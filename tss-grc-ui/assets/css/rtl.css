@@ -1,0 +1,259 @@
+/* ============================================================================
+   TSS GRC Platform — RTL (Arabic) CSS Overrides
+   Applied when:  body.rtl-layout  is set  AND  html[dir="rtl"]  is set
+   by i18n.js when the user switches to Arabic.
+   ============================================================================ */
+
+/* ── Sidebar: move to right side ────────────────────────────────────────── */
+html[dir="rtl"] .wrapper,
+body.rtl-layout  .wrapper {
+    flex-direction: row-reverse;
+}
+
+/* Sidebar inner text direction */
+html[dir="rtl"] .sidebar,
+body.rtl-layout  .sidebar {
+    direction: rtl;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+}
+
+html[dir="rtl"] .sidebar-header,
+body.rtl-layout  .sidebar-header {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .sidebar .nav-link,
+body.rtl-layout  .sidebar .nav-link {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+html[dir="rtl"] .sidebar .nav-link i,
+body.rtl-layout  .sidebar .nav-link i {
+    margin-left: 10px;
+    margin-right: 0;
+}
+
+/* Hover nudge — mirror to left for RTL */
+html[dir="rtl"] .sidebar .nav-link:hover,
+body.rtl-layout  .sidebar .nav-link:hover {
+    transform: translateX(-2px);
+}
+
+/* Active indicator bar — mirror to right side */
+html[dir="rtl"] .sidebar .nav-link.active::before,
+body.rtl-layout  .sidebar .nav-link.active::before {
+    left: auto;
+    right: -0.75rem;
+    border-radius: 2px 0 0 2px;
+}
+
+/* Sidebar footer */
+html[dir="rtl"] .sidebar-footer .d-flex,
+body.rtl-layout  .sidebar-footer .d-flex {
+    flex-direction: row-reverse;
+}
+
+/* ── Top header: flip inner content ─────────────────────────────────────── */
+html[dir="rtl"] .top-header,
+body.rtl-layout  .top-header {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] #sidebarToggle,
+body.rtl-layout  #sidebarToggle {
+    margin-right: 0;
+    margin-left: 0.75rem;
+}
+
+/* ── Notification badge position ─────────────────────────────────────────── */
+html[dir="rtl"] .notification-count,
+body.rtl-layout  .notification-count {
+    right: auto;
+    left: -4px;
+}
+
+/* ── Dropdown menus ──────────────────────────────────────────────────────── */
+html[dir="rtl"] .dropdown-menu-end,
+body.rtl-layout  .dropdown-menu-end {
+    --bs-position: start;
+}
+
+/* ── Language switcher stays LTR ─────────────────────────────────────────── */
+html[dir="rtl"] .language-switcher,
+body.rtl-layout  .language-switcher {
+    direction: ltr;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+html[dir="rtl"] .table-grc thead th,
+html[dir="rtl"] .card .table thead th,
+body.rtl-layout  .table-grc thead th,
+body.rtl-layout  .card .table thead th {
+    text-align: right;
+}
+
+html[dir="rtl"] .card .table thead th:first-child,
+body.rtl-layout  .card .table thead th:first-child {
+    border-radius: 0 var(--radius-sm) 0 0;
+}
+html[dir="rtl"] .card .table thead th:last-child,
+body.rtl-layout  .card .table thead th:last-child {
+    border-radius: var(--radius-sm) 0 0 0;
+}
+
+/* ── Form labels ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .form-label,
+body.rtl-layout  .form-label {
+    text-align: right;
+    display: block;
+}
+
+/* ── Alerts ──────────────────────────────────────────────────────────────── */
+html[dir="rtl"] .alert,
+body.rtl-layout  .alert {
+    text-align: right;
+    direction: rtl;
+}
+html[dir="rtl"] .alert .bi,
+body.rtl-layout  .alert .bi {
+    margin-right: 0;
+    margin-left: 0.5rem;
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+html[dir="rtl"] .card-header,
+body.rtl-layout  .card-header {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .page-header,
+body.rtl-layout  .page-header {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .breadcrumb,
+body.rtl-layout  .breadcrumb {
+    direction: rtl;
+    text-align: right;
+}
+
+/* ── Filter bar ──────────────────────────────────────────────────────────── */
+html[dir="rtl"] .filter-bar,
+body.rtl-layout  .filter-bar {
+    direction: rtl;
+}
+html[dir="rtl"] .filter-bar .form-label,
+body.rtl-layout  .filter-bar .form-label {
+    text-align: right;
+}
+
+/* ── Section titles ──────────────────────────────────────────────────────── */
+html[dir="rtl"] .section-title,
+body.rtl-layout  .section-title {
+    text-align: right;
+    letter-spacing: 0;
+}
+
+/* ── Pagination ──────────────────────────────────────────────────────────── */
+html[dir="rtl"] .pagination,
+body.rtl-layout  .pagination {
+    direction: rtl;
+}
+html[dir="rtl"] .pagination-bar,
+body.rtl-layout  .pagination-bar {
+    flex-direction: row-reverse;
+}
+
+/* ── Border accents — flip for RTL ──────────────────────────────────────── */
+html[dir="rtl"] .border-start-accent,
+body.rtl-layout  .border-start-accent {
+    border-left: none !important;
+    border-right: 3px solid var(--color-accent) !important;
+}
+html[dir="rtl"] .border-start-critical,
+body.rtl-layout  .border-start-critical {
+    border-left: none !important;
+    border-right: 3px solid var(--color-critical) !important;
+}
+html[dir="rtl"] .border-start-high,
+body.rtl-layout  .border-start-high {
+    border-left: none !important;
+    border-right: 3px solid var(--color-high) !important;
+}
+html[dir="rtl"] .border-start-medium,
+body.rtl-layout  .border-start-medium {
+    border-left: none !important;
+    border-right: 3px solid var(--color-medium) !important;
+}
+html[dir="rtl"] .border-start-low,
+body.rtl-layout  .border-start-low {
+    border-left: none !important;
+    border-right: 3px solid var(--color-low) !important;
+}
+
+/* ── Bootstrap margin/padding overrides ─────────────────────────────────── */
+html[dir="rtl"] .me-1, body.rtl-layout .me-1 { margin-right: 0 !important; margin-left: 0.25rem !important; }
+html[dir="rtl"] .me-2, body.rtl-layout .me-2 { margin-right: 0 !important; margin-left: 0.5rem  !important; }
+html[dir="rtl"] .me-3, body.rtl-layout .me-3 { margin-right: 0 !important; margin-left: 1rem    !important; }
+html[dir="rtl"] .ms-1, body.rtl-layout .ms-1 { margin-left:  0 !important; margin-right: 0.25rem !important; }
+html[dir="rtl"] .ms-2, body.rtl-layout .ms-2 { margin-left:  0 !important; margin-right: 0.5rem  !important; }
+html[dir="rtl"] .ms-3, body.rtl-layout .ms-3 { margin-left:  0 !important; margin-right: 1rem    !important; }
+
+/* ── Login page: mirror panels for RTL ──────────────────────────────────── */
+html[dir="rtl"] .login-page,
+body.rtl-layout  .login-page {
+    flex-direction: row-reverse;
+}
+
+/* ── Login form input groups — flip radius ───────────────────────────────── */
+html[dir="rtl"] .login-form-card .input-group-text,
+body.rtl-layout  .login-form-card .input-group-text {
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    border-right: none;
+    border-left: 1px solid var(--color-border);
+}
+html[dir="rtl"] .login-form-card .form-control,
+body.rtl-layout  .login-form-card .form-control {
+    border-right: none;
+    border-left: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    padding-right: 0.5rem;
+    padding-left: 0.875rem;
+}
+
+/* ── KPI grid — text alignment ───────────────────────────────────────────── */
+html[dir="rtl"] .kpi-card,
+body.rtl-layout  .kpi-card {
+    text-align: right;
+}
+html[dir="rtl"] .kpi-icon,
+body.rtl-layout  .kpi-icon {
+    margin-right: 0;
+    margin-left: auto;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+html[dir="rtl"] .footer,
+body.rtl-layout  .footer {
+    text-align: right;
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+html[dir="rtl"] .modal-header,
+body.rtl-layout  .modal-header {
+    flex-direction: row-reverse;
+}
+html[dir="rtl"] .modal-footer,
+body.rtl-layout  .modal-footer {
+    flex-direction: row-reverse;
+}
+
+/* ── Role pills in users page ────────────────────────────────────────────── */
+html[dir="rtl"] .role-filter-pills,
+body.rtl-layout  .role-filter-pills {
+    direction: ltr;
+    justify-content: flex-end;
+}

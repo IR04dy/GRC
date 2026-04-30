@@ -1,0 +1,115 @@
+# ============================================================================
+# TSS GRC Platform — Production Profile Configuration
+# Activate: --spring.profiles.active=prod
+# All sensitive values MUST be supplied via environment variables.
+# ============================================================================
+
+spring:
+  datasource:
+    url: ${DB_URL}                         # jdbc:sqlserver://HOST:1433;databaseName=TSS_GRC;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.yourdomain.com;sendStringParametersAsUnicode=true
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  flyway:
+    baseline-on-migrate: false             # Never baseline in production
+
+  thymeleaf:
+    cache: true                            # Enable template caching
+
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+logging:
+  level:
+    root: WARN
+    com.tss.grc: INFO
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate.SQL: ERROR
+    org.flywaydb: INFO
+  file:
+    name: /var/log/tss-grc/application.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 30
+      total-size-cap: 1GB
+
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEYSTORE_PATH}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    key-store-type: PKCS12
+    key-alias: tss-grc
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        secure: true
+        http-only: true
+        same-site: strict
+  compression:
+    enabled: true
+    mime-types: text/html,text/css,application/javascript,application/json
+    min-response-size: 2048
+  http2:
+    enabled: true
+
+grc:
+  security:
+    session-timeout-minutes: 30
+    max-login-attempts: 5
+    lockout-duration-minutes: 30
+  storage:
+    base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
+  notifications:
+    from-email: ${NOTIFY_FROM_EMAIL:noreply@tss-grc.com}
+    from-name: TSS GRC Platform
+
+springdoc:
+  swagger-ui:
+    enabled: false                         # Disable Swagger UI in production
+  api-docs:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics       # Restrict actuator endpoints in production
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+  server:
+    port: 8090                             # Actuator on separate port, not exposed publicly

@@ -1,0 +1,98 @@
+Total ops on translations.js: 6
+
+----- [0] 2026-04-23T12:37:52.145Z EDIT -----
+PATH: /c/AYMAN/Github/Claude-GRC/.claude/worktrees/quirky-borg/tss-grc-ui/assets/js/translations.js
+REPLACE_ALL: False
+OLD (67 chars):
+        'cyber.dash.openActions':    'خطط العمل المفتوحة',
+    }
+};
+NEW (2602 chars):
+        'cyber.dash.openActions':    'خطط العمل المفتوحة',
+
+        // Evidence Management (إدارة الأدلة)
+        'nav.evidence':                    'إدارة الأدلة',
+        'evidence.title':                  'إدارة الأدلة',
+        'evidence.subtitle':               'الإطار ← الضابط ← الضابط الفرعي ← الدليل',
+        'evidence.tab.overview':           'الملخص',
+        'evidence.tab.catalog':            'الكتالوج',
+        'evidence.tab.requests':           'الطلبات',
+        'evidence.tab.review':             'المراجعة',
+        'evidence.tab.expired':            'الأدلة المنتهية',
+        'e
+... [+2002 more]
+
+----- [1] 2026-04-23T12:40:20.765Z EDIT -----
+PATH: /c/AYMAN/Github/Claude-GRC/.claude/worktrees/quirky-borg/tss-grc-ui/assets/js/translations.js
+REPLACE_ALL: False
+OLD (44 chars):
+        // Risk module
+        'risk.title':
+NEW (2644 chars):
+        // Evidence Management
+        'nav.evidence':                    'Evidence Management',
+        'evidence.title':                  'Evidence Management',
+        'evidence.subtitle':               'Framework → Control → Sub-Control → Evidence',
+        'evidence.tab.overview':           'Overview',
+        'evidence.tab.catalog':            'Catalog',
+        'evidence.tab.requests':           'Requests',
+        'evidence.tab.review':             'Review & Approval',
+        'evidence.tab.expired':            'Expired Evidence',
+        'evidence.tab.reuse':              'Reuse',
+   
+... [+2044 more]
+
+----- [2] 2026-04-23T12:40:34.228Z EDIT -----
+PATH: /c/AYMAN/Github/Claude-GRC/.claude/worktrees/quirky-borg/tss-grc-ui/assets/js/translations.js
+REPLACE_ALL: False
+OLD (90 chars):
+        'label.contract.end':'Contract End',
+
+        // Risk module
+        'risk.title':
+NEW (2648 chars):
+        'label.contract.end':'Contract End',
+        'label.valid.from':  'Valid From',
+        'label.valid.to':    'Valid To',
+        'label.priority':    'Priority',
+
+        // Evidence Management
+        'nav.evidence':                    'Evidence Management',
+        'evidence.title':                  'Evidence Management',
+        'evidence.subtitle':               'Framework → Control → Sub-Control → Evidence',
+        'evidence.tab.overview':           'Overview',
+        'evidence.tab.catalog':            'Catalog',
+        'evidence.tab.requests':           'Requests',
+        'ev
+... [+2048 more]
+
+----- [3] 2026-04-29T11:34:44.932Z EDIT -----
+PATH: C:\AYMAN\Github\Claude-GRC\.claire\worktrees\quirky-borg\tss-grc-ui\assets\js\translations.js
+REPLACE_ALL: False
+OLD (49 chars):
+        'nav.tprm':           'Third Party Risk',
+NEW (95 chars):
+        'nav.tprm':           'Third Party Risk',
+        'nav.scm':            'Supply Chain',
+
+----- [4] 2026-04-29T11:34:55.354Z EDIT -----
+PATH: C:\AYMAN\Github\Claude-GRC\.claude\worktrees\quirky-borg\tss-grc-ui\assets\js\translations.js
+REPLACE_ALL: False
+OLD (91 chars):
+        'nav.tprm':           'Third Party Risk',
+        'nav.policies':       'Policies',
+NEW (137 chars):
+        'nav.tprm':           'Third Party Risk',
+        'nav.scm':            'Supply Chain',
+        'nav.policies':       'Policies',
+
+----- [5] 2026-04-29T11:34:57.163Z EDIT -----
+PATH: C:\AYMAN\Github\Claude-GRC\.claude\worktrees\quirky-borg\tss-grc-ui\assets\js\translations.js
+REPLACE_ALL: False
+OLD (96 chars):
+        'nav.tprm':           'مخاطر الجهات الخارجية',
+        'nav.policies':       'السياسات',
+NEW (143 chars):
+        'nav.tprm':           'مخاطر الجهات الخارجية',
+        'nav.scm':            'سلاسل الإمداد',
+        'nav.policies':       'السياسات',

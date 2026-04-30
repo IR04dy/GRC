@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>إدارة الأدلة — TSS GRC</title>
+
+    <link id="bootstrap-css" rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css"/>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css"/>
+
+    <style>
+        /* ── Category Cards ─────────────────────────────── */
+        .cat-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: .6rem;
+            margin-bottom: .85rem;
+        }
+        @media (max-width: 992px) { .cat-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 576px) { .cat-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .cat-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .3rem;
+            padding: .85rem .6rem .75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            background: #fff;
+            cursor: pointer;
+            transition: all .18s;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .cat-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity .18s;
+        }
+        .cat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.09); }
+        .cat-card:hover::before { opacity: .05; }
+        .cat-card.active {
+            border-width: 2.5px;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,.12);
+        }
+        .cat-card.active::before { opacity: .08; }
+
+        .cat-emoji { font-size: 1.6rem; line-height: 1; display: block; }
+        .cat-name  { font-size: .75rem; font-weight: 700; line-height: 1.3; }
+        .cat-count {
+            font-size: .68rem;
+            font-weight: 600;
+            padding: 1px 8px;
+            border-radius: 20px;
+            opacity: .85;
+        }
+
+        /* per-category colours */
+        .cat-cyber      { --cc:#0f4c35; --cb:#f0fdf4; --cbr:#bbf7d0; }
+        .cat-bcm        { --cc:#0369a1; --cb:#f0f9ff; --cbr:#bae6fd; }
+        .cat-risk       { --cc:#b45309; --cb:#fffbeb; --cbr:#fde68a; }
+        .cat-privacy    { --cc:#7c3aed; --cb:#faf5ff; --cbr:#ddd6fe; }
+        .cat-compliance { --cc:#0891b2; --cb:#ecfeff; --cbr:#a5f3fc; }
+        .cat-datagov    { --cc:#be185d; --cb:#fdf2f8; --cbr:#fbcfe8; }
+
+        .cat-card[class*="cat-"] {
+            background: var(--cb, #f8fafc);
+            border-color: var(--cbr, #e5e7eb);
+        }
+        .cat-card[class*="cat-"]::before { background: var(--cc, #374151); }
+        .cat-card[class*="cat-"].active  { border-color: var(--cc, #374151); }
+        .cat-name  { color: var(--cc, #1e293b); }
+        .cat-count { background: rgba(0,0,0,.07); color: var(--cc, #374151); }
+
+        .cat-card.disabled { opacity: .5; cursor: default; }
+        .cat-card.disabled:hover { transform: none; box-shadow: none; }
+
+        /* ── Selected Category bar ──────────────────── */
+        .selected-cat-bar {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            padding: .45rem .9rem;
+            border-radius: 8px;
+            margin-bottom: .5rem;
+            border: 1.5px solid var(--cbr, #e5e7eb);
+            background: var(--cb, #f8fafc);
+        }
+        .selected-cat-bar .cat-emoji-sm { font-size: 1.1rem; }
+        .selected-cat-bar .cat-name-sm  { font-size: .82rem; font-weight: 700; color: var(--cc, #1e293b); }
+
+        /* ── Framework tab label ─────────────────── */
+        .fw-tab-label {
+            font-size: .72rem; font-weight: 700; color: #64748b;
+            white-space: nowrap; padding: 0 .25rem;
+            display: flex; align-items: center;
+        }
+        .fw-pill-empty { font-size:.78rem; color:#94a3b8; font-style:italic; padding: .45rem .5rem; }
+
+        /* ── Placeholder ────────────────────────────── */
+        #ev-placeholder {
+            text-align: center;
+            padding: 2rem 2rem;
+            border: 2px dashed #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: #94a3b8;
+        }
+        #ev-placeholder .ph-icon { font-size: 2rem; opacity: .25; display: block; margin-bottom: .5rem; }
+        #ev-placeholder h5 { font-size: .88rem; color: #475569; margin-bottom: .2rem; }
+        #ev-placeholder p  { font-size: .78rem; margin: 0; }
+
+        /* ── Compact stats bar ───────────────────────── */
+        .ev-stats-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.85rem; }
+        .ev-stat-chip {
+            display:flex; align-items:center; gap:.65rem;
+            padding:.5rem .9rem; border-radius:9px;
+            border:1px solid #e5e7eb; background:#fff;
+            flex:1; min-width:130px;
+        }
+        .ev-stat-icon { font-size:1.3rem; opacity:.75; flex-shrink:0; }
+        .ev-stat-num  { font-size:1.55rem; font-weight:800; line-height:1; }
+        .ev-stat-label{ font-size:.7rem; color:#64748b; font-weight:600; line-height:1.2; }
+
+        /* ── Badges ─────────────────────────────────── */
+        .ev-badge-approved   { background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0; }
+        .ev-badge-draft      { background:#f1f5f9;color:#475569;border:1px solid #e2e8f0; }
+        .ev-badge-pending    { background:#fef3c7;color:#d97706;border:1px solid #fde68a; }
+        .ev-badge-rejected   { background:#fee2e2;color:#dc2626;border:1px solid #fecaca; }
+        .ev-badge-expired    { background:#fff1f2;color:#be123c;border:1px solid #fecdd3; }
+        .ev-badge-superseded { background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe; }
+        .pri-low      { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0; }
+        .pri-medium   { background:#fefce8;color:#a16207;border:1px solid #fef08a; }
+        .pri-high     { background:#fff7ed;color:#c2410c;border:1px solid #fed7aa; }
+        .pri-critical { background:#fef2f2;color:#b91c1c;border:1px solid #fecaca; }
+
+        /* ── Control tree ────────────────────────────── */
+        .ctrl-item {
+            padding:.5rem .75rem; border-radius:7px; margin-bottom:.3rem;
+            background:#f8fafc; cursor:pointer; border:1.5px solid transparent; transition:all .15s;
+        }
+        .ctrl-item:hover { background:#f0f7f4; border-color:rgba(15,76,53,.2); }
+        .ctrl-item.active { background:#e8f5ef; border-color:var(--grc-primary,#0f4c35); }
+    </style>
+</head>
+<body>
+
+<div id="app-shell"></div>
+
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <!-- ── Page Header ──────────────────────────────────────── -->
+    <div class="page-header mb-3">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="/dashboard.html">لوحة التحكم</a></li>
+                    <li class="breadcrumb-item active">إدارة الأدلة</li>
+                </ol>
+            </nav>
+            <h4>إدارة الأدلة</h4>
+            <p class="page-subtitle">اختر نطاق المعيار، ثم المعيار، ثم تصفح الأدلة</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" id="exportBtn" style="display:none">
+                <i class="bi bi-file-earmark-excel me-1"></i>تصدير
+            </button>
+            <button class="btn btn-primary btn-sm" id="uploadEvidenceBtn" style="display:none">
+                <i class="bi bi-cloud-upload me-1"></i>رفع دليل
+            </button>
+            <button class="btn btn-outline-primary btn-sm" id="requestEvidenceBtn" style="display:none">
+                <i class="bi bi-send me-1"></i>طلب دليل
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         LEVEL 1 — Category Cards
+    ══════════════════════════════════════════════════════ -->
+    <div class="cat-grid" id="catGrid">
+        <div class="cat-card cat-cyber"      onclick="selectCategory('cyber')">
+            <span class="cat-emoji">🔒</span>
+            <div class="cat-name">الأمن السيبراني</div>
+            <span class="cat-count" id="cnt-cyber">…</span>
+        </div>
+        <div class="cat-card cat-bcm"        onclick="selectCategory('bcm')">
+            <span class="cat-emoji">🔄</span>
+            <div class="cat-name">استمرارية الأعمال</div>
+            <span class="cat-count" id="cnt-bcm">…</span>
+        </div>
+        <div class="cat-card cat-risk"       onclick="selectCategory('risk')">
+            <span class="cat-emoji">⚠️</span>
+            <div class="cat-name">إدارة المخاطر</div>
+            <span class="cat-count" id="cnt-risk">…</span>
+        </div>
+        <div class="cat-card cat-privacy"    onclick="selectCategory('privacy')">
+            <span class="cat-emoji">🔏</span>
+            <div class="cat-name">حماية البيانات الشخصية</div>
+            <span class="cat-count" id="cnt-privacy">…</span>
+        </div>
+        <div class="cat-card cat-compliance" onclick="selectCategory('compliance')">
+            <span class="cat-emoji">✅</span>
+            <div class="cat-name">الامتثال والتدقيق</div>
+            <span class="cat-count" id="cnt-compliance">…</span>
+        </div>
+        <div class="cat-card cat-datagov"    onclick="selectCategory('datagov')">
+            <span class="cat-emoji">🗄️</span>
+            <div class="cat-name">حوكمة البيانات</div>
+            <span class="cat-count" id="cnt-datagov">…</span>
+        </div>
+    </div>
+
+    <!-- Placeholder (no category selected yet) -->
+    <div id="ev-placeholder">
+        <i class="bi bi-grid-3x3-gap ph-icon"></i>
+        <h5>اختر نطاقاً من الأعلى</h5>
+        <p>حدد نطاق المعيار لعرض المعايير والأدلة المرتبطة به</p>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         LEVEL 2 + 3 — Framework pills + Sub-tabs
+    ══════════════════════════════════════════════════════ -->
+    <div id="ev-content" style="display:none">
+
+        <!-- Selected category bar -->
+        <div class="selected-cat-bar" id="selCatBar">
+            <span class="cat-emoji-sm" id="selCatEmoji"></span>
+            <span class="cat-name-sm"  id="selCatName"></span>
+            <span class="badge bg-white border ms-auto" style="font-size:.72rem;color:#64748b" id="selCatFwCount"></span>
+        </div>
+
+        <!-- Framework tabs — same .tab-nav / .tab-btn style as all other pages -->
+        <div class="tab-nav mb-2" id="fwTabNav">
+            <span class="fw-tab-label"><i class="bi bi-layers me-1"></i>المعيار:</span>
+            <div id="fwPillsWrap" class="d-flex" style="gap:4px;flex-wrap:nowrap;overflow-x:auto"></div>
+        </div>
+
+        <!-- Sub-tabs — standard .tab-nav / .tab-btn matching all other pages -->
+        <div id="sub-area" style="display:none">
+            <div class="tab-nav mb-3" id="subTabNav">
+                <button class="tab-btn active" data-tab="overview"><i class="bi bi-grid-1x2 me-1"></i>الملخص</button>
+                <button class="tab-btn" data-tab="catalog"><i class="bi bi-collection me-1"></i>الكتالوج</button>
+                <button class="tab-btn" data-tab="requests"><i class="bi bi-send me-1"></i>الطلبات</button>
+                <button class="tab-btn" data-tab="review"><i class="bi bi-clipboard-check me-1"></i>المراجعة</button>
+                <button class="tab-btn" data-tab="expired"><i class="bi bi-clock-history me-1"></i>المنتهية</button>
+                <button class="tab-btn" data-tab="controls"><i class="bi bi-diagram-3 me-1"></i>الضوابط</button>
+                <button class="tab-btn" data-tab="reuse"><i class="bi bi-arrow-repeat me-1"></i>إعادة الاستخدام</button>
+                <button class="tab-btn" data-tab="reports"><i class="bi bi-bar-chart me-1"></i>التقارير</button>
+            </div>
+
+            <!-- ── Overview ────────────────────────────────────── -->
+            <div id="sub-overview">
+                <div class="ev-stats-bar" id="statsRow">
+                    <div class="ev-stat-chip"><div class="skeleton" style="height:36px;width:100%"></div></div>
+                    <div class="ev-stat-chip"><div class="skeleton" style="height:36px;width:100%"></div></div>
+                    <div class="ev-stat-chip"><div class="skeleton" style="height:36px;width:100%"></div></div>
+                    <div class="ev-stat-chip"><div class="skeleton" style="height:36px;width:100%"></div></div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-collection text-primary me-1"></i><strong>أحدث الأدلة</strong></div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead><tr><th>الكود</th><th>العنوان</th><th>النوع</th><th>الحالة</th></tr></thead>
+                                    <tbody id="recentEvidenceBody">
+                                        <tr><td colspan="4"><div class="skeleton" style="height:34px"></div></td></tr>
+                                        <tr><td colspan="4"><div class="skeleton" style="height:34px;opacity:.6"></div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-bell text-warning me-1"></i><strong>الطلبات المفتوحة</strong></div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead><tr><th>الرقم</th><th>الطلب</th><th>الأولوية</th><th>التاريخ</th></tr></thead>
+                                    <tbody id="openRequestsBody">
+                                        <tr><td colspan="4"><div class="skeleton" style="height:34px"></div></td></tr>
+                                        <tr><td colspan="4"><div class="skeleton" style="height:34px;opacity:.6"></div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Catalog ─────────────────────────────────────── -->
+            <div id="sub-catalog" style="display:none">
+                <div class="filter-bar">
+                    <div>
+                        <label class="form-label">الحالة</label>
+                        <select class="form-select form-select-sm" id="catalogStatus" style="min-width:130px">
+                            <option value="">الكل</option>
+                            <option value="DRAFT">مسودة</option>
+                            <option value="PENDING_REVIEW">قيد المراجعة</option>
+                            <option value="APPROVED">معتمد</option>
+                            <option value="REJECTED">مرفوض</option>
+                            <option value="EXPIRED">منتهي</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">النوع</label>
+                        <select class="form-select form-select-sm" id="catalogType" style="min-width:130px">
+                            <option value="">الكل</option>
+                            <option value="POLICY">سياسة</option>
+                            <option value="PROCEDURE">إجراء</option>
+                            <option value="LOG">سجل</option>
+                            <option value="ASSESSMENT">تقييم</option>
+                            <option value="TEST">اختبار</option>
+                            <option value="AUDIT">مراجعة</option>
+                            <option value="CERTIFICATE">شهادة</option>
+                            <option value="DOCUMENT">وثيقة</option>
+                        </select>
+                    </div>
+                    <div class="flex-grow-1" style="min-width:180px">
+                        <label class="form-label">بحث</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="catalogSearch" placeholder="ابحث…"/>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-end">
+                        <button class="btn btn-outline-secondary btn-sm" id="clearCatalogFilters">
+                            <i class="bi bi-x-circle me-1"></i>مسح
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr>
+                                <th style="width:100px">الكود</th>
+                                <th>العنوان</th>
+                                <th style="width:110px">النوع</th>
+                                <th>الضابط الفرعي</th>
+                                <th style="width:110px">صالح حتى</th>
+                                <th style="width:115px">الحالة</th>
+                                <th style="width:100px" class="text-center">إجراءات</th>
+                            </tr></thead>
+                            <tbody id="catalogBody">
+                                <tr><td colspan="7"><div class="skeleton" style="height:38px"></div></td></tr>
+                                <tr><td colspan="7"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Requests ────────────────────────────────────── -->
+            <div id="sub-requests" style="display:none">
+                <div class="filter-bar">
+                    <div>
+                        <label class="form-label">الحالة</label>
+                        <select class="form-select form-select-sm" id="reqStatus" style="min-width:130px">
+                            <option value="">الكل</option>
+                            <option value="OPEN">مفتوح</option>
+                            <option value="IN_PROGRESS">جارٍ</option>
+                            <option value="SUBMITTED">مقدّم</option>
+                            <option value="APPROVED">معتمد</option>
+                            <option value="REJECTED">مرفوض</option>
+                            <option value="CLOSED">مغلق</option>
+                        </select>
+                    </div>
+                    <div class="d-flex align-items-end ms-auto">
+                        <button class="btn btn-primary btn-sm" id="newRequestBtn">
+                            <i class="bi bi-plus-lg me-1"></i>طلب جديد
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr>
+                                <th style="width:110px">رقم الطلب</th>
+                                <th>الطلب</th>
+                                <th>الضابط الفرعي</th>
+                                <th style="width:110px">تاريخ الاستحقاق</th>
+                                <th style="width:95px">الأولوية</th>
+                                <th style="width:115px">الحالة</th>
+                                <th style="width:100px" class="text-center">إجراءات</th>
+                            </tr></thead>
+                            <tbody id="requestsBody">
+                                <tr><td colspan="7"><div class="skeleton" style="height:38px"></div></td></tr>
+                                <tr><td colspan="7"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Review ──────────────────────────────────────── -->
+            <div id="sub-review" style="display:none">
+                <div class="filter-bar">
+                    <div>
+                        <label class="form-label">الحالة</label>
+                        <select class="form-select form-select-sm" id="reviewStatus" style="min-width:130px">
+                            <option value="">الكل</option>
+                            <option value="PENDING">معلق</option>
+                            <option value="IN_REVIEW">قيد المراجعة</option>
+                            <option value="COMPLETED">مكتمل</option>
+                        </select>
+                    </div>
+                    <div class="d-flex align-items-end ms-auto">
+                        <button class="btn btn-primary btn-sm" id="newReviewBtn">
+                            <i class="bi bi-plus-lg me-1"></i>بدء مراجعة
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr>
+                                <th>الدليل</th>
+                                <th style="width:140px">المراجع</th>
+                                <th style="width:110px">تاريخ المراجعة</th>
+                                <th style="width:130px">النتيجة</th>
+                                <th>الملاحظات</th>
+                                <th style="width:115px">الحالة</th>
+                                <th style="width:110px" class="text-center">إجراءات</th>
+                            </tr></thead>
+                            <tbody id="reviewBody">
+                                <tr><td colspan="7"><div class="skeleton" style="height:38px"></div></td></tr>
+                                <tr><td colspan="7"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Expired ─────────────────────────────────────── -->
+            <div id="sub-expired" style="display:none">
+                <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>هذه الأدلة تجاوزت تاريخ صلاحيتها وتحتاج إلى تجديد أو أرشفة.</span>
+                </div>
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr>
+                                <th style="width:100px">الكود</th>
+                                <th>العنوان</th>
+                                <th>الضابط الفرعي</th>
+                                <th style="width:110px">النوع</th>
+                                <th style="width:115px">انتهى في</th>
+                                <th style="width:110px" class="text-center">إجراءات</th>
+                            </tr></thead>
+                            <tbody id="expiredBody">
+                                <tr><td colspan="6"><div class="skeleton" style="height:38px"></div></td></tr>
+                                <tr><td colspan="6"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Controls Tree ───────────────────────────────── -->
+            <div id="sub-controls" style="display:none">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card h-100">
+                            <div class="card-header d-flex align-items-center gap-2">
+                                <i class="bi bi-list-nested text-success"></i>
+                                <strong>الضوابط</strong>
+                            </div>
+                            <div class="card-body p-2" id="controlTree"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-8 col-lg-9">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <strong id="controlDetailTitle">اختر ضابطاً من القائمة</strong>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead><tr>
+                                            <th>الضابط الفرعي</th><th>الدليل</th>
+                                            <th style="width:110px">النوع</th>
+                                            <th style="width:110px">الحالة</th>
+                                            <th style="width:100px">صالح حتى</th>
+                                        </tr></thead>
+                                        <tbody id="controlDetailBody">
+                                            <tr><td colspan="5" class="text-center text-muted py-5">
+                                                <i class="bi bi-diagram-3" style="font-size:2.5rem;opacity:.2;display:block;margin-bottom:.75rem"></i>
+                                                اختر ضابطاً لعرض الأدلة المرتبطة
+                                            </td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Reuse ───────────────────────────────────────── -->
+            <div id="sub-reuse" style="display:none">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <i class="bi bi-arrow-repeat text-info"></i>
+                        <strong>إعادة استخدام الأدلة المعتمدة</strong>
+                        <span class="text-muted ms-2" style="font-size:.8rem">الأدلة المعتمدة يمكن ربطها بوحدات متعددة دون تكرار</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr>
+                                <th>الدليل</th>
+                                <th>الضابط الفرعي</th>
+                                <th style="width:110px">الحالة</th>
+                                <th style="width:190px">مرتبط بـ</th>
+                                <th style="width:110px" class="text-center">إجراءات</th>
+                            </tr></thead>
+                            <tbody id="reuseBody">
+                                <tr><td colspan="5"><div class="skeleton" style="height:38px"></div></td></tr>
+                                <tr><td colspan="5"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Reports ─────────────────────────────────────── -->
+            <div id="sub-reports" style="display:none">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-5">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-pie-chart-fill text-success me-1"></i><strong>الأدلة حسب الحالة</strong></div>
+                            <div class="card-body" style="height:250px;position:relative">
+                                <canvas id="statusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-bar-chart-fill text-primary me-1"></i><strong>تغطية الضوابط الفرعية</strong></div>
+                            <div class="card-body" style="height:250px;position:relative">
+                                <canvas id="coverageChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-bar-chart text-warning me-1"></i><strong>الأدلة حسب النوع</strong></div>
+                            <div class="card-body" style="height:220px;position:relative">
+                                <canvas id="typeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-calendar-event text-danger me-1"></i><strong>توقعات انتهاء الصلاحية</strong></div>
+                            <div class="card-body py-3 text-center text-muted">
+                                <i class="bi bi-calendar-event" style="font-size:2rem;opacity:.25;display:block;margin-bottom:.5rem"></i>
+                                <span style="font-size:.82rem">قيد التطوير — الإصدار القادم</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /sub-area -->
+    </div><!-- /ev-content -->
+
+</main>
+
+<!-- ════ MODAL: Upload Evidence ══════════════════════════════ -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cloud-upload me-2"></i>رفع دليل</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span id="uploadCtxNote">اختر معياراً أولاً</span>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-12">
+                        <label class="form-label fw-600">العنوان (EN) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="evTitleEn" placeholder="Evidence title in English"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600">العنوان (AR)</label>
+                        <input type="text" class="form-control" id="evTitleAr" placeholder="عنوان الدليل بالعربية" dir="rtl"/>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">نوع الدليل <span class="text-danger">*</span></label>
+                        <select class="form-select" id="evType">
+                            <option value="POLICY">سياسة</option>
+                            <option value="PROCEDURE">إجراء</option>
+                            <option value="LOG">سجل</option>
+                            <option value="ASSESSMENT">تقرير تقييم</option>
+                            <option value="TEST">نتيجة اختبار</option>
+                            <option value="AUDIT">تقرير مراجعة</option>
+                            <option value="CERTIFICATE">شهادة</option>
+                            <option value="DOCUMENT" selected>وثيقة</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">الضابط الفرعي</label>
+                        <select class="form-select" id="evSubControl">
+                            <option value="">— اختر الضابط الفرعي —</option>
+                        </select>
+                        <div class="form-text text-success" id="evSubHint" style="font-size:.72rem"></div>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">صالح من</label>
+                        <input type="date" class="form-control" id="evValidFrom"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">صالح حتى</label>
+                        <input type="date" class="form-control" id="evValidTo"/>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label fw-600">الوصف</label>
+                    <textarea class="form-control" id="evDescription" rows="2" placeholder="وصف مختصر للدليل…"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="saveEvidenceBtn">
+                    <i class="bi bi-floppy me-1"></i>حفظ
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════ MODAL: Request Evidence ═════════════════════════════ -->
+<div class="modal fade" id="requestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-send me-2"></i>طلب دليل</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span id="requestCtxNote">اختر معياراً أولاً</span>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-600">عنوان الطلب <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="reqTitleEn" placeholder="ما الدليل المطلوب؟"/>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">الضابط الفرعي</label>
+                        <select class="form-select" id="reqSubControl">
+                            <option value="">— اختر الضابط الفرعي —</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-600">الأولوية</label>
+                        <select class="form-select" id="reqPriority">
+                            <option value="LOW">منخفضة</option>
+                            <option value="MEDIUM" selected>متوسطة</option>
+                            <option value="HIGH">عالية</option>
+                            <option value="CRITICAL">حرجة</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-600">تاريخ الاستحقاق</label>
+                    <input type="date" class="form-control" id="reqDueDate"/>
+                </div>
+                <div>
+                    <label class="form-label fw-600">التعليمات</label>
+                    <textarea class="form-control" id="reqDescription" rows="3" placeholder="ما هو الدليل المطلوب وكيفية تقديمه؟"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="saveRequestBtn">
+                    <i class="bi bi-send me-1"></i>إرسال
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════ MODAL: Start Review ═════════════════════════════════ -->
+<div class="modal fade" id="startReviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clipboard-plus me-2"></i>بدء مراجعة دليل</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-600">الدليل المراد مراجعته <span class="text-danger">*</span></label>
+                    <select class="form-select" id="reviewEvidenceSel">
+                        <option value="">— اختر الدليل —</option>
+                    </select>
+                    <div class="form-text">يعرض الأدلة قيد المراجعة والمعتمدة للمعيار المحدد</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-600">تاريخ المراجعة</label>
+                    <input type="date" class="form-control" id="reviewStartDate"/>
+                </div>
+                <div>
+                    <label class="form-label fw-600">ملاحظات أولية</label>
+                    <textarea class="form-control" id="reviewStartNotes" rows="2" placeholder="ملاحظات مبدئية للمراجعة…"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirmStartReviewBtn">
+                    <i class="bi bi-clipboard-check me-1"></i>بدء المراجعة
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════ MODAL: Link Evidence ════════════════════════════════ -->
+<div class="modal fade" id="linkModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>ربط الدليل بوحدة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="linkEvidenceId"/>
+                <div class="alert alert-info py-2 d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span id="linkEvidenceName" style="font-size:.85rem">—</span>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-600">الوحدة <span class="text-danger">*</span></label>
+                    <select class="form-select" id="linkModule">
+                        <option value="RISK">إدارة المخاطر</option>
+                        <option value="COMPLIANCE">الامتثال والتدقيق</option>
+                        <option value="CYBER">الأمن السيبراني</option>
+                        <option value="BCM">استمرارية الأعمال</option>
+                        <option value="AUDIT">التدقيق الداخلي</option>
+                        <option value="TPRM">مخاطر الأطراف الثالثة</option>
+                        <option value="INCIDENT">إدارة الحوادث</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-600">رقم السجل (اختياري)</label>
+                    <input type="number" class="form-control" id="linkEntityId" placeholder="ID السجل المرتبط"/>
+                    <div class="form-text">اتركه فارغاً لربط الدليل بالوحدة بشكل عام</div>
+                </div>
+                <div>
+                    <label class="form-label fw-600">ملاحظات</label>
+                    <input type="text" class="form-control" id="linkNotes" placeholder="سبب الربط…"/>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirmLinkBtn">
+                    <i class="bi bi-link-45deg me-1"></i>ربط
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════ MODAL: Complete Review ══════════════════════════════ -->
+<div class="modal fade" id="reviewCompleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clipboard-check me-2"></i>إتمام المراجعة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reviewCompleteId"/>
+                <div class="mb-3">
+                    <label class="form-label fw-600">النتيجة <span class="text-danger">*</span></label>
+                    <select class="form-select" id="reviewResult">
+                        <option value="APPROVED">معتمد</option>
+                        <option value="REJECTED">مرفوض</option>
+                        <option value="NEEDS_REVISION">يحتاج مراجعة</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label fw-600">الملاحظات</label>
+                    <textarea class="form-control" id="reviewNotes" rows="3" placeholder="تعليقات المراجع…"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirmReviewBtn">
+                    <i class="bi bi-check-lg me-1"></i>تأكيد
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+
+<script>
+(function () {
+    'use strict';
+
+    // ══════════════════════════════════════════════════════════
+    // Category definitions — map NCA framework codes to module
+    // ══════════════════════════════════════════════════════════
+    const CATS = {
+        cyber:      { emoji:'🔒', nameAr:'الأمن السيبراني',         cssVar:'--cc:#0f4c35;--cb:#f0fdf4;--cbr:#bbf7d0', prefixes:['ECC','CSCC','TW'] },
+        bcm:        { emoji:'🔄', nameAr:'استمرارية الأعمال',       cssVar:'--cc:#0369a1;--cb:#f0f9ff;--cbr:#bae6fd', prefixes:['BCM','BIA'] },
+        risk:       { emoji:'⚠️', nameAr:'إدارة المخاطر',           cssVar:'--cc:#b45309;--cb:#fffbeb;--cbr:#fde68a', prefixes:['ERM','RISK'] },
+        privacy:    { emoji:'🔏', nameAr:'حماية البيانات الشخصية', cssVar:'--cc:#7c3aed;--cb:#faf5ff;--cbr:#ddd6fe', prefixes:['DCC','PDPL','PDP'] },
+        compliance: { emoji:'✅', nameAr:'الامتثال والتدقيق',       cssVar:'--cc:#0891b2;--cb:#ecfeff;--cbr:#a5f3fc', prefixes:['CMP','COMP','AUD'] },
+        datagov:    { emoji:'🗄️', nameAr:'حوكمة البيانات',          cssVar:'--cc:#be185d;--cb:#fdf2f8;--cbr:#fbcfe8', prefixes:['DGV','DG','DATA'] },
+    };
+
+    function catForFramework(fw) {
+        const code = (fw.code||'').toUpperCase();
+        for (const [key, cat] of Object.entries(CATS)) {
+            if (cat.prefixes.some(p => code.startsWith(p))) return key;
+        }
+        return 'cyber'; // fallback
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // State
+    // ══════════════════════════════════════════════════════════
+    let allFrameworks  = [];          // from API
+    let fwByCategory   = {};          // { cyber:[fw,...], bcm:[fw,...], ... }
+    let selectedCatId  = null;
+    let selectedFw     = null;
+    let activeSubTab   = 'overview';
+    let searchTimer    = null;
+    let statusChartInst=null, coverageChartInst=null, typeChartInst=null;
+
+    const ALL_SUB_TABS = ['overview','catalog','requests','review','expired','controls','reuse','reports'];
+
+    const uploadModal      = new bootstrap.Modal(document.getElementById('uploadModal'));
+    const requestModal     = new bootstrap.Modal(document.getElementById('requestModal'));
+    const startReviewModal = new bootstrap.Modal(document.getElementById('startReviewModal'));
+    const linkModal        = new bootstrap.Modal(document.getElementById('linkModal'));
+    const reviewModal      = new bootstrap.Modal(document.getElementById('reviewCompleteModal'));
+
+    // ══════════════════════════════════════════════════════════
+    // Helpers
+    // ══════════════════════════════════════════════════════════
+    const S = id => document.getElementById(id);
+
+    function evBadge(status) {
+        const c = {APPROVED:'approved',DRAFT:'draft',PENDING_REVIEW:'pending',
+                   REJECTED:'rejected',EXPIRED:'expired',SUPERSEDED:'superseded'};
+        const l = {APPROVED:'معتمد',DRAFT:'مسودة',PENDING_REVIEW:'قيد المراجعة',
+                   REJECTED:'مرفوض',EXPIRED:'منتهي',SUPERSEDED:'محل',ARCHIVED:'مؤرشف'};
+        return `<span class="badge ev-badge-${c[status]||'draft'}" style="font-size:.72rem">${l[status]||status}</span>`;
+    }
+    function priBadge(p) {
+        const pc=(p||'').toLowerCase();
+        const ar={LOW:'منخفض',MEDIUM:'متوسط',HIGH:'عالي',CRITICAL:'حرج'};
+        return `<span class="badge pri-${pc}" style="font-size:.72rem">${ar[p]||p||''}</span>`;
+    }
+    function rvBadge(r) {
+        if (!r) return '<span class="badge bg-light text-muted border" style="font-size:.72rem">—</span>';
+        const c={APPROVED:'#dcfce7;color:#16a34a',REJECTED:'#fee2e2;color:#dc2626',NEEDS_REVISION:'#fef3c7;color:#d97706'};
+        const ar={APPROVED:'معتمد',REJECTED:'مرفوض',NEEDS_REVISION:'يحتاج مراجعة'};
+        return `<span class="badge" style="background:${c[r]||'#f1f5f9;color:#475569'};font-size:.72rem;border:1px solid #e5e7eb">${ar[r]||r}</span>`;
+    }
+    function fmtD(d) { return d ? d.substring(0,10) : '—'; }
+    function empty(cols,icon,msg) {
+        return `<tr><td colspan="${cols}"><div class="empty-state py-4">
+            <i class="bi bi-${icon} empty-state-icon"></i><h5>${msg}</h5>
+        </div></td></tr>`;
+    }
+    function errRow(cols,msg) {
+        return `<tr><td colspan="${cols}"><div class="empty-state py-3">
+            <i class="bi bi-wifi-off empty-state-icon"></i><p>${msg}</p>
+        </div></td></tr>`;
+    }
+    function scIds() {
+        if (!selectedFw) return new Set();
+        const s = new Set();
+        (selectedFw.controls||[]).forEach(c => (c.subControls||[]).forEach(sc => s.add(sc.id)));
+        return s;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Init — load frameworks then update counts
+    // ══════════════════════════════════════════════════════════
+    async function init() {
+        try {
+            allFrameworks = await Api.get('/evidence/frameworks');
+        } catch(_) { allFrameworks = []; }
+
+        // Group by category
+        fwByCategory = { cyber:[], bcm:[], risk:[], privacy:[], compliance:[], datagov:[] };
+        allFrameworks.forEach(fw => {
+            const cat = catForFramework(fw);
+            if (fwByCategory[cat]) fwByCategory[cat].push(fw);
+            else fwByCategory.cyber.push(fw); // fallback
+        });
+
+        // Update counts on cards
+        Object.keys(CATS).forEach(key => {
+            const cnt = S(`cnt-${key}`);
+            if (!cnt) return;
+            const n = (fwByCategory[key]||[]).length;
+            cnt.textContent = n > 0 ? `${n} معيار` : 'قريباً';
+            if (n === 0) {
+                cnt.closest('.cat-card')?.classList.add('disabled');
+                cnt.closest('.cat-card')?.removeAttribute('onclick');
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Level 1 — Select category
+    // ══════════════════════════════════════════════════════════
+    window.selectCategory = function(catId) {
+        const cat = CATS[catId];
+        if (!cat) return;
+        const fws = fwByCategory[catId] || [];
+        if (!fws.length) return; // disabled
+
+        selectedCatId = catId;
+        selectedFw    = null;
+        activeSubTab  = 'overview';
+
+        // Highlight card
+        document.querySelectorAll('.cat-card').forEach(c => c.classList.remove('active'));
+        document.querySelector(`.cat-card.cat-${catId}`)?.classList.add('active');
+
+        // Update selected-cat bar with category colours
+        const bar = S('selCatBar');
+        bar.style.cssText = fwStyleFor(catId);
+        S('selCatEmoji').textContent = cat.emoji;
+        S('selCatName').textContent  = cat.nameAr;
+        S('selCatFwCount').textContent = `${fws.length} معيار`;
+
+        // Build framework tabs using standard tab-btn style
+        const wrap = S('fwPillsWrap');
+        if (fws.length === 0) {
+            wrap.innerHTML = `<span class="fw-pill-empty">لا توجد معايير مضافة بعد</span>`;
+        } else {
+            wrap.innerHTML = fws.map(fw =>
+                `<button class="tab-btn" data-fw-id="${fw.id}" onclick="selectFramework(${fw.id})">${fw.code}</button>`
+            ).join('');
+        }
+
+        // Hide sub-area until a framework is picked
+        S('sub-area').style.display = 'none';
+
+        // Show/hide header buttons
+        S('exportBtn').style.display      = '';
+        S('uploadEvidenceBtn').style.display  = '';
+        S('requestEvidenceBtn').style.display = '';
+
+        // Show content area, hide placeholder
+        S('ev-placeholder').style.display = 'none';
+        S('ev-content').style.display     = '';
+
+        // Auto-select if only one framework
+        if (fws.length === 1) selectFramework(fws[0].id);
+    };
+
+    function fwStyleFor(catId) {
+        const map = {
+            cyber:      'border-color:#bbf7d0;background:#f0fdf4',
+            bcm:        'border-color:#bae6fd;background:#f0f9ff',
+            risk:       'border-color:#fde68a;background:#fffbeb',
+            privacy:    'border-color:#ddd6fe;background:#faf5ff',
+            compliance: 'border-color:#a5f3fc;background:#ecfeff',
+            datagov:    'border-color:#fbcfe8;background:#fdf2f8',
+        };
+        return map[catId]||'';
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Level 2 — Select framework
+    // ══════════════════════════════════════════════════════════
+    window.selectFramework = function(fwId) {
+        selectedFw = allFrameworks.find(f => f.id === fwId) || null;
+        if (!selectedFw) return;
+
+        // Activate framework tab
+        document.querySelectorAll('#fwPillsWrap .tab-btn').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('#fwPillsWrap .tab-btn').forEach(p => {
+            if (parseInt(p.dataset.fwId) === fwId) p.classList.add('active');
+        });
+
+        // Populate dropdowns (framework-scoped)
+        populateSubControlDropdowns();
+
+        // Update modal notes
+        const note = `المعيار: ${selectedFw.code} — ${selectedFw.nameEn||selectedFw.nameAr||''}`;
+        S('uploadCtxNote').textContent  = note;
+        S('requestCtxNote').textContent = note;
+
+        // Build control tree
+        buildControlTree();
+
+        // Reset sub-tabs to overview
+        document.querySelectorAll('#subTabNav .tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('#subTabNav .tab-btn[data-tab="overview"]')?.classList.add('active');
+        activeSubTab = 'overview';
+
+        // Show sub-area
+        S('sub-area').style.display = '';
+        loadSubTab('overview');
+    };
+
+    function populateSubControlDropdowns() {
+        const evSel  = S('evSubControl');
+        const reqSel = S('reqSubControl');
+        evSel.innerHTML  = '<option value="">— اختر الضابط الفرعي —</option>';
+        reqSel.innerHTML = '<option value="">— اختر الضابط الفرعي —</option>';
+        if (!selectedFw) return;
+        let total = 0;
+        (selectedFw.controls||[]).forEach(ctrl => {
+            const og1 = document.createElement('optgroup');
+            const og2 = document.createElement('optgroup');
+            og1.label = og2.label = `${ctrl.controlCode||ctrl.code||''} — ${ctrl.nameEn||ctrl.nameAr||''}`;
+            (ctrl.subControls||[]).forEach(sc => {
+                const lbl = `[${sc.subControlCode||sc.code}] ${sc.nameEn||sc.nameAr||''}`;
+                og1.appendChild(new Option(lbl, sc.id));
+                og2.appendChild(new Option(lbl, sc.id));
+                total++;
+            });
+            evSel.appendChild(og1); reqSel.appendChild(og2);
+        });
+        S('evSubHint').textContent = `${total} ضابط فرعي من ${selectedFw.code}`;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Level 3 — Sub-tab switching
+    // ══════════════════════════════════════════════════════════
+    document.querySelectorAll('#subTabNav .tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('#subTabNav .tab-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            loadSubTab(this.dataset.tab);
+        });
+    });
+
+    function loadSubTab(tab) {
+        activeSubTab = tab;
+        ALL_SUB_TABS.forEach(t => { const el = S('sub-'+t); if(el) el.style.display = t===tab?'':'none'; });
+        if (!selectedFw) return;
+        if (tab==='overview')  loadOverview();
+        if (tab==='catalog')   loadCatalog();
+        if (tab==='requests')  loadRequests();
+        if (tab==='review')    loadReviews();
+        if (tab==='expired')   loadExpired();
+        if (tab==='reuse')     loadReuse();
+        if (tab==='reports')   loadReports();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Sub-tab loaders
+    // ══════════════════════════════════════════════════════════
+
+    async function loadOverview() {
+        try {
+            const [allItems, allReqs] = await Promise.all([
+                Api.page('/evidence/items', {page:0, size:200, sort:'createdAt,desc'}),
+                Api.page('/evidence/requests', {page:0, size:200, sort:'createdAt,desc'}),
+            ]);
+            const fwCode = selectedFw.code;
+            const items = (allItems?.content??[]).filter(e => e.frameworkCode===fwCode);
+            const localScIds = scIds();
+            const reqs  = (allReqs?.content??[]).filter(r => !r.subControlId || localScIds.has(r.subControlId));
+            const stats = {
+                totalEvidence: items.length,
+                approved:      items.filter(e=>e.status==='APPROVED').length,
+                pendingReview: items.filter(e=>e.status==='PENDING_REVIEW').length,
+                expired:       items.filter(e=>e.status==='EXPIRED'||e.isExpired).length,
+            };
+            renderStats(stats);
+            renderRecentEvidence(items.slice(0,6));
+            renderOpenRequests(reqs.filter(r=>r.status==='OPEN').slice(0,6));
+        } catch(e) { console.error(e); }
+    }
+
+    function renderStats(s) {
+        const chips = [
+            { label:'إجمالي الأدلة', value:s.totalEvidence, color:'var(--grc-primary,#0f4c35)', icon:'bi-file-earmark-check', bg:'#f0fdf4' },
+            { label:'معتمدة',        value:s.approved,      color:'#16a34a',  icon:'bi-check-circle',       bg:'#f0fdf4' },
+            { label:'قيد المراجعة', value:s.pendingReview, color:'#d97706',  icon:'bi-hourglass-split',    bg:'#fffbeb' },
+            { label:'منتهية',       value:s.expired,       color:'#dc2626',  icon:'bi-exclamation-circle', bg:'#fff5f5' },
+        ];
+        S('statsRow').innerHTML = chips.map(c =>
+            `<div class="ev-stat-chip" style="border-color:${c.color}22;background:${c.bg}">
+                <i class="bi ${c.icon} ev-stat-icon" style="color:${c.color}"></i>
+                <div>
+                    <div class="ev-stat-num" style="color:${c.color}">${c.value}</div>
+                    <div class="ev-stat-label">${c.label}</div>
+                </div>
+            </div>`
+        ).join('');
+    }
+
+    function renderRecentEvidence(items) {
+        const t = S('recentEvidenceBody');
+        if (!items.length) { t.innerHTML = empty(4,'folder2-open','لا توجد أدلة بعد'); return; }
+        t.innerHTML = items.map(e => `<tr>
+            <td><span class="fw-600 text-accent" style="font-size:.8rem">${e.evidenceCode||'—'}</span></td>
+            <td style="max-width:180px"><div class="fw-500 text-truncate">${e.titleEn||e.titleAr||'—'}</div></td>
+            <td><span class="badge bg-light text-dark border" style="font-size:.72rem">${e.evidenceType}</span></td>
+            <td>${evBadge(e.status)}</td>
+        </tr>`).join('');
+    }
+
+    function renderOpenRequests(reqs) {
+        const t = S('openRequestsBody');
+        if (!reqs.length) { t.innerHTML = empty(4,'inbox','لا توجد طلبات مفتوحة'); return; }
+        t.innerHTML = reqs.map(r => {
+            const od = r.dueDate && new Date(r.dueDate) < new Date();
+            return `<tr>
+                <td><span class="fw-600 text-accent" style="font-size:.8rem">${r.requestCode||'—'}</span></td>
+                <td style="max-width:180px"><div class="fw-500 text-truncate">${r.titleEn||r.titleAr||'—'}</div></td>
+                <td>${priBadge(r.priority)}</td>
+                <td><span style="font-size:.82rem;${od?'color:#dc2626;font-weight:600':''}">${fmtD(r.dueDate)}</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function loadCatalog() {
+        const t = S('catalogBody');
+        t.innerHTML = `<tr><td colspan="7"><div class="skeleton" style="height:38px"></div></td></tr>`.repeat(3);
+        const status = S('catalogStatus').value;
+        const type   = S('catalogType').value;
+        const search = S('catalogSearch').value.trim().toLowerCase();
+        try {
+            const data = await Api.page('/evidence/items', {page:0, size:200, sort:'createdAt,desc',
+                ...(status?{status}:{}), ...(type?{type}:{})});
+            let items = (data?.content??[]).filter(e => e.frameworkCode===selectedFw.code);
+            if (search) items = items.filter(e =>
+                (e.titleEn||'').toLowerCase().includes(search)||
+                (e.titleAr||'').toLowerCase().includes(search)||
+                (e.evidenceCode||'').toLowerCase().includes(search));
+            if (!items.length) { t.innerHTML = empty(7,'folder2-open','لا توجد أدلة — ارفع دليلاً أو عدّل الفلتر'); return; }
+            t.innerHTML = items.map(e => `<tr>
+                <td><span class="fw-600 text-accent" style="font-size:.8rem">${e.evidenceCode}</span></td>
+                <td>
+                    <div class="fw-500" style="max-width:210px" title="${e.titleEn||''}">${e.titleEn||e.titleAr||'—'}</div>
+                    ${e.titleAr?`<div class="text-muted" style="font-size:.72rem">${e.titleAr}</div>`:''}
+                </td>
+                <td><span class="badge bg-light text-dark border" style="font-size:.72rem">${e.evidenceType}</span></td>
+                <td style="font-size:.8rem">${e.subControlCode||'—'}</td>
+                <td><span style="font-size:.82rem;${e.isExpired?'color:#dc2626;font-weight:600':''}">${fmtD(e.validTo)}</span></td>
+                <td>${evBadge(e.status)}</td>
+                <td class="text-center table-actions">
+                    <div class="d-flex justify-content-center gap-1">
+                        ${e.status==='DRAFT'?`<button class="btn btn-sm btn-outline-primary action-btn" onclick="submitEvidence(${e.id})" title="إرسال للمراجعة"><i class="bi bi-send"></i></button>`:''}
+                        ${e.status==='PENDING_REVIEW'?`<button class="btn btn-sm btn-outline-success action-btn" onclick="approveEvidence(${e.id})" title="اعتماد"><i class="bi bi-check-lg"></i></button>`:''}
+                        <button class="btn btn-sm btn-outline-danger action-btn" onclick="deleteEvidence(${e.id})" title="حذف"><i class="bi bi-trash"></i></button>
+                    </div>
+                </td>
+            </tr>`).join('');
+        } catch(err) { t.innerHTML = errRow(7, err.message); }
+    }
+
+    async function loadRequests() {
+        const t = S('requestsBody');
+        t.innerHTML = `<tr><td colspan="7"><div class="skeleton" style="height:38px"></div></td></tr>`.repeat(2);
+        const status = S('reqStatus').value;
+        const localScIds = scIds();
+        try {
+            const data = await Api.page('/evidence/requests', {page:0, size:200, sort:'createdAt,desc',
+                ...(status?{status}:{})});
+            let reqs = (data?.content??[]).filter(r => !r.subControlId || localScIds.has(r.subControlId));
+            if (!reqs.length) { t.innerHTML = empty(7,'inbox','لا توجد طلبات'); return; }
+            t.innerHTML = reqs.map(r => {
+                const od = r.dueDate && r.status==='OPEN' && new Date(r.dueDate)<new Date();
+                return `<tr>
+                    <td><span class="fw-600 text-accent" style="font-size:.8rem">${r.requestCode}</span></td>
+                    <td><div class="fw-500" style="max-width:210px">${r.titleEn||r.titleAr||'—'}</div></td>
+                    <td style="font-size:.8rem">${r.subControlCode||'—'}</td>
+                    <td><span style="font-size:.82rem;${od?'color:#dc2626;font-weight:600':''}">${fmtD(r.dueDate)}</span></td>
+                    <td>${priBadge(r.priority)}</td>
+                    <td>${evBadge(r.status)}</td>
+                    <td class="text-center table-actions">
+                        <div class="d-flex justify-content-center gap-1">
+                            ${r.status==='OPEN'?`<button class="btn btn-sm btn-outline-primary action-btn" onclick="startRequest(${r.id})" title="بدء التنفيذ"><i class="bi bi-play"></i></button>`:''}
+                            ${r.status==='SUBMITTED'?`<button class="btn btn-sm btn-outline-success action-btn" onclick="approveRequest(${r.id})" title="قبول"><i class="bi bi-check-lg"></i></button>`:''}
+                            <button class="btn btn-sm btn-outline-danger action-btn" onclick="deleteRequest(${r.id})" title="إلغاء"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch(err) { t.innerHTML = errRow(7, err.message); }
+    }
+
+    async function loadReviews() {
+        const t = S('reviewBody');
+        t.innerHTML = `<tr><td colspan="7"><div class="skeleton" style="height:38px"></div></td></tr>`.repeat(2);
+        const status = S('reviewStatus').value;
+        const fwCode = selectedFw.code;
+        try {
+            const data = await Api.page('/evidence/reviews', {page:0, size:100, ...(status?{status}:{})});
+            let revs = (data?.content??[]).filter(r => !r.frameworkCode || r.frameworkCode===fwCode);
+            if (!revs.length) { t.innerHTML = empty(7,'clipboard2','لا توجد مراجعات'); return; }
+            t.innerHTML = revs.map(r => `<tr>
+                <td><div class="fw-500" style="max-width:230px">${r.evidenceTitleEn||'—'}</div></td>
+                <td style="font-size:.82rem">${r.reviewerName||'—'}</td>
+                <td style="font-size:.82rem">${fmtD(r.reviewDate)}</td>
+                <td>${rvBadge(r.result)}</td>
+                <td style="font-size:.8rem;max-width:190px" class="text-truncate">${r.notesEn||'—'}</td>
+                <td>${evBadge(r.status)}</td>
+                <td class="text-center table-actions">
+                    ${r.status!=='COMPLETED'?`<button class="btn btn-sm btn-outline-primary action-btn" onclick="openReviewComplete(${r.id})"><i class="bi bi-clipboard-check"></i></button>`:''}
+                </td>
+            </tr>`).join('');
+        } catch(err) { t.innerHTML = errRow(7, err.message); }
+    }
+
+    async function loadExpired() {
+        const t = S('expiredBody');
+        t.innerHTML = `<tr><td colspan="6"><div class="skeleton" style="height:38px"></div></td></tr>`.repeat(2);
+        const fwCode = selectedFw.code;
+        try {
+            let items = (await Api.get('/evidence/items/expired')).filter(e => e.frameworkCode===fwCode);
+            if (!items.length) { t.innerHTML = empty(6,'check-circle-fill','لا توجد أدلة منتهية الصلاحية ✓'); return; }
+            t.innerHTML = items.map(e => `<tr>
+                <td><span class="fw-600 text-danger" style="font-size:.8rem">${e.evidenceCode}</span></td>
+                <td><div class="fw-500" style="max-width:210px">${e.titleEn||e.titleAr||'—'}</div></td>
+                <td style="font-size:.8rem">${e.subControlCode||'—'}</td>
+                <td><span class="badge bg-light text-dark border" style="font-size:.72rem">${e.evidenceType}</span></td>
+                <td><span style="font-size:.82rem;color:#dc2626;font-weight:600">${fmtD(e.validTo)}</span></td>
+                <td class="text-center table-actions">
+                    <button class="btn btn-sm btn-outline-primary action-btn" onclick="renewEvidence(${e.id})" title="تجديد">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </td>
+            </tr>`).join('');
+        } catch(err) { t.innerHTML = errRow(6, err.message); }
+    }
+
+    async function loadReuse() {
+        const t = S('reuseBody');
+        t.innerHTML = `<tr><td colspan="5"><div class="skeleton" style="height:38px"></div></td></tr>`.repeat(2);
+        const fwCode = selectedFw.code;
+        try {
+            const data = await Api.page('/evidence/items', {status:'APPROVED', page:0, size:100});
+            let items = (data?.content??[]).filter(e => e.frameworkCode===fwCode);
+            if (!items.length) { t.innerHTML = empty(5,'arrow-repeat','لا توجد أدلة معتمدة لإعادة الاستخدام'); return; }
+            t.innerHTML = items.map(e => {
+                const mods = ['المخاطر','الامتثال','الأمن'].map(m=>
+                    `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:.7rem">${m}</span>`).join(' ');
+                return `<tr>
+                    <td><div class="fw-500" style="max-width:210px">${e.titleEn||e.titleAr||'—'}</div>
+                        <div class="text-muted" style="font-size:.72rem">${e.evidenceCode}</div></td>
+                    <td style="font-size:.8rem">${e.subControlCode||'—'}</td>
+                    <td>${evBadge(e.status)}</td>
+                    <td>${mods}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-primary action-btn"
+                                onclick="openLinkModal(${e.id}, '${(e.titleEn||e.titleAr||'').replace(/'/g,'')}')">
+                            <i class="bi bi-link-45deg me-1"></i>ربط
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch(err) { t.innerHTML = errRow(5, err.message); }
+    }
+
+    // ── Controls tree ──────────────────────────────────────
+    function buildControlTree() {
+        const treeEl = S('controlTree');
+        if (!selectedFw) { treeEl.innerHTML=''; return; }
+        treeEl.innerHTML = (selectedFw.controls||[]).map(ctrl => `
+            <div class="ctrl-item" onclick="selectControl(${ctrl.id})" id="ctrl-${ctrl.id}">
+                <div class="fw-600" style="font-size:.82rem">${ctrl.controlCode||ctrl.code||''}</div>
+                <div class="text-muted" style="font-size:.72rem">${ctrl.nameEn||ctrl.nameAr||''}</div>
+                <span class="badge bg-light text-dark border mt-1" style="font-size:.65rem">${(ctrl.subControls||[]).length} فرعي</span>
+            </div>`).join('');
+    }
+
+    window.selectControl = async function(ctrlId) {
+        document.querySelectorAll('.ctrl-item').forEach(c => c.classList.remove('active'));
+        S('ctrl-'+ctrlId)?.classList.add('active');
+        const ctrl = (selectedFw?.controls||[]).find(c=>c.id===ctrlId);
+        if (!ctrl) return;
+        S('controlDetailTitle').textContent = `${ctrl.controlCode||''} — ${ctrl.nameEn||ctrl.nameAr||''}`;
+        const t = S('controlDetailBody');
+        t.innerHTML = `<tr><td colspan="5"><div class="skeleton" style="height:38px"></div></td></tr>`;
+        try {
+            const rows = [];
+            for (const sc of ctrl.subControls||[]) {
+                const items = await Api.get(`/evidence/items/by-sub-control/${sc.id}`);
+                if (items.length) {
+                    items.forEach(e => rows.push(`<tr style="font-size:.82rem">
+                        <td><div class="fw-600" style="font-size:.8rem">${sc.subControlCode||sc.code||''}</div>
+                            <div class="text-muted" style="font-size:.72rem">${sc.nameEn||sc.nameAr||''}</div></td>
+                        <td><div class="fw-500">${e.titleEn||e.titleAr||'—'}</div>
+                            <div class="text-muted" style="font-size:.72rem">${e.evidenceCode}</div></td>
+                        <td><span class="badge bg-light text-dark border" style="font-size:.72rem">${e.evidenceType}</span></td>
+                        <td>${evBadge(e.status)}</td>
+                        <td style="${e.isExpired?'color:#dc2626;font-weight:600':''}">${fmtD(e.validTo)}</td>
+                    </tr>`));
+                } else {
+                    rows.push(`<tr style="font-size:.82rem">
+                        <td><div class="fw-600" style="font-size:.8rem">${sc.subControlCode||sc.code||''}</div>
+                            <div class="text-muted" style="font-size:.72rem">${sc.nameEn||sc.nameAr||''}</div></td>
+                        <td colspan="4" style="color:#94a3b8">
+                            <i class="bi bi-dash-circle me-1"></i>لا توجد أدلة
+                            <button class="btn btn-sm btn-outline-primary ms-2" style="font-size:.7rem;padding:1px 8px"
+                                    onclick="openUploadForSubControl(${sc.id})">+ إضافة</button>
+                        </td>
+                    </tr>`);
+                }
+            }
+            t.innerHTML = rows.join('')||`<tr><td colspan="5" class="text-center text-muted py-4">لا توجد ضوابط فرعية</td></tr>`;
+        } catch(err) { t.innerHTML = errRow(5, err.message); }
+    };
+
+    // ── Reports ────────────────────────────────────────────
+    async function loadReports() {
+        let items = [];
+        try {
+            const data = await Api.page('/evidence/items', {page:0, size:200});
+            items = (data?.content??[]).filter(e => e.frameworkCode===selectedFw.code);
+        } catch(_) {}
+        renderStatusChart(items);
+        renderTypeChart(items);
+        renderCoverageChart(items);
+    }
+
+    function renderStatusChart(items) {
+        if (statusChartInst) { statusChartInst.destroy(); statusChartInst=null; }
+        const ctx = S('statusChart'); if(!ctx) return;
+        const counts = {};
+        items.forEach(e => { counts[e.status]=(counts[e.status]||0)+1; });
+        const keys = Object.keys(counts);
+        const arL  = keys.map(l=>({APPROVED:'معتمد',DRAFT:'مسودة',PENDING_REVIEW:'قيد المراجعة',REJECTED:'مرفوض',EXPIRED:'منتهي',SUPERSEDED:'محل'}[l]||l));
+        const cols  = keys.map(l=>({APPROVED:'#16a34a',DRAFT:'#64748b',PENDING_REVIEW:'#d97706',REJECTED:'#dc2626',EXPIRED:'#be123c',SUPERSEDED:'#7c3aed'}[l]||'#94a3b8'));
+        statusChartInst = new Chart(ctx, { type:'doughnut',
+            data:{ labels:arL, datasets:[{ data:keys.map(l=>counts[l]), backgroundColor:cols, borderWidth:0 }] },
+            options:{ responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{ position:'right', labels:{ font:{size:11}, padding:12, usePointStyle:true } } } }
+        });
+    }
+
+    function renderTypeChart(items) {
+        if (typeChartInst) { typeChartInst.destroy(); typeChartInst=null; }
+        const ctx = S('typeChart'); if(!ctx) return;
+        const counts = {};
+        items.forEach(e => { counts[e.evidenceType]=(counts[e.evidenceType]||0)+1; });
+        const types = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+        const arT = types.map(t=>({POLICY:'سياسة',PROCEDURE:'إجراء',LOG:'سجل',ASSESSMENT:'تقييم',TEST:'اختبار',AUDIT:'مراجعة',CERTIFICATE:'شهادة',REPORT:'تقرير',DOCUMENT:'وثيقة',SCREENSHOT:'لقطة',CONFIGURATION:'إعداد'}[t]||t));
+        typeChartInst = new Chart(ctx, { type:'bar',
+            data:{ labels:arT, datasets:[{ label:'عدد الأدلة', data:types.map(t=>counts[t]),
+                backgroundColor:'rgba(15,76,53,.7)', borderRadius:4 }] },
+            options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{display:false} },
+                scales:{ x:{ beginAtZero:true }, y:{ grid:{display:false} } } }
+        });
+    }
+
+    function renderCoverageChart(items) {
+        if (coverageChartInst) { coverageChartInst.destroy(); coverageChartInst=null; }
+        const ctx = S('coverageChart'); if(!ctx||!selectedFw) return;
+        const approvedById = {};
+        items.filter(e=>e.status==='APPROVED').forEach(e => {
+            if (e.subControlId) approvedById[e.subControlId]=(approvedById[e.subControlId]||0)+1;
+        });
+        const labels=[], covered=[], uncovered=[];
+        (selectedFw.controls||[]).forEach(c => (c.subControls||[]).forEach(sc => {
+            labels.push(sc.subControlCode||sc.code||'');
+            const has = (approvedById[sc.id]||0)>0;
+            covered.push(has?1:0); uncovered.push(has?0:1);
+        }));
+        coverageChartInst = new Chart(ctx, { type:'bar',
+            data:{ labels, datasets:[
+                { label:'مغطى',     data:covered,   backgroundColor:'#16a34a', borderRadius:3 },
+                { label:'غير مغطى', data:uncovered, backgroundColor:'#fca5a5', borderRadius:3 },
+            ]},
+            options:{ responsive:true, maintainAspectRatio:false,
+                scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, max:1, ticks:{stepSize:1}} },
+                plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, usePointStyle:true } } }
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Actions
+    // ══════════════════════════════════════════════════════════
+    window.submitEvidence   = async id => { try { await Api.post(`/evidence/items/${id}/submit`);  App.showFlash('success','تم الإرسال للمراجعة'); loadCatalog(); } catch(e){ App.showFlash('danger',e.message); } };
+    window.approveEvidence  = async id => { try { await Api.post(`/evidence/items/${id}/approve`); App.showFlash('success','تم الاعتماد');        loadCatalog(); } catch(e){ App.showFlash('danger',e.message); } };
+    window.deleteEvidence   = async id => {
+        if (!confirm('حذف هذا الدليل؟')) return;
+        try { await Api.delete(`/evidence/items/${id}`); App.showFlash('success','تم الحذف'); loadCatalog(); }
+        catch(e){ App.showFlash('danger',e.message); }
+    };
+    window.renewEvidence    = () => App.showFlash('info','ارفع نسخة جديدة عبر "رفع دليل".');
+    window.startRequest     = async id => { try { await Api.post(`/evidence/requests/${id}/status?status=IN_PROGRESS`); App.showFlash('success','تم التحديث'); loadRequests(); } catch(e){ App.showFlash('danger',e.message); } };
+    window.approveRequest   = async id => { try { await Api.post(`/evidence/requests/${id}/status?status=APPROVED`);   App.showFlash('success','تمت الموافقة'); loadRequests(); } catch(e){ App.showFlash('danger',e.message); } };
+    window.deleteRequest    = async id => {
+        if (!confirm('إلغاء هذا الطلب؟')) return;
+        try { await Api.delete(`/evidence/requests/${id}`); App.showFlash('success','تم الإلغاء'); loadRequests(); }
+        catch(e){ App.showFlash('danger',e.message); }
+    };
+    window.openReviewComplete = id => { S('reviewCompleteId').value=id; reviewModal.show(); };
+    window.openUploadForSubControl = subControlId => {
+        S('evSubControl').value = subControlId;
+        uploadModal.show();
+    };
+    window.openLinkModal = function(evidenceId, evidenceName) {
+        S('linkEvidenceId').value   = evidenceId;
+        S('linkEvidenceName').textContent = evidenceName || `دليل #${evidenceId}`;
+        S('linkEntityId').value     = '';
+        S('linkNotes').value        = '';
+        linkModal.show();
+    };
+
+    // ══════════════════════════════════════════════════════════
+    // Modal saves
+    // ══════════════════════════════════════════════════════════
+    S('saveEvidenceBtn').addEventListener('click', async () => {
+        const titleEn = S('evTitleEn').value.trim();
+        if (!titleEn) { App.showFlash('warning','العنوان مطلوب'); return; }
+        const btn=S('saveEvidenceBtn'); btn.disabled=true;
+        try {
+            await Api.post('/evidence/items', {
+                titleEn, titleAr:S('evTitleAr').value.trim()||null,
+                evidenceType:S('evType').value,
+                subControlId:S('evSubControl').value||null,
+                validFrom:S('evValidFrom').value||null,
+                validTo:S('evValidTo').value||null,
+                descriptionEn:S('evDescription').value.trim()||null,
+                status:'DRAFT'
+            });
+            uploadModal.hide();
+            App.showFlash('success','تم رفع الدليل بنجاح');
+            if (activeSubTab==='catalog') loadCatalog();
+            if (activeSubTab==='overview') loadOverview();
+        } catch(e){ App.showFlash('danger',e.message); }
+        finally { btn.disabled=false; }
+    });
+
+    S('saveRequestBtn').addEventListener('click', async () => {
+        const titleEn=S('reqTitleEn').value.trim();
+        if (!titleEn) { App.showFlash('warning','العنوان مطلوب'); return; }
+        const btn=S('saveRequestBtn'); btn.disabled=true;
+        try {
+            await Api.post('/evidence/requests', {
+                titleEn,
+                subControlId:S('reqSubControl').value||null,
+                priority:S('reqPriority').value,
+                dueDate:S('reqDueDate').value||null,
+                descriptionEn:S('reqDescription').value.trim()||null,
+            });
+            requestModal.hide();
+            App.showFlash('success','تم إنشاء الطلب');
+            if (activeSubTab==='requests') loadRequests();
+            if (activeSubTab==='overview') loadOverview();
+        } catch(e){ App.showFlash('danger',e.message); }
+        finally { btn.disabled=false; }
+    });
+
+    S('confirmReviewBtn').addEventListener('click', async () => {
+        const id=S('reviewCompleteId').value, result=S('reviewResult').value, notes=S('reviewNotes').value.trim();
+        const btn=S('confirmReviewBtn'); btn.disabled=true;
+        try {
+            await Api.post(`/evidence/reviews/${id}/complete?result=${result}&notes=${encodeURIComponent(notes)}`);
+            reviewModal.hide(); App.showFlash('success','تمت المراجعة'); loadReviews();
+        } catch(e){ App.showFlash('danger',e.message); }
+        finally { btn.disabled=false; }
+    });
+
+    // ══════════════════════════════════════════════════════════
+    // Header buttons + filters
+    // ══════════════════════════════════════════════════════════
+    S('uploadEvidenceBtn').addEventListener('click', () => { if(!selectedFw){App.showFlash('warning','اختر معياراً أولاً');return;} uploadModal.show(); });
+    S('requestEvidenceBtn').addEventListener('click', () => { if(!selectedFw){App.showFlash('warning','اختر معياراً أولاً');return;} requestModal.show(); });
+    S('newRequestBtn').addEventListener('click', () => { if(!selectedFw){App.showFlash('warning','اختر معياراً أولاً');return;} requestModal.show(); });
+    S('newReviewBtn').addEventListener('click', async () => {
+        if (!selectedFw) { App.showFlash('warning','اختر معياراً أولاً'); return; }
+        // Populate evidence selector with items from this framework (pending_review or approved)
+        const sel = S('reviewEvidenceSel');
+        sel.innerHTML = '<option value="">— اختر الدليل —</option>';
+        try {
+            const data = await Api.page('/evidence/items', {page:0, size:200,
+                sort:'createdAt,desc'});
+            const eligible = (data?.content??[]).filter(e =>
+                e.frameworkCode === selectedFw.code &&
+                (e.status === 'PENDING_REVIEW' || e.status === 'APPROVED' || e.status === 'DRAFT'));
+            if (!eligible.length) {
+                App.showFlash('info','لا توجد أدلة قابلة للمراجعة في هذا المعيار حالياً');
+                return;
+            }
+            eligible.forEach(e => {
+                sel.appendChild(new Option(`[${e.evidenceCode}] ${e.titleEn||e.titleAr||'—'} (${e.status})`, e.id));
+            });
+        } catch(err) { App.showFlash('danger', err.message); return; }
+        // Set today as default review date
+        S('reviewStartDate').value = new Date().toISOString().substring(0,10);
+        S('reviewStartNotes').value = '';
+        startReviewModal.show();
+    });
+    S('exportBtn').addEventListener('click', () => App.showFlash('info','التصدير قريباً.'));
+
+    S('catalogStatus').addEventListener('change', loadCatalog);
+    S('catalogType').addEventListener('change', loadCatalog);
+    S('catalogSearch').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer=setTimeout(loadCatalog,380); });
+    S('clearCatalogFilters').addEventListener('click', () => {
+        S('catalogStatus').value=''; S('catalogType').value=''; S('catalogSearch').value='';
+        loadCatalog();
+    });
+    S('reqStatus').addEventListener('change', loadRequests);
+    S('reviewStatus').addEventListener('change', loadReviews);
+
+    // ── Confirm Start Review ───────────────────────────────
+    S('confirmStartReviewBtn').addEventListener('click', async () => {
+        const evId = S('reviewEvidenceSel').value;
+        if (!evId) { App.showFlash('warning','اختر الدليل أولاً'); return; }
+        const btn = S('confirmStartReviewBtn'); btn.disabled = true;
+        try {
+            await Api.post('/evidence/reviews', {
+                evidenceId: parseInt(evId),
+                reviewDate: S('reviewStartDate').value || null,
+                notesEn:   S('reviewStartNotes').value.trim() || null,
+                status:    'PENDING'
+            });
+            startReviewModal.hide();
+            App.showFlash('success','تم إنشاء المراجعة بنجاح');
+            loadReviews();
+        } catch(e) { App.showFlash('danger', e.message); }
+        finally { btn.disabled = false; }
+    });
+
+    // ── Confirm Link Evidence ──────────────────────────────
+    S('confirmLinkBtn').addEventListener('click', async () => {
+        const evidenceId  = parseInt(S('linkEvidenceId').value);
+        const linkedModule = S('linkModule').value;
+        const entityIdVal  = S('linkEntityId').value.trim();
+        const notes        = S('linkNotes').value.trim();
+        if (!linkedModule) { App.showFlash('warning','اختر الوحدة'); return; }
+        const btn = S('confirmLinkBtn'); btn.disabled = true;
+        try {
+            await Api.post('/evidence/items/link', {
+                evidenceId,
+                linkedModule,
+                linkedEntityType: null,
+                linkedEntityId:   entityIdVal ? parseInt(entityIdVal) : null,
+                notes:            notes || null
+            });
+            linkModal.hide();
+            App.showFlash('success','تم ربط الدليل بنجاح');
+        } catch(e) { App.showFlash('danger', e.message); }
+        finally { btn.disabled = false; }
+    });
+
+    document.addEventListener('languageChanged', () => { if (selectedFw) loadSubTab(activeSubTab); });
+
+    // ══════════════════════════════════════════════════════════
+    // Start
+    // ══════════════════════════════════════════════════════════
+    init();
+
+})();
+</script>
+</body>
+</html>

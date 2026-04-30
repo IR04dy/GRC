@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supply Chain Management — TSS GRC</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="/assets/css/style.css" rel="stylesheet">
+<link href="/assets/css/rtl.css" rel="stylesheet" id="rtl-css" disabled>
+<style>
+.tab-nav{display:flex;gap:.4rem;flex-wrap:wrap;border-bottom:1px solid var(--color-border,#e5e7eb);margin-bottom:1rem;padding-bottom:0}
+.tab-btn{display:inline-flex;align-items:center;gap:.4rem;background:none;border:none;border-bottom:3px solid transparent;
+  padding:.6rem .9rem;font-size:.85rem;color:var(--color-text-muted,#6b7280);font-weight:500;cursor:pointer;white-space:nowrap}
+.tab-btn:hover{color:var(--color-primary,#0066ff);background:var(--color-surface2,#f8fafc)}
+.tab-btn.active{color:var(--color-primary,#0066ff);border-bottom-color:var(--color-primary,#0066ff);font-weight:600}
+.tab-panel{display:none}.tab-panel.active{display:block}
+[dir=rtl] .tab-nav{flex-direction:row-reverse}
+.table-sm td,.table-sm th{padding:.45rem .6rem;font-size:.82rem;vertical-align:middle}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:.65rem 1rem;background:var(--color-surface2,#f8fafc);
+  border-radius:8px;margin-bottom:1rem;border:1px solid var(--color-border,#e5e7eb)}
+.section-hdr h6{margin:0;font-size:.88rem;font-weight:700}
+[dir=rtl] .section-hdr{flex-direction:row-reverse}
+.wf-bar{display:flex;gap:0;margin-bottom:1rem;flex-wrap:wrap}
+.wf-step{flex:1;text-align:center;font-size:.65rem;font-weight:600;
+  padding:.35rem .4rem;background:var(--color-surface2,#f8fafc);
+  border:1px solid var(--color-border,#e5e7eb);color:var(--color-text-muted,#6b7280);
+  border-right:none;cursor:default;white-space:nowrap;min-width:80px}
+.wf-step:last-child{border-right:1px solid var(--color-border,#e5e7eb)}
+.wf-step.done{background:#dcfce7;color:#16a34a;border-color:#bbf7d0}
+.wf-step.current{background:var(--color-primary,#0066ff);color:#fff;
+  border-color:var(--color-primary,#0066ff);font-weight:700}
+[dir=rtl] .wf-bar{flex-direction:row-reverse}
+[dir=rtl] .wf-step{border-right:1px solid var(--color-border,#e5e7eb);border-left:none}
+.kpi-card.kc-orange{--kc-accent:#f97316}
+.kpi-card.kc-purple{--kc-accent:#a855f7}
+.kpi-card.kc-pink  {--kc-accent:#ec4899}
+.kpi-card.kc-cyan  {--kc-accent:#06b6d4}
+
+/* ── SCM compact KPI strip — 8 cards in a single tight row ── */
+.scm-kpi{
+  display:grid;
+  grid-template-columns:repeat(8, 1fr);
+  gap:.6rem;
+  margin-bottom:1rem;
+}
+.scm-kpi .mini{
+  display:flex;align-items:center;gap:.55rem;
+  padding:.55rem .7rem;
+  border:1px solid var(--color-border,#e5e7eb);
+  border-radius:8px;
+  background:var(--color-bg-card,#fff);
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+  transition:transform .15s, box-shadow .15s;
+  min-width:0;
+}
+.scm-kpi .mini:hover{transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,.08)}
+.scm-kpi .mini-ico{
+  flex-shrink:0;width:30px;height:30px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.95rem;color:#fff;
+}
+.scm-kpi .mini-ico.b-blue   {background:#3b82f6}
+.scm-kpi .mini-ico.b-red    {background:#ef4444}
+.scm-kpi .mini-ico.b-green  {background:#22c55e}
+.scm-kpi .mini-ico.b-orange {background:#f97316}
+.scm-kpi .mini-ico.b-purple {background:#a855f7}
+.scm-kpi .mini-ico.b-amber  {background:#f59e0b}
+.scm-kpi .mini-ico.b-pink   {background:#ec4899}
+.scm-kpi .mini-ico.b-cyan   {background:#06b6d4}
+.scm-kpi .mini-body{min-width:0;flex:1}
+.scm-kpi .mini-val{
+  font-weight:700;font-size:1.05rem;line-height:1.1;
+  color:var(--color-text,#111827);
+}
+.scm-kpi .mini-lbl{
+  font-size:.68rem;color:var(--color-text-muted,#6b7280);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+[dir=rtl] .scm-kpi .mini{flex-direction:row-reverse}
+@media (max-width: 1400px){ .scm-kpi{grid-template-columns:repeat(4, 1fr);} }
+@media (max-width: 768px){  .scm-kpi{grid-template-columns:repeat(2, 1fr);} }
+</style>
+</head>
+<body class="grc-body">
+<div id="app-shell"></div>
+
+<div id="page-content" class="p-4">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb breadcrumb-sm">
+      <li class="breadcrumb-item">
+        <a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
+      <li class="breadcrumb-item active" data-i18n="scm.page.breadcrumb">Supply Chain</li>
+    </ol>
+  </nav>
+
+  <!-- Page header -->
+  <div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h4 class="mb-1 fw-700" data-i18n="scm.page.title">Supply Chain Management</h4>
+      <p class="text-muted mb-0" style="font-size:.83rem" data-i18n="scm.page.subtitle">
+        Vendors, dependencies, supplier incidents and contract resilience</p>
+    </div>
+  </div>
+
+  <!-- Compact KPI strip — 8 mini-cards on a single row -->
+  <div class="scm-kpi">
+    <div class="mini"><div class="mini-ico b-blue"><i class="bi bi-buildings"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-vendors">—</div><div class="mini-lbl" data-i18n="scm.kpi.vendors">Vendors</div></div></div>
+    <div class="mini"><div class="mini-ico b-red"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-critical">—</div><div class="mini-lbl" data-i18n="scm.kpi.critical">Critical</div></div></div>
+    <div class="mini"><div class="mini-ico b-green"><i class="bi bi-check-circle"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-active">—</div><div class="mini-lbl" data-i18n="scm.kpi.active">Active</div></div></div>
+    <div class="mini"><div class="mini-ico b-orange"><i class="bi bi-hourglass-split"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-onboarding">—</div><div class="mini-lbl" data-i18n="scm.kpi.onboarding">Onboarding</div></div></div>
+    <div class="mini"><div class="mini-ico b-purple"><i class="bi bi-diagram-3"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-deps">—</div><div class="mini-lbl" data-i18n="scm.kpi.dependencies">Dependencies</div></div></div>
+    <div class="mini"><div class="mini-ico b-amber"><i class="bi bi-shield-exclamation"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-highdeps">—</div><div class="mini-lbl" data-i18n="scm.kpi.highDeps">High Deps</div></div></div>
+    <div class="mini"><div class="mini-ico b-pink"><i class="bi bi-exclamation-octagon"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-incidents">—</div><div class="mini-lbl" data-i18n="scm.kpi.openIncidents">Open Incidents</div></div></div>
+    <div class="mini"><div class="mini-ico b-cyan"><i class="bi bi-file-earmark-text"></i></div>
+      <div class="mini-body"><div class="mini-val" id="k-contracts">—</div><div class="mini-lbl" data-i18n="scm.kpi.activeContracts">Contracts</div></div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-nav mt-3">
+    <button class="tab-btn active" data-tab="overview"><i class="bi bi-speedometer2"></i><span data-i18n="scm.nav.overview">Overview</span></button>
+    <button class="tab-btn" data-tab="vendors"><i class="bi bi-buildings"></i><span data-i18n="scm.nav.vendors">Vendors</span></button>
+    <button class="tab-btn" data-tab="onboarding"><i class="bi bi-clipboard-check"></i><span data-i18n="scm.nav.onboarding">Onboarding</span></button>
+    <button class="tab-btn" data-tab="assessments"><i class="bi bi-clipboard-data"></i><span data-i18n="scm.nav.assessments">Assessments</span></button>
+    <button class="tab-btn" data-tab="dependencies"><i class="bi bi-diagram-3"></i><span data-i18n="scm.nav.dependencies">Dependencies</span></button>
+    <button class="tab-btn" data-tab="incidents"><i class="bi bi-exclamation-octagon"></i><span data-i18n="scm.nav.incidents">Incidents</span></button>
+    <button class="tab-btn" data-tab="resilience"><i class="bi bi-arrow-repeat"></i><span data-i18n="scm.nav.resilience">Resilience</span></button>
+    <button class="tab-btn" data-tab="contracts"><i class="bi bi-file-earmark-text"></i><span data-i18n="scm.nav.contracts">Contracts &amp; SLA</span></button>
+    <button class="tab-btn" data-tab="reports"><i class="bi bi-bar-chart-line"></i><span data-i18n="scm.nav.reports">Reports</span></button>
+  </div>
+
+  <!-- TAB: OVERVIEW -->
+  <div class="tab-panel active" id="tab-overview">
+    <div class="row g-3">
+      <div class="col-12 col-xl-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-buildings me-2 text-primary"></i><span data-i18n="scm.dash.topVendors">Top Vendors</span>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light"><tr>
+                <th data-i18n="scm.field.vendor">Vendor</th>
+                <th data-i18n="scm.field.criticality">Criticality</th>
+                <th data-i18n="cyber.field.status">Status</th>
+              </tr></thead>
+              <tbody id="dash-vendors-tbody"><tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-exclamation-octagon me-2 text-danger"></i><span data-i18n="scm.dash.recentIncidents">Recent Incidents</span>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light"><tr>
+                <th data-i18n="scm.field.vendor">Vendor</th>
+                <th data-i18n="cyber.field.type">Type</th>
+                <th data-i18n="label.impact">Impact</th>
+                <th data-i18n="cyber.field.status">Status</th>
+              </tr></thead>
+              <tbody id="dash-incidents-tbody"><tr><td colspan="4" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: VENDORS -->
+  <div class="tab-panel" id="tab-vendors">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.vendorsRegister">Vendors Register</h6>
+      <button class="btn btn-sm btn-primary" onclick="openVendorModal()">
+        <i class="bi bi-plus-lg me-1"></i><span data-i18n="scm.btn.addVendor">Add Vendor</span>
+      </button>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th data-i18n="scm.field.vendorName">Vendor Name</th>
+            <th data-i18n="scm.field.category">Category</th>
+            <th data-i18n="scm.field.criticality">Criticality</th>
+            <th data-i18n="scm.field.country">Country</th>
+            <th data-i18n="scm.field.serviceType">Service Type</th>
+            <th data-i18n="scm.field.riskLevel">Risk Level</th>
+            <th data-i18n="cyber.field.status">Status</th>
+            <th data-i18n="label.actions">Actions</th>
+          </tr></thead>
+          <tbody id="vendors-tbody"><tr><td colspan="8" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ONBOARDING -->
+  <div class="tab-panel" id="tab-onboarding">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.onboarding">Vendor Onboarding</h6>
+      <button class="btn btn-sm btn-primary" onclick="openOnboardingModal()">
+        <i class="bi bi-plus-lg me-1"></i><span data-i18n="scm.btn.startOnboarding">Start Onboarding</span>
+      </button>
+    </div>
+    <div class="alert alert-info py-2 small">
+      <strong data-i18n="scm.workflow.onboarding">Onboarding workflow:</strong>
+      <span data-i18n="scm.workflow.onboardingStages">Registration → Criticality Classification → Security Review → Operational Review → Legal Review → Approval</span>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th data-i18n="scm.field.vendor">Vendor</th>
+            <th data-i18n="scm.field.currentStage">Current Stage</th>
+            <th data-i18n="cyber.field.status">Status</th>
+            <th data-i18n="label.dueDate">Due Date</th>
+            <th data-i18n="scm.field.completedStages">Completed</th>
+            <th data-i18n="label.actions">Actions</th>
+          </tr></thead>
+          <tbody id="onboarding-tbody"><tr><td colspan="6" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ASSESSMENTS -->
+  <div class="tab-panel" id="tab-assessments">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.assessments">Vendor Assessments</h6>
+      <button class="btn btn-sm btn-primary" onclick="openAssessmentModal()">
+        <i class="bi bi-plus-lg me-1"></i><span data-i18n="scm.btn.startAssessment">Start Assessment</span>
+      </button>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th data-i18n="scm.field.vendor">Vendor</th>
+            <th data-i18n="cyber.field.type">Type</th>
+            <th data-i18n="label.date">Date</th>
+            <th data-i18n="scm.field.score">Score</th>
+            <th data-i18n="scm.field.riskRating">Risk Rating</th>
+            <th data-i18n="cyber.field.status">Status</th>
+            <th data-i18n="label.actions">Actions</th>
+          </tr></thead>
+          <tbody id="assessments-tbody"><tr><td colspan="7" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: DEPENDENCIES -->
+  <div class="tab-panel" id="tab-dependencies">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.dependencies">Service / Asset Dependencies</h6>
+      <button class="btn btn-sm btn-primary" onclick="openDependencyModal()">
+        <i class="bi bi-plus-lg me-1"></i><span data-i18n="scm.btn.addDependency">Add Dependency</span>
+      </button>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th data-i18n="scm.field.service">Service</th>
+            <th data-i18n="scm.field.asset">Asset</th>
+            <th data-i18n="scm.field.vendor">Vendor</th>
+            <th data-i18n="scm.field.dependencyType">Type</th>
+            <th data-i18n="scm.field.dependencyLevel">Level</th>
+            <th data-i18n="scm.field.alternative">Alternative</th>
+            <th data-i18n="cyber.field.status">Status</th>
+            <th data-i18n="label.actions">Actions</th>
+          </tr></thead>
+          <tbody id="deps-tbody"><tr><td colspan="8" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: INCIDENTS -->
+  <div class="tab-panel" id="tab-incidents">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.incidents">Supplier Incidents &amp; Disruptions</h6>
+      <button class="btn btn-sm btn-primary" onclick="openIncidentModal()">
+        <i class="bi bi-plus-lg me-1"></i><span data-i18n="scm.btn.registerIncident">Register Incident</span>
+      </button>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th data-i18n="label.incidentNo">Incident #</th>
+            <th data-i18n="scm.field.vendor">Vendor</th>
+            <th data-i18n="cyber.field.type">Type</th>
+            <th data-i18n="label.impact">Impact</th>
+            <th data-i18n="scm.field.slaBreached">SLA</th>
+            <th data-i18n="cyber.field.status">Status</th>
+            <th data-i18n="label.actions">Actions</th>
+          </tr></thead>
+          <tbody id="incidents-tbody"><tr><td colspan="7" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: RESILIENCE -->
+  <div class="tab-panel" id="tab-resilience">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.resilience">Resilience Plans &amp; Alternatives</h6>
+      <button class="btn btn-sm btn-primary" onclick="openDependencyModal()">
+        <i class="bi bi-plus-lg me-1"></i><span data-i18n="scm.btn.addDependency">Add Dependency</span>
+      </button>
+    </div>
+    <div class="alert alert-light border py-3 small">
+      <i class="bi bi-info-circle me-2 text-primary"></i>
+      <span data-i18n="scm.resilience.desc">High and critical dependencies should have an alternative supplier or documented exit / replacement plan.</span>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th data-i18n="scm.field.service">Service</th>
+            <th data-i18n="scm.field.primary">Primary Vendor</th>
+            <th data-i18n="scm.field.alternative">Alternative</th>
+            <th data-i18n="scm.field.dependencyLevel">Level</th>
+            <th data-i18n="scm.field.gap">Gap</th>
+            <th data-i18n="label.actions">Actions</th>
+          </tr></thead>
+          <tbody id="resilience-tbody"><tr><td colspan="6" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: CONTRACTS -->
+  <div class="tab-panel" id="tab-contracts">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.contracts">Contracts &amp; SLA</h6>
+      <button class="btn btn-sm btn-primary" onclick="openContractModal()">
+        <i class="bi bi-plus-lg me-1"></i><span data-i18n="scm.btn.addContract">Add Contract</span>
+      </button>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr>
+            <th data-i18n="scm.field.contractNumber">Contract #</th>
+            <th data-i18n="scm.field.vendor">Vendor</th>
+            <th data-i18n="label.title">Title</th>
+            <th data-i18n="cyber.field.type">Type</th>
+            <th data-i18n="scm.field.startDate">Start</th>
+            <th data-i18n="scm.field.endDate">End</th>
+            <th data-i18n="scm.field.value">Value</th>
+            <th data-i18n="cyber.field.status">Status</th>
+          </tr></thead>
+          <tbody id="contracts-tbody"><tr><td colspan="8" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: REPORTS -->
+  <div class="tab-panel" id="tab-reports">
+    <div class="section-hdr">
+      <h6 data-i18n="scm.section.reports">Supply Chain Reports</h6>
+    </div>
+    <!-- Headline numbers -->
+    <div class="row g-3 mb-3" id="reports-cards">
+      <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center">
+        <div class="display-6 text-primary fw-bold" id="r-total">—</div>
+        <small class="text-muted" data-i18n="scm.kpi.vendors">Vendors</small></div></div></div>
+      <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center">
+        <div class="display-6 text-danger fw-bold" id="r-critical">—</div>
+        <small class="text-muted" data-i18n="scm.kpi.critical">Critical</small></div></div></div>
+      <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center">
+        <div class="display-6 text-warning fw-bold" id="r-incidents">—</div>
+        <small class="text-muted" data-i18n="scm.kpi.openIncidents">Open Incidents</small></div></div></div>
+      <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center">
+        <div class="display-6 text-info fw-bold" id="r-expiring">—</div>
+        <small class="text-muted" data-i18n="scm.kpi.expiring">Expiring (90d)</small></div></div></div>
+    </div>
+
+    <!-- Breakdown tables -->
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-pie-chart me-2 text-primary"></i><span data-i18n="scm.report.byCriticality">Vendors by Criticality</span>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0"><tbody id="rep-criticality"><tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-bar-chart me-2 text-danger"></i><span data-i18n="scm.report.byImpact">Incidents by Impact</span>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0"><tbody id="rep-impact"><tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-diagram-3 me-2 text-purple"></i><span data-i18n="scm.report.depsByLevel">Dependencies by Level</span>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0"><tbody id="rep-deps"><tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-clock-history me-2 text-warning"></i><span data-i18n="scm.report.expiringContracts">Expiring Contracts (90 days)</span>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+              <thead class="table-light"><tr><th data-i18n="scm.field.vendor">Vendor</th><th data-i18n="label.title">Title</th><th data-i18n="scm.field.endDate">End</th></tr></thead>
+              <tbody id="rep-expiring"><tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Vendor Modal ── -->
+<div class="modal fade" id="vendorModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" data-i18n="scm.btn.addVendor">Add Vendor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="vendorId">
+        <div class="row g-2">
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.vendorNameEn">Name (EN)</label><input id="vendorNameEn" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.vendorNameAr">Name (AR)</label><input id="vendorNameAr" class="form-control form-control-sm" dir="rtl"></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.category">Category</label>
+            <select id="vendorCategory" class="form-select form-select-sm">
+              <option value="IT_SERVICES">IT Services</option><option value="LOGISTICS">Logistics</option>
+              <option value="MANUFACTURING">Manufacturing</option><option value="FINANCIAL">Financial</option>
+              <option value="UTILITIES">Utilities</option><option value="CONSULTING">Consulting</option>
+              <option value="OTHER">Other</option></select></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.criticality">Criticality</label>
+            <select id="vendorCriticality" class="form-select form-select-sm">
+              <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option>
+              <option value="HIGH">High</option><option value="CRITICAL">Critical</option></select></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.riskLevel">Risk Level</label>
+            <select id="vendorRiskLevel" class="form-select form-select-sm">
+              <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option>
+              <option value="HIGH">High</option></select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.country">Country</label><input id="vendorCountry" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.serviceType">Service Type</label><input id="vendorServiceType" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.contactName">Contact Name</label><input id="vendorContactName" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.contactEmail">Contact Email</label><input id="vendorContactEmail" type="email" class="form-control form-control-sm"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveVendor()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Incident Modal ── -->
+<div class="modal fade" id="incidentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" data-i18n="scm.btn.registerIncident">Register Incident</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-md-12"><label class="form-label small" data-i18n="scm.field.vendor">Vendor</label>
+            <select id="incVendorId" class="form-select form-select-sm"></select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="cyber.field.type">Type</label>
+            <select id="incType" class="form-select form-select-sm">
+              <option value="SERVICE_DISRUPTION">Service Disruption</option><option value="BREACH">Breach</option>
+              <option value="DELAY">Delay</option><option value="QUALITY">Quality</option>
+              <option value="SLA_BREACH">SLA Breach</option><option value="OTHER">Other</option></select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.impact">Impact</label>
+            <select id="incImpact" class="form-select form-select-sm">
+              <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option>
+              <option value="HIGH">High</option><option value="CRITICAL">Critical</option></select></div>
+          <div class="col-12"><label class="form-label small" data-i18n="label.description">Description</label>
+            <textarea id="incDesc" class="form-control form-control-sm" rows="3"></textarea></div>
+          <div class="col-12 form-check ms-3">
+            <input class="form-check-input" type="checkbox" id="incSlaBreach">
+            <label class="form-check-label small" for="incSlaBreach" data-i18n="scm.field.slaBreached">SLA Breached</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveIncident()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Onboarding Modal ── -->
+<div class="modal fade" id="onboardingModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" data-i18n="scm.btn.startOnboarding">Start Onboarding</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-12"><label class="form-label small" data-i18n="scm.field.vendor">Vendor</label>
+            <select id="obVendorId" class="form-select form-select-sm"></select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.dueDate">Due Date</label>
+            <input id="obDueDate" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.assignedTo">Assigned To (User ID)</label>
+            <input id="obAssignedTo" type="number" class="form-control form-control-sm" placeholder="optional"></div>
+          <div class="col-12"><label class="form-label small" data-i18n="label.notes">Notes</label>
+            <textarea id="obNotes" class="form-control form-control-sm" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveOnboarding()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Assessment Modal ── -->
+<div class="modal fade" id="assessmentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" data-i18n="scm.btn.startAssessment">Start Assessment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-12"><label class="form-label small" data-i18n="scm.field.vendor">Vendor</label>
+            <select id="asVendorId" class="form-select form-select-sm"></select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="cyber.field.type">Type</label>
+            <select id="asType" class="form-select form-select-sm">
+              <option value="INITIAL">Initial</option>
+              <option value="PERIODIC">Periodic</option>
+              <option value="TRIGGERED">Triggered</option>
+            </select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.scoreRange">Score (0-5)</label>
+            <input id="asScore" type="number" step="0.1" min="0" max="5" class="form-control form-control-sm" value="3.5"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.riskRating">Risk Rating</label>
+            <select id="asRating" class="form-select form-select-sm">
+              <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option>
+              <option value="HIGH">High</option><option value="CRITICAL">Critical</option>
+            </select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="cyber.field.status">Status</label>
+            <select id="asStatus" class="form-select form-select-sm">
+              <option value="PLANNED">Planned</option><option value="IN_PROGRESS" selected>In Progress</option>
+              <option value="COMPLETED">Completed</option>
+            </select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.date">Date</label>
+            <input id="asDate" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.nextDate">Next Date</label>
+            <input id="asNextDate" type="date" class="form-control form-control-sm"></div>
+          <div class="col-12"><label class="form-label small" data-i18n="label.findings">Findings</label>
+            <textarea id="asFindings" class="form-control form-control-sm" rows="2"></textarea></div>
+          <div class="col-12"><label class="form-label small" data-i18n="label.recommendations">Recommendations</label>
+            <textarea id="asRecommendations" class="form-control form-control-sm" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveAssessment()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Dependency Modal ── -->
+<div class="modal fade" id="dependencyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" data-i18n="scm.btn.addDependency">Add Dependency</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.serviceNameEn">Service Name (EN)</label>
+            <input id="depServiceEn" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.serviceNameAr">Service Name (AR)</label>
+            <input id="depServiceAr" class="form-control form-control-sm" dir="rtl"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.asset">Asset</label>
+            <input id="depAsset" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.vendor">Vendor</label>
+            <select id="depVendorId" class="form-select form-select-sm"></select></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.dependencyType">Type</label>
+            <select id="depType" class="form-select form-select-sm">
+              <option value="CRITICAL">Critical</option><option value="EXCLUSIVE">Exclusive</option>
+              <option value="SHARED">Shared</option><option value="NON_CRITICAL">Non-Critical</option>
+            </select></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.dependencyLevel">Level</label>
+            <select id="depLevel" class="form-select form-select-sm">
+              <option value="LOW">Low</option><option value="MEDIUM" selected>Medium</option>
+              <option value="HIGH">High</option>
+            </select></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="cyber.field.status">Status</label>
+            <select id="depStatus" class="form-select form-select-sm">
+              <option value="ACTIVE" selected>Active</option><option value="INACTIVE">Inactive</option>
+              <option value="AT_RISK">At Risk</option>
+            </select></div>
+          <div class="col-md-6 form-check ms-3 mt-2">
+            <input id="depHasAlt" type="checkbox" class="form-check-input">
+            <label class="form-check-label small" for="depHasAlt" data-i18n="label.hasAlternative">Has Alternative Supplier</label>
+          </div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.alternativeVendor">Alternative Vendor</label>
+            <select id="depAltVendorId" class="form-select form-select-sm"><option value="">— None —</option></select></div>
+          <div class="col-12"><label class="form-label small" data-i18n="label.impactAnalysis">Impact Analysis</label>
+            <textarea id="depImpact" class="form-control form-control-sm" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveDependency()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Contract Modal ── -->
+<div class="modal fade" id="contractModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" data-i18n="scm.btn.addContract">Add Contract</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.vendor">Vendor</label>
+            <select id="ctVendorId" class="form-select form-select-sm"></select></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="scm.field.contractNumber">Contract #</label>
+            <input id="ctNumber" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.titleEn">Title (EN)</label>
+            <input id="ctTitleEn" class="form-control form-control-sm"></div>
+          <div class="col-md-6"><label class="form-label small" data-i18n="label.titleAr">Title (AR)</label>
+            <input id="ctTitleAr" class="form-control form-control-sm" dir="rtl"></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="cyber.field.type">Type</label>
+            <select id="ctType" class="form-select form-select-sm">
+              <option value="SERVICE">Service</option><option value="SUPPLY">Supply</option>
+              <option value="NDA">NDA</option><option value="FRAMEWORK">Framework</option>
+              <option value="OTHER">Other</option>
+            </select></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.startDate">Start</label>
+            <input id="ctStart" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.endDate">End</label>
+            <input id="ctEnd" type="date" class="form-control form-control-sm"></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="scm.field.value">Value</label>
+            <input id="ctValue" type="number" class="form-control form-control-sm"></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="label.currency">Currency</label>
+            <select id="ctCurrency" class="form-select form-select-sm">
+              <option value="SAR" selected>SAR</option><option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select></div>
+          <div class="col-md-4"><label class="form-label small" data-i18n="cyber.field.status">Status</label>
+            <select id="ctStatus" class="form-select form-select-sm">
+              <option value="DRAFT">Draft</option><option value="UNDER_REVIEW">Under Review</option>
+              <option value="ACTIVE" selected>Active</option><option value="EXPIRED">Expired</option>
+              <option value="TERMINATED">Terminated</option>
+            </select></div>
+          <div class="col-md-12 form-check ms-3 mt-2">
+            <input id="ctAutoRenew" type="checkbox" class="form-check-input">
+            <label class="form-check-label small" for="ctAutoRenew" data-i18n="label.autoRenewal">Auto-renewal</label>
+          </div>
+          <div class="col-12"><label class="form-label small" data-i18n="label.notes">Notes</label>
+            <textarea id="ctNotes" class="form-control form-control-sm" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveContract()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/app.js"></script>
+
+<script>
+const SCM = '/scm';
+let _vendors = [];
+
+const ar = () => (typeof I18n !== 'undefined') && I18n.current === 'ar';
+const vname = v => ar() && v.nameAr ? v.nameAr : (v.nameEn || '');
+
+function badge(level, txt) {
+  const map = {CRITICAL:'danger', HIGH:'warning', MEDIUM:'info', LOW:'success',
+               ACTIVE:'success', INACTIVE:'secondary', OPEN:'danger', RESOLVED:'success',
+               IN_PROGRESS:'warning', COMPLETED:'success', ESCALATED:'danger',
+               UNDER_REVIEW:'info', PENDING:'secondary', REJECTED:'danger',
+               AT_RISK:'warning', BREACHED:'danger', MET:'success', NOT_MEASURED:'secondary'};
+  return `<span class="badge bg-${map[level]||'secondary'}">${txt||level||''}</span>`;
+}
+
+function flash(type, msg) {
+  if (typeof App !== 'undefined' && App.showFlash) App.showFlash(type, msg);
+  else alert(msg);
+}
+
+async function loadStats() {
+  try {
+    const s = await Api.get('/scm/stats');
+    document.getElementById('k-vendors').textContent = s.totalVendors;
+    document.getElementById('k-critical').textContent = s.criticalVendors;
+    document.getElementById('k-active').textContent = s.activeVendors;
+    document.getElementById('k-onboarding').textContent = s.pendingOnboarding;
+    document.getElementById('k-deps').textContent = s.totalDependencies;
+    document.getElementById('k-highdeps').textContent = s.highDependencies;
+    document.getElementById('k-incidents').textContent = s.openIncidents;
+    document.getElementById('k-contracts').textContent = s.activeContracts;
+    document.getElementById('r-total').textContent = s.totalVendors;
+    document.getElementById('r-critical').textContent = s.criticalVendors;
+    document.getElementById('r-incidents').textContent = s.openIncidents;
+    document.getElementById('r-expiring').textContent = s.expiringContracts;
+  } catch (e) { console.error('SCM stats failed:', e); flash('danger', 'Failed to load stats: ' + e.message); }
+}
+
+async function loadVendors() {
+  try {
+    const data = await Api.get('/scm/vendors', {size: 100, sort: 'createdAt,desc'});
+    _vendors = data.content || [];
+    const tb = document.getElementById('vendors-tbody');
+    if (!_vendors.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No data</td></tr>'; }
+    else tb.innerHTML = _vendors.map(v => `
+      <tr>
+        <td><strong>${vname(v)}</strong>${v.nameAr && !ar() ? `<br><small class="text-muted" dir="rtl">${v.nameAr}</small>`:''}</td>
+        <td><small>${v.category||''}</small></td>
+        <td>${badge(v.criticality)}</td>
+        <td><small>${v.country||''}</small></td>
+        <td><small>${v.serviceType||''}</small></td>
+        <td>${badge(v.riskLevel)}</td>
+        <td>${badge(v.status)}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1" onclick="editVendor(${v.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="startOnboardingFor(${v.id})" title="Start Onboarding"><i class="bi bi-clipboard-check"></i></button>
+        </td>
+      </tr>`).join('');
+
+    const dv = document.getElementById('dash-vendors-tbody');
+    if (dv) dv.innerHTML = _vendors.slice(0,5).map(v => `
+      <tr><td>${vname(v)}</td><td>${badge(v.criticality)}</td><td>${badge(v.status)}</td></tr>`).join('');
+
+    const sel = document.getElementById('incVendorId');
+    if (sel) sel.innerHTML = _vendors.map(v => `<option value="${v.id}">${vname(v)}</option>`).join('');
+  } catch (e) { console.error('Vendors load failed:', e); flash('danger', 'Failed to load vendors: ' + e.message); }
+}
+
+async function loadOverviewIncidents() {
+  try {
+    const d = await Api.get('/scm/incidents', {size: 5, sort: 'reportedAt,desc'});
+    const tb = document.getElementById('dash-incidents-tbody');
+    const list = d.content || [];
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>'; return; }
+    tb.innerHTML = list.map(i => `
+      <tr><td><small>${ar() && i.vendorNameAr ? i.vendorNameAr : (i.vendorNameEn||'')}</small></td>
+          <td><small>${i.incidentType||''}</small></td>
+          <td>${badge(i.impact)}</td>
+          <td>${badge(i.status)}</td></tr>`).join('');
+  } catch (e) { console.error('Overview incidents failed:', e); }
+}
+
+async function loadOnboarding() {
+  try {
+    const d = await Api.get('/scm/onboarding', {size: 50});
+    const tb = document.getElementById('onboarding-tbody');
+    const list = d.content || [];
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No data</td></tr>'; return; }
+    tb.innerHTML = list.map(o => `
+      <tr><td><strong>${ar() && o.vendorNameAr ? o.vendorNameAr : (o.vendorNameEn||'')}</strong></td>
+          <td><small><code>${o.currentStage||''}</code></small></td>
+          <td>${badge(o.status)}</td>
+          <td><small>${o.dueDate||'—'}</small></td>
+          <td><small>${(o.completedStages||'').split(',').filter(Boolean).length}/6</small></td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="advanceOnboarding(${o.id})" title="Advance"><i class="bi bi-arrow-right-circle"></i></button>
+            <button class="btn btn-sm btn-outline-success py-0 px-2 me-1" onclick="approveOnboarding(${o.id})" title="Approve"><i class="bi bi-check-circle"></i></button>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="rejectOnboarding(${o.id})" title="Reject"><i class="bi bi-x-circle"></i></button>
+          </td></tr>`).join('');
+  } catch (e) { console.error(e); flash('danger','Failed to load onboarding: ' + e.message); }
+}
+
+async function loadAssessments() {
+  try {
+    const d = await Api.get('/scm/assessments', {size: 50, sort: 'assessmentDate,desc'});
+    const tb = document.getElementById('assessments-tbody');
+    const list = d.content || [];
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No data</td></tr>'; return; }
+    tb.innerHTML = list.map(a => `
+      <tr><td><strong>${ar() && a.vendorNameAr ? a.vendorNameAr : (a.vendorNameEn||'')}</strong></td>
+          <td><small>${a.assessmentType||''}</small></td>
+          <td><small>${a.assessmentDate||''}</small></td>
+          <td><strong>${a.overallScore!=null?a.overallScore:'—'}</strong></td>
+          <td>${badge(a.riskRating)}</td>
+          <td>${badge(a.status)}</td>
+          <td><button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="escalateAssessment(${a.id})" title="Escalate to Risk"><i class="bi bi-exclamation-triangle"></i></button></td></tr>`).join('');
+  } catch (e) { console.error(e); flash('danger','Failed to load assessments: ' + e.message); }
+}
+
+async function loadDependencies() {
+  try {
+    const d = await Api.get('/scm/dependencies', {size: 100});
+    const tb = document.getElementById('deps-tbody');
+    const list = d.content || [];
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No data</td></tr>'; return; }
+    tb.innerHTML = list.map(x => `
+      <tr><td>${ar() && x.serviceNameAr ? x.serviceNameAr : (x.serviceNameEn||'')}</td>
+          <td><small>${x.assetName||''}</small></td>
+          <td><small>${x.vendorNameEn||''}</small></td>
+          <td><small>${x.dependencyType||''}</small></td>
+          <td>${badge(x.dependencyLevel)}</td>
+          <td>${x.hasAlternative?'<i class="bi bi-check-circle text-success"></i> '+(x.alternativeVendorNameEn||''):'<i class="bi bi-x-circle text-danger"></i>'}</td>
+          <td>${badge(x.status)}</td>
+          <td><button class="btn btn-sm btn-outline-secondary py-0 px-2"><i class="bi bi-pencil"></i></button></td></tr>`).join('');
+  } catch (e) { console.error(e); flash('danger','Failed to load dependencies: ' + e.message); }
+}
+
+async function loadIncidents() {
+  try {
+    const d = await Api.get('/scm/incidents', {size: 50, sort: 'reportedAt,desc'});
+    const tb = document.getElementById('incidents-tbody');
+    const list = d.content || [];
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No data</td></tr>'; return; }
+    tb.innerHTML = list.map(i => `
+      <tr><td><small><code>${i.incidentCode||''}</code></small></td>
+          <td><small>${ar() && i.vendorNameAr ? i.vendorNameAr : (i.vendorNameEn||'')}</small></td>
+          <td><small>${i.incidentType||''}</small></td>
+          <td>${badge(i.impact)}</td>
+          <td>${i.slaBreached?'<i class="bi bi-exclamation-triangle text-danger" title="SLA breached"></i>':'—'}</td>
+          <td>${badge(i.status)}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-info py-0 px-2 me-1" onclick="activateBackup(${i.id})" title="Activate Backup Plan"><i class="bi bi-shield-check"></i></button>
+            <button class="btn btn-sm btn-outline-warning py-0 px-2 me-1" onclick="createCapa(${i.id})" title="Create CAPA"><i class="bi bi-clipboard-plus"></i></button>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2 me-1" onclick="escalateIncident(${i.id})" title="Escalate to Mgmt"><i class="bi bi-arrow-up-circle"></i></button>
+            <button class="btn btn-sm btn-outline-success py-0 px-2" onclick="resolveIncident(${i.id})" title="Resolve"><i class="bi bi-check2-circle"></i></button>
+          </td></tr>`).join('');
+  } catch (e) { console.error(e); flash('danger','Failed to load incidents: ' + e.message); }
+}
+
+let _deps = [];
+async function loadResilience() {
+  try {
+    const d = await Api.get('/scm/dependencies', {size: 100});
+    _deps = d.content || [];
+    const tb = document.getElementById('resilience-tbody');
+    const list = _deps.filter(x => x.dependencyLevel === 'HIGH' || x.dependencyLevel === 'CRITICAL' || !x.hasAlternative);
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No data</td></tr>'; return; }
+    tb.innerHTML = list.map(x => `
+      <tr><td>${ar() && x.serviceNameAr ? x.serviceNameAr : (x.serviceNameEn||'')}</td>
+          <td><small>${x.vendorNameEn||''}</small></td>
+          <td><small>${x.alternativeVendorNameEn || '<span class="text-danger">— None —</span>'}</small></td>
+          <td>${badge(x.dependencyLevel)}</td>
+          <td>${x.hasAlternative ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">No alternative</span>'}</td>
+          <td>${x.hasAlternative
+            ? `<button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editDependency(${x.id})" title="Edit"><i class="bi bi-pencil"></i></button>`
+            : `<button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editDependency(${x.id})"><i class="bi bi-plus-circle me-1"></i><span data-i18n="scm.btn.addAlternative">Add Alternative</span></button>`}
+          </td></tr>`).join('');
+    if (typeof I18n !== 'undefined' && I18n.applyTranslations) I18n.applyTranslations();
+  } catch (e) { console.error(e); flash('danger','Failed to load resilience view: ' + e.message); }
+}
+
+// Open the dependency modal pre-populated for editing
+function editDependency(id){
+  const x = _deps.find(d => d.id === id); if (!x) return;
+  if (!_vendors.length) { loadVendors().then(() => _editDepInternal(x)); }
+  else { _editDepInternal(x); }
+}
+function _editDepInternal(x){
+  fillVendorSelects();
+  document.getElementById('depServiceEn').value = x.serviceNameEn || '';
+  document.getElementById('depServiceAr').value = x.serviceNameAr || '';
+  document.getElementById('depAsset').value = x.assetName || '';
+  document.getElementById('depVendorId').value = x.vendorId || '';
+  document.getElementById('depType').value = x.dependencyType || 'CRITICAL';
+  document.getElementById('depLevel').value = x.dependencyLevel || 'MEDIUM';
+  document.getElementById('depStatus').value = x.status || 'ACTIVE';
+  document.getElementById('depHasAlt').checked = !!x.hasAlternative;
+  document.getElementById('depAltVendorId').value = x.alternativeVendorId || '';
+  document.getElementById('depImpact').value = x.impactAnalysis || '';
+  // stash id so saveDependency can choose POST vs PUT
+  document.getElementById('dependencyModal').dataset.depId = x.id;
+  new bootstrap.Modal(document.getElementById('dependencyModal')).show();
+}
+
+async function loadContracts() {
+  try {
+    const d = await Api.get('/scm/contracts', {size: 100, sort: 'endDate'});
+    const tb = document.getElementById('contracts-tbody');
+    const list = d.content || [];
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No data</td></tr>'; return; }
+    tb.innerHTML = list.map(c => `
+      <tr><td><code>${c.contractNumber||''}</code></td>
+          <td><small>${c.vendorNameEn||''}</small></td>
+          <td><small>${ar() && c.titleAr ? c.titleAr : (c.titleEn||'')}</small></td>
+          <td><small>${c.contractType||''}</small></td>
+          <td><small>${c.startDate||''}</small></td>
+          <td><small>${c.endDate||''}</small></td>
+          <td><small>${c.contractValue?c.contractValue.toLocaleString():''} ${c.currency||''}</small></td>
+          <td>${badge(c.status)}</td></tr>`).join('');
+  } catch (e) { console.error(e); flash('danger','Failed to load contracts: ' + e.message); }
+}
+
+async function loadReports() {
+  // Cards are kept in sync by loadStats(); now populate the four breakdown tables.
+  try {
+    const [vendors, incidents, deps, contracts] = await Promise.all([
+      Api.get('/scm/vendors',      {size: 200, sort: 'createdAt,desc'}),
+      Api.get('/scm/incidents',    {size: 200, sort: 'reportedAt,desc'}),
+      Api.get('/scm/dependencies', {size: 200}),
+      Api.get('/scm/contracts',    {size: 200, sort: 'endDate'}),
+    ]);
+
+    // ── Vendors by criticality ──
+    const tot = (vendors.content || []).length || 1;
+    const byCrit = {CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0};
+    (vendors.content || []).forEach(v => { byCrit[v.criticality] = (byCrit[v.criticality] || 0) + 1; });
+    document.getElementById('rep-criticality').innerHTML = ['CRITICAL','HIGH','MEDIUM','LOW'].map(k => {
+      const n = byCrit[k] || 0; const pct = Math.round((n*100)/tot);
+      return `<tr><td style="width:30%">${badge(k)}</td>
+        <td><div class="progress" style="height:14px"><div class="progress-bar bg-${{CRITICAL:'danger',HIGH:'warning',MEDIUM:'info',LOW:'success'}[k]}" style="width:${pct}%"></div></div></td>
+        <td style="width:80px" class="text-end"><strong>${n}</strong> <small class="text-muted">(${pct}%)</small></td></tr>`;
+    }).join('');
+
+    // ── Incidents by impact ──
+    const itot = (incidents.content || []).length || 1;
+    const byImp = {CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0};
+    (incidents.content || []).forEach(i => { byImp[i.impact] = (byImp[i.impact] || 0) + 1; });
+    document.getElementById('rep-impact').innerHTML = ['CRITICAL','HIGH','MEDIUM','LOW'].map(k => {
+      const n = byImp[k] || 0; const pct = Math.round((n*100)/itot);
+      return `<tr><td style="width:30%">${badge(k)}</td>
+        <td><div class="progress" style="height:14px"><div class="progress-bar bg-${{CRITICAL:'danger',HIGH:'warning',MEDIUM:'info',LOW:'success'}[k]}" style="width:${pct}%"></div></div></td>
+        <td style="width:80px" class="text-end"><strong>${n}</strong> <small class="text-muted">(${pct}%)</small></td></tr>`;
+    }).join('');
+
+    // ── Dependencies by level ──
+    const dtot = (deps.content || []).length || 1;
+    const byLvl = {HIGH:0, MEDIUM:0, LOW:0};
+    (deps.content || []).forEach(d => { byLvl[d.dependencyLevel] = (byLvl[d.dependencyLevel] || 0) + 1; });
+    document.getElementById('rep-deps').innerHTML = ['HIGH','MEDIUM','LOW'].map(k => {
+      const n = byLvl[k] || 0; const pct = Math.round((n*100)/dtot);
+      return `<tr><td style="width:30%">${badge(k)}</td>
+        <td><div class="progress" style="height:14px"><div class="progress-bar bg-${{HIGH:'warning',MEDIUM:'info',LOW:'success'}[k]}" style="width:${pct}%"></div></div></td>
+        <td style="width:80px" class="text-end"><strong>${n}</strong> <small class="text-muted">(${pct}%)</small></td></tr>`;
+    }).join('');
+
+    // ── Expiring contracts (next 90 days) ──
+    const today = new Date(); const cutoff = new Date(today.getTime() + 90*24*60*60*1000);
+    const expiring = (contracts.content || []).filter(c => c.endDate && new Date(c.endDate) <= cutoff && new Date(c.endDate) >= today);
+    if (!expiring.length) {
+      document.getElementById('rep-expiring').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No contracts expiring</td></tr>';
+    } else {
+      document.getElementById('rep-expiring').innerHTML = expiring.map(c => `
+        <tr><td><small>${c.vendorNameEn || ''}</small></td>
+            <td><small>${ar() && c.titleAr ? c.titleAr : (c.titleEn || '')}</small></td>
+            <td><small><strong class="text-warning">${c.endDate}</strong></small></td></tr>`).join('');
+    }
+    if (typeof I18n !== 'undefined' && I18n.applyTranslations) I18n.applyTranslations();
+  } catch (e) { console.error(e); flash('danger','Failed to load reports: ' + e.message); }
+}
+
+// ── Tab switching ──
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+  if (name === 'vendors') loadVendors();
+  else if (name === 'onboarding') loadOnboarding();
+  else if (name === 'assessments') loadAssessments();
+  else if (name === 'dependencies') loadDependencies();
+  else if (name === 'incidents') loadIncidents();
+  else if (name === 'resilience') loadResilience();
+  else if (name === 'contracts') loadContracts();
+  else if (name === 'reports') loadReports();
+}
+
+// ── Vendor actions ──
+function openVendorModal(){
+  ['vendorId','vendorNameEn','vendorNameAr','vendorCountry','vendorServiceType','vendorContactName','vendorContactEmail']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  new bootstrap.Modal(document.getElementById('vendorModal')).show();
+}
+function editVendor(id){
+  const v = _vendors.find(x => x.id === id); if (!v) return;
+  document.getElementById('vendorId').value = id;
+  document.getElementById('vendorNameEn').value = v.nameEn || '';
+  document.getElementById('vendorNameAr').value = v.nameAr || '';
+  document.getElementById('vendorCategory').value = v.category || 'IT_SERVICES';
+  document.getElementById('vendorCriticality').value = v.criticality || 'MEDIUM';
+  document.getElementById('vendorRiskLevel').value = v.riskLevel || 'MEDIUM';
+  document.getElementById('vendorCountry').value = v.country || '';
+  document.getElementById('vendorServiceType').value = v.serviceType || '';
+  document.getElementById('vendorContactName').value = v.contactName || '';
+  document.getElementById('vendorContactEmail').value = v.contactEmail || '';
+  new bootstrap.Modal(document.getElementById('vendorModal')).show();
+}
+async function saveVendor(){
+  const id = document.getElementById('vendorId').value;
+  const body = {
+    nameEn: document.getElementById('vendorNameEn').value,
+    nameAr: document.getElementById('vendorNameAr').value,
+    category: document.getElementById('vendorCategory').value,
+    criticality: document.getElementById('vendorCriticality').value,
+    riskLevel: document.getElementById('vendorRiskLevel').value,
+    country: document.getElementById('vendorCountry').value,
+    serviceType: document.getElementById('vendorServiceType').value,
+    contactName: document.getElementById('vendorContactName').value,
+    contactEmail: document.getElementById('vendorContactEmail').value
+  };
+  try {
+    if (id) await Api.put('/scm/vendors/' + id, body);
+    else    await Api.post('/scm/vendors', body);
+    bootstrap.Modal.getInstance(document.getElementById('vendorModal')).hide();
+    flash('success', id ? 'Vendor updated.' : 'Vendor created.');
+    await loadVendors(); await loadStats();
+  } catch (e) { flash('danger','Save failed: ' + e.message); }
+}
+
+// ── Onboarding actions ──
+async function startOnboardingFor(vendorId){
+  try {
+    await Api.post('/scm/onboarding', {vendorId});
+    flash('success','Onboarding started.');
+    await loadStats();
+    switchTab('onboarding');
+  } catch (e) { flash('danger','Failed: ' + e.message); }
+}
+async function advanceOnboarding(id){
+  try { await Api.post('/scm/onboarding/' + id + '/advance'); loadOnboarding(); loadStats(); flash('success','Stage advanced.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+async function approveOnboarding(id){
+  try { await Api.post('/scm/onboarding/' + id + '/approve'); loadOnboarding(); loadStats(); flash('success','Onboarding approved.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+async function rejectOnboarding(id){
+  const reason = prompt('Rejection reason:'); if (reason === null) return;
+  try { await Api.post('/scm/onboarding/' + id + '/reject', {reason}); loadOnboarding(); loadStats(); flash('success','Onboarding rejected.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+
+// ── Assessment actions ──
+async function escalateAssessment(id){
+  try { await Api.post('/scm/assessments/' + id + '/escalate'); loadAssessments(); flash('success','Escalated to Enterprise Risk.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+
+// ── Incident actions ──
+function openIncidentModal(){
+  document.getElementById('incDesc').value = '';
+  document.getElementById('incSlaBreach').checked = false;
+  if (!_vendors.length) loadVendors();
+  new bootstrap.Modal(document.getElementById('incidentModal')).show();
+}
+async function saveIncident(){
+  const body = {
+    vendorId: parseInt(document.getElementById('incVendorId').value),
+    incidentType: document.getElementById('incType').value,
+    impact: document.getElementById('incImpact').value,
+    description: document.getElementById('incDesc').value,
+    slaBreached: document.getElementById('incSlaBreach').checked
+  };
+  try {
+    await Api.post('/scm/incidents', body);
+    bootstrap.Modal.getInstance(document.getElementById('incidentModal')).hide();
+    flash('success','Incident registered.');
+    loadIncidents(); loadStats();
+  } catch (e) { flash('danger','Failed: ' + e.message); }
+}
+async function activateBackup(id){
+  try { await Api.post('/scm/incidents/' + id + '/activate-backup'); loadIncidents(); flash('success','Backup plan activated.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+async function createCapa(id){
+  try { await Api.post('/scm/incidents/' + id + '/create-capa'); loadIncidents(); flash('success','CAPA created.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+async function escalateIncident(id){
+  try { await Api.post('/scm/incidents/' + id + '/escalate'); loadIncidents(); loadStats(); flash('success','Escalated to management.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+async function resolveIncident(id){
+  const notes = prompt('Resolution notes:') || '';
+  try { await Api.post('/scm/incidents/' + id + '/resolve', {notes}); loadIncidents(); loadStats(); flash('success','Incident resolved.'); }
+  catch (e) { flash('danger','Failed: ' + e.message); }
+}
+
+// ── Helper: populate every <select> that lists vendors ──
+function fillVendorSelects() {
+  const opts = _vendors.map(v => `<option value="${v.id}">${vname(v)}</option>`).join('');
+  ['incVendorId','obVendorId','asVendorId','depVendorId','ctVendorId'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+  const altSel = document.getElementById('depAltVendorId');
+  if (altSel) altSel.innerHTML = '<option value="">— None —</option>' + opts;
+}
+
+// ── Onboarding modal ──
+function openOnboardingModal(){
+  if (!_vendors.length) loadVendors().then(() => { fillVendorSelects(); _showOnboardingModal(); });
+  else { fillVendorSelects(); _showOnboardingModal(); }
+}
+function _showOnboardingModal(){
+  document.getElementById('obDueDate').value = '';
+  document.getElementById('obAssignedTo').value = '';
+  document.getElementById('obNotes').value = '';
+  new bootstrap.Modal(document.getElementById('onboardingModal')).show();
+}
+async function saveOnboarding(){
+  const body = {
+    vendorId: parseInt(document.getElementById('obVendorId').value),
+    dueDate:  document.getElementById('obDueDate').value || null,
+    assignedToId: document.getElementById('obAssignedTo').value ? parseInt(document.getElementById('obAssignedTo').value) : null,
+    notes:    document.getElementById('obNotes').value
+  };
+  try {
+    await Api.post('/scm/onboarding', body);
+    bootstrap.Modal.getInstance(document.getElementById('onboardingModal')).hide();
+    flash('success','Onboarding started.');
+    switchTab('onboarding');
+    await loadStats();
+  } catch (e) { flash('danger','Failed: ' + e.message); }
+}
+
+// ── Assessment modal ──
+function openAssessmentModal(){
+  if (!_vendors.length) loadVendors().then(() => { fillVendorSelects(); _showAssessmentModal(); });
+  else { fillVendorSelects(); _showAssessmentModal(); }
+}
+function _showAssessmentModal(){
+  document.getElementById('asScore').value = 3.5;
+  document.getElementById('asRating').value = 'MEDIUM';
+  document.getElementById('asStatus').value = 'IN_PROGRESS';
+  document.getElementById('asType').value = 'INITIAL';
+  document.getElementById('asDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('asNextDate').value = '';
+  document.getElementById('asFindings').value = '';
+  document.getElementById('asRecommendations').value = '';
+  new bootstrap.Modal(document.getElementById('assessmentModal')).show();
+}
+async function saveAssessment(){
+  const body = {
+    vendorId:           parseInt(document.getElementById('asVendorId').value),
+    assessmentType:     document.getElementById('asType').value,
+    overallScore:       parseFloat(document.getElementById('asScore').value),
+    riskRating:         document.getElementById('asRating').value,
+    status:             document.getElementById('asStatus').value,
+    assessmentDate:     document.getElementById('asDate').value || null,
+    nextAssessmentDate: document.getElementById('asNextDate').value || null,
+    findings:           document.getElementById('asFindings').value,
+    recommendations:    document.getElementById('asRecommendations').value
+  };
+  try {
+    await Api.post('/scm/assessments', body);
+    bootstrap.Modal.getInstance(document.getElementById('assessmentModal')).hide();
+    flash('success','Assessment created.');
+    switchTab('assessments');
+  } catch (e) { flash('danger','Failed: ' + e.message); }
+}
+
+// ── Dependency modal ──
+function openDependencyModal(){
+  if (!_vendors.length) loadVendors().then(() => { fillVendorSelects(); _showDepModal(); });
+  else { fillVendorSelects(); _showDepModal(); }
+}
+function _showDepModal(){
+  ['depServiceEn','depServiceAr','depAsset','depImpact'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('depType').value = 'CRITICAL';
+  document.getElementById('depLevel').value = 'MEDIUM';
+  document.getElementById('depStatus').value = 'ACTIVE';
+  document.getElementById('depHasAlt').checked = false;
+  document.getElementById('depAltVendorId').value = '';
+  document.getElementById('dependencyModal').dataset.depId = '';
+  new bootstrap.Modal(document.getElementById('dependencyModal')).show();
+}
+async function saveDependency(){
+  const altVal = document.getElementById('depAltVendorId').value;
+  const editId = document.getElementById('dependencyModal').dataset.depId;
+  const body = {
+    serviceNameEn: document.getElementById('depServiceEn').value,
+    serviceNameAr: document.getElementById('depServiceAr').value,
+    assetName:     document.getElementById('depAsset').value,
+    vendorId:      parseInt(document.getElementById('depVendorId').value),
+    dependencyType:  document.getElementById('depType').value,
+    dependencyLevel: document.getElementById('depLevel').value,
+    hasAlternative:  document.getElementById('depHasAlt').checked,
+    alternativeVendorId: altVal ? parseInt(altVal) : null,
+    status:         document.getElementById('depStatus').value,
+    impactAnalysis: document.getElementById('depImpact').value
+  };
+  try {
+    if (editId) await Api.put('/scm/dependencies/' + editId, body);
+    else        await Api.post('/scm/dependencies', body);
+    bootstrap.Modal.getInstance(document.getElementById('dependencyModal')).hide();
+    flash('success', editId ? 'Dependency updated.' : 'Dependency created.');
+    document.getElementById('dependencyModal').dataset.depId = '';
+    // Reload whichever tab is currently visible
+    const active = document.querySelector('.tab-btn.active');
+    const which = active ? active.dataset.tab : 'dependencies';
+    if (which === 'resilience') await loadResilience();
+    else { switchTab('dependencies'); }
+    await loadStats();
+  } catch (e) { flash('danger','Failed: ' + e.message); }
+}
+
+// ── Contract modal ──
+function openContractModal(){
+  if (!_vendors.length) loadVendors().then(() => { fillVendorSelects(); _showContractModal(); });
+  else { fillVendorSelects(); _showContractModal(); }
+}
+function _showContractModal(){
+  ['ctNumber','ctTitleEn','ctTitleAr','ctValue','ctNotes','ctStart','ctEnd'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ctType').value = 'SERVICE';
+  document.getElementById('ctCurrency').value = 'SAR';
+  document.getElementById('ctStatus').value = 'ACTIVE';
+  document.getElementById('ctAutoRenew').checked = false;
+  new bootstrap.Modal(document.getElementById('contractModal')).show();
+}
+async function saveContract(){
+  const v = document.getElementById('ctValue').value;
+  const body = {
+    vendorId: parseInt(document.getElementById('ctVendorId').value),
+    contractNumber: document.getElementById('ctNumber').value,
+    titleEn:   document.getElementById('ctTitleEn').value,
+    titleAr:   document.getElementById('ctTitleAr').value,
+    contractType: document.getElementById('ctType').value,
+    startDate: document.getElementById('ctStart').value || null,
+    endDate:   document.getElementById('ctEnd').value || null,
+    autoRenewal: document.getElementById('ctAutoRenew').checked,
+    contractValue: v ? parseFloat(v) : null,
+    currency:  document.getElementById('ctCurrency').value,
+    status:    document.getElementById('ctStatus').value,
+    notes:     document.getElementById('ctNotes').value
+  };
+  try {
+    await Api.post('/scm/contracts', body);
+    bootstrap.Modal.getInstance(document.getElementById('contractModal')).hide();
+    flash('success','Contract created.');
+    switchTab('contracts');
+    await loadStats();
+  } catch (e) { flash('danger','Failed: ' + e.message); }
+}
+
+// ── Boot ──
+async function init() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  await loadStats();
+  await loadVendors();
+  await loadOverviewIncidents();
+}
+document.addEventListener('DOMContentLoaded', () => init());
+</script>
+</body>
+</html>

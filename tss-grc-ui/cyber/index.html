@@ -1,0 +1,2582 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title data-i18n="cyber.page.title">Cyber Security — TSS GRC</title>
+
+<link id="bootstrap-css"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+<link rel="stylesheet" href="/assets/css/style.css"/>
+<link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+
+<style>
+/* ── KPI Grid ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:800px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.kpi-grid{grid-template-columns:1fr 1fr;gap:.6rem}}
+.kpi-card{background:var(--color-surface,#fff);border:1px solid var(--color-border,#e5e7eb);
+  border-radius:12px;padding:1.1rem 1.25rem 1rem;display:flex;align-items:flex-start;gap:1rem;
+  border-top:3px solid transparent;box-shadow:0 1px 3px rgba(0,0,0,.06);
+  transition:box-shadow .2s,transform .15s}
+.kpi-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.1);transform:translateY(-1px)}
+[dir=rtl] .kpi-card{flex-direction:row-reverse;text-align:right}
+.kc-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;font-size:1.25rem}
+.kc-val{font-size:2rem;font-weight:900;line-height:1;letter-spacing:-1.5px;
+  color:var(--color-text,#111)}
+.kc-lbl{font-size:11px;font-weight:600;text-transform:uppercase;
+  color:var(--color-text-muted,#6b7280);letter-spacing:.5px;margin-top:2px}
+.kc-blue  {border-top-color:#3b82f6}.kc-blue   .kc-icon{background:#eff6ff;color:#3b82f6}
+.kc-teal  {border-top-color:#14b8a6}.kc-teal   .kc-icon{background:#f0fdfa;color:#14b8a6}
+.kc-green {border-top-color:#22c55e}.kc-green  .kc-icon{background:#f0fdf4;color:#22c55e}
+.kc-red   {border-top-color:#ef4444}.kc-red    .kc-icon{background:#fef2f2;color:#ef4444}
+.kc-purple{border-top-color:#a855f7}.kc-purple .kc-icon{background:#faf5ff;color:#a855f7}
+.kc-amber {border-top-color:#f59e0b}.kc-amber  .kc-icon{background:#fffbeb;color:#f59e0b}
+.kc-orange{border-top-color:#f97316}.kc-orange .kc-icon{background:#fff7ed;color:#f97316}
+.kc-indigo{border-top-color:#6366f1}.kc-indigo .kc-icon{background:#eef2ff;color:#6366f1}
+
+/* ── Tabs ── */
+.tab-nav{display:flex;gap:.25rem;border-bottom:2px solid var(--color-border,#e5e7eb);
+  padding-bottom:0;margin-bottom:1.5rem;overflow-x:auto;flex-wrap:nowrap}
+.tab-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem .85rem;
+  border:none;background:none;border-radius:8px 8px 0 0;font-size:.82rem;font-weight:500;
+  color:var(--color-text-muted,#6b7280);cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s}
+.tab-btn:hover{color:var(--color-primary,#0066ff);background:var(--color-bg,#f8f9fa)}
+.tab-btn.active{color:var(--color-primary,#0066ff);border-bottom-color:var(--color-primary,#0066ff);
+  font-weight:600}
+.tab-panel{display:none}.tab-panel.active{display:block}
+[dir=rtl] .tab-nav{flex-direction:row-reverse}
+[dir=rtl] .tab-btn{flex-direction:row-reverse}
+
+/* ── Table / Filter ── */
+.table-sm td,.table-sm th{padding:.45rem .6rem;font-size:.82rem;vertical-align:middle}
+.filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
+[dir=rtl] .filter-bar{flex-direction:row-reverse}
+
+/* ── Workflow progress bar ── */
+.wf-bar{display:flex;gap:0;margin-bottom:1rem;flex-wrap:wrap}
+.wf-step{flex:1;text-align:center;font-size:.65rem;font-weight:600;
+  padding:.35rem .4rem;background:var(--color-surface2,#f8fafc);
+  border:1px solid var(--color-border,#e5e7eb);color:var(--color-text-muted,#6b7280);
+  border-right:none;cursor:default;white-space:nowrap}
+.wf-step:last-child{border-right:1px solid var(--color-border,#e5e7eb)}
+.wf-step.done{background:#dcfce7;color:#16a34a;border-color:#bbf7d0}
+.wf-step.current{background:var(--color-primary,#0066ff);color:#fff;
+  border-color:var(--color-primary,#0066ff);font-weight:700}
+[dir=rtl] .wf-bar{flex-direction:row-reverse}
+[dir=rtl] .wf-step{border-right:1px solid var(--color-border,#e5e7eb);border-left:none}
+[dir=rtl] .wf-step:last-child{border-left:1px solid var(--color-border,#e5e7eb)}
+
+/* ── Section sub-header ── */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:.65rem 1rem;background:var(--color-surface2,#f8fafc);
+  border-radius:8px;margin-bottom:1rem;border:1px solid var(--color-border,#e5e7eb)}
+.section-hdr h6{margin:0;font-size:.88rem;font-weight:700}
+[dir=rtl] .section-hdr{flex-direction:row-reverse}
+
+/* ── Progress bar ── */
+.prog-bar-wrap{height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;min-width:80px}
+.prog-bar-fill{height:100%;background:var(--color-primary,#0066ff);border-radius:4px;
+  transition:width .4s}
+
+/* ── Chart container ── */
+.chart-wrap{position:relative;height:220px}
+
+/* ── Overdue indicator ── */
+.overdue-dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:#ef4444;margin-left:4px;vertical-align:middle}
+</style>
+</head>
+<body class="grc-body">
+<div id="app-shell"></div>
+
+<div id="page-content" class="p-4">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb breadcrumb-sm">
+      <li class="breadcrumb-item">
+        <a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
+      <li class="breadcrumb-item active" data-i18n="cyber.page.breadcrumb">Cyber Security</li>
+    </ol>
+  </nav>
+
+  <!-- Page header -->
+  <div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h4 class="mb-1 fw-700" data-i18n="cyber.page.title">Cyber Security</h4>
+      <p class="text-muted mb-0" style="font-size:.83rem" data-i18n="cyber.page.subtitle">
+        Controls, Vulnerabilities, Incidents &amp; Compliance — NCA ECC / ISO 27001</p>
+    </div>
+  </div>
+
+  <!-- ══ KPI Grid (always visible above tabs) ══ -->
+  <div class="kpi-grid">
+    <div class="kpi-card kc-blue">
+      <div class="kc-icon"><i class="bi bi-shield-check"></i></div>
+      <div><div class="kc-val" id="k-controls">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.controls">Total Controls</div></div>
+    </div>
+    <div class="kpi-card kc-green">
+      <div class="kc-icon"><i class="bi bi-check-circle"></i></div>
+      <div><div class="kc-val" id="k-compliant">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.compliant">Compliant</div></div>
+    </div>
+    <div class="kpi-card kc-red">
+      <div class="kc-icon"><i class="bi bi-x-circle"></i></div>
+      <div><div class="kc-val" id="k-noncompliant">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.noncompliant">Non-Compliant</div></div>
+    </div>
+    <div class="kpi-card kc-amber">
+      <div class="kc-icon"><i class="bi bi-bug"></i></div>
+      <div><div class="kc-val" id="k-vulns">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.vulns">Open Vulnerabilities</div></div>
+    </div>
+    <div class="kpi-card kc-orange">
+      <div class="kc-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <div><div class="kc-val" id="k-critvulns">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.critvulns">Critical Vulns</div></div>
+    </div>
+    <div class="kpi-card kc-purple">
+      <div class="kc-icon"><i class="bi bi-exclamation-octagon"></i></div>
+      <div><div class="kc-val" id="k-incidents">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.incidents">Open Incidents</div></div>
+    </div>
+    <div class="kpi-card kc-teal">
+      <div class="kc-icon"><i class="bi bi-list-task"></i></div>
+      <div><div class="kc-val" id="k-actions">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.actions">Open Action Plans</div></div>
+    </div>
+    <div class="kpi-card kc-indigo">
+      <div class="kc-icon"><i class="bi bi-server"></i></div>
+      <div><div class="kc-val" id="k-assets">—</div>
+        <div class="kc-lbl" data-i18n="cyber.kpi.assets">Total Assets</div></div>
+    </div>
+  </div>
+
+  <!-- ══ Tab Navigation ══ -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="overview">
+      <i class="bi bi-speedometer2"></i>
+      <span data-i18n="cyber.nav.overview">Overview</span></button>
+    <button class="tab-btn" data-tab="controls">
+      <i class="bi bi-shield-lock"></i>
+      <span data-i18n="cyber.nav.controls">Controls Library</span></button>
+    <button class="tab-btn" data-tab="subcontrols">
+      <i class="bi bi-list-nested"></i>
+      <span data-i18n="cyber.nav.subcontrols">Sub-Controls</span></button>
+    <button class="tab-btn" data-tab="assessments">
+      <i class="bi bi-clipboard2-check"></i>
+      <span data-i18n="cyber.nav.assessments">Control Assessments</span></button>
+    <button class="tab-btn" data-tab="vulnerabilities">
+      <i class="bi bi-bug-fill"></i>
+      <span data-i18n="cyber.nav.vulnerabilities">Vulnerabilities &amp; Exceptions</span></button>
+    <button class="tab-btn" data-tab="incidents">
+      <i class="bi bi-exclamation-octagon-fill"></i>
+      <span data-i18n="cyber.nav.incidents">Cyber Incidents</span></button>
+    <button class="tab-btn" data-tab="assets">
+      <i class="bi bi-hdd-stack"></i>
+      <span data-i18n="cyber.nav.assets">Assets &amp; Systems</span></button>
+    <button class="tab-btn" data-tab="evidence">
+      <i class="bi bi-folder2-open"></i>
+      <span data-i18n="cyber.nav.evidence">Evidence &amp; Compliance</span></button>
+    <button class="tab-btn" data-tab="actionplans">
+      <i class="bi bi-check2-square"></i>
+      <span data-i18n="cyber.nav.actionplans">Action Plans</span></button>
+    <button class="tab-btn" data-tab="reporting">
+      <i class="bi bi-bar-chart-line"></i>
+      <span data-i18n="cyber.nav.reporting">Reporting</span></button>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 1 — OVERVIEW
+  ════════════════════════════════════════ -->
+  <div class="tab-panel active" id="tab-overview">
+    <div class="row g-3">
+      <!-- Recent Incidents -->
+      <div class="col-12 col-xl-4">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-transparent fw-600 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-exclamation-octagon me-2 text-danger"></i>
+              <span data-i18n="cyber.dash.recentIncidents">Recent Incidents</span></span>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem"
+                    onclick="switchTab('incidents')" data-i18n="common.view">View All</button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light"><tr>
+                <th data-i18n="cyber.field.type">Type</th>
+                <th data-i18n="cyber.field.severity">Severity</th>
+                <th data-i18n="cyber.field.status">Status</th>
+              </tr></thead>
+              <tbody id="dash-incidents-tbody">
+                <tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- Recent Vulnerabilities -->
+      <div class="col-12 col-xl-4">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-transparent fw-600 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-bug me-2 text-warning"></i>
+              <span data-i18n="cyber.dash.recentVulns">Recent Vulnerabilities</span></span>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem"
+                    onclick="switchTab('vulnerabilities')" data-i18n="common.view">View All</button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light"><tr>
+                <th data-i18n="cyber.field.asset">Asset</th>
+                <th data-i18n="cyber.field.severity">Severity</th>
+                <th data-i18n="cyber.field.status">Status</th>
+              </tr></thead>
+              <tbody id="dash-vulns-tbody">
+                <tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- Open Action Plans -->
+      <div class="col-12 col-xl-4">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-transparent fw-600 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-task me-2 text-primary"></i>
+              <span data-i18n="cyber.dash.openActions">Open Action Plans</span></span>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem"
+                    onclick="switchTab('actionplans')" data-i18n="common.view">View All</button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light"><tr>
+                <th data-i18n="label.title">Title</th>
+                <th data-i18n="cyber.field.priority">Priority</th>
+                <th data-i18n="cyber.field.status">Status</th>
+              </tr></thead>
+              <tbody id="dash-actions-tbody">
+                <tr><td colspan="3" class="text-center text-muted py-3" data-i18n="common.loading">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- Control Compliance Doughnut -->
+      <div class="col-12 col-md-6">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-shield-check me-2 text-primary"></i>Control Compliance Status</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="complianceChart"></canvas></div></div>
+        </div>
+      </div>
+      <!-- Vulns by Severity Bar -->
+      <div class="col-12 col-md-6">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-transparent fw-600">
+            <i class="bi bi-bar-chart me-2 text-warning"></i>Vulnerabilities by Severity</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="vulnChart"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 2 — CONTROLS LIBRARY
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-controls">
+    <div class="filter-bar">
+      <input type="search" class="form-control form-control-sm" id="ctrl-search"
+             style="max-width:220px" placeholder="Search controls…"/>
+      <select class="form-select form-select-sm" id="ctrl-filter-fw" style="max-width:160px">
+        <option value="">All Frameworks</option>
+        <option>NCA ECC</option><option>ISO 27001</option>
+        <option>PCI DSS</option><option>NIST</option><option>SAMA CSF</option>
+      </select>
+      <select class="form-select form-select-sm" id="ctrl-filter-status" style="max-width:160px">
+        <option value="">All Statuses</option>
+        <option value="COMPLIANT">Compliant</option>
+        <option value="NON_COMPLIANT">Non-Compliant</option>
+        <option value="PARTIAL">Partial</option>
+        <option value="NOT_ASSESSED">Not Assessed</option>
+      </select>
+      <button class="btn btn-sm btn-primary ms-auto" onclick="openControlModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.addControl">Add Control</span></button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="cyber.field.framework">Framework</th>
+              <th data-i18n="cyber.field.domain">Domain</th>
+              <th>#</th>
+              <th data-i18n="cyber.field.control">Control</th>
+              <th data-i18n="cyber.field.maturity">Maturity</th>
+              <th data-i18n="label.implStatus">Impl. Status</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="controls-tbody">
+              <tr><td colspan="8" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="ctrl-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 3 — SUB-CONTROLS
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-subcontrols">
+    <div class="filter-bar">
+      <input type="search" class="form-control form-control-sm" id="sc-search"
+             style="max-width:220px" placeholder="Search sub-controls…"/>
+      <select class="form-select form-select-sm" id="sc-filter-ctrl" style="max-width:220px">
+        <option value="">All Controls</option>
+      </select>
+      <button class="btn btn-sm btn-primary ms-auto" onclick="openSubControlModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.addSubControl">Add Sub-Control</span></button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="label.parentControl">Parent Control</th>
+              <th>#</th>
+              <th data-i18n="label.title">Title</th>
+              <th data-i18n="cyber.field.owner">Owner</th>
+              <th data-i18n="cyber.field.maturity">Maturity</th>
+              <th data-i18n="label.implStatus">Impl. Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="subcontrols-tbody">
+              <tr><td colspan="7" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="sc-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 4 — CONTROL ASSESSMENTS
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-assessments">
+    <div class="filter-bar">
+      <input type="search" class="form-control form-control-sm" id="ass-search"
+             style="max-width:220px" placeholder="Search assessments…"/>
+      <select class="form-select form-select-sm" id="ass-filter-status" style="max-width:160px">
+        <option value="">All Statuses</option>
+        <option>DRAFT</option><option>IN_PROGRESS</option>
+        <option>UNDER_REVIEW</option><option>APPROVED</option><option>CLOSED</option>
+      </select>
+      <button class="btn btn-sm btn-primary ms-auto" onclick="openAssessmentModal(null)">
+        <i class="bi bi-play-circle me-1"></i>
+        <span data-i18n="cyber.btn.startAssessment">Start Assessment</span></button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="cyber.field.control">Control</th>
+              <th data-i18n="label.assessor">Assessor</th>
+              <th data-i18n="label.date">Date</th>
+              <th data-i18n="cyber.field.result">Result</th>
+              <th data-i18n="cyber.field.maturity">Maturity</th>
+              <th data-i18n="cyber.field.gap">Gap</th>
+              <th data-i18n="label.capa">CAPA</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="assessments-tbody">
+              <tr><td colspan="9" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="ass-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 5 — VULNERABILITIES & EXCEPTIONS
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-vulnerabilities">
+
+    <!-- Vulnerabilities Section -->
+    <div class="section-hdr">
+      <h6><i class="bi bi-bug-fill me-2 text-warning"></i>
+        <span data-i18n="cyber.vulnerabilities">Vulnerabilities</span></h6>
+      <button class="btn btn-sm btn-warning text-dark" onclick="openVulnModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.registerVuln">Register Vulnerability</span></button>
+    </div>
+    <div class="filter-bar mb-2">
+      <input type="search" class="form-control form-control-sm" id="vuln-search"
+             style="max-width:220px" placeholder="Search vulnerabilities…"/>
+      <select class="form-select form-select-sm" id="vuln-filter-sev" style="max-width:140px">
+        <option value="">All Severities</option>
+        <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+      <select class="form-select form-select-sm" id="vuln-filter-status" style="max-width:160px">
+        <option value="">All Statuses</option>
+        <option>REGISTERED</option><option>CLASSIFICATION</option>
+        <option>OWNER_ASSIGNMENT</option><option>REMEDIATION</option>
+        <option>VERIFICATION</option><option>CLOSED</option>
+      </select>
+    </div>
+    <!-- Workflow steps -->
+    <div class="wf-bar mb-3">
+      <div class="wf-step">1. Register</div>
+      <div class="wf-step">2. Classification</div>
+      <div class="wf-step">3. Owner Assignment</div>
+      <div class="wf-step">4. Remediation</div>
+      <div class="wf-step">5. Verification</div>
+      <div class="wf-step">6. Closure</div>
+    </div>
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="cyber.field.asset">Asset</th>
+              <th data-i18n="label.vulnerability">Vulnerability</th>
+              <th data-i18n="label.cve">CVE</th>
+              <th data-i18n="cyber.field.severity">Severity</th>
+              <th data-i18n="cyber.field.owner">Owner</th>
+              <th data-i18n="label.slaDays">SLA (days)</th>
+              <th data-i18n="label.dueDate">Due Date</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="vulns-tbody">
+              <tr><td colspan="9" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="vuln-pagination" class="d-flex justify-content-end mb-4 gap-2"></div>
+
+    <!-- Exceptions Section -->
+    <div class="section-hdr">
+      <h6><i class="bi bi-file-earmark-x me-2 text-secondary"></i>Exceptions</h6>
+      <button class="btn btn-sm btn-outline-secondary" onclick="openExceptionModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.requestException">Request Exception</span></button>
+    </div>
+    <!-- Exception Workflow -->
+    <div class="wf-bar mb-3">
+      <div class="wf-step">1. Request</div>
+      <div class="wf-step">2. Impact Assessment</div>
+      <div class="wf-step">3. Compensating Controls</div>
+      <div class="wf-step">4. Approval</div>
+      <div class="wf-step">5. Expiry</div>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="label.exceptionTitle">Exception Title</th>
+              <th data-i18n="cyber.field.owner">Owner</th>
+              <th data-i18n="label.approver">Approver</th>
+              <th data-i18n="label.expiryDate">Expiry Date</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="exceptions-tbody">
+              <tr><td colspan="6" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="exc-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 6 — CYBER INCIDENTS
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-incidents">
+    <!-- Incident Workflow -->
+    <div class="wf-bar mb-3">
+      <div class="wf-step">Detection</div>
+      <div class="wf-step">Logging</div>
+      <div class="wf-step">Triage</div>
+      <div class="wf-step">Containment</div>
+      <div class="wf-step">Investigation</div>
+      <div class="wf-step">Eradication</div>
+      <div class="wf-step">Recovery</div>
+      <div class="wf-step">Closure</div>
+      <div class="wf-step">Lessons Learned</div>
+    </div>
+    <div class="filter-bar">
+      <input type="search" class="form-control form-control-sm" id="inc-search"
+             style="max-width:220px" placeholder="Search incidents…"/>
+      <select class="form-select form-select-sm" id="inc-filter-sev" style="max-width:140px">
+        <option value="">All Severities</option>
+        <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+      <select class="form-select form-select-sm" id="inc-filter-status" style="max-width:180px">
+        <option value="">All Statuses</option>
+        <option>DETECTION</option><option>LOGGING</option><option>TRIAGE</option>
+        <option>CONTAINMENT</option><option>INVESTIGATION</option>
+        <option>ERADICATION</option><option>RECOVERY</option>
+        <option>CLOSURE</option><option>LESSONS_LEARNED</option>
+      </select>
+      <button class="btn btn-sm btn-danger ms-auto" onclick="openIncidentModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.registerIncident">Register Incident</span></button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="label.incidentNo">Incident #</th>
+              <th data-i18n="cyber.field.type">Type</th>
+              <th data-i18n="label.affectedAsset">Affected Asset</th>
+              <th data-i18n="label.impact">Impact</th>
+              <th data-i18n="cyber.field.severity">Severity</th>
+              <th data-i18n="label.lead">Lead</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="incidents-tbody">
+              <tr><td colspan="8" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="inc-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 7 — ASSETS & SYSTEMS
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-assets">
+    <div class="filter-bar">
+      <input type="search" class="form-control form-control-sm" id="ast-search"
+             style="max-width:220px" placeholder="Search assets…"/>
+      <select class="form-select form-select-sm" id="ast-filter-crit" style="max-width:140px">
+        <option value="">All Criticality</option>
+        <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+      <select class="form-select form-select-sm" id="ast-filter-type" style="max-width:140px">
+        <option value="">All Types</option>
+        <option>SERVER</option><option>WORKSTATION</option><option>NETWORK</option>
+        <option>APPLICATION</option><option>DATABASE</option><option>CLOUD</option>
+      </select>
+      <button class="btn btn-sm btn-primary ms-auto" onclick="openAssetModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.addAsset">Add Asset</span></button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="label.assetName">Asset Name</th>
+              <th data-i18n="cyber.field.type">Type</th>
+              <th data-i18n="label.businessOwner">Business Owner</th>
+              <th data-i18n="label.technicalOwner">Technical Owner</th>
+              <th data-i18n="label.classification">Classification</th>
+              <th data-i18n="label.criticality">Criticality</th>
+              <th data-i18n="label.ipHost">IP / Host</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="assets-tbody">
+              <tr><td colspan="9" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="ast-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 8 — EVIDENCE & COMPLIANCE
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-evidence">
+    <div class="filter-bar">
+      <input type="search" class="form-control form-control-sm" id="ev-search"
+             style="max-width:220px" placeholder="Search evidence…"/>
+      <select class="form-select form-select-sm" id="ev-filter-status" style="max-width:140px">
+        <option value="">All Statuses</option>
+        <option>CURRENT</option><option>EXPIRED</option><option>PENDING</option>
+      </select>
+      <button class="btn btn-sm btn-success ms-auto" onclick="openEvidenceModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.addEvidence">Add Evidence</span></button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="label.evidenceTitle">Evidence Title</th>
+              <th data-i18n="cyber.field.type">Type</th>
+              <th data-i18n="label.linkedControl">Linked Control</th>
+              <th data-i18n="label.frameworkReq">Framework Req.</th>
+              <th data-i18n="cyber.field.owner">Owner</th>
+              <th data-i18n="cyber.field.version">Version</th>
+              <th data-i18n="label.reviewDate">Review Date</th>
+              <th data-i18n="label.expiryDate">Expiry Date</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="evidence-tbody">
+              <tr><td colspan="10" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="ev-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 9 — ACTION PLANS (CAPA)
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-actionplans">
+    <div class="filter-bar">
+      <input type="search" class="form-control form-control-sm" id="ap-search"
+             style="max-width:220px" placeholder="Search action plans…"/>
+      <select class="form-select form-select-sm" id="ap-filter-priority" style="max-width:130px">
+        <option value="">All Priorities</option>
+        <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+      <select class="form-select form-select-sm" id="ap-filter-status" style="max-width:150px">
+        <option value="">All Statuses</option>
+        <option>OPEN</option><option>IN_PROGRESS</option>
+        <option>COMPLETED</option><option>OVERDUE</option><option>CANCELLED</option>
+      </select>
+      <button class="btn btn-sm btn-primary ms-auto" onclick="openActionPlanModal(null)">
+        <i class="bi bi-plus-lg me-1"></i>
+        <span data-i18n="cyber.btn.addActionPlan">Add Action Plan</span></button>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light"><tr>
+              <th data-i18n="label.title">Title</th>
+              <th data-i18n="label.source">Source</th>
+              <th data-i18n="cyber.field.priority">Priority</th>
+              <th data-i18n="cyber.field.owner">Owner</th>
+              <th data-i18n="label.dueDate">Due Date</th>
+              <th data-i18n="cyber.field.progress">Progress</th>
+              <th data-i18n="cyber.field.status">Status</th>
+              <th data-i18n="label.actions">Actions</th>
+            </tr></thead>
+            <tbody id="actionplans-tbody">
+              <tr><td colspan="8" class="text-center text-muted py-4" data-i18n="common.loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div id="ap-pagination" class="d-flex justify-content-end mt-2 gap-2"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TAB 10 — REPORTING
+  ════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-reporting">
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div style="font-size:2rem;font-weight:900;color:#3b82f6" id="rep-controls">—</div>
+          <div class="text-muted" style="font-size:.75rem;font-weight:600">TOTAL CONTROLS</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div style="font-size:2rem;font-weight:900;color:#ef4444" id="rep-vulns">—</div>
+          <div class="text-muted" style="font-size:.75rem;font-weight:600">OPEN VULNERABILITIES</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div style="font-size:2rem;font-weight:900;color:#a855f7" id="rep-incidents">—</div>
+          <div class="text-muted" style="font-size:.75rem;font-weight:600">OPEN INCIDENTS</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div style="font-size:2rem;font-weight:900;color:#f59e0b" id="rep-actions">—</div>
+          <div class="text-muted" style="font-size:.75rem;font-weight:600">OPEN ACTION PLANS</div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent fw-600">Controls by Implementation Status</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="rep-ctrl-chart"></canvas></div></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent fw-600">Incidents by Severity</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="rep-inc-chart"></canvas></div></div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent fw-600">Vulnerabilities by Status</div>
+          <div class="card-body"><div class="chart-wrap" style="height:180px"><canvas id="rep-vuln-chart"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page-content -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════════════════════ -->
+
+<!-- ── Modal: Add/Edit Control ── -->
+<div class="modal fade" id="controlModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="controlModalTitle" data-i18n="cyber.btn.addControl">Add Control</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ctrl-id"/>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-600">Framework</label>
+            <select class="form-select form-select-sm" id="ctrl-frameworkName">
+              <option value="">Select…</option>
+              <option>NCA ECC</option><option>ISO 27001</option>
+              <option>PCI DSS</option><option>NIST CSF</option><option>SAMA CSF</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">Domain</label>
+            <input type="text" class="form-control form-control-sm" id="ctrl-domain" placeholder="e.g. Access Control"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Control Number</label>
+            <input type="text" class="form-control form-control-sm" id="ctrl-number" placeholder="e.g. AC-1"/>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label fw-600">Title (EN) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="ctrl-titleEn" required/>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Title (AR)</label>
+            <input type="text" class="form-control form-control-sm" id="ctrl-titleAr" dir="rtl"/>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Procedure</label>
+            <textarea class="form-control form-control-sm" id="ctrl-procedureEn" rows="3"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Control Type</label>
+            <select class="form-select form-select-sm" id="ctrl-controlType">
+              <option value="">Select…</option>
+              <option>PREVENTIVE</option><option>DETECTIVE</option>
+              <option>CORRECTIVE</option><option>COMPENSATING</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Control Owner</label>
+            <input type="text" class="form-control form-control-sm" id="ctrl-controlOwner"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Review Frequency</label>
+            <select class="form-select form-select-sm" id="ctrl-reviewFrequency">
+              <option value="">Select…</option>
+              <option>MONTHLY</option><option>QUARTERLY</option>
+              <option>SEMI_ANNUAL</option><option>ANNUAL</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Maturity Level</label>
+            <select class="form-select form-select-sm" id="ctrl-maturityLevel">
+              <option value="">Select…</option>
+              <option>1 - Initial</option><option>2 - Developing</option>
+              <option>3 - Defined</option><option>4 - Managed</option><option>5 - Optimized</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Implementation Status</label>
+            <select class="form-select form-select-sm" id="ctrl-implementationStatus">
+              <option value="">Select…</option>
+              <option value="COMPLIANT">Compliant</option>
+              <option value="NON_COMPLIANT">Non-Compliant</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="NOT_ASSESSED">Not Assessed</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.status">Status</label>
+            <select class="form-select form-select-sm" id="ctrl-status">
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveControl()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Add/Edit Sub-Control ── -->
+<div class="modal fade" id="subControlModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="scModalTitle" data-i18n="cyber.btn.addSubControl">Add Sub-Control</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="sc-id"/>
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="form-label fw-600">Parent Control <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="sc-controlId" required></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Sub-Control Number</label>
+            <input type="text" class="form-control form-control-sm" id="sc-subControlNumber" placeholder="e.g. AC-1.1"/>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label fw-600">Title (EN) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="sc-titleEn" required/>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Title (AR)</label>
+            <input type="text" class="form-control form-control-sm" id="sc-titleAr" dir="rtl"/>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Description</label>
+            <textarea class="form-control form-control-sm" id="sc-descriptionEn" rows="2"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Control Owner</label>
+            <input type="text" class="form-control form-control-sm" id="sc-controlOwner"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Maturity Level</label>
+            <select class="form-select form-select-sm" id="sc-maturityLevel">
+              <option value="">Select…</option>
+              <option>1 - Initial</option><option>2 - Developing</option>
+              <option>3 - Defined</option><option>4 - Managed</option><option>5 - Optimized</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Implementation Status</label>
+            <select class="form-select form-select-sm" id="sc-implementationStatus">
+              <option value="">Select…</option>
+              <option value="COMPLIANT">Compliant</option>
+              <option value="NON_COMPLIANT">Non-Compliant</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="NOT_ASSESSED">Not Assessed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSubControl()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Start/Edit Assessment ── -->
+<div class="modal fade" id="assessmentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="assModalTitle">Start Control Assessment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ass-id"/>
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="form-label fw-600">Control <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="ass-controlId" required></select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">Assessor Name</label>
+            <input type="text" class="form-control form-control-sm" id="ass-assessorName"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">Reviewer Name</label>
+            <input type="text" class="form-control form-control-sm" id="ass-reviewerName"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Assessment Date</label>
+            <input type="date" class="form-control form-control-sm" id="ass-assessmentDate"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.result">Result</label>
+            <select class="form-select form-select-sm" id="ass-result">
+              <option value="">Select…</option>
+              <option>PASS</option><option>FAIL</option><option>PARTIAL</option><option>N/A</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Maturity Score (1–5)</label>
+            <input type="number" min="1" max="5" class="form-control form-control-sm" id="ass-maturityScore"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Risk Level</label>
+            <select class="form-select form-select-sm" id="ass-riskLevel">
+              <option value="">Select…</option>
+              <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Gap Identified?</label>
+            <select class="form-select form-select-sm" id="ass-gapIdentified">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.status">Status</label>
+            <select class="form-select form-select-sm" id="ass-status">
+              <option value="DRAFT">Draft</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="UNDER_REVIEW">Under Review</option>
+              <option value="APPROVED">Approved</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Gap Description</label>
+            <textarea class="form-control form-control-sm" id="ass-gapDescription" rows="2"></textarea>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Assessor Comments</label>
+            <textarea class="form-control form-control-sm" id="ass-assessorComments" rows="2"></textarea>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Reviewer Comments</label>
+            <textarea class="form-control form-control-sm" id="ass-reviewerComments" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAssessment()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Register Vulnerability ── -->
+<div class="modal fade" id="vulnModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="vulnModalTitle">Register Vulnerability</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="vuln-id"/>
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="form-label fw-600" data-i18n="cyber.field.asset">Asset</label>
+            <select class="form-select form-select-sm" id="vuln-assetId">
+              <option value="">Select Asset…</option>
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label fw-600">Title (EN) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="vuln-titleEn" required/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">CVE ID</label>
+            <input type="text" class="form-control form-control-sm" id="vuln-cveId" placeholder="CVE-2024-XXXX"/>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Title (AR)</label>
+            <input type="text" class="form-control form-control-sm" id="vuln-titleAr" dir="rtl"/>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Description</label>
+            <textarea class="form-control form-control-sm" id="vuln-descriptionEn" rows="2"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Severity <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="vuln-severity" required>
+              <option value="">Select…</option>
+              <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Vulnerability Type</label>
+            <select class="form-select form-select-sm" id="vuln-type">
+              <option value="">Select…</option>
+              <option>NETWORK</option><option>APPLICATION</option><option>OS</option>
+              <option>CONFIGURATION</option><option>PHYSICAL</option><option>SOCIAL_ENGINEERING</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.owner">Owner</label>
+            <input type="text" class="form-control form-control-sm" id="vuln-ownerName"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="label.slaDays">SLA (days)</label>
+            <input type="number" class="form-control form-control-sm" id="vuln-slaDays" min="1"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="label.dueDate">Due Date</label>
+            <input type="date" class="form-control form-control-sm" id="vuln-dueDate"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Workflow Status</label>
+            <select class="form-select form-select-sm" id="vuln-workflowStatus">
+              <option>REGISTERED</option><option>CLASSIFICATION</option>
+              <option>OWNER_ASSIGNMENT</option><option>REMEDIATION</option>
+              <option>VERIFICATION</option><option>CLOSED</option>
+            </select>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Remediation Notes</label>
+            <textarea class="form-control form-control-sm" id="vuln-remediationNotes" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-warning text-dark" onclick="saveVuln()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Request Exception ── -->
+<div class="modal fade" id="exceptionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="excModalTitle">Request Exception</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="exc-id"/>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-600">Exception Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="exc-titleEn" required/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="cyber.field.owner">Owner</label>
+            <input type="text" class="form-control form-control-sm" id="exc-ownerName"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.approver">Approver</label>
+            <input type="text" class="form-control form-control-sm" id="exc-approverName"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.expiryDate">Expiry Date</label>
+            <input type="date" class="form-control form-control-sm" id="exc-expiryDate"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="cyber.field.status">Status</label>
+            <select class="form-select form-select-sm" id="exc-workflowStatus">
+              <option value="REQUESTED">Requested</option>
+              <option value="IMPACT_ASSESSMENT">Impact Assessment</option>
+              <option value="COMPENSATING_CONTROLS">Compensating Controls</option>
+              <option value="APPROVED">Approved</option>
+              <option value="EXPIRED">Expired</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-600">Impact Assessment</label>
+            <textarea class="form-control form-control-sm" id="exc-impactAssessment" rows="2"></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-600">Exception Reason / Justification</label>
+            <textarea class="form-control form-control-sm" id="exc-exceptionReason" rows="2"></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-600">Compensating Controls</label>
+            <textarea class="form-control form-control-sm" id="exc-compensatingControls" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveException()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Register Incident ── -->
+<div class="modal fade" id="incidentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="incModalTitle">Register Cyber Incident</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="inc-id"/>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-600">Incident Title (EN) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="inc-titleEn" required/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Incident Type</label>
+            <select class="form-select form-select-sm" id="inc-incidentType">
+              <option value="">Select…</option>
+              <option>MALWARE</option><option>PHISHING</option><option>DATA_BREACH</option>
+              <option>RANSOMWARE</option><option>DDoS</option><option>INSIDER_THREAT</option>
+              <option>UNAUTHORIZED_ACCESS</option><option>OTHER</option>
+            </select>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Title (AR)</label>
+            <input type="text" class="form-control form-control-sm" id="inc-titleAr" dir="rtl"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.affectedAsset">Affected Asset</label>
+            <select class="form-select form-select-sm" id="inc-affectedAssetId">
+              <option value="">Select Asset…</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">Incident Lead</label>
+            <input type="text" class="form-control form-control-sm" id="inc-incidentLead"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Severity <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="inc-severity" required>
+              <option value="">Select…</option>
+              <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="label.impact">Impact</label>
+            <select class="form-select form-select-sm" id="inc-impact">
+              <option value="">Select…</option>
+              <option>CONFIDENTIALITY</option><option>INTEGRITY</option>
+              <option>AVAILABILITY</option><option>MULTIPLE</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.status">Status</label>
+            <select class="form-select form-select-sm" id="inc-workflowStatus">
+              <option>DETECTION</option><option>LOGGING</option><option>TRIAGE</option>
+              <option>CONTAINMENT</option><option>INVESTIGATION</option>
+              <option>ERADICATION</option><option>RECOVERY</option>
+              <option>CLOSURE</option><option>LESSONS_LEARNED</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">BCM Handoff?</label>
+            <select class="form-select form-select-sm" id="inc-bcmHandoff">
+              <option value="false">No</option>
+              <option value="true">Yes – Escalate to BCM</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-600">Lessons Learned</label>
+            <textarea class="form-control form-control-sm" id="inc-lessonsLearned" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-danger" onclick="saveIncident()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Add/Edit Asset ── -->
+<div class="modal fade" id="assetModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="astModalTitle" data-i18n="cyber.btn.addAsset">Add Asset</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ast-id"/>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-600">Asset Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="ast-assetName" required/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Asset Type</label>
+            <select class="form-select form-select-sm" id="ast-assetType">
+              <option value="">Select…</option>
+              <option>SERVER</option><option>WORKSTATION</option><option>NETWORK</option>
+              <option>APPLICATION</option><option>DATABASE</option>
+              <option>CLOUD</option><option>MOBILE</option><option>IoT</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.businessOwner">Business Owner</label>
+            <input type="text" class="form-control form-control-sm" id="ast-businessOwner"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.technicalOwner">Technical Owner</label>
+            <input type="text" class="form-control form-control-sm" id="ast-technicalOwner"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="label.classification">Classification</label>
+            <select class="form-select form-select-sm" id="ast-classification">
+              <option value="">Select…</option>
+              <option>TOP_SECRET</option><option>SECRET</option>
+              <option>CONFIDENTIAL</option><option>RESTRICTED</option><option>PUBLIC</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="label.criticality">Criticality</label>
+            <select class="form-select form-select-sm" id="ast-criticality">
+              <option value="">Select…</option>
+              <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.status">Status</label>
+            <select class="form-select form-select-sm" id="ast-status">
+              <option value="ACTIVE">Active</option>
+              <option value="DECOMMISSIONED">Decommissioned</option>
+              <option value="MAINTENANCE">Maintenance</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">IP Address</label>
+            <input type="text" class="form-control form-control-sm" id="ast-ipAddress" placeholder="192.168.x.x"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Hostname</label>
+            <input type="text" class="form-control form-control-sm" id="ast-hostname"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Operating System</label>
+            <input type="text" class="form-control form-control-sm" id="ast-operatingSystem" placeholder="Windows Server 2022"/>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAsset()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Add/Edit Evidence ── -->
+<div class="modal fade" id="evidenceModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="evModalTitle" data-i18n="cyber.btn.addEvidence">Add Evidence</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ev-id"/>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-600">Evidence Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="ev-titleEn" required/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Evidence Type</label>
+            <select class="form-select form-select-sm" id="ev-evidenceType">
+              <option value="">Select…</option>
+              <option>DOCUMENT</option><option>SCREENSHOT</option><option>LOG</option>
+              <option>SCAN_REPORT</option><option>AUDIT_REPORT</option><option>CERTIFICATE</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.linkedControl">Linked Control</label>
+            <select class="form-select form-select-sm" id="ev-controlId">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">Framework Requirement</label>
+            <input type="text" class="form-control form-control-sm" id="ev-frameworkRequirement" placeholder="e.g. ISO 27001 A.5.1"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.owner">Owner</label>
+            <input type="text" class="form-control form-control-sm" id="ev-ownerName"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.version">Version</label>
+            <input type="text" class="form-control form-control-sm" id="ev-version" placeholder="v1.0"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.status">Status</label>
+            <select class="form-select form-select-sm" id="ev-status">
+              <option value="CURRENT">Current</option>
+              <option value="EXPIRED">Expired</option>
+              <option value="PENDING">Pending</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.reviewDate">Review Date</label>
+            <input type="date" class="form-control form-control-sm" id="ev-reviewDate"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600" data-i18n="label.expiryDate">Expiry Date</label>
+            <input type="date" class="form-control form-control-sm" id="ev-expiryDate"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-600">File Name / Reference</label>
+            <input type="text" class="form-control form-control-sm" id="ev-fileName" placeholder="evidence_file.pdf"/>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-success" onclick="saveEvidence()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Add/Edit Action Plan ── -->
+<div class="modal fade" id="actionPlanModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="apModalTitle" data-i18n="cyber.btn.addActionPlan">Add Action Plan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ap-id"/>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-600">Title (EN) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="ap-titleEn" required/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.priority">Priority</label>
+            <select class="form-select form-select-sm" id="ap-priority">
+              <option value="">Select…</option>
+              <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+            </select>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label fw-600">Title (AR)</label>
+            <input type="text" class="form-control form-control-sm" id="ap-titleAr" dir="rtl"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-600">Description</label>
+            <textarea class="form-control form-control-sm" id="ap-descriptionEn" rows="2"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600">Source Type</label>
+            <select class="form-select form-select-sm" id="ap-sourceType">
+              <option value="">Select…</option>
+              <option>ASSESSMENT</option><option>VULNERABILITY</option>
+              <option>INCIDENT</option><option>AUDIT</option><option>MANUAL</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="cyber.field.owner">Owner</label>
+            <input type="text" class="form-control form-control-sm" id="ap-ownerName"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-600" data-i18n="label.dueDate">Due Date</label>
+            <input type="date" class="form-control form-control-sm" id="ap-dueDate"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">Workflow Status</label>
+            <select class="form-select form-select-sm" id="ap-workflowStatus">
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-600">Progress %</label>
+            <input type="number" min="0" max="100" class="form-control form-control-sm" id="ap-progressPct" value="0"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-600">Completion Evidence</label>
+            <textarea class="form-control form-control-sm" id="ap-completionEvidence" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveActionPlan()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Delete Confirm ── -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title text-danger"><i class="bi bi-trash me-2"></i>Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-1" id="deleteModalBody">Are you sure you want to delete this record?</div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-danger" id="deleteConfirmBtn" data-i18n="common.delete">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Scripts ── -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let allControls = [], allAssets = [];
+let ctrlPage = 0, scPage = 0, assPage = 0, vulnPage = 0;
+let excPage = 0, incPage = 0, astPage = 0, evPage = 0, apPage = 0;
+const PAGE_SIZE = 20;
+let pendingDeleteFn = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const ar = () => document.documentElement.getAttribute('dir') === 'rtl';
+const fmt = v => v || '—';
+const fmtDate = v => v ? String(v).split('T')[0] : '—';
+const t = k => (typeof I18n !== 'undefined') ? I18n.t(k) : k;
+
+function statusBadge(s) {
+  const m = {
+    DRAFT:'secondary', IN_PROGRESS:'primary', UNDER_REVIEW:'warning',
+    APPROVED:'success', REJECTED:'danger', CLOSED:'dark', ARCHIVED:'secondary',
+    ACTIVE:'success', INACTIVE:'secondary',OPEN:'warning', COMPLETED:'success',
+    CANCELLED:'danger', EXPIRED:'danger', CURRENT:'success', PENDING:'warning',
+    COMPLIANT:'success', NON_COMPLIANT:'danger', PARTIAL:'warning', NOT_ASSESSED:'secondary',
+    REQUEST:'info', IMPACT_ASSESSMENT:'warning', COMPENSATING_CONTROLS:'primary',
+    DETECTION:'secondary', LOGGING:'info', TRIAGE:'primary', CONTAINMENT:'warning',
+    INVESTIGATION:'warning', ERADICATION:'danger', RECOVERY:'success',
+    CLOSURE:'dark', LESSONS_LEARNED:'success',
+    REGISTERED:'secondary', CLASSIFICATION:'info', OWNER_ASSIGNMENT:'primary',
+    REMEDIATION:'warning', VERIFICATION:'info',
+    DECOMMISSIONED:'danger', MAINTENANCE:'warning'
+  };
+  const clean = (s||'').replace(/_/g,' ');
+  return `<span class="badge bg-${m[s]||'secondary'}">${clean||'—'}</span>`;
+}
+function severityBadge(s) {
+  const m = {CRITICAL:'danger',HIGH:'warning',MEDIUM:'info',LOW:'secondary'};
+  return `<span class="badge bg-${m[s]||'secondary'}">${s||'—'}</span>`;
+}
+function criticalityBadge(c) {
+  const m = {CRITICAL:'danger',HIGH:'warning',MEDIUM:'info',LOW:'success'};
+  return `<span class="badge bg-${m[c]||'secondary'}">${c||'—'}</span>`;
+}
+function progressBar(pct) {
+  const p = Math.max(0, Math.min(100, pct || 0));
+  const color = p >= 100 ? '#22c55e' : p >= 50 ? '#3b82f6' : '#f59e0b';
+  return `<div class="d-flex align-items-center gap-2">
+    <div class="prog-bar-wrap flex-grow-1"><div class="prog-bar-fill" style="width:${p}%;background:${color}"></div></div>
+    <span style="font-size:.72rem;font-weight:600;min-width:28px">${p}%</span>
+  </div>`;
+}
+function overdueFlag(item) {
+  return item.overdue ? '<span class="overdue-dot ms-1" title="Overdue"></span>' : '';
+}
+
+function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
+function closeModal(id) { bootstrap.Modal.getInstance(document.getElementById(id))?.hide(); }
+
+function confirmDelete(msg, fn) {
+  document.getElementById('deleteModalBody').textContent = msg;
+  pendingDeleteFn = fn;
+  openModal('deleteModal');
+}
+document.getElementById('deleteConfirmBtn').addEventListener('click', () => {
+  if (pendingDeleteFn) { pendingDeleteFn(); pendingDeleteFn = null; }
+  closeModal('deleteModal');
+});
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  if (btn) btn.classList.add('active');
+  document.getElementById('tab-' + tab)?.classList.add('active');
+}
+
+function buildPagination(containerId, page, totalPages, onPageFn) {
+  const el = document.getElementById(containerId);
+  if (!el || totalPages <= 1) { if (el) el.innerHTML = ''; return; }
+  let html = '';
+  if (page > 0) html += `<button class="btn btn-sm btn-outline-secondary" onclick="${onPageFn}(${page-1})">‹</button>`;
+  for (let i = 0; i < totalPages; i++) {
+    html += `<button class="btn btn-sm ${i===page?'btn-primary':'btn-outline-secondary'}" onclick="${onPageFn}(${i})">${i+1}</button>`;
+  }
+  if (page < totalPages - 1) html += `<button class="btn btn-sm btn-outline-secondary" onclick="${onPageFn}(${page+1})">›</button>`;
+  el.innerHTML = html;
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ── Filter wiring ──────────────────────────────────────────────────────────
+document.getElementById('ctrl-search')?.addEventListener('input', () => renderControls(allControlsData));
+document.getElementById('ctrl-filter-fw')?.addEventListener('change', () => renderControls(allControlsData));
+document.getElementById('ctrl-filter-status')?.addEventListener('change', () => renderControls(allControlsData));
+document.getElementById('sc-search')?.addEventListener('input', () => loadSubControls(0));
+document.getElementById('sc-filter-ctrl')?.addEventListener('change', () => loadSubControls(0));
+document.getElementById('ass-search')?.addEventListener('input', () => renderAssessments(allAssessmentsData));
+document.getElementById('ass-filter-status')?.addEventListener('change', () => renderAssessments(allAssessmentsData));
+document.getElementById('vuln-search')?.addEventListener('input', () => renderVulns(allVulnsData));
+document.getElementById('vuln-filter-sev')?.addEventListener('change', () => renderVulns(allVulnsData));
+document.getElementById('vuln-filter-status')?.addEventListener('change', () => renderVulns(allVulnsData));
+document.getElementById('inc-search')?.addEventListener('input', () => renderIncidents(allIncidentsData));
+document.getElementById('inc-filter-sev')?.addEventListener('change', () => renderIncidents(allIncidentsData));
+document.getElementById('inc-filter-status')?.addEventListener('change', () => renderIncidents(allIncidentsData));
+document.getElementById('ast-search')?.addEventListener('input', () => renderAssets(allAssetsData));
+document.getElementById('ast-filter-crit')?.addEventListener('change', () => renderAssets(allAssetsData));
+document.getElementById('ast-filter-type')?.addEventListener('change', () => renderAssets(allAssetsData));
+document.getElementById('ev-search')?.addEventListener('input', () => renderEvidence(allEvidenceData));
+document.getElementById('ev-filter-status')?.addEventListener('change', () => renderEvidence(allEvidenceData));
+document.getElementById('ap-search')?.addEventListener('input', () => renderActionPlans(allActionPlansData));
+document.getElementById('ap-filter-priority')?.addEventListener('change', () => renderActionPlans(allActionPlansData));
+document.getElementById('ap-filter-status')?.addEventListener('change', () => renderActionPlans(allActionPlansData));
+
+// ── Data stores ────────────────────────────────────────────────────────────
+let allControlsData = [], allAssessmentsData = [], allVulnsData = [];
+let allExceptionsData = [], allIncidentsData = [], allAssetsData = [];
+let allEvidenceData = [], allActionPlansData = [];
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    await loadDashboard();
+  } catch(e) { /* non-fatal */ }
+  try { await loadAllControls(); } catch(e) {}
+  try { await loadAllAssets(); } catch(e) {}
+  loadControls(0);
+  loadSubControls(0);
+  loadAssessments(0);
+  loadVulnerabilities(0);
+  loadExceptions(0);
+  loadIncidents(0);
+  loadAssets(0);
+  loadEvidence(0);
+  loadActionPlans(0);
+  // Set today in date fields
+  const today = new Date().toISOString().split('T')[0];
+  const assDate = document.getElementById('ass-assessmentDate');
+  if (assDate) assDate.value = today;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const d = await Api.get('/cyber/dashboard');
+  const s = v => v ?? '—';
+  document.getElementById('k-controls').textContent    = s(d.totalControls);
+  document.getElementById('k-compliant').textContent   = s(d.compliantControls);
+  document.getElementById('k-noncompliant').textContent= s(d.nonCompliantControls);
+  document.getElementById('k-vulns').textContent       = s(d.openVulnerabilities);
+  document.getElementById('k-critvulns').textContent   = s(d.criticalVulnerabilities);
+  document.getElementById('k-incidents').textContent   = s(d.openIncidents);
+  document.getElementById('k-actions').textContent     = s(d.openActionPlans);
+  document.getElementById('k-assets').textContent      = s(d.totalAssets);
+  document.getElementById('rep-controls').textContent  = s(d.totalControls);
+  document.getElementById('rep-vulns').textContent     = s(d.openVulnerabilities);
+  document.getElementById('rep-incidents').textContent = s(d.openIncidents);
+  document.getElementById('rep-actions').textContent   = s(d.openActionPlans);
+
+  // Overview tables
+  renderDashIncidents(d.recentIncidents || []);
+  renderDashVulns(d.recentVulnerabilities || []);
+  renderDashActions(d.recentActionPlans || []);
+
+  // Reporting charts
+  buildComplianceChart(d);
+  buildVulnChart(d);
+  buildRepCharts(d);
+}
+
+function renderDashIncidents(items) {
+  const tb = document.getElementById('dash-incidents-tbody');
+  if (!items.length) { tb.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No incidents yet.</td></tr>'; return; }
+  tb.innerHTML = items.slice(0, 5).map(i => `<tr>
+    <td>${fmt(i.incidentType)}</td>
+    <td>${severityBadge(i.severity)}</td>
+    <td>${statusBadge(i.workflowStatus)}</td></tr>`).join('');
+}
+function renderDashVulns(items) {
+  const tb = document.getElementById('dash-vulns-tbody');
+  if (!items.length) { tb.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No vulnerabilities yet.</td></tr>'; return; }
+  tb.innerHTML = items.slice(0, 5).map(v => `<tr>
+    <td>${fmt(v.assetName)}</td>
+    <td>${severityBadge(v.severity)}</td>
+    <td>${statusBadge(v.workflowStatus)}</td></tr>`).join('');
+}
+function renderDashActions(items) {
+  const tb = document.getElementById('dash-actions-tbody');
+  if (!items.length) { tb.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No action plans yet.</td></tr>'; return; }
+  tb.innerHTML = items.slice(0, 5).map(a => `<tr>
+    <td class="text-truncate" style="max-width:180px">${ar()&&a.titleAr?a.titleAr:fmt(a.titleEn)}</td>
+    <td>${criticalityBadge(a.priority)}</td>
+    <td>${statusBadge(a.workflowStatus)}</td></tr>`).join('');
+}
+
+function buildComplianceChart(d) {
+  const ctx = document.getElementById('complianceChart');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Compliant', 'Non-Compliant', 'Partial', 'Not Assessed'],
+      datasets: [{
+        data: [d.compliantControls||0, d.nonCompliantControls||0, d.partialControls||0,
+               Math.max(0,(d.totalControls||0)-(d.compliantControls||0)-(d.nonCompliantControls||0)-(d.partialControls||0))],
+        backgroundColor: ['#22c55e','#ef4444','#f59e0b','#9ca3af'],
+        borderWidth: 2
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, padding:10, usePointStyle:true } } } }
+  });
+}
+function buildVulnChart(d) {
+  const ctx = document.getElementById('vulnChart');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Critical', 'High', 'Medium', 'Low'],
+      datasets: [{
+        label: 'Vulnerabilities',
+        data: [d.criticalVulnerabilities||0, 0, 0, 0],
+        backgroundColor: ['#ef4444','#f97316','#f59e0b','#22c55e'],
+        borderRadius: 6
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ y:{beginAtZero:true, ticks:{font:{size:11}}}, x:{ticks:{font:{size:11}}} } }
+  });
+}
+function buildRepCharts(d) {
+  const c1 = document.getElementById('rep-ctrl-chart');
+  if (c1) new Chart(c1, {
+    type: 'doughnut',
+    data: {
+      labels: ['Compliant', 'Non-Compliant', 'Partial'],
+      datasets: [{ data:[d.compliantControls||0,d.nonCompliantControls||0,d.partialControls||0],
+        backgroundColor:['#22c55e','#ef4444','#f59e0b'], borderWidth:2 }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom', labels:{font:{size:11},padding:10}} } }
+  });
+  const c2 = document.getElementById('rep-inc-chart');
+  if (c2) new Chart(c2, {
+    type: 'bar',
+    data: {
+      labels:['Critical','High','Medium','Low'],
+      datasets:[{ label:'Incidents', data:[d.criticalIncidents||0,0,0,0],
+        backgroundColor:['#ef4444','#f97316','#f59e0b','#22c55e'], borderRadius:6 }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{ y:{beginAtZero:true, ticks:{font:{size:11}}}, x:{ticks:{font:{size:11}}} } }
+  });
+  const c3 = document.getElementById('rep-vuln-chart');
+  if (c3) new Chart(c3, {
+    type: 'bar',
+    data: {
+      labels:['Registered','Classification','Remediation','Verification','Closed'],
+      datasets:[{ label:'Vulnerabilities', data:[0,0,0,0,0],
+        backgroundColor:'#3b82f6', borderRadius:5 }]
+    },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{ x:{beginAtZero:true, ticks:{font:{size:11}}}, y:{ticks:{font:{size:11}}} } }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════
+async function loadAllControls() {
+  try {
+    allControls = await Api.get('/cyber/controls/all');
+    populateControlSelects();
+  } catch(e) { allControls = []; }
+}
+function populateControlSelects() {
+  ['sc-controlId','ass-controlId','ev-controlId'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const hasNone = el.id === 'ev-controlId';
+    el.innerHTML = (hasNone ? '<option value="">None</option>' : '<option value="">Select Control…</option>') +
+      allControls.map(c => `<option value="${c.id}">${c.controlNumber||''} ${ar()&&c.titleAr?c.titleAr:c.titleEn||''}</option>`).join('');
+  });
+  // Filter dropdown
+  const fc = document.getElementById('sc-filter-ctrl');
+  if (fc) fc.innerHTML = '<option value="">All Controls</option>' +
+    allControls.map(c => `<option value="${c.id}">${c.controlNumber||''} ${c.titleEn||''}</option>`).join('');
+}
+
+async function loadControls(page) {
+  ctrlPage = page;
+  try {
+    const d = await Api.get(`/cyber/controls?page=${page}&size=${PAGE_SIZE}`);
+    allControlsData = d.content || d || [];
+    renderControls(allControlsData);
+    buildPagination('ctrl-pagination', page, d.totalPages||1, 'loadControls');
+  } catch(e) {
+    document.getElementById('controls-tbody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Failed to load controls.</td></tr>`;
+  }
+}
+function renderControls(items) {
+  const search = (document.getElementById('ctrl-search')?.value||'').toLowerCase();
+  const fw     = document.getElementById('ctrl-filter-fw')?.value||'';
+  const status = document.getElementById('ctrl-filter-status')?.value||'';
+  const filtered = items.filter(c =>
+    (!search || (c.titleEn||'').toLowerCase().includes(search) || (c.domain||'').toLowerCase().includes(search) || (c.controlNumber||'').toLowerCase().includes(search)) &&
+    (!fw     || (c.frameworkName||'') === fw) &&
+    (!status || c.implementationStatus === status)
+  );
+  const tb = document.getElementById('controls-tbody');
+  if (!filtered.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No controls found.</td></tr>'; return; }
+  tb.innerHTML = filtered.map(c => `<tr>
+    <td><span class="badge bg-light text-dark border">${fmt(c.frameworkName)}</span></td>
+    <td>${fmt(c.domain)}</td>
+    <td><code>${fmt(c.controlNumber)}</code></td>
+    <td style="max-width:220px" class="text-truncate">${ar()&&c.titleAr?c.titleAr:fmt(c.titleEn)}</td>
+    <td>${fmt(c.maturityLevel)}</td>
+    <td>${statusBadge(c.implementationStatus)}</td>
+    <td>${statusBadge(c.status)}</td>
+    <td>
+      <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" title="Edit" onclick="openControlModal(${JSON.stringify(c).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-xs btn-outline-danger py-0 px-1" title="Delete" onclick="deleteControl(${c.id})"><i class="bi bi-trash"></i></button>
+    </td></tr>`).join('');
+}
+function openControlModal(data) {
+  const editing = !!data;
+  document.getElementById('controlModalTitle').textContent = editing ? 'Edit Control' : 'Add Control';
+  document.getElementById('ctrl-id').value              = data?.id || '';
+  document.getElementById('ctrl-frameworkName').value   = data?.frameworkName || '';
+  document.getElementById('ctrl-domain').value          = data?.domain || '';
+  document.getElementById('ctrl-number').value          = data?.controlNumber || '';
+  document.getElementById('ctrl-titleEn').value         = data?.titleEn || '';
+  document.getElementById('ctrl-titleAr').value         = data?.titleAr || '';
+  document.getElementById('ctrl-procedureEn').value     = data?.procedureEn || '';
+  document.getElementById('ctrl-controlType').value     = data?.controlType || '';
+  document.getElementById('ctrl-controlOwner').value    = data?.controlOwner || '';
+  document.getElementById('ctrl-reviewFrequency').value = data?.reviewFrequency || '';
+  document.getElementById('ctrl-maturityLevel').value   = data?.maturityLevel || '';
+  document.getElementById('ctrl-implementationStatus').value = data?.implementationStatus || '';
+  document.getElementById('ctrl-status').value          = data?.status || 'ACTIVE';
+  openModal('controlModal');
+}
+async function saveControl() {
+  const titleEn = document.getElementById('ctrl-titleEn').value.trim();
+  if (!titleEn) { alert('Title (EN) is required.'); return; }
+  const id = document.getElementById('ctrl-id').value;
+  const payload = {
+    frameworkName: document.getElementById('ctrl-frameworkName').value,
+    domain: document.getElementById('ctrl-domain').value,
+    controlNumber: document.getElementById('ctrl-number').value,
+    titleEn, titleAr: document.getElementById('ctrl-titleAr').value,
+    procedureEn: document.getElementById('ctrl-procedureEn').value,
+    controlType: document.getElementById('ctrl-controlType').value,
+    controlOwner: document.getElementById('ctrl-controlOwner').value,
+    reviewFrequency: document.getElementById('ctrl-reviewFrequency').value,
+    maturityLevel: document.getElementById('ctrl-maturityLevel').value,
+    implementationStatus: document.getElementById('ctrl-implementationStatus').value,
+    status: document.getElementById('ctrl-status').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/controls/${id}`, payload);
+    else    await Api.post('/cyber/controls', payload);
+    closeModal('controlModal');
+    App.showFlash('success', id ? 'Control updated.' : 'Control created.');
+    await loadAllControls();
+    loadControls(ctrlPage);
+  } catch(e) { App.showFlash('danger', 'Failed to save control: ' + e.message); }
+}
+function deleteControl(id) {
+  confirmDelete('Delete this control?', async () => {
+    try { await Api.delete(`/cyber/controls/${id}`); App.showFlash('success','Control deleted.'); loadControls(ctrlPage); await loadAllControls(); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUB-CONTROLS
+// ═══════════════════════════════════════════════════════════════
+async function loadSubControls(page) {
+  scPage = page;
+  const ctrlId = document.getElementById('sc-filter-ctrl')?.value || '';
+  const url = ctrlId
+    ? `/cyber/sub-controls?controlId=${ctrlId}&page=${page}&size=${PAGE_SIZE}`
+    : `/cyber/sub-controls?page=${page}&size=${PAGE_SIZE}`;
+  try {
+    const d = await Api.get(url);
+    const items = d.content || d || [];
+    const search = (document.getElementById('sc-search')?.value||'').toLowerCase();
+    const filtered = items.filter(s =>
+      !search || (s.titleEn||'').toLowerCase().includes(search) || (s.subControlNumber||'').toLowerCase().includes(search)
+    );
+    const tb = document.getElementById('subcontrols-tbody');
+    if (!filtered.length) { tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No sub-controls found.</td></tr>'; return; }
+    tb.innerHTML = filtered.map(s => {
+      const parent = allControls.find(c => c.id === s.controlId);
+      const parentName = parent ? (ar()&&parent.titleAr?parent.titleAr:(parent.controlNumber||'')+ ' ' +(parent.titleEn||'')) : '—';
+      return `<tr>
+        <td style="max-width:160px" class="text-truncate">${fmt(parentName)}</td>
+        <td><code>${fmt(s.subControlNumber)}</code></td>
+        <td style="max-width:200px" class="text-truncate">${ar()&&s.titleAr?s.titleAr:fmt(s.titleEn)}</td>
+        <td>${fmt(s.controlOwner)}</td>
+        <td>${fmt(s.maturityLevel)}</td>
+        <td>${statusBadge(s.implementationStatus)}</td>
+        <td>
+          <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" onclick="openSubControlModal(${JSON.stringify(s).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="deleteSubControl(${s.id})"><i class="bi bi-trash"></i></button>
+        </td></tr>`;
+    }).join('');
+    buildPagination('sc-pagination', page, d.totalPages||1, 'loadSubControls');
+  } catch(e) {
+    document.getElementById('subcontrols-tbody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Failed to load sub-controls.</td></tr>`;
+  }
+}
+function openSubControlModal(data) {
+  document.getElementById('scModalTitle').textContent         = data ? 'Edit Sub-Control' : 'Add Sub-Control';
+  document.getElementById('sc-id').value                      = data?.id || '';
+  document.getElementById('sc-controlId').value               = data?.controlId || '';
+  document.getElementById('sc-subControlNumber').value        = data?.subControlNumber || '';
+  document.getElementById('sc-titleEn').value                 = data?.titleEn || '';
+  document.getElementById('sc-titleAr').value                 = data?.titleAr || '';
+  document.getElementById('sc-descriptionEn').value           = data?.descriptionEn || '';
+  document.getElementById('sc-controlOwner').value            = data?.controlOwner || '';
+  document.getElementById('sc-maturityLevel').value           = data?.maturityLevel || '';
+  document.getElementById('sc-implementationStatus').value    = data?.implementationStatus || '';
+  openModal('subControlModal');
+}
+async function saveSubControl() {
+  if (!document.getElementById('sc-titleEn').value.trim()) { alert('Title is required.'); return; }
+  if (!document.getElementById('sc-controlId').value) { alert('Parent control is required.'); return; }
+  const id = document.getElementById('sc-id').value;
+  const payload = {
+    controlId: +document.getElementById('sc-controlId').value,
+    subControlNumber: document.getElementById('sc-subControlNumber').value,
+    titleEn: document.getElementById('sc-titleEn').value,
+    titleAr: document.getElementById('sc-titleAr').value,
+    descriptionEn: document.getElementById('sc-descriptionEn').value,
+    controlOwner: document.getElementById('sc-controlOwner').value,
+    maturityLevel: document.getElementById('sc-maturityLevel').value,
+    implementationStatus: document.getElementById('sc-implementationStatus').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/sub-controls/${id}`, payload);
+    else    await Api.post('/cyber/sub-controls', payload);
+    closeModal('subControlModal');
+    App.showFlash('success', id ? 'Sub-control updated.' : 'Sub-control created.');
+    loadSubControls(scPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+function deleteSubControl(id) {
+  confirmDelete('Delete this sub-control?', async () => {
+    try { await Api.delete(`/cyber/sub-controls/${id}`); App.showFlash('success','Deleted.'); loadSubControls(scPage); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTROL ASSESSMENTS
+// ═══════════════════════════════════════════════════════════════
+async function loadAssessments(page) {
+  assPage = page;
+  try {
+    const d = await Api.get(`/cyber/assessments?page=${page}&size=${PAGE_SIZE}`);
+    allAssessmentsData = d.content || d || [];
+    renderAssessments(allAssessmentsData);
+    buildPagination('ass-pagination', page, d.totalPages||1, 'loadAssessments');
+  } catch(e) {
+    document.getElementById('assessments-tbody').innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Failed to load assessments.</td></tr>`;
+  }
+}
+function renderAssessments(items) {
+  const search = (document.getElementById('ass-search')?.value||'').toLowerCase();
+  const status = document.getElementById('ass-filter-status')?.value||'';
+  const filtered = items.filter(a =>
+    (!search || (a.assessorName||'').toLowerCase().includes(search) || (a.id+'').includes(search)) &&
+    (!status || a.status === status)
+  );
+  const tb = document.getElementById('assessments-tbody');
+  if (!filtered.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted py-4">No assessments found.</td></tr>'; return; }
+  tb.innerHTML = filtered.map(a => {
+    const ctrl = allControls.find(c => c.id === a.controlId);
+    const ctrlName = ctrl ? (ctrl.controlNumber||'')+ ' ' +(ar()&&ctrl.titleAr?ctrl.titleAr:ctrl.titleEn||'') : `Control #${a.controlId||'—'}`;
+    const hasGap = a.gapIdentified ? '<i class="bi bi-exclamation-circle-fill text-warning ms-1" title="Gap identified"></i>' : '';
+    return `<tr>
+      <td style="max-width:180px" class="text-truncate">${ctrlName}</td>
+      <td>${fmt(a.assessorName)}</td>
+      <td>${fmtDate(a.assessmentDate)}</td>
+      <td>${severityBadge(a.result)}</td>
+      <td>${a.maturityScore ? `<span class="badge bg-info">${a.maturityScore}/5</span>` : '—'}</td>
+      <td>${hasGap}${a.gapIdentified?'<span class="text-warning fw-600">Yes</span>':'No'}</td>
+      <td>${a.capaId?`<a href="#" onclick="switchTab('actionplans')" class="badge bg-success text-decoration-none">CAPA #${a.capaId}</a>`:'—'}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" title="Edit" onclick="openAssessmentModal(${JSON.stringify(a).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+        ${a.status!=='APPROVED'?`<button class="btn btn-xs btn-outline-success py-0 px-1 me-1" title="Approve" onclick="approveAssessment(${a.id})"><i class="bi bi-check-lg"></i></button>`:''}
+        ${a.gapIdentified&&!a.capaId?`<button class="btn btn-xs btn-outline-warning py-0 px-1 me-1" title="Convert Gap→CAPA" onclick="convertGapToCapa(${a.id})"><i class="bi bi-arrow-right-circle"></i></button>`:''}
+        <button class="btn btn-xs btn-outline-danger py-0 px-1" title="Delete" onclick="deleteAssessment(${a.id})"><i class="bi bi-trash"></i></button>
+      </td></tr>`;
+  }).join('');
+}
+function openAssessmentModal(data) {
+  document.getElementById('assModalTitle').textContent = data ? 'Edit Assessment' : 'Start Assessment';
+  document.getElementById('ass-id').value              = data?.id || '';
+  document.getElementById('ass-controlId').value       = data?.controlId || '';
+  document.getElementById('ass-assessorName').value    = data?.assessorName || '';
+  document.getElementById('ass-reviewerName').value    = data?.reviewerName || '';
+  document.getElementById('ass-assessmentDate').value  = data?.assessmentDate || new Date().toISOString().split('T')[0];
+  document.getElementById('ass-result').value          = data?.result || '';
+  document.getElementById('ass-maturityScore').value   = data?.maturityScore || '';
+  document.getElementById('ass-riskLevel').value       = data?.riskLevel || '';
+  document.getElementById('ass-gapIdentified').value   = data?.gapIdentified ? 'true' : 'false';
+  document.getElementById('ass-gapDescription').value  = data?.gapDescription || '';
+  document.getElementById('ass-assessorComments').value= data?.assessorComments || '';
+  document.getElementById('ass-reviewerComments').value= data?.reviewerComments || '';
+  document.getElementById('ass-status').value          = data?.status || 'DRAFT';
+  openModal('assessmentModal');
+}
+async function saveAssessment() {
+  const id = document.getElementById('ass-id').value;
+  if (!document.getElementById('ass-controlId').value) { alert('Control is required.'); return; }
+  const payload = {
+    controlId: +document.getElementById('ass-controlId').value,
+    assessorName: document.getElementById('ass-assessorName').value,
+    reviewerName: document.getElementById('ass-reviewerName').value,
+    assessmentDate: document.getElementById('ass-assessmentDate').value || null,
+    result: document.getElementById('ass-result').value,
+    maturityScore: +document.getElementById('ass-maturityScore').value || null,
+    riskLevel: document.getElementById('ass-riskLevel').value,
+    gapIdentified: document.getElementById('ass-gapIdentified').value === 'true',
+    gapDescription: document.getElementById('ass-gapDescription').value,
+    assessorComments: document.getElementById('ass-assessorComments').value,
+    reviewerComments: document.getElementById('ass-reviewerComments').value,
+    status: document.getElementById('ass-status').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/assessments/${id}`, payload);
+    else    await Api.post('/cyber/assessments', payload);
+    closeModal('assessmentModal');
+    App.showFlash('success', 'Assessment saved.');
+    loadAssessments(assPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+async function approveAssessment(id) {
+  try { await Api.post(`/cyber/assessments/${id}/approve`, {}); App.showFlash('success','Assessment approved.'); loadAssessments(assPage); }
+  catch(e) { App.showFlash('danger','Approve failed: '+e.message); }
+}
+async function convertGapToCapa(id) {
+  try {
+    const ap = await Api.post(`/cyber/assessments/${id}/convert-gap`, {});
+    App.showFlash('success', `Gap converted to CAPA #${ap.id}`);
+    loadAssessments(assPage);
+    loadActionPlans(apPage);
+  } catch(e) { App.showFlash('danger','Convert failed: '+e.message); }
+}
+function deleteAssessment(id) {
+  confirmDelete('Delete this assessment?', async () => {
+    try { await Api.delete(`/cyber/assessments/${id}`); App.showFlash('success','Deleted.'); loadAssessments(assPage); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VULNERABILITIES
+// ═══════════════════════════════════════════════════════════════
+async function loadAllAssets() {
+  try {
+    allAssets = await Api.get('/cyber/assets/all');
+    populateAssetSelects();
+  } catch(e) { allAssets = []; }
+}
+function populateAssetSelects() {
+  ['vuln-assetId','inc-affectedAssetId'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '<option value="">Select Asset…</option>' +
+      allAssets.map(a => `<option value="${a.id}">${a.assetName||'Asset #'+a.id}</option>`).join('');
+  });
+}
+
+async function loadVulnerabilities(page) {
+  vulnPage = page;
+  try {
+    const d = await Api.get(`/cyber/vulnerabilities?page=${page}&size=${PAGE_SIZE}`);
+    allVulnsData = d.content || d || [];
+    renderVulns(allVulnsData);
+    buildPagination('vuln-pagination', page, d.totalPages||1, 'loadVulnerabilities');
+  } catch(e) {
+    document.getElementById('vulns-tbody').innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Failed to load.</td></tr>`;
+  }
+}
+function renderVulns(items) {
+  const search = (document.getElementById('vuln-search')?.value||'').toLowerCase();
+  const sev    = document.getElementById('vuln-filter-sev')?.value||'';
+  const status = document.getElementById('vuln-filter-status')?.value||'';
+  const filtered = items.filter(v =>
+    (!search || (v.titleEn||'').toLowerCase().includes(search) || (v.assetName||'').toLowerCase().includes(search)) &&
+    (!sev    || v.severity === sev) &&
+    (!status || v.workflowStatus === status)
+  );
+  const tb = document.getElementById('vulns-tbody');
+  if (!filtered.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted py-4">No vulnerabilities found.</td></tr>'; return; }
+  tb.innerHTML = filtered.map(v => `<tr>
+    <td>${fmt(v.assetName)}</td>
+    <td style="max-width:180px" class="text-truncate">${ar()&&v.titleAr?v.titleAr:fmt(v.titleEn)}</td>
+    <td><code style="font-size:.72rem">${fmt(v.cveId)}</code></td>
+    <td>${severityBadge(v.severity)}</td>
+    <td>${fmt(v.ownerName)}</td>
+    <td>${v.slaDays?v.slaDays+'d':'—'}</td>
+    <td>${fmtDate(v.dueDate)}${overdueFlag(v)}</td>
+    <td>${statusBadge(v.workflowStatus)}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" onclick="openVulnModal(${JSON.stringify(v).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+      ${v.workflowStatus!=='CLOSED'?`<button class="btn btn-xs btn-outline-warning py-0 px-1 me-1" title="Escalate" onclick="escalateVuln(${v.id})"><i class="bi bi-arrow-up-circle"></i></button>`:''}
+      <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="deleteVuln(${v.id})"><i class="bi bi-trash"></i></button>
+    </td></tr>`).join('');
+}
+function openVulnModal(data) {
+  document.getElementById('vulnModalTitle').textContent = data ? 'Edit Vulnerability' : 'Register Vulnerability';
+  document.getElementById('vuln-id').value              = data?.id || '';
+  document.getElementById('vuln-assetId').value         = data?.assetId || '';
+  document.getElementById('vuln-titleEn').value         = data?.titleEn || '';
+  document.getElementById('vuln-titleAr').value         = data?.titleAr || '';
+  document.getElementById('vuln-cveId').value           = data?.cveId || '';
+  document.getElementById('vuln-descriptionEn').value   = data?.descriptionEn || '';
+  document.getElementById('vuln-severity').value        = data?.severity || '';
+  document.getElementById('vuln-type').value            = data?.vulnerabilityType || '';
+  document.getElementById('vuln-ownerName').value       = data?.ownerName || '';
+  document.getElementById('vuln-slaDays').value         = data?.slaDays || '';
+  document.getElementById('vuln-dueDate').value         = data?.dueDate || '';
+  document.getElementById('vuln-workflowStatus').value  = data?.workflowStatus || 'REGISTERED';
+  document.getElementById('vuln-remediationNotes').value= data?.remediationNotes || '';
+  openModal('vulnModal');
+}
+async function saveVuln() {
+  if (!document.getElementById('vuln-titleEn').value.trim()) { alert('Title required.'); return; }
+  if (!document.getElementById('vuln-severity').value) { alert('Severity required.'); return; }
+  const id = document.getElementById('vuln-id').value;
+  const assetId = +document.getElementById('vuln-assetId').value || null;
+  const payload = {
+    assetId, assetName: assetId ? (allAssets.find(a=>a.id===assetId)?.assetName||null) : null,
+    titleEn: document.getElementById('vuln-titleEn').value,
+    titleAr: document.getElementById('vuln-titleAr').value,
+    cveId: document.getElementById('vuln-cveId').value,
+    descriptionEn: document.getElementById('vuln-descriptionEn').value,
+    severity: document.getElementById('vuln-severity').value,
+    vulnerabilityType: document.getElementById('vuln-type').value,
+    ownerName: document.getElementById('vuln-ownerName').value,
+    slaDays: +document.getElementById('vuln-slaDays').value || null,
+    dueDate: document.getElementById('vuln-dueDate').value || null,
+    workflowStatus: document.getElementById('vuln-workflowStatus').value,
+    remediationNotes: document.getElementById('vuln-remediationNotes').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/vulnerabilities/${id}`, payload);
+    else    await Api.post('/cyber/vulnerabilities', payload);
+    closeModal('vulnModal');
+    App.showFlash('success', 'Vulnerability saved.');
+    loadVulnerabilities(vulnPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+async function escalateVuln(id) {
+  try { await Api.post(`/cyber/vulnerabilities/${id}/escalate`, {}); App.showFlash('success','Status escalated.'); loadVulnerabilities(vulnPage); }
+  catch(e) { App.showFlash('danger','Escalate failed: '+e.message); }
+}
+function deleteVuln(id) {
+  confirmDelete('Delete this vulnerability?', async () => {
+    try { await Api.delete(`/cyber/vulnerabilities/${id}`); App.showFlash('success','Deleted.'); loadVulnerabilities(vulnPage); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXCEPTIONS
+// ═══════════════════════════════════════════════════════════════
+async function loadExceptions(page) {
+  excPage = page;
+  try {
+    const d = await Api.get(`/cyber/exceptions?page=${page}&size=${PAGE_SIZE}`);
+    allExceptionsData = d.content || d || [];
+    renderExceptions(allExceptionsData);
+    buildPagination('exc-pagination', page, d.totalPages||1, 'loadExceptions');
+  } catch(e) {
+    document.getElementById('exceptions-tbody').innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Failed to load exceptions.</td></tr>`;
+  }
+}
+function renderExceptions(items) {
+  const tb = document.getElementById('exceptions-tbody');
+  if (!items.length) { tb.innerHTML='<tr><td colspan="6" class="text-center text-muted py-4">No exceptions found.</td></tr>'; return; }
+  tb.innerHTML = items.map(e => `<tr>
+    <td style="max-width:200px" class="text-truncate">${fmt(e.titleEn)}</td>
+    <td>${fmt(e.ownerName)}</td>
+    <td>${fmt(e.approverName)}</td>
+    <td>${fmtDate(e.expiryDate)}${e.workflowStatus==='EXPIRED'?'<span class="overdue-dot ms-1"></span>':''}</td>
+    <td>${statusBadge(e.workflowStatus)}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" onclick="openExceptionModal(${JSON.stringify(e).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+      ${e.workflowStatus!=='APPROVED'?`<button class="btn btn-xs btn-outline-success py-0 px-1 me-1" title="Approve" onclick="approveException(${e.id})"><i class="bi bi-check-lg"></i></button>`:''}
+      <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="deleteException(${e.id})"><i class="bi bi-trash"></i></button>
+    </td></tr>`).join('');
+}
+function openExceptionModal(data) {
+  document.getElementById('excModalTitle').textContent       = data ? 'Edit Exception' : 'Request Exception';
+  document.getElementById('exc-id').value                    = data?.id || '';
+  document.getElementById('exc-titleEn').value               = data?.titleEn || '';
+  document.getElementById('exc-ownerName').value             = data?.ownerName || '';
+  document.getElementById('exc-approverName').value          = data?.approverName || '';
+  document.getElementById('exc-expiryDate').value            = data?.expiryDate || '';
+  document.getElementById('exc-workflowStatus').value        = data?.workflowStatus || 'REQUESTED';
+  document.getElementById('exc-impactAssessment').value      = data?.impactAssessment || '';
+  document.getElementById('exc-exceptionReason').value       = data?.exceptionReason || '';
+  document.getElementById('exc-compensatingControls').value  = data?.compensatingControls || '';
+  openModal('exceptionModal');
+}
+async function saveException() {
+  if (!document.getElementById('exc-titleEn').value.trim()) { alert('Title required.'); return; }
+  const id = document.getElementById('exc-id').value;
+  const payload = {
+    titleEn: document.getElementById('exc-titleEn').value,
+    ownerName: document.getElementById('exc-ownerName').value,
+    approverName: document.getElementById('exc-approverName').value,
+    expiryDate: document.getElementById('exc-expiryDate').value || null,
+    workflowStatus: document.getElementById('exc-workflowStatus').value,
+    impactAssessment: document.getElementById('exc-impactAssessment').value,
+    exceptionReason: document.getElementById('exc-exceptionReason').value,
+    compensatingControls: document.getElementById('exc-compensatingControls').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/exceptions/${id}`, payload);
+    else    await Api.post('/cyber/exceptions', payload);
+    closeModal('exceptionModal');
+    App.showFlash('success','Exception saved.');
+    loadExceptions(excPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+async function approveException(id) {
+  try { await Api.post(`/cyber/exceptions/${id}/approve`, {}); App.showFlash('success','Exception approved.'); loadExceptions(excPage); }
+  catch(e) { App.showFlash('danger','Approve failed: '+e.message); }
+}
+function deleteException(id) {
+  confirmDelete('Delete this exception?', async () => {
+    try { await Api.delete(`/cyber/exceptions/${id}`); App.showFlash('success','Deleted.'); loadExceptions(excPage); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INCIDENTS
+// ═══════════════════════════════════════════════════════════════
+async function loadIncidents(page) {
+  incPage = page;
+  try {
+    const d = await Api.get(`/cyber/incidents?page=${page}&size=${PAGE_SIZE}`);
+    allIncidentsData = d.content || d || [];
+    renderIncidents(allIncidentsData);
+    buildPagination('inc-pagination', page, d.totalPages||1, 'loadIncidents');
+  } catch(e) {
+    document.getElementById('incidents-tbody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Failed to load.</td></tr>`;
+  }
+}
+function renderIncidents(items) {
+  const search = (document.getElementById('inc-search')?.value||'').toLowerCase();
+  const sev    = document.getElementById('inc-filter-sev')?.value||'';
+  const status = document.getElementById('inc-filter-status')?.value||'';
+  const filtered = items.filter(i =>
+    (!search || (i.titleEn||'').toLowerCase().includes(search) || (i.incidentNumber||'').toLowerCase().includes(search)) &&
+    (!sev    || i.severity === sev) &&
+    (!status || i.workflowStatus === status)
+  );
+  const tb = document.getElementById('incidents-tbody');
+  if (!filtered.length) { tb.innerHTML='<tr><td colspan="8" class="text-center text-muted py-4">No incidents found.</td></tr>'; return; }
+  tb.innerHTML = filtered.map(i => `<tr>
+    <td><code style="font-size:.72rem">${fmt(i.incidentNumber||i.externalId)}</code></td>
+    <td>${fmt(i.incidentType)}</td>
+    <td>${fmt(i.affectedAssetName)}</td>
+    <td><span class="badge bg-light text-dark border">${fmt(i.impact)}</span></td>
+    <td>${severityBadge(i.severity)}</td>
+    <td>${fmt(i.incidentLead)}</td>
+    <td>${statusBadge(i.workflowStatus)}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" onclick="openIncidentModal(${JSON.stringify(i).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+      ${i.workflowStatus!=='LESSONS_LEARNED'?`<button class="btn btn-xs btn-outline-success py-0 px-1 me-1" title="Advance workflow" onclick="startResponse(${i.id})"><i class="bi bi-arrow-right-circle"></i></button>`:''}
+      <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="deleteIncident(${i.id})"><i class="bi bi-trash"></i></button>
+    </td></tr>`).join('');
+}
+function openIncidentModal(data) {
+  document.getElementById('incModalTitle').textContent      = data ? 'Edit Incident' : 'Register Cyber Incident';
+  document.getElementById('inc-id').value                   = data?.id || '';
+  document.getElementById('inc-titleEn').value              = data?.titleEn || '';
+  document.getElementById('inc-titleAr').value              = data?.titleAr || '';
+  document.getElementById('inc-incidentType').value         = data?.incidentType || '';
+  document.getElementById('inc-affectedAssetId').value      = data?.affectedAssetId || '';
+  document.getElementById('inc-incidentLead').value         = data?.incidentLead || '';
+  document.getElementById('inc-severity').value             = data?.severity || '';
+  document.getElementById('inc-impact').value               = data?.impact || '';
+  document.getElementById('inc-workflowStatus').value       = data?.workflowStatus || 'DETECTION';
+  document.getElementById('inc-bcmHandoff').value           = data?.bcmHandoff ? 'true' : 'false';
+  document.getElementById('inc-lessonsLearned').value       = data?.lessonsLearned || '';
+  openModal('incidentModal');
+}
+async function saveIncident() {
+  if (!document.getElementById('inc-titleEn').value.trim()) { alert('Title required.'); return; }
+  if (!document.getElementById('inc-severity').value) { alert('Severity required.'); return; }
+  const id = document.getElementById('inc-id').value;
+  const assetId = +document.getElementById('inc-affectedAssetId').value || null;
+  const payload = {
+    titleEn: document.getElementById('inc-titleEn').value,
+    titleAr: document.getElementById('inc-titleAr').value,
+    incidentType: document.getElementById('inc-incidentType').value,
+    affectedAssetId: assetId,
+    affectedAssetName: assetId ? (allAssets.find(a=>a.id===assetId)?.assetName||null) : null,
+    incidentLead: document.getElementById('inc-incidentLead').value,
+    severity: document.getElementById('inc-severity').value,
+    impact: document.getElementById('inc-impact').value,
+    workflowStatus: document.getElementById('inc-workflowStatus').value,
+    bcmHandoff: document.getElementById('inc-bcmHandoff').value === 'true',
+    lessonsLearned: document.getElementById('inc-lessonsLearned').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/incidents/${id}`, payload);
+    else    await Api.post('/cyber/incidents', payload);
+    closeModal('incidentModal');
+    App.showFlash('success','Incident saved.');
+    loadIncidents(incPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+async function startResponse(id) {
+  try { await Api.post(`/cyber/incidents/${id}/start-response`, {}); App.showFlash('success','Incident advanced to next stage.'); loadIncidents(incPage); }
+  catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+function deleteIncident(id) {
+  confirmDelete('Delete this incident?', async () => {
+    try { await Api.delete(`/cyber/incidents/${id}`); App.showFlash('success','Deleted.'); loadIncidents(incPage); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ASSETS
+// ═══════════════════════════════════════════════════════════════
+async function loadAssets(page) {
+  astPage = page;
+  try {
+    const d = await Api.get(`/cyber/assets?page=${page}&size=${PAGE_SIZE}`);
+    allAssetsData = d.content || d || [];
+    renderAssets(allAssetsData);
+    buildPagination('ast-pagination', page, d.totalPages||1, 'loadAssets');
+  } catch(e) {
+    document.getElementById('assets-tbody').innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Failed to load assets.</td></tr>`;
+  }
+}
+function renderAssets(items) {
+  const search = (document.getElementById('ast-search')?.value||'').toLowerCase();
+  const crit   = document.getElementById('ast-filter-crit')?.value||'';
+  const type   = document.getElementById('ast-filter-type')?.value||'';
+  const filtered = items.filter(a =>
+    (!search || (a.assetName||'').toLowerCase().includes(search) || (a.ipAddress||'').includes(search)) &&
+    (!crit   || a.criticality === crit) &&
+    (!type   || a.assetType === type)
+  );
+  const tb = document.getElementById('assets-tbody');
+  if (!filtered.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted py-4">No assets found.</td></tr>'; return; }
+  tb.innerHTML = filtered.map(a => `<tr>
+    <td class="fw-600">${fmt(a.assetName)}</td>
+    <td><span class="badge bg-light text-dark border">${fmt(a.assetType)}</span></td>
+    <td>${fmt(a.businessOwner)}</td>
+    <td>${fmt(a.technicalOwner)}</td>
+    <td>${fmt(a.classification)}</td>
+    <td>${criticalityBadge(a.criticality)}</td>
+    <td><code style="font-size:.72rem">${a.ipAddress||a.hostname||'—'}</code></td>
+    <td>${statusBadge(a.status)}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" onclick="openAssetModal(${JSON.stringify(a).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="deleteAsset(${a.id})"><i class="bi bi-trash"></i></button>
+    </td></tr>`).join('');
+}
+function openAssetModal(data) {
+  document.getElementById('astModalTitle').textContent    = data ? 'Edit Asset' : 'Add Asset';
+  document.getElementById('ast-id').value                 = data?.id || '';
+  document.getElementById('ast-assetName').value          = data?.assetName || '';
+  document.getElementById('ast-assetType').value          = data?.assetType || '';
+  document.getElementById('ast-businessOwner').value      = data?.businessOwner || '';
+  document.getElementById('ast-technicalOwner').value     = data?.technicalOwner || '';
+  document.getElementById('ast-classification').value     = data?.classification || '';
+  document.getElementById('ast-criticality').value        = data?.criticality || '';
+  document.getElementById('ast-status').value             = data?.status || 'ACTIVE';
+  document.getElementById('ast-ipAddress').value          = data?.ipAddress || '';
+  document.getElementById('ast-hostname').value           = data?.hostname || '';
+  document.getElementById('ast-operatingSystem').value    = data?.operatingSystem || '';
+  openModal('assetModal');
+}
+async function saveAsset() {
+  if (!document.getElementById('ast-assetName').value.trim()) { alert('Asset name required.'); return; }
+  const id = document.getElementById('ast-id').value;
+  const payload = {
+    assetName: document.getElementById('ast-assetName').value,
+    assetType: document.getElementById('ast-assetType').value,
+    businessOwner: document.getElementById('ast-businessOwner').value,
+    technicalOwner: document.getElementById('ast-technicalOwner').value,
+    classification: document.getElementById('ast-classification').value,
+    criticality: document.getElementById('ast-criticality').value,
+    status: document.getElementById('ast-status').value,
+    ipAddress: document.getElementById('ast-ipAddress').value,
+    hostname: document.getElementById('ast-hostname').value,
+    operatingSystem: document.getElementById('ast-operatingSystem').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/assets/${id}`, payload);
+    else    await Api.post('/cyber/assets', payload);
+    closeModal('assetModal');
+    App.showFlash('success','Asset saved.');
+    await loadAllAssets();
+    loadAssets(astPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+function deleteAsset(id) {
+  confirmDelete('Delete this asset?', async () => {
+    try { await Api.delete(`/cyber/assets/${id}`); App.showFlash('success','Deleted.'); loadAssets(astPage); await loadAllAssets(); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EVIDENCE
+// ═══════════════════════════════════════════════════════════════
+async function loadEvidence(page) {
+  evPage = page;
+  try {
+    const d = await Api.get(`/cyber/evidence?page=${page}&size=${PAGE_SIZE}`);
+    allEvidenceData = d.content || d || [];
+    renderEvidence(allEvidenceData);
+    buildPagination('ev-pagination', page, d.totalPages||1, 'loadEvidence');
+  } catch(e) {
+    document.getElementById('evidence-tbody').innerHTML = `<tr><td colspan="10" class="text-center text-danger py-4">Failed to load evidence.</td></tr>`;
+  }
+}
+function renderEvidence(items) {
+  const search = (document.getElementById('ev-search')?.value||'').toLowerCase();
+  const status = document.getElementById('ev-filter-status')?.value||'';
+  const filtered = items.filter(e =>
+    (!search || (e.titleEn||'').toLowerCase().includes(search) || (e.ownerName||'').toLowerCase().includes(search)) &&
+    (!status || e.status === status)
+  );
+  const tb = document.getElementById('evidence-tbody');
+  if (!filtered.length) { tb.innerHTML='<tr><td colspan="10" class="text-center text-muted py-4">No evidence found.</td></tr>'; return; }
+  tb.innerHTML = filtered.map(e => {
+    const ctrl = allControls.find(c => c.id === e.controlId);
+    const ctrlName = ctrl ? (ctrl.controlNumber||'')+ ' ' +(ctrl.titleEn||'') : (e.controlId?`#${e.controlId}`:'—');
+    const isExpired = e.status === 'EXPIRED';
+    return `<tr>
+      <td style="max-width:180px" class="text-truncate">${fmt(e.titleEn)}</td>
+      <td><span class="badge bg-light text-dark border">${fmt(e.evidenceType)}</span></td>
+      <td style="max-width:160px" class="text-truncate">${ctrlName}</td>
+      <td style="max-width:130px" class="text-truncate">${fmt(e.frameworkRequirement)}</td>
+      <td>${fmt(e.ownerName)}</td>
+      <td>${fmt(e.version)}</td>
+      <td>${fmtDate(e.reviewDate)}</td>
+      <td>${fmtDate(e.expiryDate)}${isExpired?'<span class="overdue-dot ms-1"></span>':''}</td>
+      <td>${statusBadge(e.status)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" onclick="openEvidenceModal(${JSON.stringify(e).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="deleteEvidence(${e.id})"><i class="bi bi-trash"></i></button>
+      </td></tr>`;
+  }).join('');
+}
+function openEvidenceModal(data) {
+  document.getElementById('evModalTitle').textContent        = data ? 'Edit Evidence' : 'Add Evidence';
+  document.getElementById('ev-id').value                     = data?.id || '';
+  document.getElementById('ev-titleEn').value                = data?.titleEn || '';
+  document.getElementById('ev-evidenceType').value           = data?.evidenceType || '';
+  document.getElementById('ev-controlId').value              = data?.controlId || '';
+  document.getElementById('ev-frameworkRequirement').value   = data?.frameworkRequirement || '';
+  document.getElementById('ev-ownerName').value              = data?.ownerName || '';
+  document.getElementById('ev-version').value                = data?.version || '';
+  document.getElementById('ev-status').value                 = data?.status || 'CURRENT';
+  document.getElementById('ev-reviewDate').value             = data?.reviewDate || '';
+  document.getElementById('ev-expiryDate').value             = data?.expiryDate || '';
+  document.getElementById('ev-fileName').value               = data?.fileName || '';
+  openModal('evidenceModal');
+}
+async function saveEvidence() {
+  if (!document.getElementById('ev-titleEn').value.trim()) { alert('Title required.'); return; }
+  const id = document.getElementById('ev-id').value;
+  const payload = {
+    titleEn: document.getElementById('ev-titleEn').value,
+    evidenceType: document.getElementById('ev-evidenceType').value,
+    controlId: +document.getElementById('ev-controlId').value || null,
+    frameworkRequirement: document.getElementById('ev-frameworkRequirement').value,
+    ownerName: document.getElementById('ev-ownerName').value,
+    version: document.getElementById('ev-version').value,
+    status: document.getElementById('ev-status').value,
+    reviewDate: document.getElementById('ev-reviewDate').value || null,
+    expiryDate: document.getElementById('ev-expiryDate').value || null,
+    fileName: document.getElementById('ev-fileName').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/evidence/${id}`, payload);
+    else    await Api.post('/cyber/evidence', payload);
+    closeModal('evidenceModal');
+    App.showFlash('success','Evidence saved.');
+    loadEvidence(evPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+function deleteEvidence(id) {
+  confirmDelete('Delete this evidence record?', async () => {
+    try { await Api.delete(`/cyber/evidence/${id}`); App.showFlash('success','Deleted.'); loadEvidence(evPage); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ACTION PLANS
+// ═══════════════════════════════════════════════════════════════
+async function loadActionPlans(page) {
+  apPage = page;
+  try {
+    const d = await Api.get(`/cyber/action-plans?page=${page}&size=${PAGE_SIZE}`);
+    allActionPlansData = d.content || d || [];
+    renderActionPlans(allActionPlansData);
+    buildPagination('ap-pagination', page, d.totalPages||1, 'loadActionPlans');
+  } catch(e) {
+    document.getElementById('actionplans-tbody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Failed to load action plans.</td></tr>`;
+  }
+}
+function renderActionPlans(items) {
+  const search   = (document.getElementById('ap-search')?.value||'').toLowerCase();
+  const priority = document.getElementById('ap-filter-priority')?.value||'';
+  const status   = document.getElementById('ap-filter-status')?.value||'';
+  const filtered = items.filter(a =>
+    (!search   || (a.titleEn||'').toLowerCase().includes(search) || (a.ownerName||'').toLowerCase().includes(search)) &&
+    (!priority || a.priority === priority) &&
+    (!status   || a.workflowStatus === status)
+  );
+  const tb = document.getElementById('actionplans-tbody');
+  if (!filtered.length) { tb.innerHTML='<tr><td colspan="8" class="text-center text-muted py-4">No action plans found.</td></tr>'; return; }
+  const today = new Date().toISOString().split('T')[0];
+  tb.innerHTML = filtered.map(a => {
+    const isOverdue = a.dueDate && a.dueDate < today && a.workflowStatus !== 'COMPLETED';
+    return `<tr>
+      <td style="max-width:200px" class="text-truncate">${ar()&&a.titleAr?a.titleAr:fmt(a.titleEn)}</td>
+      <td><span class="badge bg-light text-dark border">${fmt(a.sourceType)}</span></td>
+      <td>${criticalityBadge(a.priority)}</td>
+      <td>${fmt(a.ownerName)}</td>
+      <td>${fmtDate(a.dueDate)}${isOverdue?'<span class="overdue-dot ms-1"></span>':''}</td>
+      <td>${progressBar(a.progressPct)}</td>
+      <td>${statusBadge(a.workflowStatus)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-xs btn-outline-primary py-0 px-1 me-1" onclick="openActionPlanModal(${JSON.stringify(a).replace(/"/g,'&quot;')})"><i class="bi bi-pencil"></i></button>
+        ${a.workflowStatus!=='COMPLETED'?`<button class="btn btn-xs btn-outline-success py-0 px-1 me-1" title="Mark Complete" onclick="completeActionPlan(${a.id})"><i class="bi bi-check-lg"></i></button>`:''}
+        <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="deleteActionPlan(${a.id})"><i class="bi bi-trash"></i></button>
+      </td></tr>`;
+  }).join('');
+}
+function openActionPlanModal(data) {
+  document.getElementById('apModalTitle').textContent        = data ? 'Edit Action Plan' : 'Add Action Plan';
+  document.getElementById('ap-id').value                     = data?.id || '';
+  document.getElementById('ap-titleEn').value                = data?.titleEn || '';
+  document.getElementById('ap-titleAr').value                = data?.titleAr || '';
+  document.getElementById('ap-descriptionEn').value          = data?.descriptionEn || '';
+  document.getElementById('ap-priority').value               = data?.priority || '';
+  document.getElementById('ap-sourceType').value             = data?.sourceType || '';
+  document.getElementById('ap-ownerName').value              = data?.ownerName || '';
+  document.getElementById('ap-dueDate').value                = data?.dueDate || '';
+  document.getElementById('ap-workflowStatus').value         = data?.workflowStatus || 'OPEN';
+  document.getElementById('ap-progressPct').value            = data?.progressPct ?? 0;
+  document.getElementById('ap-completionEvidence').value     = data?.completionEvidence || '';
+  openModal('actionPlanModal');
+}
+async function saveActionPlan() {
+  if (!document.getElementById('ap-titleEn').value.trim()) { alert('Title required.'); return; }
+  const id = document.getElementById('ap-id').value;
+  const payload = {
+    titleEn: document.getElementById('ap-titleEn').value,
+    titleAr: document.getElementById('ap-titleAr').value,
+    descriptionEn: document.getElementById('ap-descriptionEn').value,
+    priority: document.getElementById('ap-priority').value,
+    sourceType: document.getElementById('ap-sourceType').value,
+    ownerName: document.getElementById('ap-ownerName').value,
+    dueDate: document.getElementById('ap-dueDate').value || null,
+    workflowStatus: document.getElementById('ap-workflowStatus').value,
+    progressPct: +document.getElementById('ap-progressPct').value || 0,
+    completionEvidence: document.getElementById('ap-completionEvidence').value
+  };
+  try {
+    if (id) await Api.put(`/cyber/action-plans/${id}`, payload);
+    else    await Api.post('/cyber/action-plans', payload);
+    closeModal('actionPlanModal');
+    App.showFlash('success','Action plan saved.');
+    loadActionPlans(apPage);
+  } catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+async function completeActionPlan(id) {
+  try { await Api.post(`/cyber/action-plans/${id}/complete`, {}); App.showFlash('success','Action plan completed.'); loadActionPlans(apPage); }
+  catch(e) { App.showFlash('danger','Failed: '+e.message); }
+}
+function deleteActionPlan(id) {
+  confirmDelete('Delete this action plan?', async () => {
+    try { await Api.delete(`/cyber/action-plans/${id}`); App.showFlash('success','Deleted.'); loadActionPlans(apPage); }
+    catch(e) { App.showFlash('danger','Delete failed: '+e.message); }
+  });
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => init());
+</script>
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Privacy — TSS GRC</title>
+    <link id="bootstrap-css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+    <style>
+        .tab-nav { display:flex; gap:4px; background:var(--color-bg); padding:4px; border-radius:10px; margin-bottom:1.25rem; border:1px solid var(--color-border); }
+        .tab-btn  { padding:8px 18px; border-radius:7px; border:none; background:none; font-size:12.5px; font-weight:700; color:var(--color-text-muted); cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .18s; }
+        .tab-btn.active { background:#fff; color:var(--color-primary); box-shadow:0 1px 4px rgba(0,0,0,.1); }
+        .stats-kpi { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.5rem; }
+        @media(max-width:900px){ .stats-kpi{grid-template-columns:repeat(2,1fr)} }
+        .stat-box { background:#fff; border:1px solid var(--color-border); border-radius:12px; padding:1rem 1.25rem; text-align:center; }
+        .stat-num  { font-size:1.8rem; font-weight:900; color:var(--color-primary); letter-spacing:-1px; }
+        .stat-lbl  { font-size:11px; color:var(--color-text-muted); margin-top:3px; font-weight:600; }
+    </style>
+</head>
+<body>
+<div id="app-shell"></div>
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h5 class="fw-800 mb-0" style="font-size:1.1rem">
+                <i class="bi bi-lock-fill me-2" style="color:var(--color-primary)"></i>
+                <span data-i18n="privacy.title">Privacy &amp; Data Protection</span>
+            </h5>
+            <div class="text-muted" style="font-size:.78rem">DSR · Breaches · ROPA</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnAdd" style="border:none;background:var(--gradient-accent)">
+            <i class="bi bi-plus-lg me-1"></i><span id="btnAddLabel">New Record</span>
+        </button>
+    </div>
+
+    <div class="stats-kpi" id="statsRow">
+        <div class="stat-box"><div class="stat-num" id="statBreaches">—</div><div class="stat-lbl">Open Breaches</div></div>
+        <div class="stat-box"><div class="stat-num" id="statDsrs">—</div><div class="stat-lbl">Open DSRs</div></div>
+        <div class="stat-box"><div class="stat-num" id="statRopa">—</div><div class="stat-lbl">ROPA Activities</div></div>
+    </div>
+
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="dsr" data-i18n="privacy.tab.dsr">Data Subject Requests</button>
+        <button class="tab-btn" data-tab="breaches" data-i18n="privacy.tab.breaches">Data Breaches</button>
+        <button class="tab-btn" data-tab="ropa" data-i18n="privacy.tab.ropa">ROPA</button>
+    </div>
+
+    <div id="tabContent"><div class="text-center py-5 text-muted"><i class="bi bi-hourglass-split fs-3"></i><p class="mt-2">Loading...</p></div></div>
+</main>
+
+<!-- Modal -->
+<div class="modal fade" id="crudModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-700" id="modalTitle">Record</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="btnSave" data-i18n="common.save">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+<script>
+let activeTab = 'dsr';
+let editId = null;
+let modal;
+
+// ── Badges ────────────────────────────────────────────────────────────────────
+const statusBadge = s => {
+    const m = { OPEN:'badge-blue', INVESTIGATING:'badge-orange', RESOLVED:'badge-green', CLOSED:'badge-gray',
+                ACTIVE:'badge-green', INACTIVE:'badge-gray', COMPLETED:'badge-green', IN_PROGRESS:'badge-orange',
+                PENDING:'badge-yellow', OVERDUE:'badge-red' };
+    return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`;
+};
+const ratingBadge = r => {
+    const m = { CRITICAL:'badge-red', HIGH:'badge-orange', MEDIUM:'badge-yellow', LOW:'badge-green' };
+    return `<span class="badge ${m[r]||'badge-gray'}">${r}</span>`;
+};
+const emptyState = (icon,title,sub) => `<div class="empty-state py-5 text-center"><i class="bi ${icon} fs-2 text-muted"></i><h6 class="mt-3 text-muted">${title}</h6><p class="text-muted small">${sub}</p></div>`;
+
+function updateAddBtn(){
+    const labels = { dsr:'New Request', breaches:'Report Breach', ropa:'New Activity' };
+    const el = document.getElementById('btnAddLabel');
+    if (el) el.textContent = labels[activeTab] || 'New Record';
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function loadStats(){
+    try {
+        const s = await Api.get('/privacy/stats');
+        document.getElementById('statBreaches').textContent = s.totalBreaches ?? 0;
+        document.getElementById('statDsrs').textContent = s.openDsrs ?? 0;
+        document.getElementById('statRopa').textContent = s.totalRopa ?? 0;
+    } catch(e){}
+}
+
+// ── Load tab ──────────────────────────────────────────────────────────────────
+async function loadTab(tab){
+    const el = document.getElementById('tabContent');
+    el.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-hourglass-split fs-3"></i></div>`;
+    try {
+        if (tab === 'dsr')      await loadDsrs(el);
+        else if (tab === 'breaches') await loadBreaches(el);
+        else if (tab === 'ropa') await loadRopa(el);
+    } catch(e){
+        el.innerHTML = `<div class="alert alert-danger">${e.message||'Failed to load data'}</div>`;
+    }
+}
+
+// ── DSR ───────────────────────────────────────────────────────────────────────
+async function loadDsrs(el){
+    const data = await Api.get('/privacy/dsrs?size=50');
+    const rows = data.content ?? [];
+    if(!rows.length){ el.innerHTML = emptyState('bi-person-lock','No DSRs yet','Log the first data subject request'); return; }
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.request.type">Type</th>
+        <th data-i18n="label.requester">Requester</th>
+        <th data-i18n="label.received">Received</th>
+        <th data-i18n="label.due.date">Due Date</th>
+        <th data-i18n="label.status">Status</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(r=>`<tr>
+        <td><span class="badge badge-blue">${r.requestType||'—'}</span></td>
+        <td><div style="font-weight:600">${r.requesterName||'—'}</div><div style="font-size:11px;color:var(--color-text-muted)">${r.requesterEmail||''}</div></td>
+        <td style="font-size:12px">${r.receivedAt?.substring(0,10)||'—'}</td>
+        <td style="font-size:12px">${r.dueDate||'—'}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${r.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${r.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+// ── Breaches ──────────────────────────────────────────────────────────────────
+async function loadBreaches(el){
+    const data = await Api.get('/privacy/breaches?size=50');
+    const rows = data.content ?? [];
+    if(!rows.length){ el.innerHTML = emptyState('bi-shield-exclamation','No breaches reported','Report a data breach incident'); return; }
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.title">Title</th>
+        <th data-i18n="label.breach.type">Breach Type</th>
+        <th data-i18n="label.date">Discovered</th>
+        <th data-i18n="label.affected">Affected</th>
+        <th data-i18n="label.notified">PDPC Notified</th>
+        <th data-i18n="label.status">Status</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(b=>`<tr>
+        <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.titleEn||'—'}</td>
+        <td><span class="badge badge-orange">${b.breachType||'—'}</span></td>
+        <td style="font-size:12px">${b.discoveredAt?.substring(0,10)||'—'}</td>
+        <td style="font-size:12px">${b.dataSubjectsAffectedCount??'—'}</td>
+        <td>${b.pdpcNotificationRequired ? (b.pdpcNotifiedAt ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-red">Pending</span>') : '<span class="badge badge-gray">N/A</span>'}</td>
+        <td>${statusBadge(b.status)}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${b.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${b.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+// ── ROPA ──────────────────────────────────────────────────────────────────────
+async function loadRopa(el){
+    const data = await Api.get('/privacy/ropa?size=50');
+    const rows = data.content ?? [];
+    if(!rows.length){ el.innerHTML = emptyState('bi-file-earmark-text','No ROPA entries yet','Add a processing activity'); return; }
+    const lang = () => (localStorage.getItem('grc_lang') || 'en');
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.name">Activity</th>
+        <th data-i18n="label.legal.basis">Legal Basis</th>
+        <th data-i18n="label.retention">Retention (months)</th>
+        <th>Cross-border</th>
+        <th data-i18n="label.status">Status</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(a=>`<tr>
+        <td style="font-weight:600">${lang()==='ar'&&a.activityNameAr ? a.activityNameAr : a.activityNameEn||'—'}</td>
+        <td style="font-size:12px">${a.legalBasis||'—'}</td>
+        <td class="text-center">${a.retentionPeriodMonths??'—'}</td>
+        <td>${a.crossBorderTransfer ? '<span class="badge badge-orange">Yes</span>' : '<span class="badge badge-gray">No</span>'}</td>
+        <td>${statusBadge(a.status)}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${a.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${a.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+function openCreate(){ editId = null; buildForm(null); modal.show(); }
+async function openEdit(id){
+    editId = id;
+    let data;
+    try {
+        const ep = activeTab==='dsr' ? 'dsrs' : activeTab==='breaches' ? 'breaches' : 'ropa';
+        data = await Api.get(`/privacy/${ep}/${id}`);
+    } catch(e){ alert('Failed to load record'); return; }
+    buildForm(data);
+    modal.show();
+}
+async function doDelete(id){
+    if (!confirm('Delete this record?')) return;
+    const ep = activeTab==='dsr' ? 'dsrs' : activeTab==='breaches' ? 'breaches' : 'ropa';
+    try { await Api.delete(`/privacy/${ep}/${id}`); loadTab(activeTab); loadStats(); } catch(e){ alert(e.message); }
+}
+
+function buildForm(d){
+    const title = editId ? 'Edit Record' : 'New Record';
+    document.getElementById('modalTitle').textContent = title;
+    if (activeTab === 'dsr'){
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-600 small">Request Type *</label>
+            <select class="form-select" id="fType">
+                ${['ACCESS','RECTIFICATION','ERASURE','PORTABILITY','OBJECTION','RESTRICTION'].map(t=>`<option value="${t}" ${d?.requestType===t?'selected':''}>${t}</option>`).join('')}
+            </select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Status</label>
+            <select class="form-select" id="fStatus">
+                ${['OPEN','IN_PROGRESS','COMPLETED','CLOSED'].map(s=>`<option value="${s}" ${(d?.status||'OPEN')===s?'selected':''}>${s}</option>`).join('')}
+            </select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Requester Name</label>
+            <input class="form-control" id="fName" value="${d?.requesterName||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Requester Email</label>
+            <input class="form-control" id="fEmail" value="${d?.requesterEmail||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Due Date</label>
+            <input type="date" class="form-control" id="fDueDate" value="${d?.dueDate||''}"></div>
+        </div>`;
+    } else if (activeTab === 'breaches'){
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-12"><label class="form-label fw-600 small">Title *</label>
+            <input class="form-control" id="fTitle" value="${d?.titleEn||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Breach Type *</label>
+            <select class="form-select" id="fBreachType">
+                ${['CONFIDENTIALITY','INTEGRITY','AVAILABILITY','COMBINED'].map(t=>`<option value="${t}" ${d?.breachType===t?'selected':''}>${t}</option>`).join('')}
+            </select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Status</label>
+            <select class="form-select" id="fStatus">
+                ${['OPEN','INVESTIGATING','RESOLVED','CLOSED'].map(s=>`<option value="${s}" ${(d?.status||'OPEN')===s?'selected':''}>${s}</option>`).join('')}
+            </select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Discovered At *</label>
+            <input type="datetime-local" class="form-control" id="fDiscovered" value="${d?.discoveredAt?.substring(0,16)||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Affected Count</label>
+            <input type="number" class="form-control" id="fAffected" value="${d?.dataSubjectsAffectedCount||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">PDPC Notification Required</label>
+            <select class="form-select" id="fPdpc"><option value="false" ${!d?.pdpcNotificationRequired?'selected':''}>No</option><option value="true" ${d?.pdpcNotificationRequired?'selected':''}>Yes</option></select></div>
+            <div class="col-12"><label class="form-label fw-600 small">Description</label>
+            <textarea class="form-control" id="fDesc" rows="2">${d?.descriptionEn||''}</textarea></div>
+        </div>`;
+    } else {
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-600 small">Activity Name (EN) *</label>
+            <input class="form-control" id="fNameEn" value="${d?.activityNameEn||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Activity Name (AR)</label>
+            <input class="form-control" id="fNameAr" value="${d?.activityNameAr||''}" dir="rtl"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Legal Basis</label>
+            <select class="form-select" id="fLegalBasis">
+                ${['CONSENT','CONTRACT','LEGAL_OBLIGATION','VITAL_INTERESTS','PUBLIC_TASK','LEGITIMATE_INTERESTS'].map(l=>`<option value="${l}" ${d?.legalBasis===l?'selected':''}>${l.replace('_',' ')}</option>`).join('')}
+            </select></div>
+            <div class="col-md-3"><label class="form-label fw-600 small">Retention (months)</label>
+            <input type="number" class="form-control" id="fRetention" value="${d?.retentionPeriodMonths||''}"></div>
+            <div class="col-md-3"><label class="form-label fw-600 small">Cross-border Transfer</label>
+            <select class="form-select" id="fCross"><option value="false" ${!d?.crossBorderTransfer?'selected':''}>No</option><option value="true" ${d?.crossBorderTransfer?'selected':''}>Yes</option></select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Status</label>
+            <select class="form-select" id="fStatus">
+                ${['ACTIVE','UNDER_REVIEW','INACTIVE'].map(s=>`<option value="${s}" ${(d?.status||'ACTIVE')===s?'selected':''}>${s}</option>`).join('')}
+            </select></div>
+            <div class="col-12"><label class="form-label fw-600 small">Purpose</label>
+            <textarea class="form-control" id="fPurpose" rows="2">${d?.purposeEn||''}</textarea></div>
+        </div>`;
+    }
+}
+
+// ── Init (after App.init has built the shell and moved page-content) ─────────
+document.addEventListener('DOMContentLoaded', () => {
+    modal = new bootstrap.Modal(document.getElementById('crudModal'));
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            activeTab = btn.dataset.tab;
+            loadTab(activeTab);
+            updateAddBtn();
+        });
+    });
+
+    document.getElementById('btnAdd')?.addEventListener('click', () => openCreate());
+
+    document.getElementById('btnSave')?.addEventListener('click', async () => {
+        const ep = activeTab==='dsr' ? 'dsrs' : activeTab==='breaches' ? 'breaches' : 'ropa';
+        let body;
+        try {
+            if (activeTab === 'dsr'){
+                body = { requestType:document.getElementById('fType').value,
+                         requesterName:document.getElementById('fName').value,
+                         requesterEmail:document.getElementById('fEmail').value,
+                         dueDate:document.getElementById('fDueDate').value||null,
+                         status:document.getElementById('fStatus').value };
+            } else if (activeTab === 'breaches'){
+                body = { titleEn:document.getElementById('fTitle').value,
+                         breachType:document.getElementById('fBreachType').value,
+                         status:document.getElementById('fStatus').value,
+                         discoveredAt:document.getElementById('fDiscovered').value||null,
+                         dataSubjectsAffectedCount:parseInt(document.getElementById('fAffected').value)||null,
+                         pdpcNotificationRequired:document.getElementById('fPdpc').value==='true',
+                         descriptionEn:document.getElementById('fDesc').value };
+            } else {
+                body = { activityNameEn:document.getElementById('fNameEn').value,
+                         activityNameAr:document.getElementById('fNameAr').value,
+                         legalBasis:document.getElementById('fLegalBasis').value,
+                         retentionPeriodMonths:parseInt(document.getElementById('fRetention').value)||null,
+                         crossBorderTransfer:document.getElementById('fCross').value==='true',
+                         status:document.getElementById('fStatus').value,
+                         purposeEn:document.getElementById('fPurpose').value };
+            }
+            if (editId) await Api.put(`/privacy/${ep}/${editId}`, body);
+            else await Api.post(`/privacy/${ep}`, body);
+            modal.hide();
+            loadTab(activeTab);
+            loadStats();
+        } catch(e){ alert(e.message||'Save failed'); }
+    });
+
+    loadStats();
+    loadTab('dsr');
+    document.addEventListener('languageChanged', () => loadTab(activeTab));
+});
+</script>
+</body>
+</html>

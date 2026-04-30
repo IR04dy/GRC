@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Third Party Risk — TSS GRC</title>
+    <link id="bootstrap-css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+    <style>
+        .tab-nav { display:flex; gap:4px; background:var(--color-bg); padding:4px; border-radius:10px; margin-bottom:1.25rem; border:1px solid var(--color-border); }
+        .tab-btn  { padding:8px 18px; border-radius:7px; border:none; background:none; font-size:12.5px; font-weight:700; color:var(--color-text-muted); cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .18s; }
+        .tab-btn.active { background:#fff; color:var(--color-primary); box-shadow:0 1px 4px rgba(0,0,0,.1); }
+        .stats-kpi { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; margin-bottom:1.5rem; }
+        @media(max-width:900px){ .stats-kpi{grid-template-columns:1fr} }
+        .stat-box { background:#fff; border:1px solid var(--color-border); border-radius:12px; padding:1rem 1.25rem; text-align:center; }
+        .stat-num  { font-size:1.8rem; font-weight:900; color:var(--color-primary); letter-spacing:-1px; }
+        .stat-lbl  { font-size:11px; color:var(--color-text-muted); margin-top:3px; font-weight:600; }
+    </style>
+</head>
+<body>
+<div id="app-shell"></div>
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h5 class="fw-800 mb-0" style="font-size:1.1rem">
+                <i class="bi bi-building me-2" style="color:var(--color-primary)"></i>
+                <span data-i18n="nav.tprm">Third Party Risk Management</span>
+            </h5>
+            <div class="text-muted" style="font-size:.78rem">Vendor Registry · Risk Assessments</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnAdd" style="border:none;background:var(--gradient-accent)">
+            <i class="bi bi-plus-lg me-1"></i><span id="btnAddLabel">New Vendor</span>
+        </button>
+    </div>
+
+    <div class="stats-kpi">
+        <div class="stat-box"><div class="stat-num" id="statVendors">—</div><div class="stat-lbl" data-i18n="tprm.tab.vendors">Total Vendors</div></div>
+        <div class="stat-box"><div class="stat-num" id="statHighRisk" style="color:var(--color-danger)">—</div><div class="stat-lbl">High/Critical Risk Vendors</div></div>
+    </div>
+
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="vendors" data-i18n="tprm.tab.vendors">Vendors</button>
+        <button class="tab-btn" data-tab="assessments" data-i18n="tprm.tab.assessments">Assessments</button>
+    </div>
+
+    <div id="tabContent"><div class="text-center py-5 text-muted"><i class="bi bi-hourglass-split fs-3"></i></div></div>
+</main>
+
+<div class="modal fade" id="crudModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-700" id="modalTitle">Record</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="btnSave" data-i18n="common.save">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+<script>
+let activeTab = 'vendors';
+let editId = null;
+let modal;
+
+const ratingBadge = r => {
+    const m = { CRITICAL:'badge-red', HIGH:'badge-orange', MEDIUM:'badge-yellow', LOW:'badge-green' };
+    return `<span class="badge ${m[r]||'badge-gray'}">${r||'—'}</span>`;
+};
+const statusBadge = s => {
+    const m = { ACTIVE:'badge-green', INACTIVE:'badge-gray', PENDING_REVIEW:'badge-orange', TERMINATED:'badge-red',
+                PLANNED:'badge-blue', IN_PROGRESS:'badge-orange', COMPLETED:'badge-green' };
+    return `<span class="badge ${m[s]||'badge-gray'}">${s||'—'}</span>`;
+};
+const emptyState = (icon,title,sub) => `<div class="empty-state py-5 text-center"><i class="bi ${icon} fs-2 text-muted"></i><h6 class="mt-3 text-muted">${title}</h6><p class="text-muted small">${sub}</p></div>`;
+
+function updateAddBtn(){
+    const labels = { vendors:'New Vendor', assessments:'New Assessment' };
+    const el = document.getElementById('btnAddLabel');
+    if (el) el.textContent = labels[activeTab] || 'New';
+}
+
+async function loadStats(){
+    try {
+        const s = await Api.get('/tprm/stats');
+        document.getElementById('statVendors').textContent = s.totalVendors ?? 0;
+        document.getElementById('statHighRisk').textContent = s.highRiskVendors ?? 0;
+    } catch(e){}
+}
+
+async function loadTab(tab){
+    const el = document.getElementById('tabContent');
+    el.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-hourglass-split fs-3"></i></div>`;
+    try {
+        if (tab === 'vendors')      await loadVendors(el);
+        else if (tab === 'assessments') await loadAssessments(el);
+    } catch(e){
+        el.innerHTML = `<div class="alert alert-danger">${e.message||'Failed to load data'}</div>`;
+    }
+}
+
+async function loadVendors(el){
+    const data = await Api.get('/tprm/vendors?size=50');
+    const rows = data.content ?? [];
+    if(!rows.length){ el.innerHTML = emptyState('bi-building','No vendors yet','Register your first third-party vendor'); return; }
+    const lang = () => localStorage.getItem('grc_lang') || 'en';
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.vendor">Vendor</th>
+        <th data-i18n="label.type">Type</th>
+        <th>Country</th>
+        <th data-i18n="label.risk.rating">Risk Rating</th>
+        <th data-i18n="label.status">Status</th>
+        <th data-i18n="label.contract.end">Contract End</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(v=>`<tr>
+        <td>
+            <div style="font-weight:600">${lang()==='ar'&&v.vendorNameAr ? v.vendorNameAr : v.vendorName||'—'}</div>
+            ${v.contactEmail ? `<div style="font-size:11px;color:var(--color-text-muted)">${v.contactEmail}</div>` : ''}
+        </td>
+        <td style="font-size:12px">${v.vendorType||'—'}</td>
+        <td style="font-size:12px">${v.country||'—'}</td>
+        <td>${ratingBadge(v.riskRating)}</td>
+        <td>${statusBadge(v.status)}</td>
+        <td style="font-size:12px">${v.contractEndDate||'—'}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${v.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${v.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+async function loadAssessments(el){
+    const rows = await Api.get('/tprm/assessments');
+    if(!rows.length){ el.innerHTML = emptyState('bi-clipboard-check','No assessments yet','Create a vendor risk assessment'); return; }
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.date">Date</th>
+        <th>Assessor</th>
+        <th data-i18n="label.score">Score</th>
+        <th data-i18n="label.risk.rating">Risk Rating</th>
+        <th data-i18n="label.status">Status</th>
+        <th data-i18n="label.next.review">Next Review</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(a=>`<tr>
+        <td style="font-size:12px">${a.assessmentDate||'—'}</td>
+        <td style="font-size:12px">${a.assessor||'—'}</td>
+        <td>${a.riskScore!=null ? `<strong>${a.riskScore}%</strong>` : '—'}</td>
+        <td>${ratingBadge(a.riskRating)}</td>
+        <td>${statusBadge(a.status)}</td>
+        <td style="font-size:12px">${a.nextReviewDate||'—'}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${a.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${a.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+function openCreate(){ editId = null; buildForm(null); modal.show(); }
+async function openEdit(id){
+    editId = id;
+    let data;
+    try {
+        const ep = activeTab==='vendors' ? 'vendors' : 'assessments';
+        data = await Api.get(`/tprm/${ep}/${id}`);
+    } catch(e){ alert('Failed to load record'); return; }
+    buildForm(data);
+    modal.show();
+}
+async function doDelete(id){
+    if (!confirm('Delete this record?')) return;
+    const ep = activeTab==='vendors' ? 'vendors' : 'assessments';
+    try { await Api.delete(`/tprm/${ep}/${id}`); loadTab(activeTab); loadStats(); } catch(e){ alert(e.message); }
+}
+
+function buildForm(d){
+    document.getElementById('modalTitle').textContent = editId ? 'Edit Record' : 'New Record';
+    if (activeTab === 'vendors'){
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-600 small">Vendor Name *</label>
+            <input class="form-control" id="fName" value="${d?.vendorName||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Vendor Name (AR)</label>
+            <input class="form-control" id="fNameAr" value="${d?.vendorNameAr||''}" dir="rtl"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Type</label>
+            <input class="form-control" id="fType" value="${d?.vendorType||''}" placeholder="e.g. Cloud Services"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Country</label>
+            <input class="form-control" id="fCountry" value="${d?.country||''}"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Risk Rating</label>
+            <select class="form-select" id="fRating">
+                ${['CRITICAL','HIGH','MEDIUM','LOW'].map(r=>`<option value="${r}" ${(d?.riskRating||'MEDIUM')===r?'selected':''}>${r}</option>`).join('')}
+            </select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Status</label>
+            <select class="form-select" id="fStatus">
+                ${['ACTIVE','INACTIVE','PENDING_REVIEW','TERMINATED'].map(s=>`<option value="${s}" ${(d?.status||'ACTIVE')===s?'selected':''}>${s}</option>`).join('')}
+            </select></div>
+            <div class="col-md-3"><label class="form-label fw-600 small">Contract Start</label>
+            <input type="date" class="form-control" id="fStart" value="${d?.contractStartDate||''}"></div>
+            <div class="col-md-3"><label class="form-label fw-600 small">Contract End</label>
+            <input type="date" class="form-control" id="fEnd" value="${d?.contractEndDate||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Contact Name</label>
+            <input class="form-control" id="fContact" value="${d?.contactName||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Contact Email</label>
+            <input class="form-control" id="fEmail" value="${d?.contactEmail||''}"></div>
+            <div class="col-12"><label class="form-label fw-600 small">Description</label>
+            <textarea class="form-control" id="fDesc" rows="2">${d?.description||''}</textarea></div>
+        </div>`;
+    } else {
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-600 small">Assessment Date *</label>
+            <input type="date" class="form-control" id="fDate" value="${d?.assessmentDate||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Assessor</label>
+            <input class="form-control" id="fAssessor" value="${d?.assessor||''}"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Risk Score %</label>
+            <input type="number" class="form-control" id="fScore" min="0" max="100" value="${d?.riskScore||''}"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Risk Rating</label>
+            <select class="form-select" id="fRating">
+                ${['CRITICAL','HIGH','MEDIUM','LOW'].map(r=>`<option value="${r}" ${(d?.riskRating||'MEDIUM')===r?'selected':''}>${r}</option>`).join('')}
+            </select></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Status</label>
+            <select class="form-select" id="fStatus">
+                ${['PLANNED','IN_PROGRESS','COMPLETED'].map(s=>`<option value="${s}" ${(d?.status||'PLANNED')===s?'selected':''}>${s}</option>`).join('')}
+            </select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Next Review Date</label>
+            <input type="date" class="form-control" id="fNext" value="${d?.nextReviewDate||''}"></div>
+            <div class="col-12"><label class="form-label fw-600 small">Findings</label>
+            <textarea class="form-control" id="fFindings" rows="3">${d?.findings||''}</textarea></div>
+        </div>`;
+    }
+}
+
+// ── Init (after App.init has built the shell and moved page-content) ─────────
+document.addEventListener('DOMContentLoaded', () => {
+    modal = new bootstrap.Modal(document.getElementById('crudModal'));
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            activeTab = btn.dataset.tab;
+            loadTab(activeTab);
+            updateAddBtn();
+        });
+    });
+
+    document.getElementById('btnAdd')?.addEventListener('click', () => openCreate());
+
+    document.getElementById('btnSave')?.addEventListener('click', async () => {
+        const ep = activeTab==='vendors' ? 'vendors' : 'assessments';
+        let body;
+        try {
+            if (activeTab === 'vendors'){
+                body = { vendorName:document.getElementById('fName').value,
+                         vendorNameAr:document.getElementById('fNameAr').value,
+                         vendorType:document.getElementById('fType').value,
+                         country:document.getElementById('fCountry').value,
+                         riskRating:document.getElementById('fRating').value,
+                         status:document.getElementById('fStatus').value,
+                         contractStartDate:document.getElementById('fStart').value||null,
+                         contractEndDate:document.getElementById('fEnd').value||null,
+                         contactName:document.getElementById('fContact').value,
+                         contactEmail:document.getElementById('fEmail').value,
+                         description:document.getElementById('fDesc').value };
+            } else {
+                body = { assessmentDate:document.getElementById('fDate').value,
+                         assessor:document.getElementById('fAssessor').value,
+                         riskScore:parseFloat(document.getElementById('fScore').value)||null,
+                         riskRating:document.getElementById('fRating').value,
+                         status:document.getElementById('fStatus').value,
+                         nextReviewDate:document.getElementById('fNext').value||null,
+                         findings:document.getElementById('fFindings').value };
+            }
+            if (editId) await Api.put(`/tprm/${ep}/${editId}`, body);
+            else await Api.post(`/tprm/${ep}`, body);
+            modal.hide();
+            loadTab(activeTab);
+            loadStats();
+        } catch(e){ alert(e.message||'Save failed'); }
+    });
+
+    loadStats();
+    loadTab('vendors');
+    document.addEventListener('languageChanged', () => loadTab(activeTab));
+});
+</script>
+</body>
+</html>

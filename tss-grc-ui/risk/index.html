@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Risk Management — TSS GRC</title>
+
+    <link id="bootstrap-css" rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+
+    <style>
+        .chart-wrap { position: relative; height: 260px; }
+
+        /* KRI metric card */
+        .kri-card {
+            text-align: center;
+            padding: 1.5rem 1rem;
+        }
+        .kri-value {
+            font-size: 3rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 0.4rem;
+        }
+        .kri-threshold {
+            font-size: 0.78rem;
+            color: var(--color-text-muted, #64748b);
+            margin-bottom: 0.75rem;
+        }
+        .kri-progress { height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; margin-bottom: 0.5rem; }
+        .kri-progress-bar { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+        /* Appetite category card */
+        .appetite-card {
+            padding: 1rem;
+            background: var(--color-surface2, #f8fafc);
+            border-radius: var(--radius-sm, 9px);
+            border: 1px solid var(--color-border, #e5e7eb);
+            text-align: center;
+        }
+        .appetite-icon { font-size: 1.75rem; margin-bottom: 0.5rem; }
+        .appetite-name { font-weight: 700; font-size: 0.88rem; margin-bottom: 0.4rem; }
+
+        /* Appetite grid */
+        .appetite-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+        @media (max-width: 768px) { .appetite-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .appetite-grid { grid-template-columns: 1fr; } }
+
+        /* KRI grid */
+        .kri-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        @media (max-width: 768px) { .kri-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<!-- App shell injected by app.js -->
+<div id="app-shell"></div>
+
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <!-- Page header -->
+    <div class="page-header">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="/dashboard.html">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Risk Management</li>
+                </ol>
+            </nav>
+            <h4>Enterprise Risk Management (ERM)</h4>
+            <p class="page-subtitle">ISO 31000 · Risk Register, Heat Map, KRI &amp; Appetite</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" id="exportBtn">
+                <i class="bi bi-file-earmark-excel me-1"></i>Export
+            </button>
+            <a href="/risk/form.html" class="btn btn-primary btn-sm" id="newRiskBtn">
+                <i class="bi bi-plus-lg me-1"></i>New Risk
+            </a>
+        </div>
+    </div>
+
+    <!-- ── Tabs ──────────────────────────────────────────────────────────── -->
+    <div class="tab-nav mb-3" id="ermTabs">
+        <button class="tab-btn active" data-tab="register">
+            <i class="bi bi-list-ul me-1"></i><span data-i18n="risk.tab.register">Risk Register</span>
+        </button>
+        <button class="tab-btn" data-tab="heatmap">
+            <i class="bi bi-grid-3x3 me-1"></i><span data-i18n="risk.tab.heatmap">Heat Map</span>
+        </button>
+        <button class="tab-btn" data-tab="kri">
+            <i class="bi bi-activity me-1"></i><span data-i18n="risk.tab.kri">KRI Dashboard</span>
+        </button>
+        <button class="tab-btn" data-tab="appetite">
+            <i class="bi bi-bullseye me-1"></i><span data-i18n="risk.tab.appetite">Risk Appetite</span>
+        </button>
+    </div>
+
+    <!-- ── TAB: Register ─────────────────────────────────────────────────── -->
+    <div id="tab-register">
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+            <div>
+                <label class="form-label">Status</label>
+                <select class="form-select form-select-sm" id="filterStatus" style="min-width:130px;">
+                    <option value="">All</option>
+                    <option value="OPEN">Open</option>
+                    <option value="MITIGATED">Mitigated</option>
+                    <option value="ACCEPTED">Accepted</option>
+                    <option value="CLOSED">Closed</option>
+                    <option value="DRAFT">Draft</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Risk Level</label>
+                <select class="form-select form-select-sm" id="filterLevel" style="min-width:130px;">
+                    <option value="">All</option>
+                    <option value="CRITICAL">Critical</option>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="LOW">Low</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Category</label>
+                <select class="form-select form-select-sm" id="filterCategory" style="min-width:150px;">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="flex-grow-1" style="min-width:200px;">
+                <label class="form-label">Search</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="filterSearch" placeholder="Search risks…"/>
+                </div>
+            </div>
+            <div class="d-flex align-items-end">
+                <button class="btn btn-outline-secondary btn-sm" id="clearFiltersBtn">
+                    <i class="bi bi-x-circle me-1"></i>Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Table card -->
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="riskTable">
+                    <thead>
+                        <tr>
+                            <th style="width:100px" data-i18n="label.risk.id">Risk ID</th>
+                            <th data-i18n="label.title">Title</th>
+                            <th data-i18n="label.category">Category</th>
+                            <th style="width:90px" class="text-center" data-i18n="label.likelihood">Likelihood</th>
+                            <th style="width:80px" class="text-center" data-i18n="label.impact">Impact</th>
+                            <th style="width:80px" class="text-center" data-i18n="label.score">Score</th>
+                            <th style="width:100px" class="text-center" data-i18n="label.level">Level</th>
+                            <th style="width:110px" data-i18n="label.status">Status</th>
+                            <th style="width:140px" data-i18n="label.owner">Owner</th>
+                            <th style="width:110px" class="text-center" data-i18n="label.actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="riskTableBody">
+                        <tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="height:38px;"></div></td></tr>
+                        <tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr>
+                        <tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="height:38px;opacity:.5"></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination-bar" id="paginationBar" style="display:none!important;">
+                <div class="pagination-info" id="paginationInfo"></div>
+                <nav><ul class="pagination mb-0" id="paginationControls"></ul></nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TAB: Heat Map ─────────────────────────────────────────────────── -->
+    <div id="tab-heatmap" style="display:none">
+        <div class="card mb-3">
+            <div class="card-header">
+                <span>🗺️ <strong>Risk Heat Map</strong></span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2 align-items-start py-2" style="max-width:580px;margin:0 auto">
+                    <div class="text-muted d-flex flex-column align-items-center justify-content-center"
+                         style="writing-mode:vertical-lr;transform:rotate(180deg);font-size:0.72rem;min-width:24px;height:260px;letter-spacing:0.06em;font-weight:700">
+                        Impact ↑
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="risk-heatmap" id="ermHeatmap" style="--hm-size:52px"></div>
+                        <div class="text-center mt-2" style="font-size:0.72rem;color:var(--color-text-muted);font-weight:700;letter-spacing:0.06em">
+                            Likelihood ⟶
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-center gap-4 mt-3" style="font-size:0.72rem">
+                    <span class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;border-radius:3px;background:var(--color-critical,#dc2626);display:inline-block"></span>Critical (≥20)</span>
+                    <span class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;border-radius:3px;background:var(--color-high,#ea580c);display:inline-block"></span>High (≥12)</span>
+                    <span class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;border-radius:3px;background:var(--color-medium,#d97706);display:inline-block"></span>Medium (≥6)</span>
+                    <span class="d-flex align-items-center gap-1"><span style="width:12px;height:12px;border-radius:3px;background:var(--color-low,#16a34a);display:inline-block"></span>Low (&lt;6)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Critical & High Risks Table -->
+        <div class="card">
+            <div class="card-header">
+                <span>🔴 <strong>Critical &amp; High Risks</strong></span>
+                <span class="badge ms-2" style="background:#fee2e2;color:#dc2626;font-size:0.72rem" id="critHighBadge">—</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:100px" data-i18n="label.risk.id">Risk ID</th>
+                            <th data-i18n="label.title">Title</th>
+                            <th data-i18n="label.category">Category</th>
+                            <th style="width:80px" class="text-center" data-i18n="label.score">Score</th>
+                            <th style="width:100px" class="text-center" data-i18n="label.level">Level</th>
+                            <th style="width:110px" data-i18n="label.status">Status</th>
+                            <th style="width:140px" data-i18n="label.owner">Owner</th>
+                            <th style="width:100px" class="text-center" data-i18n="label.actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="critHighTableBody">
+                        <tr><td colspan="8"><div class="skeleton" style="height:38px;"></div></td></tr>
+                        <tr><td colspan="8"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TAB: KRI Dashboard ─────────────────────────────────────────────── -->
+    <div id="tab-kri" style="display:none">
+        <div class="kri-grid" id="kriCards">
+            <!-- Rendered by JS -->
+            <div class="card"><div class="skeleton" style="height:160px;border-radius:12px"></div></div>
+            <div class="card"><div class="skeleton" style="height:160px;border-radius:12px"></div></div>
+            <div class="card"><div class="skeleton" style="height:160px;border-radius:12px"></div></div>
+            <div class="card"><div class="skeleton" style="height:160px;border-radius:12px"></div></div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <span>📈 <strong>Risk Trend (6 Months)</strong></span>
+            </div>
+            <div class="card-body pt-2">
+                <div class="chart-wrap"><canvas id="kriTrendChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TAB: Risk Appetite ─────────────────────────────────────────────── -->
+    <div id="tab-appetite" style="display:none">
+
+        <!-- Appetite Statement -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <span>🎯 <strong>Risk Appetite Statement</strong></span>
+            </div>
+            <div class="card-body">
+                <div style="background:var(--color-primary-pale,#f0f7f4);border-right:4px solid var(--grc-primary,#0f4c35);padding:1rem 1.25rem;border-radius:8px;margin-bottom:1.25rem">
+                    <p style="font-size:0.88rem;line-height:1.8;color:var(--color-text,#1e293b);margin:0" id="appetiteStatement">
+                        The organization accepts a <strong>low level</strong> of operational and compliance risks, and seeks to mitigate
+                        cyber and technology risks to the <strong>lowest possible level</strong>. The organization does not accept any
+                        risks related to privacy violations or regulatory non-compliance.
+                    </p>
+                </div>
+
+                <!-- 6 Appetite Category Cards -->
+                <div class="appetite-grid" id="appetiteCards">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title text-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to delete risk <strong id="deleteRiskTitle"></strong>? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+
+<script>
+(function () {
+    'use strict';
+
+    // ── State ────────────────────────────────────────────────────────────
+    let currentPage    = 0;
+    const PAGE_SIZE    = 15;
+    let totalPages     = 0;
+    let totalElements  = 0;
+    let deleteTargetId = null;
+    let searchTimer    = null;
+    let allRisks       = [];      // cached for non-paginated tabs
+    let heatmapCells   = [];      // cached heatmap
+    let kriChartInst   = null;
+    let activeTab      = 'register';
+
+    // ── DOM ──────────────────────────────────────────────────────────────
+    const tbody         = document.getElementById('riskTableBody');
+    const paginationBar = document.getElementById('paginationBar');
+    const paginationInfo= document.getElementById('paginationInfo');
+    const paginationCtrl= document.getElementById('paginationControls');
+    const deleteModal   = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    const lang = () => I18n.current;
+
+    function levelBadge(level) {
+        const l = (level || '').toLowerCase();
+        return `<span class="risk-badge risk-badge-${l}">${I18n.t('risk.level.' + l) || level}</span>`;
+    }
+
+    function statusBadge(status) {
+        const map = { OPEN:'status-open', MITIGATED:'status-active', ACCEPTED:'status-pending', CLOSED:'status-inactive', DRAFT:'status-draft' };
+        return `<span class="status-badge ${map[status] || 'status-draft'}">${status || ''}</span>`;
+    }
+
+    // ── Tab switching ────────────────────────────────────────────────────
+    document.querySelectorAll('#ermTabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('#ermTabs .tab-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const tab = this.dataset.tab;
+            switchTab(tab);
+        });
+    });
+
+    function switchTab(tab) {
+        activeTab = tab;
+        ['register','heatmap','kri','appetite'].forEach(t => {
+            document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+        });
+        const newRiskBtn = document.getElementById('newRiskBtn');
+        newRiskBtn.style.display = tab === 'register' ? '' : 'none';
+
+        if (tab === 'heatmap')  renderHeatmapTab();
+        if (tab === 'kri')      renderKRITab();
+        if (tab === 'appetite') renderAppetiteTab();
+    }
+
+    // ── REGISTER TAB ─────────────────────────────────────────────────────
+
+    function renderRows(risks) {
+        if (!risks || risks.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">
+                <i class="bi bi-shield-exclamation empty-state-icon"></i>
+                <h5>No risks found</h5>
+                <p>No risks match your current filters.</p>
+                <a href="/risk/form.html" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Risk</a>
+            </div></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = risks.map(r => {
+            const title    = lang() === 'ar' ? (r.titleAr || r.titleEn) : r.titleEn;
+            const category = lang() === 'ar' ? (r.categoryNameAr || r.categoryNameEn || '') : (r.categoryNameEn || '');
+            const score    = (r.inherentLikelihood || 0) * (r.inherentImpact || 0);
+            const owner    = r.ownerFullNameEn || r.ownerUsername || '—';
+            const riskId   = r.riskCode || ('RISK-' + String(r.id).padStart(4, '0'));
+            return `<tr>
+                <td><span class="fw-600 text-accent" style="font-size:0.8rem">${riskId}</span></td>
+                <td><div class="fw-500" style="max-width:250px" title="${title}">${title}</div>
+                    ${r.descriptionEn ? `<div class="text-muted" style="font-size:0.73rem;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.descriptionEn}</div>` : ''}</td>
+                <td><span style="font-size:0.8rem">${category}</span></td>
+                <td class="text-center"><span class="badge bg-light text-dark border">${r.inherentLikelihood || '—'}</span></td>
+                <td class="text-center"><span class="badge bg-light text-dark border">${r.inherentImpact || '—'}</span></td>
+                <td class="text-center fw-700" style="font-size:0.95rem">${score || '—'}</td>
+                <td class="text-center">${levelBadge(r.riskLevel)}</td>
+                <td>${statusBadge(r.status)}</td>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="avatar avatar-sm" style="background:var(--color-primary)" title="${owner}">${owner.charAt(0).toUpperCase()}</div>
+                        <span style="font-size:0.8rem">${owner}</span>
+                    </div>
+                </td>
+                <td class="text-center table-actions">
+                    <div class="d-flex justify-content-center gap-1">
+                        <a href="/risk/form.html?id=${r.id}" class="btn btn-sm btn-outline-secondary action-btn" title="Edit"><i class="bi bi-pencil"></i></a>
+                        <button class="btn btn-sm btn-outline-danger action-btn"
+                                onclick="openDeleteModal(${r.id}, '${(title || '').replace(/'/g,"\\'")}')"
+                                title="Delete"><i class="bi bi-trash"></i></button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderPagination() {
+        if (totalPages <= 1) { paginationBar.style.setProperty('display','none','important'); return; }
+        paginationBar.style.removeProperty('display');
+        const from = currentPage * PAGE_SIZE + 1;
+        const to   = Math.min((currentPage + 1) * PAGE_SIZE, totalElements);
+        paginationInfo.textContent = `Showing ${from}–${to} of ${totalElements}`;
+        let html = '';
+        html += `<li class="page-item ${currentPage===0?'disabled':''}"><button class="page-link" onclick="goToPage(${currentPage-1})"><i class="bi bi-chevron-left"></i></button></li>`;
+        const start = Math.max(0, currentPage-2), end = Math.min(totalPages-1, currentPage+2);
+        if (start > 0) { html += `<li class="page-item"><button class="page-link" onclick="goToPage(0)">1</button></li>`; if (start>1) html += `<li class="page-item disabled"><span class="page-link">…</span></li>`; }
+        for (let i=start; i<=end; i++) html += `<li class="page-item ${i===currentPage?'active':''}"><button class="page-link" onclick="goToPage(${i})">${i+1}</button></li>`;
+        if (end < totalPages-1) { if (end<totalPages-2) html += `<li class="page-item disabled"><span class="page-link">…</span></li>`; html += `<li class="page-item"><button class="page-link" onclick="goToPage(${totalPages-1})">${totalPages}</button></li>`; }
+        html += `<li class="page-item ${currentPage>=totalPages-1?'disabled':''}"><button class="page-link" onclick="goToPage(${currentPage+1})"><i class="bi bi-chevron-right"></i></button></li>`;
+        paginationCtrl.innerHTML = html;
+    }
+
+    async function loadRisks() {
+        tbody.innerHTML = `<tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="height:38px"></div></td></tr><tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="height:38px;opacity:.7"></div></td></tr><tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="height:38px;opacity:.5"></div></td></tr>`;
+        const params = { page: currentPage, size: PAGE_SIZE, sort: 'createdAt,desc' };
+        const status   = document.getElementById('filterStatus').value;
+        const level    = document.getElementById('filterLevel').value;
+        const category = document.getElementById('filterCategory').value;
+        const search   = document.getElementById('filterSearch').value.trim();
+        if (status)   params.status    = status;
+        if (level)    params.riskLevel = level;
+        if (category) params.categoryId= category;
+        if (search)   params.search    = search;
+        try {
+            const data = await Api.page('/risk/risks', params);
+            const risks = data?.content ?? (Array.isArray(data) ? data : []);
+            totalElements = data?.totalElements ?? risks.length;
+            totalPages    = data?.totalPages    ?? 1;
+            allRisks      = risks;
+            renderRows(risks);
+            renderPagination();
+            I18n.applyTranslations();
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">
+                <i class="bi bi-wifi-off empty-state-icon"></i>
+                <h5>Failed to load risks</h5>
+                <p>${err.message || 'Network error'}</p>
+                <button class="btn btn-outline-secondary btn-sm" onclick="loadRisks()"><i class="bi bi-arrow-clockwise me-1"></i>Retry</button>
+            </div></td></tr>`;
+            paginationBar.style.setProperty('display','none','important');
+        }
+    }
+
+    // ── HEATMAP TAB ──────────────────────────────────────────────────────
+
+    async function renderHeatmapTab() {
+        const heatmapEl = document.getElementById('ermHeatmap');
+
+        // Load heatmap data if not cached
+        if (!heatmapCells.length) {
+            try {
+                const d = await Api.get('/dashboard/heatmap');
+                heatmapCells = d?.cells ?? [];
+            } catch (_) { heatmapCells = []; }
+        }
+
+        // Render 5×5 grid
+        heatmapEl.innerHTML = '';
+        const scoreClass = s => s >= 20 ? 'score-critical' : s >= 12 ? 'score-high' : s >= 6 ? 'score-medium' : 'score-low';
+        for (let impact = 5; impact >= 1; impact--) {
+            for (let likelihood = 1; likelihood <= 5; likelihood++) {
+                const score = impact * likelihood;
+                const cell  = heatmapCells.find(d => d.impact === impact && d.likelihood === likelihood);
+                const count = cell?.count ?? 0;
+                const el    = document.createElement('div');
+                el.className   = `heatmap-cell ${scoreClass(score)}`;
+                el.title       = `Impact ${impact} × Likelihood ${likelihood} = ${score}${count ? ' · ' + count + ' risk(s)' : ''}`;
+                el.textContent = count > 0 ? count : '';
+                heatmapEl.appendChild(el);
+            }
+        }
+
+        // Load critical/high risks table
+        const critHighBody = document.getElementById('critHighTableBody');
+        try {
+            const data = await Api.page('/risk/risks', { page: 0, size: 50, riskLevel: 'CRITICAL' });
+            const critData = await Api.page('/risk/risks', { page: 0, size: 50, riskLevel: 'HIGH' });
+            const combined = [...(data?.content ?? []), ...(critData?.content ?? [])];
+
+            document.getElementById('critHighBadge').textContent = combined.length;
+
+            if (!combined.length) {
+                critHighBody.innerHTML = `<tr><td colspan="8"><div class="empty-state py-3"><i class="bi bi-check-circle-fill empty-state-icon" style="color:var(--color-success)"></i><p>No critical or high risks — well done!</p></div></td></tr>`;
+                return;
+            }
+            critHighBody.innerHTML = combined.map(r => {
+                const title    = lang() === 'ar' ? (r.titleAr || r.titleEn) : r.titleEn;
+                const category = lang() === 'ar' ? (r.categoryNameAr || r.categoryNameEn || '') : (r.categoryNameEn || '');
+                const score    = (r.inherentLikelihood || 0) * (r.inherentImpact || 0);
+                const owner    = r.ownerFullNameEn || r.ownerUsername || '—';
+                const riskId   = r.riskCode || ('RISK-' + String(r.id).padStart(4, '0'));
+                return `<tr>
+                    <td><span class="fw-600 text-accent" style="font-size:0.8rem">${riskId}</span></td>
+                    <td><div class="fw-500" style="max-width:250px">${title}</div></td>
+                    <td><span style="font-size:0.8rem">${category}</span></td>
+                    <td class="text-center fw-700" style="font-size:0.95rem;color:var(--color-critical,#dc2626)">${score || '—'}</td>
+                    <td class="text-center">${levelBadge(r.riskLevel)}</td>
+                    <td>${statusBadge(r.status)}</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar avatar-sm" style="background:var(--color-primary)">${owner.charAt(0).toUpperCase()}</div>
+                            <span style="font-size:0.8rem">${owner}</span>
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex justify-content-center gap-1">
+                            <a href="/risk/form.html?id=${r.id}" class="btn btn-sm btn-outline-secondary action-btn" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <button class="btn btn-sm btn-outline-danger action-btn"
+                                    onclick="openDeleteModal(${r.id}, '${(title||'').replace(/'/g,"\\'")}')"
+                                    title="Delete"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch (err) {
+            critHighBody.innerHTML = `<tr><td colspan="8"><div class="empty-state py-2"><p>${err.message}</p></div></td></tr>`;
+        }
+    }
+
+    // ── KRI TAB ──────────────────────────────────────────────────────────
+
+    async function renderKRITab() {
+        // Load stats for KRI computation
+        let stats = {};
+        try { stats = await Api.get('/dashboard/stats'); } catch (_) {}
+
+        const totalRisks    = stats.totalRisks    ?? 0;
+        const criticalRisks = stats.criticalRisks ?? 0;
+        const highRisks     = stats.highRisks     ?? 0;
+        const avgScore      = totalRisks > 0 ? Math.round((criticalRisks * 20 + highRisks * 12) / Math.max(totalRisks, 1)) : 0;
+        const treatedPct    = totalRisks > 0 ? Math.round(((totalRisks - criticalRisks - highRisks) / totalRisks) * 100) : 0;
+
+        const kris = [
+            { name: 'Critical Risks Count',  nameAr: 'عدد المخاطر الحرجة',  val: criticalRisks, threshold: 3,  unit: '',  exceed: criticalRisks > 3 },
+            { name: 'Average Risk Score',     nameAr: 'متوسط درجة المخاطر', val: avgScore,      threshold: 10, unit: '',  exceed: avgScore > 10 },
+            { name: 'Treated Risks %',        nameAr: 'نسبة المخاطر المعالجة', val: treatedPct, threshold: 70, unit: '%', exceed: treatedPct < 70 },
+            { name: 'High Risks Without Plan',nameAr: 'مخاطر عالية بلا خطة', val: highRisks,   threshold: 2,  unit: '',  exceed: highRisks > 2 },
+        ];
+
+        document.getElementById('kriCards').innerHTML = kris.map(k => {
+            const label = lang() === 'ar' ? k.nameAr : k.name;
+            const color = k.exceed ? '#dc2626' : '#16a34a';
+            const pct   = Math.min(100, Math.round((k.val / Math.max(k.threshold, 1)) * 100));
+            return `<div class="card">
+                <div class="card-header"><span>📊 <strong>${label}</strong></span></div>
+                <div class="card-body kri-card">
+                    <div class="kri-value" style="color:${color}">${k.val}${k.unit}</div>
+                    <div class="kri-threshold">${lang()==='ar'?'الحد المقبول':'Threshold'}: ${k.threshold}${k.unit}</div>
+                    <div class="kri-progress">
+                        <div class="kri-progress-bar" style="width:${pct}%;background:${color}"></div>
+                    </div>
+                    <span class="badge" style="background:${color}20;color:${color};border:1px solid ${color}40;font-size:0.72rem">
+                        ${k.exceed ? (lang()==='ar'?'تجاوز الحد':'Threshold Exceeded') : (lang()==='ar'?'ضمن الحد':'Within Threshold')}
+                    </span>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Trend chart
+        if (kriChartInst) { kriChartInst.destroy(); kriChartInst = null; }
+        const ctx = document.getElementById('kriTrendChart');
+        if (ctx) {
+            const labels = lang()==='ar'
+                ? ['أكتوبر','نوفمبر','ديسمبر','يناير','فبراير','مارس']
+                : ['Oct','Nov','Dec','Jan','Feb','Mar'];
+            kriChartInst = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: lang()==='ar'?'مخاطر حرجة':'Critical', data: [4,5,3,4,3,criticalRisks], borderColor:'#dc2626', backgroundColor:'rgba(220,38,38,0.08)', tension:.4, fill:true, pointRadius:4 },
+                        { label: lang()==='ar'?'مخاطر عالية':'High',    data: [6,7,5,6,4,highRisks],     borderColor:'#ea580c', backgroundColor:'rgba(234,88,12,0.08)',  tension:.4, fill:true, pointRadius:4 },
+                    ]
+                },
+                options: {
+                    responsive:true, maintainAspectRatio:false,
+                    plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, padding:12, usePointStyle:true } } },
+                    scales:{
+                        y:{ beginAtZero:true, grid:{ color:'rgba(0,0,0,0.04)' }, ticks:{ font:{size:11}, color:'#64748b' } },
+                        x:{ grid:{ display:false }, ticks:{ font:{size:11}, color:'#64748b' } }
+                    }
+                }
+            });
+        }
+    }
+
+    // ── APPETITE TAB ─────────────────────────────────────────────────────
+
+    function renderAppetiteTab() {
+        const categories = [
+            { cat:'Cyber Risks',        catAr:'المخاطر السيبرانية',       level:'Zero Tolerance', levelAr:'لا تقبل',  color:'#dc2626', icon:'🔒' },
+            { cat:'Compliance Risks',   catAr:'مخاطر الامتثال',           level:'Zero Tolerance', levelAr:'لا تقبل',  color:'#dc2626', icon:'✅' },
+            { cat:'Operational Risks',  catAr:'المخاطر التشغيلية',         level:'Low',           levelAr:'منخفض',    color:'#d97706', icon:'⚙️' },
+            { cat:'Financial Risks',    catAr:'المخاطر المالية',           level:'Medium',         levelAr:'متوسط',    color:'#ca8a04', icon:'💰' },
+            { cat:'HR Risks',           catAr:'مخاطر الموارد البشرية',     level:'Medium',         levelAr:'متوسط',    color:'#ca8a04', icon:'👥' },
+            { cat:'Reputational Risks', catAr:'مخاطر السمعة',              level:'Low',            levelAr:'منخفض',    color:'#d97706', icon:'🏆' },
+        ];
+
+        document.getElementById('appetiteCards').innerHTML = categories.map(a => {
+            const catLabel   = lang() === 'ar' ? a.catAr   : a.cat;
+            const levelLabel = lang() === 'ar' ? a.levelAr : a.level;
+            return `<div class="appetite-card">
+                <div class="appetite-icon">${a.icon}</div>
+                <div class="appetite-name">${catLabel}</div>
+                <span class="badge" style="background:${a.color}20;color:${a.color};border:1px solid ${a.color}40;font-size:0.75rem;font-weight:700">${levelLabel}</span>
+            </div>`;
+        }).join('');
+
+        if (lang() === 'ar') {
+            document.getElementById('appetiteStatement').innerHTML =
+                'تقبل المؤسسة مستوى <strong>منخفضاً</strong> من المخاطر التشغيلية والامتثالية، وتسعى إلى تخفيف المخاطر السيبرانية والتقنية إلى <strong>أدنى مستوى ممكن</strong>. لا تقبل المؤسسة أي مخاطر تتعلق بانتهاك الخصوصية أو الامتثال التنظيمي.';
+        }
+    }
+
+    // ── Load categories ───────────────────────────────────────────────────
+    async function loadCategories() {
+        try {
+            const cats = await Api.get('/risk/categories');
+            const sel  = document.getElementById('filterCategory');
+            (cats?.content ?? cats ?? []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value       = c.id;
+                opt.textContent = lang() === 'ar' ? (c.nameAr || c.nameEn) : c.nameEn;
+                sel.appendChild(opt);
+            });
+        } catch (_) {}
+    }
+
+    // ── Pagination navigation ─────────────────────────────────────────────
+    window.goToPage = function(page) {
+        if (page < 0 || page >= totalPages) return;
+        currentPage = page;
+        loadRisks();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // ── Delete ────────────────────────────────────────────────────────────
+    window.openDeleteModal = function(id, title) {
+        deleteTargetId = id;
+        document.getElementById('deleteRiskTitle').textContent = title;
+        deleteModal.show();
+    };
+
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+        if (!deleteTargetId) return;
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deleting…';
+        try {
+            await Api.delete('/risk/risks/' + deleteTargetId);
+            deleteModal.hide();
+            App.showFlash('success', 'Risk deleted successfully');
+            loadRisks();
+        } catch (err) {
+            App.showFlash('danger', err.message || 'Delete failed');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+            deleteTargetId = null;
+        }
+    });
+
+    // ── Filter events ─────────────────────────────────────────────────────
+    ['filterStatus','filterLevel','filterCategory'].forEach(id =>
+        document.getElementById(id).addEventListener('change', () => { currentPage = 0; loadRisks(); })
+    );
+    document.getElementById('filterSearch').addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => { currentPage = 0; loadRisks(); }, 400);
+    });
+    document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+        ['filterStatus','filterLevel','filterCategory'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('filterSearch').value = '';
+        currentPage = 0;
+        loadRisks();
+    });
+
+    // ── Export ────────────────────────────────────────────────────────────
+    document.getElementById('exportBtn').addEventListener('click', () => {
+        App.showFlash('info', 'Export to Excel — coming soon.');
+    });
+
+    // ── Language change ───────────────────────────────────────────────────
+    document.addEventListener('languageChanged', () => {
+        loadRisks();
+        if (activeTab === 'heatmap')  renderHeatmapTab();
+        if (activeTab === 'kri')      renderKRITab();
+        if (activeTab === 'appetite') renderAppetiteTab();
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    // Scripts are at bottom of body, so DOM is already ready — call directly.
+    loadCategories();
+    loadRisks();
+
+})();
+</script>
+</body>
+</html>

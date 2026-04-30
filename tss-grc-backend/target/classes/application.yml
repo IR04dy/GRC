@@ -1,0 +1,155 @@
+# ============================================================================
+# TSS GRC Platform — Application Configuration (REST API Backend)
+# Profile: default (common settings across all environments)
+#
+# Frontend: tss-grc-ui/ — standalone HTML/CSS/JS project served separately.
+# This backend exposes ONLY a REST API (no Thymeleaf, no server-side rendering).
+# ============================================================================
+
+spring:
+  application:
+    name: tss-grc-platform
+
+  # SQL Server Datasource
+  datasource:
+    url: ${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=TSS_GRC;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true}
+    username: ${DB_USERNAME:grc_app}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      pool-name: GrcHikariPool
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000        # 5 minutes
+      connection-timeout: 30000   # 30 seconds
+      max-lifetime: 1800000       # 30 minutes
+      leak-detection-threshold: 60000
+
+  # JPA / Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: validate            # Flyway manages schema; Hibernate validates
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        default_schema: platform
+        jdbc:
+          time_zone: UTC
+        globally_quoted_identifiers: false
+
+  # Flyway database migrations
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/sqlserver
+    baseline-on-migrate: false
+    out-of-order: false
+    validate-on-migrate: true
+    table: flyway_schema_history
+    encoding: UTF-8
+    clean-disabled: true           # NEVER allow clean (especially in production)
+    connect-retries: 3
+
+  # Email (SMTP) — for notification delivery
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+
+  # Cache (Caffeine) — dashboard aggregations, permission lookups
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=300s
+
+  # Jackson — JSON serialization settings
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: UTC
+
+# Server configuration
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  error:
+    include-message: on_param
+    include-binding-errors: on_param
+
+# Spring Boot Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+  info:
+    app:
+      name: TSS GRC Platform
+      version: ${project.version:0.1.0}
+
+# SpringDoc OpenAPI 3.0 (Swagger UI — disabled in prod via profile)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:false}
+  info:
+    title: TSS GRC Platform API
+    description: Enterprise GRC REST API — consumed by the tss-grc-ui frontend and third-party integrations
+    version: v1
+
+# Application-specific settings
+grc:
+  # JWT authentication
+  jwt:
+    secret: ${JWT_SECRET:change-this-to-a-256-bit-secret-key-in-production}
+    access-token-expiry-ms: ${JWT_ACCESS_EXPIRY_MS:900000}        # 15 minutes
+    refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY_MS:604800000}   # 7 days
+
+  # CORS — allowed origins for the standalone frontend
+  # In production, set to empty list (same-origin via Nginx reverse proxy)
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+  # Security policies
+  security:
+    max-failed-login-attempts: 5
+    lockout-duration-minutes: 30
+    password-expiry-days: 90
+    password-history-count: 5
+
+  # File storage (evidence attachments, report exports)
+  storage:
+    base-path: ${STORAGE_BASE_PATH:./uploads}
+    max-file-size-mb: 50
+    allowed-extensions: pdf,doc,docx,xls,xlsx,png,jpg,jpeg,zip,txt
+
+  # Notification settings
+  notifications:
+    from-email: ${NOTIFY_FROM_EMAIL:noreply@tss-grc.com}
+    from-name: TSS GRC Platform
+
+  # Platform defaults
+  default-locale: en
+  supported-locales: en,ar

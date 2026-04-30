@@ -1,0 +1,7 @@
+'cyber.incidents'
+'cyber.severity.critical'
+'cyber.severity.high'
+'cyber.severity.low'
+'cyber.severity.medium'
+'cyber.title'
+'cyber.vulnerabilities'

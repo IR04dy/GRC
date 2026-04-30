@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Incident Management — TSS GRC</title>
+    <link id="bootstrap-css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+
+    <style>
+        /* ── 5 Stat Cards ── */
+        .inc-stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        @media (max-width: 1100px) { .inc-stats { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 650px)  { .inc-stats { grid-template-columns: repeat(2, 1fr); } }
+
+        .inc-stat {
+            background: #fff;
+            border: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            text-align: center;
+            border-top-width: 3px;
+        }
+        .inc-stat-num {
+            font-size: 2.25rem;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+        .inc-stat-lbl {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--color-text-muted, #64748b);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Inner Tabs (inside card, like GRC.html) ── */
+        .inc-tab-bar {
+            display: flex;
+            border-bottom: 2px solid var(--color-border, #e5e7eb);
+            background: var(--color-surface2, #f8fafc);
+        }
+        .inc-tab-btn {
+            flex: 1;
+            padding: 14px 16px;
+            border: none;
+            background: none;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--color-text-muted, #64748b);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-family: var(--font, inherit);
+            transition: color 0.2s, border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .inc-tab-btn.active {
+            color: var(--grc-primary, #0f4c35);
+            border-bottom-color: var(--grc-primary, #0f4c35);
+        }
+        .inc-tab-icon { font-size: 1.2rem; }
+
+        /* ── Register tab: card list ── */
+        .inc-card-list { display: flex; flex-direction: column; gap: 10px; }
+        .inc-card-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            background: var(--color-surface, #fff);
+            border: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 12px;
+            transition: transform 0.18s, box-shadow 0.18s;
+            cursor: default;
+        }
+        .inc-card-item:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+        .inc-sev-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        .inc-card-title { font-size: 0.88rem; font-weight: 800; margin-bottom: 3px; }
+        .inc-card-meta  { font-size: 0.72rem; color: var(--color-text-muted, #64748b); display: flex; gap: 12px; flex-wrap: wrap; }
+        .inc-card-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+        /* ── Timeline ── */
+        .timeline-incident { margin-bottom: 2rem; }
+        .timeline-incident:last-child { margin-bottom: 0; }
+        .timeline-body {
+            position: relative;
+            padding-inline-start: 28px;
+            margin-top: 12px;
+        }
+        .timeline-line {
+            position: absolute;
+            top: 0; bottom: 0;
+            left: 8px;
+            width: 3px;
+            background: linear-gradient(180deg, var(--grc-primary, #0f4c35), rgba(15,76,53,0.25));
+            border-radius: 3px;
+        }
+        .timeline-entry {
+            position: relative;
+            padding-bottom: 18px;
+        }
+        .timeline-entry:last-child { padding-bottom: 0; }
+        .timeline-dot {
+            position: absolute;
+            left: -22px;
+            top: 5px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--grc-primary, #0f4c35);
+            box-shadow: 0 0 0 4px rgba(15,76,53,0.15);
+            z-index: 1;
+        }
+        .timeline-content {
+            background: var(--color-surface2, #f8fafc);
+            border: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 10px;
+            padding: 10px 14px;
+        }
+        .timeline-action { font-weight: 700; font-size: 0.82rem; }
+        .timeline-date   { font-size: 0.7rem; color: var(--color-text-muted, #64748b); margin-top: 2px; }
+
+        /* ── Lessons Learned ── */
+        .lessons-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        @media (max-width: 768px) { .lessons-grid { grid-template-columns: 1fr; } }
+
+        .lesson-card {
+            padding: 18px 20px;
+            border-radius: 14px;
+            border: 1px solid var(--color-border, #e5e7eb);
+            border-top-width: 3px;
+        }
+        .lesson-header  { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .lesson-icon    { font-size: 1.5rem; }
+        .lesson-title   { font-weight: 800; font-size: 0.88rem; }
+        .lesson-resolved { font-size: 0.7rem; color: var(--color-text-muted, #64748b); }
+        .lesson-text {
+            background: var(--color-surface2, #f8fafc);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 0.82rem;
+            line-height: 1.75;
+            color: var(--color-text, #1e293b);
+        }
+
+        /* ── Chart grid ── */
+        .inc-dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+        @media (max-width: 768px) { .inc-dashboard-grid { grid-template-columns: 1fr; } }
+        .chart-wrap { position: relative; height: 260px; }
+
+        /* ── Status / Severity badges ── */
+        .sev-badge { display:inline-block; font-size:0.7rem; font-weight:800; border-radius:20px; padding:3px 10px; }
+        .sev-badge.CRITICAL { background:#fef2f2; color:#dc2626; }
+        .sev-badge.HIGH     { background:#fff7ed; color:#c2410c; }
+        .sev-badge.MEDIUM   { background:#fefce8; color:#a16207; }
+        .sev-badge.LOW      { background:#f0fdf4; color:#15803d; }
+
+        .st-badge { display:inline-block; font-size:0.7rem; font-weight:800; border-radius:20px; padding:3px 10px; }
+        .st-badge.OPEN          { background:#fef2f2; color:#dc2626; }
+        .st-badge.INVESTIGATING { background:#fff7ed; color:#c2410c; }
+        .st-badge.RESOLVED      { background:#f0fdf4; color:#15803d; }
+        .st-badge.CLOSED        { background:#f1f5f9; color:#64748b; }
+    </style>
+</head>
+<body>
+<div id="app-shell"></div>
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <!-- Header -->
+    <div class="d-flex align-items-start justify-content-between mb-4">
+        <div>
+            <nav aria-label="breadcrumb"><ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="/dashboard.html">Dashboard</a></li>
+                <li class="breadcrumb-item active">Incident Management</li>
+            </ol></nav>
+            <h4 class="mb-0">Incident Management</h4>
+            <p class="page-subtitle">Monitor and manage cybersecurity &amp; operational incidents</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnAdd">
+            <i class="bi bi-plus-lg me-1"></i>Report Incident
+        </button>
+    </div>
+
+    <!-- ── 5 Stat Cards ──────────────────────────────────────────────────── -->
+    <div class="inc-stats">
+        <div class="inc-stat" style="border-top-color:var(--grc-primary,#0f4c35)">
+            <div class="inc-stat-lbl"><span style="font-size:1rem">📊</span> <span data-i18n="incident.stat.total">Total Incidents</span></div>
+            <div class="inc-stat-num" id="s-total" style="color:var(--grc-primary,#0f4c35)">—</div>
+        </div>
+        <div class="inc-stat" style="border-top-color:#dc2626">
+            <div class="inc-stat-lbl"><span style="font-size:1rem">🔴</span> <span data-i18n="incident.stat.open">Open</span></div>
+            <div class="inc-stat-num" id="s-open" style="color:#dc2626">—</div>
+        </div>
+        <div class="inc-stat" style="border-top-color:#7f1d1d">
+            <div class="inc-stat-lbl"><span style="font-size:1rem">🚨</span> <span data-i18n="incident.stat.critical">Critical</span></div>
+            <div class="inc-stat-num" id="s-critical" style="color:#dc2626">—</div>
+        </div>
+        <div class="inc-stat" style="border-top-color:#16a34a">
+            <div class="inc-stat-lbl"><span style="font-size:1rem">✅</span> <span data-i18n="incident.stat.resolved">Resolved</span></div>
+            <div class="inc-stat-num" id="s-resolved" style="color:#16a34a">—</div>
+        </div>
+        <div class="inc-stat" style="border-top-color:#2563eb">
+            <div class="inc-stat-lbl"><span style="font-size:1rem">⏱️</span> <span data-i18n="incident.stat.avgdays">Avg Resolution</span></div>
+            <div class="inc-stat-num" id="s-avg" style="color:#2563eb">—</div>
+        </div>
+    </div>
+
+    <!-- ── Main Card with Tabs ───────────────────────────────────────────── -->
+    <div class="card" style="border-radius:16px;overflow:hidden">
+
+        <!-- Tab bar -->
+        <div class="inc-tab-bar" id="incTabs">
+            <button class="inc-tab-btn active" data-tab="dashboard">
+                <span class="inc-tab-icon">📊</span><span data-i18n="incident.tab.dashboard">Dashboard</span>
+            </button>
+            <button class="inc-tab-btn" data-tab="register">
+                <span class="inc-tab-icon">📋</span><span data-i18n="incident.tab.register">Register</span>
+            </button>
+            <button class="inc-tab-btn" data-tab="timeline">
+                <span class="inc-tab-icon">📅</span><span data-i18n="incident.tab.timeline">Timeline</span>
+            </button>
+            <button class="inc-tab-btn" data-tab="lessons">
+                <span class="inc-tab-icon">💡</span><span data-i18n="incident.tab.lessons">Lessons Learned</span>
+            </button>
+        </div>
+
+        <!-- Tab content -->
+        <div style="padding:1.5rem" id="incTabContent">
+            <!-- Filled by JS -->
+        </div>
+    </div>
+
+</main>
+
+<!-- ── Add / Edit Modal ────────────────────────────────────────────────── -->
+<div class="modal fade" id="incidentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:var(--grc-primary,#0f4c35)">
+                <h5 class="modal-title text-white fw-800" id="modalTitle">Report Incident</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-600" style="font-size:.82rem">Title (EN) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-sm" id="fTitle" placeholder="Brief description of the incident"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600" style="font-size:.82rem">Title (AR)</label>
+                        <input type="text" class="form-control form-control-sm" id="fTitleAr" placeholder="الوصف المختصر للحادثة" dir="rtl"/>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600" style="font-size:.82rem">Severity <span class="text-danger">*</span></label>
+                        <select class="form-select form-select-sm" id="fSeverity">
+                            <option value="">Select…</option>
+                            <option value="CRITICAL">Critical</option>
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="LOW">Low</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600" style="font-size:.82rem">Category</label>
+                        <select class="form-select form-select-sm" id="fCategory">
+                            <option value="">Select…</option>
+                            <option value="CYBER">Cyber</option>
+                            <option value="DATA_BREACH">Data Breach</option>
+                            <option value="INFRASTRUCTURE">Infrastructure</option>
+                            <option value="ACCESS_CONTROL">Access Control</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-600" style="font-size:.82rem">Status</label>
+                        <select class="form-select form-select-sm" id="fStatus">
+                            <option value="OPEN">Open</option>
+                            <option value="INVESTIGATING">Investigating</option>
+                            <option value="RESOLVED">Resolved</option>
+                            <option value="CLOSED">Closed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-600" style="font-size:.82rem">Assignee</label>
+                        <input type="text" class="form-control form-control-sm" id="fAssignee"/>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-600" style="font-size:.82rem">Discovery Date</label>
+                        <input type="date" class="form-control form-control-sm" id="fDiscoveryDate"/>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-600" style="font-size:.82rem">Resolution Date</label>
+                        <input type="date" class="form-control form-control-sm" id="fResolutionDate"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600" style="font-size:.82rem">Description</label>
+                        <textarea class="form-control form-control-sm" id="fDescription" rows="3" placeholder="What happened, impact, and initial response…"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600" style="font-size:.82rem">Lessons Learned (EN)</label>
+                        <textarea class="form-control form-control-sm" id="fLessons" rows="2" placeholder="Key lessons from this incident…"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600" style="font-size:.82rem">Lessons Learned (AR)</label>
+                        <textarea class="form-control form-control-sm" id="fLessonsAr" rows="2" placeholder="الدروس المستفادة…" dir="rtl"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="btnSave">
+                    <i class="bi bi-floppy me-1"></i>Save Incident
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Delete -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size:2rem"></i>
+                <p class="mt-2 mb-0 fw-600">Delete this incident?</p>
+                <p class="text-muted" style="font-size:.8rem">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-danger btn-sm" id="btnConfirmDelete"><i class="bi bi-trash me-1"></i>Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/app.js"></script>
+
+<script>
+const Incidents = {
+    _modal: null,
+    _confirmModal: null,
+    editingId: null,
+    _allData: [],
+    _activeTab: 'dashboard',
+    _charts: {},
+
+    async init() {
+        this._modal        = new bootstrap.Modal(document.getElementById('incidentModal'));
+        this._confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+        // Tab switching
+        document.querySelectorAll('#incTabs .inc-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#incTabs .inc-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this._activeTab = btn.dataset.tab;
+                this._renderActiveTab();
+            });
+        });
+
+        document.getElementById('btnAdd').addEventListener('click', () => this.openAdd());
+        document.getElementById('btnSave').addEventListener('click', () => this.save());
+
+        await Promise.all([this.loadStats(), this.loadAll()]);
+    },
+
+    async loadStats() {
+        try {
+            const s = await Api.get('/incidents/stats');
+            document.getElementById('s-total').textContent    = s.total        ?? 0;
+            document.getElementById('s-open').textContent     = s.open         ?? 0;
+            document.getElementById('s-critical').textContent = s.critical      ?? 0;
+            document.getElementById('s-resolved').textContent = s.resolved      ?? 0;
+            document.getElementById('s-avg').textContent      = s.avgDays != null ? Math.round(s.avgDays) : '—';
+        } catch(e) {
+            console.warn('Stats load failed', e);
+        }
+    },
+
+    async loadAll() {
+        document.getElementById('incTabContent').innerHTML =
+            `<div class="skeleton" style="height:260px;border-radius:10px"></div>`;
+        try {
+            // Load up to 100 for local tab rendering
+            const data = await Api.get('/incidents?page=0&size=100&sort=createdAt,desc');
+            this._allData = Array.isArray(data) ? data : (data?.content ?? []);
+            this._renderActiveTab();
+        } catch(e) {
+            document.getElementById('incTabContent').innerHTML =
+                `<div class="empty-state"><i class="bi bi-wifi-off empty-state-icon"></i><h5>Failed to load incidents</h5><p>${e.message}</p><button class="btn btn-outline-secondary btn-sm" onclick="Incidents.loadAll()"><i class="bi bi-arrow-clockwise me-1"></i>Retry</button></div>`;
+        }
+    },
+
+    _renderActiveTab() {
+        const tab = this._activeTab;
+        if (tab === 'dashboard') this._renderDashboard();
+        else if (tab === 'register') this._renderRegister();
+        else if (tab === 'timeline') this._renderTimeline();
+        else if (tab === 'lessons')  this._renderLessons();
+    },
+
+    // ── DASHBOARD TAB ─────────────────────────────────────────────────────
+    _renderDashboard() {
+        const data = this._allData;
+
+        // Count by severity and status
+        const sevCounts   = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+        const statCounts  = {};
+        const catCounts   = {};
+        data.forEach(i => {
+            if (i.severity && sevCounts[i.severity] !== undefined) sevCounts[i.severity]++;
+            if (i.status)   statCounts[i.status]   = (statCounts[i.status]   || 0) + 1;
+            if (i.category) catCounts[i.category]  = (catCounts[i.category]  || 0) + 1;
+        });
+
+        const lang = I18n.current;
+
+        document.getElementById('incTabContent').innerHTML = `
+        <div class="inc-dashboard-grid">
+            <!-- Severity Doughnut -->
+            <div class="card" style="padding:1.25rem;border-radius:12px">
+                <h6 class="fw-800 mb-3" style="font-size:.88rem">🎯 ${lang==='ar'?'الحوادث حسب الخطورة':'Incidents by Severity'}</h6>
+                <div class="chart-wrap"><canvas id="incSevChart"></canvas></div>
+            </div>
+            <!-- Status Bar -->
+            <div class="card" style="padding:1.25rem;border-radius:12px">
+                <h6 class="fw-800 mb-3" style="font-size:.88rem">📈 ${lang==='ar'?'الحوادث حسب الحالة':'Incidents by Status'}</h6>
+                <div class="chart-wrap"><canvas id="incStatChart"></canvas></div>
+            </div>
+            <!-- Category Polar -->
+            <div class="card" style="padding:1.25rem;border-radius:12px">
+                <h6 class="fw-800 mb-3" style="font-size:.88rem">📂 ${lang==='ar'?'الحوادث حسب التصنيف':'Incidents by Category'}</h6>
+                <div class="chart-wrap"><canvas id="incCatChart"></canvas></div>
+            </div>
+            <!-- Recent Incidents -->
+            <div class="card" style="padding:1.25rem;border-radius:12px">
+                <h6 class="fw-800 mb-3" style="font-size:.88rem">⚡ ${lang==='ar'?'الحوادث الأخيرة':'Recent Incidents'}</h6>
+                <div style="display:flex;flex-direction:column;gap:8px" id="incRecentList">
+                    ${data.slice(0,4).map(i => {
+                        const sevC = this._sevColor(i.severity);
+                        const label = (lang === 'ar' && i.titleAr) ? i.titleAr : i.title;
+                        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--color-surface2,#f8fafc);border-radius:10px;border-left:3px solid ${sevC}">
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:700;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(label)}</div>
+                                <div style="font-size:.7rem;color:var(--color-text-muted)">${i.discoveryDate || ''}${i.assignee ? ' · '+i.assignee : ''}</div>
+                            </div>
+                            <span class="sev-badge ${i.severity}">${i.severity}</span>
+                        </div>`;
+                    }).join('')}
+                    ${!data.length ? `<div class="empty-state py-3"><p>No incidents yet</p></div>` : ''}
+                </div>
+            </div>
+        </div>`;
+
+        // Destroy old charts
+        ['incSev','incStat','incCat'].forEach(k => { if (this._charts[k]) { this._charts[k].destroy(); delete this._charts[k]; } });
+
+        setTimeout(() => {
+            // Severity doughnut
+            const ctx1 = document.getElementById('incSevChart');
+            if (ctx1) this._charts['incSev'] = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: [lang==='ar'?'حرجة':'Critical', lang==='ar'?'عالية':'High', lang==='ar'?'متوسطة':'Medium', lang==='ar'?'منخفضة':'Low'],
+                    datasets: [{ data: [sevCounts.CRITICAL, sevCounts.HIGH, sevCounts.MEDIUM, sevCounts.LOW],
+                        backgroundColor: ['#dc2626','#ea580c','#d97706','#16a34a'], borderWidth: 0, hoverOffset: 8 }]
+                },
+                options: { responsive:true, maintainAspectRatio:false, cutout:'65%',
+                    plugins:{ legend:{ position:'bottom', labels:{ padding:14, usePointStyle:true, font:{size:11} } } } }
+            });
+
+            // Status bar
+            const ctx2 = document.getElementById('incStatChart');
+            if (ctx2) this._charts['incStat'] = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(statCounts).map(s => ({ OPEN:lang==='ar'?'مفتوح':'Open', INVESTIGATING:lang==='ar'?'قيد التحقيق':'Investigating', RESOLVED:lang==='ar'?'تم الحل':'Resolved', CLOSED:lang==='ar'?'مغلق':'Closed' }[s] || s)),
+                    datasets: [{ data: Object.values(statCounts), backgroundColor: ['rgba(15,76,53,.7)','rgba(234,88,12,.7)','rgba(22,163,74,.7)','rgba(100,116,139,.7)'],
+                        borderRadius: 8, borderSkipped: false, label: lang==='ar'?'العدد':'Count' }]
+                },
+                options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+                    scales:{ y:{ beginAtZero:true, ticks:{ stepSize:1, font:{size:11}, color:'#64748b' }, grid:{ color:'rgba(0,0,0,0.04)' } }, x:{ grid:{ display:false }, ticks:{ font:{size:11}, color:'#64748b' } } } }
+            });
+
+            // Category polar area
+            const ctx3 = document.getElementById('incCatChart');
+            if (ctx3 && Object.keys(catCounts).length) this._charts['incCat'] = new Chart(ctx3, {
+                type: 'polarArea',
+                data: {
+                    labels: Object.keys(catCounts).map(c => c.replace(/_/g,' ')),
+                    datasets: [{ data: Object.values(catCounts),
+                        backgroundColor: ['rgba(15,76,53,.6)','rgba(37,99,235,.6)','rgba(220,38,38,.6)','rgba(217,119,6,.6)','rgba(139,92,246,.6)'], borderWidth: 0 }]
+                },
+                options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ padding:10, font:{size:10} } } } }
+            });
+        }, 150);
+    },
+
+    // ── REGISTER TAB ──────────────────────────────────────────────────────
+    _renderRegister() {
+        const data   = this._allData;
+        const lang   = I18n.current;
+
+        if (!data.length) {
+            document.getElementById('incTabContent').innerHTML =
+                `<div class="empty-state"><i class="bi bi-shield-check empty-state-icon" style="color:var(--color-success)"></i><h5>No incidents found!</h5><p>Click "Report Incident" to add the first one.</p></div>`;
+            return;
+        }
+
+        document.getElementById('incTabContent').innerHTML = `
+        <div class="mb-3 d-flex gap-2 flex-wrap align-items-center">
+            <input type="text" class="form-control form-control-sm" id="regSearch" placeholder="Search…" style="max-width:200px" oninput="Incidents._filterRegister()"/>
+            <select class="form-select form-select-sm" id="regSev" style="max-width:150px" onchange="Incidents._filterRegister()">
+                <option value="">All Severities</option>
+                <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+            </select>
+            <select class="form-select form-select-sm" id="regStatus" style="max-width:150px" onchange="Incidents._filterRegister()">
+                <option value="">All Statuses</option>
+                <option>OPEN</option><option>INVESTIGATING</option><option>RESOLVED</option><option>CLOSED</option>
+            </select>
+        </div>
+        <div class="inc-card-list" id="registerList"></div>`;
+
+        this._filterRegister();
+    },
+
+    _filterRegister() {
+        const q      = (document.getElementById('regSearch')?.value || '').toLowerCase();
+        const sev    = document.getElementById('regSev')?.value    || '';
+        const status = document.getElementById('regStatus')?.value || '';
+        const lang   = I18n.current;
+
+        const filtered = this._allData.filter(i =>
+            (!q      || i.title?.toLowerCase().includes(q) || i.titleAr?.toLowerCase().includes(q)) &&
+            (!sev    || i.severity === sev) &&
+            (!status || i.status   === status)
+        );
+
+        const el = document.getElementById('registerList');
+        if (!el) return;
+        if (!filtered.length) { el.innerHTML = `<div class="empty-state py-3"><i class="bi bi-inbox"></i><p>No incidents match your filters.</p></div>`; return; }
+
+        el.innerHTML = filtered.map(i => {
+            const sevC  = this._sevColor(i.severity);
+            const sevBg = this._sevBg(i.severity);
+            const emoji = ({ CRITICAL:'🔴', HIGH:'🟠', MEDIUM:'🟡', LOW:'🟢' }[i.severity] || '🔵');
+            const title = (lang === 'ar' && i.titleAr) ? i.titleAr : i.title;
+            return `<div class="inc-card-item" style="border-left:4px solid ${sevC}">
+                <div class="inc-sev-icon" style="background:${sevBg}">${emoji}</div>
+                <div style="flex:1;min-width:0">
+                    <div class="inc-card-title">${this._esc(title)}</div>
+                    <div class="inc-card-meta">
+                        ${i.discoveryDate ? `<span><i class="bi bi-calendar3"></i> ${i.discoveryDate}</span>` : ''}
+                        ${i.assignee      ? `<span><i class="bi bi-person"></i> ${this._esc(i.assignee)}</span>` : ''}
+                        ${i.category      ? `<span><i class="bi bi-folder"></i> ${i.category.replace(/_/g,' ')}</span>` : ''}
+                    </div>
+                </div>
+                <div class="inc-card-badges">
+                    <span class="sev-badge ${i.severity}">${i.severity}</span>
+                    <span class="st-badge ${i.status}">${i.status}</span>
+                    <button class="btn btn-sm btn-outline-secondary" style="padding:3px 8px;font-size:.72rem" onclick="Incidents.openEdit(${i.id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" style="padding:3px 8px;font-size:.72rem" onclick="Incidents.confirmDelete(${i.id})" title="Delete"><i class="bi bi-trash"></i></button>
+                </div>
+            </div>`;
+        }).join('');
+    },
+
+    // ── TIMELINE TAB ──────────────────────────────────────────────────────
+    _renderTimeline() {
+        const lang  = I18n.current;
+        const withTimeline = this._allData.filter(i => i.timelineJson);
+
+        if (!withTimeline.length) {
+            document.getElementById('incTabContent').innerHTML =
+                `<div class="empty-state"><i class="bi bi-clock-history empty-state-icon"></i><h5>No timeline data</h5><p>Timeline events will appear here once incidents are updated with timeline information.</p></div>`;
+            return;
+        }
+
+        document.getElementById('incTabContent').innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:1.75rem">
+            ${withTimeline.map(i => {
+                const sevC  = this._sevColor(i.severity);
+                const title = (lang === 'ar' && i.titleAr) ? i.titleAr : i.title;
+                let events  = [];
+                try { events = JSON.parse(i.timelineJson || '[]'); } catch(_) {}
+
+                return `<div class="timeline-incident">
+                    <div class="card" style="padding:1.25rem;border-radius:14px;border:1px solid var(--color-border)">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+                            <div style="width:40px;height:40px;border-radius:10px;background:${sevC}18;display:flex;align-items:center;justify-content:center;font-size:1.2rem">
+                                ${{ CRITICAL:'🔴', HIGH:'🟠', MEDIUM:'🟡', LOW:'🟢' }[i.severity] || '🔵'}
+                            </div>
+                            <div style="flex:1">
+                                <div style="font-weight:800;font-size:.92rem">${this._esc(title)}</div>
+                                <div style="font-size:.72rem;color:var(--color-text-muted)">${lang==='ar'?'تاريخ الاكتشاف':'Discovery'}: ${i.discoveryDate || '—'}</div>
+                            </div>
+                            <span class="sev-badge ${i.severity}" style="margin-inline-start:auto">${i.severity}</span>
+                        </div>
+                        <div class="timeline-body">
+                            <div class="timeline-line"></div>
+                            ${events.map(ev => {
+                                const action = (lang === 'ar' && ev.actionAr) ? ev.actionAr : ev.action;
+                                return `<div class="timeline-entry">
+                                    <div class="timeline-dot"></div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-action">${this._esc(action)}</div>
+                                        <div class="timeline-date"><i class="bi bi-calendar3 me-1"></i>${ev.date || ''}</div>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                            ${!events.length ? `<p style="font-size:.82rem;color:var(--color-text-muted)">No timeline events recorded.</p>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>`;
+    },
+
+    // ── LESSONS LEARNED TAB ────────────────────────────────────────────────
+    _renderLessons() {
+        const lang     = I18n.current;
+        const withLessons = this._allData.filter(i => i.lessonsLearned || i.lessonsLearnedAr);
+
+        if (!withLessons.length) {
+            document.getElementById('incTabContent').innerHTML =
+                `<div class="empty-state"><i class="bi bi-lightbulb empty-state-icon"></i><h5>No lessons learned yet</h5><p>Lessons learned appear here once incidents are resolved and documented.</p></div>`;
+            return;
+        }
+
+        document.getElementById('incTabContent').innerHTML = `
+        <div class="lessons-grid">
+            ${withLessons.map(i => {
+                const sevC    = this._sevColor(i.severity);
+                const title   = (lang === 'ar' && i.titleAr)         ? i.titleAr         : i.title;
+                const lessons = (lang === 'ar' && i.lessonsLearnedAr) ? i.lessonsLearnedAr : i.lessonsLearned;
+                return `<div class="lesson-card" style="border-top-color:${sevC}">
+                    <div class="lesson-header">
+                        <span class="lesson-icon">💡</span>
+                        <div>
+                            <div class="lesson-title">${this._esc(title)}</div>
+                            <div class="lesson-resolved"><span class="st-badge ${i.status}" style="font-size:.65rem">${i.status}</span></div>
+                        </div>
+                    </div>
+                    <div class="lesson-text">${this._esc(lessons)}</div>
+                </div>`;
+            }).join('')}
+        </div>`;
+    },
+
+    // ── CRUD ──────────────────────────────────────────────────────────────
+    openAdd() {
+        this.editingId = null;
+        document.getElementById('modalTitle').textContent = 'Report Incident';
+        this._clearForm();
+        this._modal.show();
+    },
+
+    async openEdit(id) {
+        this.editingId = id;
+        document.getElementById('modalTitle').textContent = 'Edit Incident';
+        this._clearForm();
+        try {
+            const inc = await Api.get('/incidents/' + id);
+            document.getElementById('fTitle').value          = inc.title          ?? '';
+            document.getElementById('fTitleAr').value        = inc.titleAr        ?? '';
+            document.getElementById('fSeverity').value       = inc.severity       ?? '';
+            document.getElementById('fCategory').value       = inc.category       ?? '';
+            document.getElementById('fStatus').value         = inc.status         ?? 'OPEN';
+            document.getElementById('fAssignee').value       = inc.assignee       ?? '';
+            document.getElementById('fDiscoveryDate').value  = inc.discoveryDate  ?? '';
+            document.getElementById('fResolutionDate').value = inc.resolutionDate ?? '';
+            document.getElementById('fDescription').value    = inc.description    ?? '';
+            document.getElementById('fLessons').value        = inc.lessonsLearned   ?? '';
+            document.getElementById('fLessonsAr').value      = inc.lessonsLearnedAr ?? '';
+        } catch(e) {
+            App.showFlash('danger', 'Failed to load incident.');
+            return;
+        }
+        this._modal.show();
+    },
+
+    async save() {
+        const title    = document.getElementById('fTitle').value.trim();
+        const severity = document.getElementById('fSeverity').value;
+        if (!title || !severity) {
+            App.showFlash('warning', 'Title and Severity are required.');
+            return;
+        }
+        const payload = {
+            title,
+            titleAr:        document.getElementById('fTitleAr').value.trim() || null,
+            severity,
+            category:       document.getElementById('fCategory').value       || null,
+            status:         document.getElementById('fStatus').value         || 'OPEN',
+            assignee:       document.getElementById('fAssignee').value.trim()|| null,
+            discoveryDate:  document.getElementById('fDiscoveryDate').value  || null,
+            resolutionDate: document.getElementById('fResolutionDate').value || null,
+            description:    document.getElementById('fDescription').value.trim()   || null,
+            lessonsLearned:   document.getElementById('fLessons').value.trim()     || null,
+            lessonsLearnedAr: document.getElementById('fLessonsAr').value.trim()   || null,
+        };
+
+        const btn = document.getElementById('btnSave');
+        btn.disabled = true;
+        try {
+            if (this.editingId) {
+                await Api.put('/incidents/' + this.editingId, payload);
+                App.showFlash('success', 'Incident updated.');
+            } else {
+                await Api.post('/incidents', payload);
+                App.showFlash('success', 'Incident reported.');
+            }
+            this._modal.hide();
+            await Promise.all([this.loadStats(), this.loadAll()]);
+        } catch(e) {
+            App.showFlash('danger', 'Save failed. Please try again.');
+        } finally {
+            btn.disabled = false;
+        }
+    },
+
+    confirmDelete(id) {
+        this.editingId = id;
+        this._confirmModal.show();
+        document.getElementById('btnConfirmDelete').onclick = () => this.deleteInc(id);
+    },
+
+    async deleteInc(id) {
+        try {
+            await Api.delete('/incidents/' + id);
+            this._confirmModal.hide();
+            App.showFlash('success', 'Incident deleted.');
+            await Promise.all([this.loadStats(), this.loadAll()]);
+        } catch(e) {
+            App.showFlash('danger', 'Delete failed.');
+        }
+    },
+
+    _clearForm() {
+        ['fTitle','fTitleAr','fSeverity','fCategory','fAssignee','fDiscoveryDate','fResolutionDate','fDescription','fLessons','fLessonsAr']
+            .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        const st = document.getElementById('fStatus'); if (st) st.value = 'OPEN';
+    },
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    _sevColor(s) {
+        return { CRITICAL:'#dc2626', HIGH:'#ea580c', MEDIUM:'#d97706', LOW:'#16a34a' }[s] || '#6b7280';
+    },
+    _sevBg(s) {
+        return { CRITICAL:'#fef2f2', HIGH:'#fff7ed', MEDIUM:'#fefce8', LOW:'#f0fdf4' }[s] || '#f3f4f6';
+    },
+    _esc(str) {
+        return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+};
+
+// Scripts are at bottom of body, so DOM is already ready — call directly.
+Incidents.init();
+document.addEventListener('languageChanged', () => {
+    Incidents._renderStats();
+    Incidents._renderActiveTab();
+    I18n.applyTranslations();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+        'label.contract.end':'Contract End',
+
+        // Risk module
+        'risk.title':

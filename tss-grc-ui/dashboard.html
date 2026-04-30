@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dashboard — TSS GRC</title>
+
+    <link id="bootstrap-css" rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+
+    <style>
+        /* 8-KPI grid: 4 cols desktop → 2 cols tablet → 1 col mobile */
+        .kpi-g4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        @media (max-width: 1200px) { .kpi-g4 { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 576px)  { .kpi-g4 { grid-template-columns: 1fr 1fr; } }
+
+        /* 2-col widget row */
+        .widget-g2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        @media (max-width: 900px) { .widget-g2 { grid-template-columns: 1fr; } }
+
+        /* Module status: 3 cols desktop → 2 cols tablet */
+        .module-g3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+        @media (max-width: 900px) { .module-g3 { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 576px) { .module-g3 { grid-template-columns: 1fr; } }
+
+        .chart-wrap { position: relative; height: 240px; }
+
+        /* KPI trend badge */
+        .kpi-trend-up   { color: #16a34a; font-size: 0.72rem; font-weight: 700; }
+        .kpi-trend-down { color: #dc2626; font-size: 0.72rem; font-weight: 700; }
+        .kpi-trend-neutral { color: #6b7280; font-size: 0.72rem; font-weight: 600; }
+
+        /* Alert / notification row */
+        .alert-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.65rem 0;
+            border-bottom: 1px solid var(--color-border, #e5e7eb);
+        }
+        .alert-item:last-child { border-bottom: none; }
+        .alert-icon {
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; flex-shrink: 0;
+        }
+        .alert-title { font-size: 0.82rem; font-weight: 600; line-height: 1.3; }
+        .alert-meta  { font-size: 0.7rem; color: var(--color-text-muted, #64748b); margin-top: 2px; }
+
+        /* Module status card */
+        .module-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: var(--color-surface2, #f8fafc);
+            border-radius: var(--radius-sm, 9px);
+            border: 1px solid var(--color-border, #e5e7eb);
+        }
+        .module-icon { font-size: 1.5rem; flex-shrink: 0; }
+        .module-name { font-weight: 700; font-size: 0.88rem; line-height: 1; }
+        .module-sub  { font-size: 0.7rem; color: var(--color-text-muted, #64748b); margin-top: 3px; }
+
+        /* Skeleton loading */
+        .skeleton-kpi {
+            background: var(--color-surface2, #f8fafc);
+            border-radius: var(--radius, 14px);
+            padding: 1.1rem 1.25rem;
+            border: 1px solid var(--color-border, #e5e7eb);
+        }
+    </style>
+</head>
+<body>
+
+<!-- App shell (sidebar + header) injected by app.js -->
+<div id="app-shell"></div>
+
+<!-- Page content -->
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <!-- ── Welcome Banner ────────────────────────────────────────────────── -->
+    <div class="welcome-banner">
+        <div class="d-flex align-items-center justify-content-between" style="position:relative;z-index:1">
+            <div>
+                <h2 id="welcomeTitle" style="font-size:1.35rem;font-weight:800;color:#fff;margin:0 0 0.25rem">
+                    مرحباً بك في منصة GRC
+                </h2>
+                <p style="font-size:0.82rem;opacity:.8;color:#fff;margin:0">
+                    Enterprise Governance, Risk &amp; Compliance
+                </p>
+                <div class="welcome-date" id="todayDate"></div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span style="background:rgba(255,255,255,.15);color:#fff;font-size:0.72rem;font-weight:700;padding:4px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.25)">
+                    <i class="bi bi-circle-fill me-1" style="font-size:0.45rem;vertical-align:middle;color:#4caf7d"></i>
+                    Live
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 8 KPI Cards (g4 layout, matching GRC.html) ───────────────────── -->
+    <div class="kpi-g4" id="kpiGrid">
+        <!-- Skeleton while loading -->
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+        <div class="skeleton-kpi"><div class="skeleton" style="height:36px;width:50%;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:70%"></div></div>
+    </div>
+
+    <!-- ── Row 1: Risk Heatmap + Compliance Bar Chart ────────────────────── -->
+    <div class="widget-g2">
+
+        <!-- Risk Heatmap 5×5 -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <span>🗺️ <strong>Risk Heat Map</strong></span>
+                <a href="/risk/index.html" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.72rem">
+                    View All <i class="bi bi-arrow-up-right-square ms-1"></i>
+                </a>
+            </div>
+            <div class="card-body d-flex gap-2 align-items-start py-3">
+                <div class="text-muted d-flex flex-column align-items-center justify-content-center"
+                     style="writing-mode:vertical-lr;transform:rotate(180deg);font-size:0.68rem;min-width:22px;height:200px;letter-spacing:0.05em;font-weight:600">
+                    Impact ↑
+                </div>
+                <div class="flex-grow-1">
+                    <div class="risk-heatmap" id="riskHeatmap"></div>
+                    <div class="text-center mt-2"
+                         style="font-size:0.68rem;color:var(--color-text-muted);font-weight:600;letter-spacing:0.05em">
+                        Likelihood ⟶
+                    </div>
+                </div>
+            </div>
+            <div class="px-3 pb-3 d-flex align-items-center gap-3" style="font-size:0.68rem">
+                <span class="d-flex align-items-center gap-1">
+                    <span style="width:10px;height:10px;border-radius:2px;background:var(--color-critical,#dc2626);display:inline-block"></span>Critical
+                </span>
+                <span class="d-flex align-items-center gap-1">
+                    <span style="width:10px;height:10px;border-radius:2px;background:var(--color-high,#ea580c);display:inline-block"></span>High
+                </span>
+                <span class="d-flex align-items-center gap-1">
+                    <span style="width:10px;height:10px;border-radius:2px;background:var(--color-medium,#d97706);display:inline-block"></span>Medium
+                </span>
+                <span class="d-flex align-items-center gap-1">
+                    <span style="width:10px;height:10px;border-radius:2px;background:var(--color-low,#16a34a);display:inline-block"></span>Low
+                </span>
+            </div>
+        </div>
+
+        <!-- Compliance Bar Chart (6 frameworks) -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <span>📊 <strong>Compliance by Framework</strong></span>
+                <a href="/compliance/index.html" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.72rem">
+                    View All <i class="bi bi-arrow-up-right-square ms-1"></i>
+                </a>
+            </div>
+            <div class="card-body pt-2">
+                <div class="chart-wrap"><canvas id="complianceBarChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Row 2: Trend Chart + Recent Alerts ────────────────────────────── -->
+    <div class="widget-g2">
+
+        <!-- Risk Trend Line Chart -->
+        <div class="card">
+            <div class="card-header">
+                <span>📈 <strong>Risk &amp; Incident Trend</strong></span>
+            </div>
+            <div class="card-body pt-2">
+                <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Recent Alerts / Notifications -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <span>🔔 <strong>Recent Alerts</strong></span>
+                <a href="/incidents/index.html" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.72rem">View All</a>
+            </div>
+            <div class="card-body px-3 py-2" id="recentAlerts">
+                <div class="skeleton mb-2" style="height:48px;border-radius:8px"></div>
+                <div class="skeleton mb-2" style="height:48px;border-radius:8px"></div>
+                <div class="skeleton mb-2" style="height:48px;border-radius:8px"></div>
+                <div class="skeleton"      style="height:48px;border-radius:8px"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Row 3: Module Status (full width) ─────────────────────────────── -->
+    <div class="card">
+        <div class="card-header">
+            <span>📦 <strong>Module Status</strong></span>
+        </div>
+        <div class="card-body">
+            <div class="module-g3" id="moduleStatus">
+                <div class="skeleton" style="height:64px;border-radius:9px"></div>
+                <div class="skeleton" style="height:64px;border-radius:9px"></div>
+                <div class="skeleton" style="height:64px;border-radius:9px"></div>
+                <div class="skeleton" style="height:64px;border-radius:9px"></div>
+                <div class="skeleton" style="height:64px;border-radius:9px"></div>
+                <div class="skeleton" style="height:64px;border-radius:9px"></div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+
+<script>
+(async function () {
+    'use strict';
+
+    // ── Welcome greeting + date ──────────────────────────────────────────
+    const user = Auth.getUser();
+    const lang = I18n.current;
+    const userName = user?.fullNameAr || user?.fullNameEn || user?.username || '';
+    document.getElementById('welcomeTitle').textContent =
+        lang === 'ar' ? `مرحباً، ${userName} 👋` : `Welcome, ${userName} 👋`;
+    document.getElementById('todayDate').textContent =
+        new Date().toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-GB',
+            { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+    // ── Fetch data ───────────────────────────────────────────────────────
+    let stats = {}, heatmap = [], incidents = [];
+    try {
+        let heatmapRaw;
+        [stats, heatmapRaw, incidents] = await Promise.all([
+            Api.get('/dashboard/stats'),
+            Api.get('/dashboard/heatmap'),
+            Api.get('/incidents/recent'),
+        ]);
+        heatmap   = heatmapRaw?.cells ?? [];
+        incidents = Array.isArray(incidents) ? incidents : (incidents?.content ?? []);
+    } catch (e) {
+        App.showFlash('danger', 'Failed to load dashboard data');
+    }
+
+    // ── Helper: severity/alert colours ──────────────────────────────────
+    const sevColor = s => ({ CRITICAL:'#fee2e2', HIGH:'#ffedd5', MEDIUM:'#fef9c3', LOW:'#dcfce7' }[s] || '#dbeafe');
+    const sevEmoji = s => ({ CRITICAL:'🔴', HIGH:'🟠', MEDIUM:'🟡', LOW:'🟢' }[s] || '🔵');
+
+    // ── 8 KPI Cards ──────────────────────────────────────────────────────
+    const criticalRisks   = stats.criticalRisks   ?? 0;
+    const totalRisks      = stats.totalRisks      ?? 0;
+    const openIncidents   = stats.openIncidents   ?? 0;
+    const complianceScore = stats.complianceScore ?? 72;
+    // BCM / DSR: placeholders until Sprint 3
+    const bcmCoverage = 75;
+    const pendingDSR  = 2;
+
+    const kpiHtml = (icon, bg, val, valColor, label, trendHtml) => `
+        <div class="kpi-card" style="cursor:pointer">
+            <div class="kpi-top d-flex align-items-start justify-content-between mb-1">
+                <div class="kpi-icon" style="background:${bg}">${icon}</div>
+                <span>${trendHtml}</span>
+            </div>
+            <div class="kpi-value" style="color:${valColor}">${val}</div>
+            <div class="kpi-label">${label}</div>
+        </div>`;
+
+    document.getElementById('kpiGrid').innerHTML = `
+        ${kpiHtml('⚠️','#fff3cd', totalRisks, 'var(--grc-primary,#0f4c35)',
+            lang==='ar'?'إجمالي المخاطر':'Total Risks',
+            `<span class="kpi-trend-${criticalRisks>3?'down':'up'}">${criticalRisks>3?'▲':'▼'} ${criticalRisks}</span>`)}
+
+        ${kpiHtml('🔴','#fee2e2', criticalRisks, '#dc2626',
+            lang==='ar'?'مخاطر حرجة':'Critical Risks',
+            `<span class="kpi-trend-down">▲ ${criticalRisks}</span>`)}
+
+        ${kpiHtml('✅','#dcfce7', complianceScore+'%', '#16a34a',
+            lang==='ar'?'مستوى الامتثال':'Compliance Level',
+            `<span class="kpi-trend-up">▲ 5%</span>`)}
+
+        ${kpiHtml('🔒','#dbeafe', openIncidents, '#2563eb',
+            lang==='ar'?'الحوادث المفتوحة':'Open Incidents',
+            `<span class="kpi-trend-${openIncidents>2?'down':'neutral'}">${openIncidents}</span>`)}
+
+        ${kpiHtml('🔄','#ede9fe', bcmCoverage+'%', '#7c3aed',
+            lang==='ar'?'تغطية استمرارية الأعمال':'BCM Coverage',
+            `<span class="kpi-trend-up">▲ 5%</span>`)}
+
+        ${kpiHtml('🔏','#ffedd5', pendingDSR, '#ea580c',
+            lang==='ar'?'طلبات DSR المعلقة':'Pending DSR',
+            `<span class="kpi-trend-${pendingDSR>0?'down':'neutral'}">${pendingDSR}</span>`)}
+
+        ${kpiHtml('📈','#f0fdf4', 'ERM', 'var(--grc-primary,#0f4c35)',
+            lang==='ar'?'إدارة مخاطر المؤسسة':'Enterprise Risk',
+            `<span class="kpi-trend-neutral">ISO 31000</span>`)}
+
+        ${kpiHtml('🏥','#f0fdf4', 'BCM', 'var(--grc-primary,#0f4c35)',
+            lang==='ar'?'استمرارية الأعمال':'Business Continuity',
+            `<span class="kpi-trend-neutral">ISO 22301</span>`)}
+    `;
+
+    // Make KPI cards clickable
+    const kpiLinks = ['/risk/index.html','/risk/index.html','/compliance/index.html','/incidents/index.html',
+                      '/bcm/index.html','/privacy/index.html','/risk/index.html','/bcm/index.html'];
+    document.querySelectorAll('.kpi-g4 .kpi-card').forEach((el, i) => {
+        if (kpiLinks[i]) el.addEventListener('click', () => location.href = kpiLinks[i]);
+    });
+
+    // ── Risk Heatmap 5×5 ─────────────────────────────────────────────────
+    const heatmapEl  = document.getElementById('riskHeatmap');
+    const scoreClass = s => s >= 20 ? 'score-critical' : s >= 12 ? 'score-high' : s >= 6 ? 'score-medium' : 'score-low';
+    for (let impact = 5; impact >= 1; impact--) {
+        for (let likelihood = 1; likelihood <= 5; likelihood++) {
+            const score = impact * likelihood;
+            const cell  = heatmap.find(d => d.impact === impact && d.likelihood === likelihood);
+            const count = cell?.count ?? 0;
+            const el    = document.createElement('div');
+            el.className   = `heatmap-cell ${scoreClass(score)}`;
+            el.title       = `Impact ${impact} × Likelihood ${likelihood} = ${score}${count ? ' · ' + count + ' risk(s)' : ''}`;
+            el.textContent = count > 0 ? count : '';
+            heatmapEl.appendChild(el);
+        }
+    }
+
+    // ── Compliance Bar Chart (6 frameworks, matching GRC.html) ───────────
+    new Chart(document.getElementById('complianceBarChart'), {
+        type: 'bar',
+        data: {
+            labels: ['ISO 27001', 'NCA ECC', 'PDPL', 'ISO 22301', 'ISO 31000', 'SDAIA'],
+            datasets: [{
+                label: lang === 'ar' ? 'نسبة الامتثال %' : 'Compliance %',
+                data: [
+                    complianceScore || 72,
+                    65, 58, 80, 70, 55
+                ],
+                backgroundColor: ['#1a6b3c','#2e8b57','#4caf7d','#1a6b3c','#2e8b57','#4caf7d'],
+                borderRadius: 6,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true, max: 100,
+                    ticks: { callback: v => v + '%', font: { size: 11 }, color: '#64748b' },
+                    grid: { color: 'rgba(0,0,0,0.04)' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 10 }, color: '#64748b', maxRotation: 30 }
+                }
+            }
+        }
+    });
+
+    // ── Trend Line Chart (Open Risks + Incidents, 6 months) ──────────────
+    const trendLabels = lang === 'ar'
+        ? ['أكتوبر','نوفمبر','ديسمبر','يناير','فبراير','مارس']
+        : ['Oct','Nov','Dec','Jan','Feb','Mar'];
+
+    new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: trendLabels,
+            datasets: [
+                {
+                    label: lang === 'ar' ? 'مخاطر مفتوحة' : 'Open Risks',
+                    data: [12, 14, 11, 13, 10, totalRisks || 8],
+                    borderColor: '#dc2626',
+                    backgroundColor: 'rgba(220,38,38,0.08)',
+                    tension: 0.4, fill: true, pointRadius: 4,
+                    pointBackgroundColor: '#dc2626'
+                },
+                {
+                    label: lang === 'ar' ? 'حوادث' : 'Incidents',
+                    data: [5, 7, 4, 6, 3, openIncidents || 4],
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.08)',
+                    tension: 0.4, fill: true, pointRadius: 4,
+                    pointBackgroundColor: '#2563eb'
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12, usePointStyle: true } } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 }, color: '#64748b' } },
+                x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#64748b' } }
+            }
+        }
+    });
+
+    // ── Recent Alerts (from incidents as alert feed) ──────────────────────
+    const alertsEl = document.getElementById('recentAlerts');
+    if (incidents.length) {
+        // Map incidents to alert-style display (4 most recent)
+        const alertItems = incidents.slice(0, 4).map(inc => {
+            const bg    = sevColor(inc.severity);
+            const emoji = sevEmoji(inc.severity);
+            const date  = inc.discoveryDate
+                ? new Date(inc.discoveryDate).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-GB')
+                : (inc.createdAt ? new Date(inc.createdAt).toLocaleDateString() : '—');
+            return `
+            <div class="alert-item">
+                <div class="alert-icon" style="background:${bg}">${emoji}</div>
+                <div style="min-width:0;flex:1">
+                    <div class="alert-title text-truncate">${lang === 'ar' && inc.titleAr ? inc.titleAr : inc.title}</div>
+                    <div class="alert-meta">${inc.status} · ${date}</div>
+                </div>
+            </div>`;
+        }).join('');
+        alertsEl.innerHTML = alertItems;
+    } else {
+        // Fallback: static sample alerts (like GRC.html does with DB.get('notifications'))
+        alertsEl.innerHTML = `
+            <div class="alert-item">
+                <div class="alert-icon" style="background:#fee2e2">🔴</div>
+                <div><div class="alert-title">Critical Risk Identified</div><div class="alert-meta">SQL Injection vulnerability · Today</div></div>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon" style="background:#ffedd5">🟠</div>
+                <div><div class="alert-title">Phishing Incident Reported</div><div class="alert-meta">3 accounts compromised · Yesterday</div></div>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon" style="background:#dcfce7">🟢</div>
+                <div><div class="alert-title">Compliance Score Improved</div><div class="alert-meta">+5% since last quarter · Mar 2024</div></div>
+            </div>
+            <div class="alert-item">
+                <div class="alert-icon" style="background:#dbeafe">🔵</div>
+                <div><div class="alert-title">BCM Review Scheduled</div><div class="alert-meta">Quarterly review · Apr 2024</div></div>
+            </div>`;
+    }
+
+    // ── Module Status Grid (6 modules) ────────────────────────────────────
+    const modules = [
+        { name: 'ERM',        icon: '⚠️',  link: '/risk/index.html',       count: totalRisks,    label: lang==='ar'?'مخاطرة':'risks',       active: totalRisks > 0 },
+        { name: 'Cyber',      icon: '🔒',  link: '/incidents/index.html',   count: openIncidents, label: lang==='ar'?'حادثة':'incidents',    active: true },
+        { name: 'BCM',        icon: '🔄',  link: '/bcm/index.html',         count: bcmCoverage+'%', label: lang==='ar'?'تغطية':'coverage',  active: false },
+        { name: 'PDPL',       icon: '🔏',  link: '/privacy/index.html',     count: pendingDSR,    label: lang==='ar'?'طلب DSR':'DSR req',    active: false },
+        { name: 'Compliance', icon: '✅',  link: '/compliance/index.html',  count: complianceScore+'%', label: lang==='ar'?'امتثال':'score', active: true },
+        { name: 'Workflow',   icon: '⚙️',  link: '/workflow/tasks.html',    count: stats.pendingTasks ?? 0, label: lang==='ar'?'مهمة':'tasks', active: false },
+    ];
+
+    const badgeHtml = active =>
+        active
+        ? `<span class="badge" style="background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;font-size:0.68rem;font-weight:700">${lang==='ar'?'نشط':'Active'}</span>`
+        : `<span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;font-size:0.68rem;font-weight:700">${lang==='ar'?'قريباً':'Soon'}</span>`;
+
+    document.getElementById('moduleStatus').innerHTML = modules.map(m => `
+        <div class="module-card" onclick="location.href='${m.link}'" style="cursor:pointer">
+            <div class="module-icon">${m.icon}</div>
+            <div style="flex:1;min-width:0">
+                <div class="module-name">${m.name}</div>
+                <div class="module-sub">${m.count} ${m.label}</div>
+            </div>
+            ${badgeHtml(m.active)}
+        </div>`).join('');
+
+})();
+</script>
+</body>
+</html>

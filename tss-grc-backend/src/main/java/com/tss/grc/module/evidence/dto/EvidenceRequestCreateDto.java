@@ -1,0 +1,17 @@
+package com.tss.grc.module.evidence.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import java.time.LocalDate;
+
+public record EvidenceRequestCreateDto(
+    @NotBlank @Size(max = 300) String titleEn,
+    @Size(max = 300) String titleAr,
+    String descriptionEn,
+    Long subControlId,
+    Long assignedToId,
+    LocalDate dueDate,
+    String priority,
+    String notes
+) {}

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Business Continuity — TSS GRC</title>
+    <link id="bootstrap-css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+    <style>
+        .tab-nav { display:flex; gap:4px; background:var(--color-bg); padding:4px; border-radius:10px; margin-bottom:1.25rem; border:1px solid var(--color-border); }
+        .tab-btn  { padding:8px 18px; border-radius:7px; border:none; background:none; font-size:12.5px; font-weight:700; color:var(--color-text-muted); cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .18s; }
+        .tab-btn.active { background:#fff; color:var(--color-primary); box-shadow:0 1px 4px rgba(0,0,0,.1); }
+        .stats-kpi { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.5rem; }
+        @media(max-width:900px){ .stats-kpi{grid-template-columns:repeat(2,1fr)} }
+        .stat-box { background:#fff; border:1px solid var(--color-border); border-radius:12px; padding:1rem 1.25rem; text-align:center; }
+        .stat-num  { font-size:1.8rem; font-weight:900; color:var(--color-primary); letter-spacing:-1px; }
+        .stat-lbl  { font-size:11px; color:var(--color-text-muted); margin-top:3px; font-weight:600; }
+    </style>
+</head>
+<body>
+<div id="app-shell"></div>
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h5 class="fw-800 mb-0" style="font-size:1.1rem">
+                <i class="bi bi-arrow-repeat me-2" style="color:var(--color-primary)"></i>
+                <span data-i18n="bcm.title">Business Continuity Management</span>
+            </h5>
+            <div class="text-muted" style="font-size:.78rem">BCM Plans · BIA · Critical Processes</div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btnAdd" style="border:none;background:var(--gradient-accent)">
+            <i class="bi bi-plus-lg me-1"></i><span id="btnAddLabel">New Plan</span>
+        </button>
+    </div>
+
+    <div class="stats-kpi">
+        <div class="stat-box"><div class="stat-num" id="statPlans">—</div><div class="stat-lbl" data-i18n="bcm.tab.plans">BCM Plans</div></div>
+        <div class="stat-box"><div class="stat-num" id="statProcesses">—</div><div class="stat-lbl" data-i18n="bcm.tab.processes">Critical Processes</div></div>
+        <div class="stat-box"><div class="stat-num" id="statBia">—</div><div class="stat-lbl" data-i18n="bcm.tab.bia">BIA Records</div></div>
+    </div>
+
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="plans" data-i18n="bcm.tab.plans">BCM Plans</button>
+        <button class="tab-btn" data-tab="processes" data-i18n="bcm.tab.processes">Critical Processes</button>
+        <button class="tab-btn" data-tab="bia" data-i18n="bcm.tab.bia">BIA Records</button>
+    </div>
+
+    <div id="tabContent"><div class="text-center py-5 text-muted"><i class="bi bi-hourglass-split fs-3"></i></div></div>
+</main>
+
+<div class="modal fade" id="crudModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-700" id="modalTitle">Record</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="btnSave" data-i18n="common.save">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+<script>
+let activeTab = 'plans';
+let editId = null;
+let modal;
+
+const statusBadge = s => {
+    const m = { DRAFT:'badge-yellow', APPROVED:'badge-green', ACTIVE:'badge-blue', REVIEW:'badge-orange',
+                COMPLETED:'badge-green', IN_PROGRESS:'badge-orange', PLANNED:'badge-blue' };
+    return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`;
+};
+const critBadge = c => {
+    const m = { CRITICAL:'badge-red', HIGH:'badge-orange', MEDIUM:'badge-yellow', LOW:'badge-green' };
+    return `<span class="badge ${m[c]||'badge-gray'}">${c}</span>`;
+};
+const emptyState = (icon,title,sub) => `<div class="empty-state py-5 text-center"><i class="bi ${icon} fs-2 text-muted"></i><h6 class="mt-3 text-muted">${title}</h6><p class="text-muted small">${sub}</p></div>`;
+
+function updateAddBtn(){
+    const labels = { plans:'New Plan', processes:'New Process', bia:'New BIA Record' };
+    const el = document.getElementById('btnAddLabel');
+    if (el) el.textContent = labels[activeTab] || 'New Record';
+}
+
+async function loadStats(){
+    try {
+        const s = await Api.get('/bcm/stats');
+        document.getElementById('statPlans').textContent = s.totalPlans ?? 0;
+        document.getElementById('statProcesses').textContent = s.totalProcesses ?? 0;
+        document.getElementById('statBia').textContent = s.totalBia ?? 0;
+    } catch(e){}
+}
+
+async function loadTab(tab){
+    const el = document.getElementById('tabContent');
+    el.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-hourglass-split fs-3"></i></div>`;
+    try {
+        if (tab === 'plans')     await loadPlans(el);
+        else if (tab === 'processes') await loadProcesses(el);
+        else if (tab === 'bia') await loadBia(el);
+    } catch(e){
+        el.innerHTML = `<div class="alert alert-danger">${e.message||'Failed to load data'}</div>`;
+    }
+}
+
+async function loadPlans(el){
+    const data = await Api.get('/bcm/plans?size=50');
+    const rows = data.content ?? [];
+    if(!rows.length){ el.innerHTML = emptyState('bi-file-earmark-check','No BCM plans yet','Create your first BCM plan'); return; }
+    const lang = () => localStorage.getItem('grc_lang') || 'en';
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.name">Plan Name</th>
+        <th data-i18n="label.plan.type">Type</th>
+        <th data-i18n="label.version">Version</th>
+        <th data-i18n="label.status">Status</th>
+        <th data-i18n="label.next.review">Next Review</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(p=>`<tr>
+        <td style="font-weight:600">${lang()==='ar'&&p.planNameAr ? p.planNameAr : p.planNameEn||'—'}</td>
+        <td style="font-size:12px">${p.planType||'—'}</td>
+        <td style="font-size:12px;font-family:monospace">${p.version||'—'}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td style="font-size:12px">${p.nextReviewDate||'—'}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${p.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${p.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+async function loadProcesses(el){
+    const data = await Api.get('/bcm/processes?size=50');
+    const rows = data.content ?? [];
+    if(!rows.length){ el.innerHTML = emptyState('bi-diagram-3','No critical processes yet','Define your critical business processes'); return; }
+    const lang = () => localStorage.getItem('grc_lang') || 'en';
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.process">Process Name</th>
+        <th data-i18n="label.criticality">Criticality</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(p=>`<tr>
+        <td style="font-weight:600">${lang()==='ar'&&p.processNameAr ? p.processNameAr : p.processNameEn||'—'}</td>
+        <td>${critBadge(p.criticality||'HIGH')}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${p.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${p.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+async function loadBia(el){
+    const rows = await Api.get('/bcm/bia');
+    if(!rows.length){ el.innerHTML = emptyState('bi-bar-chart-steps','No BIA records yet','Conduct your first BIA assessment'); return; }
+    el.innerHTML = `<div class="card"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover mb-0">
+    <thead><tr>
+        <th data-i18n="label.date">Assessment Date</th>
+        <th data-i18n="label.rto">RTO (hrs)</th>
+        <th data-i18n="label.rpo">RPO (hrs)</th>
+        <th data-i18n="label.mtpd">MTPD (hrs)</th>
+        <th>Impact</th>
+        <th data-i18n="label.status">Status</th>
+        <th data-i18n="label.actions">Actions</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(b=>`<tr>
+        <td style="font-size:12px">${b.assessmentDate||'—'}</td>
+        <td class="text-center">${b.rtoHours??'—'}</td>
+        <td class="text-center">${b.rpoHours??'—'}</td>
+        <td class="text-center">${b.mtpdHours??'—'}</td>
+        <td>${critBadge(b.overallImpact||'MEDIUM')}</td>
+        <td>${statusBadge(b.status)}</td>
+        <td><div class="d-flex gap-1">
+            <button class="btn btn-sm btn-secondary" onclick="openEdit(${b.id})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="doDelete(${b.id})"><i class="bi bi-trash"></i></button>
+        </div></td>
+    </tr>`).join('')}
+    </tbody></table></div></div></div>`;
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+}
+
+function openCreate(){ editId = null; buildForm(null); modal.show(); }
+async function openEdit(id){
+    editId = id;
+    let data;
+    try {
+        const ep = activeTab==='plans' ? 'plans' : activeTab==='processes' ? 'processes' : 'bia';
+        data = await Api.get(`/bcm/${ep}/${id}`);
+    } catch(e){ alert('Failed to load record'); return; }
+    buildForm(data);
+    modal.show();
+}
+async function doDelete(id){
+    if (!confirm('Delete this record?')) return;
+    const ep = activeTab==='plans' ? 'plans' : activeTab==='processes' ? 'processes' : 'bia';
+    try { await Api.delete(`/bcm/${ep}/${id}`); loadTab(activeTab); loadStats(); } catch(e){ alert(e.message); }
+}
+
+function buildForm(d){
+    document.getElementById('modalTitle').textContent = editId ? 'Edit Record' : 'New Record';
+    if (activeTab === 'plans'){
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-600 small">Plan Name (EN) *</label>
+            <input class="form-control" id="fNameEn" value="${d?.planNameEn||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Plan Name (AR)</label>
+            <input class="form-control" id="fNameAr" value="${d?.planNameAr||''}" dir="rtl"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Plan Type</label>
+            <select class="form-select" id="fType">
+                ${['BCP','DRP','COOP','ERP','IRP'].map(t=>`<option value="${t}" ${d?.planType===t?'selected':''}>${t}</option>`).join('')}
+            </select></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Version</label>
+            <input class="form-control" id="fVersion" value="${d?.version||'1.0'}"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">Status</label>
+            <select class="form-select" id="fStatus">
+                ${['DRAFT','REVIEW','APPROVED','ACTIVE'].map(s=>`<option value="${s}" ${(d?.status||'DRAFT')===s?'selected':''}>${s}</option>`).join('')}
+            </select></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Next Review Date</label>
+            <input type="date" class="form-control" id="fReview" value="${d?.nextReviewDate||''}"></div>
+        </div>`;
+    } else if (activeTab === 'processes'){
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-600 small">Process Name (EN) *</label>
+            <input class="form-control" id="fNameEn" value="${d?.processNameEn||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Process Name (AR)</label>
+            <input class="form-control" id="fNameAr" value="${d?.processNameAr||''}" dir="rtl"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Criticality</label>
+            <select class="form-select" id="fCrit">
+                ${['CRITICAL','HIGH','MEDIUM','LOW'].map(c=>`<option value="${c}" ${(d?.criticality||'HIGH')===c?'selected':''}>${c}</option>`).join('')}
+            </select></div>
+        </div>`;
+    } else {
+        document.getElementById('modalBody').innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-600 small">Assessment Date *</label>
+            <input type="date" class="form-control" id="fDate" value="${d?.assessmentDate||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Overall Impact</label>
+            <select class="form-select" id="fImpact">
+                ${['CRITICAL','HIGH','MEDIUM','LOW'].map(c=>`<option value="${c}" ${(d?.overallImpact||'HIGH')===c?'selected':''}>${c}</option>`).join('')}
+            </select></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">RTO (hours)</label>
+            <input type="number" class="form-control" id="fRto" value="${d?.rtoHours||''}"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">RPO (hours)</label>
+            <input type="number" class="form-control" id="fRpo" value="${d?.rpoHours||''}"></div>
+            <div class="col-md-4"><label class="form-label fw-600 small">MTPD (hours)</label>
+            <input type="number" class="form-control" id="fMtpd" value="${d?.mtpdHours||''}"></div>
+            <div class="col-md-6"><label class="form-label fw-600 small">Status</label>
+            <select class="form-select" id="fStatus">
+                ${['DRAFT','IN_PROGRESS','COMPLETED'].map(s=>`<option value="${s}" ${(d?.status||'DRAFT')===s?'selected':''}>${s}</option>`).join('')}
+            </select></div>
+        </div>`;
+    }
+}
+
+// ── Init (after App.init has built the shell and moved page-content) ─────────
+document.addEventListener('DOMContentLoaded', () => {
+    modal = new bootstrap.Modal(document.getElementById('crudModal'));
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            activeTab = btn.dataset.tab;
+            loadTab(activeTab);
+            updateAddBtn();
+        });
+    });
+
+    document.getElementById('btnAdd')?.addEventListener('click', () => openCreate());
+
+    document.getElementById('btnSave')?.addEventListener('click', async () => {
+        const ep = activeTab==='plans' ? 'plans' : activeTab==='processes' ? 'processes' : 'bia';
+        let body;
+        try {
+            if (activeTab === 'plans'){
+                body = { planNameEn:document.getElementById('fNameEn').value,
+                         planNameAr:document.getElementById('fNameAr').value,
+                         planType:document.getElementById('fType').value,
+                         version:document.getElementById('fVersion').value,
+                         status:document.getElementById('fStatus').value,
+                         nextReviewDate:document.getElementById('fReview').value||null };
+            } else if (activeTab === 'processes'){
+                body = { processNameEn:document.getElementById('fNameEn').value,
+                         processNameAr:document.getElementById('fNameAr').value,
+                         criticality:document.getElementById('fCrit').value };
+            } else {
+                body = { assessmentDate:document.getElementById('fDate').value,
+                         overallImpact:document.getElementById('fImpact').value,
+                         rtoHours:parseInt(document.getElementById('fRto').value)||null,
+                         rpoHours:parseInt(document.getElementById('fRpo').value)||null,
+                         mtpdHours:parseInt(document.getElementById('fMtpd').value)||null,
+                         status:document.getElementById('fStatus').value };
+            }
+            if (editId) await Api.put(`/bcm/${ep}/${editId}`, body);
+            else await Api.post(`/bcm/${ep}`, body);
+            modal.hide();
+            loadTab(activeTab);
+            loadStats();
+        } catch(e){ alert(e.message||'Save failed'); }
+    });
+
+    loadStats();
+    loadTab('plans');
+    document.addEventListener('languageChanged', () => loadTab(activeTab));
+});
+</script>
+</body>
+</html>

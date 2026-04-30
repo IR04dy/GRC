@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Risk Form — TSS GRC</title>
+
+    <link id="bootstrap-css" rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="/assets/css/style.css"/>
+    <link rel="stylesheet" href="/assets/css/rtl.css" id="rtl-css" disabled/>
+
+    <style>
+        /* Score preview panel */
+        .score-panel {
+            position: sticky;
+            top: calc(var(--header-height) + 1.5rem);
+        }
+
+        .score-box {
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .score-box .score-number {
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+            transition: color 0.3s ease;
+        }
+
+        .score-box .score-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--color-text-muted);
+            margin-top: 6px;
+        }
+
+        .score-box .score-level-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-top: 8px;
+        }
+
+        /* Mini heatmap */
+        .mini-heatmap-wrap {
+            position: relative;
+        }
+
+        .mini-heatmap-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 2px;
+            width: 100%;
+        }
+
+        .mini-heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: rgba(0,0,0,0.4);
+            transition: transform 0.15s ease;
+        }
+
+        .mini-heatmap-cell.active-cell {
+            outline: 2.5px solid var(--color-primary);
+            outline-offset: 1px;
+            border-radius: 4px;
+            z-index: 2;
+            position: relative;
+        }
+
+        /* Axis labels for mini heatmap */
+        .heatmap-container {
+            display: flex;
+            gap: 6px;
+            align-items: flex-start;
+        }
+
+        .heatmap-y-label {
+            writing-mode: vertical-lr;
+            transform: rotate(180deg);
+            font-size: 0.65rem;
+            color: var(--color-text-muted);
+            white-space: nowrap;
+            align-self: center;
+        }
+
+        .heatmap-x-label {
+            font-size: 0.65rem;
+            color: var(--color-text-muted);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        /* Form section card header */
+        .form-section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-muted);
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--color-border);
+            margin-bottom: 1.25rem;
+        }
+
+        .form-section-header i {
+            color: var(--color-accent);
+            font-size: 1rem;
+        }
+
+        /* Likelihood/Impact 1-5 visual selector */
+        .rating-selector {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .rating-btn {
+            width: 42px;
+            height: 42px;
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: var(--color-surface);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            color: var(--color-text-muted);
+        }
+
+        .rating-btn:hover {
+            border-color: var(--color-accent);
+            color: var(--color-accent);
+            background: rgba(0,168,224,0.06);
+        }
+
+        .rating-btn.selected-1,
+        .rating-btn.selected-2 { border-color: var(--color-success); background: #d1fae5; color: #065f46; }
+        .rating-btn.selected-3 { border-color: var(--color-warning); background: #fef3c7; color: #92400e; }
+        .rating-btn.selected-4 { border-color: var(--color-high-risk); background: #ffedd5; color: #9a3412; }
+        .rating-btn.selected-5 { border-color: var(--color-danger); background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+
+<!-- App shell -->
+<div id="app-shell"></div>
+
+<main id="page-content" class="flex-grow-1 p-4">
+
+    <!-- Page header -->
+    <div class="page-header">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item">
+                        <a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="/risk/index.html" data-i18n="risk.register">Risk Register</a>
+                    </li>
+                    <li class="breadcrumb-item active" id="breadcrumbMode">New Risk</li>
+                </ol>
+            </nav>
+            <h4 id="pageTitle" data-i18n="risk.new">New Risk</h4>
+            <p class="page-subtitle" data-i18n="risk.title">Enterprise Risk Management</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/risk/index.html" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>
+                <span data-i18n="common.back">Back</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Error banner -->
+    <div id="formError" class="alert alert-danger d-none mb-3" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>
+        <span id="formErrorMsg" data-i18n="msg.error.validation">Please correct the highlighted fields.</span>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- ── Main form column ──────────────────────────────── -->
+        <div class="col-xl-8 col-lg-7">
+            <form id="riskForm" novalidate>
+
+                <!-- Section: Basic Information -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="form-section-header">
+                            <i class="bi bi-info-circle-fill"></i>
+                            Basic Information
+                        </div>
+
+                        <div class="row g-3">
+                            <!-- Title EN -->
+                            <div class="col-md-6">
+                                <label class="form-label" for="titleEn">
+                                    Title (English) <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="titleEn" name="titleEn"
+                                       placeholder="e.g. Data Breach Risk" required maxlength="250"/>
+                                <div class="invalid-feedback">English title is required.</div>
+                            </div>
+
+                            <!-- Title AR -->
+                            <div class="col-md-6">
+                                <label class="form-label" for="titleAr">
+                                    Title (Arabic) — العنوان بالعربية
+                                </label>
+                                <input type="text" class="form-control" id="titleAr" name="titleAr"
+                                       placeholder="مثال: مخاطر اختراق البيانات"
+                                       dir="auto" maxlength="250"/>
+                            </div>
+
+                            <!-- Description -->
+                            <div class="col-12">
+                                <label class="form-label" for="descriptionEn" data-i18n="label.description">
+                                    Description
+                                </label>
+                                <textarea class="form-control" id="descriptionEn" name="descriptionEn"
+                                          rows="3" maxlength="2000"
+                                          placeholder="Describe the risk, its context and potential consequences..."></textarea>
+                                <div class="form-text text-end">
+                                    <span id="descCount">0</span> / 2000
+                                </div>
+                            </div>
+
+                            <!-- Category -->
+                            <div class="col-md-6">
+                                <label class="form-label" for="categoryId">
+                                    <span data-i18n="label.category">Category</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" id="categoryId" name="categoryId" required>
+                                    <option value="">— Select category —</option>
+                                </select>
+                                <div class="invalid-feedback">Please select a category.</div>
+                            </div>
+
+                            <!-- Owner -->
+                            <div class="col-md-6">
+                                <label class="form-label" for="ownerId">
+                                    <span data-i18n="label.owner">Risk Owner</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" id="ownerId" name="ownerId" required>
+                                    <option value="">— Select owner —</option>
+                                </select>
+                                <div class="invalid-feedback">Please assign an owner.</div>
+                            </div>
+
+                            <!-- Status -->
+                            <div class="col-md-6">
+                                <label class="form-label" for="status" data-i18n="label.status">
+                                    Status
+                                </label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="DRAFT">Draft</option>
+                                    <option value="OPEN" selected>Open</option>
+                                    <option value="MITIGATED">Mitigated</option>
+                                    <option value="ACCEPTED">Accepted</option>
+                                    <option value="CLOSED">Closed</option>
+                                </select>
+                            </div>
+
+                            <!-- Review Date -->
+                            <div class="col-md-6">
+                                <label class="form-label" for="reviewDate">
+                                    Next Review Date
+                                </label>
+                                <input type="date" class="form-control" id="reviewDate" name="reviewDate"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Inherent Risk Assessment -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="form-section-header">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span data-i18n="risk.inherent">Inherent Risk</span>
+                            <span class="ms-auto" style="font-size:0.72rem;color:var(--color-text-muted);text-transform:none;letter-spacing:0;">
+                                Before controls are applied
+                            </span>
+                        </div>
+
+                        <div class="row g-4">
+                            <!-- Inherent Likelihood -->
+                            <div class="col-md-6">
+                                <label class="form-label" data-i18n="risk.likelihood">
+                                    Likelihood (1–5)
+                                </label>
+                                <div class="rating-selector" id="inherentLikelihoodBtns">
+                                    <button type="button" class="rating-btn" data-val="1">1</button>
+                                    <button type="button" class="rating-btn" data-val="2">2</button>
+                                    <button type="button" class="rating-btn" data-val="3">3</button>
+                                    <button type="button" class="rating-btn" data-val="4">4</button>
+                                    <button type="button" class="rating-btn" data-val="5">5</button>
+                                </div>
+                                <input type="hidden" id="inherentLikelihood" name="inherentLikelihood" value=""/>
+                                <div class="form-text mt-1" id="likelihoodHint">
+                                    1 = Rare &nbsp;·&nbsp; 3 = Possible &nbsp;·&nbsp; 5 = Almost Certain
+                                </div>
+                            </div>
+
+                            <!-- Inherent Impact -->
+                            <div class="col-md-6">
+                                <label class="form-label" data-i18n="risk.impact">
+                                    Impact (1–5)
+                                </label>
+                                <div class="rating-selector" id="inherentImpactBtns">
+                                    <button type="button" class="rating-btn" data-val="1">1</button>
+                                    <button type="button" class="rating-btn" data-val="2">2</button>
+                                    <button type="button" class="rating-btn" data-val="3">3</button>
+                                    <button type="button" class="rating-btn" data-val="4">4</button>
+                                    <button type="button" class="rating-btn" data-val="5">5</button>
+                                </div>
+                                <input type="hidden" id="inherentImpact" name="inherentImpact" value=""/>
+                                <div class="form-text mt-1">
+                                    1 = Negligible &nbsp;·&nbsp; 3 = Moderate &nbsp;·&nbsp; 5 = Catastrophic
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Residual Risk Assessment -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="form-section-header">
+                            <i class="bi bi-shield-check-fill"></i>
+                            <span data-i18n="risk.residual">Residual Risk</span>
+                            <span class="ms-auto" style="font-size:0.72rem;color:var(--color-text-muted);text-transform:none;letter-spacing:0;">
+                                After controls are applied
+                            </span>
+                        </div>
+
+                        <div class="row g-4">
+                            <!-- Residual Likelihood -->
+                            <div class="col-md-6">
+                                <label class="form-label" data-i18n="risk.likelihood">
+                                    Residual Likelihood (1–5)
+                                </label>
+                                <div class="rating-selector" id="residualLikelihoodBtns">
+                                    <button type="button" class="rating-btn" data-val="1">1</button>
+                                    <button type="button" class="rating-btn" data-val="2">2</button>
+                                    <button type="button" class="rating-btn" data-val="3">3</button>
+                                    <button type="button" class="rating-btn" data-val="4">4</button>
+                                    <button type="button" class="rating-btn" data-val="5">5</button>
+                                </div>
+                                <input type="hidden" id="residualLikelihood" name="residualLikelihood" value=""/>
+                            </div>
+
+                            <!-- Residual Impact -->
+                            <div class="col-md-6">
+                                <label class="form-label" data-i18n="risk.impact">
+                                    Residual Impact (1–5)
+                                </label>
+                                <div class="rating-selector" id="residualImpactBtns">
+                                    <button type="button" class="rating-btn" data-val="1">1</button>
+                                    <button type="button" class="rating-btn" data-val="2">2</button>
+                                    <button type="button" class="rating-btn" data-val="3">3</button>
+                                    <button type="button" class="rating-btn" data-val="4">4</button>
+                                    <button type="button" class="rating-btn" data-val="5">5</button>
+                                </div>
+                                <input type="hidden" id="residualImpact" name="residualImpact" value=""/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form actions -->
+                <div class="d-flex gap-3 justify-content-end">
+                    <a href="/risk/index.html" class="btn btn-outline-secondary px-4" data-i18n="common.cancel">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary px-5" id="submitBtn">
+                        <span id="submitSpinner"
+                              class="spinner-border spinner-border-sm me-2 d-none"
+                              role="status"></span>
+                        <i class="bi bi-check2-circle me-1" id="submitIcon"></i>
+                        <span id="submitLabel" data-i18n="common.save">Save</span>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- ── Score Preview column ──────────────────────────── -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="score-panel">
+
+                <!-- Inherent Score Preview -->
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span data-i18n="risk.inherent">Inherent Risk Score</span>
+                        <i class="bi bi-exclamation-triangle text-warning"></i>
+                    </div>
+                    <div class="card-body">
+                        <div class="score-box mb-3">
+                            <div class="score-number" id="inherentScoreNum" style="color:var(--color-text-muted);">—</div>
+                            <div class="score-label" data-i18n="risk.score">Risk Score</div>
+                            <div>
+                                <span class="score-level-badge" id="inherentLevelBadge"
+                                      style="background:#f1f5f9;color:#64748b;">
+                                    Not rated
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Mini heatmap — inherent -->
+                        <div class="heatmap-container">
+                            <div class="heatmap-y-label" data-i18n="risk.impact">Impact</div>
+                            <div class="flex-grow-1">
+                                <div class="mini-heatmap-grid" id="miniHeatmapInherent"></div>
+                                <div class="heatmap-x-label" data-i18n="risk.likelihood">Likelihood</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Residual Score Preview -->
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span data-i18n="risk.residual">Residual Risk Score</span>
+                        <i class="bi bi-shield-check text-success"></i>
+                    </div>
+                    <div class="card-body">
+                        <div class="score-box mb-3">
+                            <div class="score-number" id="residualScoreNum" style="color:var(--color-text-muted);">—</div>
+                            <div class="score-label" data-i18n="risk.score">Risk Score</div>
+                            <div>
+                                <span class="score-level-badge" id="residualLevelBadge"
+                                      style="background:#f1f5f9;color:#64748b;">
+                                    Not rated
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Mini heatmap — residual -->
+                        <div class="heatmap-container">
+                            <div class="heatmap-y-label" data-i18n="risk.impact">Impact</div>
+                            <div class="flex-grow-1">
+                                <div class="mini-heatmap-grid" id="miniHeatmapResidual"></div>
+                                <div class="heatmap-x-label" data-i18n="risk.likelihood">Likelihood</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div><!-- end row -->
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/translations.js"></script>
+<script src="/assets/js/auth.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script src="/assets/js/config.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/app.js"></script>
+
+<script>
+(function () {
+    'use strict';
+
+    // ── Determine mode (create vs edit) ─────────────────────────
+    const params  = new URLSearchParams(location.search);
+    const riskId  = params.get('id');
+    const isEdit  = !!riskId;
+
+    // ── Score / level helpers ────────────────────────────────────
+    function calcScore(l, i) {
+        const ll = parseInt(l) || 0;
+        const ii = parseInt(i) || 0;
+        return ll && ii ? ll * ii : null;
+    }
+
+    function getLevel(score) {
+        if (!score) return null;
+        if (score >= 20) return 'CRITICAL';
+        if (score >= 12) return 'HIGH';
+        if (score >= 6)  return 'MEDIUM';
+        return 'LOW';
+    }
+
+    const LEVEL_STYLE = {
+        CRITICAL: { bg: '#fee2e2', color: '#991b1b', cssClass: 'score-critical' },
+        HIGH:     { bg: '#ffedd5', color: '#9a3412', cssClass: 'score-high' },
+        MEDIUM:   { bg: '#fef3c7', color: '#92400e', cssClass: 'score-medium' },
+        LOW:      { bg: '#d1fae5', color: '#065f46', cssClass: 'score-low' },
+    };
+
+    const HEATMAP_CLASS = s =>
+        s >= 20 ? 'score-critical' : s >= 12 ? 'score-high' : s >= 6 ? 'score-medium' : 'score-low';
+
+    // ── Build mini heatmap ───────────────────────────────────────
+    function buildMiniHeatmap(containerId, activeLikelihood, activeImpact) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+
+        for (let impact = 5; impact >= 1; impact--) {
+            for (let likelihood = 1; likelihood <= 5; likelihood++) {
+                const score = impact * likelihood;
+                const cell  = document.createElement('div');
+                cell.className = 'mini-heatmap-cell ' + HEATMAP_CLASS(score);
+                cell.title     = `L:${likelihood} × I:${impact} = ${score}`;
+                cell.textContent = score;
+
+                const al = parseInt(activeLikelihood) || 0;
+                const ai = parseInt(activeImpact) || 0;
+                if (al === likelihood && ai === impact) {
+                    cell.classList.add('active-cell');
+                }
+                container.appendChild(cell);
+            }
+        }
+    }
+
+    // ── Update score preview ─────────────────────────────────────
+    function updateScorePreview(type) {
+        const l = document.getElementById(type + 'Likelihood').value;
+        const i = document.getElementById(type + 'Impact').value;
+        const score = calcScore(l, i);
+        const level = getLevel(score);
+        const style = level ? LEVEL_STYLE[level] : null;
+
+        const numEl   = document.getElementById(type + 'ScoreNum');
+        const badgeEl = document.getElementById(type + 'LevelBadge');
+
+        if (score) {
+            numEl.textContent = score;
+            numEl.className   = 'score-number ' + (style?.cssClass || '');
+            badgeEl.textContent = I18n.t('risk.level.' + level.toLowerCase());
+            badgeEl.style.background = style?.bg || '#f1f5f9';
+            badgeEl.style.color      = style?.color || '#64748b';
+        } else {
+            numEl.textContent = '—';
+            numEl.className   = 'score-number';
+            numEl.style.color = 'var(--color-text-muted)';
+            badgeEl.textContent = 'Not rated';
+            badgeEl.style.background = '#f1f5f9';
+            badgeEl.style.color      = '#64748b';
+        }
+
+        const heatmapId = type === 'inherent' ? 'miniHeatmapInherent' : 'miniHeatmapResidual';
+        buildMiniHeatmap(heatmapId, l, i);
+    }
+
+    // ── Rating button groups ─────────────────────────────────────
+    function wireRatingGroup(groupId, hiddenId, type) {
+        const group = document.getElementById(groupId);
+        if (!group) return;
+
+        group.querySelectorAll('.rating-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const val = this.dataset.val;
+                document.getElementById(hiddenId).value = val;
+
+                // Update button styles
+                group.querySelectorAll('.rating-btn').forEach(b => {
+                    b.className = 'rating-btn';
+                });
+                this.className = 'rating-btn selected-' + val;
+
+                updateScorePreview(type);
+            });
+        });
+    }
+
+    function setRatingGroup(groupId, hiddenId, val) {
+        if (!val) return;
+        document.getElementById(hiddenId).value = val;
+        const group = document.getElementById(groupId);
+        group?.querySelectorAll('.rating-btn').forEach(btn => {
+            btn.className = btn.dataset.val == val ? 'rating-btn selected-' + val : 'rating-btn';
+        });
+    }
+
+    // ── Load categories ──────────────────────────────────────────
+    async function loadCategories(selectedId) {
+        try {
+            const data = await Api.get('/risk/categories');
+            const sel  = document.getElementById('categoryId');
+            const list = data?.content ?? data ?? [];
+            list.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value       = c.id;
+                opt.textContent = I18n.current === 'ar' ? (c.nameAr || c.nameEn) : c.nameEn;
+                if (String(c.id) === String(selectedId)) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        } catch (_) { /* silent */ }
+    }
+
+    // ── Load users (owners) ──────────────────────────────────────
+    async function loadOwners(selectedId) {
+        try {
+            const data = await Api.get('/admin/users', { page: 0, size: 200, enabled: true });
+            const sel  = document.getElementById('ownerId');
+            const list = data?.content ?? data ?? [];
+            list.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value       = u.id;
+                opt.textContent = u.fullNameEn || u.username;
+                if (String(u.id) === String(selectedId)) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        } catch (_) { /* silent */ }
+    }
+
+    // ── Load existing risk (edit mode) ────────────────────────────
+    async function loadRisk() {
+        if (!isEdit) return;
+
+        // Update UI to edit mode
+        document.getElementById('pageTitle').setAttribute('data-i18n', 'risk.edit');
+        document.getElementById('pageTitle').textContent = I18n.t('risk.edit');
+        document.getElementById('breadcrumbMode').textContent = I18n.t('risk.edit');
+        document.getElementById('submitLabel').setAttribute('data-i18n', 'common.save');
+        document.title = 'Edit Risk — TSS GRC';
+
+        try {
+            const risk = await Api.get('/risk/risks/' + riskId);
+
+            document.getElementById('titleEn').value   = risk.titleEn       || '';
+            document.getElementById('titleAr').value   = risk.titleAr       || '';
+            document.getElementById('descriptionEn').value = risk.descriptionEn || '';
+            document.getElementById('status').value    = risk.status        || 'OPEN';
+            document.getElementById('reviewDate').value = risk.reviewDate?.substring(0, 10) || '';
+
+            updateDescCount();
+
+            // Set category and owner after dropdowns load
+            if (risk.categoryId) document.getElementById('categoryId').value = risk.categoryId;
+            if (risk.ownerId)    document.getElementById('ownerId').value    = risk.ownerId;
+
+            // Set rating buttons
+            setRatingGroup('inherentLikelihoodBtns', 'inherentLikelihood', risk.inherentLikelihood);
+            setRatingGroup('inherentImpactBtns',     'inherentImpact',     risk.inherentImpact);
+            setRatingGroup('residualLikelihoodBtns', 'residualLikelihood', risk.residualLikelihood);
+            setRatingGroup('residualImpactBtns',     'residualImpact',     risk.residualImpact);
+
+            updateScorePreview('inherent');
+            updateScorePreview('residual');
+
+        } catch (err) {
+            App.showFlash('danger', err.message || I18n.t('msg.error.generic'));
+        }
+    }
+
+    // ── Description character counter ────────────────────────────
+    function updateDescCount() {
+        const len = document.getElementById('descriptionEn').value.length;
+        document.getElementById('descCount').textContent = len;
+    }
+    document.getElementById('descriptionEn').addEventListener('input', updateDescCount);
+
+    // ── Form validation ──────────────────────────────────────────
+    function validateForm() {
+        let valid = true;
+        const form = document.getElementById('riskForm');
+
+        // Required text fields
+        ['titleEn', 'categoryId', 'ownerId'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el.value.trim()) {
+                el.classList.add('is-invalid');
+                valid = false;
+            } else {
+                el.classList.remove('is-invalid');
+            }
+        });
+
+        return valid;
+    }
+
+    // ── Form submit ───────────────────────────────────────────────
+    document.getElementById('riskForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        document.getElementById('formError').classList.add('d-none');
+
+        if (!validateForm()) {
+            document.getElementById('formError').classList.remove('d-none');
+            document.getElementById('formErrorMsg').textContent = I18n.t('msg.error.validation');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        const btn     = document.getElementById('submitBtn');
+        const spinner = document.getElementById('submitSpinner');
+        const icon    = document.getElementById('submitIcon');
+
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        icon.classList.add('d-none');
+
+        const payload = {
+            titleEn:              document.getElementById('titleEn').value.trim(),
+            titleAr:              document.getElementById('titleAr').value.trim() || null,
+            descriptionEn:        document.getElementById('descriptionEn').value.trim() || null,
+            categoryId:           parseInt(document.getElementById('categoryId').value) || null,
+            ownerId:              parseInt(document.getElementById('ownerId').value)    || null,
+            status:               document.getElementById('status').value,
+            reviewDate:           document.getElementById('reviewDate').value || null,
+            inherentLikelihood:   parseInt(document.getElementById('inherentLikelihood').value) || null,
+            inherentImpact:       parseInt(document.getElementById('inherentImpact').value)     || null,
+            residualLikelihood:   parseInt(document.getElementById('residualLikelihood').value) || null,
+            residualImpact:       parseInt(document.getElementById('residualImpact').value)     || null,
+        };
+
+        try {
+            if (isEdit) {
+                await Api.put('/risk/risks/' + riskId, payload);
+            } else {
+                await Api.post('/risk/risks', payload);
+            }
+            sessionStorage.setItem('grc_flash_type', 'success');
+            sessionStorage.setItem('grc_flash_msg', I18n.t('msg.success.saved'));
+            window.location.href = '/risk/index.html';
+        } catch (err) {
+            const errMsg = err.body?.message || err.body?.errors?.join(', ') || err.message || I18n.t('msg.error.generic');
+            document.getElementById('formErrorMsg').textContent = errMsg;
+            document.getElementById('formError').classList.remove('d-none');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+            icon.classList.remove('d-none');
+        }
+    });
+
+    // ── Clear validation on change ────────────────────────────────
+    ['titleEn', 'categoryId', 'ownerId'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', function () {
+            this.classList.remove('is-invalid');
+        });
+        document.getElementById(id)?.addEventListener('change', function () {
+            this.classList.remove('is-invalid');
+        });
+    });
+
+    // ── Flash from previous page ──────────────────────────────────
+    function checkFlash() {
+        const type = sessionStorage.getItem('grc_flash_type');
+        const msg  = sessionStorage.getItem('grc_flash_msg');
+        if (type && msg) {
+            sessionStorage.removeItem('grc_flash_type');
+            sessionStorage.removeItem('grc_flash_msg');
+            App.showFlash(type, msg);
+        }
+    }
+
+    // ── Page title ────────────────────────────────────────────────
+    // Scripts are at bottom of body, so DOM is already ready — call directly.
+    {
+        const titleEl = document.getElementById('page-title');
+        if (titleEl) titleEl.textContent = isEdit ? I18n.t('risk.edit') : I18n.t('risk.new');
+
+        // Wire rating groups
+        wireRatingGroup('inherentLikelihoodBtns', 'inherentLikelihood', 'inherent');
+        wireRatingGroup('inherentImpactBtns',     'inherentImpact',     'inherent');
+        wireRatingGroup('residualLikelihoodBtns', 'residualLikelihood', 'residual');
+        wireRatingGroup('residualImpactBtns',     'residualImpact',     'residual');
+
+        // Build empty heatmaps on load
+        buildMiniHeatmap('miniHeatmapInherent', null, null);
+        buildMiniHeatmap('miniHeatmapResidual', null, null);
+
+        // Load dropdown data, then load risk if editing
+        Promise.all([loadCategories(), loadOwners()]).then(() => {
+            if (isEdit) loadRisk();
+        });
+
+        checkFlash();
+    }
+
+    // ── Re-apply on language change ───────────────────────────────
+    document.addEventListener('languageChanged', () => {
+        updateScorePreview('inherent');
+        updateScorePreview('residual');
+    });
+
+})();
+</script>
+</body>
+</html>

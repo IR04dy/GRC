@@ -1,0 +1,137 @@
+/* ============================================================================
+   TSS GRC Platform — RTL (Arabic) CSS Overrides
+   Applied when body.rtl-layout is active (Arabic locale)
+   ============================================================================ */
+
+/* Sidebar — mirror to right side in RTL */
+body.rtl-layout .wrapper {
+    flex-direction: row-reverse;
+}
+
+body.rtl-layout .sidebar .nav-link {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+body.rtl-layout .sidebar .nav-link i {
+    margin-left: 10px;
+    margin-right: 0;
+}
+
+body.rtl-layout .sidebar-header {
+    flex-direction: row-reverse;
+}
+
+/* KPI Cards — top bar accent is direction-neutral; no flip needed */
+/* The kpi-card::before is a top border (top:0) — same for LTR and RTL */
+
+/* Utility border accents — flip for RTL */
+body.rtl-layout .border-start-accent {
+    border-left: none !important;
+    border-right: 3px solid var(--color-accent) !important;
+}
+body.rtl-layout .border-start-critical {
+    border-left: none !important;
+    border-right: 3px solid var(--color-critical) !important;
+}
+body.rtl-layout .border-start-high {
+    border-left: none !important;
+    border-right: 3px solid var(--color-high) !important;
+}
+body.rtl-layout .border-start-medium {
+    border-left: none !important;
+    border-right: 3px solid var(--color-medium) !important;
+}
+body.rtl-layout .border-start-low {
+    border-left: none !important;
+    border-right: 3px solid var(--color-low) !important;
+}
+
+/* Table headers — align right in RTL */
+body.rtl-layout .table-grc thead th {
+    text-align: right;
+}
+
+/* Form labels */
+body.rtl-layout .form-label {
+    text-align: right;
+    display: block;
+}
+
+/* Notification badge position */
+body.rtl-layout .notification-count {
+    right: auto;
+    left: -4px;
+}
+
+/* Sidebar toggle — mirror icon */
+body.rtl-layout #sidebarToggle {
+    margin-right: 0;
+    margin-left: 0.75rem;
+}
+
+/* Active nav indicator — mirror to right side for RTL */
+body.rtl-layout .sidebar .nav-link.active::before {
+    left: auto;
+    right: -0.75rem;
+    border-radius: 2px 0 0 2px;
+}
+
+body.rtl-layout .sidebar .nav-link:hover {
+    transform: translateX(-2px);
+}
+
+/* Language switcher — spacing adjustment */
+body.rtl-layout .language-switcher {
+    direction: ltr; /* keep EN/AR buttons in logical order */
+}
+
+/* Dropdown menus — align start for RTL */
+body.rtl-layout .dropdown-menu-end {
+    --bs-position: start;
+}
+
+/* Card header text */
+body.rtl-layout .card-header {
+    text-align: right;
+}
+
+/* Section titles */
+body.rtl-layout .section-title {
+    text-align: right;
+    letter-spacing: 0; /* Arabic doesn't benefit from letter-spacing */
+}
+
+/* Alert messages */
+body.rtl-layout .alert {
+    text-align: right;
+}
+
+body.rtl-layout .alert .bi {
+    margin-right: 0;
+    margin-left: 0.5rem;
+}
+
+/* Bootstrap overrides for RTL spacing utilities */
+body.rtl-layout .me-1 { margin-right: 0 !important; margin-left: 0.25rem !important; }
+body.rtl-layout .me-2 { margin-right: 0 !important; margin-left: 0.5rem !important; }
+body.rtl-layout .me-3 { margin-right: 0 !important; margin-left: 1rem !important; }
+body.rtl-layout .ms-1 { margin-left: 0 !important; margin-right: 0.25rem !important; }
+body.rtl-layout .ms-2 { margin-left: 0 !important; margin-right: 0.5rem !important; }
+body.rtl-layout .ms-3 { margin-left: 0 !important; margin-right: 1rem !important; }
+
+/* Risk Heatmap — axis labels */
+body.rtl-layout .risk-heatmap-axis-y {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+}
+
+/* Pagination */
+body.rtl-layout .pagination {
+    direction: rtl;
+}
+
+/* Footer */
+body.rtl-layout .footer {
+    text-align: right;
+}

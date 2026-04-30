@@ -1,0 +1,61 @@
+package com.tss.grc.module.evidence.entity;
+
+import com.tss.grc.common.model.BaseEntity;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.Where;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(schema = "evidence", name = "evidence_requests")
+@Where(clause = "is_deleted = 0")
+@Getter @Setter @NoArgsConstructor
+public class EvidenceRequest extends BaseEntity {
+
+    @Column(name = "external_id", nullable = false, updatable = false)
+    private UUID externalId = UUID.randomUUID();
+
+    @Column(name = "organisation_id", nullable = false)
+    private Long organisationId;
+
+    @Column(name = "sub_control_id")
+    private Long subControlId;
+
+    @Column(name = "title_en", nullable = false, length = 300)
+    private String titleEn;
+
+    @Column(name = "title_ar", length = 300)
+    private String titleAr;
+
+    @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)")
+    private String descriptionEn;
+
+    @Column(name = "requested_by_id")
+    private Long requestedById;
+
+    @Column(name = "assigned_to_id")
+    private Long assignedToId;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
+    @Column(name = "priority", nullable = false, length = 20)
+    private String priority = "MEDIUM";
+
+    @Column(name = "status", nullable = false, length = 30)
+    private String status = "OPEN";
+
+    @Column(name = "fulfilled_by_id")
+    private Long fulfilledById;
+
+    @Column(name = "fulfilled_at")
+    private LocalDateTime fulfilledAt;
+
+    @Column(name = "notes", columnDefinition = "NVARCHAR(MAX)")
+    private String notes;
+}
