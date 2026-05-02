@@ -1,0 +1,680 @@
+import { clearSession, getAccessToken, setSession, type UserInfo } from './auth';
+
+// VITE_API_BASE is empty by default → calls go to /api/* on the same origin and Vite proxies
+// to http://localhost:8084. Set VITE_API_BASE in .env.local to bypass the proxy.
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string, public body?: unknown) {
+    super(message);
+  }
+}
+
+interface FetchOpts extends Omit<RequestInit, 'body'> {
+  body?: unknown;
+  /** Skip Authorization header even if a token exists. */
+  anonymous?: boolean;
+}
+
+async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
+  const { body, anonymous, headers, ...rest } = opts;
+  const token = getAccessToken();
+
+  const init: RequestInit = {
+    ...rest,
+    headers: {
+      'Accept': 'application/json',
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token && !anonymous ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(headers as Record<string, string> | undefined),
+    },
+    credentials: 'include',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  };
+
+  const res = await fetch(`${API_BASE}${path}`, init);
+  const text = await res.text();
+  let parsed: unknown = undefined;
+  if (text) {
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+  }
+
+  if (!res.ok) {
+    const msg = (parsed as { message?: string })?.message ?? res.statusText ?? 'Request failed';
+    if (res.status === 401) clearSession();
+    throw new ApiError(res.status, msg, parsed);
+  }
+  return parsed as T;
+}
+
+export const api = {
+  get:    <T>(p: string, opts?: FetchOpts) => request<T>(p, { ...opts, method: 'GET' }),
+  post:   <T>(p: string, body?: unknown, opts?: FetchOpts) => request<T>(p, { ...opts, method: 'POST', body }),
+  put:    <T>(p: string, body?: unknown, opts?: FetchOpts) => request<T>(p, { ...opts, method: 'PUT',  body }),
+  patch:  <T>(p: string, body?: unknown, opts?: FetchOpts) => request<T>(p, { ...opts, method: 'PATCH', body }),
+  delete: <T>(p: string, opts?: FetchOpts) => request<T>(p, { ...opts, method: 'DELETE' }),
+};
+
+// ─── Spring Page<T> wrapper ─────────────────────────────────────────────────
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+function pageQ(page = 0, size = 50, status?: string, extra: Record<string, string | number | undefined> = {}): string {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('size', String(size));
+  if (status) params.set('status', status);
+  for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== '') params.set(k, String(v));
+  return `?${params.toString()}`;
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+export interface LoginResponse { accessToken: string; user: UserInfo; }
+export async function login(username: string, password: string): Promise<LoginResponse> {
+  const res = await api.post<LoginResponse>('/api/auth/login', { username, password }, { anonymous: true });
+  setSession(res.accessToken, res.user);
+  return res;
+}
+export async function logout(): Promise<void> {
+  try { await api.post('/api/auth/logout'); } catch { /* ignore */ }
+  clearSession();
+}
+
+// ─── Risk ───────────────────────────────────────────────────────────────────
+export interface RiskResponse {
+  id: number; externalId?: string; riskCode: string;
+  titleEn: string; titleAr?: string; descriptionEn?: string;
+  categoryId?: number; categoryName?: string; categoryNameEn?: string; categoryNameAr?: string;
+  ownerId?: number; ownerName?: string; ownerFullNameEn?: string; ownerUsername?: string;
+  status: string;
+  inherentLikelihood: number; inherentImpact: number; inherentScore: number;
+  residualLikelihood?: number; residualImpact?: number; residualScore?: number;
+  riskLevel?: string; identifiedDate?: string; reviewDate?: string;
+  createdAt?: string; updatedAt?: string;
+}
+export interface RiskRequest {
+  titleEn: string; titleAr?: string; descriptionEn?: string;
+  categoryId?: number; ownerId?: number;
+  inherentLikelihood: number; inherentImpact: number;
+  residualLikelihood?: number; residualImpact?: number;
+  status?: string; reviewDate?: string;
+}
+export interface RiskCategoryDto {
+  id: number; nameEn: string; nameAr?: string;
+  isActive?: boolean;
+}
+export const riskApi = {
+  list:       (status?: string, page = 0, size = 50) => api.get<PageResponse<RiskResponse>>(`/api/v1/risk/risks${pageQ(page, size, status)}`),
+  get:        (id: number) => api.get<RiskResponse>(`/api/v1/risk/risks/${id}`),
+  create:     (body: RiskRequest) => api.post<RiskResponse>('/api/v1/risk/risks', body),
+  update:     (id: number, body: RiskRequest) => api.put<RiskResponse>(`/api/v1/risk/risks/${id}`, body),
+  remove:     (id: number) => api.delete<void>(`/api/v1/risk/risks/${id}`),
+  categories: () => api.get<RiskCategoryDto[]>('/api/v1/risk/categories'),
+};
+
+// ─── Dashboard ──────────────────────────────────────────────────────────────
+export interface DashboardStats {
+  totalRisks: number; criticalRisks: number; highRisks: number; mediumRisks: number; lowRisks: number;
+  openRisks: number; closedRisks: number; totalUsers: number; activeUsers: number;
+  openCriticalRisks: number; openHighRisks: number; openIncidents: number;
+  complianceScore: number; pendingTasks: number;
+}
+export const dashboardApi = {
+  stats: () => api.get<DashboardStats>('/api/v1/dashboard/stats'),
+  heatmap: () => api.get<unknown>('/api/v1/dashboard/heatmap'),
+  riskByCategory: () => api.get<unknown>('/api/v1/dashboard/risk-by-category'),
+  recentRisks: () => api.get<unknown>('/api/v1/dashboard/recent-risks'),
+  recentIncidents: () => api.get<unknown>('/api/v1/dashboard/recent-incidents'),
+  complianceByFramework: () => api.get<unknown>('/api/v1/dashboard/compliance-by-framework'),
+};
+
+// ─── BCM ────────────────────────────────────────────────────────────────────
+export interface BcmPlanDto {
+  id: number; planNameEn: string; planNameAr?: string;
+  planType?: string; version?: string; status: string;
+  nextReviewDate?: string; createdAt?: string;
+}
+export interface BcmPlanRequest {
+  planNameEn: string; planNameAr?: string;
+  planType?: string; version?: string; status?: string;
+  nextReviewDate?: string;
+}
+export interface BcmProcessDto {
+  id: number; processNameEn: string; processNameAr?: string;
+  ownerId?: number; criticality?: string;
+  status?: string;
+}
+export interface BcmProcessRequest {
+  processNameEn: string; processNameAr?: string;
+  ownerId?: number | null; criticality?: string;
+}
+export interface BcmBiaDto {
+  id: number; processId?: number;
+  assessmentDate?: string;
+  rtoHours?: number; rpoHours?: number; mtpdHours?: number;
+  overallImpact?: string; status?: string;
+  linkedRiskId?: number;
+}
+export interface BcmBiaRequest {
+  processId?: number | null;
+  assessmentDate?: string;
+  rtoHours?: number | null; rpoHours?: number | null; mtpdHours?: number | null;
+  overallImpact?: string; status?: string;
+  linkedRiskId?: number | null;
+}
+export const bcmApi = {
+  plans:        (page = 0, size = 50) => api.get<PageResponse<BcmPlanDto>>(`/api/v1/bcm/plans${pageQ(page, size)}`),
+  createPlan:   (body: BcmPlanRequest) => api.post<BcmPlanDto>('/api/v1/bcm/plans', body),
+  updatePlan:   (id: number, body: BcmPlanRequest) => api.put<BcmPlanDto>(`/api/v1/bcm/plans/${id}`, body),
+  deletePlan:   (id: number) => api.delete<void>(`/api/v1/bcm/plans/${id}`),
+  processes:      (page = 0, size = 50) => api.get<PageResponse<BcmProcessDto>>(`/api/v1/bcm/processes${pageQ(page, size)}`),
+  createProcess:  (body: BcmProcessRequest) => api.post<BcmProcessDto>('/api/v1/bcm/processes', body),
+  updateProcess:  (id: number, body: BcmProcessRequest) => api.put<BcmProcessDto>(`/api/v1/bcm/processes/${id}`, body),
+  deleteProcess:  (id: number) => api.delete<void>(`/api/v1/bcm/processes/${id}`),
+  /** /api/v1/bcm/bia returns a plain array, not a Page<T>. */
+  bia:          () => api.get<BcmBiaDto[]>('/api/v1/bcm/bia'),
+  createBia:    (body: BcmBiaRequest) => api.post<BcmBiaDto>('/api/v1/bcm/bia', body),
+  updateBia:    (id: number, body: BcmBiaRequest) => api.put<BcmBiaDto>(`/api/v1/bcm/bia/${id}`, body),
+  deleteBia:    (id: number) => api.delete<void>(`/api/v1/bcm/bia/${id}`),
+  stats:        () => api.get<unknown>('/api/v1/bcm/stats'),
+};
+
+// ─── Cyber · Controls ───────────────────────────────────────────────────────
+export interface CyberControlDto {
+  id: number; frameworkId?: number; frameworkName?: string; domain?: string;
+  controlNumber: string; titleEn: string; titleAr?: string;
+  procedureEn?: string;
+  controlType?: string; controlOwner?: string;
+  reviewFrequency?: string; maturityLevel?: string;
+  implementationStatus?: string; status?: string;
+}
+
+// ─── Cyber · Sub-Controls ───────────────────────────────────────────────────
+export interface CyberSubControlDto {
+  id: number; controlId: number;
+  subControlNumber: string; titleEn: string; titleAr?: string;
+  descriptionEn?: string;
+  controlOwner?: string;
+  maturityLevel?: string; implementationStatus?: string;
+  evidenceRequired?: boolean;
+}
+export interface CyberSubControlRequest {
+  controlId: number; subControlNumber?: string;
+  titleEn: string; titleAr?: string; descriptionEn?: string;
+  controlOwner?: string;
+  maturityLevel?: string; implementationStatus?: string;
+  evidenceRequired?: boolean;
+}
+
+// ─── Cyber · Assessments ────────────────────────────────────────────────────
+export interface CyberAssessmentDto {
+  id: number; controlId: number;
+  assessmentDate?: string; assessorName?: string; reviewerName?: string;
+  result?: string; maturityScore?: number;
+  gapIdentified?: boolean; gapDescription?: string;
+  riskLevel?: string; status?: string;
+  assessorComments?: string; reviewerComments?: string;
+  evidenceCount?: number; capaId?: number;
+}
+export interface CyberAssessmentRequest {
+  controlId: number;
+  assessorName?: string; reviewerName?: string;
+  assessmentDate?: string;
+  result?: string; maturityScore?: number;
+  riskLevel?: string; gapIdentified?: boolean;
+  gapDescription?: string;
+  assessorComments?: string; reviewerComments?: string;
+  status?: string;
+}
+
+// ─── Cyber · Incidents ──────────────────────────────────────────────────────
+export interface CyberIncidentDto {
+  id: number; incidentNumber: string;
+  titleEn: string; titleAr?: string;
+  incidentType?: string;
+  affectedAssetId?: number; affectedAssetName?: string;
+  impact?: string; severity?: string;
+  workflowStatus?: string; status?: string;
+  detectedAt?: string; reportedAt?: string; resolvedAt?: string;
+  detectionDate?: string;
+  incidentLead?: string;
+  notificationSent?: boolean; bcmHandoff?: boolean;
+  linkedVulnerabilitiesCount?: number; linkedEvidenceCount?: number;
+  lessonsLearned?: string;
+  responseStage?: string;
+}
+export interface CyberIncidentRequest {
+  titleEn: string; titleAr?: string;
+  incidentType?: string;
+  affectedAssetId?: number;
+  severity?: string; impact?: string;
+  workflowStatus?: string;
+  incidentLead?: string;
+  bcmHandoff?: boolean;
+  lessonsLearned?: string;
+}
+
+// ─── Cyber · Assets ─────────────────────────────────────────────────────────
+export interface CyberAssetDto {
+  id: number; assetName: string; assetType?: string;
+  businessOwner?: string; technicalOwner?: string;
+  classification?: string; criticality?: string;
+  ipAddress?: string; hostname?: string; operatingSystem?: string;
+  linkedVulnerabilitiesCount?: number;
+  linkedIncidentsCount?: number;
+  linkedControlsCount?: number;
+  status?: string;
+}
+export interface CyberAssetRequest {
+  assetName: string; assetType?: string;
+  businessOwner?: string; technicalOwner?: string;
+  classification?: string; criticality?: string;
+  ipAddress?: string; hostname?: string; operatingSystem?: string;
+  status?: string;
+}
+
+// ─── Cyber · Evidence ───────────────────────────────────────────────────────
+export interface CyberEvidenceDto {
+  id: number; titleEn: string; titleAr?: string;
+  evidenceType?: string;
+  controlId?: number; assessmentId?: number;
+  frameworkRequirement?: string; ownerName?: string;
+  version?: string;
+  reviewDate?: string; expiryDate?: string;
+  collectedDate?: string;
+  fileName?: string; status?: string;
+}
+export interface CyberEvidenceRequest {
+  titleEn: string;
+  evidenceType?: string;
+  controlId?: number;
+  frameworkRequirement?: string; ownerName?: string;
+  version?: string;
+  reviewDate?: string; expiryDate?: string;
+  fileName?: string; status?: string;
+}
+
+// ─── Cyber · Action Plans ───────────────────────────────────────────────────
+export interface CyberActionPlanDto {
+  id: number; titleEn: string; titleAr?: string;
+  descriptionEn?: string;
+  sourceType?: string; sourceId?: number; sourceRef?: string;
+  priority?: string; ownerName?: string;
+  dueDate?: string; targetDate?: string;
+  workflowStatus?: string; status?: string;
+  progressPct?: number; progressPercent?: number;
+  completionEvidence?: string; validationNotes?: string;
+  linkedControlId?: number;
+  startDate?: string; completedAt?: string;
+}
+export interface CyberActionPlanRequest {
+  titleEn: string; titleAr?: string;
+  descriptionEn?: string;
+  priority?: string; ownerName?: string;
+  dueDate?: string;
+  workflowStatus?: string;
+  progressPct?: number;
+  sourceType?: string;
+  completionEvidence?: string;
+}
+
+// ─── Cyber · Vulnerability Exceptions ───────────────────────────────────────
+export interface CyberExceptionDto {
+  id: number; vulnerabilityId?: number;
+  titleEn: string;
+  exceptionReason?: string;
+  workflowStatus?: string;
+  ownerName?: string; approverName?: string;
+  compensatingControls?: string;
+  impactAssessment?: string;
+  expiryDate?: string; approvedAt?: string;
+}
+export interface CyberExceptionRequest {
+  vulnerabilityId?: number;
+  titleEn: string;
+  ownerName?: string; approverName?: string;
+  expiryDate?: string;
+  workflowStatus?: string;
+  impactAssessment?: string;
+  exceptionReason?: string;
+  compensatingControls?: string;
+}
+export interface CyberControlRequest {
+  controlNumber: string; titleEn: string; titleAr?: string;
+  frameworkId?: number; frameworkName?: string;
+  domain?: string;
+  procedureEn?: string;
+  controlType?: string; controlOwner?: string;
+  reviewFrequency?: string; maturityLevel?: string;
+  implementationStatus?: string;
+  status?: string;
+}
+export interface CyberVulnDto {
+  id: number;
+  assetId?: number; assetName?: string;
+  titleEn: string; titleAr?: string;
+  descriptionEn?: string;
+  severity: string; cvssScore?: number;
+  vulnerabilityType?: string; cveId?: string;
+  ownerName?: string;
+  slaDays?: number; dueDate?: string;
+  workflowStatus?: string; status?: string;
+  remediationNotes?: string;
+  capaId?: number;
+  overdue?: boolean;
+  reopenedCount?: number;
+  discoveryDate?: string; targetResolutionDate?: string;
+}
+export interface CyberVulnRequest {
+  assetId?: number;
+  titleEn: string; titleAr?: string;
+  descriptionEn?: string;
+  severity: string; cvssScore?: number;
+  vulnerabilityType?: string; cveId?: string;
+  ownerName?: string;
+  slaDays?: number; dueDate?: string;
+  workflowStatus?: string;
+  remediationNotes?: string;
+}
+export const cyberApi = {
+  controls:       (page = 0, size = 50) => api.get<PageResponse<CyberControlDto>>(`/api/v1/cyber/controls${pageQ(page, size)}`),
+  createControl:  (body: CyberControlRequest) => api.post<CyberControlDto>('/api/v1/cyber/controls', body),
+  updateControl:  (id: number, body: CyberControlRequest) => api.put<CyberControlDto>(`/api/v1/cyber/controls/${id}`, body),
+  deleteControl:  (id: number) => api.delete<void>(`/api/v1/cyber/controls/${id}`),
+
+  vulns:          (page = 0, size = 50) => api.get<PageResponse<CyberVulnDto>>(`/api/v1/cyber/vulnerabilities${pageQ(page, size)}`),
+  createVuln:     (body: CyberVulnRequest) => api.post<CyberVulnDto>('/api/v1/cyber/vulnerabilities', body),
+  updateVuln:     (id: number, body: CyberVulnRequest) => api.put<CyberVulnDto>(`/api/v1/cyber/vulnerabilities/${id}`, body),
+  deleteVuln:     (id: number) => api.delete<void>(`/api/v1/cyber/vulnerabilities/${id}`),
+
+  // Sub-controls
+  subControls:        (page = 0, size = 50) => api.get<PageResponse<CyberSubControlDto>>(`/api/v1/cyber/sub-controls${pageQ(page, size)}`),
+  createSubControl:   (body: CyberSubControlRequest) => api.post<CyberSubControlDto>('/api/v1/cyber/sub-controls', body),
+  updateSubControl:   (id: number, body: CyberSubControlRequest) => api.put<CyberSubControlDto>(`/api/v1/cyber/sub-controls/${id}`, body),
+  deleteSubControl:   (id: number) => api.delete<void>(`/api/v1/cyber/sub-controls/${id}`),
+
+  // Assessments
+  assessments:        (page = 0, size = 50) => api.get<PageResponse<CyberAssessmentDto>>(`/api/v1/cyber/assessments${pageQ(page, size)}`),
+  createAssessment:   (body: CyberAssessmentRequest) => api.post<CyberAssessmentDto>('/api/v1/cyber/assessments', body),
+  updateAssessment:   (id: number, body: CyberAssessmentRequest) => api.put<CyberAssessmentDto>(`/api/v1/cyber/assessments/${id}`, body),
+  deleteAssessment:   (id: number) => api.delete<void>(`/api/v1/cyber/assessments/${id}`),
+  approveAssessment:  (id: number) => api.post<CyberAssessmentDto>(`/api/v1/cyber/assessments/${id}/approve`),
+  convertAssessmentGap: (id: number) => api.post(`/api/v1/cyber/assessments/${id}/convert-gap`),
+
+  // Vulnerabilities (already declared above as createVuln/updateVuln/deleteVuln)
+  escalateVuln:       (id: number) => api.post(`/api/v1/cyber/vulnerabilities/${id}/escalate`),
+
+  // Vulnerability exceptions
+  exceptions:         (page = 0, size = 50) => api.get<PageResponse<CyberExceptionDto>>(`/api/v1/cyber/exceptions${pageQ(page, size)}`),
+  createException:    (body: CyberExceptionRequest) => api.post<CyberExceptionDto>('/api/v1/cyber/exceptions', body),
+  updateException:    (id: number, body: CyberExceptionRequest) => api.put<CyberExceptionDto>(`/api/v1/cyber/exceptions/${id}`, body),
+  deleteException:    (id: number) => api.delete<void>(`/api/v1/cyber/exceptions/${id}`),
+  approveException:   (id: number) => api.post<CyberExceptionDto>(`/api/v1/cyber/exceptions/${id}/approve`),
+
+  // Incidents
+  incidents:          (page = 0, size = 50) => api.get<PageResponse<CyberIncidentDto>>(`/api/v1/cyber/incidents${pageQ(page, size)}`),
+  createIncident:     (body: CyberIncidentRequest) => api.post<CyberIncidentDto>('/api/v1/cyber/incidents', body),
+  updateIncident:     (id: number, body: CyberIncidentRequest) => api.put<CyberIncidentDto>(`/api/v1/cyber/incidents/${id}`, body),
+  deleteIncident:     (id: number) => api.delete<void>(`/api/v1/cyber/incidents/${id}`),
+  startResponse:      (id: number) => api.post<CyberIncidentDto>(`/api/v1/cyber/incidents/${id}/start-response`),
+
+  // Assets
+  assets:             (page = 0, size = 50) => api.get<PageResponse<CyberAssetDto>>(`/api/v1/cyber/assets${pageQ(page, size)}`),
+  assetsAll:          () => api.get<CyberAssetDto[]>('/api/v1/cyber/assets/all'),
+  createAsset:        (body: CyberAssetRequest) => api.post<CyberAssetDto>('/api/v1/cyber/assets', body),
+  updateAsset:        (id: number, body: CyberAssetRequest) => api.put<CyberAssetDto>(`/api/v1/cyber/assets/${id}`, body),
+  deleteAsset:        (id: number) => api.delete<void>(`/api/v1/cyber/assets/${id}`),
+
+  // Evidence
+  evidence:           (page = 0, size = 50) => api.get<PageResponse<CyberEvidenceDto>>(`/api/v1/cyber/evidence${pageQ(page, size)}`),
+  createEvidence:     (body: CyberEvidenceRequest) => api.post<CyberEvidenceDto>('/api/v1/cyber/evidence', body),
+  updateEvidence:     (id: number, body: CyberEvidenceRequest) => api.put<CyberEvidenceDto>(`/api/v1/cyber/evidence/${id}`, body),
+  deleteEvidence:     (id: number) => api.delete<void>(`/api/v1/cyber/evidence/${id}`),
+
+  // Action Plans
+  actionPlans:        (page = 0, size = 50) => api.get<PageResponse<CyberActionPlanDto>>(`/api/v1/cyber/action-plans${pageQ(page, size)}`),
+  createActionPlan:   (body: CyberActionPlanRequest) => api.post<CyberActionPlanDto>('/api/v1/cyber/action-plans', body),
+  updateActionPlan:   (id: number, body: CyberActionPlanRequest) => api.put<CyberActionPlanDto>(`/api/v1/cyber/action-plans/${id}`, body),
+  deleteActionPlan:   (id: number) => api.delete<void>(`/api/v1/cyber/action-plans/${id}`),
+  completePlan:       (id: number) => api.post<CyberActionPlanDto>(`/api/v1/cyber/action-plans/${id}/complete`),
+
+  // Catalog
+  controlsAll:        () => api.get<CyberControlDto[]>('/api/v1/cyber/controls/all'),
+  dashboard:          () => api.get<unknown>('/api/v1/cyber/dashboard'),
+  frameworks:         () => api.get<unknown>('/api/v1/cyber/frameworks'),
+};
+
+// ─── Privacy ────────────────────────────────────────────────────────────────
+export interface PrivacyDsrDto {
+  id: number; requestType: string;
+  requesterName: string; requesterEmail?: string;
+  receivedAt?: string; dueDate?: string;
+  status: string;
+}
+export interface PrivacyDsrRequest {
+  requestType: string; requesterName: string; requesterEmail?: string;
+  receivedAt?: string; dueDate?: string; status?: string;
+  description?: string;
+}
+export interface PrivacyBreachDto {
+  id: number; titleEn: string; descriptionEn?: string;
+  breachType?: string; severity?: string; status?: string;
+  occurredAt?: string; reportedAt?: string;
+  affectedRecords?: number;
+}
+export interface PrivacyRopaDto {
+  id: number; activityNameEn: string; activityNameAr?: string;
+  purposeEn?: string; legalBasis?: string;
+  retentionPeriod?: string; status?: string;
+}
+export const privacyApi = {
+  dsrs:        (page = 0, size = 50) => api.get<PageResponse<PrivacyDsrDto>>(`/api/v1/privacy/dsrs${pageQ(page, size)}`),
+  createDsr:   (body: PrivacyDsrRequest) => api.post<PrivacyDsrDto>('/api/v1/privacy/dsrs', body),
+  updateDsr:   (id: number, body: PrivacyDsrRequest) => api.put<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}`, body),
+  deleteDsr:   (id: number) => api.delete<void>(`/api/v1/privacy/dsrs/${id}`),
+  breaches:    (page = 0, size = 50) => api.get<PageResponse<PrivacyBreachDto>>(`/api/v1/privacy/breaches${pageQ(page, size)}`),
+  ropa:        (page = 0, size = 50) => api.get<PageResponse<PrivacyRopaDto>>(`/api/v1/privacy/ropa${pageQ(page, size)}`),
+  stats:       () => api.get<unknown>('/api/v1/privacy/stats'),
+};
+
+// ─── Compliance ─────────────────────────────────────────────────────────────
+export interface ComplianceControlDto {
+  id: number; code: string;
+  nameEn: string; nameAr?: string;
+  framework: string; domain?: string;
+  maturityLevel?: number; status: string; owner?: string; description?: string;
+}
+export interface ComplianceControlRequest {
+  code: string; nameEn: string; nameAr?: string;
+  framework: string; domain?: string;
+  maturityLevel?: number; status?: string; owner?: string; description?: string;
+}
+export interface ComplianceAssessmentDto {
+  id: number; framework: string; period: string;
+  auditor?: string; score?: number; status: string;
+  assessmentDate?: string; notes?: string;
+}
+export interface ComplianceFindingDto {
+  id: number; title: string;
+  severity: string; owner?: string;
+  capa?: string; dueDate?: string; status: string;
+}
+export const complianceApi = {
+  controls:       (page = 0, size = 50) => api.get<PageResponse<ComplianceControlDto>>(`/api/v1/compliance/controls${pageQ(page, size)}`),
+  createControl:  (body: ComplianceControlRequest) => api.post<ComplianceControlDto>('/api/v1/compliance/controls', body),
+  updateControl:  (id: number, body: ComplianceControlRequest) => api.put<ComplianceControlDto>(`/api/v1/compliance/controls/${id}`, body),
+  deleteControl:  (id: number) => api.delete<void>(`/api/v1/compliance/controls/${id}`),
+  assessments:    (page = 0, size = 50) => api.get<PageResponse<ComplianceAssessmentDto>>(`/api/v1/compliance/assessments${pageQ(page, size)}`),
+  findings:       (page = 0, size = 50) => api.get<PageResponse<ComplianceFindingDto>>(`/api/v1/compliance/findings${pageQ(page, size)}`),
+  stats:          () => api.get<unknown>('/api/v1/compliance/stats'),
+};
+
+// ─── TPRM ───────────────────────────────────────────────────────────────────
+export interface TprmVendorDto {
+  id: number; vendorName: string; vendorNameAr?: string;
+  vendorType?: string; country?: string;
+  riskRating: string; status: string;
+  contractEndDate?: string; description?: string;
+}
+export interface TprmVendorRequest {
+  vendorName: string; vendorNameAr?: string;
+  vendorType?: string; country?: string;
+  riskRating?: string; status?: string;
+  contractEndDate?: string; description?: string;
+}
+export const tprmApi = {
+  vendors:       (page = 0, size = 50) => api.get<PageResponse<TprmVendorDto>>(`/api/v1/tprm/vendors${pageQ(page, size)}`),
+  createVendor:  (body: TprmVendorRequest) => api.post<TprmVendorDto>('/api/v1/tprm/vendors', body),
+  updateVendor:  (id: number, body: TprmVendorRequest) => api.put<TprmVendorDto>(`/api/v1/tprm/vendors/${id}`, body),
+  deleteVendor:  (id: number) => api.delete<void>(`/api/v1/tprm/vendors/${id}`),
+  stats:         () => api.get<unknown>('/api/v1/tprm/stats'),
+};
+
+// ─── Incidents ──────────────────────────────────────────────────────────────
+export interface IncidentDto {
+  id: number; title: string; titleAr?: string;
+  severity: string; category?: string; status: string;
+  assignee?: string; discoveryDate?: string;
+  description?: string;
+}
+export interface IncidentRequest {
+  title: string; titleAr?: string;
+  severity: string; category?: string; status?: string;
+  assignee?: string; discoveryDate?: string;
+  description?: string;
+}
+export const incidentApi = {
+  list:    (page = 0, size = 50) => api.get<PageResponse<IncidentDto>>(`/api/v1/incidents${pageQ(page, size)}`),
+  get:     (id: number) => api.get<IncidentDto>(`/api/v1/incidents/${id}`),
+  create:  (body: IncidentRequest) => api.post<IncidentDto>('/api/v1/incidents', body),
+  update:  (id: number, body: IncidentRequest) => api.put<IncidentDto>(`/api/v1/incidents/${id}`, body),
+  remove:  (id: number) => api.delete<void>(`/api/v1/incidents/${id}`),
+  stats:   () => api.get<unknown>('/api/v1/incidents/stats'),
+};
+
+// ─── Evidence ───────────────────────────────────────────────────────────────
+export interface EvidenceItemDto {
+  id: number; evidenceCode: string;
+  subControlCode?: string; controlCode?: string; frameworkCode?: string;
+  titleEn: string; titleAr?: string;
+  descriptionEn?: string; descriptionAr?: string;
+  evidenceType: string; status?: string;
+  collectedDate?: string; expiryDate?: string;
+}
+export interface EvidenceItemRequest {
+  titleEn: string; titleAr?: string; descriptionEn?: string;
+  evidenceType: string; subControlId?: number;
+  collectedDate?: string; expiryDate?: string;
+}
+export interface EvidenceRequestDto {
+  id: number; requestCode: string;
+  subControlCode?: string; frameworkCode?: string;
+  titleEn: string; titleAr?: string;
+  status?: string; requestedAt?: string; dueDate?: string;
+  ownerName?: string;
+}
+export interface EvidenceReviewDto {
+  id: number; evidenceId: number;
+  evidenceTitleEn?: string;
+  reviewerName?: string; reviewDate?: string;
+  result?: string; notesEn?: string;
+}
+export const evidenceApi = {
+  items:        (page = 0, size = 50) => api.get<PageResponse<EvidenceItemDto>>(`/api/v1/evidence/items${pageQ(page, size)}`),
+  createItem:   (body: EvidenceItemRequest) => api.post<EvidenceItemDto>('/api/v1/evidence/items', body),
+  updateItem:   (id: number, body: EvidenceItemRequest) => api.put<EvidenceItemDto>(`/api/v1/evidence/items/${id}`, body),
+  deleteItem:   (id: number) => api.delete<void>(`/api/v1/evidence/items/${id}`),
+  approve:      (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/approve`),
+  reject:       (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/reject`),
+  stats:        () => api.get<unknown>('/api/v1/evidence/items/stats'),
+  expired:      () => api.get<PageResponse<EvidenceItemDto>>('/api/v1/evidence/items/expired'),
+  requests:     (page = 0, size = 50) => api.get<PageResponse<EvidenceRequestDto>>(`/api/v1/evidence/requests${pageQ(page, size)}`),
+  reviews:      (page = 0, size = 50) => api.get<PageResponse<EvidenceReviewDto>>(`/api/v1/evidence/reviews${pageQ(page, size)}`),
+};
+
+// ─── SCM ────────────────────────────────────────────────────────────────────
+export interface ScmVendorDto {
+  id: number; nameEn: string; nameAr?: string;
+  category?: string; criticality?: string;
+  country?: string; serviceType?: string;
+  riskLevel?: string; status: string;
+  onboardingStatus?: string;
+  contactName?: string; contactEmail?: string; contactPhone?: string;
+}
+export interface ScmVendorRequest {
+  nameEn: string; nameAr?: string;
+  category?: string; criticality?: string;
+  country?: string; serviceType?: string;
+  riskLevel?: string; status?: string;
+  contactName?: string; contactEmail?: string; contactPhone?: string;
+  description?: string;
+}
+export interface ScmOnboardingDto {
+  id: number; vendorId: number;
+  vendorNameEn?: string; vendorNameAr?: string;
+  currentStage: string; status: string;
+  completedStages?: string;
+  dueDate?: string; assignee?: string;
+}
+export interface ScmAssessmentDto {
+  id: number; vendorId: number;
+  vendorNameEn?: string; vendorNameAr?: string;
+  assessmentType?: string;
+  assessmentDate?: string; nextAssessmentDate?: string;
+  overallScore?: number; riskRating?: string;
+  status: string; findings?: string;
+}
+export interface ScmContractDto {
+  id: number; vendorId: number;
+  vendorNameEn?: string;
+  contractNumber: string; titleEn: string; titleAr?: string;
+  contractType?: string;
+  startDate?: string; endDate?: string;
+  autoRenewal?: boolean; contractValue?: number;
+  status?: string;
+}
+export const scmApi = {
+  vendors:       (page = 0, size = 50) => api.get<PageResponse<ScmVendorDto>>(`/api/v1/scm/vendors${pageQ(page, size)}`),
+  createVendor:  (body: ScmVendorRequest) => api.post<ScmVendorDto>('/api/v1/scm/vendors', body),
+  updateVendor:  (id: number, body: ScmVendorRequest) => api.put<ScmVendorDto>(`/api/v1/scm/vendors/${id}`, body),
+  deleteVendor:  (id: number) => api.delete<void>(`/api/v1/scm/vendors/${id}`),
+  onboarding:    (page = 0, size = 50) => api.get<PageResponse<ScmOnboardingDto>>(`/api/v1/scm/onboarding${pageQ(page, size)}`),
+  advanceOnboarding: (id: number) => api.post(`/api/v1/scm/onboarding/${id}/advance`),
+  approveOnboarding: (id: number) => api.post(`/api/v1/scm/onboarding/${id}/approve`),
+  assessments:   (page = 0, size = 50) => api.get<PageResponse<ScmAssessmentDto>>(`/api/v1/scm/assessments${pageQ(page, size)}`),
+  contracts:     (page = 0, size = 50) => api.get<PageResponse<ScmContractDto>>(`/api/v1/scm/contracts${pageQ(page, size)}`),
+  stats:         () => api.get<unknown>('/api/v1/scm/stats'),
+};
+
+// ─── Admin ──────────────────────────────────────────────────────────────────
+export interface AdminUserDto {
+  id: number; username: string; email: string;
+  fullNameEn?: string; fullNameAr?: string;
+  isActive: boolean; isLocked?: boolean;
+  roles: string[]; createdAt?: string; lastLoginAt?: string;
+}
+export interface AdminUserRequest {
+  username: string; email: string;
+  fullNameEn?: string; fullNameAr?: string;
+  password?: string;
+  roles?: string[];
+  isActive?: boolean;
+}
+export interface AdminRoleDto {
+  id: number; roleName: string;
+  displayNameEn?: string; displayNameAr?: string;
+  isSystemRole?: boolean; isActive?: boolean;
+}
+export const adminApi = {
+  users:         (page = 0, size = 50) => api.get<PageResponse<AdminUserDto>>(`/api/v1/admin/users${pageQ(page, size)}`),
+  createUser:    (body: AdminUserRequest) => api.post<AdminUserDto>('/api/v1/admin/users', body),
+  updateUser:    (id: number, body: AdminUserRequest) => api.put<AdminUserDto>(`/api/v1/admin/users/${id}`, body),
+  patchUser:     (id: number, body: Partial<AdminUserRequest>) => api.patch<AdminUserDto>(`/api/v1/admin/users/${id}`, body),
+  deleteUser:    (id: number) => api.delete<void>(`/api/v1/admin/users/${id}`),
+  roles:         () => api.get<AdminRoleDto[]>('/api/v1/admin/roles'),
+};

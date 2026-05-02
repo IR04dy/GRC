@@ -1,0 +1,145 @@
+/* TSS GRC Platform — shell layout (sidebar + topbar + page chrome).
+   Adapted from the design system's ui_kits/grc-platform/shell.css. */
+
+/* ─── Shell grid ─────────────────────────────────── */
+/* Same column template in both directions — direction:rtl on <html> flips the flow,
+   so the DOM-first child (the sidebar) lands on the right in RTL automatically. */
+.grc-shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh; background: var(--bg); color: var(--ink-1); }
+
+.grc-main { display: flex; flex-direction: column; min-width: 0; }
+
+/* ─── Sidebar ────────────────────────────────────── */
+.sb {
+  background: var(--sb-bg);
+  color: var(--sb-text);
+  padding: 14px 0;
+  overflow-y: auto;
+  border-right: 1px solid #0F1B19;
+}
+[dir="rtl"] .sb { border-right: none; border-left: 1px solid #0F1B19; }
+
+.sb-brand { display: flex; align-items: center; gap: 10px; padding: 6px 16px 16px; border-bottom: 1px solid var(--sb-border); }
+.sb-mark {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--primary-300), var(--accent-300));
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(46,158,158,.25), inset 0 1px 0 rgba(255,255,255,.2);
+}
+.sb-title { color: #fff; font-weight: 800; font-size: 13.5px; letter-spacing: -.2px; }
+.sb-sub   { color: var(--sb-text-3); font: 500 10px var(--font-mono); letter-spacing: .08em; margin-top: 2px; }
+
+.sb-section { font-weight: 800; font-size: 9px; color: var(--sb-text-3); letter-spacing: .14em; text-transform: uppercase; padding: 18px 18px 6px; }
+
+.sb-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 18px;
+  font-size: 13px;
+  color: var(--sb-text);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  position: relative;
+  border-left: 3px solid transparent;
+}
+[dir="rtl"] .sb-item { border-left: none; border-right: 3px solid transparent; }
+.sb-item:hover { background: var(--sb-hover-bg); color: #fff; }
+.sb-item.active {
+  background: var(--sb-active-bg);
+  color: var(--sb-active-fg);
+  font-weight: 600;
+  border-left-color: var(--accent-300);
+}
+[dir="rtl"] .sb-item.active { border-right-color: var(--accent-300); border-left-color: transparent; }
+
+/* ─── Topbar ─────────────────────────────────────── */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px;
+  height: var(--header-h);
+  flex-shrink: 0;
+}
+.topbar-title { font: 800 18px/1.1 var(--font-sans); color: var(--ink-1); letter-spacing: -.01em; margin: 0; }
+.topbar-sub   { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.search-box {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 7px 11px;
+  width: 320px;
+  transition: all var(--dur-fast);
+}
+.search-box:focus-within { border-color: var(--primary); box-shadow: var(--focus-ring); background: var(--surface); }
+.search-box svg { color: var(--ink-4); }
+.search-box input { border: none; background: transparent; outline: none; flex: 1; font: 500 13px var(--font-sans); color: var(--ink-1); }
+.search-box input::placeholder { color: var(--ink-4); }
+.search-box kbd {
+  font: 600 10px var(--font-mono);
+  background: var(--surface-3); color: var(--ink-3);
+  padding: 2px 6px; border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.icon-btn {
+  position: relative;
+  width: 38px; height: 38px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--dur-fast);
+}
+.icon-btn:hover { background: var(--primary-50); color: var(--primary); border-color: var(--primary-200); }
+.icon-btn .dot {
+  position: absolute; top: 8px; right: 9px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+}
+[dir="rtl"] .icon-btn .dot { right: auto; left: 9px; }
+
+.lang-toggle {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--primary-50); color: var(--primary-700);
+  border: 1px solid var(--primary-200);
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  font: 700 11px var(--font-sans);
+  letter-spacing: .04em;
+  transition: all var(--dur-fast);
+}
+.lang-toggle:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px var(--font-sans);
+  box-shadow: 0 2px 6px rgba(14,94,94,.2);
+}
+
+/* ─── Page chrome ────────────────────────────────── */
+.page { padding: 24px 28px; overflow-y: auto; height: calc(100vh - var(--header-h)); max-width: var(--content-max); width: 100%; }
+
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
+.eyebrow { font: 800 10px var(--font-mono); color: var(--primary); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; }
+.page-title { font: 800 26px/1.15 var(--font-sans); color: var(--ink-1); letter-spacing: -.02em; margin: 0; }
+.page-sub { font-size: 13px; color: var(--ink-3); margin: 6px 0 0; max-width: 600px; line-height: 1.5; }
+.page-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+/* ─── Grids ─────────────────────────────────────── */
+.kpi-grid     { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.dash-grid    { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 20px; }
+.modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+
+@media (max-width: 1100px) {
+  .dash-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,183 @@
+/* ============================================================
+   TSS GRC Platform — Design Tokens
+   Color, type, spacing, radius, shadow, motion.
+   "Eye-Comfort Enterprise" palette.
+   Lifted verbatim from the design system's colors_and_type.css.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ─── Color · Surface ─────────────────────────────── */
+  --bg:           #F2EEE6;
+  --surface:      #FAF8F4;
+  --surface-2:    #F5F1E9;
+  --surface-3:    #EFEAE0;
+  --border:       #E5DFD2;
+  --border-strong:#D6CEBC;
+
+  /* ─── Color · Ink ─────────────────────────────────── */
+  --ink-0: #FFFFFF;
+  --ink-1: #15201D;
+  --ink-2: #2E3A36;
+  --ink-3: #5C6A65;
+  --ink-4: #8C9690;
+  --ink-5: #B8C0BB;
+
+  /* ─── Color · Primary (deep teal-petrol) ──────────── */
+  --primary-50:  #E6F1F1;
+  --primary-100: #C7E1E1;
+  --primary-200: #97C6C6;
+  --primary-300: #5FA5A5;
+  --primary-400: #2E8888;
+  --primary-500: #0E5E5E;
+  --primary-600: #0B5050;
+  --primary-700: #094242;
+  --primary-800: #073535;
+  --primary-900: #052525;
+  --primary:        var(--primary-500);
+  --primary-hover:  var(--primary-600);
+  --primary-press:  var(--primary-700);
+  --primary-soft:   var(--primary-50);
+
+  /* ─── Color · Accent (warm sand-amber) ────────────── */
+  --accent-50:  #FBF3DD;
+  --accent-100: #F6E4B0;
+  --accent-200: #EFCE7A;
+  --accent-300: #E5B547;
+  --accent-400: #D6A22F;
+  --accent-500: #C8932A;
+  --accent-600: #A87A20;
+  --accent-700: #876019;
+  --accent:        var(--accent-500);
+  --accent-hover:  var(--accent-600);
+
+  /* ─── Color · Semantic ────────────────────────────── */
+  --success:    #3F8C5C;
+  --success-bg: #E6F0E9;
+  --success-fg: #235D3D;
+  --warning:    #C8932A;
+  --warning-bg: #FBF3DD;
+  --warning-fg: #876019;
+  --danger:     #C0413A;
+  --danger-bg:  #F8E5E2;
+  --danger-fg:  #7E2A25;
+  --info:       #5A7A8C;
+  --info-bg:    #E5ECEF;
+  --info-fg:    #36505D;
+  --neutral-bg: #ECE7DB;
+  --neutral-fg: #5C6A65;
+
+  /* ─── Color · Risk severity (heatmap) ─────────────── */
+  --risk-vlow:  #C8DDC8;
+  --risk-low:   #A6CCA6;
+  --risk-med:   #F0D58A;
+  --risk-high:  #E8A878;
+  --risk-vhigh: #D87560;
+  --risk-crit:  #B33C36;
+
+  /* ─── Color · Categorical (charts) ────────────────── */
+  --cat-1: #0E5E5E;
+  --cat-2: #C8932A;
+  --cat-3: #5A7A8C;
+  --cat-4: #8E5A7A;
+  --cat-5: #3F8C5C;
+  --cat-6: #B5663C;
+  --cat-7: #6A4E8E;
+  --cat-8: #C8B042;
+
+  /* ─── Color · Sidebar (dark warm-petrol) ──────────── */
+  --sb-bg:        #0B1F22;
+  --sb-bg-2:      #102A2E;
+  --sb-text:      #DCE6E4;
+  --sb-text-2:    #7E928F;
+  --sb-text-3:    #4A5C58;
+  --sb-active-bg: rgba(46,136,136,0.18);
+  --sb-active-fg: #FFFFFF;
+  --sb-hover-bg:  rgba(255,255,255,0.05);
+  --sb-border:    rgba(220,230,228,0.08);
+  --sb-accent:    var(--accent-300);
+
+  /* ─── Color · Hero / brand gradient ───────────────── */
+  --grad-hero:   linear-gradient(135deg, #073535 0%, #0E5E5E 55%, #2E8888 100%);
+  --grad-accent: linear-gradient(135deg, #C8932A 0%, #E5B547 100%);
+  --grad-aurora: radial-gradient(circle at 85% 12%, rgba(229,181,71,0.18), transparent 55%);
+
+  /* ─── Type ────────────────────────────────────────── */
+  --font-sans-latin: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans-ar:    "IBM Plex Sans Arabic", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans:       "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono:       "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-2xs: 11px;
+  --text-xs:  12px;
+  --text-sm:  13px;
+  --text-md:  14px;
+  --text-lg:  16px;
+  --text-xl:  19px;
+  --text-2xl: 23px;
+  --text-3xl: 28px;
+  --text-4xl: 34px;
+  --text-5xl: 41px;
+
+  --leading-tight:  1.2;
+  --leading-snug:   1.35;
+  --leading-normal: 1.5;
+  --leading-loose:  1.7;
+
+  --tracking-tight:  -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+  --tracking-mono:   0.01em;
+
+  /* ─── Spacing (4px base) ──────────────────────────── */
+  --sp-0:  0;
+  --sp-1:  2px;
+  --sp-2:  4px;
+  --sp-3:  6px;
+  --sp-4:  8px;
+  --sp-5:  12px;
+  --sp-6:  16px;
+  --sp-7:  20px;
+  --sp-8:  24px;
+  --sp-9:  32px;
+  --sp-10: 40px;
+  --sp-11: 56px;
+  --sp-12: 72px;
+
+  /* ─── Radius ──────────────────────────────────────── */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   8px;
+  --r-lg:   12px;
+  --r-xl:   14px;
+  --r-2xl:  20px;
+  --r-pill: 999px;
+
+  /* ─── Shadows ─────────────────────────────────────── */
+  --shadow-1: 0 1px 2px rgba(21,32,29,.04), 0 4px 12px rgba(21,32,29,.04);
+  --shadow-2: 0 4px 16px rgba(21,32,29,.06), 0 2px 4px rgba(21,32,29,.04);
+  --shadow-3: 0 16px 48px rgba(21,32,29,.16), 0 4px 12px rgba(21,32,29,.06);
+  --shadow-inset: inset 0 1px 2px rgba(21,32,29,.05);
+  --focus-ring: 0 0 0 3px color-mix(in oklab, var(--primary) 22%, transparent);
+  --focus-ring-accent: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent);
+
+  /* ─── Motion ──────────────────────────────────────── */
+  --dur-micro:   120ms;
+  --dur-fast:    180ms;
+  --dur-normal:  220ms;
+  --dur-slow:    320ms;
+  --ease-standard: cubic-bezier(.4, 0, .2, 1);
+  --ease-spring:   cubic-bezier(.2, .8, .2, 1);
+  --ease-out:      cubic-bezier(.16, 1, .3, 1);
+
+  /* ─── Layout ──────────────────────────────────────── */
+  --sidebar-w:   280px;
+  --header-h:    64px;
+  --content-max: 1440px;
+}
+
+/* RTL switches font stack */
+[dir="rtl"] {
+  --font-sans: "IBM Plex Sans Arabic", "Plus Jakarta Sans", system-ui, sans-serif;
+}
