@@ -345,6 +345,17 @@ export const ar = {
   evidenceTabRequests: 'الطلبات',
   evidenceTabReview: 'المراجعة',
   evidenceTabExpired: 'المنتهية',
+  evidenceTabFrameworks: 'الأُطر',
+  evidenceTabConnectors: 'الموصلات',
+
+  // الأدلة v2 — مصفوفة الضوابط + الموصلات + تاريخ الإصدارات
+  evidenceVersionHistory: 'تاريخ الإصدارات',
+  evidenceVersionsTitle:  'سجل إصدارات الدليل',
+  evidenceVersionsSub:    'استبدال ملف الدليل يُنشئ إصداراً جديداً. تُحفظ الإصدارات السابقة للقراءة فقط وتُكوّن سلسلة تجزئة WORM لكل دليل.',
+  evidenceSnapshotNew:    'إصدار نسخة جديدة',
+  evidenceConnRun:        'تشغيل الآن',
+  evidenceConnEnable:     'تفعيل',
+  evidenceConnDisable:    'تعطيل',
   evidenceTitleCol: 'العنوان',
   evidenceTypeCol: 'النوع',
   evidenceFrameworkCol: 'الإطار',

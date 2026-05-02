@@ -351,6 +351,17 @@ export const en = {
   evidenceKpiApproved: 'Approved %',
   evidenceTabCatalog: 'Catalog',
   evidenceTabRequests: 'Requests',
+  evidenceTabFrameworks: 'Frameworks',
+  evidenceTabConnectors: 'Connectors',
+
+  // Evidence v2 — control-anchored matrix + connectors + version history
+  evidenceVersionHistory: 'Version History',
+  evidenceVersionsTitle:  'Evidence version history',
+  evidenceVersionsSub:    'Replacing an evidence file produces a new version row. Previous versions are retained read-only and form a per-evidence WORM hash chain.',
+  evidenceSnapshotNew:    'Snapshot New Version',
+  evidenceConnRun:        'Run Now',
+  evidenceConnEnable:     'Enable',
+  evidenceConnDisable:    'Disable',
   evidenceTabReview: 'Review',
   evidenceTabExpired: 'Expired',
   evidenceTitleCol: 'Title',

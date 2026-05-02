@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { Files, Inbox, CalendarX, BadgeCheck, Filter, Download, Plus, BarChart3, FileText, Send, ClipboardCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  Files, Inbox, CalendarX, BadgeCheck, Filter, Download, Plus, BarChart3, FileText, Send, ClipboardCheck,
+  Layers, Plug, ChevronDown, ChevronRight, History, Power, Zap,
+} from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -16,11 +19,26 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
-import { evidenceApi, ApiError, type EvidenceItemDto, type EvidenceItemRequest, type EvidenceRequestDto, type EvidenceReviewDto } from '../../lib/api';
+import {
+  evidenceApi, ApiError,
+  type EvidenceItemDto, type EvidenceItemRequest,
+  type EvidenceRequestDto, type EvidenceReviewDto,
+  type FrameworkBlock, type SubControlBlock,
+  type ConnectorDefinitionDto, type EvidenceVersionDto,
+} from '../../lib/api';
+import { Modal } from '../../components/ui/Modal';
+import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { EVIDENCE } from './mockEvidence';
 
-type TabId = 'overview' | 'catalog' | 'requests' | 'review' | 'expired';
+type TabId = 'overview' | 'frameworks' | 'connectors' | 'catalog' | 'requests' | 'review' | 'expired';
+
+const FRESHNESS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  GREEN: 'success', AMBER: 'warning', RED: 'danger', GREY: 'neutral',
+};
+const CONNECTOR_STATUS_TONE: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {
+  AVAILABLE: 'info', CONFIGURED: 'warning', RUNNING: 'success', DISABLED: 'neutral',
+};
 
 const TYPE_OPTIONS = [
   { value: 'POLICY', label: 'Policy' }, { value: 'SCREENSHOT', label: 'Screenshot' },
@@ -55,6 +73,77 @@ export function EvidencePage() {
   const requests = useApiList<EvidenceRequestDto>(() => evidenceApi.requests(0, 100), []);
   const reviews  = useApiList<EvidenceReviewDto>(()  => evidenceApi.reviews(0, 100),  []);
 
+  // ── Matrix (frameworks → controls → sub-controls), Connectors, Version history ──
+  const [matrix, setMatrix] = useState<FrameworkBlock[]>([]);
+  const [matrixLoading, setMatrixLoading] = useState(false);
+  const [activeFrameworkId, setActiveFrameworkId] = useState<number | null>(null);
+  const [expandedControlIds, setExpandedControlIds] = useState<Set<number>>(new Set());
+  const [connectors, setConnectors] = useState<ConnectorDefinitionDto[]>([]);
+  const [connectorsLoading, setConnectorsLoading] = useState(false);
+  const [versionsModal, setVersionsModal] = useState<{ item: EvidenceItemDto; versions: EvidenceVersionDto[] } | null>(null);
+
+  function loadMatrix() {
+    if (!isAuthenticated()) return;
+    setMatrixLoading(true);
+    evidenceApi.matrix()
+      .then(rows => {
+        setMatrix(rows);
+        if (rows.length > 0 && activeFrameworkId == null) setActiveFrameworkId(rows[0].frameworkId);
+      })
+      .catch(() => setMatrix([]))
+      .finally(() => setMatrixLoading(false));
+  }
+  function loadConnectors() {
+    if (!isAuthenticated()) return;
+    setConnectorsLoading(true);
+    evidenceApi.connectors()
+      .then(setConnectors)
+      .catch(() => setConnectors([]))
+      .finally(() => setConnectorsLoading(false));
+  }
+  // Lazy-load each tab's data on first activation.
+  useEffect(() => { if (tab === 'frameworks' && matrix.length === 0 && !matrixLoading) loadMatrix(); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab === 'connectors' && connectors.length === 0 && !connectorsLoading) loadConnectors(); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleControl(id: number) {
+    setExpandedControlIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  async function openVersions(item: EvidenceItemDto) {
+    try {
+      const versions = await evidenceApi.versions(item.id);
+      setVersionsModal({ item, versions });
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Could not load versions'); }
+  }
+  async function snapshotVersion(itemId: number) {
+    const summary = window.prompt('Change summary?', '') ?? '';
+    if (!summary.trim()) return;
+    try {
+      await evidenceApi.snapshot(itemId, summary);
+      toast.success('Snapshot recorded');
+      const versions = await evidenceApi.versions(itemId);
+      setVersionsModal(prev => prev ? { ...prev, versions } : null);
+      items.reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Snapshot failed'); }
+  }
+  async function runConnector(c: ConnectorDefinitionDto) {
+    try {
+      const updated = await evidenceApi.runConnector(c.id);
+      toast.success(`Connector "${c.code}" run recorded`);
+      setConnectors(prev => prev.map(x => x.id === updated.id ? updated : x));
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Run failed'); }
+  }
+  async function toggleConnectorStatus(c: ConnectorDefinitionDto) {
+    const next = c.status === 'DISABLED' ? 'AVAILABLE' : 'DISABLED';
+    try {
+      const updated = await evidenceApi.setConnectorStatus(c.id, next);
+      setConnectors(prev => prev.map(x => x.id === updated.id ? updated : x));
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Status change failed'); }
+  }
+
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'titleEn',         label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 200, span: 8 },
     { kind: 'select', key: 'evidenceType',  label: t('cyberFldEvidenceType') + ' *', options: TYPE_OPTIONS, required: true, span: 4 },
@@ -66,12 +155,16 @@ export function EvidencePage() {
   ];
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'overview', label: t('tabOverview') },
-    { id: 'catalog',  label: t('evidenceTabCatalog') },
-    { id: 'requests', label: t('evidenceTabRequests') },
-    { id: 'review',   label: t('evidenceTabReview') },
-    { id: 'expired',  label: t('evidenceTabExpired') },
+    { id: 'overview',   label: t('tabOverview') },
+    { id: 'frameworks', label: t('evidenceTabFrameworks') },
+    { id: 'connectors', label: t('evidenceTabConnectors') },
+    { id: 'catalog',    label: t('evidenceTabCatalog') },
+    { id: 'requests',   label: t('evidenceTabRequests') },
+    { id: 'review',     label: t('evidenceTabReview') },
+    { id: 'expired',    label: t('evidenceTabExpired') },
   ];
+
+  const activeFramework = matrix.find(f => f.frameworkId === activeFrameworkId) ?? matrix[0];
 
   const itemCols: Column<EvidenceItemDto>[] = [
     { header: t('colCode'),      cell: r => r.evidenceCode, mono: true },
@@ -80,8 +173,13 @@ export function EvidencePage() {
     { header: t('colFramework'), cell: r => <Badge tone="primary">{r.frameworkCode ?? '—'}</Badge> },
     { header: t('colExpiry'),    cell: r => <span className="mono">{r.expiryDate ?? '—'}</span> },
     { header: t('colStatus'),    cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
-    { header: '',                align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+    { header: '', align: 'end', width: '120px',
+      cell: r => (
+        <RowActions
+          extras={[{ Icon: History, onClick: () => openVersions(r), title: t('evidenceVersionHistory'), tone: 'primary' }]}
+          onEdit={() => { setEditing(r); setOpen(true); }}
+          onDelete={() => setConfirmDel(r)} />
+      ) },
   ];
 
   const reqCols: Column<EvidenceRequestDto>[] = [
@@ -169,6 +267,147 @@ export function EvidencePage() {
           </Card>
         </div>
       )}
+      {/* ── Frameworks tab — control/sub-control as prime key, framework as tab ── */}
+      {tab === 'frameworks' && (
+        <>
+          {matrixLoading
+            ? <LoadingRow />
+            : matrix.length === 0
+              ? <EmptyState Icon={Layers} title="No frameworks loaded" sub="Frameworks live in the evidence schema; seed data ships with NCA ECC, NCA CCC, NCA DCC and others." />
+              : (
+                <>
+                  {/* Framework selector tabs (sub-tabs) */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 0 16px' }}>
+                    {matrix.map(fw => (
+                      <button key={fw.frameworkId}
+                        onClick={() => setActiveFrameworkId(fw.frameworkId)}
+                        style={{
+                          padding: '6px 14px', borderRadius: 'var(--r-pill)',
+                          fontSize: 13, fontWeight: 600,
+                          background: fw.frameworkId === (activeFramework?.frameworkId ?? -1) ? 'var(--primary)' : 'var(--surface-2)',
+                          color:      fw.frameworkId === (activeFramework?.frameworkId ?? -1) ? 'var(--ink-on-primary)' : 'var(--ink-1)',
+                          border: '1px solid var(--border)', cursor: 'pointer',
+                        }}>
+                        {fw.code} <span style={{ opacity: 0.7, fontWeight: 400 }}>· {fw.controlCount}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {activeFramework && (
+                    <Card padded={false}>
+                      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{activeFramework.nameEn}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                          {activeFramework.issuer} · v{activeFramework.version} · {activeFramework.controlCount} controls · {activeFramework.evidenceCount} evidence items
+                        </div>
+                      </div>
+                      <div style={{ padding: 0 }}>
+                        {activeFramework.controls.map(ctrl => {
+                          const isExpanded = expandedControlIds.has(ctrl.controlId);
+                          return (
+                            <div key={ctrl.controlId} style={{ borderBottom: '1px solid var(--border)' }}>
+                              <button onClick={() => toggleControl(ctrl.controlId)}
+                                style={{
+                                  width: '100%', padding: '12px 16px', display: 'flex',
+                                  justifyContent: 'space-between', alignItems: 'center', gap: 12,
+                                  background: 'var(--surface)', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                }}>
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                  <span className="mono" style={{ fontWeight: 700, fontSize: 13 }}>{ctrl.controlCode}</span>
+                                  <span style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ctrl.nameEn}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  <Badge tone="info">{ctrl.evidenceCount} evidence</Badge>
+                                  <Badge tone={FRESHNESS_TONE[ctrl.freshness]} dot>{ctrl.freshness}</Badge>
+                                </div>
+                              </button>
+                              {isExpanded && (
+                                <div style={{ padding: '0 16px 12px 38px', background: 'var(--surface-2)' }}>
+                                  {ctrl.subControls.length === 0 && (
+                                    <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>No sub-controls catalogued for this control.</div>
+                                  )}
+                                  {ctrl.subControls.map((sub: SubControlBlock) => (
+                                    <div key={sub.subControlId} style={{
+                                      display: 'grid', gridTemplateColumns: '120px 1fr auto auto auto',
+                                      gap: 10, padding: '10px 12px', borderBottom: '1px dashed var(--border)',
+                                      alignItems: 'center', fontSize: 12,
+                                    }}>
+                                      <span className="mono" style={{ fontWeight: 600 }}>{sub.subControlCode}</span>
+                                      <div>
+                                        <div style={{ fontWeight: 500 }}>{sub.nameEn}</div>
+                                        {sub.evidenceGuidance && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{sub.evidenceGuidance.slice(0, 120)}</div>}
+                                      </div>
+                                      <Badge tone="info">{sub.evidenceCount} ev</Badge>
+                                      <Badge tone={FRESHNESS_TONE[sub.freshness]} dot>{sub.freshness}</Badge>
+                                      <span style={{ fontSize: 11, color: 'var(--ink-3)' }} className="mono">
+                                        {sub.freshestExpiry ? `expires ${sub.freshestExpiry}` : '—'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Card>
+                  )}
+                </>
+              )}
+        </>
+      )}
+
+      {/* ── Connectors tab — connector library MVP ── */}
+      {tab === 'connectors' && (
+        <Card padded={false}>
+          {connectorsLoading
+            ? <LoadingRow />
+            : connectors.length === 0
+              ? <EmptyState Icon={Plug} title="No connectors registered" sub="Connectors automate evidence collection from source systems (AD, Defender, AWS Config, NCA HEY, etc.)." />
+              : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {connectors.map(c => (
+                    <div key={c.id} style={{
+                      display: 'grid', gridTemplateColumns: '1fr auto auto auto',
+                      gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--border)',
+                      alignItems: 'center', background: 'var(--surface)',
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          {c.nameEn} <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>· {c.vendor}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                          <Badge tone="neutral">{c.connectorType.replace(/_/g, ' ')}</Badge>
+                          {c.targetFrameworks && <span style={{ marginLeft: 8 }}>Frameworks: <span className="mono">{c.targetFrameworks}</span></span>}
+                        </div>
+                        {c.collectionPlanEn && (
+                          <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, maxWidth: 720 }}>
+                            {c.collectionPlanEn.slice(0, 240)}{c.collectionPlanEn.length > 240 ? '…' : ''}
+                          </div>
+                        )}
+                        {c.lastRunAt && (
+                          <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4 }} className="mono">
+                            Last run: {c.lastRunAt.slice(0, 16).replace('T', ' ')} · status {c.lastRunStatus} · {c.evidenceCollectedCount} evidence collected
+                          </div>
+                        )}
+                      </div>
+                      <Badge tone={CONNECTOR_STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status}</Badge>
+                      <Button size="sm" variant="ghost" Icon={c.status === 'DISABLED' ? Power : Power}
+                        onClick={() => toggleConnectorStatus(c)}>
+                        {c.status === 'DISABLED' ? t('evidenceConnEnable') : t('evidenceConnDisable')}
+                      </Button>
+                      <Button size="sm" variant="primary" Icon={Zap}
+                        onClick={() => runConnector(c)}>
+                        {t('evidenceConnRun')}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+        </Card>
+      )}
+
       {tab === 'catalog' && (
         <Card padded={false}>
           {items.loading ? <LoadingRow /> : <DataTable columns={itemCols} rows={items.data} empty={<EmptyState />} />}
@@ -207,6 +446,50 @@ export function EvidencePage() {
         confirmLabel="Delete"
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
       />
+
+      {/* ── Version history modal (assessment §5.9 #1) ── */}
+      <Modal
+        open={!!versionsModal}
+        title={versionsModal ? `${t('evidenceVersionsTitle')} · ${versionsModal.item.evidenceCode}` : ''}
+        size="lg"
+        onClose={() => setVersionsModal(null)}
+        footer={
+          versionsModal && (
+            <Button variant="primary" Icon={History} onClick={() => snapshotVersion(versionsModal.item.id)}>
+              {t('evidenceSnapshotNew')}
+            </Button>
+          )
+        }
+      >
+        {versionsModal && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ fontSize: 12, color: 'var(--ink-3)', margin: 0 }}>{t('evidenceVersionsSub')}</p>
+            {versionsModal.versions.length === 0
+              ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>No prior versions on file.</div>
+              : versionsModal.versions.map(v => (
+                <div key={v.id} style={{
+                  display: 'grid', gridTemplateColumns: '60px 1fr auto', gap: 12,
+                  padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                  background: 'var(--surface-2)',
+                }}>
+                  <span className="mono" style={{ fontWeight: 700, fontSize: 14 }}>v{v.versionNo}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{v.titleEn ?? '—'}</div>
+                    {v.changeSummary && <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 2 }}>{v.changeSummary}</div>}
+                    {v.evidenceHash && (
+                      <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        sha: {v.evidenceHash.slice(0, 24)}…
+                      </div>
+                    )}
+                  </div>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    {v.snapshottedAt ? v.snapshottedAt.slice(0, 16).replace('T', ' ') : '—'}
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
+      </Modal>
     </Shell>
   );
 }

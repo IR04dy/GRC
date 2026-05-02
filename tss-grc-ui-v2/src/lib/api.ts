@@ -751,6 +751,51 @@ export interface EvidenceReviewDto {
   reviewerName?: string; reviewDate?: string;
   result?: string; notesEn?: string;
 }
+// Cross-framework matrix view (assessment §5.9 — control/sub-control as prime key, framework as tab)
+export interface SubControlBlock {
+  subControlId: number; subControlCode: string;
+  nameEn: string; nameAr?: string; evidenceGuidance?: string;
+  evidenceCount: number; freshestExpiry?: string;
+  freshness: 'GREEN' | 'AMBER' | 'RED' | 'GREY';
+  methodMix: Record<string, number>;
+}
+export interface ControlBlock {
+  controlId: number; controlCode: string;
+  nameEn: string; nameAr?: string; descriptionEn?: string;
+  evidenceCount: number; freshestExpiry?: string;
+  freshness: 'GREEN' | 'AMBER' | 'RED' | 'GREY';
+  subControls: SubControlBlock[];
+}
+export interface FrameworkBlock {
+  frameworkId: number; code: string;
+  nameEn: string; nameAr?: string;
+  version?: string; issuer?: string;
+  controls: ControlBlock[];
+  controlCount: number; evidenceCount: number;
+}
+
+// Version history (assessment §5.9 #1)
+export interface EvidenceVersionDto {
+  id: number; evidenceId: number; versionNo: number;
+  titleEn?: string; titleAr?: string; descriptionEn?: string;
+  evidenceHash?: string; previousHash?: string;
+  fileName?: string; fileSize?: number;
+  changeSummary?: string;
+  snapshottedAt: string; snapshottedBy?: number;
+}
+
+// Connector library (assessment §5.9 #2)
+export interface ConnectorDefinitionDto {
+  id: number; code: string;
+  nameEn: string; nameAr?: string;
+  connectorType: string; vendor?: string;
+  descriptionEn?: string; collectionPlanEn?: string;
+  targetFrameworks?: string;
+  status: 'AVAILABLE' | 'CONFIGURED' | 'RUNNING' | 'DISABLED';
+  lastRunAt?: string; lastRunStatus?: string; lastRunSummary?: string;
+  evidenceCollectedCount: number;
+}
+
 export const evidenceApi = {
   items:        (page = 0, size = 50) => api.get<PageResponse<EvidenceItemDto>>(`/api/v1/evidence/items${pageQ(page, size)}`),
   createItem:   (body: EvidenceItemRequest) => api.post<EvidenceItemDto>('/api/v1/evidence/items', body),
@@ -762,6 +807,15 @@ export const evidenceApi = {
   expired:      () => api.get<PageResponse<EvidenceItemDto>>('/api/v1/evidence/items/expired'),
   requests:     (page = 0, size = 50) => api.get<PageResponse<EvidenceRequestDto>>(`/api/v1/evidence/requests${pageQ(page, size)}`),
   reviews:      (page = 0, size = 50) => api.get<PageResponse<EvidenceReviewDto>>(`/api/v1/evidence/reviews${pageQ(page, size)}`),
+  // Cross-framework matrix + version history + connectors (assessment §5.9)
+  matrix:       () => api.get<FrameworkBlock[]>('/api/v1/evidence/matrix'),
+  versions:     (id: number) => api.get<EvidenceVersionDto[]>(`/api/v1/evidence/items/${id}/versions`),
+  snapshot:     (id: number, changeSummary: string, evidenceHash?: string) =>
+                  api.post<EvidenceVersionDto>(`/api/v1/evidence/items/${id}/snapshot`, { changeSummary, evidenceHash }),
+  connectors:   () => api.get<ConnectorDefinitionDto[]>('/api/v1/evidence/connectors'),
+  setConnectorStatus: (id: number, status: string) =>
+                  api.post<ConnectorDefinitionDto>(`/api/v1/evidence/connectors/${id}/status`, { status }),
+  runConnector: (id: number) => api.post<ConnectorDefinitionDto>(`/api/v1/evidence/connectors/${id}/run`),
 };
 
 // ─── SCM ────────────────────────────────────────────────────────────────────
