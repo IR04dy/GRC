@@ -38,6 +38,11 @@ import { SUPPLIERS } from './mockScm';
 type TabId = 'overview' | 'suppliers' | 'onboarding' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
 
 // ── Static option lists ───────────────────────────────────────────────────
+// IMPORTANT: every option `value` below is constrained at the DB level by a
+// CHECK constraint. The canonical allowed sets are documented at the top of
+// `tss-grc-backend/src/main/resources/db/seed/V_scm_seed.sql`. Do not add new
+// values here without first migrating the CHECK constraint, or POSTs will be
+// rejected by SQL Server with a 500.
 const ONBOARDING_STAGES = [
   { id: 'REGISTRATION',               label: 'Registration' },
   { id: 'CRITICALITY_CLASSIFICATION', label: 'Classification' },
@@ -47,15 +52,16 @@ const ONBOARDING_STAGES = [
   { id: 'APPROVAL',                   label: 'Approval' },
 ];
 const STAGE_OPTIONS = ONBOARDING_STAGES.map(s => ({ value: s.id, label: s.label }));
+
+// vendor.category ∈ {IT_SERVICES, LOGISTICS, MANUFACTURING, FINANCIAL, UTILITIES, CONSULTING, OTHER}
 const CATEGORY_OPTIONS = [
-  { value: 'IT_SERVICES',           label: 'IT Services' },
-  { value: 'HARDWARE',              label: 'Hardware' },
-  { value: 'SAAS',                  label: 'SaaS' },
-  { value: 'LOGISTICS',             label: 'Logistics' },
-  { value: 'PROFESSIONAL_SERVICES', label: 'Professional Services' },
-  { value: 'MANUFACTURING',         label: 'Manufacturing' },
-  { value: 'TELECOM',               label: 'Telecom' },
-  { value: 'FACILITIES',            label: 'Facilities' },
+  { value: 'IT_SERVICES',   label: 'IT Services' },
+  { value: 'LOGISTICS',     label: 'Logistics' },
+  { value: 'MANUFACTURING', label: 'Manufacturing' },
+  { value: 'FINANCIAL',     label: 'Financial Services' },
+  { value: 'UTILITIES',     label: 'Utilities' },
+  { value: 'CONSULTING',    label: 'Consulting' },
+  { value: 'OTHER',         label: 'Other' },
 ];
 const CRITICALITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' },
@@ -63,75 +69,86 @@ const CRITICALITY_OPTIONS = [
   { value: 'MEDIUM',   label: 'Medium' },
   { value: 'LOW',      label: 'Low' },
 ];
+// vendor.status ∈ {ACTIVE, INACTIVE, BLACKLISTED, UNDER_REVIEW, EXITED}
 const STATUS_OPTIONS = [
   { value: 'ACTIVE',       label: 'Active' },
-  { value: 'PENDING',      label: 'Pending' },
+  { value: 'INACTIVE',     label: 'Inactive' },
   { value: 'UNDER_REVIEW', label: 'Under Review' },
-  { value: 'SUSPENDED',    label: 'Suspended' },
-  { value: 'CLOSED',       label: 'Closed' },
+  { value: 'BLACKLISTED',  label: 'Blacklisted' },
+  { value: 'EXITED',       label: 'Exited' },
 ];
+// dep.status ∈ {ACTIVE, INACTIVE, AT_RISK} — narrower than vendor.status
+const DEP_STATUS_OPTIONS = [
+  { value: 'ACTIVE',   label: 'Active' },
+  { value: 'INACTIVE', label: 'Inactive' },
+  { value: 'AT_RISK',  label: 'At Risk' },
+];
+// onboarding.status ∈ {IN_PROGRESS, COMPLETED, REJECTED, ON_HOLD}
 const ONB_STATUS_OPTIONS = [
   { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'APPROVED',    label: 'Approved' },
+  { value: 'COMPLETED',   label: 'Completed' },
   { value: 'REJECTED',    label: 'Rejected' },
+  { value: 'ON_HOLD',     label: 'On Hold' },
 ];
+// assess.type ∈ {INITIAL, PERIODIC, TRIGGERED}
 const ASSESSMENT_TYPE_OPTIONS = [
-  { value: 'INITIAL',  label: 'Initial' },
-  { value: 'PERIODIC', label: 'Periodic' },
-  { value: 'EVENT_TRIGGERED', label: 'Event-triggered' },
-  { value: 'EXIT',     label: 'Exit' },
+  { value: 'INITIAL',   label: 'Initial' },
+  { value: 'PERIODIC',  label: 'Periodic' },
+  { value: 'TRIGGERED', label: 'Event-triggered' },
 ];
+// assess.status ∈ {PLANNED, IN_PROGRESS, COMPLETED, ESCALATED}
 const ASSESS_STATUS_OPTIONS = [
-  { value: 'DRAFT',     label: 'Draft' },
-  { value: 'IN_REVIEW', label: 'In Review' },
-  { value: 'APPROVED',  label: 'Approved' },
-  { value: 'CLOSED',    label: 'Closed' },
+  { value: 'PLANNED',     label: 'Planned' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'COMPLETED',   label: 'Completed' },
+  { value: 'ESCALATED',   label: 'Escalated' },
 ];
+// dep.type ∈ {CRITICAL, NON_CRITICAL, SHARED, EXCLUSIVE}
 const DEPENDENCY_TYPE_OPTIONS = [
-  { value: 'IT_SERVICE',    label: 'IT Service' },
-  { value: 'CRITICAL_DATA', label: 'Critical Data' },
-  { value: 'PHYSICAL_GOOD', label: 'Physical Good' },
-  { value: 'PROFESSIONAL',  label: 'Professional Service' },
-  { value: 'INFRASTRUCTURE', label: 'Infrastructure' },
+  { value: 'CRITICAL',     label: 'Critical' },
+  { value: 'NON_CRITICAL', label: 'Non-Critical' },
+  { value: 'SHARED',       label: 'Shared' },
+  { value: 'EXCLUSIVE',    label: 'Exclusive' },
 ];
 const DEPENDENCY_LEVEL_OPTIONS = CRITICALITY_OPTIONS;
+// contract.type ∈ {SERVICE, SUPPLY, NDA, FRAMEWORK, OTHER}
 const CONTRACT_TYPE_OPTIONS = [
-  { value: 'MASTER_AGREEMENT', label: 'Master Agreement' },
-  { value: 'SOW',              label: 'Statement of Work' },
-  { value: 'NDA',              label: 'NDA' },
-  { value: 'DPA',              label: 'Data Processing Agreement' },
-  { value: 'SLA',              label: 'Service Level Agreement' },
-  { value: 'PURCHASE_ORDER',   label: 'Purchase Order' },
+  { value: 'SERVICE',   label: 'Service Agreement' },
+  { value: 'SUPPLY',    label: 'Supply Agreement' },
+  { value: 'NDA',       label: 'NDA' },
+  { value: 'FRAMEWORK', label: 'Framework Agreement' },
+  { value: 'OTHER',     label: 'Other' },
 ];
+// contract.status ∈ {ACTIVE, EXPIRED, TERMINATED, DRAFT, UNDER_REVIEW}
 const CONTRACT_STATUS_OPTIONS = [
-  { value: 'ACTIVE',      label: 'Active' },
-  { value: 'EXPIRED',     label: 'Expired' },
-  { value: 'TERMINATED',  label: 'Terminated' },
-  { value: 'IN_RENEWAL',  label: 'In Renewal' },
+  { value: 'ACTIVE',       label: 'Active' },
+  { value: 'DRAFT',        label: 'Draft' },
+  { value: 'UNDER_REVIEW', label: 'Under Review' },
+  { value: 'EXPIRED',      label: 'Expired' },
+  { value: 'TERMINATED',   label: 'Terminated' },
 ];
 const CURRENCY_OPTIONS = [
   { value: 'SAR', label: 'SAR' }, { value: 'USD', label: 'USD' },
   { value: 'EUR', label: 'EUR' }, { value: 'AED', label: 'AED' },
 ];
+// inc.type ∈ {SERVICE_DISRUPTION, BREACH, DELAY, QUALITY, SLA_BREACH, OTHER}
 const INCIDENT_TYPE_OPTIONS = [
-  { value: 'OUTAGE',           label: 'Service Outage' },
-  { value: 'SLA_BREACH',       label: 'SLA Breach' },
-  { value: 'QUALITY',          label: 'Quality Defect' },
-  { value: 'DELIVERY',         label: 'Delivery Delay' },
-  { value: 'SECURITY',         label: 'Security Incident' },
-  { value: 'COMPLIANCE',       label: 'Compliance Breach' },
-  { value: 'FINANCIAL_DISTRESS', label: 'Financial Distress' },
-  { value: 'OTHER',            label: 'Other' },
+  { value: 'SERVICE_DISRUPTION', label: 'Service Disruption' },
+  { value: 'BREACH',             label: 'Breach' },
+  { value: 'DELAY',              label: 'Delay' },
+  { value: 'QUALITY',            label: 'Quality Defect' },
+  { value: 'SLA_BREACH',         label: 'SLA Breach' },
+  { value: 'OTHER',              label: 'Other' },
 ];
 
 const RISK_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success'> = {
   CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'info', LOW: 'success',
 };
 
-// ── Empty defaults ─────────────────────────────────────────────────────────
+// ── Empty defaults (every default value must satisfy the matching DB CHECK) ─
 const SUPPLIER_EMPTY: ScmVendorRequest = {
   nameEn: '', nameAr: '', category: 'IT_SERVICES', criticality: 'MEDIUM',
-  country: 'Saudi Arabia', serviceType: '', riskLevel: 'MEDIUM', status: 'PENDING',
+  country: 'Saudi Arabia', serviceType: '', riskLevel: 'MEDIUM', status: 'ACTIVE',
   contactName: '', contactEmail: '', contactPhone: '',
   registrationNumber: '', website: '', description: '',
 };
@@ -141,23 +158,23 @@ const ONBOARDING_EMPTY: ScmOnboardingRequest = {
 };
 const ASSESSMENT_EMPTY: ScmAssessmentRequest = {
   vendorId: 0, assessmentType: 'INITIAL', assessmentDate: '', nextAssessmentDate: '',
-  overallScore: null, riskRating: 'MEDIUM', status: 'DRAFT',
+  overallScore: null, riskRating: 'MEDIUM', status: 'PLANNED',
   findings: '', recommendations: '',
 };
 const DEPENDENCY_EMPTY: ScmDependencyRequest = {
   serviceNameEn: '', serviceNameAr: '', assetName: '',
-  vendorId: null, dependencyType: 'IT_SERVICE', dependencyLevel: 'MEDIUM',
+  vendorId: null, dependencyType: 'CRITICAL', dependencyLevel: 'MEDIUM',
   hasAlternative: false, alternativeVendorId: null,
   status: 'ACTIVE', impactAnalysis: '',
 };
 const CONTRACT_EMPTY: ScmContractRequest = {
   vendorId: 0, contractNumber: '', titleEn: '', titleAr: '',
-  contractType: 'MASTER_AGREEMENT', startDate: '', endDate: '',
+  contractType: 'SERVICE', startDate: '', endDate: '',
   autoRenewal: false, contractValue: null, currency: 'SAR',
   status: 'ACTIVE', notes: '',
 };
 const INCIDENT_EMPTY: ScmIncidentRequest = {
-  vendorId: 0, incidentType: 'OUTAGE', impact: 'MEDIUM',
+  vendorId: 0, incidentType: 'SERVICE_DISRUPTION', impact: 'MEDIUM',
   description: '', slaBreached: false, assignedToId: null,
 };
 
@@ -297,7 +314,7 @@ export function ScmPage() {
     { kind: 'select', key: 'hasAlternative',    label: t('scmFldHasAlternative'),
       options: [{ value: 'false', label: t('selectNone') }, { value: 'true', label: 'Yes' }], span: 6 },
     { kind: 'select', key: 'alternativeVendorId', label: t('scmFldAlternativeVendor'), options: supplierOptions, span: 6 },
-    { kind: 'select', key: 'status',            label: t('fldStatusLbl'), options: STATUS_OPTIONS, span: 6 },
+    { kind: 'select', key: 'status',            label: t('fldStatusLbl'), options: DEP_STATUS_OPTIONS, span: 6 },
     { kind: 'textarea', key: 'impactAnalysis',  label: t('scmFldImpactAnalysis'), rows: 3, span: 12 },
   ];
   const CONTRACT_FIELDS: FieldDef[] = [

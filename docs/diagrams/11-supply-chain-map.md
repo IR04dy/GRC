@@ -144,7 +144,7 @@ erDiagram
         nvarchar country
         nvarchar service_type
         nvarchar risk_level
-        nvarchar status "ACTIVE|PENDING|UNDER_REVIEW|SUSPENDED|CLOSED"
+        nvarchar status "ACTIVE|INACTIVE|UNDER_REVIEW|BLACKLISTED|EXITED"
         nvarchar registration_number "Saudi CR / VAT"
         nvarchar onboarding_status
         nvarchar website
@@ -158,7 +158,7 @@ erDiagram
         bigint id PK
         bigint vendor_id FK
         nvarchar current_stage "REGISTRATION → CRITICALITY_CLASSIFICATION → SECURITY_REVIEW → OPERATIONAL_REVIEW → LEGAL_REVIEW → APPROVAL"
-        nvarchar status "IN_PROGRESS|APPROVED|REJECTED"
+        nvarchar status "IN_PROGRESS|COMPLETED|REJECTED|ON_HOLD"
         bigint assigned_to_id FK
         date due_date
         nvarchar completed_stages
@@ -168,12 +168,12 @@ erDiagram
     vendor_assessments {
         bigint id PK
         bigint vendor_id FK
-        nvarchar assessment_type "INITIAL|PERIODIC|EVENT_TRIGGERED|EXIT"
+        nvarchar assessment_type "INITIAL|PERIODIC|TRIGGERED"
         date assessment_date
         date next_assessment_date
         decimal overall_score "0-10"
         nvarchar risk_rating
-        nvarchar status "DRAFT|IN_REVIEW|APPROVED|CLOSED"
+        nvarchar status "PLANNED|IN_PROGRESS|COMPLETED|ESCALATED"
         nvarchar findings
         nvarchar recommendations
         boolean escalated_to_risk
@@ -185,13 +185,13 @@ erDiagram
         nvarchar contract_number
         nvarchar title_en
         nvarchar title_ar
-        nvarchar contract_type "MASTER_AGREEMENT|SOW|NDA|DPA|SLA|PO"
+        nvarchar contract_type "SERVICE|SUPPLY|NDA|FRAMEWORK|OTHER"
         date start_date
         date end_date
         boolean auto_renewal
         decimal contract_value
         nvarchar currency "default SAR"
-        nvarchar status
+        nvarchar status "ACTIVE|DRAFT|UNDER_REVIEW|EXPIRED|TERMINATED"
     }
 
     slas {
@@ -207,7 +207,7 @@ erDiagram
         bigint id PK
         bigint vendor_id FK
         nvarchar incident_code
-        nvarchar incident_type "OUTAGE|SLA_BREACH|QUALITY|DELIVERY|SECURITY|COMPLIANCE|FINANCIAL_DISTRESS"
+        nvarchar incident_type "SERVICE_DISRUPTION|BREACH|DELAY|QUALITY|SLA_BREACH|OTHER"
         nvarchar impact "CRITICAL|HIGH|MEDIUM|LOW"
         nvarchar description
         boolean sla_breached
@@ -228,10 +228,10 @@ erDiagram
         nvarchar service_name_en "e.g. Core Banking"
         nvarchar service_name_ar
         nvarchar asset_name "e.g. Temenos T24 production cluster"
-        nvarchar dependency_type "IT_SERVICE|CRITICAL_DATA|PHYSICAL_GOOD|PROFESSIONAL|INFRASTRUCTURE"
+        nvarchar dependency_type "CRITICAL|NON_CRITICAL|SHARED|EXCLUSIVE"
         nvarchar dependency_level "CRITICAL|HIGH|MEDIUM|LOW"
         boolean has_alternative
-        nvarchar status
+        nvarchar status "ACTIVE|INACTIVE|AT_RISK"
         nvarchar impact_analysis
     }
 
@@ -428,10 +428,22 @@ flowchart LR
 | Currency defaults to **SAR** | Contract values default to riyals; USD/EUR/AED available from dropdown. |
 | `registration_number` field | Captures Saudi Commercial Registration (CR) or VAT number for ZATCA cross-check. |
 | KSA suppliers tagged KSA in the dependency map | Visual cue for Vision 2030 local-content scoring and PDPL data-residency assessment. |
-| Tier-1 contract types include **DPA** | Saudi data-processing agreement under PDPL; required for any vendor processing personal data of Saudi data subjects. |
-| Disruption types include **FINANCIAL_DISTRESS** | SAMA expects banks to track vendor financial-stability indicators. |
-| Disruption types include **COMPLIANCE** | NCA / Data Office / SAMA breach-of-obligation by the supplier. |
+| Disruption type **BREACH** | Captures supplier-side data or contract breach; the catch-all for PDPL-relevant supplier incidents until a dedicated `COMPLIANCE` value lands. |
 | Onboarding stage **LEGAL_REVIEW** | Captures Saudi-Article-39 / cross-border-transfer legal sign-off. |
+
+### Aspirational additions (require a follow-up DB CHECK-constraint migration)
+
+The buyer assessment recommended several Saudi-specific enum values that are not yet in the DB CHECK constraints. Adding them needs a new migration that drops and re-creates the relevant `CK_*` constraints with the expanded value set:
+
+| Future value | Column | Why it matters |
+|---|---|---|
+| `DPA` | `contracts.contract_type` | Data Processing Agreement under PDPL; required for any vendor processing personal data of Saudi data subjects. |
+| `SLA` | `contracts.contract_type` | First-class SLA contract record alongside the existing SLA child table. |
+| `MASTER_AGREEMENT`, `SOW`, `PURCHASE_ORDER` | `contracts.contract_type` | Aligns with mid-market procurement vocabulary. |
+| `FINANCIAL_DISTRESS` | `supplier_incidents.incident_type` | SAMA expectation — banks must track vendor financial-stability indicators. |
+| `COMPLIANCE` | `supplier_incidents.incident_type` | NCA / Data Office / SAMA breach-of-obligation by the supplier. |
+| `SECURITY` | `supplier_incidents.incident_type` | Vendor-originated security incident (separate from `BREACH` for sub-typing). |
+| `EVENT_TRIGGERED` | `vendor_assessments.assessment_type` | More descriptive than `TRIGGERED` for UI labelling. |
 
 ---
 

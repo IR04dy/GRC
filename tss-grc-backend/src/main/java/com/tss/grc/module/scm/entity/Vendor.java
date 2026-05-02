@@ -30,7 +30,7 @@ public class Vendor {
     private String nameAr;
 
     @Column(name = "category", length = 100)
-    private String category;
+    private String category = "OTHER";
 
     @Column(name = "criticality", length = 20)
     private String criticality = "MEDIUM";
