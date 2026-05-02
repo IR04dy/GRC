@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Download, Plus, BarChart3, Building2, AlertTriangle } from 'lucide-react';
+import {
+  ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Download, Plus, BarChart3, Building2, AlertTriangle,
+  ScrollText, BookCopy, Send, CheckCheck, Archive, RotateCcw, X as XIcon, Wrench, Flag, Search,
+} from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -16,11 +19,17 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
-import { complianceApi, ApiError, type ComplianceControlDto, type ComplianceControlRequest, type ComplianceAssessmentDto, type ComplianceFindingDto } from '../../lib/api';
+import {
+  complianceApi, ApiError,
+  type ComplianceControlDto, type ComplianceControlRequest,
+  type ComplianceAssessmentDto, type ComplianceFindingDto,
+  type RegulatoryChangeDto, type RegulatoryChangeRequest,
+  type PolicyDto, type PolicyRequest,
+} from '../../lib/api';
 import { useToast } from '../../lib/toast';
 import { COMPLIANCE_CONTROLS } from './mockCompliance';
 
-type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard';
+type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies';
 
 const FRAMEWORK_OPTIONS = [
   { value: 'ISO_27001', label: 'ISO 27001' }, { value: 'ISO_22301', label: 'ISO 22301' },
@@ -31,6 +40,89 @@ const STATUS_OPTIONS = [
   { value: 'IMPLEMENTED', label: 'Implemented' }, { value: 'PARTIAL', label: 'Partial' },
   { value: 'PLANNED', label: 'Planned' }, { value: 'NOT_APPLICABLE', label: 'Not Applicable' },
 ];
+
+// Saudi authorities that publish regulations relevant to enterprise GRC.
+const AUTHORITY_OPTIONS = [
+  { value: 'NCA',    label: 'NCA — National Cybersecurity Authority' },
+  { value: 'SDAIA',  label: 'SDAIA — Saudi Data & AI Authority' },
+  { value: 'SAMA',   label: 'SAMA — Saudi Central Bank' },
+  { value: 'CMA',    label: 'CMA — Capital Market Authority' },
+  { value: 'ZATCA',  label: 'ZATCA — Zakat, Tax & Customs Authority' },
+  { value: 'CITC',   label: 'CITC — Communications, Space & Technology Commission' },
+  { value: 'NCEMA',  label: 'NCEMA — National Center for Emergency Management' },
+  { value: 'MoCI',   label: 'MoCI — Ministry of Commerce' },
+  { value: 'HRSD',   label: 'HRSD — Ministry of Human Resources' },
+  { value: 'MoH',    label: 'MoH / HCIS — Ministry of Health' },
+  { value: 'OTHER',  label: 'Other' },
+];
+const APPLICABILITY_OPTIONS = [
+  { value: 'UNKNOWN',         label: 'Unknown' },
+  { value: 'APPLICABLE',      label: 'Applicable' },
+  { value: 'PARTIAL',         label: 'Partial' },
+  { value: 'NOT_APPLICABLE',  label: 'Not Applicable' },
+];
+const IMPACT_LEVEL_OPTIONS = [
+  { value: 'UNKNOWN',  label: 'Unknown' },
+  { value: 'CRITICAL', label: 'Critical' },
+  { value: 'HIGH',     label: 'High' },
+  { value: 'MEDIUM',   label: 'Medium' },
+  { value: 'LOW',      label: 'Low' },
+];
+const POLICY_CATEGORY_OPTIONS = [
+  { value: 'INFORMATION_SECURITY', label: 'Information Security' },
+  { value: 'PRIVACY',              label: 'Privacy / PDPL' },
+  { value: 'RISK_MANAGEMENT',      label: 'Risk Management' },
+  { value: 'BUSINESS_CONTINUITY',  label: 'Business Continuity' },
+  { value: 'ACCEPTABLE_USE',       label: 'Acceptable Use' },
+  { value: 'INCIDENT_RESPONSE',    label: 'Incident Response' },
+  { value: 'HR',                   label: 'Human Resources' },
+  { value: 'FINANCE',              label: 'Finance' },
+];
+const CHANGE_EMPTY: RegulatoryChangeRequest = {
+  sourceAuthority: 'NCA', titleEn: '', titleAr: '', citation: '',
+  summaryEn: '', summaryAr: '', publishedDate: '', effectiveDate: '',
+  applicability: 'UNKNOWN', impactLevel: 'UNKNOWN', impactSummary: '',
+};
+const POLICY_EMPTY: PolicyRequest = {
+  code: '', titleEn: '', titleAr: '',
+  version: '1.0', category: 'INFORMATION_SECURITY',
+  contentEn: '', effectiveFrom: '', nextReviewDate: '',
+};
+
+const RISK_TONE_BADGE: Record<string, 'danger' | 'warning' | 'info' | 'success' | 'neutral'> = {
+  CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'info', LOW: 'success', UNKNOWN: 'neutral',
+};
+
+// Generic per-entity state hook — same pattern used in BCM/SCM/Cyber pages.
+function useEntityState<T>() {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<T | null>(null);
+  const [confirmDel, setConfirmDel] = useState<T | null>(null);
+  return {
+    open, editing, confirmDel,
+    startCreate: () => { setEditing(null); setOpen(true); },
+    startEdit: (r: T) => { setEditing(r); setOpen(true); },
+    askDelete: (r: T) => setConfirmDel(r),
+    closeModal: () => { setOpen(false); setEditing(null); },
+    closeConfirm: () => setConfirmDel(null),
+  };
+}
+
+function changeToReq(c: RegulatoryChangeDto): RegulatoryChangeRequest {
+  return {
+    sourceAuthority: c.sourceAuthority, titleEn: c.titleEn, titleAr: c.titleAr,
+    citation: c.citation, summaryEn: c.summaryEn, summaryAr: c.summaryAr,
+    publishedDate: c.publishedDate, effectiveDate: c.effectiveDate,
+    applicability: c.applicability, impactLevel: c.impactLevel, impactSummary: c.impactSummary,
+  };
+}
+function policyToReq(p: PolicyDto): PolicyRequest {
+  return {
+    code: p.code, titleEn: p.titleEn, titleAr: p.titleAr,
+    version: p.version, category: p.category, contentEn: p.contentEn, contentAr: p.contentAr,
+    effectiveFrom: p.effectiveFrom, nextReviewDate: p.nextReviewDate,
+  };
+}
 // FIELDS now built inside the component via t()
 const EMPTY: ComplianceControlRequest = {
   code: '', nameEn: '', nameAr: '', framework: 'ISO_27001',
@@ -63,6 +155,11 @@ export function CompliancePage() {
   const controls    = useApiList<ComplianceControlDto>(()    => complianceApi.controls(0, 100),    COMPLIANCE_CONTROLS as unknown as ComplianceControlDto[]);
   const assessments = useApiList<ComplianceAssessmentDto>(() => complianceApi.assessments(0, 100), []);
   const findings    = useApiList<ComplianceFindingDto>(()    => complianceApi.findings(0, 100),    []);
+  const changes     = useApiList<RegulatoryChangeDto>(()     => complianceApi.regulatoryChanges(0, 100), []);
+  const policies    = useApiList<PolicyDto>(()               => complianceApi.policies(0, 100),    []);
+
+  const changeS = useEntityState<RegulatoryChangeDto>();
+  const policyS = useEntityState<PolicyDto>();
 
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'code',           label: t('fldCode') + ' *', required: true, maxLength: 50, span: 4 },
@@ -79,11 +176,170 @@ export function CompliancePage() {
   const tabs: TabItem<TabId>[] = [
     { id: 'overview',  label: t('tabOverview') },
     { id: 'controls',  label: t('complianceTabControls') },
+    { id: 'changes',   label: t('complianceTabChanges') },
+    { id: 'policies',  label: t('complianceTabPolicies') },
     { id: 'internal',  label: t('complianceTabInternal') },
     { id: 'external',  label: t('complianceTabExternal') },
     { id: 'findings',  label: t('complianceTabFindings') },
     { id: 'scorecard', label: t('complianceTabScorecard') },
   ];
+
+  // ── Field defs for Regulatory Changes + Policies (built per-render so labels translate) ──
+  const CHANGE_FIELDS: FieldDef[] = [
+    { kind: 'select',   key: 'sourceAuthority', label: t('complianceFldAuthority') + ' *', required: true, options: AUTHORITY_OPTIONS, span: 6 },
+    { kind: 'text',     key: 'citation',        label: t('complianceFldCitation'), span: 6 },
+    { kind: 'text',     key: 'titleEn',         label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'titleAr',         label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
+    { kind: 'date',     key: 'publishedDate',   label: t('complianceFldPublishedDate'), span: 6 },
+    { kind: 'date',     key: 'effectiveDate',   label: t('complianceFldEffectiveDate'), span: 6 },
+    { kind: 'select',   key: 'applicability',   label: t('complianceFldApplicability'), options: APPLICABILITY_OPTIONS, span: 6 },
+    { kind: 'select',   key: 'impactLevel',     label: t('complianceFldImpactLevel'),   options: IMPACT_LEVEL_OPTIONS, span: 6 },
+    { kind: 'textarea', key: 'summaryEn',       label: t('complianceFldSummary'), rows: 3, span: 12 },
+    { kind: 'textarea', key: 'impactSummary',   label: t('complianceFldImpactSummary'), rows: 2, span: 12 },
+  ];
+  const POLICY_FIELDS: FieldDef[] = [
+    { kind: 'text',     key: 'code',     label: t('fldCode') + ' *', required: true, maxLength: 50, placeholder: 'POL-INFO-001', span: 4 },
+    { kind: 'text',     key: 'version',  label: t('fldVersion'), placeholder: '1.0', span: 4 },
+    { kind: 'select',   key: 'category', label: t('fldCategory'), options: POLICY_CATEGORY_OPTIONS, span: 4 },
+    { kind: 'text',     key: 'titleEn',  label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'titleAr',  label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
+    { kind: 'date',     key: 'effectiveFrom',   label: t('complianceFldEffectiveFrom'), span: 6 },
+    { kind: 'date',     key: 'nextReviewDate',  label: t('fldNextReviewDate'), span: 6 },
+    { kind: 'textarea', key: 'contentEn',       label: t('complianceFldPolicyContent'), rows: 4, span: 12 },
+  ];
+
+  // ── Columns for Regulatory Changes + Policies ──
+  const changeCols: Column<RegulatoryChangeDto>[] = [
+    { header: t('complianceFldAuthority'), cell: r => <Badge tone="primary">{r.sourceAuthority}</Badge> },
+    { header: t('colTitle'),               cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}</div>{r.citation && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} className="mono">{r.citation}</div>}</div> },
+    { header: t('complianceFldEffectiveDate'), cell: r => r.effectiveDate ?? '—', mono: true },
+    { header: t('complianceFldApplicability'), cell: r => <Badge tone={r.applicability === 'APPLICABLE' ? 'warning' : r.applicability === 'NOT_APPLICABLE' ? 'success' : r.applicability === 'PARTIAL' ? 'info' : 'neutral'}>{r.applicability}</Badge> },
+    { header: t('complianceFldImpactLevel'),   cell: r => <Badge tone={RISK_TONE_BADGE[r.impactLevel] ?? 'neutral'}>{r.impactLevel}</Badge> },
+    { header: t('colStatus'),                  cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? (r.status === 'CLOSED' ? 'success' : 'info')} dot>{r.status.replace(/_/g, ' ')}</Badge> },
+    { header: '', align: 'end', width: '210px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof Search; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status === 'NEW')                     extras.push({ Icon: Search, onClick: () => assessApplicability(r), title: t('complianceActAssessApplicability'), tone: 'primary' });
+        if (r.status === 'APPLICABILITY_ASSESSED')  extras.push({ Icon: Flag,   onClick: () => assessImpact(r),         title: t('complianceActAssessImpact'),         tone: 'accent' });
+        if (r.status === 'IMPACT_ASSESSED')         extras.push({ Icon: Wrench, onClick: () => markControlsUpdated(r),  title: t('complianceActMarkControlsUpdated'),  tone: 'primary' });
+        if (r.status === 'CONTROLS_UPDATED')        extras.push({ Icon: Archive, onClick: () => closeChangeAction(r),   title: t('complianceActCloseChange'),          tone: 'success' });
+        return <RowActions extras={extras} onEdit={() => changeS.startEdit(r)} onDelete={() => changeS.askDelete(r)} />;
+      } },
+  ];
+
+  const policyCols: Column<PolicyDto>[] = [
+    { header: t('fldCode'),     cell: r => <span className="mono" style={{ fontWeight: 600 }}>{r.code}</span> },
+    { header: t('colTitle'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}</div>{r.category && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.category.replace(/_/g, ' ')}</div>}</div> },
+    { header: t('fldVersion'),  cell: r => r.version, mono: true },
+    { header: t('complianceFldEffectiveFrom'), cell: r => r.effectiveFrom ?? '—', mono: true },
+    { header: t('fldNextReviewDate'),          cell: r => r.nextReviewDate ?? '—', mono: true },
+    { header: t('colStatus'),   cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'info'} dot>{r.status.replace(/_/g, ' ')}</Badge> },
+    { header: '', align: 'end', width: '230px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof Send; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status === 'DRAFT' || r.status === 'REJECTED') extras.push({ Icon: Send,        onClick: () => submitForLegal(r),   title: t('complianceActSubmitLegal'),  tone: 'primary' });
+        if (r.status === 'LEGAL_REVIEW')                     extras.push({ Icon: CheckCheck,  onClick: () => legalApprove(r),     title: t('complianceActLegalApprove'), tone: 'accent' });
+        if (r.status === 'EXEC_APPROVAL')                    extras.push({ Icon: CheckCheck,  onClick: () => execApprove(r),      title: t('complianceActExecApprove'),  tone: 'success' });
+        if (r.status === 'PUBLISHED')                        extras.push({ Icon: RotateCcw,   onClick: () => markReviewDue(r),    title: t('complianceActMarkReview'),   tone: 'accent' });
+        if (r.status === 'PUBLISHED' || r.status === 'REVIEW_DUE') extras.push({ Icon: Archive, onClick: () => retire(r),         title: t('complianceActRetire'),       tone: 'primary' });
+        if (r.status === 'LEGAL_REVIEW' || r.status === 'EXEC_APPROVAL') extras.push({ Icon: XIcon, onClick: () => rejectPolicy(r), title: t('complianceActReject') });
+        return <RowActions extras={extras} onEdit={() => policyS.startEdit(r)} onDelete={() => policyS.askDelete(r)} />;
+      } },
+  ];
+
+  // ── Submit + workflow handlers (Regulatory Changes + Policies) ──
+  async function submitChange(values: RegulatoryChangeRequest) {
+    try {
+      if (changeS.editing) await complianceApi.updateChange(changeS.editing.id, values);
+      else await complianceApi.createChange(values);
+      toast.success(changeS.editing ? 'Change updated' : 'Change added');
+      changeS.closeModal(); changes.reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  async function submitPolicy(values: PolicyRequest) {
+    try {
+      if (policyS.editing) await complianceApi.updatePolicy(policyS.editing.id, values);
+      else await complianceApi.createPolicy(values);
+      toast.success(policyS.editing ? 'Policy updated' : 'Policy added');
+      policyS.closeModal(); policies.reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  async function assessApplicability(c: RegulatoryChangeDto) {
+    const v = window.prompt('Applicability — APPLICABLE / PARTIAL / NOT_APPLICABLE', 'APPLICABLE');
+    if (!v) return;
+    try { await complianceApi.assessApplicability(c.id, v.trim().toUpperCase()); toast.success('Applicability recorded'); changes.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function assessImpact(c: RegulatoryChangeDto) {
+    const lvl = window.prompt('Impact level — CRITICAL / HIGH / MEDIUM / LOW', 'MEDIUM');
+    if (!lvl) return;
+    const summ = window.prompt('Impact summary (1-2 sentences)?', '') ?? '';
+    try { await complianceApi.assessImpact(c.id, lvl.trim().toUpperCase(), summ); toast.success('Impact assessed'); changes.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function markControlsUpdated(c: RegulatoryChangeDto) {
+    const n = window.prompt('How many controls were updated?', '1');
+    if (n === null) return;
+    try { await complianceApi.markControlsUpdated(c.id, Number(n) || 0); toast.success('Controls update recorded'); changes.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function closeChangeAction(c: RegulatoryChangeDto) {
+    try { await complianceApi.closeChange(c.id); toast.success('Change closed'); changes.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function submitForLegal(p: PolicyDto) {
+    try { await complianceApi.submitForLegalReview(p.id); toast.success('Submitted for legal review'); policies.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function legalApprove(p: PolicyDto) {
+    try { await complianceApi.legalApprovePolicy(p.id); toast.success('Legal review approved'); policies.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function execApprove(p: PolicyDto) {
+    if (!window.confirm(`Publish policy "${p.titleEn}" via executive approval? This sets effective_from = today and nextReviewDate = +12 months if blank.`)) return;
+    try { await complianceApi.execApprovePolicy(p.id); toast.success('Policy published'); policies.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function markReviewDue(p: PolicyDto) {
+    try { await complianceApi.markPolicyReviewDue(p.id); toast.success('Marked review-due'); policies.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function retire(p: PolicyDto) {
+    if (!window.confirm(`Retire policy "${p.titleEn}"? It will no longer be enforceable.`)) return;
+    try { await complianceApi.retirePolicy(p.id); toast.success('Policy retired'); policies.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function rejectPolicy(p: PolicyDto) {
+    const reason = window.prompt('Rejection reason?', '') ?? '';
+    if (!reason.trim()) return;
+    try { await complianceApi.rejectPolicy(p.id, reason); toast.success('Policy rejected'); policies.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function execDelete<T extends { id: number }>(
+    target: T | null,
+    apiFn: (id: number) => Promise<unknown>,
+    onClose: () => void,
+    reload: () => void,
+    label: string,
+  ) {
+    if (!target) return;
+    setBusy(true);
+    try { await apiFn(target.id); toast.success(`${label} deleted`); reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Delete failed'); }
+    finally { setBusy(false); onClose(); }
+  }
+
+  // Tab-aware "New" dispatcher
+  function newAction() {
+    return () => {
+      switch (tab) {
+        case 'changes':  return changeS.startCreate();
+        case 'policies': return policyS.startCreate();
+        default:         return setOpen(true);  // Controls modal (legacy)
+      }
+    };
+  }
+  const showNewButton = tab !== 'overview';
 
   const ctrlCols: Column<ComplianceControlDto>[] = [
     { header: t('colFramework'),  cell: r => <Badge tone="primary">{(r.framework ?? '').replace(/_/g, ' ')}</Badge> },
@@ -152,7 +408,7 @@ export function CompliancePage() {
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter}>{t('actionFilter')}</Button>
             <Button variant="secondary" Icon={Download}>{t('actionExport')}</Button>
-            <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
+            {showNewButton && <Button variant="primary" Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>}
           </>
         }
       />
@@ -183,6 +439,18 @@ export function CompliancePage() {
       {tab === 'controls' && (
         <Card padded={false}>
           {controls.loading ? <LoadingRow /> : <DataTable columns={ctrlCols} rows={controls.data} empty={<EmptyState />} />}
+        </Card>
+      )}
+      {tab === 'changes' && (
+        <Card padded={false}>
+          {changes.loading ? <LoadingRow /> : <DataTable columns={changeCols} rows={changes.data}
+            empty={<EmptyState Icon={ScrollText} title="No regulatory changes tracked" sub="New laws, amendments and guidance from NCA, SDAIA, SAMA, CMA, ZATCA, CITC, NCEMA flow through here." />} />}
+        </Card>
+      )}
+      {tab === 'policies' && (
+        <Card padded={false}>
+          {policies.loading ? <LoadingRow /> : <DataTable columns={policyCols} rows={policies.data}
+            empty={<EmptyState Icon={BookCopy} title="No policies on file" sub="Author, review, approve and publish enterprise policies through the lifecycle." />} />}
         </Card>
       )}
       {tab === 'internal' && (
@@ -236,6 +504,34 @@ export function CompliancePage() {
         confirmLabel="Delete"
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
       />
+
+      {/* Regulatory Change modal + confirm */}
+      <FormModal<RegulatoryChangeRequest> open={changeS.open}
+        title={changeS.editing ? `${t('editPrefix')} · ${changeS.editing.titleEn}` : t('newRegulatoryChangeTitle')}
+        fields={CHANGE_FIELDS}
+        initial={changeS.editing ? changeToReq(changeS.editing) : CHANGE_EMPTY}
+        onClose={changeS.closeModal} onSubmit={submitChange} />
+      <ConfirmDialog
+        open={!!changeS.confirmDel} destructive busy={busy}
+        title={t('complianceConfirmDeleteChange')}
+        message={changeS.confirmDel ? `Change "${changeS.confirmDel.titleEn}" ${t('confirmDeleteSuffix')}` : ''}
+        confirmLabel={t('deleteBtn')}
+        onCancel={changeS.closeConfirm}
+        onConfirm={() => execDelete(changeS.confirmDel, complianceApi.deleteChange, changeS.closeConfirm, changes.reload, 'Change')} />
+
+      {/* Policy modal + confirm */}
+      <FormModal<PolicyRequest> open={policyS.open}
+        title={policyS.editing ? `${t('editPrefix')} · ${policyS.editing.code}` : t('newPolicyTitle')}
+        fields={POLICY_FIELDS}
+        initial={policyS.editing ? policyToReq(policyS.editing) : POLICY_EMPTY}
+        onClose={policyS.closeModal} onSubmit={submitPolicy} />
+      <ConfirmDialog
+        open={!!policyS.confirmDel} destructive busy={busy}
+        title={t('complianceConfirmDeletePolicy')}
+        message={policyS.confirmDel ? `Policy "${policyS.confirmDel.code} · ${policyS.confirmDel.titleEn}" ${t('confirmDeleteSuffix')}` : ''}
+        confirmLabel={t('deleteBtn')}
+        onCancel={policyS.closeConfirm}
+        onConfirm={() => execDelete(policyS.confirmDel, complianceApi.deletePolicy, policyS.closeConfirm, policies.reload, 'Policy')} />
     </Shell>
   );
 }

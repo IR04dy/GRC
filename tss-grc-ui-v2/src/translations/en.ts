@@ -251,6 +251,42 @@ export const en = {
   complianceTabExternal: 'External Audit',
   complianceTabFindings: 'Findings',
   complianceTabScorecard: 'Scorecard',
+  complianceTabChanges: 'Regulatory Changes',
+  complianceTabPolicies: 'Policies',
+
+  // Regulatory change + Policy field labels
+  complianceFldAuthority:        'Issuing Authority',
+  complianceFldCitation:         'Citation',
+  complianceFldPublishedDate:    'Published',
+  complianceFldEffectiveDate:    'Effective From',
+  complianceFldApplicability:    'Applicability',
+  complianceFldImpactLevel:      'Impact',
+  complianceFldSummary:          'Summary',
+  complianceFldImpactSummary:    'Impact Summary',
+  complianceFldEffectiveFrom:    'Effective From',
+  complianceFldPolicyContent:    'Policy Content',
+
+  // Modal titles
+  newRegulatoryChangeTitle: 'New Regulatory Change',
+  newPolicyTitle:           'New Policy',
+
+  // Workflow actions — Regulatory Change
+  complianceActAssessApplicability: 'Assess Applicability',
+  complianceActAssessImpact:        'Assess Impact',
+  complianceActMarkControlsUpdated: 'Mark Controls Updated',
+  complianceActCloseChange:         'Close Change',
+
+  // Workflow actions — Policy
+  complianceActSubmitLegal:  'Submit for Legal Review',
+  complianceActLegalApprove: 'Legal Approve',
+  complianceActExecApprove:  'Executive Approve & Publish',
+  complianceActMarkReview:   'Mark Review Due',
+  complianceActRetire:       'Retire Policy',
+  complianceActReject:       'Reject',
+
+  // Confirms
+  complianceConfirmDeleteChange:  'Delete this regulatory change?',
+  complianceConfirmDeletePolicy:  'Delete this policy?',
   complianceFrameworkCol: 'Framework',
   complianceProgressCol: 'Coverage',
   complianceLastTestCol: 'Last Tested',

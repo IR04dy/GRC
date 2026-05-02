@@ -243,6 +243,42 @@ export const ar = {
   complianceTabExternal: 'تدقيق خارجي',
   complianceTabFindings: 'الملاحظات',
   complianceTabScorecard: 'بطاقة الأداء',
+  complianceTabChanges: 'التغيرات التنظيمية',
+  complianceTabPolicies: 'السياسات',
+
+  // حقول التغيرات التنظيمية والسياسات
+  complianceFldAuthority:        'الجهة المُصدرة',
+  complianceFldCitation:         'المرجع',
+  complianceFldPublishedDate:    'تاريخ النشر',
+  complianceFldEffectiveDate:    'تاريخ النفاذ',
+  complianceFldApplicability:    'الانطباق',
+  complianceFldImpactLevel:      'مستوى الأثر',
+  complianceFldSummary:          'الملخص',
+  complianceFldImpactSummary:    'ملخص الأثر',
+  complianceFldEffectiveFrom:    'سريان من',
+  complianceFldPolicyContent:    'نص السياسة',
+
+  // عناوين النوافذ
+  newRegulatoryChangeTitle: 'تغيير تنظيمي جديد',
+  newPolicyTitle:           'سياسة جديدة',
+
+  // إجراءات سير العمل — التغيرات التنظيمية
+  complianceActAssessApplicability: 'تقييم الانطباق',
+  complianceActAssessImpact:        'تقييم الأثر',
+  complianceActMarkControlsUpdated: 'تأكيد تحديث الضوابط',
+  complianceActCloseChange:         'إغلاق التغيير',
+
+  // إجراءات سير العمل — السياسات
+  complianceActSubmitLegal:  'إرسال للمراجعة القانونية',
+  complianceActLegalApprove: 'اعتماد قانوني',
+  complianceActExecApprove:  'اعتماد تنفيذي ونشر',
+  complianceActMarkReview:   'إعلام بضرورة المراجعة',
+  complianceActRetire:       'تقاعد السياسة',
+  complianceActReject:       'رفض',
+
+  // تأكيدات
+  complianceConfirmDeleteChange:  'حذف هذا التغيير التنظيمي؟',
+  complianceConfirmDeletePolicy:  'حذف هذه السياسة؟',
   complianceFrameworkCol: 'الإطار',
   complianceProgressCol: 'التغطية',
   complianceLastTestCol: 'آخر اختبار',

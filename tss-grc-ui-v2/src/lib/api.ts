@@ -578,6 +578,47 @@ export interface ComplianceFindingRequest {
   owner?: string; capa?: string;
   dueDate?: string; status?: string;
 }
+// Regulatory change management (assessment §5.3 critical #1)
+export interface RegulatoryChangeDto {
+  id: number; sourceAuthority: string;
+  titleEn: string; titleAr?: string; citation?: string;
+  summaryEn?: string; summaryAr?: string;
+  publishedDate?: string; effectiveDate?: string;
+  applicability: string; impactLevel: string; status: string;
+  impactSummary?: string; controlsUpdatedCount?: number;
+  assignedToId?: number; closedAt?: string;
+}
+export interface RegulatoryChangeRequest {
+  sourceAuthority: string;
+  titleEn: string; titleAr?: string; citation?: string;
+  summaryEn?: string; summaryAr?: string;
+  publishedDate?: string; effectiveDate?: string;
+  applicability?: string; impactLevel?: string;
+  impactSummary?: string;
+  assignedToId?: number | null;
+}
+
+// Policy lifecycle (assessment §5.3 critical #2)
+export interface PolicyDto {
+  id: number; code: string;
+  titleEn: string; titleAr?: string;
+  version: string; category?: string;
+  contentEn?: string; contentAr?: string;
+  status: string;
+  authorId?: number; legalReviewerId?: number; approverId?: number;
+  legalReviewedAt?: string; approvedAt?: string;
+  publishedAt?: string; effectiveFrom?: string;
+  nextReviewDate?: string; retiredAt?: string;
+  rejectionReason?: string;
+}
+export interface PolicyRequest {
+  code: string;
+  titleEn: string; titleAr?: string;
+  version?: string; category?: string;
+  contentEn?: string; contentAr?: string;
+  effectiveFrom?: string; nextReviewDate?: string;
+}
+
 export const complianceApi = {
   controls:           (page = 0, size = 50) => api.get<PageResponse<ComplianceControlDto>>(`/api/v1/compliance/controls${pageQ(page, size)}`),
   createControl:      (body: ComplianceControlRequest) => api.post<ComplianceControlDto>('/api/v1/compliance/controls', body),
@@ -590,6 +631,28 @@ export const complianceApi = {
   createFinding:      (body: ComplianceFindingRequest) => api.post<ComplianceFindingDto>('/api/v1/compliance/findings', body),
   updateFinding:      (id: number, body: ComplianceFindingRequest) => api.put<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}`, body),
   deleteFinding:      (id: number) => api.delete<void>(`/api/v1/compliance/findings/${id}`),
+  // Regulatory change management — §5.3 critical #1
+  regulatoryChanges:  (page = 0, size = 50) => api.get<PageResponse<RegulatoryChangeDto>>(`/api/v1/compliance/regulatory-changes${pageQ(page, size)}`),
+  createChange:       (body: RegulatoryChangeRequest) => api.post<RegulatoryChangeDto>('/api/v1/compliance/regulatory-changes', body),
+  updateChange:       (id: number, body: RegulatoryChangeRequest) => api.put<RegulatoryChangeDto>(`/api/v1/compliance/regulatory-changes/${id}`, body),
+  deleteChange:       (id: number) => api.delete<void>(`/api/v1/compliance/regulatory-changes/${id}`),
+  assessApplicability: (id: number, applicability: string) => api.post<RegulatoryChangeDto>(`/api/v1/compliance/regulatory-changes/${id}/assess-applicability`, { applicability }),
+  assessImpact:       (id: number, impactLevel: string, impactSummary: string) => api.post<RegulatoryChangeDto>(`/api/v1/compliance/regulatory-changes/${id}/assess-impact`, { impactLevel, impactSummary }),
+  markControlsUpdated:(id: number, controlsUpdatedCount: number) => api.post<RegulatoryChangeDto>(`/api/v1/compliance/regulatory-changes/${id}/mark-controls-updated`, { controlsUpdatedCount }),
+  closeChange:        (id: number) => api.post<RegulatoryChangeDto>(`/api/v1/compliance/regulatory-changes/${id}/close`),
+  changeStats:        () => api.get<unknown>('/api/v1/compliance/regulatory-changes/stats'),
+  // Policy lifecycle — §5.3 critical #2
+  policies:           (page = 0, size = 50) => api.get<PageResponse<PolicyDto>>(`/api/v1/compliance/policies${pageQ(page, size)}`),
+  createPolicy:       (body: PolicyRequest) => api.post<PolicyDto>('/api/v1/compliance/policies', body),
+  updatePolicy:       (id: number, body: PolicyRequest) => api.put<PolicyDto>(`/api/v1/compliance/policies/${id}`, body),
+  deletePolicy:       (id: number) => api.delete<void>(`/api/v1/compliance/policies/${id}`),
+  submitForLegalReview: (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/submit-for-legal-review`),
+  legalApprovePolicy: (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/legal-approve`),
+  execApprovePolicy:  (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/exec-approve`),
+  markPolicyReviewDue:(id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/mark-review-due`),
+  retirePolicy:       (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/retire`),
+  rejectPolicy:       (id: number, reason: string) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/reject`, { reason }),
+  policyStats:        () => api.get<unknown>('/api/v1/compliance/policies/stats'),
   stats:              () => api.get<unknown>('/api/v1/compliance/stats'),
 };
 
