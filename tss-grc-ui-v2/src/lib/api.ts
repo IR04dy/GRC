@@ -124,6 +124,91 @@ export const riskApi = {
   incidentBump:    (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/incident-bump`),
 };
 
+// ─── KRI threshold engine — assessment §5.1 ERM #5 ───────────────────────────
+export interface KriDefinitionDto {
+  id: number;
+  organisationId?: number;
+  riskId?: number; categoryId?: number;
+  code?: string;
+  nameEn: string; nameAr?: string;
+  descriptionEn?: string; descriptionAr?: string;
+  unit?: string;
+  direction: string; // HIGHER_IS_WORSE | LOWER_IS_WORSE
+  greenMax?: number;
+  amberMax?: number;
+  targetValue?: number;
+  frequency?: string;
+  owner?: string;
+  dataSource?: string;
+  framework?: string;
+  isActive?: boolean;
+}
+export interface KriReadingDto {
+  id: number; kriId: number;
+  readingValue: number; readingAt: string;
+  band?: string; notes?: string;
+}
+export interface KriBreachEventDto {
+  id: number; kriId: number; readingId: number;
+  breachBand: string; readingValue: number; thresholdCrossed: number;
+  breachedAt: string;
+  acknowledgedAt?: string; acknowledgedById?: number;
+  resolvedAt?: string; resolutionNotes?: string;
+  status: string;
+}
+
+// ─── Risk appetite — assessment §5.1 ERM #6 ──────────────────────────────────
+export interface RiskAppetiteStatementDto {
+  id: number;
+  organisationId?: number;
+  categoryId?: number;
+  titleEn: string; titleAr?: string;
+  statementEn?: string; statementAr?: string;
+  riskDimension: string;
+  appetiteLevel: string;
+  toleranceLower?: number; toleranceUpper?: number;
+  unit?: string;
+  currentExposure?: number;
+  approvedBy?: string; approvedAt?: string;
+  nextReviewDate?: string;
+  status: string;
+  createdAt?: string;
+}
+export interface AppetiteBreachEventDto {
+  id: number; appetiteId: number;
+  observedValue: number; breachSeverity: string;
+  breachedAt: string;
+  notes?: string;
+  status: string;
+}
+
+export const ermAdvancedApi = {
+  // KRIs
+  kris:        (page = 0, size = 50) => api.get<PageResponse<KriDefinitionDto>>(`/api/v1/risk/kris${pageQ(page, size)}`),
+  getKri:      (id: number) => api.get<KriDefinitionDto>(`/api/v1/risk/kris/${id}`),
+  createKri:   (body: Partial<KriDefinitionDto>) => api.post<KriDefinitionDto>('/api/v1/risk/kris', body),
+  updateKri:   (id: number, body: Partial<KriDefinitionDto>) => api.put<KriDefinitionDto>(`/api/v1/risk/kris/${id}`, body),
+  deleteKri:   (id: number) => api.delete<void>(`/api/v1/risk/kris/${id}`),
+  recordReading: (id: number, value: number, notes?: string) =>
+                 api.post<{ readingId: number; band: string; previousBand: string; breachCreated: boolean; breachId?: number }>(`/api/v1/risk/kris/${id}/readings`, { value, notes }),
+  readings:    (id: number) => api.get<KriReadingDto[]>(`/api/v1/risk/kris/${id}/readings`),
+  breaches:    (id: number) => api.get<KriBreachEventDto[]>(`/api/v1/risk/kris/${id}/breaches`),
+  ackBreach:   (breachId: number, userId?: number) => api.post<KriBreachEventDto>(`/api/v1/risk/kris/breaches/${breachId}/acknowledge`, { userId }),
+  resolveBreach: (breachId: number, notes?: string) => api.post<KriBreachEventDto>(`/api/v1/risk/kris/breaches/${breachId}/resolve`, { notes }),
+  kriDashboard: () => api.get<{ totalKris: number; green: number; amber: number; red: number; noData: number; openBreaches: number }>('/api/v1/risk/kris/dashboard'),
+  // Appetite
+  appetites:   (page = 0, size = 50) => api.get<PageResponse<RiskAppetiteStatementDto>>(`/api/v1/risk/appetite${pageQ(page, size)}`),
+  getAppetite: (id: number) => api.get<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}`),
+  createAppetite: (body: Partial<RiskAppetiteStatementDto>) => api.post<RiskAppetiteStatementDto>('/api/v1/risk/appetite', body),
+  updateAppetite: (id: number, body: Partial<RiskAppetiteStatementDto>) => api.put<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}`, body),
+  deleteAppetite: (id: number) => api.delete<void>(`/api/v1/risk/appetite/${id}`),
+  approveAppetite: (id: number, approvedBy: string) => api.post<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}/approve`, { approvedBy }),
+  retireAppetite:  (id: number) => api.post<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}/retire`),
+  updateExposure:  (id: number, value: number, notes?: string) => api.post<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}/exposure`, { value, notes }),
+  appetiteBreaches: (id: number) => api.get<AppetiteBreachEventDto[]>(`/api/v1/risk/appetite/${id}/breaches`),
+  appetiteDashboard: () => api.get<{ total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number }>('/api/v1/risk/appetite/dashboard'),
+};
+
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 export interface DashboardStats {
   totalRisks: number; criticalRisks: number; highRisks: number; mediumRisks: number; lowRisks: number;

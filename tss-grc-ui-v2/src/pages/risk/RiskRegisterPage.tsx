@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Filter, Download, Plus, Flame, ShieldCheck, ClipboardCheck, TrendingUp, TrendingDown, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw } from 'lucide-react';
+import { AlertTriangle, Filter, Download, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
@@ -13,7 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
-import { riskApi, ApiError, type RiskResponse } from '../../lib/api';
+import { riskApi, ermAdvancedApi, ApiError, type RiskResponse, type KriDefinitionDto, type KriBreachEventDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -228,9 +228,9 @@ export function RiskRegisterPage() {
         </Card>
       )}
 
-      {tab === 'kri' && <KriDashboard risks={risks} />}
+      {tab === 'kri' && <KriDashboard demoMode={demoMode} risks={risks} />}
 
-      {tab === 'appetite' && <AppetiteDashboard risks={risks} />}
+      {tab === 'appetite' && <AppetiteDashboard demoMode={demoMode} risks={risks} />}
 
       <NewRiskModal
         open={modalOpen}
@@ -256,83 +256,234 @@ export function RiskRegisterPage() {
   );
 }
 
-// ─── KRI Dashboard ──────────────────────────────────────────────────────────
-function KriDashboard({ risks }: { risks: RiskResponse[] }) {
-  const criticalCount = risks.filter(r => r.inherentScore >= 16).length;
-  const openCount = risks.filter(r => r.status === 'OPEN').length;
-  const kris = [
-    { name: 'Critical risks open',           value: criticalCount,    threshold: 5,    unit: '',  trend: 'up',   delta: '+2'   },
-    { name: 'Risks past review date',         value: 3,                threshold: 0,    unit: '',  trend: 'up',   delta: '+1'   },
-    { name: 'Failed login attempts (24h)',    value: 1247,             threshold: 1000, unit: '',  trend: 'up',   delta: '+18%' },
-    { name: 'Privileged access reviews due',  value: 2,                threshold: 5,    unit: '',  trend: 'down', delta: '−3'   },
-    { name: 'Vendor SLA breaches (30d)',      value: 4,                threshold: 2,    unit: '',  trend: 'up',   delta: '+1'   },
-    { name: 'Unpatched critical CVEs',        value: 1,                threshold: 0,    unit: '',  trend: 'down', delta: '−2'   },
-    { name: 'Open risks',                     value: openCount,        threshold: 30,   unit: '',  trend: 'down', delta: '−4'   },
-    { name: 'Mean time to treat (days)',      value: 14,               threshold: 21,   unit: 'd', trend: 'down', delta: '−3'   },
-  ];
+// ─── KRI Dashboard (W3 — assessment §5.1 ERM #5) ────────────────────────────
+const BAND_TONE: Record<string, BadgeTone> = { GREEN: 'success', AMBER: 'warning', RED: 'danger' };
+
+function KriDashboard({ demoMode, risks }: { demoMode: boolean; risks: RiskResponse[] }) {
+  const [kris, setKris] = useState<KriDefinitionDto[]>([]);
+  const [latest, setLatest] = useState<Record<number, string>>({});
+  const [breaches, setBreaches] = useState<Record<number, KriBreachEventDto[]>>({});
+  const [stats, setStats] = useState<{ totalKris: number; green: number; amber: number; red: number; noData: number; openBreaches: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function loadAll() {
+    if (demoMode) {
+      setKris([]); setStats({ totalKris: 0, green: 0, amber: 0, red: 0, noData: 0, openBreaches: 0 });
+      return;
+    }
+    setLoading(true);
+    try {
+      const [page, dash] = await Promise.all([
+        ermAdvancedApi.kris(0, 100),
+        ermAdvancedApi.kriDashboard(),
+      ]);
+      const list = page.content ?? [];
+      setKris(list);
+      setStats(dash);
+      // Pull latest reading per KRI in parallel
+      const bandMap: Record<number, string> = {};
+      const breachMap: Record<number, KriBreachEventDto[]> = {};
+      await Promise.all(list.map(async k => {
+        try {
+          const [r, b] = await Promise.all([
+            ermAdvancedApi.readings(k.id),
+            ermAdvancedApi.breaches(k.id),
+          ]);
+          bandMap[k.id] = r[0]?.band ?? 'NO_DATA';
+          breachMap[k.id] = b.filter(x => x.status !== 'RESOLVED');
+        } catch { /* ignore per-KRI failure */ }
+      }));
+      setLatest(bandMap);
+      setBreaches(breachMap);
+    } finally { setLoading(false); }
+  }
+
+  useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
+
+  const toast = useToast();
+  async function recordReading(k: KriDefinitionDto) {
+    const v = window.prompt(`Enter reading for "${k.nameEn}" (${k.unit ?? ''}):`, '');
+    if (v === null) return;
+    const num = Number(v);
+    if (Number.isNaN(num)) { toast.danger('Invalid number'); return; }
+    const notes = window.prompt('Notes (optional)?', '') ?? '';
+    try {
+      const out = await ermAdvancedApi.recordReading(k.id, num, notes);
+      toast.success(`Reading recorded — band ${out.band}` + (out.breachCreated ? ' (breach raised)' : ''));
+      void loadAll();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+
+  if (demoMode) {
+    return (
+      <Card title="KRI engine">
+        <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>
+          Sign in to view live KRI thresholds, readings and breach events.
+          <div style={{ marginTop: 8, fontSize: 12 }}>Open risks (demo): {risks.filter(r => r.status === 'OPEN').length}</div>
+        </div>
+      </Card>
+    );
+  }
+
   return (
-    <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-      {kris.map(k => {
-        const breached = k.threshold > 0 && k.value > k.threshold;
-        const Trend = k.trend === 'up' ? TrendingUp : TrendingDown;
-        const trendBg = k.trend === 'up' ? (breached ? 'var(--danger-bg)' : 'var(--success-bg)') : 'var(--success-bg)';
-        const trendFg = k.trend === 'up' ? (breached ? 'var(--danger-fg)' : 'var(--success-fg)') : 'var(--success-fg)';
-        return (
-          <Card key={k.name} title={k.name} Icon={Activity} action={breached ? <Badge tone="danger" dot>Breach</Badge> : <Badge tone="success" dot>OK</Badge>}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 800, color: breached ? 'var(--danger-fg)' : 'var(--ink-1)' }}>
-                {k.value.toLocaleString()}{k.unit}
-              </span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 8px', background: trendBg, color: trendFg, fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', borderRadius: 'var(--r-pill)' }}>
-                <Trend size={11} /> {k.delta}
-              </span>
+    <>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
+        <Kpi Icon={Activity}      label="Total KRIs"   value={stats?.totalKris ?? 0} tone="primary" />
+        <Kpi Icon={ShieldCheck}   label="Green"        value={stats?.green ?? 0}     tone="success" />
+        <Kpi Icon={AlertTriangle} label="Amber"        value={stats?.amber ?? 0}     tone="warning" />
+        <Kpi Icon={Flame}         label="Red"          value={stats?.red ?? 0}       tone="danger" />
+        <Kpi Icon={ClipboardCheck} label="Open breaches" value={stats?.openBreaches ?? 0} tone="accent" />
+      </div>
+      {loading
+        ? <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
+        : kris.length === 0
+          ? <Card><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>No KRIs defined yet.</div></Card>
+          : (
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+              {kris.map(k => {
+                const band = latest[k.id] ?? 'NO_DATA';
+                const tone = BAND_TONE[band] ?? 'neutral';
+                const openBreaches = (breaches[k.id] ?? []).length;
+                return (
+                  <Card key={k.id} title={k.code ? `${k.code} · ${k.nameEn}` : k.nameEn} Icon={Activity}
+                    action={<Badge tone={tone} dot>{band.replace('NO_DATA', 'No data')}</Badge>}>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>
+                      {k.framework && <span>{k.framework} · </span>}
+                      {k.frequency} · {k.owner ?? '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Green ≤ <span className="mono">{k.greenMax ?? '—'}</span> · Amber ≤ <span className="mono">{k.amberMax ?? '—'}</span></span>
+                      <span>{k.unit ?? ''}</span>
+                    </div>
+                    <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <Button variant="secondary" Icon={ArrowRight} onClick={() => recordReading(k)}>Record reading</Button>
+                      {openBreaches > 0 && <Badge tone="danger">{openBreaches} open breach{openBreaches > 1 ? 'es' : ''}</Badge>}
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
-            <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 'var(--r-pill)', overflow: 'hidden', marginBottom: 6 }}>
-              <div style={{ width: `${Math.min(100, k.threshold > 0 ? (k.value / k.threshold) * 100 : 0)}%`, height: '100%', background: breached ? 'linear-gradient(90deg, var(--accent), var(--danger))' : 'linear-gradient(90deg, var(--primary-300), var(--primary))' }} />
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Threshold: <span className="mono">{k.threshold}{k.unit}</span></span>
-              <span>{breached ? 'Above limit' : 'Within limit'}</span>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+          )
+      }
+    </>
   );
 }
 
-// ─── Risk Appetite Dashboard ────────────────────────────────────────────────
-function AppetiteDashboard({ risks }: { risks: RiskResponse[] }) {
-  const categories = ['Cyber', 'Operational', 'Compliance', 'Third-Party', 'Financial', 'Strategic'];
-  const buckets = categories.map(cat => {
-    const cs = risks.filter(r => (r.categoryNameEn ?? r.categoryName ?? '').toLowerCase().includes(cat.toLowerCase()));
-    const score = cs.reduce((s, r) => s + r.inherentScore, 0);
-    const budget = cat === 'Cyber' ? 80 : cat === 'Operational' ? 60 : cat === 'Compliance' ? 50 : cat === 'Third-Party' ? 40 : cat === 'Financial' ? 70 : 30;
-    const used = Math.min(100, Math.round((score / budget) * 100));
-    const tone: 'primary' | 'accent' | 'danger' | 'success' = used >= 100 ? 'danger' : used >= 80 ? 'accent' : used >= 50 ? 'primary' : 'success';
-    return { cat, used, budget, score, count: cs.length, tone };
-  });
-  return (
-    <>
-      <Card title="Risk Appetite Statement" Icon={Target} action={<Badge tone="primary">FY2026</Badge>}>
-        <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6, padding: '4px 2px' }}>
-          The board accepts <b>moderate</b> risk in pursuit of strategic growth, with <b>zero tolerance</b> for unmanaged
-          regulatory non-compliance, customer-impacting privacy breaches, or material misstatement.
-          Risk consumption is monitored monthly by the Risk Council; categories above 80% trigger a treatment review.
+// ─── Risk Appetite Dashboard (W3 — assessment §5.1 ERM #6) ──────────────────
+const APPETITE_TONE: Record<string, BadgeTone> = {
+  AVERSE: 'danger', MINIMAL: 'warning', CAUTIOUS: 'accent', OPEN: 'info', HUNGRY: 'success',
+};
+const SEVERITY_TONE_APP: Record<string, BadgeTone> = {
+  WITHIN_TOLERANCE: 'success', EXCEEDED: 'warning', CRITICAL: 'danger',
+};
+
+function AppetiteDashboard({ demoMode, risks }: { demoMode: boolean; risks: RiskResponse[] }) {
+  const [items, setItems] = useState<RiskAppetiteStatementDto[]>([]);
+  const [breaches, setBreaches] = useState<Record<number, AppetiteBreachEventDto[]>>({});
+  const [stats, setStats] = useState<{ total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+
+  async function loadAll() {
+    if (demoMode) { setItems([]); setStats({ total: 0, withinTolerance: 0, exceeded: 0, critical: 0, noExposure: 0 }); return; }
+    setLoading(true);
+    try {
+      const [page, dash] = await Promise.all([
+        ermAdvancedApi.appetites(0, 100),
+        ermAdvancedApi.appetiteDashboard(),
+      ]);
+      const list = page.content ?? [];
+      setItems(list);
+      setStats(dash);
+      const bm: Record<number, AppetiteBreachEventDto[]> = {};
+      await Promise.all(list.map(async s => {
+        try {
+          const b = await ermAdvancedApi.appetiteBreaches(s.id);
+          bm[s.id] = b.filter(x => x.status === 'OPEN');
+        } catch { /* ignore */ }
+      }));
+      setBreaches(bm);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
+
+  function severity(s: RiskAppetiteStatementDto): string | null {
+    const v = s.currentExposure;
+    const upper = s.toleranceUpper;
+    if (v == null || upper == null) return null;
+    if (v <= upper) return 'WITHIN_TOLERANCE';
+    const pct = upper === 0 ? 100 : ((v - upper) / upper) * 100;
+    return pct >= 25 ? 'CRITICAL' : 'EXCEEDED';
+  }
+
+  async function updateExposure(s: RiskAppetiteStatementDto) {
+    const v = window.prompt(`Update exposure for "${s.titleEn}" (${s.unit ?? ''}):`, String(s.currentExposure ?? ''));
+    if (v === null) return;
+    const num = Number(v);
+    if (Number.isNaN(num)) { toast.danger('Invalid number'); return; }
+    const notes = window.prompt('Notes (optional)?', '') ?? '';
+    try { await ermAdvancedApi.updateExposure(s.id, num, notes); toast.success('Exposure updated'); void loadAll(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  async function approveAppetite(s: RiskAppetiteStatementDto) {
+    const who = window.prompt('Approver name?', s.approvedBy ?? '');
+    if (!who) return;
+    try { await ermAdvancedApi.approveAppetite(s.id, who); toast.success('Approved'); void loadAll(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  if (demoMode) {
+    return (
+      <Card title="Risk appetite">
+        <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>
+          Sign in to view live appetite statements with exposure tracking and breach events.
+          <div style={{ marginTop: 8, fontSize: 12 }}>Risks in scope (demo): {risks.length}</div>
         </div>
       </Card>
-      <div style={{ height: 16 }} />
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-        {buckets.map(b => (
-          <Card key={b.cat} title={b.cat} Icon={Target} action={<Badge tone={b.tone}>{b.used}% used</Badge>}>
-            <Progress label={`${b.count} risks · score ${b.score} / ${b.budget}`} value={Math.min(100, b.used)} tone={b.tone} />
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, display: 'flex', justifyContent: 'space-between' }}>
-              <span>{b.used >= 100 ? 'Over appetite — escalate' : b.used >= 80 ? 'Approaching limit' : 'Within appetite'}</span>
-              <span className="mono">{b.score}/{b.budget}</span>
-            </div>
-          </Card>
-        ))}
+    );
+  }
+
+  return (
+    <>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
+        <Kpi Icon={Target}        label="Statements"        value={stats?.total ?? 0} tone="primary" />
+        <Kpi Icon={ShieldCheck}   label="Within tolerance"  value={stats?.withinTolerance ?? 0} tone="success" />
+        <Kpi Icon={AlertTriangle} label="Exceeded"          value={stats?.exceeded ?? 0} tone="warning" />
+        <Kpi Icon={Flame}         label="Critical"          value={stats?.critical ?? 0} tone="danger" />
+        <Kpi Icon={ClipboardCheck} label="No exposure data" value={stats?.noExposure ?? 0} tone="info" />
       </div>
+      {loading
+        ? <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
+        : items.length === 0
+          ? <Card><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>No appetite statements yet.</div></Card>
+          : (
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
+              {items.map(s => {
+                const sev = severity(s);
+                const sevTone = sev ? SEVERITY_TONE_APP[sev] : 'neutral';
+                const used = (s.currentExposure != null && s.toleranceUpper != null && s.toleranceUpper !== 0)
+                  ? Math.min(150, Math.round((s.currentExposure / s.toleranceUpper) * 100)) : 0;
+                const ob = (breaches[s.id] ?? []).length;
+                return (
+                  <Card key={s.id} title={s.titleEn} Icon={Target}
+                    action={<Badge tone={APPETITE_TONE[s.appetiteLevel] ?? 'neutral'}>{s.appetiteLevel}</Badge>}>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>
+                      {s.riskDimension} · {s.status}
+                    </div>
+                    <Progress label={`Exposure ${s.currentExposure ?? '—'} / ${s.toleranceUpper ?? '—'} ${s.unit ?? ''}`} value={Math.min(100, used)} tone={sev === 'CRITICAL' ? 'danger' : sev === 'EXCEEDED' ? 'accent' : 'success'} />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {sev && <Badge tone={sevTone}>{sev.replace(/_/g, ' ')}</Badge>}
+                      {ob > 0 && <Badge tone="danger">{ob} open breach{ob > 1 ? 'es' : ''}</Badge>}
+                      <Button variant="secondary" Icon={ArrowRight} onClick={() => updateExposure(s)}>Update exposure</Button>
+                      {s.status !== 'APPROVED' && s.status !== 'RETIRED' &&
+                        <Button variant="secondary" Icon={CheckCheck} onClick={() => approveAppetite(s)}>Approve</Button>}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )
+      }
     </>
   );
 }
