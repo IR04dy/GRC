@@ -472,14 +472,31 @@ export interface PrivacyRopaDto {
   purposeEn?: string; legalBasis?: string;
   retentionPeriod?: string; status?: string;
 }
+export interface PrivacyBreachRequest {
+  titleEn: string; titleAr?: string;
+  description?: string; severity?: string;
+  affectedRecords?: number | null; discoveredAt?: string;
+  reportedToAuthority?: boolean; status?: string;
+}
+export interface PrivacyRopaRequest {
+  processNameEn: string; processNameAr?: string;
+  legalBasis?: string; dataCategories?: string;
+  retentionPeriod?: string; status?: string;
+}
 export const privacyApi = {
-  dsrs:        (page = 0, size = 50) => api.get<PageResponse<PrivacyDsrDto>>(`/api/v1/privacy/dsrs${pageQ(page, size)}`),
-  createDsr:   (body: PrivacyDsrRequest) => api.post<PrivacyDsrDto>('/api/v1/privacy/dsrs', body),
-  updateDsr:   (id: number, body: PrivacyDsrRequest) => api.put<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}`, body),
-  deleteDsr:   (id: number) => api.delete<void>(`/api/v1/privacy/dsrs/${id}`),
-  breaches:    (page = 0, size = 50) => api.get<PageResponse<PrivacyBreachDto>>(`/api/v1/privacy/breaches${pageQ(page, size)}`),
-  ropa:        (page = 0, size = 50) => api.get<PageResponse<PrivacyRopaDto>>(`/api/v1/privacy/ropa${pageQ(page, size)}`),
-  stats:       () => api.get<unknown>('/api/v1/privacy/stats'),
+  dsrs:           (page = 0, size = 50) => api.get<PageResponse<PrivacyDsrDto>>(`/api/v1/privacy/dsrs${pageQ(page, size)}`),
+  createDsr:      (body: PrivacyDsrRequest) => api.post<PrivacyDsrDto>('/api/v1/privacy/dsrs', body),
+  updateDsr:      (id: number, body: PrivacyDsrRequest) => api.put<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}`, body),
+  deleteDsr:      (id: number) => api.delete<void>(`/api/v1/privacy/dsrs/${id}`),
+  breaches:       (page = 0, size = 50) => api.get<PageResponse<PrivacyBreachDto>>(`/api/v1/privacy/breaches${pageQ(page, size)}`),
+  createBreach:   (body: PrivacyBreachRequest) => api.post<PrivacyBreachDto>('/api/v1/privacy/breaches', body),
+  updateBreach:   (id: number, body: PrivacyBreachRequest) => api.put<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}`, body),
+  deleteBreach:   (id: number) => api.delete<void>(`/api/v1/privacy/breaches/${id}`),
+  ropa:           (page = 0, size = 50) => api.get<PageResponse<PrivacyRopaDto>>(`/api/v1/privacy/ropa${pageQ(page, size)}`),
+  createRopa:     (body: PrivacyRopaRequest) => api.post<PrivacyRopaDto>('/api/v1/privacy/ropa', body),
+  updateRopa:     (id: number, body: PrivacyRopaRequest) => api.put<PrivacyRopaDto>(`/api/v1/privacy/ropa/${id}`, body),
+  deleteRopa:     (id: number) => api.delete<void>(`/api/v1/privacy/ropa/${id}`),
+  stats:          () => api.get<unknown>('/api/v1/privacy/stats'),
 };
 
 // ─── Compliance ─────────────────────────────────────────────────────────────
@@ -504,14 +521,29 @@ export interface ComplianceFindingDto {
   severity: string; owner?: string;
   capa?: string; dueDate?: string; status: string;
 }
+export interface ComplianceAssessmentRequest {
+  framework: string; period: string;
+  auditor?: string; score?: number | null; status?: string;
+  assessmentDate?: string; notes?: string;
+}
+export interface ComplianceFindingRequest {
+  title: string; severity?: string;
+  owner?: string; capa?: string;
+  dueDate?: string; status?: string;
+}
 export const complianceApi = {
-  controls:       (page = 0, size = 50) => api.get<PageResponse<ComplianceControlDto>>(`/api/v1/compliance/controls${pageQ(page, size)}`),
-  createControl:  (body: ComplianceControlRequest) => api.post<ComplianceControlDto>('/api/v1/compliance/controls', body),
-  updateControl:  (id: number, body: ComplianceControlRequest) => api.put<ComplianceControlDto>(`/api/v1/compliance/controls/${id}`, body),
-  deleteControl:  (id: number) => api.delete<void>(`/api/v1/compliance/controls/${id}`),
-  assessments:    (page = 0, size = 50) => api.get<PageResponse<ComplianceAssessmentDto>>(`/api/v1/compliance/assessments${pageQ(page, size)}`),
-  findings:       (page = 0, size = 50) => api.get<PageResponse<ComplianceFindingDto>>(`/api/v1/compliance/findings${pageQ(page, size)}`),
-  stats:          () => api.get<unknown>('/api/v1/compliance/stats'),
+  controls:           (page = 0, size = 50) => api.get<PageResponse<ComplianceControlDto>>(`/api/v1/compliance/controls${pageQ(page, size)}`),
+  createControl:      (body: ComplianceControlRequest) => api.post<ComplianceControlDto>('/api/v1/compliance/controls', body),
+  updateControl:      (id: number, body: ComplianceControlRequest) => api.put<ComplianceControlDto>(`/api/v1/compliance/controls/${id}`, body),
+  deleteControl:      (id: number) => api.delete<void>(`/api/v1/compliance/controls/${id}`),
+  assessments:        (page = 0, size = 50) => api.get<PageResponse<ComplianceAssessmentDto>>(`/api/v1/compliance/assessments${pageQ(page, size)}`),
+  createAssessment:   (body: ComplianceAssessmentRequest) => api.post<ComplianceAssessmentDto>('/api/v1/compliance/assessments', body),
+  updateAssessment:   (id: number, body: ComplianceAssessmentRequest) => api.put<ComplianceAssessmentDto>(`/api/v1/compliance/assessments/${id}`, body),
+  findings:           (page = 0, size = 50) => api.get<PageResponse<ComplianceFindingDto>>(`/api/v1/compliance/findings${pageQ(page, size)}`),
+  createFinding:      (body: ComplianceFindingRequest) => api.post<ComplianceFindingDto>('/api/v1/compliance/findings', body),
+  updateFinding:      (id: number, body: ComplianceFindingRequest) => api.put<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}`, body),
+  deleteFinding:      (id: number) => api.delete<void>(`/api/v1/compliance/findings/${id}`),
+  stats:              () => api.get<unknown>('/api/v1/compliance/stats'),
 };
 
 // ─── TPRM ───────────────────────────────────────────────────────────────────
@@ -605,6 +637,7 @@ export interface ScmVendorDto {
   riskLevel?: string; status: string;
   onboardingStatus?: string;
   contactName?: string; contactEmail?: string; contactPhone?: string;
+  registrationNumber?: string; website?: string; description?: string;
 }
 export interface ScmVendorRequest {
   nameEn: string; nameAr?: string;
@@ -612,6 +645,7 @@ export interface ScmVendorRequest {
   country?: string; serviceType?: string;
   riskLevel?: string; status?: string;
   contactName?: string; contactEmail?: string; contactPhone?: string;
+  registrationNumber?: string; website?: string;
   description?: string;
 }
 export interface ScmOnboardingDto {
@@ -620,6 +654,12 @@ export interface ScmOnboardingDto {
   currentStage: string; status: string;
   completedStages?: string;
   dueDate?: string; assignee?: string;
+  notes?: string;
+}
+export interface ScmOnboardingRequest {
+  vendorId: number; currentStage?: string;
+  status?: string; assignedToId?: number | null;
+  dueDate?: string; notes?: string;
 }
 export interface ScmAssessmentDto {
   id: number; vendorId: number;
@@ -627,7 +667,42 @@ export interface ScmAssessmentDto {
   assessmentType?: string;
   assessmentDate?: string; nextAssessmentDate?: string;
   overallScore?: number; riskRating?: string;
-  status: string; findings?: string;
+  status: string; findings?: string; recommendations?: string;
+  escalatedToRisk?: boolean;
+}
+export interface ScmAssessmentRequest {
+  vendorId: number; assessmentType?: string;
+  assessmentDate?: string; nextAssessmentDate?: string;
+  overallScore?: number | null; riskRating?: string;
+  status?: string; assessorId?: number | null;
+  findings?: string; recommendations?: string;
+}
+export interface ScmDependencyDto {
+  id: number; serviceNameEn: string; serviceNameAr?: string;
+  assetName?: string; vendorId?: number; vendorNameEn?: string;
+  dependencyType?: string; dependencyLevel?: string;
+  hasAlternative?: boolean; alternativeVendorId?: number; alternativeVendorNameEn?: string;
+  status?: string; impactAnalysis?: string;
+}
+export interface ScmDependencyRequest {
+  serviceNameEn: string; serviceNameAr?: string;
+  assetName?: string; vendorId?: number | null;
+  dependencyType?: string; dependencyLevel?: string;
+  hasAlternative?: boolean; alternativeVendorId?: number | null;
+  status?: string; impactAnalysis?: string;
+}
+export interface ScmIncidentDto {
+  id: number; incidentCode?: string; vendorId: number;
+  vendorNameEn?: string; vendorNameAr?: string;
+  incidentType?: string; impact?: string; description?: string;
+  slaBreached?: boolean; status?: string;
+  backupPlanActivated?: boolean; capaCreated?: boolean; escalatedToManagement?: boolean;
+  reportedAt?: string; resolvedAt?: string; resolutionNotes?: string;
+}
+export interface ScmIncidentRequest {
+  vendorId: number; incidentType?: string;
+  impact?: string; description?: string;
+  slaBreached?: boolean; assignedToId?: number | null;
 }
 export interface ScmContractDto {
   id: number; vendorId: number;
@@ -636,19 +711,57 @@ export interface ScmContractDto {
   contractType?: string;
   startDate?: string; endDate?: string;
   autoRenewal?: boolean; contractValue?: number;
-  status?: string;
+  currency?: string; status?: string; notes?: string;
+}
+export interface ScmContractRequest {
+  vendorId: number; contractNumber?: string;
+  titleEn: string; titleAr?: string;
+  contractType?: string; startDate?: string; endDate?: string;
+  autoRenewal?: boolean; contractValue?: number | null;
+  currency?: string; status?: string; notes?: string;
+}
+export interface ScmStats {
+  totalVendors: number; criticalVendors: number; activeVendors: number;
+  pendingOnboarding: number; totalDependencies: number; highDependencies: number;
+  openIncidents: number; slaBreaches: number;
+  activeContracts: number; expiringContracts: number;
 }
 export const scmApi = {
-  vendors:       (page = 0, size = 50) => api.get<PageResponse<ScmVendorDto>>(`/api/v1/scm/vendors${pageQ(page, size)}`),
-  createVendor:  (body: ScmVendorRequest) => api.post<ScmVendorDto>('/api/v1/scm/vendors', body),
-  updateVendor:  (id: number, body: ScmVendorRequest) => api.put<ScmVendorDto>(`/api/v1/scm/vendors/${id}`, body),
-  deleteVendor:  (id: number) => api.delete<void>(`/api/v1/scm/vendors/${id}`),
-  onboarding:    (page = 0, size = 50) => api.get<PageResponse<ScmOnboardingDto>>(`/api/v1/scm/onboarding${pageQ(page, size)}`),
-  advanceOnboarding: (id: number) => api.post(`/api/v1/scm/onboarding/${id}/advance`),
-  approveOnboarding: (id: number) => api.post(`/api/v1/scm/onboarding/${id}/approve`),
-  assessments:   (page = 0, size = 50) => api.get<PageResponse<ScmAssessmentDto>>(`/api/v1/scm/assessments${pageQ(page, size)}`),
-  contracts:     (page = 0, size = 50) => api.get<PageResponse<ScmContractDto>>(`/api/v1/scm/contracts${pageQ(page, size)}`),
-  stats:         () => api.get<unknown>('/api/v1/scm/stats'),
+  // Vendors
+  vendors:        (page = 0, size = 50) => api.get<PageResponse<ScmVendorDto>>(`/api/v1/scm/vendors${pageQ(page, size)}`),
+  allVendors:     () => api.get<ScmVendorDto[]>('/api/v1/scm/vendors/all'),
+  createVendor:   (body: ScmVendorRequest) => api.post<ScmVendorDto>('/api/v1/scm/vendors', body),
+  updateVendor:   (id: number, body: ScmVendorRequest) => api.put<ScmVendorDto>(`/api/v1/scm/vendors/${id}`, body),
+  deleteVendor:   (id: number) => api.delete<void>(`/api/v1/scm/vendors/${id}`),
+  // Onboarding
+  onboarding:        (page = 0, size = 50) => api.get<PageResponse<ScmOnboardingDto>>(`/api/v1/scm/onboarding${pageQ(page, size)}`),
+  startOnboarding:   (body: ScmOnboardingRequest) => api.post<ScmOnboardingDto>('/api/v1/scm/onboarding', body),
+  advanceOnboarding: (id: number) => api.post<ScmOnboardingDto>(`/api/v1/scm/onboarding/${id}/advance`),
+  approveOnboarding: (id: number) => api.post<ScmOnboardingDto>(`/api/v1/scm/onboarding/${id}/approve`),
+  rejectOnboarding:  (id: number, reason: string) => api.post<ScmOnboardingDto>(`/api/v1/scm/onboarding/${id}/reject`, { reason }),
+  // Assessments
+  assessments:        (page = 0, size = 50) => api.get<PageResponse<ScmAssessmentDto>>(`/api/v1/scm/assessments${pageQ(page, size)}`),
+  createAssessment:   (body: ScmAssessmentRequest) => api.post<ScmAssessmentDto>('/api/v1/scm/assessments', body),
+  updateAssessment:   (id: number, body: ScmAssessmentRequest) => api.put<ScmAssessmentDto>(`/api/v1/scm/assessments/${id}`, body),
+  escalateAssessment: (id: number) => api.post<ScmAssessmentDto>(`/api/v1/scm/assessments/${id}/escalate`),
+  // Dependencies
+  dependencies:       (page = 0, size = 50) => api.get<PageResponse<ScmDependencyDto>>(`/api/v1/scm/dependencies${pageQ(page, size)}`),
+  createDependency:   (body: ScmDependencyRequest) => api.post<ScmDependencyDto>('/api/v1/scm/dependencies', body),
+  updateDependency:   (id: number, body: ScmDependencyRequest) => api.put<ScmDependencyDto>(`/api/v1/scm/dependencies/${id}`, body),
+  deleteDependency:   (id: number) => api.delete<void>(`/api/v1/scm/dependencies/${id}`),
+  // Incidents (disruptions)
+  incidents:        (page = 0, size = 50) => api.get<PageResponse<ScmIncidentDto>>(`/api/v1/scm/incidents${pageQ(page, size)}`),
+  createIncident:   (body: ScmIncidentRequest) => api.post<ScmIncidentDto>('/api/v1/scm/incidents', body),
+  activateBackup:   (id: number) => api.post<ScmIncidentDto>(`/api/v1/scm/incidents/${id}/activate-backup`),
+  createIncidentCapa: (id: number) => api.post<ScmIncidentDto>(`/api/v1/scm/incidents/${id}/create-capa`),
+  escalateIncident: (id: number) => api.post<ScmIncidentDto>(`/api/v1/scm/incidents/${id}/escalate`),
+  resolveIncident:  (id: number, notes: string) => api.post<ScmIncidentDto>(`/api/v1/scm/incidents/${id}/resolve`, { notes }),
+  // Contracts
+  contracts:       (page = 0, size = 50) => api.get<PageResponse<ScmContractDto>>(`/api/v1/scm/contracts${pageQ(page, size)}`),
+  createContract:  (body: ScmContractRequest) => api.post<ScmContractDto>('/api/v1/scm/contracts', body),
+  updateContract:  (id: number, body: ScmContractRequest) => api.put<ScmContractDto>(`/api/v1/scm/contracts/${id}`, body),
+  // Stats
+  stats:         () => api.get<ScmStats>('/api/v1/scm/stats'),
 };
 
 // ─── Admin ──────────────────────────────────────────────────────────────────

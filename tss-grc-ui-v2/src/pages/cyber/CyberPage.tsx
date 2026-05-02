@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ShieldCheck, Bug, Flame, ClipboardCheck, Filter, Download, Plus, Activity, BarChart3,
   Shield, Target, Cpu, FileCheck2, ListTodo, ShieldOff,
-  CheckCheck, TrendingUp, PlayCircle, Check,
+  CheckCheck, TrendingUp, PlayCircle, Check, GitBranchPlus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -654,6 +654,10 @@ export function CyberPage() {
     try { await cyberApi.approveAssessment(a.id); toast.success('Assessment approved'); assessments.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Approve failed'); }
   }
+  async function convertGap(a: CyberAssessmentDto) {
+    try { await cyberApi.convertAssessmentGap(a.id); toast.success('Gap converted to Action Plan'); assessments.reload(); actionPlans.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Convert failed'); }
+  }
   async function escalateVuln(v: CyberVulnDto) {
     try { await cyberApi.escalateVuln(v.id); toast.success('Vulnerability escalated'); vulns.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Escalate failed'); }
@@ -702,14 +706,21 @@ export function CyberPage() {
     { header: t('colRisk'),     cell: r => <Badge tone={SEVERITY_TONE[r.riskLevel ?? ''] ?? 'neutral'} dot>{severityLabel(t, r.riskLevel ?? '—')}</Badge> },
     { header: t('colGap'),      cell: r => r.gapIdentified ? <Badge tone="danger">{t('colGap')}</Badge> : <Badge tone="success">{t('badgeNone')}</Badge> },
     { header: t('colStatus'),   cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
-    { header: '', align: 'end', width: '120px',
-      cell: r => (
-        <RowActions
-          extras={r.status !== 'APPROVED' && r.status !== 'CLOSED' ? [{ Icon: CheckCheck, onClick: () => approveAssess(r), title: t('actionApprove'), tone: 'success' }] : []}
-          onEdit={() => assessS.startEdit(r)}
-          onDelete={() => assessS.askDelete(r)}
-        />
-      ) },
+    { header: '', align: 'end', width: '160px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof CheckCheck; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status !== 'APPROVED' && r.status !== 'CLOSED') {
+          extras.push({ Icon: CheckCheck, onClick: () => approveAssess(r), title: t('actionApprove'), tone: 'success' });
+        }
+        if (r.gapIdentified && !r.capaId) {
+          extras.push({ Icon: GitBranchPlus, onClick: () => convertGap(r), title: t('cyberActConvertGap'), tone: 'accent' });
+        }
+        return (
+          <RowActions extras={extras}
+            onEdit={() => assessS.startEdit(r)}
+            onDelete={() => assessS.askDelete(r)} />
+        );
+      } },
   ];
   const vulnCols: Column<CyberVulnDto>[] = [
     { header: t('colAsset'),    cell: r => <span style={{ fontWeight: 600 }}>{r.assetName ?? '—'}</span> },
