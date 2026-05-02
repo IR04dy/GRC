@@ -315,6 +315,23 @@ export const ar = {
   incidentsCategoryCol: 'الفئة',
   incidentsSeverityCol: 'الخطورة',
   incidentsDetectedCol: 'تاريخ الكشف',
+  incidentsNistCol: 'مرحلة NIST',
+
+  // إجراءات سير الحوادث (NIST 800-61)
+  incidentsActAdvancePhase:    'الانتقال للمرحلة التالية',
+  incidentsActClose:           'إغلاق الحادثة',
+  incidentsActSaudiTemplates:  'قوالب الإبلاغ السعودية',
+  incidentsActMarkNotified:    'تأكيد الإبلاغ',
+  incidentsTemplatesTitle:     'قوالب الإبلاغ التنظيمي السعودي',
+  incidentsTemplatesSub:       'قوالب جاهزة لإخطارات هيئة الأمن السيبراني (24 ساعة)، مكتب البيانات السعودي (72 ساعة - المادة 20 من نظام حماية البيانات)، هيئة الاتصالات (24 ساعة)، البنك المركزي السعودي، ووزارة الموارد البشرية. اضغط "تأكيد الإبلاغ" بعد إرسال الحزمة عبر القناة المحددة.',
+
+  // تقادم ملاحظات الالتزام
+  complianceColDaysOpen:    'أيام مفتوحة',
+  complianceColEscalation:  'مستوى التصعيد',
+  complianceTierOnTrack:           'على المسار',
+  complianceTierManagerEscalated:  'صعّد للمدير',
+  complianceTierDirectorEscalated: 'صعّد للمدير التنفيذي',
+  complianceTierExecEscalated:     'صعّد للإدارة العليا',
 
   // ─── Evidence ───────────────────────────────────
   evidenceEyebrow: 'إدارة الأدلة',

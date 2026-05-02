@@ -323,6 +323,23 @@ export const en = {
   incidentsCategoryCol: 'Category',
   incidentsSeverityCol: 'Severity',
   incidentsDetectedCol: 'Detected',
+  incidentsNistCol: 'NIST Phase',
+
+  // Incident workflow actions (NIST 800-61)
+  incidentsActAdvancePhase:    'Advance Phase',
+  incidentsActClose:           'Close Incident',
+  incidentsActSaudiTemplates:  'Saudi Reports',
+  incidentsActMarkNotified:    'Mark Notified',
+  incidentsTemplatesTitle:     'Saudi Regulatory Notification Templates',
+  incidentsTemplatesSub:       'Auto-filled templates for NCA HEY (24-hr), Saudi Data Office (72-hr PDPL Article 20), CITC (24-hr telecom/cloud), SAMA (banks) and HRSD (employee data). Click "Mark Notified" once you have submitted the package via the listed channel.',
+
+  // Compliance findings aging
+  complianceColDaysOpen:    'Days Open',
+  complianceColEscalation:  'Escalation Tier',
+  complianceTierOnTrack:           'On Track',
+  complianceTierManagerEscalated:  'Manager',
+  complianceTierDirectorEscalated: 'Director',
+  complianceTierExecEscalated:     'Executive',
 
   // ─── Evidence ───────────────────────────────────
   evidenceEyebrow: 'Evidence Management',

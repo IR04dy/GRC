@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
-import { AlertOctagon, Flame, Timer, CheckCircle2, Filter, Download, Plus, BarChart3, Lightbulb, Activity, FileText, AlertTriangle, ShieldCheck, RefreshCw } from 'lucide-react';
+import {
+  AlertOctagon, Flame, Timer, CheckCircle2, Filter, Download, Plus, BarChart3, Lightbulb,
+  Activity, FileText, AlertTriangle, ShieldCheck, RefreshCw, ArrowRight, Send, Archive, Scroll,
+} from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -17,7 +20,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, SEVERITY_TONE, statusLabel, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
-import { incidentApi, ApiError, type IncidentDto, type IncidentRequest } from '../../lib/api';
+import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type RegulatoryTemplate, type SaudiRegulator } from '../../lib/api';
+import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
 
@@ -60,8 +64,36 @@ export function IncidentsPage() {
   const [editing, setEditing] = useState<IncidentDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<IncidentDto | null>(null);
   const [busy, setBusy] = useState(false);
+  // Saudi regulatory-report templates state
+  const [templatesOpen, setTemplatesOpen] = useState<{ incident: IncidentDto; templates: RegulatoryTemplate[] } | null>(null);
 
   const incidents = useApiList<IncidentDto>(() => incidentApi.list(0, 100), INCIDENTS as unknown as IncidentDto[]);
+
+  // ── NIST 800-61 phase + Saudi regulator workflow handlers ──
+  async function advancePhase(r: IncidentDto) {
+    try { await incidentApi.advancePhase(r.id); toast.success('Phase advanced'); incidents.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function closeIncidentAction(r: IncidentDto) {
+    try { await incidentApi.closeIncident(r.id); toast.success('Incident closed'); incidents.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Close failed'); }
+  }
+  async function openTemplates(r: IncidentDto) {
+    try {
+      const templates = await incidentApi.regulatoryTemplates(r.id);
+      setTemplatesOpen({ incident: r, templates });
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Could not load templates'); }
+  }
+  async function notifyRegulator(incidentId: number, regulator: SaudiRegulator) {
+    try {
+      await incidentApi.notifyRegulator(incidentId, regulator);
+      toast.success(`${regulator.replace('_', ' ')} notification recorded`);
+      // Refresh templates so the modal shows the updated notifiedAt
+      const fresh = await incidentApi.regulatoryTemplates(incidentId);
+      setTemplatesOpen(prev => prev ? { ...prev, templates: fresh } : null);
+      incidents.reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Notify failed'); }
+  }
 
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'title',         label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 200, span: 8 },
@@ -85,11 +117,20 @@ export function IncidentsPage() {
     { header: t('incidentsTitleCol'),    cell: r => <span style={{ fontWeight: 600 }}>{r.title}</span> },
     { header: t('incidentsCategoryCol'), cell: r => <Badge tone="info">{r.category ?? '—'}</Badge> },
     { header: t('incidentsSeverityCol'), cell: r => <Badge tone={SEVERITY_TONE[r.severity] ?? 'neutral'} dot>{severityLabel(t, r.severity)}</Badge> },
+    // NIST 800-61 phase column
+    { header: t('incidentsNistCol'),     cell: r => <Badge tone="primary">{((r as IncidentDto & { nistPhase?: string }).nistPhase ?? 'IDENTIFICATION').replace(/_/g, ' ')}</Badge> },
     { header: t('colAssignee'),          cell: r => r.assignee ?? '—', mono: true },
     { header: t('incidentsDetectedCol'), cell: r => r.discoveryDate ?? '—', mono: true },
     { header: t('bcmStatusCol'),         cell: r => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(t, r.status)}</Badge> },
-    { header: '',                        align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+    { header: '', align: 'end', width: '230px',
+      cell: r => {
+        const phase = (r as IncidentDto & { nistPhase?: string }).nistPhase ?? 'IDENTIFICATION';
+        const extras: Array<{ Icon: typeof ArrowRight; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status !== 'CLOSED' && phase !== 'POST_INCIDENT') extras.push({ Icon: ArrowRight, onClick: () => advancePhase(r), title: t('incidentsActAdvancePhase'), tone: 'primary' });
+        if (r.status !== 'CLOSED')                              extras.push({ Icon: Scroll,     onClick: () => openTemplates(r),  title: t('incidentsActSaudiTemplates'), tone: 'accent' });
+        if (r.status !== 'CLOSED')                              extras.push({ Icon: Archive,    onClick: () => closeIncidentAction(r), title: t('incidentsActClose'),    tone: 'success' });
+        return <RowActions extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
+      } },
   ];
 
   const timelineEvents: TimelineEvent[] = useMemo(() => {
@@ -253,6 +294,67 @@ export function IncidentsPage() {
         confirmLabel="Delete"
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
       />
+
+      {/* ── Saudi regulatory-report templates modal ── */}
+      <Modal
+        open={!!templatesOpen}
+        title={templatesOpen ? `${t('incidentsTemplatesTitle')} · ${templatesOpen.incident.title}` : ''}
+        size="lg"
+        onClose={() => setTemplatesOpen(null)}
+      >
+        {templatesOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p style={{ fontSize: 13, color: 'var(--ink-2)', margin: 0 }}>
+              {t('incidentsTemplatesSub')}
+            </p>
+            {templatesOpen.templates.map(tmpl => {
+              const remaining = tmpl.hoursRemaining;
+              const colour = tmpl.notifiedAt
+                ? 'var(--success-fg)'
+                : remaining < 0 ? 'var(--danger)'
+                : remaining <= 6 ? 'var(--accent-700)'
+                : 'var(--success-fg)';
+              return (
+                <div key={tmpl.code} style={{
+                  border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                  padding: 12, background: 'var(--surface-2)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{tmpl.titleEn}</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)' }} dir="rtl">{tmpl.titleAr}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{tmpl.applicabilityHint}</div>
+                    </div>
+                    <div style={{ minWidth: 180, textAlign: 'right' }}>
+                      <div className="mono" style={{ color: colour, fontWeight: 700, fontSize: 13 }}>
+                        {tmpl.notifiedAt
+                          ? `Notified ${tmpl.notifiedAt.slice(0, 16).replace('T', ' ')}`
+                          : remaining < 0 ? `${Math.abs(remaining)}h overdue`
+                          : `${remaining}h remaining`}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{tmpl.deadlineHours}h deadline</div>
+                    </div>
+                  </div>
+                  <pre style={{
+                    fontSize: 11, fontFamily: 'var(--font-mono)', background: 'var(--surface)',
+                    padding: 10, borderRadius: 'var(--r-sm)', marginTop: 8, marginBottom: 8,
+                    whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto',
+                  }}>{tmpl.prefilledBody}</pre>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{tmpl.submissionChannel}</div>
+                    {!tmpl.notifiedAt && (
+                      <Button variant="primary" size="sm" Icon={Send}
+                        onClick={() => notifyRegulator(templatesOpen.incident.id, tmpl.code)}>
+                        {t('incidentsActMarkNotified')}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
     </Shell>
   );
 }

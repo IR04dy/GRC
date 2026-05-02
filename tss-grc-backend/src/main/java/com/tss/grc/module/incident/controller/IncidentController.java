@@ -76,4 +76,40 @@ public class IncidentController {
     public List<IncidentResponse> getRecent() {
         return incidentService.getRecent();
     }
+
+    // ── NIST 800-61 lifecycle workflow ───────────────────────────────────────
+    @PostMapping("/{id}/advance-phase")
+    @PreAuthorize("hasPermission('INCIDENT', 'WRITE')")
+    @Operation(summary = "Advance to the next NIST 800-61 phase (IDENTIFICATION → ANALYSIS → CONTAINMENT → ERADICATION → RECOVERY → POST_INCIDENT)")
+    public java.util.Map<String, Object> advancePhase(@PathVariable Long id) {
+        return incidentService.advancePhase(id);
+    }
+
+    @PostMapping("/{id}/set-phase")
+    @PreAuthorize("hasPermission('INCIDENT', 'WRITE')")
+    @Operation(summary = "Set the NIST phase explicitly (use sparingly — prefer /advance-phase)")
+    public java.util.Map<String, Object> setPhase(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return incidentService.setPhase(id, body.getOrDefault("phase", ""));
+    }
+
+    @PostMapping("/{id}/close")
+    @PreAuthorize("hasPermission('INCIDENT', 'WRITE')")
+    public java.util.Map<String, Object> closeIncident(@PathVariable Long id) {
+        return incidentService.closeIncident(id);
+    }
+
+    // ── Saudi regulator notification ─────────────────────────────────────────
+    @PostMapping("/{id}/notify-regulator")
+    @PreAuthorize("hasPermission('INCIDENT', 'WRITE')")
+    @Operation(summary = "Stamp regulator notification timestamp. body.regulator ∈ {NCA_HEY, DATA_OFFICE, CITC, SAMA, HRSD}")
+    public java.util.Map<String, Object> notifyRegulator(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return incidentService.notifyRegulator(id, body.getOrDefault("regulator", ""));
+    }
+
+    @GetMapping("/{id}/regulatory-templates")
+    @PreAuthorize("hasPermission('INCIDENT', 'READ')")
+    @Operation(summary = "Saudi regulatory notification templates (NCA HEY 24-hr, Data Office 72-hr, CITC 24-hr, SAMA, HRSD) auto-filled from this incident")
+    public java.util.List<java.util.Map<String, Object>> regulatoryTemplates(@PathVariable Long id) {
+        return incidentService.regulatoryTemplates(id);
+    }
 }

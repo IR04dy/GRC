@@ -653,6 +653,9 @@ export const complianceApi = {
   retirePolicy:       (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/retire`),
   rejectPolicy:       (id: number, reason: string) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/reject`, { reason }),
   policyStats:        () => api.get<unknown>('/api/v1/compliance/policies/stats'),
+  // Findings aging engine — §5.3 recommendation #4
+  findingsAging:      () => api.get<Array<ComplianceFindingDto & { daysOpen: number; escalationTier: string; createdAt?: string }>>('/api/v1/compliance/findings/aging'),
+  findingsAgingStats: () => api.get<{ onTrack: number; managerEscalated: number; directorEscalated: number; execEscalated: number }>('/api/v1/compliance/findings/aging/stats'),
   stats:              () => api.get<unknown>('/api/v1/compliance/stats'),
 };
 
@@ -690,6 +693,21 @@ export interface IncidentRequest {
   assignee?: string; discoveryDate?: string;
   description?: string;
 }
+export interface IncidentPhaseSnapshot {
+  id: number; status: string; nistPhase: string;
+  ncaHeyNotifiedAt?: string; dataOfficeNotifiedAt?: string;
+  citcNotifiedAt?: string; samaNotifiedAt?: string; hrsdNotifiedAt?: string;
+  mitreTactics?: string; mitreTechniques?: string;
+}
+export interface RegulatoryTemplate {
+  code: 'NCA_HEY' | 'DATA_OFFICE' | 'CITC' | 'SAMA' | 'HRSD';
+  titleEn: string; titleAr: string;
+  deadlineHours: number; hoursSinceDiscovery: number; hoursRemaining: number;
+  overdue: boolean; notifiedAt?: string;
+  submissionChannel: string; applicabilityHint: string;
+  prefilledBody: string;
+}
+export type SaudiRegulator = 'NCA_HEY' | 'DATA_OFFICE' | 'CITC' | 'SAMA' | 'HRSD';
 export const incidentApi = {
   list:    (page = 0, size = 50) => api.get<PageResponse<IncidentDto>>(`/api/v1/incidents${pageQ(page, size)}`),
   get:     (id: number) => api.get<IncidentDto>(`/api/v1/incidents/${id}`),
@@ -697,6 +715,13 @@ export const incidentApi = {
   update:  (id: number, body: IncidentRequest) => api.put<IncidentDto>(`/api/v1/incidents/${id}`, body),
   remove:  (id: number) => api.delete<void>(`/api/v1/incidents/${id}`),
   stats:   () => api.get<unknown>('/api/v1/incidents/stats'),
+  // NIST 800-61 lifecycle
+  advancePhase:    (id: number) => api.post<IncidentPhaseSnapshot>(`/api/v1/incidents/${id}/advance-phase`),
+  setPhase:        (id: number, phase: string) => api.post<IncidentPhaseSnapshot>(`/api/v1/incidents/${id}/set-phase`, { phase }),
+  closeIncident:   (id: number) => api.post<IncidentPhaseSnapshot>(`/api/v1/incidents/${id}/close`),
+  // Saudi regulator notification
+  notifyRegulator: (id: number, regulator: SaudiRegulator) => api.post<IncidentPhaseSnapshot>(`/api/v1/incidents/${id}/notify-regulator`, { regulator }),
+  regulatoryTemplates: (id: number) => api.get<RegulatoryTemplate[]>(`/api/v1/incidents/${id}/regulatory-templates`),
 };
 
 // ─── Evidence ───────────────────────────────────────────────────────────────
