@@ -63,11 +63,18 @@ const CATEGORY_OPTIONS = [
   { value: 'CONSULTING',    label: 'Consulting' },
   { value: 'OTHER',         label: 'Other' },
 ];
+// vendor.criticality + supplier_incidents.impact ∈ {CRITICAL,HIGH,MEDIUM,LOW}
 const CRITICALITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' },
   { value: 'HIGH',     label: 'High' },
   { value: 'MEDIUM',   label: 'Medium' },
   { value: 'LOW',      label: 'Low' },
+];
+// vendors.risk_level + dependencies.dependency_level ∈ {LOW,MEDIUM,HIGH} only
+const RISK_LEVEL_OPTIONS = [
+  { value: 'HIGH',   label: 'High' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'LOW',    label: 'Low' },
 ];
 // vendor.status ∈ {ACTIVE, INACTIVE, BLACKLISTED, UNDER_REVIEW, EXITED}
 const STATUS_OPTIONS = [
@@ -110,7 +117,7 @@ const DEPENDENCY_TYPE_OPTIONS = [
   { value: 'SHARED',       label: 'Shared' },
   { value: 'EXCLUSIVE',    label: 'Exclusive' },
 ];
-const DEPENDENCY_LEVEL_OPTIONS = CRITICALITY_OPTIONS;
+const DEPENDENCY_LEVEL_OPTIONS = RISK_LEVEL_OPTIONS;  // dep.dependency_level ∈ {LOW,MEDIUM,HIGH}
 // contract.type ∈ {SERVICE, SUPPLY, NDA, FRAMEWORK, OTHER}
 const CONTRACT_TYPE_OPTIONS = [
   { value: 'SERVICE',   label: 'Service Agreement' },
@@ -277,7 +284,7 @@ export function ScmPage() {
     { kind: 'select', key: 'criticality',     label: t('fldCriticality'), options: CRITICALITY_OPTIONS, span: 6 },
     { kind: 'text',   key: 'country',         label: t('fldCountry'), span: 4 },
     { kind: 'text',   key: 'serviceType',     label: t('scmFldServiceType'), span: 4 },
-    { kind: 'select', key: 'riskLevel',       label: t('scmFldRiskLevel'), options: CRITICALITY_OPTIONS, span: 4 },
+    { kind: 'select', key: 'riskLevel',       label: t('scmFldRiskLevel'), options: RISK_LEVEL_OPTIONS, span: 4 },
     { kind: 'select', key: 'status',          label: t('fldStatusLbl'), options: STATUS_OPTIONS, span: 6 },
     { kind: 'text',   key: 'registrationNumber', label: t('scmFldRegistrationNo'), span: 6 },
     { kind: 'text',   key: 'website',         label: t('scmFldWebsite'), span: 12 },

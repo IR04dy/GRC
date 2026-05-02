@@ -554,6 +554,19 @@ export const ar = {
   bcmConfirmDeleteBia:      'حذف سجل تحليل الأثر؟',
   bcmConfirmDeleteExercise: 'حذف هذا التمرين؟',
 
+  // إجراءات دورة حياة الخطة (ISO 22301)
+  bcmActApprovePlan:        'اعتماد الخطة',
+  bcmActInvokePlan:         'تفعيل الخطة',
+  bcmActRestorePlan:        'الإعلان عن استعادة',
+  bcmActCompleteExercise:   'إنهاء وتسجيل الدرجة',
+
+  // حقول إضافية للتمارين
+  bcmFldExerciseExecuted:   'تاريخ التنفيذ',
+  bcmFldExerciseLinkedPlan: 'الخطة المرتبطة',
+  bcmFldExerciseFacilitator:'الميسّر',
+  bcmFldExerciseScenario:   'السيناريو',
+  bcmFldExerciseFindings:   'النتائج',
+
   // Privacy
   privacyFldReqName: 'اسم مقدم الطلب',
   privacyFldReqEmail: 'البريد الإلكتروني لمقدم الطلب',

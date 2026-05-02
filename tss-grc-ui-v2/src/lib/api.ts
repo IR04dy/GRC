@@ -167,11 +167,35 @@ export interface BcmBiaRequest {
   overallImpact?: string; status?: string;
   linkedRiskId?: number | null;
 }
+export interface BcmExerciseDto {
+  id: number;
+  planId?: number;
+  exerciseNameEn: string; exerciseNameAr?: string;
+  exerciseType: string; scenario?: string;
+  scheduledDate?: string; executedDate?: string;
+  score?: number; status: string;
+  findings?: string; capaCount?: number;
+  facilitator?: string;
+}
+export interface BcmExerciseRequest {
+  planId?: number | null;
+  exerciseNameEn: string; exerciseNameAr?: string;
+  exerciseType?: string; scenario?: string;
+  scheduledDate?: string; executedDate?: string;
+  score?: number | null; status?: string;
+  findings?: string; capaCount?: number;
+  facilitator?: string;
+}
 export const bcmApi = {
   plans:        (page = 0, size = 50) => api.get<PageResponse<BcmPlanDto>>(`/api/v1/bcm/plans${pageQ(page, size)}`),
   createPlan:   (body: BcmPlanRequest) => api.post<BcmPlanDto>('/api/v1/bcm/plans', body),
   updatePlan:   (id: number, body: BcmPlanRequest) => api.put<BcmPlanDto>(`/api/v1/bcm/plans/${id}`, body),
   deletePlan:   (id: number) => api.delete<void>(`/api/v1/bcm/plans/${id}`),
+  // Plan ISO-22301 lifecycle workflow
+  submitPlanForReview: (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/submit-for-review`),
+  approvePlan:  (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/approve`),
+  invokePlan:   (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/invoke`),
+  restorePlan:  (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/restore`),
   processes:      (page = 0, size = 50) => api.get<PageResponse<BcmProcessDto>>(`/api/v1/bcm/processes${pageQ(page, size)}`),
   createProcess:  (body: BcmProcessRequest) => api.post<BcmProcessDto>('/api/v1/bcm/processes', body),
   updateProcess:  (id: number, body: BcmProcessRequest) => api.put<BcmProcessDto>(`/api/v1/bcm/processes/${id}`, body),
@@ -181,6 +205,13 @@ export const bcmApi = {
   createBia:    (body: BcmBiaRequest) => api.post<BcmBiaDto>('/api/v1/bcm/bia', body),
   updateBia:    (id: number, body: BcmBiaRequest) => api.put<BcmBiaDto>(`/api/v1/bcm/bia/${id}`, body),
   deleteBia:    (id: number) => api.delete<void>(`/api/v1/bcm/bia/${id}`),
+  // Exercises (ISO 22301 §8.5)
+  exercises:        (page = 0, size = 50) => api.get<PageResponse<BcmExerciseDto>>(`/api/v1/bcm/exercises${pageQ(page, size)}`),
+  createExercise:   (body: BcmExerciseRequest) => api.post<BcmExerciseDto>('/api/v1/bcm/exercises', body),
+  updateExercise:   (id: number, body: BcmExerciseRequest) => api.put<BcmExerciseDto>(`/api/v1/bcm/exercises/${id}`, body),
+  deleteExercise:   (id: number) => api.delete<void>(`/api/v1/bcm/exercises/${id}`),
+  completeExercise: (id: number, score: number, findings: string) =>
+    api.post<BcmExerciseDto>(`/api/v1/bcm/exercises/${id}/complete`, { score, findings }),
   stats:        () => api.get<unknown>('/api/v1/bcm/stats'),
 };
 

@@ -564,6 +564,19 @@ export const en = {
   bcmConfirmDeleteBia:      'Delete this BIA record?',
   bcmConfirmDeleteExercise: 'Delete this exercise?',
 
+  // BCM workflow actions (ISO 22301 lifecycle)
+  bcmActApprovePlan:        'Approve Plan',
+  bcmActInvokePlan:         'Invoke Plan',
+  bcmActRestorePlan:        'Mark Restored',
+  bcmActCompleteExercise:   'Complete & Score',
+
+  // BCM exercise extra fields
+  bcmFldExerciseExecuted:   'Executed Date',
+  bcmFldExerciseLinkedPlan: 'Linked Plan',
+  bcmFldExerciseFacilitator:'Facilitator',
+  bcmFldExerciseScenario:   'Scenario',
+  bcmFldExerciseFindings:   'Findings',
+
   // Privacy form fields
   privacyFldReqName: 'Requester Name',
   privacyFldReqEmail: 'Requester Email',

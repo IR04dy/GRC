@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { RefreshCw, Activity, TimerReset, Gauge, Filter, Download, Plus, BarChart3, Cpu, Calendar } from 'lucide-react';
+import {
+  RefreshCw, Activity, TimerReset, Gauge, Filter, Download, Plus, BarChart3, Cpu, Calendar,
+  CheckCheck, PlayCircle, RotateCcw, FileCheck2,
+} from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -21,6 +24,7 @@ import {
   type BcmPlanDto, type BcmPlanRequest,
   type BcmProcessDto, type BcmProcessRequest,
   type BcmBiaDto, type BcmBiaRequest,
+  type BcmExerciseDto, type BcmExerciseRequest,
   ApiError,
 } from '../../lib/api';
 import { useToast } from '../../lib/toast';
@@ -64,15 +68,21 @@ const BIA_EMPTY: BcmBiaRequest = {
   overallImpact: 'MEDIUM', status: 'DRAFT', linkedRiskId: null,
 };
 
-interface ExerciseRow { id: number; name: string; date: string; type: string; score: number }
-const INITIAL_EXERCISES: ExerciseRow[] = [
-  { id: 1, name: 'Tabletop · Q1 2026',    date: '2026-03-12', score: 100, type: 'TABLETOP' },
-  { id: 2, name: 'Functional · Q1 2026',  date: '2026-03-26', score: 92,  type: 'FUNCTIONAL' },
-  { id: 3, name: 'Full · Q4 2025',        date: '2025-12-08', score: 78,  type: 'FULL' },
-  { id: 4, name: 'Crisis Comms · Q3 2025', date: '2025-09-19', score: 64,  type: 'COMMUNICATION' },
-  { id: 5, name: 'Tabletop · Q2 2026',    date: '2026-06-02', score: 0,   type: 'TABLETOP' },
+// Exercise lifecycle status (matches backend CHECK constraint)
+const EXERCISE_STATUS_OPTIONS = [
+  { value: 'SCHEDULED',   label: 'Scheduled' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'COMPLETED',   label: 'Completed' },
+  { value: 'CANCELLED',   label: 'Cancelled' },
 ];
-const EXERCISE_EMPTY: ExerciseRow = { id: 0, name: '', date: '', type: 'TABLETOP', score: 0 };
+const EXERCISE_EMPTY: BcmExerciseRequest = {
+  exerciseNameEn: '', exerciseNameAr: '',
+  exerciseType: 'TABLETOP', scenario: '',
+  scheduledDate: '', executedDate: '',
+  score: null, status: 'SCHEDULED',
+  findings: '', capaCount: 0, facilitator: '',
+  planId: null,
+};
 
 const IMPACT_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success'> = {
   CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'info', LOW: 'success',
@@ -123,15 +133,13 @@ export function BcmPage() {
   const planS = useEntityState<BcmPlanDto>();
   const procS = useEntityState<BcmProcessDto>();
   const biaS  = useEntityState<BcmBiaDto>();
-  const exerS = useEntityState<ExerciseRow>();
+  const exerS = useEntityState<BcmExerciseDto>();
 
   const plans = useApiList<BcmPlanDto>(() => bcmApi.plans(0, 100), BCM_PLANS as unknown as BcmPlanDto[]);
   const procs = useApiList<BcmProcessDto>(() => bcmApi.processes(0, 100), []);
   // /bia returns a plain array — adapt to the Page<T> shape useApiList expects.
   const bia   = useApiList<BcmBiaDto>(() => bcmApi.bia().then(arr => ({ content: arr })), []);
-
-  // Exercises are demo-only (no backend). Hold them in local state so add/edit/delete still work.
-  const [exercises, setExercises] = useState<ExerciseRow[]>(INITIAL_EXERCISES);
+  const exercises = useApiList<BcmExerciseDto>(() => bcmApi.exercises(0, 200), []);
 
   // ── Field defs (built per-render so labels translate via t()) ──
   const PLAN_FIELDS: FieldDef[] = [
@@ -166,12 +174,35 @@ export function BcmPage() {
     { kind: 'number', key: 'linkedRiskId',  label: t('bcmFldLinkedRisk'), min: 1, span: 12 },
   ];
 
-  const EXERCISE_FIELDS: FieldDef[] = [
-    { kind: 'text',   key: 'name',  label: t('bcmFldExerciseName'), required: true, maxLength: 200, span: 12 },
-    { kind: 'select', key: 'type',  label: t('bcmFldExerciseType'), options: EXERCISE_TYPE_OPTIONS, span: 6 },
-    { kind: 'date',   key: 'date',  label: t('bcmFldExerciseDate'), span: 6 },
-    { kind: 'number', key: 'score', label: t('bcmFldExerciseScore'), min: 0, max: 100, span: 12 },
+  const planSelectOptions = [
+    { value: '', label: t('selectPlaceholder') },
+    ...plans.data.map(p => ({ value: String(p.id), label: p.planNameEn })),
   ];
+  const EXERCISE_FIELDS: FieldDef[] = [
+    { kind: 'text',     key: 'exerciseNameEn', label: `${t('bcmFldExerciseName')} (${t('fldTitleEnLbl').match(/\(([^)]+)\)/)?.[1] ?? 'EN'})`, required: true, maxLength: 200, span: 6 },
+    { kind: 'text',     key: 'exerciseNameAr', label: `${t('bcmFldExerciseName')} (${t('fldTitleArLbl').match(/\(([^)]+)\)/)?.[1] ?? 'AR'})`, maxLength: 200, span: 6 },
+    { kind: 'select',   key: 'exerciseType',   label: t('bcmFldExerciseType'), options: EXERCISE_TYPE_OPTIONS, span: 6 },
+    { kind: 'select',   key: 'status',         label: t('fldStatusLbl'), options: EXERCISE_STATUS_OPTIONS, span: 6 },
+    { kind: 'date',     key: 'scheduledDate',  label: t('bcmFldExerciseDate'), span: 6 },
+    { kind: 'date',     key: 'executedDate',   label: t('bcmFldExerciseExecuted'), span: 6 },
+    { kind: 'number',   key: 'score',          label: t('bcmFldExerciseScore'), min: 0, max: 100, span: 6 },
+    { kind: 'select',   key: 'planId',         label: t('bcmFldExerciseLinkedPlan'), options: planSelectOptions, span: 6 },
+    { kind: 'text',     key: 'facilitator',    label: t('bcmFldExerciseFacilitator'), span: 12 },
+    { kind: 'textarea', key: 'scenario',       label: t('bcmFldExerciseScenario'), rows: 2, span: 12 },
+    { kind: 'textarea', key: 'findings',       label: t('bcmFldExerciseFindings'), rows: 2, span: 12 },
+  ];
+
+  function exerciseToReq(e: BcmExerciseDto): BcmExerciseRequest {
+    return {
+      planId: e.planId ?? null,
+      exerciseNameEn: e.exerciseNameEn, exerciseNameAr: e.exerciseNameAr,
+      exerciseType: e.exerciseType, scenario: e.scenario,
+      scheduledDate: e.scheduledDate, executedDate: e.executedDate,
+      score: e.score ?? null, status: e.status,
+      findings: e.findings, capaCount: e.capaCount ?? 0,
+      facilitator: e.facilitator,
+    };
+  }
 
   const tabs: TabItem<TabId>[] = [
     { id: 'overview',  label: t('tabOverview') },
@@ -187,8 +218,20 @@ export function BcmPage() {
     { header: t('colVersion'),    cell: r => r.version, mono: true },
     { header: t('bcmReviewCol'),  cell: r => r.nextReviewDate ?? '—', mono: true },
     { header: t('bcmStatusCol'),  cell: r => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(t, r.status)}</Badge> },
-    { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => planS.startEdit(r)} onDelete={() => planS.askDelete(r)} /> },
+    { header: '', align: 'end', width: '160px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof CheckCheck; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status === 'DRAFT' || r.status === 'UNDER_REVIEW') {
+          extras.push({ Icon: CheckCheck, onClick: () => approvePlan(r), title: t('bcmActApprovePlan'), tone: 'success' });
+        }
+        if (r.status === 'APPROVED') {
+          extras.push({ Icon: PlayCircle, onClick: () => invokePlan(r), title: t('bcmActInvokePlan'), tone: 'accent' });
+        }
+        if (r.status === 'INVOKED') {
+          extras.push({ Icon: RotateCcw, onClick: () => restorePlan(r), title: t('bcmActRestorePlan'), tone: 'primary' });
+        }
+        return <RowActions extras={extras} onEdit={() => planS.startEdit(r)} onDelete={() => planS.askDelete(r)} />;
+      } },
   ];
 
   const procCols: Column<BcmProcessDto>[] = [
@@ -248,17 +291,42 @@ export function BcmPage() {
       biaS.closeModal(); bia.reload();
     } catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Save failed'); }
   }
-  function submitExercise(values: ExerciseRow) {
-    const score = Number(values.score) || 0;
-    if (exerS.editing) {
-      setExercises(prev => prev.map(e => e.id === exerS.editing!.id ? { ...exerS.editing!, ...values, score } : e));
-      toast.success('Exercise updated');
-    } else {
-      const id = exercises.length ? Math.max(...exercises.map(e => e.id)) + 1 : 1;
-      setExercises(prev => [...prev, { ...values, id, score }]);
-      toast.success('Exercise added');
-    }
-    exerS.closeModal();
+  async function submitExercise(values: BcmExerciseRequest) {
+    try {
+      const body: BcmExerciseRequest = {
+        ...values,
+        planId: values.planId ? Number(values.planId) : null,
+        score: values.score != null && values.score !== ('' as unknown as number) ? Number(values.score) : null,
+        capaCount: values.capaCount ? Number(values.capaCount) : 0,
+      };
+      if (exerS.editing) await bcmApi.updateExercise(exerS.editing.id, body);
+      else await bcmApi.createExercise(body);
+      toast.success(exerS.editing ? 'Exercise updated' : 'Exercise added');
+      exerS.closeModal(); exercises.reload();
+    } catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Save failed'); }
+  }
+
+  // ── Plan workflow handlers (ISO 22301 lifecycle) ──
+  async function approvePlan(p: BcmPlanDto) {
+    try { await bcmApi.approvePlan(p.id); toast.success('Plan approved'); plans.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Approve failed'); }
+  }
+  async function invokePlan(p: BcmPlanDto) {
+    if (!window.confirm(`Invoke plan "${p.planNameEn}"? This signals the plan is now active in response to a real disruption.`)) return;
+    try { await bcmApi.invokePlan(p.id); toast.success('Plan invoked'); plans.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Invoke failed'); }
+  }
+  async function restorePlan(p: BcmPlanDto) {
+    try { await bcmApi.restorePlan(p.id); toast.success('Plan restored'); plans.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Restore failed'); }
+  }
+  async function completeExercise(e: BcmExerciseDto) {
+    const scoreStr = window.prompt('Final score (0-100)?', String(e.score ?? 80));
+    if (scoreStr === null) return;
+    const score = Math.max(0, Math.min(100, Number(scoreStr) || 0));
+    const findings = window.prompt('Findings (brief)?', e.findings ?? '') ?? '';
+    try { await bcmApi.completeExercise(e.id, score, findings); toast.success('Exercise completed'); exercises.reload(); }
+    catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Complete failed'); }
   }
 
   // ── Delete handlers ──
@@ -274,12 +342,6 @@ export function BcmPage() {
     try { await apiFn(target.id); toast.success(`${label} deleted`); reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Delete failed'); }
     finally { setBusy(false); onClose(); }
-  }
-  function deleteExercise() {
-    if (!exerS.confirmDel) return;
-    setExercises(prev => prev.filter(e => e.id !== exerS.confirmDel!.id));
-    toast.success('Exercise deleted');
-    exerS.closeConfirm();
   }
 
   // ── Tab-aware "New" button ──
@@ -329,7 +391,13 @@ export function BcmPage() {
             <Progress label="Draft"     value={Math.round(plans.data.filter(p => p.status === 'DRAFT').length / Math.max(1, plans.data.length) * 100)} tone="primary" />
           </Card>
           <Card title={t('bcmTabExercises')}>
-            {exercises.slice(0, 4).map(e => <Progress key={e.id} label={e.name} value={e.score} tone={e.score >= 90 ? 'success' : e.score >= 70 ? 'primary' : 'accent'} />)}
+            {exercises.data.filter(e => e.score != null).slice(0, 4).map(e => (
+              <Progress key={e.id} label={e.exerciseNameEn} value={e.score ?? 0}
+                tone={(e.score ?? 0) >= 90 ? 'success' : (e.score ?? 0) >= 70 ? 'primary' : 'accent'} />
+            ))}
+            {exercises.data.filter(e => e.score != null).length === 0 && (
+              <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>No completed exercises yet.</div>
+            )}
           </Card>
         </div>
       )}
@@ -352,22 +420,33 @@ export function BcmPage() {
       )}
       {tab === 'exercises' && (
         <Card title={t('cardExerciseCalendar')} Icon={Calendar} padded>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {exercises.map(e => (
-              <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 130px 90px', gap: 12, alignItems: 'center', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)' }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{e.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }} className="mono">{e.date}</div>
-                </div>
-                <Badge tone="info">{e.type}</Badge>
-                {e.score > 0
-                  ? <span className="mono" style={{ fontWeight: 700, color: e.score >= 90 ? 'var(--success-fg)' : e.score >= 70 ? 'var(--primary-700)' : 'var(--accent-700)' }}>{e.score}%</span>
-                  : <Badge tone="neutral">Scheduled</Badge>}
-                <Button variant="ghost" size="sm">View report →</Button>
-                <RowActions onEdit={() => exerS.startEdit(e)} onDelete={() => exerS.askDelete(e)} />
+          {exercises.loading ? <LoadingRow /> : exercises.data.length === 0
+            ? <EmptyState Icon={Calendar} title="No exercises scheduled" sub="Schedule tabletop, functional or full exercises to validate plans." />
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {exercises.data.map(e => {
+                  const score = e.score ?? 0;
+                  const date = e.executedDate ?? e.scheduledDate ?? '—';
+                  return (
+                    <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px 130px 90px', gap: 12, alignItems: 'center', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)' }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{e.exerciseNameEn}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }} className="mono">{date}</div>
+                      </div>
+                      <Badge tone="info">{e.exerciseType}</Badge>
+                      <Badge tone={STATUS_TONE[e.status] ?? 'neutral'} dot>{statusLabel(t, e.status)}</Badge>
+                      {e.score != null
+                        ? <span className="mono" style={{ fontWeight: 700, color: score >= 90 ? 'var(--success-fg)' : score >= 70 ? 'var(--primary-700)' : 'var(--accent-700)' }}>{score}%</span>
+                        : <Badge tone="neutral">{e.status === 'SCHEDULED' ? 'Scheduled' : '—'}</Badge>}
+                      {e.status !== 'COMPLETED' && e.status !== 'CANCELLED'
+                        ? <Button variant="ghost" size="sm" Icon={FileCheck2} onClick={() => completeExercise(e)}>{t('bcmActCompleteExercise')}</Button>
+                        : <span />}
+                      <RowActions onEdit={() => exerS.startEdit(e)} onDelete={() => exerS.askDelete(e)} />
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            )}
         </Card>
       )}
 
@@ -390,10 +469,10 @@ export function BcmPage() {
         initial={biaS.editing ? biaToReq(biaS.editing) : BIA_EMPTY}
         onClose={biaS.closeModal} onSubmit={submitBia} />
 
-      <FormModal<ExerciseRow> open={exerS.open}
-        title={exerS.editing ? `${t('editPrefix')} · ${exerS.editing.name}` : t('newExerciseTitle')}
+      <FormModal<BcmExerciseRequest> open={exerS.open}
+        title={exerS.editing ? `${t('editPrefix')} · ${exerS.editing.exerciseNameEn}` : t('newExerciseTitle')}
         fields={EXERCISE_FIELDS}
-        initial={exerS.editing ?? EXERCISE_EMPTY}
+        initial={exerS.editing ? exerciseToReq(exerS.editing) : EXERCISE_EMPTY}
         onClose={exerS.closeModal} onSubmit={submitExercise} />
 
       {/* ── Confirms ── */}
@@ -424,10 +503,10 @@ export function BcmPage() {
       <ConfirmDialog
         open={!!exerS.confirmDel} destructive busy={busy}
         title={t('bcmConfirmDeleteExercise')}
-        message={exerS.confirmDel ? `Exercise "${exerS.confirmDel.name}" ${t('confirmDeleteSuffix')}` : ''}
+        message={exerS.confirmDel ? `Exercise "${exerS.confirmDel.exerciseNameEn}" ${t('confirmDeleteSuffix')}` : ''}
         confirmLabel={t('deleteBtn')}
         onCancel={exerS.closeConfirm}
-        onConfirm={deleteExercise}
+        onConfirm={() => execDelete(exerS.confirmDel, bcmApi.deleteExercise, exerS.closeConfirm, exercises.reload, 'Exercise')}
       />
     </Shell>
   );
