@@ -818,6 +818,53 @@ export const evidenceApi = {
   runConnector: (id: number) => api.post<ConnectorDefinitionDto>(`/api/v1/evidence/connectors/${id}/run`),
 };
 
+// ─── Workflow Engine (assessment §6.1) ──────────────────────────────────────
+export interface WorkflowDefinitionDto {
+  id: number; code: string;
+  nameEn: string; nameAr?: string;
+  targetModule: string; targetEntity: string;
+  version: string; descriptionEn?: string;
+  isActive: boolean;
+}
+export interface WorkflowStateDto {
+  id: number; definitionId: number; code: string;
+  nameEn: string; nameAr?: string;
+  isInitial: boolean; isTerminal: boolean;
+  sortOrder: number; uiColor?: string;
+  descriptionEn?: string;
+}
+export interface WorkflowTransitionView {
+  id: number;
+  fromStateCode: string; toStateCode: string;
+  actionCode: string;
+  actionNameEn: string; actionNameAr?: string;
+  requiredRole?: string; slaHours?: number;
+  descriptionEn?: string;
+}
+export interface WorkflowDefinitionGraph {
+  definition: WorkflowDefinitionDto;
+  states: WorkflowStateDto[];
+  transitions: WorkflowTransitionView[];
+}
+export interface WorkflowInstanceDto {
+  id: number; definitionId: number;
+  targetModule: string; targetEntity: string; targetEntityId: number;
+  currentStateId: number; ownerId?: number;
+  startedAt: string; completedAt?: string; lastTransitionAt?: string;
+}
+export const workflowApi = {
+  definitions:    (targetModule?: string) => api.get<WorkflowDefinitionDto[]>(
+    `/api/v1/workflow/definitions${targetModule ? `?targetModule=${encodeURIComponent(targetModule)}` : ''}`),
+  graph:          (id: number) => api.get<WorkflowDefinitionGraph>(`/api/v1/workflow/definitions/${id}`),
+  startInstance:  (body: { definitionId: number; targetModule: string; targetEntity: string; targetEntityId: number; ownerId?: number }) =>
+    api.post<WorkflowInstanceDto>('/api/v1/workflow/instances', body),
+  getInstance:    (id: number) => api.get<unknown>(`/api/v1/workflow/instances/${id}`),
+  executeTransition: (id: number, actionCode: string, executedById?: number, comments?: string) =>
+    api.post<WorkflowInstanceDto>(`/api/v1/workflow/instances/${id}/transitions`, { actionCode, executedById, comments }),
+  findInstance:   (targetModule: string, targetEntity: string, targetEntityId: number) =>
+    api.get<WorkflowInstanceDto | null>(`/api/v1/workflow/instances/by-target?targetModule=${targetModule}&targetEntity=${targetEntity}&targetEntityId=${targetEntityId}`),
+};
+
 // ─── SCM ────────────────────────────────────────────────────────────────────
 export interface ScmVendorDto {
   id: number; nameEn: string; nameAr?: string;

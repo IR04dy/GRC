@@ -16,6 +16,7 @@ export const ar = {
   modRisk: 'إدارة المخاطر المؤسسية',
   modCyber: 'الأمن السيبراني',
   modBcm: 'استمرارية الأعمال',
+  modWorkflow: 'سير العمل',
   modData: 'حوكمة البيانات',
   modPdpl: 'حماية البيانات الشخصية',
   modCompliance: 'الامتثال',

@@ -18,6 +18,7 @@ export const en = {
   modRisk: 'Enterprise Risk',
   modCyber: 'Cybersecurity',
   modBcm: 'Business Continuity',
+  modWorkflow: 'Workflows',
   modData: 'Data Governance',
   modPdpl: 'PDPL',
   modCompliance: 'Compliance',
