@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database, PlayCircle, CheckCheck, X as XIcon, Clock, Send, ShieldCheck, Archive } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database, PlayCircle, CheckCheck, X as XIcon, Clock, Send, ShieldCheck, Archive, ScrollText, Shield } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -16,11 +16,12 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
-import { privacyApi, ApiError, type PrivacyDsrDto, type PrivacyDsrRequest, type PrivacyBreachDto, type PrivacyRopaDto } from '../../lib/api';
+import { privacyApi, dpiaApi, ApiError, type PrivacyDsrDto, type PrivacyDsrRequest, type PrivacyBreachDto, type PrivacyRopaDto, type DpiaDto } from '../../lib/api';
+import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { DSRS } from './mockPrivacy';
 
-type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'consent';
+type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent';
 
 const TYPE_OPTIONS = [
   { value: 'ACCESS', label: 'Access' }, { value: 'ERASURE', label: 'Erasure' },
@@ -73,6 +74,7 @@ export function PrivacyPage() {
     { id: 'dsr',      label: t('privacyTabDsr') },
     { id: 'breaches', label: t('privacyTabBreaches') },
     { id: 'ropa',     label: t('privacyTabRopa') },
+    { id: 'dpia',     label: t('privacyTabDpia') },
     { id: 'consent',  label: t('privacyTabConsent') },
   ];
 
@@ -257,6 +259,7 @@ export function PrivacyPage() {
           {ropa.loading ? <LoadingRow /> : <DataTable columns={ropaCols} rows={ropa.data} empty={<EmptyState Icon={Database} title="No processing activities" sub="Article 30 RoPA — every processing activity must be recorded." />} />}
         </Card>
       )}
+      {tab === 'dpia' && <DpiaTab toast={toast} t={t} />}
       {tab === 'consent' && (
         <div className="dash-grid">
           <Card title="Consent Coverage" Icon={Users} action={<Badge tone="primary">By channel</Badge>}>
@@ -297,4 +300,78 @@ function fmtDate(s?: string): string { return s ? s.slice(0, 10) : '—'; }
 function LoadingRow() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+const DPIA_RISK_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success' | 'neutral'> = {
+  CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'info', LOW: 'success',
+};
+
+/**
+ * DPIA tab — assessment §5.4 critical recommendation #3.
+ * Lists DPIA records with their state, residual risk, and exposes the
+ * lifecycle workflow (submit-for-review / approve / reject / expire).
+ */
+function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnType<typeof useI18n>['t'] }) {
+  const [items, setItems] = useState<DpiaDto[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  function reload() {
+    if (!isAuthenticated()) { setItems([]); return; }
+    setLoading(true);
+    dpiaApi.list(0, 100)
+      .then(p => setItems(p.content))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function submit(d: DpiaDto)  { try { await dpiaApi.submitForReview(d.id); toast.success('DPIA submitted'); reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); } }
+  async function approve(d: DpiaDto) {
+    const conclusion = window.prompt('Conclusion (optional)?', '') ?? '';
+    try { await dpiaApi.approve(d.id, conclusion); toast.success('DPIA approved'); reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Approve failed'); }
+  }
+  async function reject(d: DpiaDto)  {
+    const reason = window.prompt('Rejection reason?', '') ?? '';
+    if (!reason.trim()) return;
+    try { await dpiaApi.reject(d.id, reason); toast.success('DPIA rejected'); reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Reject failed'); }
+  }
+  async function expire(d: DpiaDto)  { try { await dpiaApi.expire(d.id); toast.success('DPIA expired'); reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Expire failed'); } }
+
+  if (loading) return <Card padded><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Card>;
+  if (items.length === 0) return <Card padded><EmptyState Icon={ScrollText} title={t('privacyDpiaEmptyTitle')} sub={t('privacyDpiaEmptySub')} /></Card>;
+
+  return (
+    <Card padded={false}>
+      {items.map(d => (
+        <div key={d.id} style={{
+          display: 'grid', gridTemplateColumns: '1fr auto auto auto auto',
+          gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{d.titleEn}</div>
+            {d.titleAr && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} dir="rtl">{d.titleAr}</div>}
+            <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <Badge tone="primary">{d.triggerReason.replace(/_/g, ' ')}</Badge>
+              {d.assessmentDate && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>assessed {d.assessmentDate}</span>}
+              {d.nextReviewDate && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>· review due {d.nextReviewDate}</span>}
+            </div>
+            {d.conclusion && <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4 }}>{d.conclusion.slice(0, 200)}</div>}
+            {d.rejectionReason && <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>Rejected: {d.rejectionReason.slice(0, 150)}</div>}
+          </div>
+          <Badge tone={STATUS_TONE[d.status] ?? 'info'} dot>{d.status.replace(/_/g, ' ')}</Badge>
+          <Badge tone={DPIA_RISK_TONE[d.overallResidualRisk ?? ''] ?? 'neutral'}>
+            <Shield size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+            {d.overallResidualRisk ?? '—'}
+          </Badge>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {d.status === 'DRAFT'     && <Button size="sm" variant="ghost" Icon={Send}       onClick={() => submit(d)}>{t('privacyDpiaActSubmit')}</Button>}
+            {d.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCheck} onClick={() => approve(d)}>{t('privacyDpiaActApprove')}</Button>}
+            {(d.status === 'IN_REVIEW' || d.status === 'DRAFT') && <Button size="sm" variant="ghost" Icon={XIcon} onClick={() => reject(d)}>{t('privacyDpiaActReject')}</Button>}
+            {d.status === 'APPROVED'  && <Button size="sm" variant="ghost" Icon={Clock}      onClick={() => expire(d)}>{t('privacyDpiaActExpire')}</Button>}
+          </div>
+          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>#{d.id}</span>
+        </div>
+      ))}
+    </Card>
+  );
 }

@@ -818,6 +818,31 @@ export const evidenceApi = {
   runConnector: (id: number) => api.post<ConnectorDefinitionDto>(`/api/v1/evidence/connectors/${id}/run`),
 };
 
+// ─── PDPL DPIA (assessment §5.4 critical #3) ────────────────────────────────
+export interface DpiaDto {
+  id: number; titleEn: string; titleAr?: string;
+  triggerReason: string;
+  status: string;
+  overallResidualRisk?: string;
+  processingActivityId?: number;
+  dpoId?: number; assessorId?: number;
+  assessmentDate?: string; nextReviewDate?: string;
+  approvedAt?: string; rejectedAt?: string;
+  rejectionReason?: string; conclusion?: string;
+}
+export const dpiaApi = {
+  list:            (page = 0, size = 50) => api.get<PageResponse<DpiaDto>>(`/api/v1/privacy/dpias${pageQ(page, size)}`),
+  get:             (id: number) => api.get<{ dpia: DpiaDto; questions: unknown[]; mitigations: unknown[]; reviews: unknown[] }>(`/api/v1/privacy/dpias/${id}`),
+  create:          (body: Partial<DpiaDto>) => api.post<DpiaDto>('/api/v1/privacy/dpias', body),
+  update:          (id: number, body: Partial<DpiaDto>) => api.put<DpiaDto>(`/api/v1/privacy/dpias/${id}`, body),
+  remove:          (id: number) => api.delete<void>(`/api/v1/privacy/dpias/${id}`),
+  submitForReview: (id: number) => api.post<DpiaDto>(`/api/v1/privacy/dpias/${id}/submit-for-review`),
+  approve:         (id: number, conclusion?: string) => api.post<DpiaDto>(`/api/v1/privacy/dpias/${id}/approve`, { conclusion }),
+  reject:          (id: number, reason: string) => api.post<DpiaDto>(`/api/v1/privacy/dpias/${id}/reject`, { reason }),
+  expire:          (id: number) => api.post<DpiaDto>(`/api/v1/privacy/dpias/${id}/expire`),
+  stats:           () => api.get<{ draftCount: number; inReviewCount: number; approvedCount: number; rejectedCount: number; expiredCount: number }>('/api/v1/privacy/dpias/stats'),
+};
+
 // ─── BCM Crisis Communication (assessment §5.5 #5) ─────────────────────────
 export interface CrisisCommsTemplateDto {
   id: number; code: string;
