@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   RefreshCw, Activity, TimerReset, Gauge, Filter, Download, Plus, BarChart3, Cpu, Calendar,
-  CheckCheck, PlayCircle, RotateCcw, FileCheck2,
+  CheckCheck, PlayCircle, RotateCcw, FileCheck2, Megaphone, Send,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -20,17 +20,19 @@ import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import {
-  bcmApi,
+  bcmApi, crisisCommsApi,
   type BcmPlanDto, type BcmPlanRequest,
   type BcmProcessDto, type BcmProcessRequest,
   type BcmBiaDto, type BcmBiaRequest,
   type BcmExerciseDto, type BcmExerciseRequest,
+  type CrisisCommsTemplateDto, type CrisisCommsAudienceDto, type CrisisCommsDistributionDto,
   ApiError,
 } from '../../lib/api';
+import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { BCM_PLANS } from './mockBcm';
 
-type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'exercises';
+type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'exercises' | 'comms';
 
 const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' }, { value: 'UNDER_REVIEW', label: 'Under Review' },
@@ -210,6 +212,7 @@ export function BcmPage() {
     { id: 'processes', label: t('bcmTabProcesses') },
     { id: 'bia',       label: t('bcmTabBia') },
     { id: 'exercises', label: t('bcmTabExercises') },
+    { id: 'comms',     label: t('bcmTabComms') },
   ];
 
   const planCols: Column<BcmPlanDto>[] = [
@@ -450,6 +453,8 @@ export function BcmPage() {
         </Card>
       )}
 
+      {tab === 'comms' && <CrisisCommsTab toast={toast} t={t} />}
+
       {/* ── Modals ── */}
       <FormModal<BcmPlanRequest> open={planS.open}
         title={planS.editing ? `${t('editPrefix')} · ${planS.editing.planNameEn}` : t('newPlanTitle')}
@@ -509,6 +514,115 @@ export function BcmPage() {
         onConfirm={() => execDelete(exerS.confirmDel, bcmApi.deleteExercise, exerS.closeConfirm, exercises.reload, 'Exercise')}
       />
     </Shell>
+  );
+}
+
+/**
+ * Crisis Communication tab — assessment §5.5 #5.
+ * Lists pre-approved templates + audience groups + recent distributions, with
+ * a one-click "Send" action that simulates the channel-side delivery and
+ * records an audit row.
+ */
+function CrisisCommsTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnType<typeof useI18n>['t'] }) {
+  const [templates, setTemplates] = useState<CrisisCommsTemplateDto[]>([]);
+  const [audiences, setAudiences] = useState<CrisisCommsAudienceDto[]>([]);
+  const [distributions, setDistributions] = useState<CrisisCommsDistributionDto[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  function reload() {
+    if (!isAuthenticated()) return;
+    setLoading(true);
+    Promise.all([crisisCommsApi.templates(), crisisCommsApi.audiences(), crisisCommsApi.distributions()])
+      .then(([ts, as_, ds]) => { setTemplates(ts); setAudiences(as_); setDistributions(ds); })
+      .catch(() => { setTemplates([]); setAudiences([]); setDistributions([]); })
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function send(template: CrisisCommsTemplateDto) {
+    const matchingAudiences = audiences.filter(a =>
+      a.audienceRole === template.audienceRole || template.audienceRole === 'ALL');
+    if (matchingAudiences.length === 0) { toast.danger(`No audience configured for role ${template.audienceRole}`); return; }
+    const target = matchingAudiences[0];
+    if (!window.confirm(`Send template "${template.nameEn}" to audience "${target.name}" (${target.recipientCount} recipients) via ${template.channel}?`)) return;
+    try {
+      await crisisCommsApi.send(template.id, target.id);
+      toast.success(`${template.code} → ${target.name}: send recorded (simulated)`);
+      reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Send failed'); }
+  }
+
+  if (loading) return <Card padded><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Card>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="dash-grid">
+        {/* Templates */}
+        <Card title={t('bcmCommsTemplates')} Icon={Megaphone} action={<Badge tone="primary">{templates.length}</Badge>}>
+          {templates.length === 0
+            ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>No templates configured.</div>
+            : templates.map(tmpl => (
+              <div key={tmpl.id} style={{
+                padding: '10px 0', borderBottom: '1px dashed var(--border)',
+                display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'flex-start',
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{tmpl.nameEn}</div>
+                  {tmpl.nameAr && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} dir="rtl">{tmpl.nameAr}</div>}
+                  <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <Badge tone="primary">{tmpl.audienceRole}</Badge>
+                    <Badge tone="info">{tmpl.channel}</Badge>
+                    {tmpl.severityBand && <Badge tone="warning">{tmpl.severityBand}</Badge>}
+                    <span style={{ fontSize: 10, color: 'var(--ink-3)' }} className="mono">v{tmpl.version}</span>
+                  </div>
+                </div>
+                <Button size="sm" variant="primary" Icon={Send} onClick={() => send(tmpl)}>{t('bcmCommsActSend')}</Button>
+              </div>
+            ))}
+        </Card>
+
+        {/* Audiences */}
+        <Card title={t('bcmCommsAudiences')} Icon={Activity} action={<Badge tone="primary">{audiences.length}</Badge>}>
+          {audiences.length === 0
+            ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>No audience groups configured.</div>
+            : audiences.map(a => (
+              <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{a.name}</div>
+                {a.nameAr && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} dir="rtl">{a.nameAr}</div>}
+                <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
+                  <Badge tone="primary">{a.audienceRole}</Badge>
+                  <Badge tone="info">{a.recipientCount} recipients</Badge>
+                </div>
+              </div>
+            ))}
+        </Card>
+      </div>
+
+      {/* Distribution audit log */}
+      <Card title={t('bcmCommsDistributions')} padded>
+        {distributions.length === 0
+          ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>No distributions recorded yet.</div>
+          : distributions.slice(0, 12).map(d => (
+            <div key={d.id} style={{
+              display: 'grid', gridTemplateColumns: '180px 1fr 100px 110px 90px', gap: 10,
+              padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center', fontSize: 12,
+            }}>
+              <span className="mono">{d.sentAt.slice(0, 16).replace('T', ' ')}</span>
+              <div>
+                <div style={{ fontWeight: 600 }}>{d.subjectSnapshot ?? '—'}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  template #{d.templateId} → audience #{d.audienceId}
+                </div>
+              </div>
+              <Badge tone="info">{d.channel}</Badge>
+              <Badge tone="primary">{d.recipientCount} recipients</Badge>
+              <Badge tone={d.deliveryStatus === 'DELIVERED' ? 'success' : d.deliveryStatus === 'FAILED' ? 'danger' : 'neutral'} dot>
+                {d.deliveryStatus}
+              </Badge>
+            </div>
+          ))}
+      </Card>
+    </div>
   );
 }
 

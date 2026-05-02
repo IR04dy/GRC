@@ -818,6 +818,44 @@ export const evidenceApi = {
   runConnector: (id: number) => api.post<ConnectorDefinitionDto>(`/api/v1/evidence/connectors/${id}/run`),
 };
 
+// ─── BCM Crisis Communication (assessment §5.5 #5) ─────────────────────────
+export interface CrisisCommsTemplateDto {
+  id: number; code: string;
+  nameEn: string; nameAr?: string;
+  audienceRole: string; channel: string;
+  subjectEn?: string; subjectAr?: string;
+  bodyEn: string; bodyAr?: string;
+  severityBand?: string; version: string;
+  isActive: boolean;
+}
+export interface CrisisCommsAudienceDto {
+  id: number;
+  name: string; nameAr?: string;
+  audienceRole: string;
+  contactsCsv?: string;
+  recipientCount: number;
+  isActive: boolean;
+}
+export interface CrisisCommsDistributionDto {
+  id: number; templateId: number; audienceId: number;
+  planId?: number; channel: string;
+  subjectSnapshot?: string; bodySnapshot?: string;
+  recipientCount: number; sentAt: string; sentById?: number;
+  deliveryStatus: string; deliverySummary?: string;
+}
+export const crisisCommsApi = {
+  templates:        () => api.get<CrisisCommsTemplateDto[]>('/api/v1/bcm/comms/templates'),
+  createTemplate:   (body: Partial<CrisisCommsTemplateDto>) => api.post<CrisisCommsTemplateDto>('/api/v1/bcm/comms/templates', body),
+  updateTemplate:   (id: number, body: Partial<CrisisCommsTemplateDto>) => api.put<CrisisCommsTemplateDto>(`/api/v1/bcm/comms/templates/${id}`, body),
+  deleteTemplate:   (id: number) => api.delete<void>(`/api/v1/bcm/comms/templates/${id}`),
+  audiences:        () => api.get<CrisisCommsAudienceDto[]>('/api/v1/bcm/comms/audiences'),
+  createAudience:   (body: Partial<CrisisCommsAudienceDto>) => api.post<CrisisCommsAudienceDto>('/api/v1/bcm/comms/audiences', body),
+  updateAudience:   (id: number, body: Partial<CrisisCommsAudienceDto>) => api.put<CrisisCommsAudienceDto>(`/api/v1/bcm/comms/audiences/${id}`, body),
+  distributions:    () => api.get<CrisisCommsDistributionDto[]>('/api/v1/bcm/comms/distributions'),
+  send:             (templateId: number, audienceId: number, planId?: number, placeholders?: Record<string, string>) =>
+    api.post<CrisisCommsDistributionDto>('/api/v1/bcm/comms/send', { templateId, audienceId, planId, placeholders: placeholders ?? {} }),
+};
+
 // ─── Workflow Engine (assessment §6.1) ──────────────────────────────────────
 export interface WorkflowDefinitionDto {
   id: number; code: string;
