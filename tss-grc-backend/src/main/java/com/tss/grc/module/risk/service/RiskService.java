@@ -76,6 +76,79 @@ public class RiskService {
         riskRepository.save(risk);
     }
 
+    // ── Risk lifecycle workflow (ISO 31000 / COSO ERM) ────────────────────────
+    // State machine:
+    //   OPEN → UNDER_REVIEW → MITIGATING → CLOSED
+    //   OPEN | UNDER_REVIEW → ACCEPTED (formal risk acceptance)
+    //   CLOSED → OPEN (reopen on recurrence)
+
+    @Transactional
+    public RiskResponse submitForReview(Long id) {
+        Risk r = mustGet(id);
+        require(r, "OPEN");
+        r.setStatus("UNDER_REVIEW");
+        return toResponse(riskRepository.save(r));
+    }
+
+    @Transactional
+    public RiskResponse approve(Long id) {
+        Risk r = mustGet(id);
+        require(r, "UNDER_REVIEW");
+        r.setStatus("MITIGATING");
+        return toResponse(riskRepository.save(r));
+    }
+
+    @Transactional
+    public RiskResponse accept(Long id) {
+        Risk r = mustGet(id);
+        require(r, "OPEN", "UNDER_REVIEW");
+        r.setStatus("ACCEPTED");
+        return toResponse(riskRepository.save(r));
+    }
+
+    @Transactional
+    public RiskResponse close(Long id) {
+        Risk r = mustGet(id);
+        require(r, "MITIGATING", "ACCEPTED");
+        r.setStatus("CLOSED");
+        return toResponse(riskRepository.save(r));
+    }
+
+    @Transactional
+    public RiskResponse reopen(Long id) {
+        Risk r = mustGet(id);
+        require(r, "CLOSED");
+        r.setStatus("OPEN");
+        return toResponse(riskRepository.save(r));
+    }
+
+    /**
+     * Risk-incident retrospective: when an incident is logged for this risk,
+     * bump the residual likelihood by 1 (capped at 5) so the heatmap reflects
+     * the realised event. Returns the updated risk.
+     */
+    @Transactional
+    public RiskResponse bumpLikelihoodFromIncident(Long id) {
+        Risk r = mustGet(id);
+        Integer current = r.getResidualLikelihood();
+        int next = Math.min(5, (current == null ? 1 : current) + 1);
+        r.setResidualLikelihood(next);
+        return toResponse(riskRepository.save(r));
+    }
+
+    private Risk mustGet(Long id) {
+        Long orgId = TenantContext.getCurrentTenant();
+        return riskRepository.findById(id)
+            .filter(r -> r.getOrganisationId().equals(orgId))
+            .orElseThrow(() -> new EntityNotFoundException("Risk not found: " + id));
+    }
+
+    private void require(Risk r, String... allowed) {
+        for (String s : allowed) if (s.equals(r.getStatus())) return;
+        throw new IllegalArgumentException(
+            "Risk must be in " + java.util.Arrays.toString(allowed) + " (was " + r.getStatus() + ")");
+    }
+
     private void applyRequest(Risk risk, RiskRequest req) {
         risk.setTitleEn(req.titleEn());
         risk.setTitleAr(req.titleAr());

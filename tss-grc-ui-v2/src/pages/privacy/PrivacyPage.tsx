@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database } from 'lucide-react';
+import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database, PlayCircle, CheckCheck, X as XIcon, Clock, Send, ShieldCheck, Archive } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -81,9 +81,27 @@ export function PrivacyPage() {
     { header: t('privacyDsrType'),     cell: r => <Badge tone="info">{r.requestType}</Badge> },
     { header: t('privacyDsrReceived'), cell: r => fmtDate(r.receivedAt), mono: true },
     { header: t('privacyDsrDue'),      cell: r => fmtDate(r.dueDate), mono: true },
+    // PDPL 30-day countdown — green ≥ 7 days, amber 1-6 days, red ≤ 0 (overdue)
+    { header: t('privacyDsrSlaLeft'),
+      cell: r => {
+        if (r.status === 'FULFILLED' || r.status === 'REJECTED') return <span style={{ color: 'var(--ink-3)' }}>—</span>;
+        if (!r.dueDate) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
+        const ms = new Date(r.dueDate).getTime() - Date.now();
+        const days = Math.ceil(ms / 86400000);
+        const colour = days < 0 ? 'var(--danger)' : days <= 6 ? 'var(--accent-700)' : 'var(--success-fg)';
+        return <span className="mono" style={{ color: colour, fontWeight: 700 }}>{days < 0 ? `${Math.abs(days)}d overdue` : `${days}d left`}</span>;
+      } },
     { header: t('bcmStatusCol'),       cell: r => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(t, r.status)}</Badge> },
-    { header: '',                      align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+    { header: '', align: 'end', width: '230px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof PlayCircle; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        const terminal = r.status === 'FULFILLED' || r.status === 'REJECTED';
+        if (!terminal && r.status === 'OPEN') extras.push({ Icon: PlayCircle, onClick: () => startDsrAction(r),  title: t('privacyActStartDsr'),  tone: 'primary' });
+        if (!terminal)                          extras.push({ Icon: CheckCheck, onClick: () => fulfilDsrAction(r), title: t('privacyActFulfilDsr'), tone: 'success' });
+        if (!terminal)                          extras.push({ Icon: Clock,      onClick: () => extendDsrAction(r), title: t('privacyActExtendDsr'), tone: 'accent' });
+        if (!terminal)                          extras.push({ Icon: XIcon,      onClick: () => rejectDsrAction(r), title: t('privacyActRejectDsr') });
+        return <RowActions extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
+      } },
   ];
 
   const breachCols: Column<PrivacyBreachDto>[] = [
@@ -92,7 +110,28 @@ export function PrivacyPage() {
     { header: t('colSeverity'), cell: r => <Badge tone={SEVERITY_TONE[r.severity ?? ''] ?? 'neutral'} dot>{severityLabel(t, r.severity ?? '—')}</Badge> },
     { header: t('colRecords'),  cell: r => r.affectedRecords?.toLocaleString() ?? '—', mono: true },
     { header: t('colOccurred'), cell: r => fmtDate(r.occurredAt), mono: true },
+    // PDPL Article 20 72-hour notification clock
+    { header: t('privacyBreachClock'),
+      cell: r => {
+        if (r.status === 'CLOSED') return <span style={{ color: 'var(--ink-3)' }}>—</span>;
+        const reportedToAuthority = (r as PrivacyBreachDto & { reportedToAuthority?: boolean }).reportedToAuthority ?? false;
+        if (reportedToAuthority) return <Badge tone="success" dot>Notified</Badge>;
+        if (!r.occurredAt) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
+        const ms = Date.now() - new Date(r.occurredAt).getTime();
+        const hours = Math.floor(ms / 3600000);
+        const remaining = 72 - hours;
+        const colour = remaining < 0 ? 'var(--danger)' : remaining <= 12 ? 'var(--accent-700)' : 'var(--success-fg)';
+        return <span className="mono" style={{ color: colour, fontWeight: 700 }}>{remaining < 0 ? `${Math.abs(remaining)}h overdue` : `${remaining}h left`}</span>;
+      } },
     { header: t('colStatus'),   cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
+    { header: '', align: 'end', width: '210px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof Send; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status === 'OPEN')          extras.push({ Icon: ShieldCheck, onClick: () => containBreachAction(r),    title: t('privacyActContainBreach'), tone: 'primary' });
+        if (r.status !== 'CLOSED')        extras.push({ Icon: Send,        onClick: () => notifyDataOfficeAction(r), title: t('privacyActNotifyDataOffice'), tone: 'accent' });
+        if (r.status !== 'CLOSED')        extras.push({ Icon: Archive,     onClick: () => closeBreachAction(r),      title: t('privacyActCloseBreach'),   tone: 'success' });
+        return <RowActions extras={extras} />;
+      } },
   ];
 
   const ropaCols: Column<PrivacyRopaDto>[] = [
@@ -119,6 +158,43 @@ export function PrivacyPage() {
     try { await privacyApi.deleteDsr(confirmDel.id); toast.success('DSR deleted'); dsrs.reload(); }
     catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Delete failed'); }
     finally { setBusy(false); setConfirmDel(null); }
+  }
+
+  // ── DSR workflow handlers (PDPL 30-day SLA) ──
+  async function startDsrAction(r: PrivacyDsrDto) {
+    try { await privacyApi.startDsr(r.id); toast.success('DSR started; 30-day SLA tracker armed'); dsrs.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function fulfilDsrAction(r: PrivacyDsrDto) {
+    try { await privacyApi.fulfilDsr(r.id); toast.success('DSR fulfilled within SLA'); dsrs.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function extendDsrAction(r: PrivacyDsrDto) {
+    const daysStr = window.prompt('Extend the DSR due date by how many days?', '30');
+    if (daysStr === null) return;
+    const days = Math.max(1, Number(daysStr) || 30);
+    try { await privacyApi.extendDsr(r.id, days); toast.success(`Due date extended by ${days} days`); dsrs.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Extend failed'); }
+  }
+  async function rejectDsrAction(r: PrivacyDsrDto) {
+    if (!window.confirm('Reject this DSR? The data subject must be notified with reasoning per PDPL.')) return;
+    try { await privacyApi.rejectDsr(r.id); toast.success('DSR rejected'); dsrs.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  // ── Breach workflow handlers (PDPL Article 20 — 72-hour notification) ──
+  async function containBreachAction(r: PrivacyBreachDto) {
+    try { await privacyApi.containBreach(r.id); toast.success('Breach contained — investigation in progress'); breaches.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function notifyDataOfficeAction(r: PrivacyBreachDto) {
+    if (!window.confirm('Mark the Saudi Data Office as notified? This stamps the notification time and unlocks the audit trail.')) return;
+    try { await privacyApi.notifyDataOffice(r.id); toast.success('Saudi Data Office notification recorded'); breaches.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function closeBreachAction(r: PrivacyBreachDto) {
+    try { await privacyApi.closeBreach(r.id); toast.success('Breach closed'); breaches.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
   const isDemo = dsrs.isDemo;

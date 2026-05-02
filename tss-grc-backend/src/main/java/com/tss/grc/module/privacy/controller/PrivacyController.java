@@ -127,6 +127,53 @@ public class PrivacyController {
         privacyService.deleteRopa(id);
     }
 
+    // ── Breach workflow (PDPL Article 20) ────────────────────────────────────
+
+    @PostMapping("/breaches/{id}/contain")
+    @PreAuthorize("hasPermission('PRIVACY', 'WRITE')")
+    public DataBreach containBreach(@PathVariable Long id) {
+        return privacyService.containBreach(id);
+    }
+
+    @PostMapping("/breaches/{id}/notify-data-office")
+    @PreAuthorize("hasPermission('PRIVACY', 'WRITE')")
+    public DataBreach notifyDataOffice(@PathVariable Long id) {
+        return privacyService.notifyDataOffice(id);
+    }
+
+    @PostMapping("/breaches/{id}/close")
+    @PreAuthorize("hasPermission('PRIVACY', 'WRITE')")
+    public DataBreach closeBreach(@PathVariable Long id) {
+        return privacyService.closeBreach(id);
+    }
+
+    // ── DSR workflow (PDPL 30-day fulfilment SLA) ─────────────────────────────
+
+    @PostMapping("/dsrs/{id}/start")
+    @PreAuthorize("hasPermission('PRIVACY', 'WRITE')")
+    public DataSubjectRequest startDsr(@PathVariable Long id) {
+        return privacyService.startDsr(id);
+    }
+
+    @PostMapping("/dsrs/{id}/fulfil")
+    @PreAuthorize("hasPermission('PRIVACY', 'WRITE')")
+    public DataSubjectRequest fulfilDsr(@PathVariable Long id) {
+        return privacyService.fulfilDsr(id);
+    }
+
+    @PostMapping("/dsrs/{id}/extend")
+    @PreAuthorize("hasPermission('PRIVACY', 'WRITE')")
+    public DataSubjectRequest extendDsr(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Integer days = body.get("days") instanceof Number n ? n.intValue() : null;
+        return privacyService.extendDsr(id, days);
+    }
+
+    @PostMapping("/dsrs/{id}/reject")
+    @PreAuthorize("hasPermission('PRIVACY', 'WRITE')")
+    public DataSubjectRequest rejectDsr(@PathVariable Long id) {
+        return privacyService.rejectDsr(id);
+    }
+
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/stats")

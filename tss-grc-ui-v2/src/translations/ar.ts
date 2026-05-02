@@ -84,6 +84,13 @@ export const ar = {
   riskAxisLikelihood: 'الاحتمالية',
   heatLevels: 'ضئيل,منخفض,متوسط,عالي,حرج',
 
+  // إجراءات دورة حياة المخاطرة (ISO 31000 / COSO ERM)
+  riskActSubmitReview: 'إرسال للمراجعة',
+  riskActApprove:      'اعتماد للمعالجة',
+  riskActAccept:       'قبول المخاطرة رسمياً',
+  riskActClose:        'إغلاق المخاطرة',
+  riskActReopen:       'إعادة فتح',
+
   modalNewRisk: 'تسجيل مخاطرة جديدة',
   fldTitleEn: 'الاسم (إنجليزي)',
   fldTitleAr: 'الاسم (عربي)',
@@ -211,6 +218,17 @@ export const ar = {
   privacyDsrType: 'نوع الطلب',
   privacyDsrReceived: 'تاريخ الاستلام',
   privacyDsrDue: 'الاستحقاق',
+  privacyDsrSlaLeft: 'المتبقي للالتزام',
+  privacyBreachClock: 'الـ ٧٢ ساعة',
+
+  // إجراءات سير عمل حماية البيانات
+  privacyActStartDsr:        'بدء الطلب',
+  privacyActFulfilDsr:       'إنهاء الطلب',
+  privacyActExtendDsr:       'تمديد المهلة',
+  privacyActRejectDsr:       'رفض الطلب',
+  privacyActContainBreach:   'احتواء الاختراق',
+  privacyActNotifyDataOffice:'إخطار مكتب البيانات السعودي',
+  privacyActCloseBreach:     'إغلاق الاختراق',
 
   // ─── Compliance ─────────────────────────────────
   complianceEyebrow: 'الامتثال والتدقيق',

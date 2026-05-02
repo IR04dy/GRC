@@ -115,6 +115,13 @@ export const riskApi = {
   update:     (id: number, body: RiskRequest) => api.put<RiskResponse>(`/api/v1/risk/risks/${id}`, body),
   remove:     (id: number) => api.delete<void>(`/api/v1/risk/risks/${id}`),
   categories: () => api.get<RiskCategoryDto[]>('/api/v1/risk/categories'),
+  // Risk lifecycle workflow (ISO 31000 / COSO ERM)
+  submitForReview: (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/submit-for-review`),
+  approveRisk:     (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/approve`),
+  acceptRisk:      (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/accept`),
+  closeRisk:       (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/close`),
+  reopenRisk:      (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/reopen`),
+  incidentBump:    (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/incident-bump`),
 };
 
 // ─── Dashboard ──────────────────────────────────────────────────────────────
@@ -519,10 +526,19 @@ export const privacyApi = {
   createDsr:      (body: PrivacyDsrRequest) => api.post<PrivacyDsrDto>('/api/v1/privacy/dsrs', body),
   updateDsr:      (id: number, body: PrivacyDsrRequest) => api.put<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}`, body),
   deleteDsr:      (id: number) => api.delete<void>(`/api/v1/privacy/dsrs/${id}`),
+  // DSR workflow (PDPL 30-day SLA)
+  startDsr:       (id: number) => api.post<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}/start`),
+  fulfilDsr:      (id: number) => api.post<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}/fulfil`),
+  extendDsr:      (id: number, days: number) => api.post<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}/extend`, { days }),
+  rejectDsr:      (id: number) => api.post<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}/reject`),
   breaches:       (page = 0, size = 50) => api.get<PageResponse<PrivacyBreachDto>>(`/api/v1/privacy/breaches${pageQ(page, size)}`),
   createBreach:   (body: PrivacyBreachRequest) => api.post<PrivacyBreachDto>('/api/v1/privacy/breaches', body),
   updateBreach:   (id: number, body: PrivacyBreachRequest) => api.put<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}`, body),
   deleteBreach:   (id: number) => api.delete<void>(`/api/v1/privacy/breaches/${id}`),
+  // Breach workflow (PDPL Article 20 — 72-hour notification)
+  containBreach:  (id: number) => api.post<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}/contain`),
+  notifyDataOffice: (id: number) => api.post<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}/notify-data-office`),
+  closeBreach:    (id: number) => api.post<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}/close`),
   ropa:           (page = 0, size = 50) => api.get<PageResponse<PrivacyRopaDto>>(`/api/v1/privacy/ropa${pageQ(page, size)}`),
   createRopa:     (body: PrivacyRopaRequest) => api.post<PrivacyRopaDto>('/api/v1/privacy/ropa', body),
   updateRopa:     (id: number, body: PrivacyRopaRequest) => api.put<PrivacyRopaDto>(`/api/v1/privacy/ropa/${id}`, body),

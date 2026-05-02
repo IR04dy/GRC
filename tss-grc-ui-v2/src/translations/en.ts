@@ -90,6 +90,13 @@ export const en = {
   riskAxisLikelihood: 'Likelihood',
   heatLevels: 'VL,L,M,H,VH',
 
+  // Risk lifecycle workflow actions (ISO 31000 / COSO ERM)
+  riskActSubmitReview: 'Submit for Review',
+  riskActApprove:      'Approve for Treatment',
+  riskActAccept:       'Formally Accept Risk',
+  riskActClose:        'Close Risk',
+  riskActReopen:       'Reopen Risk',
+
   // New Risk Modal
   modalNewRisk: 'Register a New Risk',
   fldTitleEn: 'Title (English)',
@@ -219,6 +226,17 @@ export const en = {
   privacyDsrType: 'Type',
   privacyDsrReceived: 'Received',
   privacyDsrDue: 'Due',
+  privacyDsrSlaLeft: 'SLA',
+  privacyBreachClock: '72hr Clock',
+
+  // PDPL workflow actions
+  privacyActStartDsr:        'Start DSR',
+  privacyActFulfilDsr:       'Mark Fulfilled',
+  privacyActExtendDsr:       'Extend Due Date',
+  privacyActRejectDsr:       'Reject DSR',
+  privacyActContainBreach:   'Contain Breach',
+  privacyActNotifyDataOffice:'Notify Saudi Data Office',
+  privacyActCloseBreach:     'Close Breach',
 
   // ─── Compliance ─────────────────────────────────
   complianceEyebrow: 'Compliance & Audit',

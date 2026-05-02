@@ -65,6 +65,41 @@ public class PrivacyService {
         breachRepo.save(b);
     }
 
+    // ── Breach workflow (PDPL Article 20 — 72-hour notification) ──────────────
+
+    @Transactional
+    public DataBreach containBreach(Long id) {
+        DataBreach b = getBreach(id);
+        if (!"OPEN".equals(b.getStatus())) {
+            throw new IllegalArgumentException("Breach must be OPEN to contain (was " + b.getStatus() + ")");
+        }
+        b.setStatus("INVESTIGATING");
+        return breachRepo.save(b);
+    }
+
+    /**
+     * Mark the Saudi Data Office as notified for this breach. Records the
+     * notification timestamp; the consumer should subsequently attach the
+     * submission package as evidence.
+     */
+    @Transactional
+    public DataBreach notifyDataOffice(Long id) {
+        DataBreach b = getBreach(id);
+        b.setPdpcNotificationRequired(true);
+        b.setPdpcNotifiedAt(java.time.LocalDateTime.now());
+        return breachRepo.save(b);
+    }
+
+    @Transactional
+    public DataBreach closeBreach(Long id) {
+        DataBreach b = getBreach(id);
+        if (!"INVESTIGATING".equals(b.getStatus()) && !"OPEN".equals(b.getStatus())) {
+            throw new IllegalArgumentException("Breach must be OPEN or INVESTIGATING to close (was " + b.getStatus() + ")");
+        }
+        b.setStatus("CLOSED");
+        return breachRepo.save(b);
+    }
+
     // ── Data Subject Requests ─────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -103,6 +138,62 @@ public class PrivacyService {
         DataSubjectRequest r = getDsr(id);
         r.setIsDeleted(true);
         dsrRepo.save(r);
+    }
+
+    // ── DSR workflow (PDPL — 30-day fulfilment SLA) ───────────────────────────
+
+    /**
+     * Start fulfilling a DSR. Transitions OPEN → IN_PROGRESS and, if no
+     * due_date was set, defaults it to received_at + 30 days per PDPL.
+     */
+    @Transactional
+    public DataSubjectRequest startDsr(Long id) {
+        DataSubjectRequest r = getDsr(id);
+        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+            throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
+        }
+        r.setStatus("IN_PROGRESS");
+        if (r.getDueDate() == null) {
+            java.time.LocalDateTime base = r.getReceivedAt() != null ? r.getReceivedAt() : java.time.LocalDateTime.now();
+            r.setDueDate(base.toLocalDate().plusDays(30));
+        }
+        return dsrRepo.save(r);
+    }
+
+    @Transactional
+    public DataSubjectRequest fulfilDsr(Long id) {
+        DataSubjectRequest r = getDsr(id);
+        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+            throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
+        }
+        r.setStatus("FULFILLED");
+        r.setCompletedAt(java.time.LocalDateTime.now());
+        return dsrRepo.save(r);
+    }
+
+    /**
+     * Extend the DSR due date by N days. PDPL Implementing Regulations allow
+     * the controller to extend the response window once, with notification to
+     * the data subject. Default extension is 30 days.
+     */
+    @Transactional
+    public DataSubjectRequest extendDsr(Long id, Integer days) {
+        DataSubjectRequest r = getDsr(id);
+        int n = (days == null || days <= 0) ? 30 : days;
+        java.time.LocalDate base = r.getDueDate() != null ? r.getDueDate() : java.time.LocalDate.now();
+        r.setDueDate(base.plusDays(n));
+        return dsrRepo.save(r);
+    }
+
+    @Transactional
+    public DataSubjectRequest rejectDsr(Long id) {
+        DataSubjectRequest r = getDsr(id);
+        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+            throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
+        }
+        r.setStatus("REJECTED");
+        r.setCompletedAt(java.time.LocalDateTime.now());
+        return dsrRepo.save(r);
     }
 
     // ── Processing Activities (ROPA) ──────────────────────────────────────────

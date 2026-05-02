@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Filter, Download, Plus, Flame, ShieldCheck, ClipboardCheck, TrendingUp, TrendingDown, Target, Activity, ArrowRight } from 'lucide-react';
+import { AlertTriangle, Filter, Download, Plus, Flame, ShieldCheck, ClipboardCheck, TrendingUp, TrendingDown, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
@@ -112,6 +112,29 @@ export function RiskRegisterPage() {
     });
   }
 
+  // ── Risk lifecycle workflow handlers (ISO 31000 / COSO ERM) ──
+  async function runWorkflow(
+    fn: (id: number) => Promise<RiskResponse>,
+    risk: RiskResponse,
+    successMsg: string,
+  ) {
+    try {
+      const updated = await fn(risk.id);
+      setRisks(prev => prev.map(r => r.id === updated.id ? updated : r));
+      toast.success(successMsg);
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Workflow action failed');
+    }
+  }
+  const submitForReview = (r: RiskResponse) => runWorkflow(riskApi.submitForReview, r, 'Risk submitted for review');
+  const approveRisk     = (r: RiskResponse) => runWorkflow(riskApi.approveRisk,     r, 'Risk approved for treatment');
+  const acceptRisk      = (r: RiskResponse) => {
+    if (!window.confirm(`Formally accept risk "${r.titleEn}"? This indicates senior management acknowledges and accepts this risk without further treatment.`)) return;
+    runWorkflow(riskApi.acceptRisk, r, 'Risk formally accepted');
+  };
+  const closeRisk       = (r: RiskResponse) => runWorkflow(riskApi.closeRisk,  r, 'Risk closed');
+  const reopenRisk      = (r: RiskResponse) => runWorkflow(riskApi.reopenRisk, r, 'Risk reopened');
+
   // ── Derived ──
   const heatData: HeatCell[] = useMemo(() => {
     const buckets = new Map<string, HeatCell>();
@@ -151,7 +174,18 @@ export function RiskRegisterPage() {
         ) : <span style={{ color: 'var(--ink-4)' }} className="mono">—</span>,
       align: 'center', width: '110px' },
     { header: t('riskColStatus'),cell: r => <Badge tone={STATUS_TONES[r.status] ?? 'neutral'} dot>{statusLabel(r.status)}</Badge>, width: '130px' },
-    { header: '',                cell: r => <RowActions onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />, align: 'end', width: '90px' },
+    { header: '', align: 'end', width: '180px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof Send; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status === 'OPEN')         extras.push({ Icon: Send,       onClick: () => submitForReview(r), title: t('riskActSubmitReview'), tone: 'primary' });
+        if (r.status === 'UNDER_REVIEW') extras.push({ Icon: CheckCheck, onClick: () => approveRisk(r),     title: t('riskActApprove'),      tone: 'success' });
+        if (r.status === 'OPEN' || r.status === 'UNDER_REVIEW')
+                                         extras.push({ Icon: ShieldOff,  onClick: () => acceptRisk(r),      title: t('riskActAccept'),       tone: 'accent' });
+        if (r.status === 'MITIGATING' || r.status === 'TREATED' || r.status === 'ACCEPTED')
+                                         extras.push({ Icon: Archive,    onClick: () => closeRisk(r),       title: t('riskActClose'),        tone: 'primary' });
+        if (r.status === 'CLOSED')       extras.push({ Icon: RotateCcw,  onClick: () => reopenRisk(r),      title: t('riskActReopen'),       tone: 'accent' });
+        return <RowActions extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
+      } },
   ];
 
   return (
