@@ -567,6 +567,11 @@ export interface ComplianceFindingDto {
   id: number; title: string;
   severity: string; owner?: string;
   capa?: string; dueDate?: string; status: string;
+  // CAPA closure verification — §5.3 #6
+  capaStage?: string;
+  ownerTestAt?: string;       ownerTestResult?: string;       ownerTestNotes?: string;
+  independentTestAt?: string; independentTestResult?: string; independentTestNotes?: string;
+  auditSignoffAt?: string;    auditSignoffNotes?: string;
 }
 export interface ComplianceAssessmentRequest {
   framework: string; period: string;
@@ -654,10 +659,73 @@ export const complianceApi = {
   rejectPolicy:       (id: number, reason: string) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/reject`, { reason }),
   policyStats:        () => api.get<unknown>('/api/v1/compliance/policies/stats'),
   // Findings aging engine — §5.3 recommendation #4
-  findingsAging:      () => api.get<Array<ComplianceFindingDto & { daysOpen: number; escalationTier: string; createdAt?: string }>>('/api/v1/compliance/findings/aging'),
+  findingsAging:      () => api.get<Array<ComplianceFindingDto & { daysOpen: number; escalationTier: string; createdAt?: string; capaStage?: string }>>('/api/v1/compliance/findings/aging'),
   findingsAgingStats: () => api.get<{ onTrack: number; managerEscalated: number; directorEscalated: number; execEscalated: number }>('/api/v1/compliance/findings/aging/stats'),
   stats:              () => api.get<unknown>('/api/v1/compliance/stats'),
+
+  // CAPA closure verification — §5.3 recommendation #6
+  capaStartImplementing: (id: number) => api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/start-implementing`),
+  capaOwnerTest:         (id: number, body: { result: 'PASS' | 'FAIL' | 'PARTIAL'; notes?: string; evidenceId?: number }) =>
+                            api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/owner-test`, body),
+  capaIndependentTest:   (id: number, body: { result: 'PASS' | 'FAIL' | 'PARTIAL'; notes?: string; byUserId?: number }) =>
+                            api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/independent-test`, body),
+  capaAuditSignoff:      (id: number, body: { notes?: string; byUserId?: number }) =>
+                            api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/audit-signoff`, body),
+  capaClose:             (id: number) => api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/close`),
+
+  // External audit engagements — §5.3 recommendation #3
+  auditEngagements:      (page = 0, size = 50) => api.get<PageResponse<AuditEngagementDto>>(`/api/v1/compliance/audit-engagements${pageQ(page, size)}`),
+  createAuditEngagement: (body: AuditEngagementRequest) => api.post<AuditEngagementDto>('/api/v1/compliance/audit-engagements', body),
+  updateAuditEngagement: (id: number, body: AuditEngagementRequest) => api.put<AuditEngagementDto>(`/api/v1/compliance/audit-engagements/${id}`, body),
+  deleteAuditEngagement: (id: number) => api.delete<void>(`/api/v1/compliance/audit-engagements/${id}`),
+  advanceAuditEngagement: (id: number, status: string) => api.post<AuditEngagementDto>(`/api/v1/compliance/audit-engagements/${id}/advance`, { status }),
+  scheduleAuditFollowup:  (id: number, followupDate: string) => api.post<AuditEngagementDto>(`/api/v1/compliance/audit-engagements/${id}/schedule-followup`, { followupDate }),
+  auditEngagementStats:   () => api.get<Record<string, number>>('/api/v1/compliance/audit-engagements/stats'),
 };
+
+// External audit engagement DTO — §5.3 #3
+export interface AuditEngagementDto {
+  id: number;
+  externalId?: string;
+  organisationId?: number;
+  engagementCode?: string;
+  titleEn: string;
+  titleAr?: string;
+  auditType: string;
+  framework?: string;
+  auditorFirm?: string;
+  leadAuditor?: string;
+  engagementLetterDate?: string;
+  openingMeetingDate?: string;
+  fieldworkStartDate?: string;
+  fieldworkEndDate?: string;
+  reportIssuedDate?: string;
+  closureDate?: string;
+  nextFollowupDate?: string;
+  scopeSummary?: string;
+  status: string;
+  findingsCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+export interface AuditEngagementRequest {
+  engagementCode?: string;
+  titleEn: string;
+  titleAr?: string;
+  auditType: string;
+  framework?: string;
+  auditorFirm?: string;
+  leadAuditor?: string;
+  engagementLetterDate?: string;
+  openingMeetingDate?: string;
+  fieldworkStartDate?: string;
+  fieldworkEndDate?: string;
+  reportIssuedDate?: string;
+  closureDate?: string;
+  nextFollowupDate?: string;
+  scopeSummary?: string;
+  status?: string;
+}
 
 // ─── TPRM ───────────────────────────────────────────────────────────────────
 export interface TprmVendorDto {

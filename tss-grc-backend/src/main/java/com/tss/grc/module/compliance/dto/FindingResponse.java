@@ -12,5 +12,15 @@ public record FindingResponse(
     String capa,
     LocalDate dueDate,
     String status,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    // CAPA closure verification (assessment §5.3 #6)
+    String capaStage,
+    LocalDateTime ownerTestAt,
+    String ownerTestResult,
+    String ownerTestNotes,
+    LocalDateTime independentTestAt,
+    String independentTestResult,
+    String independentTestNotes,
+    LocalDateTime auditSignoffAt,
+    String auditSignoffNotes
 ) {}

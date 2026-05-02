@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Download, Plus, BarChart3, Building2, AlertTriangle,
   ScrollText, BookCopy, Send, CheckCheck, Archive, RotateCcw, X as XIcon, Wrench, Flag, Search,
+  Briefcase, ShieldCheck, Stamp, ChevronRight, Lock,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -25,11 +26,81 @@ import {
   type ComplianceAssessmentDto, type ComplianceFindingDto,
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
   type PolicyDto, type PolicyRequest,
+  type AuditEngagementDto, type AuditEngagementRequest,
 } from '../../lib/api';
 import { useToast } from '../../lib/toast';
 import { COMPLIANCE_CONTROLS } from './mockCompliance';
 
-type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies';
+type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements';
+
+// External audit lifecycle stages — assessment §5.3 #3
+const AUDIT_TYPE_OPTIONS = [
+  { value: 'INTERNAL',      label: 'Internal' },
+  { value: 'EXTERNAL',      label: 'External' },
+  { value: 'REGULATORY',    label: 'Regulatory' },
+  { value: 'CERTIFICATION', label: 'Certification' },
+];
+const AUDIT_FRAMEWORK_OPTIONS = [
+  { value: 'ISO 27001:2022', label: 'ISO 27001:2022' },
+  { value: 'ISO 27701',      label: 'ISO 27701' },
+  { value: 'ISO 22301',      label: 'ISO 22301' },
+  { value: 'NCA ECC v2.0',   label: 'NCA ECC v2.0' },
+  { value: 'NCA CCC',        label: 'NCA CCC' },
+  { value: 'SAMA CSF v1.0',  label: 'SAMA CSF v1.0' },
+  { value: 'PDPL',           label: 'SDAIA PDPL' },
+  { value: 'ZATCA E-invoicing', label: 'ZATCA E-invoicing' },
+  { value: 'CMA',            label: 'CMA' },
+];
+const AUDIT_STATUS_FLOW = ['PLANNED', 'ENGAGED', 'OPENING_MEETING', 'FIELDWORK', 'REPORTING', 'MGMT_RESPONSE', 'CLOSED', 'FOLLOW_UP'] as const;
+const AUDIT_STATUS_TONE: Record<string, 'neutral' | 'info' | 'primary' | 'accent' | 'warning' | 'success' | 'danger'> = {
+  PLANNED: 'neutral', ENGAGED: 'info', OPENING_MEETING: 'info',
+  FIELDWORK: 'primary', REPORTING: 'accent', MGMT_RESPONSE: 'warning',
+  CLOSED: 'success', FOLLOW_UP: 'info',
+};
+const ENGAGEMENT_EMPTY: AuditEngagementRequest = {
+  engagementCode: '', titleEn: '', titleAr: '',
+  auditType: 'EXTERNAL', framework: 'ISO 27001:2022',
+  auditorFirm: '', leadAuditor: '',
+  engagementLetterDate: '', openingMeetingDate: '',
+  fieldworkStartDate: '', fieldworkEndDate: '',
+  reportIssuedDate: '', closureDate: '', nextFollowupDate: '',
+  scopeSummary: '', status: 'PLANNED',
+};
+function engagementToReq(e: AuditEngagementDto): AuditEngagementRequest {
+  return {
+    engagementCode: e.engagementCode, titleEn: e.titleEn, titleAr: e.titleAr,
+    auditType: e.auditType, framework: e.framework,
+    auditorFirm: e.auditorFirm, leadAuditor: e.leadAuditor,
+    engagementLetterDate: e.engagementLetterDate, openingMeetingDate: e.openingMeetingDate,
+    fieldworkStartDate: e.fieldworkStartDate, fieldworkEndDate: e.fieldworkEndDate,
+    reportIssuedDate: e.reportIssuedDate, closureDate: e.closureDate,
+    nextFollowupDate: e.nextFollowupDate,
+    scopeSummary: e.scopeSummary, status: e.status,
+  };
+}
+
+// CAPA stage badges — assessment §5.3 #6
+const CAPA_STAGE_TONE: Record<string, 'neutral' | 'info' | 'primary' | 'accent' | 'warning' | 'success' | 'danger'> = {
+  IDENTIFIED:        'neutral',
+  IMPLEMENTING:      'info',
+  OWNER_TESTED:      'primary',
+  INDEPENDENT_TESTED: 'accent',
+  AUDIT_SIGNED_OFF:  'warning',
+  CLOSED:            'success',
+};
+const TIER_TONE: Record<string, 'success' | 'info' | 'warning' | 'danger'> = {
+  ON_TRACK:          'success',
+  MANAGER_ESCALATED: 'info',
+  DIRECTOR_ESCALATED: 'warning',
+  EXEC_ESCALATED:    'danger',
+};
+
+interface AgingFinding extends ComplianceFindingDto {
+  daysOpen: number;
+  escalationTier: string;
+  createdAt?: string;
+  capaStage?: string;
+}
 
 const FRAMEWORK_OPTIONS = [
   { value: 'ISO_27001', label: 'ISO 27001' }, { value: 'ISO_22301', label: 'ISO 22301' },
@@ -157,9 +228,23 @@ export function CompliancePage() {
   const findings    = useApiList<ComplianceFindingDto>(()    => complianceApi.findings(0, 100),    []);
   const changes     = useApiList<RegulatoryChangeDto>(()     => complianceApi.regulatoryChanges(0, 100), []);
   const policies    = useApiList<PolicyDto>(()               => complianceApi.policies(0, 100),    []);
+  const engagements = useApiList<AuditEngagementDto>(()      => complianceApi.auditEngagements(0, 100), []);
 
   const changeS = useEntityState<RegulatoryChangeDto>();
   const policyS = useEntityState<PolicyDto>();
+  const engageS = useEntityState<AuditEngagementDto>();
+
+  // Findings aging — pulled separately so daysOpen + escalationTier + capaStage are present
+  const [aging, setAging] = useState<AgingFinding[]>([]);
+  const [agingLoaded, setAgingLoaded] = useState(false);
+  useEffect(() => {
+    if (tab !== 'findings' || agingLoaded) return;
+    complianceApi.findingsAging()
+      .then(rows => setAging(rows as AgingFinding[]))
+      .catch(() => setAging([]))
+      .finally(() => setAgingLoaded(true));
+  }, [tab, agingLoaded]);
+  const reloadAging = () => { setAgingLoaded(false); };
 
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'code',           label: t('fldCode') + ' *', required: true, maxLength: 50, span: 4 },
@@ -174,14 +259,15 @@ export function CompliancePage() {
   ];
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'overview',  label: t('tabOverview') },
-    { id: 'controls',  label: t('complianceTabControls') },
-    { id: 'changes',   label: t('complianceTabChanges') },
-    { id: 'policies',  label: t('complianceTabPolicies') },
-    { id: 'internal',  label: t('complianceTabInternal') },
-    { id: 'external',  label: t('complianceTabExternal') },
-    { id: 'findings',  label: t('complianceTabFindings') },
-    { id: 'scorecard', label: t('complianceTabScorecard') },
+    { id: 'overview',    label: t('tabOverview') },
+    { id: 'controls',    label: t('complianceTabControls') },
+    { id: 'changes',     label: t('complianceTabChanges') },
+    { id: 'policies',    label: t('complianceTabPolicies') },
+    { id: 'engagements', label: t('complianceTabEngagements') },
+    { id: 'internal',    label: t('complianceTabInternal') },
+    { id: 'external',    label: t('complianceTabExternal') },
+    { id: 'findings',    label: t('complianceTabFindings') },
+    { id: 'scorecard',   label: t('complianceTabScorecard') },
   ];
 
   // ── Field defs for Regulatory Changes + Policies (built per-render so labels translate) ──
@@ -315,6 +401,64 @@ export function CompliancePage() {
     try { await complianceApi.rejectPolicy(p.id, reason); toast.success('Policy rejected'); policies.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
+  // ── External audit engagement workflow (assessment §5.3 #3) ──────────────
+  async function submitEngagement(values: AuditEngagementRequest) {
+    try {
+      if (engageS.editing) await complianceApi.updateAuditEngagement(engageS.editing.id, values);
+      else await complianceApi.createAuditEngagement(values);
+      toast.success(engageS.editing ? 'Engagement updated' : 'Engagement created');
+      engageS.closeModal(); engagements.reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  function nextStatus(current: string): string | null {
+    const idx = AUDIT_STATUS_FLOW.indexOf(current as typeof AUDIT_STATUS_FLOW[number]);
+    if (idx < 0 || idx >= AUDIT_STATUS_FLOW.length - 1) return null;
+    return AUDIT_STATUS_FLOW[idx + 1];
+  }
+  async function advanceEngagement(e: AuditEngagementDto) {
+    const nx = nextStatus(e.status);
+    if (!nx) { toast.danger('Engagement already at terminal status'); return; }
+    if (!window.confirm(`Advance "${e.titleEn}" → ${nx.replace(/_/g, ' ')}?`)) return;
+    try { await complianceApi.advanceAuditEngagement(e.id, nx); toast.success(`Status → ${nx}`); engagements.reload(); }
+    catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Advance failed'); }
+  }
+  async function scheduleFollowUp(e: AuditEngagementDto) {
+    const d = window.prompt('Follow-up date (YYYY-MM-DD)?', '');
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    try { await complianceApi.scheduleAuditFollowup(e.id, d); toast.success('Follow-up scheduled'); engagements.reload(); }
+    catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Action failed'); }
+  }
+
+  // ── CAPA closure verification workflow (assessment §5.3 #6) ──────────────
+  async function capaStartImpl(f: AgingFinding) {
+    try { await complianceApi.capaStartImplementing(f.id); toast.success('Marked: implementing'); reloadAging(); findings.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function capaOwnerTest(f: AgingFinding) {
+    const r = window.prompt('Owner test result — PASS / FAIL / PARTIAL', 'PASS');
+    if (!r) return;
+    const notes = window.prompt('Owner test notes (optional)?', '') ?? '';
+    try { await complianceApi.capaOwnerTest(f.id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL', notes }); toast.success('Owner test recorded'); reloadAging(); findings.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function capaIndepTest(f: AgingFinding) {
+    const r = window.prompt('Independent test result — PASS / FAIL / PARTIAL', 'PASS');
+    if (!r) return;
+    const notes = window.prompt('Independent test notes (optional)?', '') ?? '';
+    try { await complianceApi.capaIndependentTest(f.id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL', notes }); toast.success('Independent test recorded'); reloadAging(); findings.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function capaSignoff(f: AgingFinding) {
+    const notes = window.prompt('Audit sign-off notes (optional)?', '') ?? '';
+    try { await complianceApi.capaAuditSignoff(f.id, { notes }); toast.success('Audit signed off'); reloadAging(); findings.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function capaCloseFinding(f: AgingFinding) {
+    if (!window.confirm(`Close finding "${f.title}"? CAPA stage will become CLOSED.`)) return;
+    try { await complianceApi.capaClose(f.id); toast.success('Finding closed'); reloadAging(); findings.reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
   async function execDelete<T extends { id: number }>(
     target: T | null,
     apiFn: (id: number) => Promise<unknown>,
@@ -333,13 +477,76 @@ export function CompliancePage() {
   function newAction() {
     return () => {
       switch (tab) {
-        case 'changes':  return changeS.startCreate();
-        case 'policies': return policyS.startCreate();
-        default:         return setOpen(true);  // Controls modal (legacy)
+        case 'changes':     return changeS.startCreate();
+        case 'policies':    return policyS.startCreate();
+        case 'engagements': return engageS.startCreate();
+        default:            return setOpen(true);  // Controls modal (legacy)
       }
     };
   }
-  const showNewButton = tab !== 'overview';
+  const showNewButton = tab !== 'overview' && tab !== 'findings' && tab !== 'scorecard';
+
+  // Engagement form fields
+  const ENGAGEMENT_FIELDS: FieldDef[] = [
+    { kind: 'text',     key: 'engagementCode', label: t('engagementFldCode'),  placeholder: 'AUD-2025-001', span: 4 },
+    { kind: 'select',   key: 'auditType',      label: t('engagementFldType') + ' *', required: true, options: AUDIT_TYPE_OPTIONS, span: 4 },
+    { kind: 'select',   key: 'framework',      label: t('engagementFldFramework'), options: AUDIT_FRAMEWORK_OPTIONS, span: 4 },
+    { kind: 'text',     key: 'titleEn',        label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'titleAr',        label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'auditorFirm',    label: t('engagementFldAuditorFirm'), span: 6 },
+    { kind: 'text',     key: 'leadAuditor',    label: t('engagementFldLeadAuditor'), span: 6 },
+    { kind: 'date',     key: 'engagementLetterDate', label: t('engagementFldLetterDate'), span: 4 },
+    { kind: 'date',     key: 'openingMeetingDate',   label: t('engagementFldOpeningMeeting'), span: 4 },
+    { kind: 'date',     key: 'fieldworkStartDate',   label: t('engagementFldFieldworkStart'), span: 4 },
+    { kind: 'date',     key: 'fieldworkEndDate',     label: t('engagementFldFieldworkEnd'), span: 4 },
+    { kind: 'date',     key: 'reportIssuedDate',     label: t('engagementFldReportIssued'), span: 4 },
+    { kind: 'date',     key: 'closureDate',          label: t('engagementFldClosureDate'), span: 4 },
+    { kind: 'textarea', key: 'scopeSummary',         label: t('engagementFldScope'), rows: 3, span: 12 },
+  ];
+
+  const engagementCols: Column<AuditEngagementDto>[] = [
+    { header: t('engagementFldCode'),   cell: r => <span className="mono" style={{ fontWeight: 600 }}>{r.engagementCode ?? '—'}</span> },
+    { header: t('colTitle'),            cell: r => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{r.titleEn}</div>
+          {r.framework && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.framework} · {r.auditorFirm ?? '—'}</div>}
+        </div>
+    ) },
+    { header: t('engagementFldType'),   cell: r => <Badge tone={r.auditType === 'CERTIFICATION' ? 'accent' : r.auditType === 'REGULATORY' ? 'warning' : r.auditType === 'EXTERNAL' ? 'primary' : 'neutral'}>{r.auditType}</Badge> },
+    { header: t('engagementFldFieldwork'), cell: r => r.fieldworkStartDate ? `${r.fieldworkStartDate} → ${r.fieldworkEndDate ?? '?'}` : '—', mono: true },
+    { header: t('colStatus'),           cell: r => <Badge tone={AUDIT_STATUS_TONE[r.status] ?? 'neutral'} dot>{r.status.replace(/_/g, ' ')}</Badge> },
+    { header: '', align: 'end', width: '210px',
+      cell: r => {
+        const extras: Array<{ Icon: typeof ChevronRight; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (r.status !== 'CLOSED' && r.status !== 'FOLLOW_UP') {
+          const nx = nextStatus(r.status);
+          if (nx) extras.push({ Icon: ChevronRight, onClick: () => advanceEngagement(r), title: `${t('engagementActAdvance')} → ${nx}`, tone: 'primary' });
+        }
+        if (r.status === 'CLOSED') extras.push({ Icon: RotateCcw, onClick: () => scheduleFollowUp(r), title: t('engagementActScheduleFollowup'), tone: 'accent' });
+        return <RowActions extras={extras} onEdit={() => engageS.startEdit(r)} onDelete={() => engageS.askDelete(r)} />;
+      } },
+  ];
+
+  // Findings aging table columns (with CAPA workflow buttons)
+  const agingCols: Column<AgingFinding>[] = [
+    { header: t('colTitle'),    cell: r => <span style={{ fontWeight: 600 }}>{r.title}</span> },
+    { header: t('colSeverity'), cell: r => <Badge tone={SEVERITY_TONE[r.severity] ?? 'neutral'} dot>{severityLabel(t, r.severity)}</Badge> },
+    { header: t('colDaysOpen'), cell: r => <span className="mono">{r.daysOpen}d</span> },
+    { header: t('colTier'),     cell: r => <Badge tone={TIER_TONE[r.escalationTier] ?? 'neutral'} dot>{r.escalationTier.replace(/_/g, ' ')}</Badge> },
+    { header: t('colCapaStage'), cell: r => <Badge tone={CAPA_STAGE_TONE[r.capaStage ?? 'IDENTIFIED'] ?? 'neutral'}>{(r.capaStage ?? 'IDENTIFIED').replace(/_/g, ' ')}</Badge> },
+    { header: t('colOwner'),    cell: r => r.owner ?? '—' },
+    { header: '', align: 'end', width: '230px',
+      cell: r => {
+        const stage = r.capaStage ?? 'IDENTIFIED';
+        const extras: Array<{ Icon: typeof Wrench; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (stage === 'IDENTIFIED')         extras.push({ Icon: Wrench,      onClick: () => capaStartImpl(r),    title: t('capaActStart'),      tone: 'primary' });
+        if (stage === 'IMPLEMENTING')       extras.push({ Icon: ShieldCheck, onClick: () => capaOwnerTest(r),    title: t('capaActOwnerTest'),  tone: 'primary' });
+        if (stage === 'OWNER_TESTED')       extras.push({ Icon: Briefcase,   onClick: () => capaIndepTest(r),    title: t('capaActIndepTest'),  tone: 'accent' });
+        if (stage === 'INDEPENDENT_TESTED') extras.push({ Icon: Stamp,       onClick: () => capaSignoff(r),      title: t('capaActSignoff'),    tone: 'accent' });
+        if (stage === 'AUDIT_SIGNED_OFF')   extras.push({ Icon: Lock,        onClick: () => capaCloseFinding(r), title: t('capaActClose'),      tone: 'success' });
+        return <RowActions extras={extras} />;
+      } },
+  ];
 
   const ctrlCols: Column<ComplianceControlDto>[] = [
     { header: t('colFramework'),  cell: r => <Badge tone="primary">{(r.framework ?? '').replace(/_/g, ' ')}</Badge> },
@@ -464,8 +671,27 @@ export function CompliancePage() {
         </Card>
       )}
       {tab === 'findings' && (
+        <>
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))', marginBottom: 12 }}>
+            <Kpi Icon={ClipboardCheck} label={t('agingKpiOnTrack')}        value={aging.filter(f => f.escalationTier === 'ON_TRACK').length} tone="success" />
+            <Kpi Icon={Flag}           label={t('agingKpiManager')}        value={aging.filter(f => f.escalationTier === 'MANAGER_ESCALATED').length} tone="info" />
+            <Kpi Icon={AlertTriangle}  label={t('agingKpiDirector')}       value={aging.filter(f => f.escalationTier === 'DIRECTOR_ESCALATED').length} tone="accent" />
+            <Kpi Icon={AlertTriangle}  label={t('agingKpiExec')}           value={aging.filter(f => f.escalationTier === 'EXEC_ESCALATED').length} tone="danger" />
+          </div>
+          <Card padded={false}>
+            {!agingLoaded ? <LoadingRow /> :
+              aging.length === 0
+                ? <DataTable columns={findingCols} rows={findings.data} empty={<EmptyState Icon={AlertTriangle} title="No open findings" sub="Findings link audit observations to remediation owners with due dates." />} />
+                : <DataTable columns={agingCols} rows={aging} empty={<EmptyState />} />
+            }
+          </Card>
+        </>
+      )}
+      {tab === 'engagements' && (
         <Card padded={false}>
-          {findings.loading ? <LoadingRow /> : <DataTable columns={findingCols} rows={findings.data} empty={<EmptyState Icon={AlertTriangle} title="No open findings" sub="Findings link audit observations to remediation owners with due dates." />} />}
+          {engagements.loading ? <LoadingRow /> :
+            <DataTable columns={engagementCols} rows={engagements.data} empty={<EmptyState Icon={Briefcase} title={t('engagementsEmptyTitle')} sub={t('engagementsEmptySub')} />} />
+          }
         </Card>
       )}
       {tab === 'scorecard' && (
@@ -532,6 +758,20 @@ export function CompliancePage() {
         confirmLabel={t('deleteBtn')}
         onCancel={policyS.closeConfirm}
         onConfirm={() => execDelete(policyS.confirmDel, complianceApi.deletePolicy, policyS.closeConfirm, policies.reload, 'Policy')} />
+
+      {/* External audit engagement modal + confirm — §5.3 #3 */}
+      <FormModal<AuditEngagementRequest> open={engageS.open}
+        title={engageS.editing ? `${t('editPrefix')} · ${engageS.editing.titleEn}` : t('newEngagementTitle')}
+        fields={ENGAGEMENT_FIELDS}
+        initial={engageS.editing ? engagementToReq(engageS.editing) : ENGAGEMENT_EMPTY}
+        onClose={engageS.closeModal} onSubmit={submitEngagement} />
+      <ConfirmDialog
+        open={!!engageS.confirmDel} destructive busy={busy}
+        title={t('engagementConfirmDelete')}
+        message={engageS.confirmDel ? `Engagement "${engageS.confirmDel.titleEn}" ${t('confirmDeleteSuffix')}` : ''}
+        confirmLabel={t('deleteBtn')}
+        onCancel={engageS.closeConfirm}
+        onConfirm={() => execDelete(engageS.confirmDel, complianceApi.deleteAuditEngagement, engageS.closeConfirm, engagements.reload, 'Engagement')} />
     </Shell>
   );
 }

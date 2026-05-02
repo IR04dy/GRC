@@ -222,6 +222,7 @@ public class RegChangePolicyController {
                 out.put("createdAt",       f.getCreatedAt());
                 out.put("daysOpen",        daysOpen);
                 out.put("escalationTier",  tier);
+                out.put("capaStage",       f.getCapaStage());
                 return out;
             })
             .toList();

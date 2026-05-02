@@ -187,7 +187,11 @@ public class ComplianceService {
         return new FindingResponse(
             f.getId(), f.getTitle(), f.getAssessmentId(),
             f.getSeverity(), f.getOwner(), f.getCapa(),
-            f.getDueDate(), f.getStatus(), f.getCreatedAt()
+            f.getDueDate(), f.getStatus(), f.getCreatedAt(),
+            f.getCapaStage(),
+            f.getOwnerTestAt(), f.getOwnerTestResult(), f.getOwnerTestNotes(),
+            f.getIndependentTestAt(), f.getIndependentTestResult(), f.getIndependentTestNotes(),
+            f.getAuditSignoffAt(), f.getAuditSignoffNotes()
         );
     }
 
