@@ -33,9 +33,9 @@ import {
 } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { SUPPLIERS } from './mockScm';
+import { SUPPLIERS, ONBOARDING, ASSESSMENTS, DEPENDENCIES, CONTRACTS, DISRUPTIONS } from './mockScm';
 
-type TabId = 'overview' | 'suppliers' | 'onboarding' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
+type TabId = 'overview' | 'suppliers' | 'onboarding' | 'workflow' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
 
 // ── Static option lists ───────────────────────────────────────────────────
 // IMPORTANT: every option `value` below is constrained at the DB level by a
@@ -258,12 +258,12 @@ export function ScmPage() {
   const conS = useEntityState<ScmContractDto>();
   const incS = useEntityState<ScmIncidentDto>();
 
-  const vendors      = useApiList<ScmVendorDto>(()      => scmApi.vendors(0, 200),      SUPPLIERS as unknown as ScmVendorDto[]);
-  const onboarding   = useApiList<ScmOnboardingDto>(()  => scmApi.onboarding(0, 200),   []);
-  const assessments  = useApiList<ScmAssessmentDto>(()  => scmApi.assessments(0, 200),  []);
-  const dependencies = useApiList<ScmDependencyDto>(()  => scmApi.dependencies(0, 200), []);
-  const contracts    = useApiList<ScmContractDto>(()    => scmApi.contracts(0, 200),    []);
-  const incidents    = useApiList<ScmIncidentDto>(()    => scmApi.incidents(0, 200),    []);
+  const vendors      = useApiList<ScmVendorDto>(()      => scmApi.vendors(0, 200),      SUPPLIERS);
+  const onboarding   = useApiList<ScmOnboardingDto>(()  => scmApi.onboarding(0, 200),   ONBOARDING);
+  const assessments  = useApiList<ScmAssessmentDto>(()  => scmApi.assessments(0, 200),  ASSESSMENTS);
+  const dependencies = useApiList<ScmDependencyDto>(()  => scmApi.dependencies(0, 200), DEPENDENCIES);
+  const contracts    = useApiList<ScmContractDto>(()    => scmApi.contracts(0, 200),    CONTRACTS);
+  const incidents    = useApiList<ScmIncidentDto>(()    => scmApi.incidents(0, 200),    DISRUPTIONS);
 
   const [stats, setStats] = useState<ScmStats | null>(null);
   useEffect(() => {
@@ -353,6 +353,7 @@ export function ScmPage() {
     { id: 'overview',     label: t('tabOverview') },
     { id: 'suppliers',    label: t('scmTabSuppliers') },
     { id: 'onboarding',   label: t('scmTabOnboarding') },
+    { id: 'workflow',     label: t('scmTabWorkflow') },
     { id: 'assessments',  label: t('scmTabAssessments') },
     { id: 'dependencies', label: t('scmTabDependencies') },
     { id: 'contracts',    label: t('scmTabContracts') },
@@ -748,6 +749,12 @@ export function ScmPage() {
             empty={<EmptyState Icon={AlertOctagon} title="No disruptions" sub="Supplier-side outages, SLA breaches and quality defects are tracked here." />} />}
         </Card>
       )}
+      {tab === 'workflow' && (
+        <ScmWorkflowMap
+          vendors={vendors.data} onboarding={onboarding.data}
+          dependencies={dependencies.data} incidents={incidents.data}
+          stages={ONBOARDING_STAGES} t={t} />
+      )}
 
       {/* ── Modals ── */}
       <FormModal<ScmVendorRequest> open={supS.open}
@@ -833,4 +840,160 @@ function countryDistribution(vendors: ScmVendorDto[]) {
 function LoadingRow() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+// ── Workflow & Map tab ─────────────────────────────────────────────────────
+// Three stacked panels:
+//  1. Onboarding pipeline (every in-progress vendor as its own row of stages)
+//  2. Supply-chain dependency map (Service → Vendor → Alternative)
+//  3. Disruption response workflow (REPORT → CONTAIN → RECOVER → CAPA → CLOSE)
+function ScmWorkflowMap({
+  onboarding, dependencies, incidents, stages, t,
+}: {
+  vendors: ScmVendorDto[];
+  onboarding: ScmOnboardingDto[];
+  dependencies: ScmDependencyDto[];
+  incidents: ScmIncidentDto[];
+  stages: { id: string; label: string }[];
+  t: (k: string) => string;
+}) {
+  const inFlight = onboarding.filter(o => o.status === 'IN_PROGRESS' || o.status === 'ON_HOLD');
+  const responseSteps = [
+    { id: 'REPORT',   label: t('scmWfStepReport') },
+    { id: 'CONTAIN',  label: t('scmWfStepContain') },
+    { id: 'RECOVER',  label: t('scmWfStepRecover') },
+    { id: 'CAPA',     label: t('scmWfStepCapa') },
+    { id: 'CLOSE',    label: t('scmWfStepClose') },
+  ];
+  function activeStepFor(i: ScmIncidentDto): string {
+    if (i.status === 'CLOSED' || i.status === 'RESOLVED') return 'CLOSE';
+    if (i.capaCreated)              return 'CAPA';
+    if (i.backupPlanActivated)      return 'RECOVER';
+    if (i.status === 'CONTAINED')   return 'CONTAIN';
+    return 'REPORT';
+  }
+  const tone: Record<string, string> = { CRITICAL: 'var(--danger)', HIGH: 'var(--cat-6)', MEDIUM: 'var(--cat-2)', LOW: 'var(--success)' };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* 1. Onboarding pipeline */}
+      <Card title={t('scmWfPanelOnboarding')} Icon={Workflow} action={<Badge tone="info">{inFlight.length}</Badge>}>
+        {inFlight.length === 0
+          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfOnboardingEmpty')}</div>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {inFlight.map(o => (
+                <div key={o.id} style={{ padding: '10px 4px', borderBottom: '1px dashed var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{o.vendorNameEn ?? `#${o.vendorId}`}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                        {t('scmWfDue')}: <span className="mono">{o.dueDate ?? '—'}</span>
+                        {o.assignee && <> · {o.assignee}</>}
+                      </div>
+                    </div>
+                    <Badge tone={o.status === 'ON_HOLD' ? 'warning' : 'info'}>{o.status.replace(/_/g, ' ')}</Badge>
+                  </div>
+                  <Stepper steps={stages} active={o.currentStage} />
+                  {o.notes && <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 6, fontStyle: 'italic' }}>{o.notes}</div>}
+                </div>
+              ))}
+            </div>}
+      </Card>
+
+      {/* 2. Dependency map */}
+      <Card title={t('scmWfPanelDependencyMap')} Icon={Network} action={<Badge tone="primary">{dependencies.length}</Badge>}>
+        {dependencies.length === 0
+          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfDepEmpty')}</div>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>{t('scmWfDepLegend')}:</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 10, height: 10, background: tone.CRITICAL, borderRadius: 2 }} /> {t('critCritical')}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 10, height: 10, background: tone.HIGH, borderRadius: 2 }} /> {t('critHigh')}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 10, height: 10, background: tone.MEDIUM, borderRadius: 2 }} /> {t('critMedium')}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 10, height: 10, background: tone.LOW, borderRadius: 2 }} /> {t('critLow')}
+                </span>
+              </div>
+              {dependencies.map(d => {
+                const lvl = (d.dependencyLevel ?? 'LOW').toUpperCase();
+                const t2 = (d.dependencyType ?? '').toUpperCase();
+                const critical = t2 === 'CRITICAL' || t2 === 'EXCLUSIVE' || lvl === 'HIGH';
+                return (
+                  <div key={d.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(180px, 1.2fr) 28px minmax(160px, 1fr) 28px minmax(160px, 1fr) auto',
+                    gap: 8, alignItems: 'center', padding: '10px 6px',
+                    background: critical ? 'rgba(180, 60, 50, 0.04)' : 'transparent',
+                    borderInlineStart: `3px solid ${tone[lvl] ?? 'var(--border)'}`,
+                    borderRadius: 'var(--r-sm)',
+                  }}>
+                    {/* Service node */}
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{d.serviceNameEn}</div>
+                      <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{d.assetName ?? ''}</div>
+                    </div>
+                    <ArrowRight size={14} style={{ color: 'var(--ink-3)' }} />
+                    {/* Primary vendor */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{d.vendorNameEn ?? '—'}</div>
+                      <Badge tone={d.status === 'AT_RISK' ? 'danger' : d.status === 'INACTIVE' ? 'neutral' : 'success'}>
+                        {(d.status ?? '').replace(/_/g, ' ')}
+                      </Badge>
+                    </div>
+                    {/* Alt vendor link */}
+                    {d.hasAlternative
+                      ? <ArrowRight size={14} style={{ color: 'var(--success-fg)' }} />
+                      : <XIcon size={14} style={{ color: 'var(--danger-fg)' }} aria-label={t('scmWfNoAlternative')} />}
+                    <div>
+                      {d.hasAlternative
+                        ? <>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--success-fg)' }}>{d.alternativeVendorNameEn ?? '—'}</div>
+                            <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{t('scmWfAlternative')}</div>
+                          </>
+                        : <Badge tone="danger">{t('scmWfNoAlternative')}</Badge>}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+                      <Badge tone="primary">{d.dependencyType ?? '—'}</Badge>
+                      <Badge tone={lvl === 'HIGH' ? 'warning' : lvl === 'MEDIUM' ? 'info' : 'success'}>{lvl}</Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>}
+      </Card>
+
+      {/* 3. Disruption response workflow */}
+      <Card title={t('scmWfPanelResponse')} Icon={AlertOctagon} action={<Badge tone="warning">{incidents.filter(i => i.status !== 'CLOSED' && i.status !== 'RESOLVED').length}</Badge>}>
+        {incidents.length === 0
+          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfResponseEmpty')}</div>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {incidents.slice(0, 6).map(i => (
+                <div key={i.id} style={{ padding: '10px 4px', borderBottom: '1px dashed var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginInlineEnd: 6 }}>{i.incidentCode ?? `#${i.id}`}</span>
+                        {i.vendorNameEn ?? `#${i.vendorId}`} · {(i.incidentType ?? '').replace(/_/g, ' ')}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{i.description}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <Badge tone={(RISK_TONE as Record<string, 'danger' | 'warning' | 'info' | 'success' | 'neutral'>)[(i.impact ?? '').toUpperCase()] ?? 'neutral'}>{i.impact ?? '—'}</Badge>
+                      {i.slaBreached && <Badge tone="danger">{t('scmWfSlaBreached')}</Badge>}
+                      <Badge tone={i.status === 'CLOSED' || i.status === 'RESOLVED' ? 'success' : 'warning'}>{i.status ?? '—'}</Badge>
+                    </div>
+                  </div>
+                  <Stepper steps={responseSteps} active={activeStepFor(i)} />
+                </div>
+              ))}
+            </div>}
+      </Card>
+    </div>
+  );
 }
