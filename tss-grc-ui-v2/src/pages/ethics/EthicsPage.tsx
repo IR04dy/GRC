@@ -34,6 +34,8 @@ import {
 } from './mockEthics';
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { ETHICS_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { ETHICS_ANCHORS as ETHICS_REG_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'aml' | 'analytics' | 'integrations';
 
@@ -239,6 +241,10 @@ export function EthicsPage() {
         title="Ethics & Financial Crime — Processes & Lifecycles"
         subtitle="ISO 37001 / ISO 37002 + Saudi Anti-Corruption Law + SAMA AML + FATF — every named process active in this domain."
         lifecycles={ETHICS_LIFECYCLES} lang={lang} />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · Ethics & Financial Crime"
+        anchors={ETHICS_REG_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

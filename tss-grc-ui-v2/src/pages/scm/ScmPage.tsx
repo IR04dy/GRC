@@ -39,6 +39,8 @@ import { SCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { TierMapPanel } from './TierMapPanel';
 import { SUPPLY_CHAIN_TIERS } from './tierMap';
 import { Layers } from 'lucide-react';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { SCM_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'suppliers' | 'onboarding' | 'workflow' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
 
@@ -738,6 +740,10 @@ export function ScmPage() {
             primary:   { label: 'Add',         onClick: conS.startCreate },
             secondary: { label: 'Contracts',   href: '/scm?tab=contracts' } },
         ]} lang="en" />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · Supply Chain"
+        anchors={SCM_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

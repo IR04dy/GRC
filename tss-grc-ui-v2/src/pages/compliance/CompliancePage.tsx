@@ -44,6 +44,8 @@ import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflows
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { COMPLIANCE_WORKFLOWS } from '../../lib/mockWorkflows';
 import { COMPLIANCE_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { COMPLIANCE_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks' | 'workflows';
 
@@ -662,6 +664,10 @@ export function CompliancePage() {
         title="Compliance & Audit — Processes & Lifecycles"
         subtitle="ISO 19011 + IIA + COSO IC + SOX 404 — every named process active in this domain."
         lifecycles={COMPLIANCE_LIFECYCLES} lang="en" />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · All Authorities"
+        anchors={COMPLIANCE_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

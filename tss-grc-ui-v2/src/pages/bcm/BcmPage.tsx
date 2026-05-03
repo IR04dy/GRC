@@ -35,6 +35,8 @@ import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflows
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { BCM_WORKFLOWS } from '../../lib/mockWorkflows';
 import { BCM_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { BCM_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows';
 
@@ -395,6 +397,10 @@ export function BcmPage() {
         title="Business Continuity — Processes & Lifecycles"
         subtitle="ISO 22301 + ISO 22313 + ISO 22361 — every named process active in this domain."
         lifecycles={BCM_LIFECYCLES} lang="en" />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · Business Continuity"
+        anchors={BCM_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

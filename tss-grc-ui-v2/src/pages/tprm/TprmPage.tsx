@@ -23,6 +23,8 @@ import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflows
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { TPRM_WORKFLOWS } from '../../lib/mockWorkflows';
 import { TPRM_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { TPRM_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'vendors' | 'assessments' | 'contracts' | 'workflows';
 
@@ -149,6 +151,10 @@ export function TprmPage() {
         title="Third-Party Risk — Processes & Lifecycles"
         subtitle="NIST SP 800-161 + ISO 27036 + OCC 2013-29 — every named process active in this domain."
         lifecycles={TPRM_LIFECYCLES} lang="en" />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · Third-Party Risk"
+        anchors={TPRM_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

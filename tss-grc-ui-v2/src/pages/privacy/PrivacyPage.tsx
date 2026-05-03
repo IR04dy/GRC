@@ -25,6 +25,8 @@ import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflows
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { PRIVACY_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows';
 
@@ -232,6 +234,10 @@ export function PrivacyPage() {
         title="Privacy & PDPL — Processes & Lifecycles"
         subtitle="Saudi PDPL + GDPR + ISO 27701 — every named process active in this domain."
         lifecycles={PRIVACY_LIFECYCLES} lang="en" />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · Privacy & PDPL"
+        anchors={PRIVACY_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

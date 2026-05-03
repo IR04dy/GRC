@@ -28,6 +28,8 @@ import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflows
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { RISK_WORKFLOWS } from '../../lib/mockWorkflows';
 import { RISK_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { RISK_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'register' | 'heatmap' | 'kri' | 'appetite' | 'workflows';
 
@@ -344,6 +346,10 @@ export function RiskRegisterPage() {
             primary:   { label: 'Submit',   onClick: () => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); } },
             secondary: { label: 'Accepted', href: '/risk?status=ACCEPTED' } },
         ]} lang={lang} />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · Enterprise Risk"
+        anchors={RISK_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

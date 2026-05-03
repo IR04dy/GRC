@@ -26,6 +26,8 @@ import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { INCIDENT_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'register' | 'timeline' | 'lessons';
 
@@ -216,6 +218,10 @@ export function IncidentsPage() {
         title="Incident Management — Processes & Lifecycles"
         subtitle="NIST SP 800-61 + ISO 27035 + Saudi regulator (NCA HEY 24-hr / SDA 72-hr / CITC 24-hr) — every named process active in this domain."
         lifecycles={INCIDENT_LIFECYCLES} lang="en" />
+
+      <RegulatorPostureCard
+        title="Regulator Posture · Incident Management"
+        anchors={INCIDENT_ANCHORS} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
