@@ -388,8 +388,13 @@ export const ar = {
   frameworkConfirmRemoveMapping: 'إزالة ترابط السياسة بالإطار؟',
   frameworkMappingRemoved:  'تمت إزالة الترابط',
   frameworkKpiOpenFindings: 'الملاحظات المفتوحة',
+  frameworkKpiControls:     'الضوابط',
+  frameworkKpiImplemented:  'مُطبقة',
+  frameworkKpiMaturity:     'متوسط النضج',
   frameworkFindingsEmptyTitle: 'لا توجد ملاحظات مرتبطة بهذا الإطار',
   frameworkFindingsEmptySub:   'عند تسجيل ملاحظات جديدة بهذا الإطار ستظهر هنا تلقائيًا.',
+  frameworkControlsEmptyTitle: 'لا توجد ضوابط مرتبطة بهذا الإطار',
+  frameworkControlsEmptySub:   'افتح تبويب الضوابط وأنشئ ضوابط ضمن هذا الإطار لتظهر هنا.',
 
   // مهام التدقيق الخارجي (§5.3 توصية رقم ٣)
   engagementFldCode:           'الرمز',

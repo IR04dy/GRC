@@ -987,6 +987,7 @@ export interface FrameworkCoverageDto {
   full: number; partial: number;
   outOfScope: number; notApplicable: number;
   openFindings?: number; closedFindings?: number;
+  controlCount?: number; implementedControls?: number; avgMaturity?: number;
 }
 export interface FrameworkFindingRowDto {
   id: number; title: string;
@@ -995,10 +996,17 @@ export interface FrameworkFindingRowDto {
   capaStage?: string; clauseRef?: string;
   createdAt?: string;
 }
+export interface FrameworkControlRowDto {
+  id: number; code: string;
+  nameEn: string; nameAr?: string;
+  domain?: string; maturityLevel?: number;
+  status?: string; owner?: string;
+}
 export const frameworkApi = {
   list:           ()                 => api.get<FrameworkDto[]>('/api/v1/compliance/frameworks'),
   policiesFor:    (frameworkId: number) => api.get<FrameworkPolicyRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/policies`),
   findingsFor:    (frameworkId: number) => api.get<FrameworkFindingRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/findings`),
+  controlsFor:    (frameworkId: number) => api.get<FrameworkControlRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/controls`),
   mappingsFor:    (policyId: number) => api.get<PolicyMappingDto[]>(`/api/v1/compliance/policies/${policyId}/mappings`),
   addMapping:     (policyId: number, body: { frameworkId: number; clauseRef?: string; satisfaction?: string; notes?: string }) =>
                     api.post<PolicyMappingDto>(`/api/v1/compliance/policies/${policyId}/mappings`, body),

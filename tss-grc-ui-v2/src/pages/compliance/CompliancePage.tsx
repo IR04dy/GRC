@@ -27,7 +27,7 @@ import {
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
   type PolicyDto, type PolicyRequest,
   type AuditEngagementDto, type AuditEngagementRequest,
-  type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto,
+  type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto, type FrameworkControlRowDto,
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
@@ -819,9 +819,10 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
   const [coverage, setCoverage] = useState<Record<number, FrameworkCoverageDto>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
-  const [sheet, setSheet] = useState<'policies' | 'findings'>('policies');
+  const [sheet, setSheet] = useState<'controls' | 'policies' | 'findings'>('controls');
   const [policies, setPolicies] = useState<FrameworkPolicyRowDto[]>([]);
   const [findings, setFindings] = useState<FrameworkFindingRowDto[]>([]);
+  const [controls, setControls] = useState<FrameworkControlRowDto[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -842,7 +843,8 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
     Promise.all([
       frameworkApi.policiesFor(activeId).catch(() => [] as FrameworkPolicyRowDto[]),
       frameworkApi.findingsFor(activeId).catch(() => [] as FrameworkFindingRowDto[]),
-    ]).then(([p, f]) => { setPolicies(p); setFindings(f); }).finally(() => setLoading(false));
+      frameworkApi.controlsFor(activeId).catch(() => [] as FrameworkControlRowDto[]),
+    ]).then(([p, f, c]) => { setPolicies(p); setFindings(f); setControls(c); }).finally(() => setLoading(false));
   }, [activeId]);
 
   async function deleteMapping(mappingId: number) {
@@ -911,12 +913,13 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                   {active.family   && <Badge tone="info">{FAMILY_LABELS[active.family] ?? active.family}</Badge>}
                 </>}>
             {active.issuer && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>{t('frameworkIssuer')}: {active.issuer}</div>}
-            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(110px, 1fr))', gap: 8 }}>
-              <Kpi Icon={BookCopy}      label={t('frameworkKpiPolicies')} value={total}                                   tone="primary" />
-              <Kpi Icon={CheckCheck}    label={t('frameworkKpiFull')}     value={activeCov?.full ?? 0}                    tone="success" />
-              <Kpi Icon={Flag}          label={t('frameworkKpiPartial')}  value={activeCov?.partial ?? 0}                 tone="accent" />
-              <Kpi Icon={Award}         label={t('frameworkKpiCoverage')} value={`${fullPct}%`}                            tone={fullPct >= 80 ? 'success' : fullPct >= 50 ? 'primary' : 'warning'} />
-              <Kpi Icon={AlertTriangle} label={t('frameworkKpiOpenFindings')} value={activeCov?.openFindings ?? 0} tone="danger" />
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, minmax(100px, 1fr))', gap: 8 }}>
+              <Kpi Icon={ClipboardCheck} label={t('frameworkKpiControls')}     value={activeCov?.controlCount ?? 0} tone="primary" />
+              <Kpi Icon={CheckCheck}     label={t('frameworkKpiImplemented')} value={activeCov?.implementedControls ?? 0} tone="success" />
+              <Kpi Icon={Award}          label={t('frameworkKpiMaturity')}     value={typeof activeCov?.avgMaturity === 'number' ? `L${activeCov.avgMaturity}` : '—'} tone="accent" />
+              <Kpi Icon={BookCopy}       label={t('frameworkKpiPolicies')}     value={total}                                   tone="info" />
+              <Kpi Icon={Flag}           label={t('frameworkKpiCoverage')}     value={`${fullPct}%`}                            tone={fullPct >= 80 ? 'success' : fullPct >= 50 ? 'primary' : 'warning'} />
+              <Kpi Icon={AlertTriangle}  label={t('frameworkKpiOpenFindings')} value={activeCov?.openFindings ?? 0} tone="danger" />
             </div>
           </Card>
         )}
@@ -924,6 +927,9 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
         <Card padded={false}>
           {/* Sheet sub-tabs: policies / findings — same artefact list, different lens */}
           <div style={{ display: 'flex', gap: 4, padding: '8px 8px 0' }}>
+            <button onClick={() => setSheet('controls')} style={sheetTabStyle(sheet === 'controls')}>
+              {t('complianceTabControls')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{controls.length}</span>
+            </button>
             <button onClick={() => setSheet('policies')} style={sheetTabStyle(sheet === 'policies')}>
               {t('complianceTabPolicies')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{policies.length}</span>
             </button>
@@ -931,7 +937,25 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
               {t('complianceTabFindings')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{findings.length}</span>
             </button>
           </div>
-          {loading ? <LoadingRow /> : sheet === 'policies' ?
+          {loading ? <LoadingRow /> : sheet === 'controls' ?
+            (controls.length === 0
+              ? <EmptyState Icon={ClipboardCheck} title={t('frameworkControlsEmptyTitle')} sub={t('frameworkControlsEmptySub')} />
+              : (
+                <DataTable<FrameworkControlRowDto>
+                  columns={[
+                    { header: t('fldCode'),    cell: c => <span className="mono" style={{ fontWeight: 600 }}>{c.code}</span>, width: '120px' },
+                    { header: t('colControl'), cell: c => <span style={{ fontWeight: 600 }}>{c.nameEn}</span> },
+                    { header: t('fldDomain'),  cell: c => c.domain ?? '—', width: '160px' },
+                    { header: t('colMaturity'),cell: c => <span className="mono">L{c.maturityLevel ?? 0}</span>, width: '90px' },
+                    { header: t('colOwner'),   cell: c => c.owner ?? '—', width: '160px' },
+                    { header: t('colStatus'),  cell: c => <Badge tone={STATUS_TONE_MAP[c.status ?? ''] ?? 'neutral'} dot>{(c.status ?? '').replace(/_/g, ' ')}</Badge>, width: '130px' },
+                  ]}
+                  rows={controls}
+                  empty={<EmptyState />}
+                />
+              )
+            ) :
+            sheet === 'policies' ?
             (policies.length === 0
               ? <EmptyState Icon={BookCopy} title={t('frameworkSheetEmptyTitle')} sub={t('frameworkSheetEmptySub')} />
               : (

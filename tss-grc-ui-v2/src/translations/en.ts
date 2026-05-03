@@ -396,8 +396,13 @@ export const en = {
   frameworkConfirmRemoveMapping: 'Remove this policy↔framework mapping?',
   frameworkMappingRemoved:  'Mapping removed',
   frameworkKpiOpenFindings: 'Open findings',
+  frameworkKpiControls:     'Controls',
+  frameworkKpiImplemented:  'Implemented',
+  frameworkKpiMaturity:     'Avg maturity',
   frameworkFindingsEmptyTitle: 'No findings raised under this framework',
   frameworkFindingsEmptySub:   'When new findings are tagged with this framework, they appear here automatically.',
+  frameworkControlsEmptyTitle: 'No controls anchored to this framework',
+  frameworkControlsEmptySub:   'Open the Controls tab and create controls scoped to this framework — they will appear here.',
 
   // Audit engagement (assessment §5.3 #3)
   engagementFldCode:           'Code',

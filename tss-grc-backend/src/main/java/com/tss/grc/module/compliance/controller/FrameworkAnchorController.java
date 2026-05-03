@@ -2,10 +2,12 @@ package com.tss.grc.module.compliance.controller;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditFinding;
+import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.entity.Framework;
 import com.tss.grc.module.compliance.entity.Policy;
 import com.tss.grc.module.compliance.entity.PolicyFrameworkMapping;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
+import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
 import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
 import com.tss.grc.module.compliance.repository.PolicyRepository;
@@ -47,6 +49,7 @@ public class FrameworkAnchorController {
     private final PolicyRepository policyRepo;
     private final PolicyFrameworkMappingRepository mappingRepo;
     private final AuditFindingRepository findingRepo;
+    private final ControlRepository controlRepo;
 
     @GetMapping("/frameworks")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
@@ -164,6 +167,10 @@ public class FrameworkAnchorController {
                 if (fnd.getFrameworkId() == null || !fnd.getFrameworkId().equals(f.getId())) continue;
                 if ("CLOSED".equals(fnd.getStatus())) closedFindings++; else openFindings++;
             }
+            List<Control> ctrls = controlRepo.findByOrganisationIdAndFrameworkId(org, f.getId());
+            long implemented = ctrls.stream().filter(c -> "IMPLEMENTED".equals(c.getStatus())).count();
+            int  maturitySum = ctrls.stream().mapToInt(c -> c.getMaturityLevel() == null ? 0 : c.getMaturityLevel()).sum();
+            double avgMaturity = ctrls.isEmpty() ? 0 : Math.round((maturitySum * 10.0) / ctrls.size()) / 10.0;
             Map<String, Object> r = new HashMap<>();
             r.put("frameworkId",    f.getId());
             r.put("code",           f.getCode());
@@ -177,7 +184,32 @@ public class FrameworkAnchorController {
             r.put("notApplicable",  na);
             r.put("openFindings",   openFindings);
             r.put("closedFindings", closedFindings);
+            r.put("controlCount",   ctrls.size());
+            r.put("implementedControls", implemented);
+            r.put("avgMaturity",    avgMaturity);
             out.add(r);
+        }
+        return out;
+    }
+
+    @GetMapping("/frameworks/{id}/controls")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    @Operation(summary = "All controls anchored on a given framework (IA-3).")
+    public List<Map<String, Object>> controlsForFramework(@PathVariable Long id) {
+        Long org = TenantContext.getCurrentTenant();
+        List<Control> ctrls = controlRepo.findByOrganisationIdAndFrameworkId(org, id);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Control c : ctrls) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id",            c.getId());
+            row.put("code",          c.getCode());
+            row.put("nameEn",        c.getNameEn());
+            row.put("nameAr",        c.getNameAr());
+            row.put("domain",        c.getDomain());
+            row.put("maturityLevel", c.getMaturityLevel());
+            row.put("status",        c.getStatus());
+            row.put("owner",         c.getOwner());
+            out.add(row);
         }
         return out;
     }
