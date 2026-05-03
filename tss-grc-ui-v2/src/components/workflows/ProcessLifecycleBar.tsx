@@ -1,24 +1,24 @@
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRight } from 'lucide-react';
-import { Card } from '../ui/Card';
 import { Workflow } from 'lucide-react';
+import { Card } from '../ui/Card';
 
 /**
  * ProcessLifecycle — one named end-to-end process the module supports.
  * Naming follows GRC market-leader conventions (ServiceNow IRM, RSA Archer,
  * MetricStream, OneTrust, NAVEX Global, AuditBoard).
  *
- * The landing-strip renders these as **action buttons that launch the
- * process** — stages live on the detail page, not the index. The customer
- * wants to *trigger* a process from here, not study it.
+ * Renders as a ServiceNow-style "Process Launcher" tile: icon block, process
+ * name, in-flight count chip, and a left-edge health stripe (green / amber
+ * / red). Tap = open the filtered register at this process. Stages live on
+ * the workflow detail page, not on the strip.
  */
 export interface ProcessLifecycle {
   /** Industry-standard process name. */
   name: string;
   /** Arabic display name (rendered in RTL when lang === 'ar'). */
   nameAr?: string;
-  /** Reference standard / clause — kept for tooltip only. */
+  /** Reference standard / clause — surfaced in the hover tooltip only. */
   reference?: string;
   /** Process icon. */
   Icon: LucideIcon;
@@ -26,10 +26,10 @@ export interface ProcessLifecycle {
   activeCount: number;
   /** Items overdue / SLA-breached. */
   overdueCount: number;
-  /** Where to go when the user clicks the button — typically a filtered register. */
+  /** Where the user lands on click — typically a filtered register. */
   primary: { label: string; href: string };
 
-  // ── Kept for compatibility with the catalogue but not rendered on the strip ──
+  // Kept for catalogue compatibility — never rendered on the bar.
   stages?: string[];
   secondary?: { label: string; href: string };
   steward?: string;
@@ -37,10 +37,9 @@ export interface ProcessLifecycle {
 }
 
 /**
- * Compact action-bar of named process triggers, mounted under the KPI strip
- * on every module page. Each tile is a single click-target: name, icon,
- * counter chip, and a quiet overdue indicator. No stages, no stewards —
- * those belong in the workflow detail view.
+ * ServiceNow-style Process Launcher bar. Mounts under the KPI strip on
+ * every module page so the user can fire off the right process in one
+ * click without hunting through tabs.
  */
 export function ProcessLifecycleBar({
   title, subtitle, lifecycles, lang,
@@ -56,18 +55,26 @@ export function ProcessLifecycleBar({
       {subtitle && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>{subtitle}</div>}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: 8,
       }}>
-        {lifecycles.map((lc, idx) => <ProcessButton key={idx} lc={lc} lang={lang} />)}
+        {lifecycles.map((lc, idx) => <ProcessTile key={idx} lc={lc} lang={lang} />)}
       </div>
     </Card>
   );
 }
 
-function ProcessButton({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
+function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   const { Icon } = lc;
   const overdue = lc.overdueCount;
+  const active = lc.activeCount;
+
+  // Health stripe — ServiceNow-style left-edge accent
+  const stripe =
+    overdue > 0 ? 'var(--danger)' :
+    active  > 0 ? 'var(--accent-700)' :
+    'var(--success)';
+
   const tooltip = [
     lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name,
     lc.reference,
@@ -80,66 +87,76 @@ function ProcessButton({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
       to={lc.primary.href}
       title={tooltip}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '10px 12px',
-        borderRadius: 'var(--r-md)',
+        display: 'grid',
+        gridTemplateColumns: '4px 32px 1fr auto',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 12px 10px 0',
+        borderRadius: 'var(--r-sm)',
         border: '1px solid var(--border)',
-        background: 'var(--surface-2)',
+        background: 'var(--surface-1)',
         textDecoration: 'none',
         color: 'inherit',
-        transition: 'background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard)',
-        position: 'relative',
+        overflow: 'hidden',
+        transition: 'background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard)',
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLElement;
-        el.style.background = 'var(--primary-50)';
-        el.style.borderColor = 'var(--primary)';
-        el.style.transform = 'translateY(-1px)';
+        el.style.background    = 'var(--primary-50)';
+        el.style.borderColor   = 'var(--primary)';
+        el.style.boxShadow     = '0 2px 6px rgba(0,0,0,0.06)';
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLElement;
-        el.style.background = 'var(--surface-2)';
-        el.style.borderColor = 'var(--border)';
-        el.style.transform = '';
+        el.style.background    = 'var(--surface-1)';
+        el.style.borderColor   = 'var(--border)';
+        el.style.boxShadow     = '';
       }}
     >
+      {/* Health stripe */}
+      <span style={{
+        alignSelf: 'stretch',
+        background: stripe,
+      }} />
+
+      {/* Icon block */}
       <div style={{
-        width: 32, height: 32, flexShrink: 0,
+        width: 28, height: 28,
         borderRadius: 'var(--r-sm)',
-        background: 'var(--primary-50)',
-        color: 'var(--primary-700)',
+        background: 'var(--surface-3)',
+        color: 'var(--ink-1)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative',
+        marginInlineStart: 4,
       }}>
-        <Icon size={16} strokeWidth={2.2} />
-        {overdue > 0 && (
-          <span style={{
-            position: 'absolute', top: -4, insetInlineEnd: -4,
-            width: 8, height: 8, borderRadius: '50%',
-            background: 'var(--danger)',
-            border: '1.5px solid var(--surface-1)',
-          }} aria-label={`${overdue} overdue`} />
-        )}
+        <Icon size={15} strokeWidth={2} />
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Process name */}
+      <div style={{ minWidth: 0 }}>
         <div style={{
-          fontWeight: 600, fontSize: 13, color: 'var(--ink-1)',
+          fontWeight: 600, fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.2,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
           {lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
-          {lc.activeCount > 0 ? `${lc.activeCount} in flight` : 'No items in flight'}
-          {overdue > 0 && (
-            <span style={{ color: 'var(--danger-fg)', fontWeight: 600, marginInlineStart: 6 }}>
-              · {overdue} overdue
-            </span>
-          )}
-        </div>
       </div>
 
-      <ArrowRight size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
+      {/* Count chip on the right */}
+      <span style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11, fontWeight: 700,
+        padding: '2px 8px',
+        borderRadius: 'var(--r-pill)',
+        background: overdue > 0 ? 'var(--danger-bg)'
+                  : active  > 0 ? 'var(--surface-3)'
+                  : 'transparent',
+        color:    overdue > 0 ? 'var(--danger-fg)'
+                  : active  > 0 ? 'var(--ink-1)'
+                  : 'var(--ink-3)',
+        marginInlineEnd: 0,
+      }}>
+        {overdue > 0 ? `${overdue}!` : active > 0 ? active : '—'}
+      </span>
     </Link>
   );
 }
