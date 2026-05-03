@@ -865,6 +865,9 @@ export const ar = {
   scmTabVendors: 'الموردون',
   scmTabOnboarding: 'الاستقطاب',
   scmTabWorkflow: 'سير العمل والخريطة',
+  scmTierMapTitle: 'تعيين طبقات سلسلة الإمداد',
+  scmTierMapSub:   'متطلبات المركز الوطني لإدارة المخاطر + NIST SP 800-161 + ISO 28001 — رؤية متعددة الطبقات لسلسلة الإمداد (الطبقة 1 → الطبقة N) لتحديد نقاط الفشل الفردية والتبعية الأجنبية ومخاطر التمركز ومعالجتها.',
+  processBarRisk:  'المخاطر المؤسسية — مركز العمليات',
 
   // تبويب سير العمل لكل وحدة
   riskTabWorkflows:        'سير العمل',
@@ -1280,7 +1283,6 @@ export const ar = {
   colMtpd: 'الحد الأقصى لتعطل الأعمال',
   colRto: 'RTO',
   colRpo: 'RPO',
-  colTier: 'الفئة',
   colVulnerability: 'الثغرة',
   colApprover: 'المعتمد',
   colArabic: 'عربي',

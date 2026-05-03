@@ -873,6 +873,9 @@ export const en = {
   scmTabVendors: 'Vendors',
   scmTabOnboarding: 'Onboarding',
   scmTabWorkflow: 'Workflow & Map',
+  scmTierMapTitle: 'Supply Chain Tier Mapping',
+  scmTierMapSub:   'Saudi National Risk Center + NIST SP 800-161 + ISO 28001 — multi-tier visibility into the supply chain (Tier-1 → Tier-N) so single-points-of-failure, foreign-dependency and concentration risk can be quantified and treated.',
+  processBarRisk:  'Enterprise Risk — Process Center',
 
   // Per-module Workflows tab + ActiveWorkflowsPanel
   riskTabWorkflows:        'Workflows',
@@ -1290,7 +1293,6 @@ export const en = {
   colMtpd: 'MTPD',
   colRto: 'RTO',
   colRpo: 'RPO',
-  colTier: 'Tier',
   colVulnerability: 'Vulnerability',
   colApprover: 'Approver',
   colArabic: 'Arabic',
