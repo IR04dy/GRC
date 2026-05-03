@@ -1,12 +1,15 @@
 package com.tss.grc.module.compliance.controller;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.entity.Framework;
 import com.tss.grc.module.compliance.entity.Policy;
 import com.tss.grc.module.compliance.entity.PolicyFrameworkMapping;
+import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
 import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
 import com.tss.grc.module.compliance.repository.PolicyRepository;
+import org.springframework.data.domain.PageRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +46,7 @@ public class FrameworkAnchorController {
     private final FrameworkRepository frameworkRepo;
     private final PolicyRepository policyRepo;
     private final PolicyFrameworkMappingRepository mappingRepo;
+    private final AuditFindingRepository findingRepo;
 
     @GetMapping("/frameworks")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
@@ -138,7 +142,9 @@ public class FrameworkAnchorController {
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     @Operation(summary = "Per-framework coverage: policy count + breakdown of satisfaction levels")
     public List<Map<String, Object>> coverage() {
+        Long org = TenantContext.getCurrentTenant();
         List<Framework> all = frameworkRepo.findByIsActiveTrueOrderByFamilyAscCodeAsc();
+        List<AuditFinding> tenantFindings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
         List<Map<String, Object>> out = new ArrayList<>();
         for (Framework f : all) {
             List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkId(f.getId());
@@ -153,18 +159,50 @@ public class FrameworkAnchorController {
                     default -> { /* unknown */ }
                 }
             }
+            long openFindings = 0, closedFindings = 0;
+            for (AuditFinding fnd : tenantFindings) {
+                if (fnd.getFrameworkId() == null || !fnd.getFrameworkId().equals(f.getId())) continue;
+                if ("CLOSED".equals(fnd.getStatus())) closedFindings++; else openFindings++;
+            }
             Map<String, Object> r = new HashMap<>();
-            r.put("frameworkId",   f.getId());
-            r.put("code",          f.getCode());
-            r.put("nameEn",        f.getNameEn());
-            r.put("nameAr",        f.getNameAr());
-            r.put("family",        f.getFamily());
-            r.put("policyCount",   rows.size());
-            r.put("full",          full);
-            r.put("partial",       partial);
-            r.put("outOfScope",    oos);
-            r.put("notApplicable", na);
+            r.put("frameworkId",    f.getId());
+            r.put("code",           f.getCode());
+            r.put("nameEn",         f.getNameEn());
+            r.put("nameAr",         f.getNameAr());
+            r.put("family",         f.getFamily());
+            r.put("policyCount",    rows.size());
+            r.put("full",           full);
+            r.put("partial",        partial);
+            r.put("outOfScope",     oos);
+            r.put("notApplicable",  na);
+            r.put("openFindings",   openFindings);
+            r.put("closedFindings", closedFindings);
             out.add(r);
+        }
+        return out;
+    }
+
+    @GetMapping("/frameworks/{id}/findings")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    @Operation(summary = "All audit findings raised under a given framework (IA-2).")
+    public List<Map<String, Object>> findingsForFramework(@PathVariable Long id) {
+        Long org = TenantContext.getCurrentTenant();
+        // Pull a wide page; tenant filter applied in-memory below
+        List<AuditFinding> all = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (AuditFinding f : all) {
+            if (f.getFrameworkId() == null || !f.getFrameworkId().equals(id)) continue;
+            Map<String, Object> row = new HashMap<>();
+            row.put("id",        f.getId());
+            row.put("title",     f.getTitle());
+            row.put("severity",  f.getSeverity());
+            row.put("owner",     f.getOwner());
+            row.put("dueDate",   f.getDueDate());
+            row.put("status",    f.getStatus());
+            row.put("capaStage", f.getCapaStage());
+            row.put("clauseRef", f.getClauseRef());
+            row.put("createdAt", f.getCreatedAt());
+            out.add(row);
         }
         return out;
     }

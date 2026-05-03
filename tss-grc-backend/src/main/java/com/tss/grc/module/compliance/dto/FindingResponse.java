@@ -22,5 +22,8 @@ public record FindingResponse(
     String independentTestResult,
     String independentTestNotes,
     LocalDateTime auditSignoffAt,
-    String auditSignoffNotes
+    String auditSignoffNotes,
+    // Framework anchor (IA-2)
+    Long frameworkId,
+    String clauseRef
 ) {}

@@ -27,7 +27,7 @@ import {
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
   type PolicyDto, type PolicyRequest,
   type AuditEngagementDto, type AuditEngagementRequest,
-  type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto,
+  type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto,
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
@@ -804,11 +804,24 @@ const FAMILY_LABELS: Record<string, string> = {
   FINANCIAL: 'Financial', LABOUR: 'Labour', TAX: 'Tax', TELECOM: 'Telecom',
 };
 
+function sheetTabStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '6px 12px', fontSize: 12, fontWeight: 600,
+    background: active ? 'var(--surface)' : 'transparent',
+    color: active ? 'var(--primary)' : 'var(--ink-3)',
+    border: '1px solid var(--border)', borderBottom: active ? '1px solid var(--surface)' : '1px solid var(--border)',
+    borderRadius: 'var(--r-sm) var(--r-sm) 0 0',
+    cursor: 'pointer', position: 'relative', top: 1,
+  };
+}
+
 function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: ReturnType<typeof useToast> }) {
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
   const [coverage, setCoverage] = useState<Record<number, FrameworkCoverageDto>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [sheet, setSheet] = useState<'policies' | 'findings'>('policies');
   const [policies, setPolicies] = useState<FrameworkPolicyRowDto[]>([]);
+  const [findings, setFindings] = useState<FrameworkFindingRowDto[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -826,10 +839,10 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
   useEffect(() => {
     if (activeId == null) return;
     setLoading(true);
-    frameworkApi.policiesFor(activeId)
-      .then(setPolicies)
-      .catch(() => setPolicies([]))
-      .finally(() => setLoading(false));
+    Promise.all([
+      frameworkApi.policiesFor(activeId).catch(() => [] as FrameworkPolicyRowDto[]),
+      frameworkApi.findingsFor(activeId).catch(() => [] as FrameworkFindingRowDto[]),
+    ]).then(([p, f]) => { setPolicies(p); setFindings(f); }).finally(() => setLoading(false));
   }, [activeId]);
 
   async function deleteMapping(mappingId: number) {
@@ -898,18 +911,28 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                   {active.family   && <Badge tone="info">{FAMILY_LABELS[active.family] ?? active.family}</Badge>}
                 </>}>
             {active.issuer && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>{t('frameworkIssuer')}: {active.issuer}</div>}
-            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(120px, 1fr))', gap: 8 }}>
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(110px, 1fr))', gap: 8 }}>
               <Kpi Icon={BookCopy}      label={t('frameworkKpiPolicies')} value={total}                                   tone="primary" />
               <Kpi Icon={CheckCheck}    label={t('frameworkKpiFull')}     value={activeCov?.full ?? 0}                    tone="success" />
               <Kpi Icon={Flag}          label={t('frameworkKpiPartial')}  value={activeCov?.partial ?? 0}                 tone="accent" />
               <Kpi Icon={Award}         label={t('frameworkKpiCoverage')} value={`${fullPct}%`}                            tone={fullPct >= 80 ? 'success' : fullPct >= 50 ? 'primary' : 'warning'} />
+              <Kpi Icon={AlertTriangle} label={t('frameworkKpiOpenFindings')} value={activeCov?.openFindings ?? 0} tone="danger" />
             </div>
           </Card>
         )}
 
         <Card padded={false}>
-          {loading ? <LoadingRow /> :
-            policies.length === 0
+          {/* Sheet sub-tabs: policies / findings — same artefact list, different lens */}
+          <div style={{ display: 'flex', gap: 4, padding: '8px 8px 0' }}>
+            <button onClick={() => setSheet('policies')} style={sheetTabStyle(sheet === 'policies')}>
+              {t('complianceTabPolicies')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{policies.length}</span>
+            </button>
+            <button onClick={() => setSheet('findings')} style={sheetTabStyle(sheet === 'findings')}>
+              {t('complianceTabFindings')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{findings.length}</span>
+            </button>
+          </div>
+          {loading ? <LoadingRow /> : sheet === 'policies' ?
+            (policies.length === 0
               ? <EmptyState Icon={BookCopy} title={t('frameworkSheetEmptyTitle')} sub={t('frameworkSheetEmptySub')} />
               : (
                 <DataTable<FrameworkPolicyRowDto>
@@ -933,6 +956,25 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                   empty={<EmptyState />}
                 />
               )
+            ) : (
+              findings.length === 0
+                ? <EmptyState Icon={AlertTriangle} title={t('frameworkFindingsEmptyTitle')} sub={t('frameworkFindingsEmptySub')} />
+                : (
+                  <DataTable<FrameworkFindingRowDto>
+                    columns={[
+                      { header: t('colTitle'),    cell: f => <span style={{ fontWeight: 600 }}>{f.title}</span> },
+                      { header: t('frameworkClauseRef'), cell: f => <span className="mono">{f.clauseRef ?? '—'}</span>, width: '140px' },
+                      { header: t('colSeverity'), cell: f => <Badge tone={SEVERITY_TONE[f.severity] ?? 'neutral'} dot>{severityLabel(t, f.severity)}</Badge>, width: '110px' },
+                      { header: t('colOwner'),    cell: f => f.owner ?? '—', width: '160px' },
+                      { header: t('colCapaStage'), cell: f => f.capaStage ? <Badge tone="info">{f.capaStage.replace(/_/g, ' ')}</Badge> : '—', width: '160px' },
+                      { header: t('colDue'),      cell: f => f.dueDate ?? '—', mono: true, width: '110px' },
+                      { header: t('colStatus'),   cell: f => <Badge tone={f.status === 'CLOSED' ? 'success' : 'warning'} dot>{f.status}</Badge>, width: '110px' },
+                    ]}
+                    rows={findings}
+                    empty={<EmptyState />}
+                  />
+                )
+            )
           }
         </Card>
       </div>

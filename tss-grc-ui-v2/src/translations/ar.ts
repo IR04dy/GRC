@@ -387,6 +387,9 @@ export const ar = {
   frameworkRemoveMapping:   'إزالة الترابط',
   frameworkConfirmRemoveMapping: 'إزالة ترابط السياسة بالإطار؟',
   frameworkMappingRemoved:  'تمت إزالة الترابط',
+  frameworkKpiOpenFindings: 'الملاحظات المفتوحة',
+  frameworkFindingsEmptyTitle: 'لا توجد ملاحظات مرتبطة بهذا الإطار',
+  frameworkFindingsEmptySub:   'عند تسجيل ملاحظات جديدة بهذا الإطار ستظهر هنا تلقائيًا.',
 
   // مهام التدقيق الخارجي (§5.3 توصية رقم ٣)
   engagementFldCode:           'الرمز',

@@ -38,6 +38,13 @@ public class AuditFinding extends BaseEntity {
     @Column(name = "status", length = 50)
     private String status = "OPEN";
 
+    // Framework anchor (IA-2) — typically the framework this finding originated in.
+    @Column(name = "framework_id")
+    private Long frameworkId;
+
+    @Column(name = "clause_ref", length = 100)
+    private String clauseRef;
+
     // ── CAPA closure verification (assessment §5.3 #6) ────────────────────────
     // Stage flow: IDENTIFIED → IMPLEMENTING → OWNER_TESTED → INDEPENDENT_TESTED → AUDIT_SIGNED_OFF → CLOSED
     @Column(name = "capa_stage", length = 40)

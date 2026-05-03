@@ -181,6 +181,8 @@ public class ComplianceService {
         f.setCapa(req.capa());
         f.setDueDate(req.dueDate());
         f.setStatus(req.status() != null ? req.status() : "OPEN");
+        if (req.frameworkId() != null) f.setFrameworkId(req.frameworkId());
+        if (req.clauseRef()   != null) f.setClauseRef(req.clauseRef());
     }
 
     private FindingResponse toFindingResponse(AuditFinding f) {
@@ -191,7 +193,8 @@ public class ComplianceService {
             f.getCapaStage(),
             f.getOwnerTestAt(), f.getOwnerTestResult(), f.getOwnerTestNotes(),
             f.getIndependentTestAt(), f.getIndependentTestResult(), f.getIndependentTestNotes(),
-            f.getAuditSignoffAt(), f.getAuditSignoffNotes()
+            f.getAuditSignoffAt(), f.getAuditSignoffNotes(),
+            f.getFrameworkId(), f.getClauseRef()
         );
     }
 

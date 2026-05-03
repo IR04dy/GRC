@@ -841,6 +841,8 @@ export interface ComplianceFindingDto {
   ownerTestAt?: string;       ownerTestResult?: string;       ownerTestNotes?: string;
   independentTestAt?: string; independentTestResult?: string; independentTestNotes?: string;
   auditSignoffAt?: string;    auditSignoffNotes?: string;
+  // Framework anchor (IA-2)
+  frameworkId?: number; clauseRef?: string;
 }
 export interface ComplianceAssessmentRequest {
   framework: string; period: string;
@@ -851,6 +853,7 @@ export interface ComplianceFindingRequest {
   title: string; severity?: string;
   owner?: string; capa?: string;
   dueDate?: string; status?: string;
+  frameworkId?: number; clauseRef?: string;
 }
 // Regulatory change management (assessment §5.3 critical #1)
 export interface RegulatoryChangeDto {
@@ -983,10 +986,19 @@ export interface FrameworkCoverageDto {
   policyCount: number;
   full: number; partial: number;
   outOfScope: number; notApplicable: number;
+  openFindings?: number; closedFindings?: number;
+}
+export interface FrameworkFindingRowDto {
+  id: number; title: string;
+  severity: string; owner?: string;
+  dueDate?: string; status: string;
+  capaStage?: string; clauseRef?: string;
+  createdAt?: string;
 }
 export const frameworkApi = {
   list:           ()                 => api.get<FrameworkDto[]>('/api/v1/compliance/frameworks'),
   policiesFor:    (frameworkId: number) => api.get<FrameworkPolicyRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/policies`),
+  findingsFor:    (frameworkId: number) => api.get<FrameworkFindingRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/findings`),
   mappingsFor:    (policyId: number) => api.get<PolicyMappingDto[]>(`/api/v1/compliance/policies/${policyId}/mappings`),
   addMapping:     (policyId: number, body: { frameworkId: number; clauseRef?: string; satisfaction?: string; notes?: string }) =>
                     api.post<PolicyMappingDto>(`/api/v1/compliance/policies/${policyId}/mappings`, body),

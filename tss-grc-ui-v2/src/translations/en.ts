@@ -395,6 +395,9 @@ export const en = {
   frameworkRemoveMapping:   'Remove this mapping',
   frameworkConfirmRemoveMapping: 'Remove this policy↔framework mapping?',
   frameworkMappingRemoved:  'Mapping removed',
+  frameworkKpiOpenFindings: 'Open findings',
+  frameworkFindingsEmptyTitle: 'No findings raised under this framework',
+  frameworkFindingsEmptySub:   'When new findings are tagged with this framework, they appear here automatically.',
 
   // Audit engagement (assessment §5.3 #3)
   engagementFldCode:           'Code',
