@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { Truck, ListChecks, FileCheck2, Link2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -59,24 +61,40 @@ export function VendorDetailPage() {
         </>}
       />
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
-
-      {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-          <Card title={t('detailTabOverview')} Icon={Truck}>
-            <Field label={t('vendorFldName')}      value={name} bold />
-            <Field label={t('vendorFldType')}      value={item.vendorType ?? '—'} />
-            <Field label={t('vendorFldCountry')}   value={item.country ?? '—'} />
-            <Field label={t('vendorFldRisk')}      value={item.riskRating} />
-            <Field label={t('vendorFldStatus')}    value={item.status} />
-            <Field label={t('vendorFldContractEnd')} value={item.contractEndDate ?? '—'} mono />
-            <Field label={t('detailDescription')}  value={item.description ?? '—'} multiline />
+      <DetailLayout
+        rail={<>
+          <Card title={t('detailAtAGlance')} Icon={Truck}>
+            <RailFieldGroup>
+              <RailField
+                label={t('fldStatus')}
+                accent
+                value={<Badge tone={item.status === 'ACTIVE' ? 'success' : 'neutral'}>{item.status}</Badge>}
+              />
+              <RailField
+                label={t('vendorFldRisk')}
+                value={<Badge tone={RISK_TONE[item.riskRating] ?? 'neutral'} dot>{item.riskRating}</Badge>}
+              />
+              <RailField label={t('vendorFldType')}    value={item.vendorType ?? '—'} />
+              <RailField label={t('vendorFldCountry')} value={item.country ?? '—'} />
+              <RailField label={t('vendorFldContractEnd')} value={item.contractEndDate ?? '—'} mono />
+            </RailFieldGroup>
           </Card>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <LinkedChangesPanel entityType="VENDOR" entityId={item.id} />
-          </div>
-        </div>
-      )}
+          <LinkedChangesPanel entityType="VENDOR" entityId={item.id} />
+        </>}
+        main={<>
+          <Tabs items={tabs} active={tab} onChange={setTab} />
+
+          {tab === 'overview' && (
+            <Card title={t('detailTabOverview')} Icon={Truck}>
+              <Field label={t('vendorFldName')}      value={name} bold />
+              <Field label={t('vendorFldType')}      value={item.vendorType ?? '—'} />
+              <Field label={t('vendorFldCountry')}   value={item.country ?? '—'} />
+              <Field label={t('vendorFldRisk')}      value={item.riskRating} />
+              <Field label={t('vendorFldStatus')}    value={item.status} />
+              <Field label={t('vendorFldContractEnd')} value={item.contractEndDate ?? '—'} mono />
+              <Field label={t('detailDescription')}  value={item.description ?? '—'} multiline />
+            </Card>
+          )}
 
       {tab === 'assessments' && (
         <Card title={t('detailTabAssessments')} Icon={ListChecks}
@@ -118,7 +136,15 @@ export function VendorDetailPage() {
               </div>}
         </Card>
       )}
-      {tab === 'links'       && <Card title={t('detailTabLinks')}       Icon={Link2}><LinkedChangesPanel entityType="VENDOR" entityId={item.id} /></Card>}
+      {tab === 'links' && (
+        <Card title={t('detailTabLinks')} Icon={Link2}>
+          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
+            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
+          </div>
+        </Card>
+      )}
+        </>}
+      />
     </Shell>
   );
 }

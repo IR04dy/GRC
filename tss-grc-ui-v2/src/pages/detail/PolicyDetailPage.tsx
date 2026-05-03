@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { BookCopy, History, Award, Link2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -65,11 +67,31 @@ export function PolicyDetailPage() {
         </>}
       />
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <DetailLayout
+        rail={<>
+          <Card title={t('detailAtAGlance')} Icon={BookCopy}>
+            <RailFieldGroup>
+              <RailField
+                label={t('fldStatus')}
+                accent
+                value={<Badge tone={STATUS_TONE[item.status] ?? 'neutral'} dot>{(item.status ?? '').replace(/_/g, ' ')}</Badge>}
+              />
+              <RailField label={t('fldCode')}     value={item.code ?? '—'} mono />
+              <RailField label={t('fldVersion')}  value={`v${item.version ?? '—'}`} mono />
+              <RailField label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
+              <RailField label={t('complianceFldEffectiveFrom')} value={item.effectiveFrom ?? '—'} mono />
+              <RailField label={t('fldNextReviewDate')}          value={item.nextReviewDate ?? '—'} mono />
+            </RailFieldGroup>
+          </Card>
+          <EntityAnchorsPanel
+            anchors={POLICY_ANCHORS_BY_ID[item.id] ?? []}
+            subtitle="Authorities this policy satisfies." />
+          <LinkedChangesPanel entityType="POLICY" entityId={item.id} />
+        </>}
+        main={<>
+          <Tabs items={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'overview' && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+          {tab === 'overview' && (
             <Card title={t('detailTabOverview')} Icon={BookCopy}>
               <Field label={t('fldCode')}     value={item.code ?? '—'} mono bold />
               <Field label={t('colTitle')}    value={title} bold />
@@ -79,29 +101,7 @@ export function PolicyDetailPage() {
               <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
               <Field label={t('complianceFldPolicyContent')} value={item.contentEn ?? '—'} multiline />
             </Card>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <Card title={t('detailTabMappings')} Icon={Award}>
-                {mappings.length === 0
-                  ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('detailMappingsEmpty')}</div>
-                  : mappings.map(m => (
-                    <div key={m.mappingId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
-                      <Badge tone="primary">{m.frameworkCode}</Badge>
-                      {m.clauseRef && <span className="mono" style={{ fontSize: 11 }}>{m.clauseRef}</span>}
-                      <Badge tone={m.satisfaction === 'FULL' ? 'success' : m.satisfaction === 'PARTIAL' ? 'warning' : 'neutral'}>{m.satisfaction.replace(/_/g, ' ')}</Badge>
-                    </div>
-                  ))
-                }
-              </Card>
-              <LinkedChangesPanel entityType="POLICY" entityId={item.id} />
-            </div>
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <EntityAnchorsPanel
-              anchors={POLICY_ANCHORS_BY_ID[item.id] ?? []}
-              subtitle="Authorities + clauses this policy satisfies. Click any anchor to open the authority workspace." />
-          </div>
-        </>
-      )}
+          )}
 
       {tab === 'mappings' && (
         <Card title={t('detailTabMappings')} Icon={Award}>
@@ -139,7 +139,15 @@ export function PolicyDetailPage() {
               </div>}
         </Card>
       )}
-      {tab === 'links'     && <Card title={t('detailTabLinks')}     Icon={Link2}><LinkedChangesPanel entityType="POLICY" entityId={item.id} /></Card>}
+      {tab === 'links' && (
+        <Card title={t('detailTabLinks')} Icon={Link2}>
+          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
+            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
+          </div>
+        </Card>
+      )}
+        </>}
+      />
     </Shell>
   );
 }

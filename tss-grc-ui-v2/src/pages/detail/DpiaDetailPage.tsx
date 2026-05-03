@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { Fingerprint, ListChecks, ShieldCheck, MessageSquare, Link2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -64,27 +66,42 @@ export function DpiaDetailPage() {
         </>}
       />
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
-
-      {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-          <Card title={t('detailTabOverview')} Icon={Fingerprint}>
-            <Field label={t('colTitle')} value={title} bold />
-            <Field label={t('dpiaTrigger')} value={item.triggerReason.replace(/_/g, ' ')} />
-            <Field label={t('dpiaResidualRisk')} value={item.overallResidualRisk ?? '—'} />
-            <Field label={t('colDate')} value={item.assessmentDate ?? '—'} mono />
-            <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
-            {item.conclusion && <Field label={t('detailConclusion')} value={item.conclusion} multiline />}
-            {item.rejectionReason && <Field label={t('detailRejectionReason')} value={item.rejectionReason} multiline />}
+      <DetailLayout
+        rail={<>
+          <Card title={t('detailAtAGlance')} Icon={Fingerprint}>
+            <RailFieldGroup>
+              <RailField
+                label={t('fldStatus')}
+                accent
+                value={<Badge tone={STATUS_TONE[item.status] ?? 'neutral'} dot>{item.status.replace(/_/g, ' ')}</Badge>}
+              />
+              {item.overallResidualRisk && (
+                <RailField
+                  label={t('dpiaResidualRisk')}
+                  value={<Badge tone={RISK_TONE[item.overallResidualRisk] ?? 'neutral'}>{item.overallResidualRisk}</Badge>}
+                />
+              )}
+              <RailField label={t('dpiaTrigger')}        value={item.triggerReason.replace(/_/g, ' ')} />
+              <RailField label={t('colDate')}            value={item.assessmentDate ?? '—'} mono />
+              <RailField label={t('fldNextReviewDate')}  value={item.nextReviewDate ?? '—'} mono />
+            </RailFieldGroup>
           </Card>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card title={t('detailTabMitigations')} Icon={ShieldCheck} action={<Badge tone="primary">{(DPIA_MITIGATIONS_BY_ID[item.id] ?? []).length}</Badge>}>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('detailMitigationsHint')}</div>
+          <LinkedChangesPanel entityType="DPIA" entityId={item.id} />
+        </>}
+        main={<>
+          <Tabs items={tabs} active={tab} onChange={setTab} />
+
+          {tab === 'overview' && (
+            <Card title={t('detailTabOverview')} Icon={Fingerprint}>
+              <Field label={t('colTitle')} value={title} bold />
+              <Field label={t('dpiaTrigger')} value={item.triggerReason.replace(/_/g, ' ')} />
+              <Field label={t('dpiaResidualRisk')} value={item.overallResidualRisk ?? '—'} />
+              <Field label={t('colDate')} value={item.assessmentDate ?? '—'} mono />
+              <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
+              {item.conclusion && <Field label={t('detailConclusion')} value={item.conclusion} multiline />}
+              {item.rejectionReason && <Field label={t('detailRejectionReason')} value={item.rejectionReason} multiline />}
             </Card>
-            <LinkedChangesPanel entityType="DPIA" entityId={item.id} />
-          </div>
-        </div>
-      )}
+          )}
 
       {tab === 'questions' && (() => {
         const rows = DPIA_QUESTIONS_BY_ID[item.id] ?? [];
@@ -150,7 +167,15 @@ export function DpiaDetailPage() {
           </Card>
         );
       })()}
-      {tab === 'links'       && <Card title={t('detailTabLinks')}       Icon={Link2}><LinkedChangesPanel entityType="DPIA" entityId={item.id} /></Card>}
+      {tab === 'links' && (
+        <Card title={t('detailTabLinks')} Icon={Link2}>
+          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
+            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
+          </div>
+        </Card>
+      )}
+        </>}
+      />
     </Shell>
   );
 }

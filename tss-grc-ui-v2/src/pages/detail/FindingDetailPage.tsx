@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { AlertTriangle, ListChecks, ArrowRight, ShieldCheck, Stamp, Lock, Wrench, Briefcase, Link2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -92,31 +94,46 @@ export function FindingDetailPage() {
         </>}
       />
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <DetailLayout
+        rail={<>
+          <Card title={t('detailAtAGlance')} Icon={AlertTriangle}>
+            <RailFieldGroup>
+              <RailField
+                label={t('fldStatus')}
+                accent
+                value={<Badge tone={item.status === 'CLOSED' ? 'success' : 'warning'} dot>{item.status}</Badge>}
+              />
+              <RailField
+                label={t('colSeverity')}
+                value={<Badge tone={SEVERITY_TONE[item.severity] ?? 'neutral'} dot>{severityLabel(t, item.severity)}</Badge>}
+              />
+              <RailField
+                label={t('detailCapaStage')}
+                value={<Badge tone={CAPA_STAGE_TONE[stage] ?? 'neutral'}>{stage.replace(/_/g, ' ')}</Badge>}
+              />
+              <RailField label={t('colOwner')} value={item.owner ?? '—'} />
+              <RailField label={t('colDue')}   value={item.dueDate ?? '—'} mono />
+            </RailFieldGroup>
+          </Card>
+          <Card title={t('detailCapaStage')} Icon={ListChecks}>
+            <CapaStepper stage={stage} t={t} />
+          </Card>
+          <EntityAnchorsPanel
+            anchors={FINDING_ANCHORS_BY_ID[item.id] ?? []}
+            subtitle="Authorities this finding addresses." />
+          <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />
+        </>}
+        main={<>
+          <Tabs items={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'overview' && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+          {tab === 'overview' && (
             <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
               <Field label={t('colTitle')}    value={item.title} bold />
               <Field label={t('colCapa')}     value={item.capa ?? '—'} multiline />
               <Field label={t('colDue')}      value={item.dueDate ?? '—'} mono />
               <Field label={t('colOwner')}    value={item.owner ?? '—'} />
             </Card>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <Card title={t('detailCapaStage')} Icon={ListChecks}>
-                <CapaStepper stage={stage} t={t} />
-              </Card>
-              <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />
-            </div>
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <EntityAnchorsPanel
-              anchors={FINDING_ANCHORS_BY_ID[item.id] ?? []}
-              subtitle="Authorities + control references this finding addresses. Click any anchor to open the authority workspace." />
-          </div>
-        </>
-      )}
+          )}
 
       {tab === 'capa' && (
         <Card title={t('detailTabCapa')} Icon={ListChecks}>
@@ -147,7 +164,13 @@ export function FindingDetailPage() {
               </div>}
         </Card>
       )}
-      {tab === 'links' && <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />}
+      {tab === 'links' && (
+        <Card title={t('detailTabLinks')} Icon={Link2}>
+          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
+            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
+          </div>
+        </Card>
+      )}
       {tab === 'history' && (
         <Card title={t('detailTabHistory')} Icon={ListChecks}
           action={<Badge tone="primary">{(FINDING_HISTORY_BY_ID[item.id] ?? []).length}</Badge>}>
@@ -167,6 +190,8 @@ export function FindingDetailPage() {
               </div>}
         </Card>
       )}
+        </>}
+      />
     </Shell>
   );
 }
