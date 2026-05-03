@@ -24,6 +24,7 @@ export const ar = {
   modThirdParty: 'مخاطر الأطراف الثالثة',
   modPolicy: 'إدارة السياسات',
   modAuthorities: 'الجهات التنظيمية',
+  modAuditWorkspace: 'مساحة عمل المراجعة',
 
   searchPlaceholder: 'بحث في المخاطر، الضوابط، السياسات…',
   notifications: 'الإشعارات',

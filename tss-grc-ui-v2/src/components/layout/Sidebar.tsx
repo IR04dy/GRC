@@ -1,6 +1,6 @@
 import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
-         GitBranch, ShieldAlert, Calendar, Settings, Landmark, type LucideIcon } from 'lucide-react';
+         GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
@@ -25,6 +25,7 @@ const MODULE_ITEMS: NavItem[] = [
   { id: 'scm',        to: '/scm',        Icon: Truck,          labelKey: 'scmEyebrow' },
   { id: 'changes',    to: '/changes',    Icon: GitBranch,      labelKey: 'modChanges' },
   { id: 'authorities',to: '/authorities',Icon: Landmark,       labelKey: 'modAuthorities' },
+  { id: 'audit-ws',   to: '/audit-workspace', Icon: Stamp,     labelKey: 'modAuditWorkspace' },
 ];
 
 const SETTINGS_ITEMS: NavItem[] = [
