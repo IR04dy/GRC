@@ -19,6 +19,7 @@ import { ScmPage } from './pages/scm/ScmPage';
 import { WorkflowsPage } from './pages/workflow/WorkflowsPage';
 import { ChangesPage } from './pages/changes/ChangesPage';
 import { EthicsPage } from './pages/ethics/EthicsPage';
+import { ReportSchedulesPage } from './pages/reporting/ReportSchedulesPage';
 
 export function App() {
   return (
@@ -47,6 +48,7 @@ export function App() {
               <Route path="/workflows"  element={<WorkflowsPage />} />
               <Route path="/changes"    element={<ChangesPage />} />
               <Route path="/ethics"     element={<EthicsPage />} />
+              <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />

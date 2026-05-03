@@ -463,6 +463,47 @@ export const changeApi = {
   analytics:   () => api.get<ChangeAnalyticsDto>('/api/v1/changes/analytics'),
 };
 
+// ─── Reporting — Scheduled reports (R4) ────────────────────────────────────
+export interface ReportScheduleDto {
+  id: number; organisationId?: number;
+  externalId?: string;
+  name: string; description?: string;
+  reportType: string;        // RISK_REGISTER | FINDINGS_AGING | KRI_DASHBOARD
+  format: string;            // PDF | XLSX
+  language: string;          // en | ar
+  cadence: string;           // DAILY | WEEKLY | MONTHLY | QUARTERLY
+  cadenceAnchor?: string;
+  timeOfDay: string;
+  recipients: string;
+  ccRecipients?: string;
+  isActive?: boolean;
+  lastRunAt?: string;
+  nextRunAt: string;
+  lastRunStatus?: string;
+  lastRunMessage?: string;
+  createdAt?: string;
+}
+export interface ReportRunDto {
+  id: number; scheduleId: number;
+  triggeredAt?: string;
+  triggeredBy: string;
+  status: string;
+  durationMs?: number;
+  bytes?: number;
+  recipients?: string;
+  message?: string;
+}
+export const reportScheduleApi = {
+  list:    (page = 0, size = 50) => api.get<PageResponse<ReportScheduleDto>>(`/api/v1/reporting/schedules${pageQ(page, size)}`),
+  get:     (id: number) => api.get<ReportScheduleDto>(`/api/v1/reporting/schedules/${id}`),
+  create:  (body: Partial<ReportScheduleDto>) => api.post<ReportScheduleDto>('/api/v1/reporting/schedules', body),
+  update:  (id: number, body: Partial<ReportScheduleDto>) => api.put<ReportScheduleDto>(`/api/v1/reporting/schedules/${id}`, body),
+  remove:  (id: number) => api.delete<void>(`/api/v1/reporting/schedules/${id}`),
+  runNow:  (id: number) => api.post<ReportRunDto>(`/api/v1/reporting/schedules/${id}/run-now`),
+  runs:    (id: number) => api.get<ReportRunDto[]>(`/api/v1/reporting/schedules/${id}/runs`),
+  recent:  () => api.get<ReportRunDto[]>('/api/v1/reporting/schedules/runs/recent'),
+};
+
 export const reportingApi = {
   riskRegisterPdf:  (lang: string) => downloadFile(`/api/v1/reporting/risk-register.pdf?lang=${encodeURIComponent(lang)}`, 'risk-register.pdf'),
   riskRegisterXlsx: () => downloadFile('/api/v1/reporting/risk-register.xlsx', 'risk-register.xlsx'),

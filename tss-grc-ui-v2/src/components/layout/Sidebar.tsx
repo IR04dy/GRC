@@ -1,6 +1,6 @@
 import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
-         GitBranch, ShieldAlert, Settings, type LucideIcon } from 'lucide-react';
+         GitBranch, ShieldAlert, Calendar, Settings, type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
@@ -27,8 +27,9 @@ const MODULE_ITEMS: NavItem[] = [
 ];
 
 const SETTINGS_ITEMS: NavItem[] = [
-  { id: 'admin',     to: '/admin',     Icon: UserCog,         labelKey: 'adminTitle' },
-  { id: 'settings',  to: '/settings',  Icon: Settings,        labelKey: 'itemSettings' },
+  { id: 'admin',     to: '/admin',                Icon: UserCog,  labelKey: 'adminTitle' },
+  { id: 'schedules', to: '/reports/schedules',    Icon: Calendar, labelKey: 'rsTitle' },
+  { id: 'settings',  to: '/settings',             Icon: Settings, labelKey: 'itemSettings' },
 ];
 
 export function Sidebar() {
