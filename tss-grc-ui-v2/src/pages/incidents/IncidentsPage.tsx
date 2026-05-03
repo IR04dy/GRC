@@ -24,9 +24,8 @@ import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type Reg
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { INCIDENT_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'register' | 'timeline' | 'lessons';
@@ -214,14 +213,14 @@ export function IncidentsPage() {
         <Kpi Icon={CheckCircle2} label={t('incidentsKpiClosed')}   value={closed} tone="primary" />
       </div>
 
-      <ProcessLifecycleBar
-        title="Incident Management — Processes & Lifecycles"
-        subtitle="NIST SP 800-61 + ISO 27035 + Saudi regulator (NCA HEY 24-hr / SDA 72-hr / CITC 24-hr) — every named process active in this domain."
-        lifecycles={INCIDENT_LIFECYCLES} lang="en" />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Incident Management"
-        anchors={INCIDENT_ANCHORS} />
+      <OverviewStrip
+        storageKey="overview.incidents"
+        processBarTitle="Incident Management — Processes & Lifecycles"
+        processBarSubtitle="NIST SP 800-61 + ISO 27035 + Saudi regulator (NCA HEY 24-hr / SDA 72-hr / CITC 24-hr) — every named process active in this domain."
+        lifecycles={INCIDENT_LIFECYCLES}
+        postureTitle="Regulator Posture · Incident Management"
+        anchors={INCIDENT_ANCHORS}
+        lang="en" />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

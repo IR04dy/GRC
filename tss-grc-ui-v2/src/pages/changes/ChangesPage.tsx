@@ -27,9 +27,8 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 import { CHANGE_REQUESTS, CHANGE_ANALYTICS } from './mockChanges';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { CHANGE_LIFECYCLES } from '../../lib/moduleLifecycles';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CHANGE_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations';
@@ -223,14 +222,14 @@ export function ChangesPage() {
         <Kpi Icon={ShieldCheck}  label={t('changeKpiSuccess')} value={`${successPct}%`} tone="success" />
       </div>
 
-      <ProcessLifecycleBar
-        title="Change Enablement — Processes & Lifecycles"
-        subtitle="ITIL v4 Change Enablement — every named process active in this domain."
-        lifecycles={CHANGE_LIFECYCLES} lang="en" />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Change Enablement"
-        anchors={CHANGE_ANCHORS} />
+      <OverviewStrip
+        storageKey="overview.changes"
+        processBarTitle="Change Enablement — Processes & Lifecycles"
+        processBarSubtitle="ITIL v4 Change Enablement — every named process active in this domain."
+        lifecycles={CHANGE_LIFECYCLES}
+        postureTitle="Regulator Posture · Change Enablement"
+        anchors={CHANGE_ANCHORS}
+        lang="en" />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

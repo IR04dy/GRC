@@ -32,10 +32,9 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { BCM_PLANS, BCM_PROCESSES, BCM_BIA, BCM_EXERCISES } from './mockBcm';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { BCM_WORKFLOWS } from '../../lib/mockWorkflows';
 import { BCM_LIFECYCLES } from '../../lib/moduleLifecycles';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { BCM_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows';
@@ -393,14 +392,14 @@ export function BcmPage() {
         <Kpi Icon={TimerReset} label={t('bcmKpiRto')}       value="76%" trend={{ dir: 'down', value: '−2%' }} tone="warning" />
       </div>
 
-      <ProcessLifecycleBar
-        title="Business Continuity — Processes & Lifecycles"
-        subtitle="ISO 22301 + ISO 22313 + ISO 22361 — every named process active in this domain."
-        lifecycles={BCM_LIFECYCLES} lang="en" />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Business Continuity"
-        anchors={BCM_ANCHORS} />
+      <OverviewStrip
+        storageKey="overview.bcm"
+        processBarTitle="Business Continuity — Processes & Lifecycles"
+        processBarSubtitle="ISO 22301 + ISO 22313 + ISO 22361 — every named process active in this domain."
+        lifecycles={BCM_LIFECYCLES}
+        postureTitle="Regulator Posture · Business Continuity"
+        anchors={BCM_ANCHORS}
+        lang="en" />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

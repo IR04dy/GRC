@@ -22,10 +22,9 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { PRIVACY_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows';
@@ -230,14 +229,14 @@ export function PrivacyPage() {
         <Kpi Icon={ShieldAlert} label={t('privacyKpiBreaches')}   value={breaches.data.filter(b => b.status !== 'CLOSED').length} tone="danger" />
       </div>
 
-      <ProcessLifecycleBar
-        title="Privacy & PDPL — Processes & Lifecycles"
-        subtitle="Saudi PDPL + GDPR + ISO 27701 — every named process active in this domain."
-        lifecycles={PRIVACY_LIFECYCLES} lang="en" />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Privacy & PDPL"
-        anchors={PRIVACY_ANCHORS} />
+      <OverviewStrip
+        storageKey="overview.privacy"
+        processBarTitle="Privacy & PDPL — Processes & Lifecycles"
+        processBarSubtitle="Saudi PDPL + GDPR + ISO 27701 — every named process active in this domain."
+        lifecycles={PRIVACY_LIFECYCLES}
+        postureTitle="Regulator Posture · Privacy & PDPL"
+        anchors={PRIVACY_ANCHORS}
+        lang="en" />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

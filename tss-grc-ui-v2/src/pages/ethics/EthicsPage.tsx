@@ -32,9 +32,8 @@ import {
   KYC_SUBJECTS, KYC_HITS_BY_SUBJECT,
   AML_ALERTS, AML_ANALYTICS,
 } from './mockEthics';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { ETHICS_LIFECYCLES } from '../../lib/moduleLifecycles';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { ETHICS_ANCHORS as ETHICS_REG_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'aml' | 'analytics' | 'integrations';
@@ -237,14 +236,14 @@ export function EthicsPage() {
         <Kpi Icon={Stamp}          label={t('ethicsKpiSubstantiated')} value={`${substantPct}%`} tone="accent" />
       </div>
 
-      <ProcessLifecycleBar
-        title="Ethics & Financial Crime — Processes & Lifecycles"
-        subtitle="ISO 37001 / ISO 37002 + Saudi Anti-Corruption Law + SAMA AML + FATF — every named process active in this domain."
-        lifecycles={ETHICS_LIFECYCLES} lang={lang} />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Ethics & Financial Crime"
-        anchors={ETHICS_REG_ANCHORS} />
+      <OverviewStrip
+        storageKey="overview.ethics"
+        processBarTitle="Ethics & Financial Crime — Processes & Lifecycles"
+        processBarSubtitle="ISO 37001 / ISO 37002 + Saudi Anti-Corruption Law + SAMA AML + FATF — every named process active in this domain."
+        lifecycles={ETHICS_LIFECYCLES}
+        postureTitle="Regulator Posture · Ethics & Financial Crime"
+        anchors={ETHICS_REG_ANCHORS}
+        lang={lang} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

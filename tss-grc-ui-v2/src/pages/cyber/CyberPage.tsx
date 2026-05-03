@@ -40,10 +40,9 @@ import {
   INCIDENTS, ASSETS, EVIDENCE, ACTION_PLANS,
 } from './mockCyber';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { CYBER_WORKFLOWS } from '../../lib/mockWorkflows';
 import { CYBER_LIFECYCLES } from '../../lib/moduleLifecycles';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CYBER_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions' | 'workflows';
@@ -861,14 +860,14 @@ export function CyberPage() {
         <Kpi Icon={ClipboardCheck} label={t('cyberKpiCompliance')} value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" />
       </div>
 
-      <ProcessLifecycleBar
-        title="Cybersecurity — Processes & Lifecycles"
-        subtitle="NIST CSF 2.0 + NIST SP 800-61 + ISO 27001:2022 + NCA ECC — every named process active in this domain."
-        lifecycles={CYBER_LIFECYCLES} lang="en" />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Cybersecurity"
-        anchors={CYBER_ANCHORS} />
+      <OverviewStrip
+        storageKey="overview.cyber"
+        processBarTitle="Cybersecurity — Processes & Lifecycles"
+        processBarSubtitle="NIST CSF 2.0 + NIST SP 800-61 + ISO 27001:2022 + NCA ECC — every named process active in this domain."
+        lifecycles={CYBER_LIFECYCLES}
+        postureTitle="Regulator Posture · Cybersecurity"
+        anchors={CYBER_ANCHORS}
+        lang="en" />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

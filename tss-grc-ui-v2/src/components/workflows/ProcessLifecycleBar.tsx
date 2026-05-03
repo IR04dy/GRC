@@ -62,14 +62,30 @@ export interface ProcessLifecycle {
  * launcher button and a register link.
  */
 export function ProcessLifecycleBar({
-  title, subtitle, lifecycles, lang,
+  title, subtitle, lifecycles, lang, compact,
 }: {
   title: string;
   subtitle?: string;
   lifecycles: ProcessLifecycle[];
   lang: string;
+  /** When true, renders one compact dense row (no subtitle, smaller tiles, no register link). */
+  compact?: boolean;
 }) {
   if (lifecycles.length === 0) return null;
+  if (compact) {
+    return (
+      <div style={{
+        display: 'flex', gap: 6, flexWrap: 'wrap',
+        padding: '8px 12px',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-md)',
+        marginBottom: 12,
+      }}>
+        {lifecycles.map((lc, idx) => <ProcessChip key={idx} lc={lc} lang={lang} />)}
+      </div>
+    );
+  }
   return (
     <Card title={title} Icon={Workflow}>
       {subtitle && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>{subtitle}</div>}
@@ -81,6 +97,80 @@ export function ProcessLifecycleBar({
         {lifecycles.map((lc, idx) => <ProcessTile key={idx} lc={lc} lang={lang} />)}
       </div>
     </Card>
+  );
+}
+
+/** Tight one-line chip used by the compact / collapsed bar. */
+function ProcessChip({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
+  const { Icon } = lc;
+  const overdue = lc.overdueCount;
+  const stripe =
+    overdue > 0 ? 'var(--danger)' :
+    lc.activeCount > 0 ? 'var(--accent-700)' :
+    'var(--success)';
+
+  const label = lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name;
+
+  const trigger = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.preventDefault();
+    if (lc.primary.onClick) lc.primary.onClick();
+    else if (lc.primary.href) window.location.href = lc.primary.href;
+  };
+
+  return (
+    <button type="button"
+      onClick={trigger}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') trigger(e); }}
+      title={`${label} — ${lc.primary.label}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '4px 10px 4px 0',
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border)',
+        borderInlineStartWidth: 3,
+        borderInlineStartColor: stripe,
+        borderRadius: 'var(--r-sm)',
+        cursor: 'pointer',
+        fontSize: 12,
+        color: 'var(--ink-1)',
+        transition: 'background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard)',
+      }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background  = 'var(--primary-50)';
+        el.style.borderColor = 'var(--primary-300)';
+        el.style.borderInlineStartColor = stripe;
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background  = 'var(--surface-1)';
+        el.style.borderColor = 'var(--border)';
+        el.style.borderInlineStartColor = stripe;
+      }}
+    >
+      <span style={{ marginInlineStart: 8, color: 'var(--primary-700)', display: 'inline-flex' }}>
+        <Icon size={13} strokeWidth={2.1} />
+      </span>
+      <span style={{ fontWeight: 600 }}>{label}</span>
+      {lc.activeCount > 0 && (
+        <span className="mono" style={{
+          fontSize: 10, fontWeight: 700,
+          padding: '0 6px',
+          borderRadius: 'var(--r-pill)',
+          background: 'var(--surface-3)',
+          color: 'var(--ink-1)',
+        }}>{lc.activeCount}</span>
+      )}
+      {overdue > 0 && (
+        <span className="mono" style={{
+          fontSize: 10, fontWeight: 700,
+          padding: '0 5px',
+          borderRadius: 'var(--r-pill)',
+          background: 'var(--danger-bg)',
+          color: 'var(--danger-fg)',
+        }}>{overdue}!</span>
+      )}
+    </button>
   );
 }
 

@@ -34,12 +34,11 @@ import {
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { SUPPLIERS, ONBOARDING, ASSESSMENTS, DEPENDENCIES, CONTRACTS, DISRUPTIONS } from './mockScm';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { SCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { TierMapPanel } from './TierMapPanel';
 import { SUPPLY_CHAIN_TIERS } from './tierMap';
 import { Layers } from 'lucide-react';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { SCM_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'suppliers' | 'onboarding' | 'workflow' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
@@ -682,9 +681,13 @@ export function ScmPage() {
         <Kpi Icon={FileSignature} label={t('scmKpiExpiringContracts')} value={expiringContracts} tone="info" />
         <Kpi Icon={Star}          label={t('scmKpiAvgScore')}          value={String(avgAssessmentScore(assessments.data))} tone="success" />
       </div>
-      <ProcessLifecycleBar
-        title="Supply Chain — Process Center"
-        subtitle="ISO 28001 + ISO 28000 + ISO 31000 + Saudi NRC + NIST SP 800-161 — pick a process to launch it."
+      <OverviewStrip
+        storageKey="overview.scm"
+        processBarTitle="Supply Chain — Process Center"
+        processBarSubtitle="ISO 28001 + ISO 28000 + ISO 31000 + Saudi NRC + NIST SP 800-161 — pick a process to launch it."
+        postureTitle="Regulator Posture · Supply Chain"
+        anchors={SCM_ANCHORS}
+        lang="en"
         lifecycles={[
           // ── 1. Supplier Onboarding (6-stage) ──
           // Workflow: REGISTRATION → CRITICALITY_CLASSIFICATION → SECURITY → OPERATIONAL → LEGAL → APPROVAL
@@ -739,11 +742,7 @@ export function ScmPage() {
           { ...SCM_LIFECYCLES[4],
             primary:   { label: 'Add',         onClick: conS.startCreate },
             secondary: { label: 'Contracts',   href: '/scm?tab=contracts' } },
-        ]} lang="en" />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Supply Chain"
-        anchors={SCM_ANCHORS} />
+        ]} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

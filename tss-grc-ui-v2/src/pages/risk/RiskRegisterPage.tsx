@@ -25,10 +25,9 @@ import {
   APPETITES, APPETITE_BREACHES, APPETITE_DASHBOARD_STATS,
 } from './mockRisks';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
-import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { RISK_WORKFLOWS } from '../../lib/mockWorkflows';
 import { RISK_LIFECYCLES } from '../../lib/moduleLifecycles';
-import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
+import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { RISK_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'register' | 'heatmap' | 'kri' | 'appetite' | 'workflows';
@@ -299,9 +298,13 @@ export function RiskRegisterPage() {
         <Kpi Icon={ClipboardCheck}  label="Open"                  value={openCount} tone="warning"   onClick={() => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); }} />
       </div>
 
-      <ProcessLifecycleBar
-        title={t('processBarRisk') ?? 'Enterprise Risk — Process Center'}
-        subtitle="ISO 31000 + COSO ERM + NIST RMF — pick a process to launch it."
+      <OverviewStrip
+        storageKey="overview.risk"
+        processBarTitle={t('processBarRisk') ?? 'Enterprise Risk — Process Center'}
+        processBarSubtitle="ISO 31000 + COSO ERM + NIST RMF — pick a process to launch it."
+        postureTitle="Regulator Posture · Enterprise Risk"
+        anchors={RISK_ANCHORS}
+        lang={lang}
         lifecycles={[
           // ── 1. Risk Identification & Assessment ──
           // Workflow: OPEN → UNDER_ASSESSMENT → APPROVED_FOR_TREATMENT
@@ -345,11 +348,7 @@ export function RiskRegisterPage() {
           { ...RISK_LIFECYCLES[4],
             primary:   { label: 'Submit',   onClick: () => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); } },
             secondary: { label: 'Accepted', href: '/risk?status=ACCEPTED' } },
-        ]} lang={lang} />
-
-      <RegulatorPostureCard
-        title="Regulator Posture · Enterprise Risk"
-        anchors={RISK_ANCHORS} />
+        ]} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
