@@ -33,6 +33,9 @@ export const en = {
   themeModeLight:   'Light',
   themeModeDark:    'Dark',
   themeModeSystem:  'System',
+  orgSwitcher:      'Switch organisation',
+  orgSwitched:      'Switched to',
+  orgSwitchFailed:  'Could not switch organisation',
   langToggle: 'العربية',
   signOut: 'Sign out',
 

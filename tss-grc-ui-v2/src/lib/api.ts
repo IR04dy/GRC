@@ -124,6 +124,28 @@ export const riskApi = {
   incidentBump:    (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/incident-bump`),
 };
 
+// ─── Platform — Organisations / Tenant switcher (P1) ────────────────────────
+export interface OrganisationView {
+  id: number;
+  nameEn: string; nameAr?: string;
+  shortCode: string;
+  industrySector?: string; countryCode?: string;
+  subscriptionTier?: string;
+  primaryColor?: string; logoUrl?: string;
+  isCurrent: boolean;
+}
+export interface OrgSwitchResponse {
+  accessToken: string;
+  organisationId: number;
+  organisationNameEn: string;
+  organisationNameAr?: string;
+  shortCode: string;
+}
+export const platformApi = {
+  accessibleOrgs: () => api.get<OrganisationView[]>('/api/v1/platform/organisations/accessible'),
+  switchOrg:      (id: number) => api.post<OrgSwitchResponse>(`/api/v1/platform/organisations/switch/${id}`),
+};
+
 // ─── KRI threshold engine — assessment §5.1 ERM #5 ───────────────────────────
 export interface KriDefinitionDto {
   id: number;

@@ -30,6 +30,9 @@ export const ar = {
   themeModeLight:   'فاتح',
   themeModeDark:    'داكن',
   themeModeSystem:  'حسب النظام',
+  orgSwitcher:      'تبديل المنشأة',
+  orgSwitched:      'تم التبديل إلى',
+  orgSwitchFailed:  'تعذر تبديل المنشأة',
   langToggle: 'EN',
   signOut: 'تسجيل الخروج',
 

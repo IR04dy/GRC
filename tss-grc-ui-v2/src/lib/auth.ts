@@ -26,6 +26,16 @@ export function setSession(accessToken: string, user: UserInfo): void {
   sessionStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
+/** Update only the access token + organisationId — used by the org switcher. */
+export function updateAccessTokenAndOrg(accessToken: string, organisationId: number): void {
+  sessionStorage.setItem(TOKEN_KEY, accessToken);
+  const user = getUser();
+  if (user) {
+    user.organisationId = organisationId;
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+}
+
 export function clearSession(): void {
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(USER_KEY);
