@@ -25,6 +25,7 @@ export const en = {
   modAudit: 'Internal Audit',
   modThirdParty: 'Third-Party Risk',
   modPolicy: 'Policy Management',
+  modAuthorities: 'Regulatory Authorities',
 
   // Topbar
   searchPlaceholder: 'Search risks, controls, policies…',

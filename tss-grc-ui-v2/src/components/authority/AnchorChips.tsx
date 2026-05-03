@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Badge } from '../ui/Badge';
 import { findAuthority } from '../../lib/authorities';
 import { STATUS_TONE, STATUS_LABEL, type RegulatorAnchor } from '../../lib/evidenceAnchors';
@@ -35,7 +36,7 @@ function AnchorChip({ anchor }: { anchor: RegulatorAnchor }) {
   ].filter(Boolean).join('\n');
 
   return (
-    <span title={tooltip} style={{
+    <Link to={`/authority/${anchor.authorityCode}`} title={tooltip} style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '2px 6px',
       border: `1px solid var(--border)`,
@@ -43,12 +44,18 @@ function AnchorChip({ anchor }: { anchor: RegulatorAnchor }) {
       borderRadius: 'var(--r-sm)',
       background: 'var(--surface-1)',
       fontSize: 10,
-    }}>
+      textDecoration: 'none',
+      color: 'inherit',
+      transition: 'background var(--dur-fast) var(--ease-standard)',
+    }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-1)'; }}
+    >
       <span style={{ fontWeight: 700, color: auth?.colorToken ?? 'var(--ink-1)' }}>
         {anchor.authorityCode}
       </span>
       <span className="mono" style={{ color: 'var(--ink-2)' }}>{anchor.controlRef}</span>
       <Badge tone={tone}>{STATUS_LABEL[anchor.controlStatus]}</Badge>
-    </span>
+    </Link>
   );
 }

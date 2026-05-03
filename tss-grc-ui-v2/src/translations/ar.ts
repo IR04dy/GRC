@@ -23,6 +23,7 @@ export const ar = {
   modAudit: 'التدقيق الداخلي',
   modThirdParty: 'مخاطر الأطراف الثالثة',
   modPolicy: 'إدارة السياسات',
+  modAuthorities: 'الجهات التنظيمية',
 
   searchPlaceholder: 'بحث في المخاطر، الضوابط، السياسات…',
   notifications: 'الإشعارات',

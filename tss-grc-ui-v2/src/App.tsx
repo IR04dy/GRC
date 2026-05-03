@@ -26,6 +26,8 @@ import { ControlDetailPage } from './pages/detail/ControlDetailPage';
 import { PolicyDetailPage } from './pages/detail/PolicyDetailPage';
 import { VendorDetailPage } from './pages/detail/VendorDetailPage';
 import { DpiaDetailPage } from './pages/detail/DpiaDetailPage';
+import { AuthorityWorkspacePage } from './pages/authority/AuthorityWorkspacePage';
+import { AuthoritiesIndexPage } from './pages/authority/AuthoritiesIndexPage';
 
 export function App() {
   return (
@@ -63,6 +65,10 @@ export function App() {
               <Route path="/policies/:id"    element={<PolicyDetailPage />} />
               <Route path="/vendors/:id"     element={<VendorDetailPage />} />
               <Route path="/dpias/:id"       element={<DpiaDetailPage />} />
+
+              {/* Authority workspace (Phase B — auditor pivot view) */}
+              <Route path="/authorities"        element={<AuthoritiesIndexPage />} />
+              <Route path="/authority/:code"    element={<AuthorityWorkspacePage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />
