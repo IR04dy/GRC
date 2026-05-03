@@ -172,7 +172,7 @@ function buildEntityItems(): SearchItem[] {
       title: eng.titleEn,
       subtitle: `${eng.auditorFirm ?? '—'} · ${eng.framework ?? ''} · ${eng.status}`,
       ref: eng.engagementCode,
-      href: `/audit-workspace`,
+      href: `/audit-workspace/engagement/${eng.id}`,
       Icon: Briefcase,
       keywords: [eng.auditType, eng.framework ?? '', eng.status, eng.leadAuditor ?? ''],
     });

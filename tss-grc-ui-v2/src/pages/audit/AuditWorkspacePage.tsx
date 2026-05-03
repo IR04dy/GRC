@@ -126,7 +126,13 @@ export function AuditWorkspacePage() {
             ? <EmptyState Icon={Briefcase} title="No active engagements" />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {myEngagements.slice(0, 5).map(e => (
-                  <div key={e.id} style={{ padding: '6px 8px', borderBottom: '1px dashed var(--border)' }}>
+                  <Link key={e.id} to={`/audit-workspace/engagement/${e.id}`} style={{
+                    padding: '6px 8px', borderBottom: '1px dashed var(--border)',
+                    textDecoration: 'none', color: 'inherit',
+                    transition: 'background var(--dur-fast) var(--ease-standard)',
+                  }}
+                    onMouseEnter={(ev) => (ev.currentTarget as HTMLElement).style.background = 'var(--primary-50)'}
+                    onMouseLeave={(ev) => (ev.currentTarget as HTMLElement).style.background = 'transparent'}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13,
@@ -134,7 +140,7 @@ export function AuditWorkspacePage() {
                           {e.titleEn}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
-                          {e.auditorFirm} · lead: {e.leadAuditor}
+                          {e.engagementCode} · {e.auditorFirm} · lead: {e.leadAuditor}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 1 }} className="mono">
                           {e.fieldworkStartDate ?? '—'} → {e.fieldworkEndDate ?? '—'}
@@ -147,7 +153,7 @@ export function AuditWorkspacePage() {
                         </Badge>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>}
         </Card>
