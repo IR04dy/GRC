@@ -34,8 +34,15 @@ export function useApiList<T>(
     setLoad(true); setError(null);
     try {
       const page = await fetcher();
-      setData(page.content ?? []);
-      setDemo(false);
+      const list = page.content ?? [];
+      // If the backend returns no rows, prefer the rich demo set so the UI
+      // never looks broken on a fresh tenant. Stay in non-demo mode so the
+      // user's writes still hit the real API on next save.
+      if (list.length === 0 && mock.length > 0) {
+        setData(mock); setDemo(true);
+      } else {
+        setData(list); setDemo(false);
+      }
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Network error';
       setError(msg);

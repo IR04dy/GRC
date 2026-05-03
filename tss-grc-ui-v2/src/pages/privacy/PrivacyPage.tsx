@@ -21,8 +21,10 @@ import { privacyApi, dpiaApi, ApiError, type PrivacyDsrDto, type PrivacyDsrReque
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
+import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 
-type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent';
+type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows';
 
 const TYPE_OPTIONS = [
   { value: 'ACCESS', label: 'Access' }, { value: 'ERASURE', label: 'Erasure' },
@@ -77,6 +79,7 @@ export function PrivacyPage() {
     { id: 'ropa',     label: t('privacyTabRopa') },
     { id: 'dpia',     label: t('privacyTabDpia') },
     { id: 'consent',  label: t('privacyTabConsent') },
+    { id: 'workflows', label: t('privacyTabWorkflows') ?? 'Workflows' },
   ];
 
   const dsrCols: Column<PrivacyDsrDto>[] = [
@@ -277,6 +280,11 @@ export function PrivacyPage() {
           </Card>
         </div>
       )}
+      {tab === 'workflows' && <ActiveWorkflowsPanel
+        workflows={PRIVACY_WORKFLOWS}
+        title={t('privacyTabWorkflows') ?? 'Workflows'}
+        sub="DSR fulfilment (PDPL 30-day), breach notification (PDPL 72-hour) and DPIA review."
+        t={t} />}
 
       <FormModal<PrivacyDsrRequest>
         open={open}

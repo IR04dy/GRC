@@ -24,8 +24,10 @@ import {
   MOCK_RISKS, KRIS, KRI_LATEST_BANDS, KRI_BREACHES, KRI_DASHBOARD_STATS,
   APPETITES, APPETITE_BREACHES, APPETITE_DASHBOARD_STATS,
 } from './mockRisks';
+import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { RISK_WORKFLOWS } from '../../lib/mockWorkflows';
 
-type TabId = 'register' | 'heatmap' | 'kri' | 'appetite';
+type TabId = 'register' | 'heatmap' | 'kri' | 'appetite' | 'workflows';
 
 interface RiskFilters {
   l?: number; i?: number;       // heatmap drill-down
@@ -229,10 +231,11 @@ export function RiskRegisterPage() {
   const hasFilters = filters.l != null || filters.i != null || !!filters.status || !!filters.category || !!filters.level;
 
   const tabs = [
-    { id: 'register' as const, label: t('riskTabRegister') },
-    { id: 'heatmap'  as const, label: t('riskTabHeatMap') },
-    { id: 'kri'      as const, label: t('riskTabKri') },
-    { id: 'appetite' as const, label: t('riskTabAppetite') },
+    { id: 'register'  as const, label: t('riskTabRegister') },
+    { id: 'heatmap'   as const, label: t('riskTabHeatMap') },
+    { id: 'kri'       as const, label: t('riskTabKri') },
+    { id: 'appetite'  as const, label: t('riskTabAppetite') },
+    { id: 'workflows' as const, label: t('riskTabWorkflows') ?? 'Workflows' },
   ];
 
   // Columns for the Register table — DataTable, with Inherent → Residual + actions
@@ -321,6 +324,12 @@ export function RiskRegisterPage() {
 
       {tab === 'appetite' && <AppetiteDashboard demoMode={demoMode} risks={risks} />}
 
+      {tab === 'workflows' && <ActiveWorkflowsPanel
+        workflows={RISK_WORKFLOWS}
+        title={t('riskTabWorkflows') ?? 'Workflows'}
+        sub="Active risk-management workflows: lifecycle stages, KRI breach response, appetite breach escalation."
+        t={t} />}
+
       <NewRiskModal
         open={modalOpen}
         existing={editingRisk}
@@ -355,12 +364,13 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
   const [stats, setStats] = useState<{ totalKris: number; green: number; amber: number; red: number; noData: number; openBreaches: number } | null>(null);
   const [loading, setLoading] = useState(false);
 
+  function applyMock() {
+    setKris(KRIS); setStats(KRI_DASHBOARD_STATS);
+    setLatest(KRI_LATEST_BANDS); setBreaches(KRI_BREACHES);
+  }
+
   async function loadAll() {
-    if (demoMode) {
-      setKris(KRIS); setStats(KRI_DASHBOARD_STATS);
-      setLatest(KRI_LATEST_BANDS); setBreaches(KRI_BREACHES);
-      return;
-    }
+    if (demoMode) { applyMock(); return; }
     setLoading(true);
     try {
       const [page, dash] = await Promise.all([
@@ -368,6 +378,9 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
         ermAdvancedApi.kriDashboard(),
       ]);
       const list = page.content ?? [];
+      // Backend has no KRIs yet — fall back to the demo catalogue so the
+      // dashboard never reads zeros on a fresh tenant.
+      if (list.length === 0) { applyMock(); return; }
       setKris(list);
       setStats(dash);
       // Pull latest reading per KRI in parallel
@@ -385,7 +398,8 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
       }));
       setLatest(bandMap);
       setBreaches(breachMap);
-    } finally { setLoading(false); }
+    } catch { applyMock(); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
@@ -468,8 +482,12 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
+  function applyMock() {
+    setItems(APPETITES); setBreaches(APPETITE_BREACHES); setStats(APPETITE_DASHBOARD_STATS);
+  }
+
   async function loadAll() {
-    if (demoMode) { setItems(APPETITES); setBreaches(APPETITE_BREACHES); setStats(APPETITE_DASHBOARD_STATS); return; }
+    if (demoMode) { applyMock(); return; }
     setLoading(true);
     try {
       const [page, dash] = await Promise.all([
@@ -477,6 +495,7 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         ermAdvancedApi.appetiteDashboard(),
       ]);
       const list = page.content ?? [];
+      if (list.length === 0) { applyMock(); return; }
       setItems(list);
       setStats(dash);
       const bm: Record<number, AppetiteBreachEventDto[]> = {};
@@ -487,7 +506,8 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         } catch { /* ignore */ }
       }));
       setBreaches(bm);
-    } finally { setLoading(false); }
+    } catch { applyMock(); }
+    finally { setLoading(false); }
   }
   useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
 

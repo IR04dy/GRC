@@ -19,8 +19,10 @@ import { useApiList } from '../../lib/useApiResource';
 import { tprmApi, ApiError, type TprmVendorDto, type TprmVendorRequest } from '../../lib/api';
 import { useToast } from '../../lib/toast';
 import { VENDORS } from './mockTprm';
+import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { TPRM_WORKFLOWS } from '../../lib/mockWorkflows';
 
-type TabId = 'overview' | 'vendors' | 'assessments' | 'contracts';
+type TabId = 'overview' | 'vendors' | 'assessments' | 'contracts' | 'workflows';
 
 const RISK_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
@@ -75,6 +77,7 @@ export function TprmPage() {
     { id: 'vendors',     label: t('tprmTabVendors') },
     { id: 'assessments', label: t('tprmTabAssessments') },
     { id: 'contracts',   label: t('tprmTabContracts') },
+    { id: 'workflows',   label: t('tprmTabWorkflows') ?? 'Workflows' },
   ];
 
   const cols: Column<TprmVendorDto>[] = [
@@ -206,6 +209,11 @@ export function TprmPage() {
           </Card>
         </div>
       )}
+      {tab === 'workflows' && <ActiveWorkflowsPanel
+        workflows={TPRM_WORKFLOWS}
+        title={t('tprmTabWorkflows') ?? 'Workflows'}
+        sub="Vendor onboarding, periodic re-assessment and contract renewal."
+        t={t} />}
 
       <FormModal<TprmVendorRequest>
         open={open}

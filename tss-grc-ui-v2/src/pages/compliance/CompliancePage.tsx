@@ -40,8 +40,10 @@ import {
   FRAMEWORK_POLICIES_BY_ID, FRAMEWORK_FINDINGS_BY_ID, FRAMEWORK_CONTROLS_BY_ID,
   FRAMEWORK_DPIAS_BY_ID, FRAMEWORK_KRIS_BY_ID, FRAMEWORK_RISKS_BY_ID,
 } from './mockCompliance';
+import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { COMPLIANCE_WORKFLOWS } from '../../lib/mockWorkflows';
 
-type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks';
+type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks' | 'workflows';
 
 // External audit lifecycle stages — assessment §5.3 #3
 const AUDIT_TYPE_OPTIONS = [
@@ -224,7 +226,7 @@ function ctrlToReq(c: ComplianceControlDto): ComplianceControlRequest {
   };
 }
 
-const TAB_IDS = ['overview', 'controls', 'internal', 'external', 'findings', 'scorecard', 'changes', 'policies', 'engagements', 'frameworks'] as const;
+const TAB_IDS = ['overview', 'controls', 'internal', 'external', 'findings', 'scorecard', 'changes', 'policies', 'engagements', 'frameworks', 'workflows'] as const;
 function isTabId(s: string | null): s is TabId {
   return s != null && (TAB_IDS as readonly string[]).includes(s);
 }
@@ -292,6 +294,7 @@ export function CompliancePage() {
     { id: 'external',    label: t('complianceTabExternal') },
     { id: 'findings',    label: t('complianceTabFindings') },
     { id: 'scorecard',   label: t('complianceTabScorecard') },
+    { id: 'workflows',   label: t('complianceTabWorkflows') ?? 'Workflows' },
   ];
 
   // ── Field defs for Regulatory Changes + Policies (built per-render so labels translate) ──
@@ -743,6 +746,12 @@ export function CompliancePage() {
           })}
         </div>
       )}
+
+      {tab === 'workflows' && <ActiveWorkflowsPanel
+        workflows={COMPLIANCE_WORKFLOWS}
+        title={t('complianceTabWorkflows') ?? 'Workflows'}
+        sub="CAPA closure progression, regulatory-change implementation, policy approvals and audit engagements."
+        t={t} />}
 
       <FormModal<ComplianceControlRequest>
         open={open}

@@ -39,8 +39,10 @@ import {
   CONTROLS, VULNS, SUB_CONTROLS, ASSESSMENTS, EXCEPTIONS,
   INCIDENTS, ASSETS, EVIDENCE, ACTION_PLANS,
 } from './mockCyber';
+import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { CYBER_WORKFLOWS } from '../../lib/mockWorkflows';
 
-type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions';
+type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions' | 'workflows';
 
 // ─── Workflow stage steppers (overview tab) ─────────────────────────────────
 const VULN_STAGES = [
@@ -555,6 +557,7 @@ export function CyberPage() {
     { id: 'assets',      label: t('cyberTabAssets') },
     { id: 'evidence',    label: t('cyberTabEvidence') },
     { id: 'actions',     label: t('cyberTabActions') },
+    { id: 'workflows',   label: t('cyberTabWorkflows') ?? 'Workflows' },
   ];
 
   // ── Submit handlers ──
@@ -901,6 +904,11 @@ export function CyberPage() {
       {tab === 'assets'   && <Card padded={false}>{assets.loading        ? <LoadingRow /> : <DataTable columns={assetCols}    rows={assets.data}        empty={<EmptyState Icon={Cpu}        title="No assets" />} />}</Card>}
       {tab === 'evidence' && <Card padded={false}>{cyberEvidence.loading ? <LoadingRow /> : <DataTable columns={evidenceCols} rows={cyberEvidence.data} empty={<EmptyState Icon={FileCheck2} title="No evidence" />} />}</Card>}
       {tab === 'actions'  && <Card padded={false}>{actionPlans.loading   ? <LoadingRow /> : <DataTable columns={actionCols}   rows={actionPlans.data}   empty={<EmptyState Icon={ListTodo}   title="No action plans" />} />}</Card>}
+      {tab === 'workflows' && <ActiveWorkflowsPanel
+        workflows={CYBER_WORKFLOWS}
+        title={t('cyberTabWorkflows') ?? 'Workflows'}
+        sub="Cyber incident response (NIST 800-61), vulnerability remediation, control assessments, and exception approvals."
+        t={t} />}
 
       {/* ── Modals ── */}
       <FormModal<CyberControlRequest> open={ctrlS.open}

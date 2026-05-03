@@ -31,8 +31,10 @@ import {
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { BCM_PLANS, BCM_PROCESSES, BCM_BIA, BCM_EXERCISES } from './mockBcm';
+import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { BCM_WORKFLOWS } from '../../lib/mockWorkflows';
 
-type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms';
+type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows';
 
 const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' }, { value: 'UNDER_REVIEW', label: 'Under Review' },
@@ -214,6 +216,7 @@ export function BcmPage() {
     { id: 'graph',     label: t('bcmTabDepGraph') },
     { id: 'exercises', label: t('bcmTabExercises') },
     { id: 'comms',     label: t('bcmTabComms') },
+    { id: 'workflows', label: t('bcmTabWorkflows') ?? 'Workflows' },
   ];
 
   const planCols: Column<BcmPlanDto>[] = [
@@ -457,6 +460,11 @@ export function BcmPage() {
       {tab === 'graph'  && <DependencyGraphTab t={t} />}
 
       {tab === 'comms' && <CrisisCommsTab toast={toast} t={t} />}
+      {tab === 'workflows' && <ActiveWorkflowsPanel
+        workflows={BCM_WORKFLOWS}
+        title={t('bcmTabWorkflows') ?? 'Workflows'}
+        sub="BCP plan approvals, exercise execution, and crisis-management readiness."
+        t={t} />}
 
       {/* ── Modals ── */}
       <FormModal<BcmPlanRequest> open={planS.open}

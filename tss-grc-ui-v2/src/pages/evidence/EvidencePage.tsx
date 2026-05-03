@@ -30,8 +30,10 @@ import { Modal } from '../../components/ui/Modal';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS } from './mockEvidence';
+import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { EVIDENCE_WORKFLOWS } from '../../lib/mockWorkflows';
 
-type TabId = 'overview' | 'frameworks' | 'connectors' | 'catalog' | 'requests' | 'review' | 'expired';
+type TabId = 'overview' | 'frameworks' | 'connectors' | 'catalog' | 'requests' | 'review' | 'expired' | 'workflows';
 
 const FRESHNESS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
   GREEN: 'success', AMBER: 'warning', RED: 'danger', GREY: 'neutral',
@@ -162,6 +164,7 @@ export function EvidencePage() {
     { id: 'requests',   label: t('evidenceTabRequests') },
     { id: 'review',     label: t('evidenceTabReview') },
     { id: 'expired',    label: t('evidenceTabExpired') },
+    { id: 'workflows',  label: t('evidenceTabWorkflows') ?? 'Workflows' },
   ];
 
   const activeFramework = matrix.find(f => f.frameworkId === activeFrameworkId) ?? matrix[0];
@@ -430,6 +433,11 @@ export function EvidencePage() {
             : <DataTable columns={itemCols} rows={expiredItems} />}
         </Card>
       )}
+      {tab === 'workflows' && <ActiveWorkflowsPanel
+        workflows={EVIDENCE_WORKFLOWS}
+        title={t('evidenceTabWorkflows') ?? 'Workflows'}
+        sub="Evidence reviews, request fulfilment and renewal of expiring artefacts."
+        t={t} />}
 
       <FormModal<EvidenceItemRequest>
         open={open}
