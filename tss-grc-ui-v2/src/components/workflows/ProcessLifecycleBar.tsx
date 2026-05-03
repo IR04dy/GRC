@@ -1,45 +1,65 @@
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Workflow } from 'lucide-react';
+import { Workflow, Play, ArrowRight } from 'lucide-react';
 import { Card } from '../ui/Card';
 
 /**
- * ProcessLifecycle — one named end-to-end process the module supports.
- * Naming follows GRC market-leader conventions (ServiceNow IRM, RSA Archer,
- * MetricStream, OneTrust, NAVEX Global, AuditBoard).
+ * ProcessAction — a single click target on a process tile.
+ * Either navigates (`href`) or fires a callback (`onClick`).
+ * The callback shape is what lets module pages wire each tile's primary
+ * "Start" button to its actual modal opener (e.g. open NewRiskModal,
+ * open NewDsrModal, open NewIncidentModal).
+ */
+export interface ProcessAction {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  /** When true, the action is disabled (greyed-out, non-interactive). */
+  disabled?: boolean;
+}
+
+/**
+ * One named end-to-end process — modelled on ServiceNow IRM's Process
+ * Center. Naming follows ISO / SAMA / NCA standards rather than internal
+ * jargon so auditors recognise the steps.
  *
- * Renders as a ServiceNow-style "Process Launcher" tile: icon block, process
- * name, in-flight count chip, and a left-edge health stripe (green / amber
- * / red). Tap = open the filtered register at this process. Stages live on
- * the workflow detail page, not on the strip.
+ * The tile renders **two** affordances:
+ *   - `primary`   →  the verb-first launcher ("Start Assessment",
+ *                    "Submit DSR", "Report Incident"). When clicked
+ *                    the module opens the relevant new-record modal
+ *                    or routes to a wizard.
+ *   - `secondary` →  "View register" — opens the filtered list.
  */
 export interface ProcessLifecycle {
   /** Industry-standard process name. */
   name: string;
   /** Arabic display name (rendered in RTL when lang === 'ar'). */
   nameAr?: string;
-  /** Reference standard / clause — surfaced in the hover tooltip only. */
+  /** Standards reference for the tooltip (ISO 31000 §6.4, PDPL Article 23, etc.). */
   reference?: string;
-  /** Process icon. */
+  /** Icon. */
   Icon: LucideIcon;
-  /** Items currently active. */
+  /** Items currently active in this process. */
   activeCount: number;
   /** Items overdue / SLA-breached. */
   overdueCount: number;
-  /** Where the user lands on click — typically a filtered register. */
-  primary: { label: string; href: string };
-
-  // Kept for catalogue compatibility — never rendered on the bar.
-  stages?: string[];
-  secondary?: { label: string; href: string };
+  /** Verb-first launcher — wired by the host page. */
+  primary: ProcessAction;
+  /** "View register" — usually a link to the filtered list. */
+  secondary?: ProcessAction;
+  /** Optional steward/owner shown in the tooltip. */
   steward?: string;
+  /** Optional SLA hint shown in the tooltip ("30-day PDPL"). */
   sla?: string;
+
+  // Catalogue compatibility (not rendered).
+  stages?: string[];
 }
 
 /**
- * ServiceNow-style Process Launcher bar. Mounts under the KPI strip on
- * every module page so the user can fire off the right process in one
- * click without hunting through tabs.
+ * ServiceNow-style Process Center bar. Mounts under the KPI strip on every
+ * module. Each tile is one named process the module supports, with a
+ * launcher button and a register link.
  */
 export function ProcessLifecycleBar({
   title, subtitle, lifecycles, lang,
@@ -55,7 +75,7 @@ export function ProcessLifecycleBar({
       {subtitle && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>{subtitle}</div>}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
         gap: 8,
       }}>
         {lifecycles.map((lc, idx) => <ProcessTile key={idx} lc={lc} lang={lang} />)}
@@ -67,9 +87,9 @@ export function ProcessLifecycleBar({
 function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   const { Icon } = lc;
   const overdue = lc.overdueCount;
-  const active = lc.activeCount;
+  const active  = lc.activeCount;
 
-  // Health stripe — ServiceNow-style left-edge accent
+  // ServiceNow-style left-edge health stripe
   const stripe =
     overdue > 0 ? 'var(--danger)' :
     active  > 0 ? 'var(--accent-700)' :
@@ -83,80 +103,163 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   ].filter(Boolean).join(' · ');
 
   return (
-    <Link
-      to={lc.primary.href}
+    <div
       title={tooltip}
       style={{
         display: 'grid',
-        gridTemplateColumns: '4px 32px 1fr auto',
+        gridTemplateColumns: '4px 36px 1fr auto auto',
         alignItems: 'center',
         gap: 10,
         padding: '10px 12px 10px 0',
         borderRadius: 'var(--r-sm)',
         border: '1px solid var(--border)',
         background: 'var(--surface-1)',
-        textDecoration: 'none',
-        color: 'inherit',
         overflow: 'hidden',
-        transition: 'background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard)',
+        transition: 'box-shadow var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard)',
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLElement;
-        el.style.background    = 'var(--primary-50)';
-        el.style.borderColor   = 'var(--primary)';
-        el.style.boxShadow     = '0 2px 6px rgba(0,0,0,0.06)';
+        el.style.borderColor = 'var(--primary-300)';
+        el.style.boxShadow   = '0 2px 8px rgba(0,0,0,0.06)';
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLElement;
-        el.style.background    = 'var(--surface-1)';
-        el.style.borderColor   = 'var(--border)';
-        el.style.boxShadow     = '';
+        el.style.borderColor = 'var(--border)';
+        el.style.boxShadow   = '';
       }}
     >
       {/* Health stripe */}
-      <span style={{
-        alignSelf: 'stretch',
-        background: stripe,
-      }} />
+      <span style={{ alignSelf: 'stretch', background: stripe }} />
 
       {/* Icon block */}
       <div style={{
-        width: 28, height: 28,
+        width: 36, height: 36,
         borderRadius: 'var(--r-sm)',
-        background: 'var(--surface-3)',
-        color: 'var(--ink-1)',
+        background: 'var(--primary-50)',
+        color: 'var(--primary-700)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         marginInlineStart: 4,
       }}>
-        <Icon size={15} strokeWidth={2} />
+        <Icon size={18} strokeWidth={2.1} />
       </div>
 
-      {/* Process name */}
+      {/* Title + reference */}
       <div style={{ minWidth: 0 }}>
         <div style={{
-          fontWeight: 600, fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.2,
+          fontWeight: 700, fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.2,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
           {lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name}
         </div>
+        <div style={{
+          fontSize: 10, color: 'var(--ink-3)', marginTop: 2,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {lc.reference ?? ' '}
+        </div>
       </div>
 
-      {/* Count chip on the right */}
-      <span style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: 11, fontWeight: 700,
-        padding: '2px 8px',
-        borderRadius: 'var(--r-pill)',
-        background: overdue > 0 ? 'var(--danger-bg)'
-                  : active  > 0 ? 'var(--surface-3)'
-                  : 'transparent',
-        color:    overdue > 0 ? 'var(--danger-fg)'
-                  : active  > 0 ? 'var(--ink-1)'
-                  : 'var(--ink-3)',
-        marginInlineEnd: 0,
-      }}>
-        {overdue > 0 ? `${overdue}!` : active > 0 ? active : '—'}
-      </span>
-    </Link>
+      {/* Counter chip */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11, fontWeight: 700,
+          padding: '1px 8px',
+          borderRadius: 'var(--r-pill)',
+          background: 'var(--surface-3)',
+          color: 'var(--ink-1)',
+          minWidth: 24, textAlign: 'center',
+        }}>{active}</span>
+        {overdue > 0 && (
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10, fontWeight: 700,
+            padding: '1px 6px',
+            borderRadius: 'var(--r-pill)',
+            background: 'var(--danger-bg)',
+            color: 'var(--danger-fg)',
+          }}>{overdue} !</span>
+        )}
+      </div>
+
+      {/* Action buttons: primary "Start ..." + secondary register icon link */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginInlineStart: 4 }}>
+        <PrimaryButton action={lc.primary} />
+        {lc.secondary && <SecondaryButton action={lc.secondary} />}
+      </div>
+    </div>
   );
+}
+
+/** ServiceNow-style green/blue primary button. */
+function PrimaryButton({ action }: { action: ProcessAction }) {
+  const content = (
+    <>
+      <Play size={11} strokeWidth={2.6} fill="currentColor" />
+      <span style={{ fontWeight: 600, fontSize: 12 }}>{action.label}</span>
+    </>
+  );
+  const style: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '6px 10px',
+    borderRadius: 'var(--r-sm)',
+    background: action.disabled ? 'var(--surface-3)' : 'var(--primary)',
+    color: action.disabled ? 'var(--ink-3)' : '#fff',
+    border: 'none',
+    cursor: action.disabled ? 'not-allowed' : 'pointer',
+    textDecoration: 'none',
+    transition: 'background var(--dur-fast) var(--ease-standard)',
+    whiteSpace: 'nowrap',
+  };
+  if (action.onClick) {
+    return (
+      <button type="button" onClick={action.onClick} disabled={action.disabled} style={style}
+        onMouseEnter={(e) => { if (!action.disabled) (e.currentTarget as HTMLElement).style.background = 'var(--primary-700)'; }}
+        onMouseLeave={(e) => { if (!action.disabled) (e.currentTarget as HTMLElement).style.background = 'var(--primary)'; }}
+      >{content}</button>
+    );
+  }
+  if (action.href && !action.disabled) {
+    return <Link to={action.href} style={style}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--primary-700)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--primary)'; }}
+    >{content}</Link>;
+  }
+  return <span style={style}>{content}</span>;
+}
+
+/** Quiet secondary "View register" affordance. */
+function SecondaryButton({ action }: { action: ProcessAction }) {
+  const content = (
+    <>
+      <span style={{ fontSize: 11 }}>{action.label}</span>
+      <ArrowRight size={11} />
+    </>
+  );
+  const style: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '6px 8px',
+    borderRadius: 'var(--r-sm)',
+    background: 'transparent',
+    color: 'var(--primary-700)',
+    fontWeight: 500,
+    border: '1px solid transparent',
+    cursor: 'pointer',
+    textDecoration: 'none',
+    transition: 'background var(--dur-fast) var(--ease-standard)',
+    whiteSpace: 'nowrap',
+  };
+  if (action.onClick) {
+    return <button type="button" onClick={action.onClick} style={style}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--primary-50)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+    >{content}</button>;
+  }
+  if (action.href) {
+    return <Link to={action.href} style={style}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--primary-50)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+    >{content}</Link>;
+  }
+  return null;
 }
