@@ -11,6 +11,9 @@ import { complianceApi, type ComplianceControlDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { CONTROL_ANCHORS_BY_ID } from '../../lib/entityAnchors';
+import {
+  CONTROL_SUBCONTROLS_BY_ID, CONTROL_EVIDENCE_BY_ID, CONTROL_TESTS_BY_ID,
+} from '../compliance/mockCompliance';
 
 type TabId = 'overview' | 'subcontrols' | 'evidence' | 'tests' | 'links';
 
@@ -90,9 +93,64 @@ export function ControlDetailPage() {
         </>
       )}
 
-      {tab === 'subcontrols' && <Card title={t('detailTabSubControls')} Icon={ListChecks}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailSubControlsHint')}</div></Card>}
-      {tab === 'evidence'    && <Card title={t('detailTabEvidence')}    Icon={FileCheck2}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div></Card>}
-      {tab === 'tests'       && <Card title={t('detailTabTests')}       Icon={ListChecks}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailTestsHint')}</div></Card>}
+      {tab === 'subcontrols' && (
+        <Card title={t('detailTabSubControls')} Icon={ListChecks}
+          action={<Badge tone="primary">{(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailSubControlsHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).map(s => (
+                  <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 100px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{s.code}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{s.nameEn}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.owner}</div>
+                    </div>
+                    <Badge tone={s.status === 'IMPLEMENTED' ? 'success' : s.status === 'PARTIAL' ? 'warning' : 'info'}>{s.status.replace(/_/g, ' ')}</Badge>
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 700 }}>L{s.maturityLevel}</span>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
+      {tab === 'evidence' && (
+        <Card title={t('detailTabEvidence')} Icon={FileCheck2}
+          action={<Badge tone="primary">{(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).map(e => (
+                  <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 90px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{e.code}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{e.titleEn}</span>
+                    <Badge tone="neutral">{e.type.replace(/_/g, ' ')}</Badge>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.expiryDate}</span>
+                    <Badge tone={e.status === 'APPROVED' ? 'success' : 'warning'}>{e.status.replace(/_/g, ' ')}</Badge>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
+      {tab === 'tests' && (
+        <Card title={t('detailTabTests')} Icon={ListChecks}
+          action={<Badge tone="primary">{(CONTROL_TESTS_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(CONTROL_TESTS_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailTestsHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(CONTROL_TESTS_BY_ID[item.id] ?? []).map(tt => (
+                  <div key={tt.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 80px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{tt.date}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{tt.tester}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{tt.notes}</div>
+                    </div>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{tt.samples} samples · {tt.findings} findings</span>
+                    <Badge tone={tt.result === 'PASS' ? 'success' : tt.result === 'FAIL' ? 'danger' : 'warning'}>{tt.result}</Badge>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
       {tab === 'links'       && <Card title={t('detailTabLinks')}       Icon={Link2}><LinkedChangesPanel entityType="CONTROL" entityId={item.id} /></Card>}
     </Shell>
   );

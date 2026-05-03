@@ -18,7 +18,7 @@ import { useApiList } from '../../lib/useApiResource';
 import { adminApi, ApiError, type AdminUserDto, type AdminUserRequest, type AdminRoleDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { ADMIN_USERS } from './mockAdmin';
+import { ADMIN_USERS, ADMIN_ROLES, ADMIN_AUDIT_EVENTS } from './mockAdmin';
 
 type TabId = 'users' | 'roles' | 'orgs' | 'audit';
 
@@ -73,8 +73,15 @@ export function AdminPage() {
   const [roles, setRoles] = useState<AdminRoleDto[]>([]);
   const [rolesLoading, setRolesLoading] = useState<boolean>(isAuthenticated());
   useEffect(() => {
-    if (!isAuthenticated()) { setRolesLoading(false); return; }
-    adminApi.roles().then(setRoles).catch(() => setRoles([])).finally(() => setRolesLoading(false));
+    if (!isAuthenticated()) {
+      setRoles(ADMIN_ROLES as unknown as AdminRoleDto[]);
+      setRolesLoading(false);
+      return;
+    }
+    adminApi.roles()
+      .then(r => setRoles(r && r.length > 0 ? r : (ADMIN_ROLES as unknown as AdminRoleDto[])))
+      .catch(() => setRoles(ADMIN_ROLES as unknown as AdminRoleDto[]))
+      .finally(() => setRolesLoading(false));
   }, []);
 
   const tabs: TabItem<TabId>[] = [
@@ -115,12 +122,15 @@ export function AdminPage() {
     { id: 2, name: 'TSS Sandbox',         country: 'Saudi Arabia', users: 4, modules: 4, status: 'ACTIVE' },
     { id: 3, name: 'Pilot Customer A',    country: 'UAE', users: 12, modules: 6, status: 'ACTIVE' },
   ];
-  const auditEvents: TimelineEvent[] = users.data.slice(0, 8).map((u, i) => ({
-    id: u.id,
-    time: u.createdAt ? u.createdAt.slice(0, 16).replace('T', ' ') : `2026-04-${String(28 - i).padStart(2, '0')} 10:0${i}`,
-    title: i % 3 === 0 ? `${u.username} logged in` : i % 3 === 1 ? `${u.username} updated their profile` : `Role granted to ${u.username}`,
-    Icon: Users, tone: 'primary',
-    body: <span><Badge tone="info">{u.roles?.[0]?.replace(/_/g, ' ') ?? '—'}</Badge> · {u.email}</span>,
+  const auditEvents: TimelineEvent[] = ADMIN_AUDIT_EVENTS.map(ev => ({
+    id: ev.id,
+    time: ev.at,
+    title: `${ev.actor} · ${ev.action.replace(/_/g, ' ')}`,
+    Icon: Users,
+    tone: ev.outcome === 'DENIED' || ev.outcome === 'ERROR' ? 'danger'
+        : ev.action.startsWith('CREATE') || ev.action.startsWith('GRANT') ? 'success'
+        : 'primary',
+    body: <span><Badge tone={ev.outcome === 'SUCCESS' ? 'success' : 'danger'}>{ev.outcome}</Badge> · <span className="mono" style={{ fontSize: 11 }}>{ev.entity}</span> · <span style={{ color: 'var(--ink-3)' }}>{ev.ip}</span></span>,
   }));
 
   const active = users.data.filter(u => u.isActive && !u.isLocked).length;

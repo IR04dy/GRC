@@ -9,6 +9,9 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { dpiaApi, type DpiaDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import {
+  DPIA_QUESTIONS_BY_ID, DPIA_MITIGATIONS_BY_ID, DPIA_REVIEWS_BY_ID,
+} from '../privacy/mockPrivacy';
 
 type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'links';
 
@@ -23,9 +26,6 @@ export function DpiaDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
   const [item, setItem] = useState<DpiaDto | null>(null);
-  const [questions, setQuestions] = useState<unknown[]>([]);
-  const [mitigations, setMitigations] = useState<unknown[]>([]);
-  const [reviews, setReviews] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabId>('overview');
 
@@ -33,7 +33,7 @@ export function DpiaDetailPage() {
     if (!id) return;
     setLoading(true);
     dpiaApi.get(Number(id))
-      .then(r => { setItem(r.dpia); setQuestions(r.questions ?? []); setMitigations(r.mitigations ?? []); setReviews(r.reviews ?? []); })
+      .then(r => { setItem(r.dpia); })
       .catch(() => setItem(null))
       .finally(() => setLoading(false));
   }, [id]);
@@ -78,7 +78,7 @@ export function DpiaDetailPage() {
             {item.rejectionReason && <Field label={t('detailRejectionReason')} value={item.rejectionReason} multiline />}
           </Card>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card title={t('detailTabMitigations')} Icon={ShieldCheck} action={<Badge tone="primary">{mitigations.length}</Badge>}>
+            <Card title={t('detailTabMitigations')} Icon={ShieldCheck} action={<Badge tone="primary">{(DPIA_MITIGATIONS_BY_ID[item.id] ?? []).length}</Badge>}>
               <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('detailMitigationsHint')}</div>
             </Card>
             <LinkedChangesPanel entityType="DPIA" entityId={item.id} />
@@ -86,9 +86,70 @@ export function DpiaDetailPage() {
         </div>
       )}
 
-      {tab === 'questions'   && <Card title={t('detailTabQuestions')}   Icon={ListChecks}    action={<Badge tone="primary">{questions.length}</Badge>}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailQuestionsHint')}</div></Card>}
-      {tab === 'mitigations' && <Card title={t('detailTabMitigations')} Icon={ShieldCheck}   action={<Badge tone="primary">{mitigations.length}</Badge>}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailMitigationsHint')}</div></Card>}
-      {tab === 'reviews'     && <Card title={t('detailTabReviews')}     Icon={MessageSquare} action={<Badge tone="primary">{reviews.length}</Badge>}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailReviewsHint')}</div></Card>}
+      {tab === 'questions' && (() => {
+        const rows = DPIA_QUESTIONS_BY_ID[item.id] ?? [];
+        return (
+          <Card title={t('detailTabQuestions')} Icon={ListChecks} action={<Badge tone="primary">{rows.length}</Badge>}>
+            {rows.length === 0
+              ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailQuestionsHint')}</div>
+              : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {rows.map(q => (
+                    <div key={q.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <Badge tone="info">{q.section}</Badge>
+                        <Badge tone={q.risk === 'CRITICAL' ? 'danger' : q.risk === 'HIGH' ? 'warning' : q.risk === 'MEDIUM' ? 'accent' : 'success'}>{q.risk}</Badge>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 2 }}>{q.question}</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>{q.answer}</div>
+                    </div>
+                  ))}
+                </div>}
+          </Card>
+        );
+      })()}
+      {tab === 'mitigations' && (() => {
+        const rows = DPIA_MITIGATIONS_BY_ID[item.id] ?? [];
+        return (
+          <Card title={t('detailTabMitigations')} Icon={ShieldCheck} action={<Badge tone="primary">{rows.length}</Badge>}>
+            {rows.length === 0
+              ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailMitigationsHint')}</div>
+              : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {rows.map(m => (
+                    <div key={m.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>{m.mitigation}</span>
+                        <Badge tone={m.status === 'IMPLEMENTED' ? 'success' : m.status === 'IN_PROGRESS' ? 'info' : 'warning'}>{m.status.replace(/_/g, ' ')}</Badge>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>Mitigates: <em>{m.risk}</em></div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Owner: <strong style={{ color: 'var(--ink-2)' }}>{m.owner}</strong> · due <span className="mono">{m.due}</span></div>
+                    </div>
+                  ))}
+                </div>}
+          </Card>
+        );
+      })()}
+      {tab === 'reviews' && (() => {
+        const rows = DPIA_REVIEWS_BY_ID[item.id] ?? [];
+        return (
+          <Card title={t('detailTabReviews')} Icon={MessageSquare} action={<Badge tone="primary">{rows.length}</Badge>}>
+            {rows.length === 0
+              ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailReviewsHint')}</div>
+              : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {rows.map(r => (
+                    <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '110px 200px 1fr 130px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                      <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{r.date}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{r.reviewer}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.role}</div>
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{r.comments}</span>
+                      <Badge tone={r.outcome === 'APPROVED' ? 'success' : r.outcome === 'CHANGES_REQUESTED' ? 'warning' : 'danger'}>{r.outcome.replace(/_/g, ' ')}</Badge>
+                    </div>
+                  ))}
+                </div>}
+          </Card>
+        );
+      })()}
       {tab === 'links'       && <Card title={t('detailTabLinks')}       Icon={Link2}><LinkedChangesPanel entityType="DPIA" entityId={item.id} /></Card>}
     </Shell>
   );

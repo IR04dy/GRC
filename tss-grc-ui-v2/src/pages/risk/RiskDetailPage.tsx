@@ -13,6 +13,11 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { RISK_ANCHORS_BY_ID } from '../../lib/entityAnchors';
+import {
+  RISK_ASSESSMENTS_BY_ID, RISK_TREATMENTS_BY_ID,
+  RISK_KRIS_BY_ID, RISK_HISTORY_BY_ID, RISK_LINKS_BY_ID,
+} from './mockRisks';
+import { EmptyState } from '../../components/ui/EmptyState';
 
 type TabId = 'overview' | 'assessments' | 'treatments' | 'kris' | 'links' | 'history';
 
@@ -135,45 +140,120 @@ export function RiskDetailPage() {
       )}
 
       {tab === 'assessments' && (
-        <Card title={t('detailTabAssessments')} Icon={Activity}>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: 12 }}>
-            {t('detailAssessmentsHint')}
-          </div>
+        <Card title={t('detailTabAssessments')} Icon={Activity}
+          action={<Badge tone="primary">{(RISK_ASSESSMENTS_BY_ID[risk.id] ?? []).length}</Badge>}>
+          {(RISK_ASSESSMENTS_BY_ID[risk.id] ?? []).length === 0
+            ? <EmptyState Icon={Activity} title="No re-assessments yet" sub={t('detailAssessmentsHint')} />
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(RISK_ASSESSMENTS_BY_ID[risk.id] ?? []).map(a => (
+                  <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 80px 80px', gap: 12, padding: '10px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{a.date}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>{a.assessor}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 2 }}>{a.notes}</div>
+                    </div>
+                    <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 'var(--r-pill)', background: a.inherentScore >= 16 ? 'var(--risk-crit)' : a.inherentScore >= 12 ? 'var(--risk-vhigh)' : a.inherentScore >= 8 ? 'var(--risk-high)' : a.inherentScore >= 4 ? 'var(--risk-med)' : 'var(--risk-low)', color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700 }}>{a.inherentScore}</span>
+                    {a.residualScore != null
+                      ? <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 'var(--r-pill)', background: a.residualScore >= 16 ? 'var(--risk-crit)' : a.residualScore >= 12 ? 'var(--risk-vhigh)' : a.residualScore >= 8 ? 'var(--risk-high)' : a.residualScore >= 4 ? 'var(--risk-med)' : 'var(--risk-low)', color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700 }}>{a.residualScore}</span>
+                      : <span className="mono" style={{ color: 'var(--ink-4)' }}>—</span>}
+                  </div>
+                ))}
+              </div>}
         </Card>
       )}
 
       {tab === 'treatments' && (
-        <Card title={t('detailTabTreatments')} Icon={ListChecks}>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: 12 }}>
-            {t('detailTreatmentsHint')}
-          </div>
+        <Card title={t('detailTabTreatments')} Icon={ListChecks}
+          action={<Badge tone="primary">{(RISK_TREATMENTS_BY_ID[risk.id] ?? []).length}</Badge>}>
+          {(RISK_TREATMENTS_BY_ID[risk.id] ?? []).length === 0
+            ? <EmptyState Icon={ListChecks} title="No treatments planned" sub={t('detailTreatmentsHint')} />
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(RISK_TREATMENTS_BY_ID[risk.id] ?? []).map(tr => (
+                  <div key={tr.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Badge tone={tr.type === 'AVOID' ? 'danger' : tr.type === 'TRANSFER' ? 'accent' : tr.type === 'ACCEPT' ? 'warning' : 'primary'}>{tr.type}</Badge>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{tr.action}</span>
+                      </div>
+                      <Badge tone={tr.status === 'IMPLEMENTED' ? 'success' : tr.status === 'IN_PROGRESS' ? 'info' : tr.status === 'CANCELLED' ? 'neutral' : 'warning'}>{tr.status.replace(/_/g, ' ')}</Badge>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 12 }}>
+                      <span>Owner: <strong style={{ color: 'var(--ink-2)' }}>{tr.owner}</strong></span>
+                      <span>Due: <span className="mono">{tr.dueDate}</span></span>
+                    </div>
+                    <div style={{ marginTop: 6, height: 6, background: 'var(--surface-3)', borderRadius: 'var(--r-pill)', overflow: 'hidden' }}>
+                      <div style={{ width: `${tr.progressPct}%`, height: '100%', background: tr.progressPct >= 80 ? 'var(--success)' : tr.progressPct >= 40 ? 'var(--primary)' : 'var(--accent)' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>}
         </Card>
       )}
 
       {tab === 'kris' && (
-        <Card title={t('detailTabKris')} Icon={Activity}>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: 12 }}>
-            {t('detailKrisHint')}
-          </div>
+        <Card title={t('detailTabKris')} Icon={Activity}
+          action={<Badge tone="primary">{(RISK_KRIS_BY_ID[risk.id] ?? []).length}</Badge>}>
+          {(RISK_KRIS_BY_ID[risk.id] ?? []).length === 0
+            ? <EmptyState Icon={Activity} title="No KRIs linked" sub={t('detailKrisHint')} />
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(RISK_KRIS_BY_ID[risk.id] ?? []).map(k => (
+                  <div key={k.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 100px 80px', gap: 12, padding: '10px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{k.code}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{k.nameEn}</div>
+                      <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>Green ≤ {k.greenMax} · Amber ≤ {k.amberMax} {k.unit}</div>
+                    </div>
+                    <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-1)' }}>{k.current} <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 400 }}>{k.unit}</span></span>
+                    <Badge tone={k.band === 'RED' ? 'danger' : k.band === 'AMBER' ? 'warning' : k.band === 'GREEN' ? 'success' : 'neutral'} dot>{k.band}</Badge>
+                  </div>
+                ))}
+              </div>}
         </Card>
       )}
 
       {tab === 'links' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
-          <Card title={t('detailTabLinks')} Icon={Link2}>
-            <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>{t('detailLinksHint')}</div>
+          <Card title={t('detailTabLinks')} Icon={Link2}
+            action={<Badge tone="primary">{(RISK_LINKS_BY_ID[risk.id] ?? []).length}</Badge>}>
+            {(RISK_LINKS_BY_ID[risk.id] ?? []).length === 0
+              ? <EmptyState Icon={Link2} title="No links" sub={t('detailLinksHint')} />
+              : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {(RISK_LINKS_BY_ID[risk.id] ?? []).map(lk => (
+                    <Link key={lk.id} to={lk.href} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', textDecoration: 'none', color: 'inherit' }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <Badge tone="info">{lk.type}</Badge>
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{lk.ref}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{lk.title}</span>
+                      </div>
+                      {lk.status && <Badge tone={lk.status === 'IMPLEMENTED' ? 'success' : lk.status === 'AMBER' ? 'warning' : lk.status === 'RED' ? 'danger' : 'neutral'}>{lk.status}</Badge>}
+                    </Link>
+                  ))}
+                </div>}
           </Card>
+          <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
         </div>
       )}
 
       {tab === 'history' && (
-        <Card title={t('detailTabHistory')} Icon={MessageSquare}>
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', padding: 12 }}>
-            {t('detailHistoryHint')}
-          </div>
+        <Card title={t('detailTabHistory')} Icon={MessageSquare}
+          action={<Badge tone="primary">{(RISK_HISTORY_BY_ID[risk.id] ?? []).length}</Badge>}>
+          {(RISK_HISTORY_BY_ID[risk.id] ?? []).length === 0
+            ? <EmptyState Icon={MessageSquare} title="No history yet" sub={t('detailHistoryHint')} />
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(RISK_HISTORY_BY_ID[risk.id] ?? []).map(h => (
+                  <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 100px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.at.replace('T', ' ').slice(0, 16)}</span>
+                    <Badge tone={h.type === 'CREATED' ? 'primary' : h.type === 'STATUS_CHANGE' ? 'info' : h.type === 'SCORE_CHANGE' ? 'accent' : h.type === 'TREATMENT_ADDED' ? 'success' : h.type === 'REVIEW' ? 'warning' : 'neutral'}>{h.type.replace(/_/g, ' ')}</Badge>
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{h.message}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {h.actor}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>}
         </Card>
       )}
+
     </Shell>
   );
 }

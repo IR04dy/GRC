@@ -11,6 +11,7 @@ import { complianceApi, frameworkApi, type PolicyDto, type PolicyMappingDto } fr
 import { useI18n } from '../../lib/i18n';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { POLICY_ANCHORS_BY_ID } from '../../lib/entityAnchors';
+import { POLICY_LIFECYCLE_EVENTS_BY_ID } from '../compliance/mockCompliance';
 
 type TabId = 'overview' | 'mappings' | 'lifecycle' | 'links';
 
@@ -119,7 +120,25 @@ export function PolicyDetailPage() {
           }
         </Card>
       )}
-      {tab === 'lifecycle' && <Card title={t('detailTabLifecycle')} Icon={History}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailLifecycleHint')}</div></Card>}
+      {tab === 'lifecycle' && (
+        <Card title={t('detailTabLifecycle')} Icon={History}
+          action={<Badge tone="primary">{(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailLifecycleHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).map(ev => (
+                  <div key={ev.id} style={{ display: 'grid', gridTemplateColumns: '160px 140px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{ev.at.replace('T', ' ').slice(0, 16)}</span>
+                    <Badge tone={ev.stage === 'PUBLISHED' ? 'success' : ev.stage === 'EXEC_APPROVAL' ? 'accent' : ev.stage === 'LEGAL_REVIEW' ? 'info' : ev.stage === 'REVIEW_DUE' ? 'warning' : ev.stage === 'RETIRED' ? 'neutral' : 'primary'}>{ev.stage.replace(/_/g, ' ')}</Badge>
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{ev.message}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {ev.actor}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
       {tab === 'links'     && <Card title={t('detailTabLinks')}     Icon={Link2}><LinkedChangesPanel entityType="POLICY" entityId={item.id} /></Card>}
     </Shell>
   );

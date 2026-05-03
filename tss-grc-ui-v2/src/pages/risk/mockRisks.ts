@@ -208,3 +208,161 @@ export const APPETITE_BREACHES: Record<number, AppetiteBreachEventDto[]> = {
 export const APPETITE_DASHBOARD_STATS = {
   total: 7, withinTolerance: 5, exceeded: 1, critical: 1, noExposure: 0,
 };
+
+// ── Per-risk detail-tab mocks ──────────────────────────────────────────────
+// Used by RiskDetailPage tabs (Assessments / Treatments / KRIs / History).
+// Keyed by MOCK_RISKS.id.
+export interface RiskAssessmentRow {
+  id: number;
+  date: string;
+  assessor: string;
+  inherentScore: number;
+  residualScore: number | null;
+  notes: string;
+}
+export const RISK_ASSESSMENTS_BY_ID: Record<number, RiskAssessmentRow[]> = {
+  1: [
+    { id: 1011, date: '2026-04-12', assessor: 'Ahmed Al-Qahtani', inherentScore: 20, residualScore: 9,  notes: 'Quarterly re-assessment after DLP rollout. Compensating controls recognised.' },
+    { id: 1012, date: '2026-01-14', assessor: 'Hassan Al-Saud',   inherentScore: 20, residualScore: 12, notes: 'Initial assessment post-incident. Treatment plan approved.' },
+    { id: 1013, date: '2025-10-03', assessor: 'Mona Al-Bishi',    inherentScore: 16, residualScore: 12, notes: 'Pre-treatment baseline.' },
+  ],
+  2: [
+    { id: 1021, date: '2026-03-22', assessor: 'Layla Al-Saud',     inherentScore: 12, residualScore: 6, notes: 'Post-failover-drill re-assessment. Residual reduced.' },
+    { id: 1022, date: '2025-12-04', assessor: 'Mohammed Al-Otaibi',inherentScore: 12, residualScore: 9, notes: 'Initial.' },
+  ],
+  3: [
+    { id: 1031, date: '2026-02-18', assessor: 'Faisal Al-Maliki', inherentScore: 9,  residualScore: null, notes: 'Awaiting control implementation.' },
+  ],
+  5: [
+    { id: 1051, date: '2026-04-02', assessor: 'Khalid Al-Ghamdi', inherentScore: 15, residualScore: null, notes: 'Open assessment — pending control map alignment.' },
+  ],
+  7: [
+    { id: 1071, date: '2026-04-22', assessor: 'Faisal Al-Maliki', inherentScore: 20, residualScore: null, notes: 'AML rule-pack v2.4 in pilot; residual recalibration deferred.' },
+  ],
+  8: [
+    { id: 1081, date: '2026-04-15', assessor: 'Hassan Al-Saud',   inherentScore: 15, residualScore: 8,  notes: 'CyberArk session-recording extended; residual improving.' },
+    { id: 1082, date: '2025-11-08', assessor: 'Hassan Al-Saud',   inherentScore: 15, residualScore: 12, notes: 'Initial.' },
+  ],
+  10: [
+    { id: 1101, date: '2026-04-19', assessor: 'Mona Al-Bishi',    inherentScore: 20, residualScore: 12, notes: 'Awaiting SDAIA cross-border permit; safeguards documented.' },
+  ],
+};
+
+export interface RiskTreatmentRow {
+  id: number;
+  type: 'MITIGATE' | 'TRANSFER' | 'ACCEPT' | 'AVOID';
+  action: string;
+  owner: string;
+  status: 'PLANNED' | 'IN_PROGRESS' | 'IMPLEMENTED' | 'CANCELLED';
+  dueDate: string;
+  progressPct: number;
+}
+export const RISK_TREATMENTS_BY_ID: Record<number, RiskTreatmentRow[]> = {
+  1: [
+    { id: 2011, type: 'MITIGATE', action: 'Roll out DLP-tagging on all customer-data sources', owner: 'data.security@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-06-30', progressPct: 60 },
+    { id: 2012, type: 'MITIGATE', action: 'Quarterly access recertification on all sensitive stores',  owner: 'iam.team@tss.sa',     status: 'IMPLEMENTED', dueDate: '2026-03-31', progressPct: 100 },
+    { id: 2013, type: 'TRANSFER', action: 'Cyber-insurance coverage uplift to USD 25M aggregate',     owner: 'finance.lead@tss.sa', status: 'IMPLEMENTED', dueDate: '2026-01-15', progressPct: 100 },
+  ],
+  2: [
+    { id: 2021, type: 'MITIGATE', action: 'Active-active multi-region deployment for Tier-0 services', owner: 'sre.lead@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-08-31', progressPct: 45 },
+    { id: 2022, type: 'MITIGATE', action: 'Quarterly DR failover test with 1h RTO target',             owner: 'bcm.team@tss.sa', status: 'IMPLEMENTED', dueDate: '2026-02-08', progressPct: 100 },
+  ],
+  3: [
+    { id: 2031, type: 'MITIGATE', action: 'Onboard secondary supplier for top 3 critical components', owner: 'tprm.lead@tss.sa', status: 'PLANNED',     dueDate: '2026-09-30', progressPct: 10 },
+    { id: 2032, type: 'TRANSFER', action: 'Performance-bond + SLA penalty clauses in master contract', owner: 'procurement@tss.sa', status: 'IMPLEMENTED', dueDate: '2026-02-01', progressPct: 100 },
+  ],
+  8: [
+    { id: 2081, type: 'MITIGATE', action: 'Just-in-time elevation rolled out to all Tier-0 systems',  owner: 'pam.team@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-07-31', progressPct: 60 },
+    { id: 2082, type: 'MITIGATE', action: 'Session recording on DBA bastion hosts',                   owner: 'pam.team@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-05-31', progressPct: 80 },
+  ],
+  10: [
+    { id: 2101, type: 'MITIGATE', action: 'Adopt SDAIA Standard Contractual Clauses with all foreign processors', owner: 'dpo@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-06-30', progressPct: 35 },
+    { id: 2102, type: 'AVOID',    action: 'Migrate PDPL Tier-2 data to in-Kingdom STC sovereign cloud',          owner: 'cio.office@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-12-31', progressPct: 25 },
+  ],
+};
+
+export interface RiskKriRow {
+  id: number;
+  code: string;
+  nameEn: string;
+  band: 'GREEN' | 'AMBER' | 'RED' | 'NO_DATA';
+  current: number;
+  unit: string;
+  greenMax: number;
+  amberMax: number;
+}
+export const RISK_KRIS_BY_ID: Record<number, RiskKriRow[]> = {
+  1: [
+    { id: 1001, code: 'KRI-CYB-01', nameEn: 'Failed login attempts (24h)',          band: 'AMBER', current: 1240, unit: 'events',  greenMax: 500, amberMax: 1500 },
+    { id: 1002, code: 'KRI-CYB-02', nameEn: 'Critical vulnerabilities open beyond SLA', band: 'GREEN', current: 0,    unit: 'CVEs',    greenMax: 0,   amberMax: 3 },
+  ],
+  2: [
+    { id: 1003, code: 'KRI-OPS-01', nameEn: 'Critical service downtime (monthly)',     band: 'GREEN', current: 22,   unit: 'minutes', greenMax: 30,  amberMax: 120 },
+    { id: 1004, code: 'KRI-OPS-02', nameEn: 'BCP exercise pass rate (quarterly)',     band: 'AMBER', current: 81,   unit: '%',       greenMax: 90,  amberMax: 75 },
+  ],
+  3: [
+    { id: 1005, code: 'KRI-TPRM-01', nameEn: 'Critical vendors without backup (count)', band: 'RED',   current: 4,    unit: 'vendors', greenMax: 1,   amberMax: 3 },
+  ],
+  5: [
+    { id: 1006, code: 'KRI-COM-01', nameEn: 'Open audit findings beyond due date',     band: 'GREEN', current: 1,    unit: 'findings', greenMax: 2, amberMax: 5 },
+  ],
+  10: [
+    { id: 1007, code: 'KRI-PRV-01', nameEn: 'DSR responses past PDPL 30-day SLA',      band: 'GREEN', current: 0,    unit: 'DSRs',    greenMax: 0,   amberMax: 2 },
+  ],
+  7: [
+    { id: 1008, code: 'KRI-AML-01', nameEn: 'AML alerts cleared within 5 days (%)',    band: 'AMBER', current: 78,   unit: '%',       greenMax: 90,  amberMax: 75 },
+  ],
+};
+
+export interface RiskHistoryEvent {
+  id: number;
+  at: string;
+  actor: string;
+  type: 'CREATED' | 'STATUS_CHANGE' | 'SCORE_CHANGE' | 'TREATMENT_ADDED' | 'COMMENT' | 'ATTACHMENT' | 'REVIEW';
+  message: string;
+}
+export const RISK_HISTORY_BY_ID: Record<number, RiskHistoryEvent[]> = {
+  1: [
+    { id: 5011, at: '2026-04-12T10:30:00', actor: 'Ahmed Al-Qahtani', type: 'REVIEW',          message: 'Quarterly re-assessment completed. Residual recalibrated 12 → 9.' },
+    { id: 5012, at: '2026-04-08T14:00:00', actor: 'Mona Al-Bishi',     type: 'COMMENT',         message: 'DLP coverage now 92% — recommend closing residual review.' },
+    { id: 5013, at: '2026-03-22T09:15:00', actor: 'data.security@tss.sa', type: 'TREATMENT_ADDED', message: 'Added "DLP-tagging rollout" treatment.' },
+    { id: 5014, at: '2026-01-14T11:45:00', actor: 'Hassan Al-Saud',    type: 'STATUS_CHANGE',   message: 'Status changed UNDER_ASSESSMENT → APPROVED_FOR_TREATMENT.' },
+    { id: 5015, at: '2025-10-03T08:00:00', actor: 'Risk Manager',      type: 'CREATED',         message: 'Risk registered after DLP gap audit.' },
+  ],
+  2: [
+    { id: 5021, at: '2026-03-22T16:00:00', actor: 'Layla Al-Saud',     type: 'REVIEW',          message: 'Post-failover-drill assessment.' },
+    { id: 5022, at: '2026-02-08T18:00:00', actor: 'Ahmed Al-Qahtani',  type: 'COMMENT',         message: 'Datacenter failover drill: RTO 54 min vs 1h target.' },
+    { id: 5023, at: '2025-12-04T10:00:00', actor: 'Mohammed Al-Otaibi',type: 'CREATED',         message: 'Risk registered.' },
+  ],
+  8: [
+    { id: 5081, at: '2026-04-15T15:30:00', actor: 'Hassan Al-Saud',    type: 'SCORE_CHANGE',    message: 'Residual reduced 12 → 8 after PAM expansion.' },
+    { id: 5082, at: '2026-04-15T15:00:00', actor: 'pam.team@tss.sa',   type: 'TREATMENT_ADDED', message: 'Session recording on DBA bastion hosts.' },
+    { id: 5083, at: '2025-11-08T10:00:00', actor: 'Hassan Al-Saud',    type: 'CREATED',         message: 'Risk registered after CSIRT review.' },
+  ],
+};
+
+export interface RiskLinkRow {
+  id: number;
+  type: 'CONTROL' | 'FINDING' | 'POLICY' | 'INCIDENT' | 'KRI' | 'CHANGE';
+  ref: string;
+  title: string;
+  href: string;
+  status?: string;
+}
+export const RISK_LINKS_BY_ID: Record<number, RiskLinkRow[]> = {
+  1: [
+    { id: 7011, type: 'CONTROL', ref: 'A.5.34',     title: 'Privacy + protection of PII',          href: '/controls/1', status: 'IMPLEMENTED' },
+    { id: 7012, type: 'CONTROL', ref: 'AC-2.1.2',   title: 'Privileged access review',             href: '/controls/3', status: 'PARTIAL' },
+    { id: 7013, type: 'POLICY',  ref: 'POL-PDPL-001', title: 'Privacy & Personal Data Policy',      href: '/policies/52' },
+    { id: 7014, type: 'KRI',     ref: 'KRI-CYB-01', title: 'Failed login attempts (24h)',          href: '/risk?tab=kri', status: 'AMBER' },
+  ],
+  2: [
+    { id: 7021, type: 'CONTROL', ref: '8.4',        title: 'Continuity strategies',                href: '/controls/8',  status: 'PARTIAL' },
+    { id: 7022, type: 'INCIDENT',ref: 'INC-2026-001', title: 'Datacenter failover drill (Q1)',     href: '/incidents' },
+  ],
+  8: [
+    { id: 7081, type: 'CONTROL', ref: 'AC-2.1.2',   title: 'Privileged access review',             href: '/controls/3', status: 'PARTIAL' },
+    { id: 7082, type: 'FINDING', ref: 'AUD-F-032',  title: 'PAM session recording not extended',    href: '/findings/32' },
+    { id: 7083, type: 'CHANGE',  ref: 'CHG-2026-012', title: 'Roll out MFA for all VPN users',     href: '/changes' },
+  ],
+};

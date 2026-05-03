@@ -14,6 +14,7 @@ import { useToast } from '../../lib/toast';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { FINDING_ANCHORS_BY_ID } from '../../lib/entityAnchors';
+import { FINDING_EVIDENCE_BY_ID, FINDING_HISTORY_BY_ID } from '../compliance/mockCompliance';
 
 type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history';
 
@@ -128,9 +129,44 @@ export function FindingDetailPage() {
         </Card>
       )}
 
-      {tab === 'evidence' && <Card title={t('detailTabEvidence')}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div></Card>}
+      {tab === 'evidence' && (
+        <Card title={t('detailTabEvidence')} Icon={ShieldCheck}
+          action={<Badge tone="primary">{(FINDING_EVIDENCE_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(FINDING_EVIDENCE_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(FINDING_EVIDENCE_BY_ID[item.id] ?? []).map(e => (
+                  <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 90px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{e.code}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{e.titleEn}</span>
+                    <Badge tone="neutral">{e.type.replace(/_/g, ' ')}</Badge>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.expiryDate}</span>
+                    <Badge tone={e.status === 'APPROVED' ? 'success' : 'warning'}>{e.status.replace(/_/g, ' ')}</Badge>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
       {tab === 'links' && <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />}
-      {tab === 'history' && <Card title={t('detailTabHistory')}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailHistoryHint')}</div></Card>}
+      {tab === 'history' && (
+        <Card title={t('detailTabHistory')} Icon={ListChecks}
+          action={<Badge tone="primary">{(FINDING_HISTORY_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(FINDING_HISTORY_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailHistoryHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(FINDING_HISTORY_BY_ID[item.id] ?? []).map(h => (
+                  <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 130px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.at.replace('T', ' ').slice(0, 16)}</span>
+                    <Badge tone={h.type === 'CREATED' ? 'primary' : h.type === 'STATUS_CHANGE' ? 'info' : h.type === 'CAPA_PROGRESS' ? 'success' : h.type === 'TEST_RESULT' ? 'accent' : h.type === 'SIGNOFF' ? 'success' : 'neutral'}>{h.type.replace(/_/g, ' ')}</Badge>
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{h.message}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {h.actor}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
     </Shell>
   );
 }

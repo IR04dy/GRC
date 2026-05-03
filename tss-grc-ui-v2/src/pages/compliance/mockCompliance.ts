@@ -424,3 +424,134 @@ export const FRAMEWORK_RISKS_BY_ID: Record<number, FrameworkRiskRowDto[]> = {
       riskLevel: 'HIGH', matchedAsRiskFramework: true, riskFrameworkClause: '6.4.3' },
   ],
 };
+
+// ── Per-control detail-tab mocks ──────────────────────────────────────────
+export interface ControlSubControlRow {
+  id: number; code: string; nameEn: string; status: string; maturityLevel: number; owner: string;
+}
+export const CONTROL_SUBCONTROLS_BY_ID: Record<number, ControlSubControlRow[]> = {
+  1: [
+    { id: 101, code: 'A.5.1.1',  nameEn: 'Senior leadership endorsement of ISMS policy', status: 'IMPLEMENTED', maturityLevel: 5, owner: 'CISO' },
+    { id: 102, code: 'A.5.1.2',  nameEn: 'Review of policies for information security', status: 'IMPLEMENTED', maturityLevel: 4, owner: 'security.officer@tss.sa' },
+    { id: 103, code: 'A.5.1.3',  nameEn: 'Communication of ISMS policy to all staff',   status: 'IMPLEMENTED', maturityLevel: 4, owner: 'awareness.lead@tss.sa' },
+  ],
+  3: [
+    { id: 301, code: 'AC-2.1.1', nameEn: 'Joiner workflow (automated)',                status: 'IMPLEMENTED', maturityLevel: 4, owner: 'iam.team@tss.sa' },
+    { id: 302, code: 'AC-2.1.2', nameEn: 'Mover/leaver workflow (automated)',          status: 'IMPLEMENTED', maturityLevel: 4, owner: 'iam.team@tss.sa' },
+    { id: 303, code: 'AC-2.1.3', nameEn: 'Quarterly access recertification',          status: 'PARTIAL',     maturityLevel: 3, owner: 'iam.team@tss.sa' },
+    { id: 304, code: 'AC-2.1.4', nameEn: 'JIT elevation for Tier-0 systems',          status: 'IN_PROGRESS', maturityLevel: 3, owner: 'pam.team@tss.sa' },
+  ],
+  4: [
+    { id: 401, code: 'IR-3.1.1', nameEn: 'Documented incident response plan',          status: 'IMPLEMENTED', maturityLevel: 4, owner: 'csirt.lead@tss.sa' },
+    { id: 402, code: 'IR-3.1.2', nameEn: 'Annual response-plan exercise',              status: 'IMPLEMENTED', maturityLevel: 4, owner: 'csirt.lead@tss.sa' },
+    { id: 403, code: 'IR-3.1.3', nameEn: 'Saudi regulator notification templates',    status: 'IMPLEMENTED', maturityLevel: 4, owner: 'legal.counsel@tss.sa' },
+  ],
+  9: [
+    { id: 901, code: 'A.8.16.1', nameEn: 'SIEM ingest coverage of Tier-0 systems',     status: 'IMPLEMENTED', maturityLevel: 4, owner: 'soc.lead@tss.sa' },
+    { id: 902, code: 'A.8.16.2', nameEn: 'Alert tuning + false-positive rate <5%',    status: 'PARTIAL',     maturityLevel: 3, owner: 'soc.lead@tss.sa' },
+    { id: 903, code: 'A.8.16.3', nameEn: '24/7 monitoring + SOC handover',            status: 'IMPLEMENTED', maturityLevel: 4, owner: 'soc.duty@tss.sa' },
+  ],
+};
+
+export interface ControlEvidenceRow {
+  id: number; code: string; titleEn: string; type: string; collectedDate: string; expiryDate: string; status: string;
+}
+export const CONTROL_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = {
+  1: [
+    { id: 1, code: 'EV-1083', titleEn: 'Information Security Policy v3.2',             type: 'POLICY',        collectedDate: '2026-04-15', expiryDate: '2027-04-15', status: 'APPROVED' },
+    { id: 8, code: 'EV-1076', titleEn: 'Annual ISMS Internal Audit Plan',              type: 'DOCUMENT',      collectedDate: '2026-01-15', expiryDate: '2026-12-31', status: 'APPROVED' },
+  ],
+  3: [
+    { id: 7, code: 'EV-1077', titleEn: 'Q1 PAM Recertification Log',                    type: 'LOG',           collectedDate: '2026-03-31', expiryDate: '2026-06-30', status: 'APPROVED' },
+  ],
+  4: [
+    { id: 6, code: 'EV-1075', titleEn: 'IR Tabletop Minutes — April',                   type: 'MINUTES',       collectedDate: '2026-04-22', expiryDate: '2026-10-22', status: 'APPROVED' },
+  ],
+  9: [
+    { id: 3, code: 'EV-1081', titleEn: 'Firewall Rules Configuration Snapshot',         type: 'CONFIGURATION', collectedDate: '2026-04-12', expiryDate: '2026-05-12', status: 'PENDING_REVIEW' },
+  ],
+};
+
+export interface ControlTestRow {
+  id: number; date: string; tester: string; result: 'PASS' | 'FAIL' | 'PARTIAL'; samples: number; findings: number; notes: string;
+}
+export const CONTROL_TESTS_BY_ID: Record<number, ControlTestRow[]> = {
+  1: [
+    { id: 1, date: '2026-03-28', tester: 'KPMG ME',          result: 'PASS',    samples: 25, findings: 0, notes: 'No exceptions found.' },
+    { id: 2, date: '2025-11-04', tester: 'Internal Audit',   result: 'PASS',    samples: 20, findings: 1, notes: 'Minor gap closed pre-audit.' },
+  ],
+  3: [
+    { id: 3, date: '2026-03-12', tester: 'Mona Al-Bishi',     result: 'PARTIAL', samples: 30, findings: 2, notes: 'Recertification rate 96% — 2 outliers.' },
+    { id: 4, date: '2025-09-20', tester: 'Internal Audit',    result: 'PASS',    samples: 30, findings: 0, notes: 'Clean test.' },
+  ],
+  4: [
+    { id: 5, date: '2026-04-04', tester: 'CSIRT exercise',    result: 'PASS',    samples: 1,  findings: 0, notes: 'Tabletop scenario passed; minor runbook updates noted.' },
+  ],
+  9: [
+    { id: 6, date: '2026-04-04', tester: 'Yousef Al-Harbi',   result: 'PARTIAL', samples: 50, findings: 3, notes: 'Three Tier-1 systems below SIEM coverage threshold.' },
+  ],
+};
+
+// ── Per-finding detail-tab mocks ─────────────────────────────────────────
+export interface FindingHistoryEvent {
+  id: number; at: string; actor: string; type: 'CREATED' | 'CAPA_PROGRESS' | 'COMMENT' | 'TEST_RESULT' | 'STATUS_CHANGE' | 'SIGNOFF'; message: string;
+}
+export const FINDING_HISTORY_BY_ID: Record<number, FindingHistoryEvent[]> = {
+  31: [
+    { id: 11, at: '2026-04-22T14:00:00', actor: 'DPO + Legal',      type: 'CAPA_PROGRESS', message: 'Standard Contractual Clauses drafted; vendor review in progress.' },
+    { id: 12, at: '2026-04-15T10:00:00', actor: 'Mona Al-Bishi',    type: 'STATUS_CHANGE', message: 'Status: IDENTIFIED → IMPLEMENTING.' },
+    { id: 13, at: '2026-04-15T09:30:00', actor: 'External Auditor', type: 'CREATED',       message: 'Finding raised: cross-border transfer mechanism not formalised.' },
+  ],
+  32: [
+    { id: 21, at: '2026-04-25T11:00:00', actor: 'PAM Team',         type: 'TEST_RESULT',  message: 'Owner test PARTIAL — 80% of bastion hosts covered.' },
+    { id: 22, at: '2026-04-08T15:30:00', actor: 'PAM Team',         type: 'CAPA_PROGRESS', message: 'Session-recording rolled out to dev bastion.' },
+    { id: 23, at: '2026-04-04T09:00:00', actor: 'Internal Audit',   type: 'CREATED',       message: 'Finding raised after PAM coverage review.' },
+  ],
+  33: [
+    { id: 31, at: '2026-04-12T16:00:00', actor: 'SOC Lead',         type: 'TEST_RESULT',  message: 'Owner test PARTIAL — 92% tuning rate vs 95% target.' },
+    { id: 32, at: '2026-04-04T10:30:00', actor: 'KPMG ME',          type: 'CREATED',       message: 'Finding raised after surveillance audit.' },
+  ],
+  34: [
+    { id: 41, at: '2026-04-18T11:00:00', actor: 'Independent Tester',type: 'TEST_RESULT', message: 'Independent test PASS — annual rotation policy documented.' },
+    { id: 42, at: '2026-04-02T14:00:00', actor: 'PKI Team',         type: 'TEST_RESULT',  message: 'Owner test PASS.' },
+    { id: 43, at: '2026-02-28T09:00:00', actor: 'KPMG ME',          type: 'CREATED',       message: 'Finding raised post-surveillance audit.' },
+  ],
+};
+
+export const FINDING_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = {
+  31: [
+    { id: 4, code: 'EV-1080', titleEn: 'PDPL Data Inventory Report Q4 2025',   type: 'REPORT',      collectedDate: '2026-04-08', expiryDate: '2026-05-08', status: 'PENDING_REVIEW' },
+  ],
+  32: [
+    { id: 7, code: 'EV-1077', titleEn: 'Q1 PAM Recertification Log',           type: 'LOG',         collectedDate: '2026-03-31', expiryDate: '2026-06-30', status: 'APPROVED' },
+  ],
+  33: [
+    { id: 9, code: 'EV-1075', titleEn: 'Phishing Awareness Campaign Results',   type: 'REPORT',      collectedDate: '2026-04-05', expiryDate: '2026-07-05', status: 'APPROVED' },
+  ],
+};
+
+// ── Per-policy detail-tab mocks ──────────────────────────────────────────
+export interface PolicyLifecycleEvent {
+  id: number; at: string; actor: string; stage: 'DRAFT' | 'LEGAL_REVIEW' | 'EXEC_APPROVAL' | 'PUBLISHED' | 'REVIEW_DUE' | 'RETIRED'; message: string;
+}
+export const POLICY_LIFECYCLE_EVENTS_BY_ID: Record<number, PolicyLifecycleEvent[]> = {
+  51: [
+    { id: 1, at: '2026-04-01T09:00:00', actor: 'CEO',           stage: 'PUBLISHED',     message: 'Policy v3.2 published; effective 2026-04-01.' },
+    { id: 2, at: '2026-03-22T15:30:00', actor: 'Exec Committee',stage: 'EXEC_APPROVAL', message: 'Approved by executive committee.' },
+    { id: 3, at: '2026-03-08T11:00:00', actor: 'Legal Counsel', stage: 'LEGAL_REVIEW',  message: 'Legal sign-off recorded.' },
+    { id: 4, at: '2026-02-12T14:00:00', actor: 'CISO',          stage: 'DRAFT',         message: 'Initial draft submitted for review.' },
+  ],
+  52: [
+    { id: 5, at: '2026-02-15T10:00:00', actor: 'CEO',          stage: 'PUBLISHED',     message: 'Policy v2.1 published; effective 2026-02-15.' },
+    { id: 6, at: '2026-02-10T15:00:00', actor: 'Exec Committee',stage: 'EXEC_APPROVAL', message: 'Approved.' },
+    { id: 7, at: '2026-01-20T09:00:00', actor: 'Legal Counsel', stage: 'LEGAL_REVIEW',  message: 'Legal review complete.' },
+  ],
+  55: [ // AI Use Policy — currently in legal review
+    { id: 8, at: '2026-04-10T14:00:00', actor: 'Legal Counsel', stage: 'LEGAL_REVIEW',  message: 'Legal review in progress.' },
+    { id: 9, at: '2026-03-18T09:00:00', actor: 'CISO',          stage: 'DRAFT',         message: 'Draft v0.4 submitted.' },
+  ],
+  58: [ // Legacy Crypto Sunset — review due
+    { id: 10, at: '2026-04-15T10:00:00', actor: 'System',         stage: 'REVIEW_DUE',    message: 'Annual review due — flagged.' },
+    { id: 11, at: '2025-09-30T11:00:00', actor: 'CEO',            stage: 'PUBLISHED',     message: 'Policy v1.0 published.' },
+  ],
+};

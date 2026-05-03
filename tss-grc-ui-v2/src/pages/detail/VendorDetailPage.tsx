@@ -9,6 +9,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { tprmApi, type TprmVendorDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { VENDOR_ASSESSMENTS_BY_ID, VENDOR_CONTRACTS_BY_ID } from '../tprm/mockTprm';
 
 type TabId = 'overview' | 'assessments' | 'contracts' | 'links';
 
@@ -77,8 +78,46 @@ export function VendorDetailPage() {
         </div>
       )}
 
-      {tab === 'assessments' && <Card title={t('detailTabAssessments')} Icon={ListChecks}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailAssessmentsHint')}</div></Card>}
-      {tab === 'contracts'   && <Card title={t('detailTabContracts')}   Icon={FileCheck2}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailContractsHint')}</div></Card>}
+      {tab === 'assessments' && (
+        <Card title={t('detailTabAssessments')} Icon={ListChecks}
+          action={<Badge tone="primary">{(VENDOR_ASSESSMENTS_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(VENDOR_ASSESSMENTS_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailAssessmentsHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(VENDOR_ASSESSMENTS_BY_ID[item.id] ?? []).map(a => (
+                  <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '110px 80px 1fr 80px 90px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{a.date}</span>
+                    <Badge tone={a.type === 'PERIODIC' ? 'info' : a.type === 'TRIGGERED' ? 'warning' : 'primary'}>{a.type}</Badge>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{a.assessor}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{a.findings}</div>
+                    </div>
+                    <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>{a.score}</span>
+                    <Badge tone={a.risk === 'LOW' ? 'success' : a.risk === 'MEDIUM' ? 'info' : a.risk === 'HIGH' ? 'warning' : 'danger'}>{a.risk}</Badge>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
+      {tab === 'contracts' && (
+        <Card title={t('detailTabContracts')} Icon={FileCheck2}
+          action={<Badge tone="primary">{(VENDOR_CONTRACTS_BY_ID[item.id] ?? []).length}</Badge>}>
+          {(VENDOR_CONTRACTS_BY_ID[item.id] ?? []).length === 0
+            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailContractsHint')}</div>
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(VENDOR_CONTRACTS_BY_ID[item.id] ?? []).map(c => (
+                  <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr 90px 110px 110px 100px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.contractNumber}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{c.titleEn}</span>
+                    <Badge tone="neutral">{c.type}</Badge>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{c.startDate} → {c.endDate}</span>
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 700, textAlign: 'end' }}>{c.value.toLocaleString()} {c.currency}</span>
+                    <Badge tone={c.status === 'ACTIVE' ? 'success' : c.status === 'EXPIRING_SOON' ? 'warning' : 'neutral'}>{c.status.replace(/_/g, ' ')}</Badge>
+                  </div>
+                ))}
+              </div>}
+        </Card>
+      )}
       {tab === 'links'       && <Card title={t('detailTabLinks')}       Icon={Link2}><LinkedChangesPanel entityType="VENDOR" entityId={item.id} /></Card>}
     </Shell>
   );

@@ -137,3 +137,61 @@ export const DPIAS: DpiaDto[] = [
     assessmentDate: '2024-09-10', nextReviewDate: '2025-09-10',
     conclusion: 'Re-assessment due — original assessment expired.' },
 ];
+
+// ── Per-DPIA detail-tab mocks ───────────────────────────────────────────
+export interface DpiaQuestionRow {
+  id: number; section: string; question: string; answer: string; risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+}
+export const DPIA_QUESTIONS_BY_ID: Record<number, DpiaQuestionRow[]> = {
+  41: [
+    { id: 1, section: 'Lawful basis',     question: 'What lawful basis covers this AI-driven decision?',                        answer: 'Contract performance + legitimate interest balanced against subject impact.', risk: 'MEDIUM' },
+    { id: 2, section: 'Automated decisions', question: 'Does the model produce decisions with legal or significant effect?',     answer: 'Yes — credit-scoring drives loan approvals.',                                  risk: 'HIGH' },
+    { id: 3, section: 'Subject rights',   question: 'Is human review available on adverse decisions?',                          answer: 'Yes — adverse-action notice with 14-day human-review window.',                 risk: 'LOW' },
+    { id: 4, section: 'Bias',             question: 'How are bias metrics tracked?',                                            answer: 'Quarterly bias audit on protected attributes; results to DPO + AI ethics board.', risk: 'MEDIUM' },
+    { id: 5, section: 'Data minimisation', question: 'Are only necessary data fields used?',                                     answer: 'Feature set reviewed annually; PII not used as input.',                          risk: 'LOW' },
+  ],
+  42: [
+    { id: 11, section: 'Cross-border',     question: 'Where is data hosted + processed?',                                       answer: 'Hosted in Egypt by primary processor; back-up in Saudi Arabia.',                risk: 'HIGH' },
+    { id: 12, section: 'Adequacy',         question: 'Is the destination country an adequate recipient under PDPL Art 29?',     answer: 'No adequacy decision yet; SCCs in negotiation.',                               risk: 'HIGH' },
+    { id: 13, section: 'Encryption',       question: 'Is data encrypted in transit + at rest?',                                  answer: 'Yes — TLS 1.3 in transit; AES-256 at rest with HSM-backed keys.',               risk: 'LOW' },
+  ],
+  45: [
+    { id: 21, section: 'Special category', question: 'Is health data processed?',                                                answer: 'Yes — opt-in BMI, blood pressure, exercise tracking.',                          risk: 'HIGH' },
+    { id: 22, section: 'Consent',          question: 'How is consent captured + revocable?',                                     answer: 'In-app onboarding flow; revocation removes data within 30 days.',                risk: 'MEDIUM' },
+  ],
+};
+
+export interface DpiaMitigationRow {
+  id: number; risk: string; mitigation: string; owner: string; due: string; status: 'PLANNED' | 'IN_PROGRESS' | 'IMPLEMENTED';
+}
+export const DPIA_MITIGATIONS_BY_ID: Record<number, DpiaMitigationRow[]> = {
+  41: [
+    { id: 1, risk: 'Algorithmic bias on protected attributes', mitigation: 'Quarterly bias audit + threshold-based alerting',           owner: 'AI Ethics Board', due: '2026-08-31', status: 'IN_PROGRESS' },
+    { id: 2, risk: 'Lack of explainability for adverse decisions', mitigation: 'SHAP-based explainer surfaced in adverse-action notice', owner: 'Data Science',     due: '2026-06-15', status: 'IMPLEMENTED' },
+  ],
+  42: [
+    { id: 11, risk: 'Cross-border without adequacy', mitigation: 'Adopt SDAIA Standard Contractual Clauses with vendor', owner: 'DPO + Legal',     due: '2026-06-30', status: 'IN_PROGRESS' },
+    { id: 12, risk: 'Single-region hosting',         mitigation: 'Migrate primary to in-Kingdom STC sovereign region',  owner: 'CIO Office',      due: '2026-12-31', status: 'PLANNED' },
+  ],
+  45: [
+    { id: 21, risk: 'Special-category data without explicit consent', mitigation: 'In-app opt-in flow with granular categories',         owner: 'Product + DPO', due: '2026-07-01', status: 'PLANNED' },
+  ],
+};
+
+export interface DpiaReviewRow {
+  id: number; date: string; reviewer: string; role: string; outcome: 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED'; comments: string;
+}
+export const DPIA_REVIEWS_BY_ID: Record<number, DpiaReviewRow[]> = {
+  41: [
+    { id: 1, date: '2026-02-14', reviewer: 'DPO',                   role: 'Data Protection Officer', outcome: 'APPROVED',          comments: 'Approved subject to quarterly bias audit.' },
+    { id: 2, date: '2026-02-12', reviewer: 'AI Ethics Board',       role: 'Ethics Board',            outcome: 'CHANGES_REQUESTED', comments: 'Request explainability mitigation.' },
+    { id: 3, date: '2026-02-08', reviewer: 'CISO',                  role: 'Security Officer',        outcome: 'APPROVED',          comments: 'Cyber controls adequate.' },
+  ],
+  42: [
+    { id: 11, date: '2026-04-22', reviewer: 'DPO',                  role: 'Data Protection Officer', outcome: 'CHANGES_REQUESTED', comments: 'SCCs must be in place before approval.' },
+  ],
+  44: [
+    { id: 21, date: '2026-03-12', reviewer: 'DPO',                  role: 'Data Protection Officer', outcome: 'REJECTED',          comments: 'Use-case did not justify biometric processing.' },
+    { id: 22, date: '2026-03-08', reviewer: 'External Counsel',     role: 'External Legal',          outcome: 'CHANGES_REQUESTED', comments: 'Recommend rejection or alternative people-counter.' },
+  ],
+};
