@@ -36,7 +36,6 @@ import {
  */
 export function AuditWorkspacePage() {
   const { t } = useI18n();
-  void t;
 
   // ─── Sign-off queue: findings ready for audit signoff or closure ────────
   const signoffQueue = useMemo(() =>
@@ -44,6 +43,10 @@ export function AuditWorkspacePage() {
       .filter(f => f.capaStage === 'INDEPENDENT_TESTED' || f.capaStage === 'AUDIT_SIGNED_OFF')
       .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
   , []);
+  const signoffCriticalCount = useMemo(
+    () => signoffQueue.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length,
+    [signoffQueue],
+  );
 
   // ─── Document review queue ─────────────────────────────────────────────
   const policyQueue = useMemo(() =>
@@ -87,43 +90,55 @@ export function AuditWorkspacePage() {
   , []);
 
   return (
-    <Shell title="Auditor Workspace" sub="Internal + external auditor home">
+    <Shell title={t('audwsTitle')} sub={t('audwsSub')}>
       <PageHeader
-        eyebrow="Audit Workspace"
-        title="What's waiting on you"
-        sub="Cross-authority queue: every CAPA awaiting your sign-off, every policy / evidence pending your review, and every audit engagement you're leading."
+        eyebrow={t('audwsEyebrow')}
+        title={t('audwsHeader')}
+        sub={t('audwsHeaderSub')}
       />
 
       {/* KPI strip */}
       <div className="kpi-grid">
-        <Kpi Icon={Stamp}          label="Awaiting my sign-off"  value={signoffQueue.length}                      tone="primary" />
-        <Kpi Icon={BookCopy}       label="Policies in review"     value={policyQueue.length}                       tone="info" />
-        <Kpi Icon={FileCheck2}     label="Evidence pending review" value={evidencePending.length}                  tone="accent" />
-        <Kpi Icon={Briefcase}      label="Active engagements"     value={myEngagements.length}                     tone="success" />
-        <Kpi Icon={Flame}          label="Escalated findings"     value={aging.escalated + aging.overdue}          tone="danger" />
+        <Kpi Icon={Stamp}
+          label={signoffCriticalCount > 0
+            ? `${t('audwsKpiSignoff')} · ${signoffCriticalCount} ${t('audwsCapaSeverityCrit')}`
+            : t('audwsKpiSignoff')}
+          value={signoffQueue.length}
+          tone="primary" />
+        <Kpi Icon={BookCopy}       label={t('audwsKpiPolicies')}     value={policyQueue.length}                       tone="info" />
+        <Kpi Icon={FileCheck2}     label={t('audwsKpiEvidence')}     value={evidencePending.length}                   tone="accent" />
+        <Kpi Icon={Briefcase}      label={t('audwsKpiEngagements')}  value={myEngagements.length}                     tone="success" />
+        <Kpi Icon={Flame}          label={t('audwsKpiEscalated')}    value={aging.escalated + aging.overdue}          tone="danger" />
       </div>
 
       {/* Aging donut + Engagements row */}
       <div className="dash-grid" style={{ marginTop: 12 }}>
-        <Card title="Findings aging" Icon={Activity}
+        <Card title={t('audwsAging')} Icon={Activity}
           action={<Badge tone={aging.escalated + aging.overdue > 0 ? 'danger' : 'success'}>
-            {aging.onTrack + aging.atRisk + aging.overdue + aging.escalated} open
+            {aging.onTrack + aging.atRisk + aging.overdue + aging.escalated} {t('audwsAgingCenterSub')}
           </Badge>}>
           <Donut
             segments={[
-              { label: 'On track',  value: aging.onTrack,   color: 'var(--success)' },
-              { label: 'At risk (≤14d)', value: aging.atRisk, color: 'var(--cat-2)' },
-              { label: 'Overdue',   value: aging.overdue,   color: 'var(--accent-700)' },
-              { label: 'Escalated', value: aging.escalated, color: 'var(--danger)' },
+              { label: t('audwsAgingOnTrack'),   value: aging.onTrack,   color: 'var(--success)' },
+              { label: t('audwsAgingAtRisk'),    value: aging.atRisk,    color: 'var(--cat-2)' },
+              { label: t('audwsAgingOverdue'),   value: aging.overdue,   color: 'var(--accent-700)' },
+              { label: t('audwsAgingEscalated'), value: aging.escalated, color: 'var(--danger)' },
             ].filter(s => s.value > 0)}
             centerLabel={String(aging.onTrack + aging.atRisk + aging.overdue + aging.escalated)}
-            centerSub="open" />
+            centerSub={t('audwsAgingCenterSub')} />
         </Card>
 
-        <Card title="My audit engagements" Icon={Briefcase}
-          action={<Badge tone="primary">{myEngagements.length}</Badge>}>
+        <Card title={t('audwsEngagements')} Icon={Briefcase}
+          action={
+            myEngagements.length > 5
+              ? <Link to="/audit-workspace?tab=engagements"
+                  style={{ fontSize: 11, color: 'var(--primary)', textDecoration: 'none' }}>
+                  {t('audwsEngagementsViewAll')} ({myEngagements.length}) →
+                </Link>
+              : <Badge tone="primary">{myEngagements.length}</Badge>
+          }>
           {myEngagements.length === 0
-            ? <EmptyState Icon={Briefcase} title="No active engagements" />
+            ? <EmptyState Icon={Briefcase} title={t('audwsEngagementsEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {myEngagements.slice(0, 5).map(e => (
                   <Link key={e.id} to={`/audit-workspace/engagement/${e.id}`} style={{
@@ -160,10 +175,10 @@ export function AuditWorkspacePage() {
       </div>
 
       {/* CAPA sign-off queue */}
-      <Card title="CAPA sign-off queue" Icon={Stamp}
-        action={<Badge tone={signoffQueue.length > 0 ? 'warning' : 'success'}>{signoffQueue.length} awaiting</Badge>}>
+      <Card title={t('audwsCapaQueue')} Icon={Stamp}
+        action={<Badge tone={signoffQueue.length > 0 ? 'warning' : 'success'}>{signoffQueue.length} {t('audwsCapaAwaiting')}</Badge>}>
         {signoffQueue.length === 0
-          ? <EmptyState Icon={ShieldCheck} title="Inbox clear" sub="No CAPA findings are currently awaiting your sign-off." />
+          ? <EmptyState Icon={ShieldCheck} title={t('audwsCapaInboxClear')} sub={t('audwsCapaInboxClearSub')} />
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {signoffQueue.map(f => (
                 <Link key={f.id} to={`/findings/${f.id}`} style={{
@@ -213,10 +228,10 @@ export function AuditWorkspacePage() {
 
       {/* Document review queue: policies + evidence */}
       <div className="dash-grid" style={{ marginTop: 12 }}>
-        <Card title="Policies awaiting review" Icon={BookCopy}
+        <Card title={t('audwsPolicyQueue')} Icon={BookCopy}
           action={<Badge tone="info">{policyQueue.length}</Badge>}>
           {policyQueue.length === 0
-            ? <EmptyState Icon={BookCopy} title="No policies in review" />
+            ? <EmptyState Icon={BookCopy} title={t('audwsPolicyEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {policyQueue.map(p => (
                   <Link key={p.id} to={`/policies/${p.id}`} style={{
@@ -241,10 +256,10 @@ export function AuditWorkspacePage() {
               </div>}
         </Card>
 
-        <Card title="Evidence pending review" Icon={FileCheck2}
+        <Card title={t('audwsEvPending')} Icon={FileCheck2}
           action={<Badge tone="accent">{evidencePending.length}</Badge>}>
           {evidencePending.length === 0
-            ? <EmptyState Icon={FileCheck2} title="Inbox clear" />
+            ? <EmptyState Icon={FileCheck2} title={t('audwsEvEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {evidencePending.map(e => (
                   <div key={e.id} style={{
@@ -272,10 +287,10 @@ export function AuditWorkspacePage() {
 
       {/* Open evidence requests + recent reviews */}
       <div className="dash-grid" style={{ marginTop: 12 }}>
-        <Card title="Open evidence requests" Icon={ScrollText}
+        <Card title={t('audwsRequests')} Icon={ScrollText}
           action={<Badge tone="warning">{evidenceRequests.length}</Badge>}>
           {evidenceRequests.length === 0
-            ? <EmptyState Icon={ScrollText} title="No open requests" />
+            ? <EmptyState Icon={ScrollText} title={t('audwsRequestsEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {evidenceRequests.slice(0, 6).map(r => (
                   <div key={r.id} style={{
@@ -300,10 +315,10 @@ export function AuditWorkspacePage() {
               </div>}
         </Card>
 
-        <Card title="Recent sign-offs (chain of custody)" Icon={ClipboardCheck}
+        <Card title={t('audwsRecent')} Icon={ClipboardCheck}
           action={<Badge tone="success">{recentReviews.length}</Badge>}>
           {recentReviews.length === 0
-            ? <EmptyState Icon={ClipboardCheck} title="No recent sign-offs" />
+            ? <EmptyState Icon={ClipboardCheck} title={t('audwsRecentEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {recentReviews.slice(0, 6).map(r => (
                   <div key={r.id} style={{
@@ -329,9 +344,9 @@ export function AuditWorkspacePage() {
       </div>
 
       {/* Coverage donut */}
-      <Card title="Coverage by authority (cited controls)" Icon={BarChart3}>
+      <Card title={t('audwsCoverage')} Icon={BarChart3}>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
-          Cross-domain control coverage. Click an authority chip below to drill into that regulator's workspace.
+          {t('audwsCoverageHint')}
         </div>
         <CoverageQuickLinks />
       </Card>
@@ -340,6 +355,7 @@ export function AuditWorkspacePage() {
 }
 
 function CoverageQuickLinks() {
+  const { t } = useI18n();
   const all = [
     ...RISK_ANCHORS, ...CYBER_ANCHORS, ...PRIVACY_ANCHORS, ...BCM_ANCHORS,
     ...TPRM_ANCHORS, ...SCM_ANCHORS, ...ETHICS_ANCHORS, ...INCIDENT_ANCHORS, ...CHANGE_ANCHORS,
@@ -373,7 +389,7 @@ function CoverageQuickLinks() {
               onMouseLeave={(ev) => (ev.currentTarget as HTMLElement).style.background = 'var(--surface-1)'}
             >
               <span style={{ fontWeight: 700, color: a.colorToken }}>{a.code}</span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{s.total} cite{s.total !== 1 ? 's' : ''}</span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{s.total} {t('audwsCites')}</span>
               <Badge tone={pct >= 80 ? 'success' : pct >= 60 ? 'primary' : pct >= 40 ? 'warning' : 'danger'}>
                 <Clock size={9} style={{ marginInlineEnd: 3, verticalAlign: 'middle' }} />
                 {pct}%

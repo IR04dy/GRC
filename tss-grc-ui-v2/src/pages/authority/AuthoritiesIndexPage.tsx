@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Landmark, ArrowRight, Grid3x3 } from 'lucide-react';
+import { useMemo } from 'react';
+import { Landmark, Grid3x3 } from 'lucide-react';
+import { DirectionalArrow } from '../../components/rtl/DirectionalArrow';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -11,6 +13,9 @@ import {
   RISK_ANCHORS, CYBER_ANCHORS, PRIVACY_ANCHORS, BCM_ANCHORS,
   TPRM_ANCHORS, SCM_ANCHORS, ETHICS_ANCHORS, INCIDENT_ANCHORS, CHANGE_ANCHORS,
 } from '../../lib/moduleAnchors';
+import { COMPLIANCE_FINDINGS, AUDIT_ENGAGEMENTS } from '../compliance/mockCompliance';
+
+type TFn = (key: string, fallback?: string) => string;
 
 /**
  * Directory of every regulatory + advisory authority the platform tracks.
@@ -18,42 +23,71 @@ import {
  * the authority's workspace where the auditor can drill in.
  */
 export function AuthoritiesIndexPage() {
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const saudi  = AUTHORITIES.filter(a => a.authorityType === 'SAUDI_REGULATORY' || a.authorityType === 'SAUDI_ADVISORY');
   const intl   = AUTHORITIES.filter(a => a.authorityType === 'INTERNATIONAL');
 
+  // Live posture per authority — used by AuthorityCard to render a badge row.
+  const postureByCode = useMemo(() => {
+    const allAnchors = [
+      ...RISK_ANCHORS, ...CYBER_ANCHORS, ...PRIVACY_ANCHORS, ...BCM_ANCHORS,
+      ...TPRM_ANCHORS, ...SCM_ANCHORS, ...ETHICS_ANCHORS, ...INCIDENT_ANCHORS, ...CHANGE_ANCHORS,
+    ];
+    const m = new Map<string, { cited: number; openFindings: number; engagements: number }>();
+    for (const a of allAnchors) {
+      const cur = m.get(a.authorityCode) ?? { cited: 0, openFindings: 0, engagements: 0 };
+      cur.cited += 1;
+      m.set(a.authorityCode, cur);
+    }
+    for (const auth of AUTHORITIES) {
+      const cur = m.get(auth.code) ?? { cited: 0, openFindings: 0, engagements: 0 };
+      cur.openFindings = COMPLIANCE_FINDINGS.filter(f =>
+        f.status !== 'CLOSED' && (
+          auth.frameworkCodes.some(fw => (f.clauseRef ?? '').toUpperCase().includes(fw.replace(/_/g, ' ').toUpperCase().split(' ')[0]))
+        )).length;
+      cur.engagements = AUDIT_ENGAGEMENTS.filter(e =>
+        auth.frameworkCodes.includes((e.framework ?? '').replace(' ', '_').toUpperCase()) ||
+        auth.frameworkCodes.includes(e.framework ?? '')
+      ).length;
+      m.set(auth.code, cur);
+    }
+    return m;
+  }, []);
+
   return (
-    <Shell title="Regulatory Authorities" sub="Saudi regulators + international benchmarks">
+    <Shell title={t('authIdxTitle')} sub={t('authIdxSub')}>
       <PageHeader
-        eyebrow="Authority Document Library"
-        title="Regulatory Authorities"
-        sub="Single source of truth for every regulator + standard the platform tracks. Each authority opens an auditor workspace with cited controls, anchored evidence, findings and engagements."
+        eyebrow={t('authIdxEyebrow')}
+        title={t('authIdxTitle')}
+        sub={t('authIdxHeaderSub')}
       />
 
-      <Card title="Saudi authorities" Icon={Landmark}
+      <Card title={t('authIdxSaudi')} Icon={Landmark}
         action={<Badge tone="primary">{saudi.length}</Badge>}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
           gap: 8,
         }}>
-          {saudi.map(a => <AuthorityCard key={a.code} a={a} lang={lang} />)}
+          {saudi.map(a => <AuthorityCard key={a.code} a={a} lang={lang} t={t}
+            posture={postureByCode.get(a.code)} />)}
         </div>
       </Card>
 
-      <Card title="International benchmarks" Icon={Landmark}
+      <Card title={t('authIdxIntl')} Icon={Landmark}
         action={<Badge tone="primary">{intl.length}</Badge>}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
           gap: 8,
         }}>
-          {intl.map(a => <AuthorityCard key={a.code} a={a} lang={lang} />)}
+          {intl.map(a => <AuthorityCard key={a.code} a={a} lang={lang} t={t}
+            posture={postureByCode.get(a.code)} />)}
         </div>
       </Card>
 
       {/* Cross-authority coverage matrix — every authority × every domain */}
-      <CrossAuthorityMatrix />
+      <CrossAuthorityMatrix t={t} />
     </Shell>
   );
 }
@@ -64,7 +98,7 @@ const DOMAIN_COLS: AuthorityDomain[] = [
   'ETHICS', 'AML', 'COMPLIANCE', 'GOVERNANCE', 'CLOUD', 'TELECOM', 'FINANCE', 'TAX', 'HR',
 ];
 
-function CrossAuthorityMatrix() {
+function CrossAuthorityMatrix({ t }: { t: TFn }) {
   const allAnchors = [
     ...RISK_ANCHORS, ...CYBER_ANCHORS, ...PRIVACY_ANCHORS, ...BCM_ANCHORS,
     ...TPRM_ANCHORS, ...SCM_ANCHORS, ...ETHICS_ANCHORS, ...INCIDENT_ANCHORS, ...CHANGE_ANCHORS,
@@ -91,25 +125,34 @@ function CrossAuthorityMatrix() {
           : 'neutral',
         value: counts.get(a.code)?.get(d) ?? 0,
         href: `/authority/${a.code}`,
-        title: `${a.nameEn} — ${d}: ${counts.get(a.code)?.get(d) ?? 0} cited control(s)`,
+        title: `${a.nameEn} — ${t(`domain${d}`)}: ${counts.get(a.code)?.get(d) ?? 0}`,
       })),
     }));
 
   return (
-    <Card title="Cross-authority coverage matrix" Icon={Grid3x3}>
+    <Card title={t('authIdxMatrix')} Icon={Grid3x3}>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
-        Cell value = cited controls anchored to that authority across that domain. Click any row to drill into the authority workspace.
+        {t('authIdxMatrixHint')}
       </div>
       <CoverageMatrix
-        rowHeaderLabel="Authority"
-        columnLabels={DOMAIN_COLS}
+        rowHeaderLabel={t('authIdxColAuthority')}
+        columnLabels={DOMAIN_COLS.map(d => t(`domain${d}`))}
         rows={rows}
       />
     </Card>
   );
 }
 
-function AuthorityCard({ a, lang }: { a: AuthorityDto; lang: string }) {
+function AuthorityCard({ a, lang, t, posture }: {
+  a: AuthorityDto;
+  lang: string;
+  t: TFn;
+  posture?: { cited: number; openFindings: number; engagements: number };
+}) {
+  const fwLabel = a.frameworkCodes.length === 1
+    ? `${a.frameworkCodes.length} ${t('authIdxFrameworksOne')}`
+    : `${a.frameworkCodes.length} ${t('authIdxFrameworksMany')}`;
+  const domainLabels = a.domains.slice(0, 2).map(d => t(`domain${d}`)).join(' · ');
   return (
     <Link to={`/authority/${a.code}`} style={{
       display: 'grid',
@@ -150,12 +193,25 @@ function AuthorityCard({ a, lang }: { a: AuthorityDto; lang: string }) {
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {lang === 'ar' ? a.nameAr : a.nameEn}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)',
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2,
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {a.frameworkCodes.length} framework{a.frameworkCodes.length !== 1 ? 's' : ''} · {a.domains.slice(0, 2).join(' · ')}
+          {fwLabel}{domainLabels ? ` · ${domainLabels}` : ''}
         </div>
+        {posture && (posture.cited > 0 || posture.openFindings > 0 || posture.engagements > 0) && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+            {posture.cited > 0 && (
+              <Badge tone="primary">{posture.cited} {t('authIdxCitedCount')}</Badge>
+            )}
+            {posture.openFindings > 0 && (
+              <Badge tone="warning">{posture.openFindings} {t('authIdxOpenFindings')}</Badge>
+            )}
+            {posture.engagements > 0 && (
+              <Badge tone="info">{posture.engagements} {t('audwsEngagements').toLowerCase()}</Badge>
+            )}
+          </div>
+        )}
       </div>
-      <ArrowRight size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
+      <DirectionalArrow size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
     </Link>
   );
 }
