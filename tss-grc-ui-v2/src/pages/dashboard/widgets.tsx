@@ -7,6 +7,7 @@ import { Progress } from '../../components/ui/Progress';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { BarChart3D } from '../../components/viz/BarChart3D';
 import type { DashboardStats } from '../../lib/api';
+import { useNavigate } from 'react-router-dom';
 
 export type WidgetSize = 'sm' | 'md' | 'lg';
 
@@ -51,41 +52,33 @@ function mockTrend(current: number, volatility = 0.18): number[] {
 
 // ─── Built-in widgets ──────────────────────────────────────────────────────
 export const WIDGETS: DashboardWidget[] = [
-  // KPIs
+  // KPIs — every tile drills into a filtered list (Tier 1)
   { id: 'kpi-total-risks',    titleKey: 'kpiTotalRisks',    defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={AlertTriangle} label={t('kpiTotalRisks')} value={stats.totalRisks} tone="primary" spark={mockTrend(stats.totalRisks)} /> },
+    render: ({ stats, t }) => <Kpi Icon={AlertTriangle} label={t('kpiTotalRisks')} value={stats.totalRisks} tone="primary" spark={mockTrend(stats.totalRisks)} to="/risk" /> },
   { id: 'kpi-critical-risks', titleKey: 'kpiCriticalRisks', defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={Flame} label={t('kpiCriticalRisks')} value={stats.criticalRisks ?? stats.openCriticalRisks} tone="danger" spark={mockTrend(stats.criticalRisks ?? stats.openCriticalRisks ?? 0, 0.3)} /> },
+    render: ({ stats, t }) => <Kpi Icon={Flame} label={t('kpiCriticalRisks')} value={stats.criticalRisks ?? stats.openCriticalRisks} tone="danger" spark={mockTrend(stats.criticalRisks ?? stats.openCriticalRisks ?? 0, 0.3)} to="/risk?level=CRITICAL" /> },
   { id: 'kpi-compliance',     titleKey: 'kpiCompliance',    defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={ClipboardCheck} label={t('kpiCompliance')} value={`${stats.complianceScore}%`} tone="success" spark={mockTrend(stats.complianceScore, 0.06)} /> },
+    render: ({ stats, t }) => <Kpi Icon={ClipboardCheck} label={t('kpiCompliance')} value={`${stats.complianceScore}%`} tone="success" spark={mockTrend(stats.complianceScore, 0.06)} to="/compliance?tab=scorecard" /> },
   { id: 'kpi-active-controls',titleKey: 'kpiActiveControls',defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={ShieldCheck} label={t('kpiActiveControls')} value={stats.activeUsers} tone="info" spark={mockTrend(stats.activeUsers, 0.08)} /> },
+    render: ({ stats, t }) => <Kpi Icon={ShieldCheck} label={t('kpiActiveControls')} value={stats.activeUsers} tone="info" spark={mockTrend(stats.activeUsers, 0.08)} to="/compliance?tab=controls" /> },
 
   // Charts
   { id: 'heatmap',           titleKey: 'cardHeatTitle',    defaultSize: 'md', category: 'chart',
     render: ({ heat, t }) =>
       <Card title={t('cardHeatTitle')} Icon={Grid3x3} action={<Badge tone="primary">5 × 5</Badge>}>
-        <HeatMap data={heat} />
+        <HeatmapDrill heat={heat} />
       </Card> },
   { id: 'risk-by-severity',  titleKey: 'cardByCategory',   defaultSize: 'md', category: 'chart',
     render: ({ stats, t }) =>
       <Card title={t('cardByCategory')} Icon={BarChart3}>
-        <BarChart3D items={[
-          { label: 'Critical', value: stats.criticalRisks, color: 'var(--danger)', shade: '#7E2A25' },
-          { label: 'High',     value: stats.highRisks,     color: 'var(--cat-6)',  shade: '#5C3220' },
-          { label: 'Medium',   value: stats.mediumRisks,   color: 'var(--cat-2)',  shade: '#7A5612' },
-          { label: 'Low',      value: stats.lowRisks,      color: 'var(--cat-3)',  shade: '#324754' },
-        ]} />
+        <RiskBySeverityDrill stats={stats} />
       </Card> },
 
   // Progress
   { id: 'frameworks',        titleKey: 'cardFrameworks',   defaultSize: 'md', category: 'progress',
     render: ({ stats, t }) =>
       <Card title={t('cardFrameworks')} Icon={CheckSquare} action={<Badge tone="primary">Power BI</Badge>}>
-        <Progress label="ISO 27001" value={stats.complianceScore} tone="primary" />
-        <Progress label="NCA ECC"   value={Math.max(0, stats.complianceScore - 25)} tone="accent" />
-        <Progress label="PDPL"      value={Math.max(0, stats.complianceScore - 49)} tone="danger" />
-        <Progress label="ISO 22301" value={Math.max(0, stats.complianceScore - 16)} tone="success" />
+        <FrameworksDrill stats={stats} />
       </Card> },
 
   // Activity (mock)
@@ -108,6 +101,37 @@ export const DEFAULT_LAYOUT: Array<{ id: string; size: WidgetSize }> = [
   { id: 'frameworks',         size: 'md' },
   { id: 'activity',           size: 'md' },
 ];
+
+/** Heatmap that drills the risk register on cell click. */
+function HeatmapDrill({ heat }: { heat: HeatCell[] }) {
+  const navigate = useNavigate();
+  return <HeatMap data={heat} onCellClick={(l, i) => navigate(`/risk?l=${l}&i=${i}`)} />;
+}
+
+/** "Risks by severity" 3-D bar chart that drills into the register filtered by level. */
+function RiskBySeverityDrill({ stats }: { stats: DashboardStats }) {
+  const navigate = useNavigate();
+  return <BarChart3D
+    onItemClick={(it) => navigate(`/risk?level=${it.label.toUpperCase()}`)}
+    items={[
+      { label: 'Critical', value: stats.criticalRisks, color: 'var(--danger)', shade: '#7E2A25' },
+      { label: 'High',     value: stats.highRisks,     color: 'var(--cat-6)',  shade: '#5C3220' },
+      { label: 'Medium',   value: stats.mediumRisks,   color: 'var(--cat-2)',  shade: '#7A5612' },
+      { label: 'Low',      value: stats.lowRisks,      color: 'var(--cat-3)',  shade: '#324754' },
+    ]} />;
+}
+
+/** Framework readiness bars drill into the framework sheet. */
+function FrameworksDrill({ stats }: { stats: DashboardStats }) {
+  const navigate = useNavigate();
+  const go = (code: string) => () => navigate(`/compliance?tab=frameworks&fw=${encodeURIComponent(code)}`);
+  return <>
+    <Progress label="ISO 27001" value={stats.complianceScore} tone="primary" onClick={go('ISO_27001')} />
+    <Progress label="NCA ECC"   value={Math.max(0, stats.complianceScore - 25)} tone="accent" onClick={go('NCA_ECC')} />
+    <Progress label="PDPL"      value={Math.max(0, stats.complianceScore - 49)} tone="danger" onClick={go('PDPL')} />
+    <Progress label="ISO 22301" value={Math.max(0, stats.complianceScore - 16)} tone="success" onClick={go('ISO_22301')} />
+  </>;
+}
 
 function ActivityFeed() {
   const items = [

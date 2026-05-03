@@ -13,10 +13,20 @@ const FGS: Record<Tone, string> = {
   success: 'var(--success-fg)',
 };
 
-export function Progress({ label, value, tone = 'primary' }: { label: string; value: number; tone?: Tone }) {
+export function Progress({ label, value, tone = 'primary', onClick }: { label: string; value: number; tone?: Tone; onClick?: () => void }) {
   const safe = Math.max(0, Math.min(100, value));
+  const clickable = !!onClick;
   return (
-    <div className="progress-row">
+    <div
+      className={`progress-row${clickable ? ' progress-row-clickable' : ''}`}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? onClick : undefined}
+      onKeyDown={clickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick!(); }
+      } : undefined}
+      style={clickable ? { cursor: 'pointer' } : undefined}
+    >
       <div className="progress-label">
         <span>{label}</span>
         <span style={{ color: FGS[tone], fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{safe}%</span>

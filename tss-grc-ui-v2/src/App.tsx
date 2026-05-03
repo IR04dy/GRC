@@ -20,6 +20,12 @@ import { WorkflowsPage } from './pages/workflow/WorkflowsPage';
 import { ChangesPage } from './pages/changes/ChangesPage';
 import { EthicsPage } from './pages/ethics/EthicsPage';
 import { ReportSchedulesPage } from './pages/reporting/ReportSchedulesPage';
+import { RiskDetailPage } from './pages/risk/RiskDetailPage';
+import { FindingDetailPage } from './pages/detail/FindingDetailPage';
+import { ControlDetailPage } from './pages/detail/ControlDetailPage';
+import { PolicyDetailPage } from './pages/detail/PolicyDetailPage';
+import { VendorDetailPage } from './pages/detail/VendorDetailPage';
+import { DpiaDetailPage } from './pages/detail/DpiaDetailPage';
 
 export function App() {
   return (
@@ -49,6 +55,14 @@ export function App() {
               <Route path="/changes"    element={<ChangesPage />} />
               <Route path="/ethics"     element={<EthicsPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
+
+              {/* Detail-page deep-drill routes (Tier 2) */}
+              <Route path="/risk/:id"        element={<RiskDetailPage />} />
+              <Route path="/findings/:id"    element={<FindingDetailPage />} />
+              <Route path="/controls/:id"    element={<ControlDetailPage />} />
+              <Route path="/policies/:id"    element={<PolicyDetailPage />} />
+              <Route path="/vendors/:id"     element={<VendorDetailPage />} />
+              <Route path="/dpias/:id"       element={<DpiaDetailPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />

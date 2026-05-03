@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Plus, BarChart3, Building2, AlertTriangle,
   ScrollText, BookCopy, Send, CheckCheck, Archive, RotateCcw, X as XIcon, Wrench, Flag, Search,
@@ -217,10 +218,23 @@ function ctrlToReq(c: ComplianceControlDto): ComplianceControlRequest {
   };
 }
 
+const TAB_IDS = ['overview', 'controls', 'internal', 'external', 'findings', 'scorecard', 'changes', 'policies', 'engagements', 'frameworks'] as const;
+function isTabId(s: string | null): s is TabId {
+  return s != null && (TAB_IDS as readonly string[]).includes(s);
+}
+
 export function CompliancePage() {
   const { t } = useI18n();
   const toast = useToast();
-  const [tab, setTab] = useState<TabId>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [tab, setTabState] = useState<TabId>(isTabId(initialTab) ? initialTab : 'overview');
+  function setTab(next: TabId) {
+    setTabState(next);
+    const qs = new URLSearchParams(searchParams);
+    if (next === 'overview') qs.delete('tab'); else qs.set('tab', next);
+    setSearchParams(qs, { replace: true });
+  }
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ComplianceControlDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<ComplianceControlDto | null>(null);
@@ -628,10 +642,10 @@ export function CompliancePage() {
         }
       />
       <div className="kpi-grid">
-        <Kpi Icon={BookOpenCheck}  label={t('complianceKpiFrameworks')} value={new Set(controls.data.map(c => c.framework)).size} tone="primary" />
-        <Kpi Icon={ClipboardCheck} label={t('complianceKpiControls')}   value={controls.data.length} tone="success" />
-        <Kpi Icon={FileCheck2}     label={t('complianceKpiEvidence')}   value="1,283" tone="info" />
-        <Kpi Icon={Award}          label={t('complianceKpiScore')}      value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" />
+        <Kpi Icon={BookOpenCheck}  label={t('complianceKpiFrameworks')} value={new Set(controls.data.map(c => c.framework)).size} tone="primary" onClick={() => setTab('frameworks')} />
+        <Kpi Icon={ClipboardCheck} label={t('complianceKpiControls')}   value={controls.data.length} tone="success" onClick={() => setTab('controls')} />
+        <Kpi Icon={FileCheck2}     label={t('complianceKpiEvidence')}   value="1,283" tone="info" onClick={() => setTab('findings')} />
+        <Kpi Icon={Award}          label={t('complianceKpiScore')}      value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" onClick={() => setTab('scorecard')} />
       </div>
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
@@ -653,7 +667,7 @@ export function CompliancePage() {
       )}
       {tab === 'controls' && (
         <Card padded={false}>
-          {controls.loading ? <LoadingRow /> : <DataTable columns={ctrlCols} rows={controls.data} empty={<EmptyState />} />}
+          {controls.loading ? <LoadingRow /> : <DataTable columns={ctrlCols} rows={controls.data} rowHref={r => `/controls/${r.id}`} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'changes' && (
@@ -664,7 +678,7 @@ export function CompliancePage() {
       )}
       {tab === 'policies' && (
         <Card padded={false}>
-          {policies.loading ? <LoadingRow /> : <DataTable columns={policyCols} rows={policies.data}
+          {policies.loading ? <LoadingRow /> : <DataTable columns={policyCols} rows={policies.data} rowHref={r => `/policies/${r.id}`}
             empty={<EmptyState Icon={BookCopy} title="No policies on file" sub="Author, review, approve and publish enterprise policies through the lifecycle." />} />}
         </Card>
       )}
@@ -689,8 +703,8 @@ export function CompliancePage() {
           <Card padded={false}>
             {!agingLoaded ? <LoadingRow /> :
               aging.length === 0
-                ? <DataTable columns={findingCols} rows={findings.data} empty={<EmptyState Icon={AlertTriangle} title="No open findings" sub="Findings link audit observations to remediation owners with due dates." />} />
-                : <DataTable columns={agingCols} rows={aging} empty={<EmptyState />} />
+                ? <DataTable columns={findingCols} rows={findings.data} rowHref={r => `/findings/${r.id}`} empty={<EmptyState Icon={AlertTriangle} title="No open findings" sub="Findings link audit observations to remediation owners with due dates." />} />
+                : <DataTable columns={agingCols} rows={aging} rowHref={r => `/findings/${r.id}`} empty={<EmptyState />} />
             }
           </Card>
         </>

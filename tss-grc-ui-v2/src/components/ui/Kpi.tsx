@@ -1,4 +1,5 @@
-import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
+import { type LucideIcon, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 type KpiTone = 'primary' | 'danger' | 'success' | 'warning' | 'info' | 'accent';
 
@@ -14,6 +15,17 @@ interface KpiProps {
    * as the trend chip if `trend` is omitted.
    */
   spark?: number[];
+  /**
+   * When supplied, the tile becomes a clickable handle that navigates to the
+   * given route. Pattern matches ServiceNow / MetricStream / OneTrust where
+   * every KPI is a drill-down anchor.
+   */
+  to?: string;
+  /**
+   * Alternative click handler when navigation isn't appropriate (e.g. a
+   * drill that opens a slide-out panel rather than a route).
+   */
+  onClick?: () => void;
 }
 
 const TONES: Record<KpiTone, { bg: string; fg: string; line: string }> = {
@@ -34,11 +46,13 @@ function autoTrend(spark?: number[]): { dir: 'up' | 'down'; value: string } | un
   return { dir: delta >= 0 ? 'up' : 'down', value: (pct >= 0 ? '+' : '') + pct + '%' };
 }
 
-export function Kpi({ Icon, label, value, trend, tone = 'primary', spark }: KpiProps) {
+export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, onClick }: KpiProps) {
   const { bg, fg, line } = TONES[tone];
   const effectiveTrend = trend ?? autoTrend(spark);
-  return (
-    <div className="kpi">
+  const isInteractive = !!(to || onClick);
+
+  const body = (
+    <>
       <div className="kpi-top">
         <div className="kpi-icon-wrap" style={{ background: bg, color: fg }}>
           <Icon size={20} strokeWidth={2} />
@@ -49,12 +63,39 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark }: KpiP
             {effectiveTrend.value}
           </div>
         )}
+        {isInteractive && (
+          <span aria-hidden style={{
+            marginInlineStart: 'auto',
+            color: 'var(--ink-4)',
+            display: 'inline-flex',
+            transition: 'transform var(--dur-fast) var(--ease-standard), color var(--dur-fast)',
+          }} className="kpi-arrow">
+            <ArrowRight size={14} />
+          </span>
+        )}
       </div>
       <div className="kpi-value">{value}</div>
       <div className="kpi-label">{label}</div>
       {spark && spark.length >= 2 && <Sparkline values={spark} color={line} />}
-    </div>
+    </>
   );
+
+  if (to) {
+    return (
+      <Link to={to} className="kpi kpi-clickable" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+        {body}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button onClick={onClick} className="kpi kpi-clickable"
+        style={{ background: 'inherit', border: 'none', textAlign: 'inherit', padding: 'inherit', font: 'inherit', cursor: 'pointer', color: 'inherit', width: '100%' }}>
+        {body}
+      </button>
+    );
+  }
+  return <div className="kpi">{body}</div>;
 }
 
 /** Tiny inline sparkline — pure SVG, no library. Rendered at 100% width × 28px. */

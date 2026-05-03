@@ -1,0 +1,153 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { AlertTriangle, ListChecks, ArrowRight, ShieldCheck, Stamp, Lock, Wrench, Briefcase, Link2 } from 'lucide-react';
+import { Shell } from '../../components/layout/Shell';
+import { DetailHeader } from '../../components/layout/DetailHeader';
+import { Tabs, type TabItem } from '../../components/ui/Tabs';
+import { Card } from '../../components/ui/Card';
+import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
+import { complianceApi, ApiError, type ComplianceFindingDto } from '../../lib/api';
+import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
+import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
+
+type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history';
+
+const CAPA_STAGE_TONE: Record<string, BadgeTone> = {
+  IDENTIFIED: 'neutral', IMPLEMENTING: 'info', OWNER_TESTED: 'primary',
+  INDEPENDENT_TESTED: 'accent', AUDIT_SIGNED_OFF: 'warning', CLOSED: 'success',
+};
+
+export function FindingDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const { t } = useI18n();
+  const toast = useToast();
+  const [item, setItem] = useState<ComplianceFindingDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<TabId>('overview');
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    complianceApi.findings(0, 200)
+      .then(p => setItem(p.content?.find(f => f.id === Number(id)) ?? null))
+      .catch(() => setItem(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  async function capaAction(fn: (n: number) => Promise<unknown>, msg: string) {
+    if (!item) return;
+    try { await fn(item.id); toast.success(msg);
+      const p = await complianceApi.findings(0, 200);
+      setItem(p.content?.find(f => f.id === item.id) ?? null);
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  if (loading) return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
+  if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
+
+  const tabs: TabItem<TabId>[] = [
+    { id: 'overview', label: t('detailTabOverview') },
+    { id: 'capa',     label: t('detailTabCapa') },
+    { id: 'evidence', label: t('detailTabEvidence') },
+    { id: 'links',    label: t('detailTabLinks') },
+    { id: 'history',  label: t('detailTabHistory') },
+  ];
+
+  const stage = item.capaStage ?? 'IDENTIFIED';
+
+  return (
+    <Shell title={t('modCompliance')} sub={t('complianceSub')}>
+      <DetailHeader
+        breadcrumbs={[
+          { label: t('modCompliance'), to: '/compliance' },
+          { label: t('complianceTabFindings'), to: '/compliance?tab=findings' },
+          { label: `#${item.id}` },
+        ]}
+        eyebrow={`Finding #${item.id}`}
+        title={item.title}
+        sub={item.capa}
+        badges={<>
+          <Badge tone={SEVERITY_TONE[item.severity] ?? 'neutral'} dot>{severityLabel(t, item.severity)}</Badge>
+          <Badge tone={item.status === 'CLOSED' ? 'success' : 'warning'} dot>{item.status}</Badge>
+          <Badge tone={CAPA_STAGE_TONE[stage] ?? 'neutral'}>{stage.replace(/_/g, ' ')}</Badge>
+        </>}
+        actions={<>
+          {stage === 'IDENTIFIED'         && <Button variant="primary" Icon={Wrench}      onClick={() => capaAction((id) => complianceApi.capaStartImplementing(id), t('capaActStart'))}>{t('capaActStart')}</Button>}
+          {stage === 'IMPLEMENTING'       && <Button variant="primary" Icon={ShieldCheck} onClick={async () => {
+            const r = window.prompt('PASS / FAIL / PARTIAL', 'PASS'); if (!r) return;
+            await capaAction((id) => complianceApi.capaOwnerTest(id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL' }), t('capaActOwnerTest'));
+          }}>{t('capaActOwnerTest')}</Button>}
+          {stage === 'OWNER_TESTED'       && <Button variant="primary" Icon={Briefcase}   onClick={async () => {
+            const r = window.prompt('PASS / FAIL / PARTIAL', 'PASS'); if (!r) return;
+            await capaAction((id) => complianceApi.capaIndependentTest(id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL' }), t('capaActIndepTest'));
+          }}>{t('capaActIndepTest')}</Button>}
+          {stage === 'INDEPENDENT_TESTED' && <Button variant="primary" Icon={Stamp}       onClick={() => capaAction((id) => complianceApi.capaAuditSignoff(id, {}), t('capaActSignoff'))}>{t('capaActSignoff')}</Button>}
+          {stage === 'AUDIT_SIGNED_OFF'   && <Button variant="primary" Icon={Lock}        onClick={() => capaAction((id) => complianceApi.capaClose(id), t('capaActClose'))}>{t('capaActClose')}</Button>}
+        </>}
+      />
+
+      <Tabs items={tabs} active={tab} onChange={setTab} />
+
+      {tab === 'overview' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+          <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
+            <Field label={t('colTitle')}    value={item.title} bold />
+            <Field label={t('colCapa')}     value={item.capa ?? '—'} multiline />
+            <Field label={t('colDue')}      value={item.dueDate ?? '—'} mono />
+            <Field label={t('colOwner')}    value={item.owner ?? '—'} />
+          </Card>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Card title={t('detailCapaStage')} Icon={ListChecks}>
+              <CapaStepper stage={stage} t={t} />
+            </Card>
+            <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'capa' && (
+        <Card title={t('detailTabCapa')} Icon={ListChecks}>
+          <CapaStepper stage={stage} t={t} />
+          <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+            <Field label={t('detailOwnerTest')}        value={item.ownerTestResult ? `${item.ownerTestResult} · ${item.ownerTestAt?.slice(0, 10) ?? ''}` : '—'} />
+            <Field label={t('detailIndependentTest')}  value={item.independentTestResult ? `${item.independentTestResult} · ${item.independentTestAt?.slice(0, 10) ?? ''}` : '—'} />
+            <Field label={t('detailAuditSignoff')}     value={item.auditSignoffAt ? item.auditSignoffAt.slice(0, 10) : '—'} />
+          </div>
+        </Card>
+      )}
+
+      {tab === 'evidence' && <Card title={t('detailTabEvidence')}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div></Card>}
+      {tab === 'links' && <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />}
+      {tab === 'history' && <Card title={t('detailTabHistory')}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailHistoryHint')}</div></Card>}
+    </Shell>
+  );
+}
+
+function Field({ label, value, bold, mono, multiline }: { label: string; value: string; bold?: boolean; mono?: boolean; multiline?: boolean }) {
+  return <div style={{ marginBottom: 8 }}>
+    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+    <div style={{ fontSize: 13, color: 'var(--ink-1)', fontWeight: bold ? 600 : 500, fontFamily: mono ? 'var(--font-mono)' : undefined, whiteSpace: multiline ? 'pre-wrap' : 'normal', marginTop: 2 }}>{value}</div>
+  </div>;
+}
+
+const CAPA_STEPS = ['IDENTIFIED', 'IMPLEMENTING', 'OWNER_TESTED', 'INDEPENDENT_TESTED', 'AUDIT_SIGNED_OFF', 'CLOSED'];
+
+function CapaStepper({ stage, t }: { stage: string; t: (k: string) => string }) {
+  const idx = CAPA_STEPS.indexOf(stage);
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    {CAPA_STEPS.map((s, i) => {
+      const done = i < idx, current = i === idx;
+      return <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: current ? 'var(--primary-50)' : 'transparent', borderRadius: 'var(--r-sm)', fontSize: 12 }}>
+        <span style={{ width: 18, height: 18, borderRadius: '50%', background: done ? 'var(--success)' : current ? 'var(--primary)' : 'var(--surface-3)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>{done ? '✓' : i + 1}</span>
+        <span style={{ fontWeight: current ? 600 : 500, color: current ? 'var(--primary)' : done ? 'var(--ink-2)' : 'var(--ink-3)' }}>{s.replace(/_/g, ' ')}</span>
+        {current && <ArrowRight size={11} style={{ marginInlineStart: 'auto', color: 'var(--primary)' }} />}
+      </div>;
+    })}
+    {/* Suppress unused warning for Link2 — kept for future use */}
+    <span style={{ display: 'none' }}><Link2 size={1} /></span>
+    <span style={{ display: 'none' }}>{t('detailCapaStage')}</span>
+  </div>;
+}

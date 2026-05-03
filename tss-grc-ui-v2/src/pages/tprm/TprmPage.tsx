@@ -163,7 +163,7 @@ export function TprmPage() {
       )}
       {tab === 'vendors' && (
         <Card padded={false}>
-          {vendors.loading ? <LoadingRow /> : <DataTable columns={cols} rows={vendors.data} empty={<EmptyState />} />}
+          {vendors.loading ? <LoadingRow /> : <DataTable columns={cols} rows={vendors.data} rowHref={r => `/vendors/${r.id}`} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'assessments' && (

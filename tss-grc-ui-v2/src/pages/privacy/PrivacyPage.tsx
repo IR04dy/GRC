@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database, PlayCircle, CheckCheck, X as XIcon, Clock, Send, ShieldCheck, Archive, ScrollText, Shield } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -348,7 +349,7 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
           gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center',
         }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>{d.titleEn}</div>
+            <Link to={`/dpias/${d.id}`} style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-1)', textDecoration: 'none' }}>{d.titleEn}</Link>
             {d.titleAr && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} dir="rtl">{d.titleAr}</div>}
             <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <Badge tone="primary">{d.triggerReason.replace(/_/g, ' ')}</Badge>

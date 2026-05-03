@@ -28,6 +28,7 @@ interface RiskFilters {
   l?: number; i?: number;       // heatmap drill-down
   status?: string;              // status chip
   category?: string;            // category chip
+  level?: string;               // severity-band drill-down (CRITICAL / HIGH / MEDIUM / LOW)
 }
 
 function readFiltersFromQs(qs: URLSearchParams): RiskFilters {
@@ -37,6 +38,7 @@ function readFiltersFromQs(qs: URLSearchParams): RiskFilters {
   if (i && /^[1-5]$/.test(i)) f.i = Number(i);
   const s = qs.get('status');   if (s) f.status = s;
   const c = qs.get('category'); if (c) f.category = c;
+  const lvl = qs.get('level');  if (lvl && /^(CRITICAL|HIGH|MEDIUM|LOW)$/.test(lvl)) f.level = lvl;
   return f;
 }
 
@@ -46,8 +48,16 @@ function writeFiltersToQs(qs: URLSearchParams, f: RiskFilters, tab: TabId): URLS
   if (f.i != null) next.set('i', String(f.i));         else next.delete('i');
   if (f.status)    next.set('status', f.status);       else next.delete('status');
   if (f.category)  next.set('category', f.category);   else next.delete('category');
+  if (f.level)     next.set('level', f.level);         else next.delete('level');
   if (tab !== 'register') next.set('tab', tab); else next.delete('tab');
   return next;
+}
+
+function scoreToLevel(score: number): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' {
+  if (score >= 16) return 'CRITICAL';
+  if (score >= 12) return 'HIGH';
+  if (score >= 8)  return 'MEDIUM';
+  return 'LOW';
 }
 
 const STATUS_TONES: Record<string, BadgeTone> = {
@@ -194,6 +204,7 @@ export function RiskRegisterPage() {
       if (filters.l != null && r.inherentLikelihood !== filters.l) return false;
       if (filters.i != null && r.inherentImpact     !== filters.i) return false;
       if (filters.status   && r.status !== filters.status) return false;
+      if (filters.level    && scoreToLevel(r.inherentScore) !== filters.level) return false;
       if (filters.category) {
         const cat = r.categoryNameEn ?? r.categoryName ?? '';
         if (!cat.toLowerCase().includes(filters.category.toLowerCase())) return false;
@@ -212,7 +223,7 @@ export function RiskRegisterPage() {
     setFilters(prev => same ? { ...prev, l: undefined, i: undefined } : { ...prev, l, i });
     if (!same) setTab('register');
   }
-  const hasFilters = filters.l != null || filters.i != null || !!filters.status || !!filters.category;
+  const hasFilters = filters.l != null || filters.i != null || !!filters.status || !!filters.category || !!filters.level;
 
   const tabs = [
     { id: 'register' as const, label: t('riskTabRegister') },
@@ -272,10 +283,10 @@ export function RiskRegisterPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={AlertTriangle}   label={t('kpiTotalRisks')}    value={risks.length} tone="primary" />
-        <Kpi Icon={Flame}           label={t('kpiCriticalRisks')} value={criticalCount} tone="danger" />
-        <Kpi Icon={ShieldCheck}     label="Treated"               value={treatedCount} tone="success" />
-        <Kpi Icon={ClipboardCheck}  label="Open"                  value={openCount} tone="warning" />
+        <Kpi Icon={AlertTriangle}   label={t('kpiTotalRisks')}    value={risks.length} tone="primary" onClick={() => setFilters(() => ({}))} />
+        <Kpi Icon={Flame}           label={t('kpiCriticalRisks')} value={criticalCount} tone="danger"  onClick={() => { setFilters(prev => ({ ...prev, status: undefined })); setTab('register'); }} />
+        <Kpi Icon={ShieldCheck}     label="Treated"               value={treatedCount} tone="success" onClick={() => { setFilters(prev => ({ ...prev, status: 'CLOSED' })); setTab('register'); }} />
+        <Kpi Icon={ClipboardCheck}  label="Open"                  value={openCount} tone="warning"   onClick={() => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); }} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
@@ -287,7 +298,7 @@ export function RiskRegisterPage() {
             {error && <div style={{ padding: 12, color: 'var(--danger-fg)', background: 'var(--danger-bg)', borderBottom: '1px solid #ECCFCC', fontSize: 13 }}>{error}</div>}
             {loading
               ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>
-              : <DataTable columns={cols} rows={filteredRisks} empty={<EmptyState Icon={AlertTriangle} title={hasFilters ? t('riskNoMatchTitle') : t('riskEmpty')} sub={hasFilters ? t('riskNoMatchSub') : t('riskEmptySub')} />} />}
+              : <DataTable columns={cols} rows={filteredRisks} rowHref={r => `/risk/${r.id}`} empty={<EmptyState Icon={AlertTriangle} title={hasFilters ? t('riskNoMatchTitle') : t('riskEmpty')} sub={hasFilters ? t('riskNoMatchSub') : t('riskEmptySub')} />} />}
           </Card>
         </>
       )}
@@ -574,6 +585,7 @@ function FilterChips({ filters, setFilters, t, totalShown, totalAll }: { filters
         <Chip label={`L${filters.l} × I${filters.i}`} onClear={() => setFilters(p => ({ ...p, l: undefined, i: undefined }))} />
       )}
       {filters.status && <Chip label={`${t('riskColStatus')}: ${filters.status}`} onClear={() => setFilters(p => ({ ...p, status: undefined }))} />}
+      {filters.level && <Chip label={`${t('riskColInherent')}: ${filters.level}`} onClear={() => setFilters(p => ({ ...p, level: undefined }))} />}
       {filters.category && <Chip label={`${t('riskColCategory')}: ${filters.category}`} onClear={() => setFilters(p => ({ ...p, category: undefined }))} />}
       <span style={{ fontSize: 11, color: 'var(--ink-3)', marginInlineStart: 'auto', fontFamily: 'var(--font-mono)' }}>
         {totalShown} / {totalAll}
