@@ -802,6 +802,7 @@ const SATISFACTION_TONE: Record<string, SatisfactionTone> = {
 const FAMILY_LABELS: Record<string, string> = {
   SECURITY: 'Security', PRIVACY: 'Privacy', BCM: 'Business Continuity',
   FINANCIAL: 'Financial', LABOUR: 'Labour', TAX: 'Tax', TELECOM: 'Telecom',
+  ETHICS: 'Ethics & Anti-Corruption', FINCRIME: 'Financial Crime / AML',
 };
 
 function sheetTabStyle(active: boolean): React.CSSProperties {
