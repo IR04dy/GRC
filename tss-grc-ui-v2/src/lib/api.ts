@@ -952,6 +952,50 @@ export const complianceApi = {
   auditEngagementStats:   () => api.get<Record<string, number>>('/api/v1/compliance/audit-engagements/stats'),
 };
 
+// ─── Compliance frameworks (IA-1 framework anchor) ───────────────────────────
+export interface FrameworkDto {
+  id: number; code: string;
+  nameEn: string; nameAr?: string;
+  version?: string; issuer?: string;
+  family?: string; isActive: boolean;
+}
+export interface PolicyMappingDto {
+  mappingId: number; frameworkId: number;
+  frameworkCode?: string; frameworkName?: string; frameworkVersion?: string;
+  clauseRef?: string;
+  satisfaction: 'FULL' | 'PARTIAL' | 'OUT_OF_SCOPE' | 'NOT_APPLICABLE';
+  notes?: string;
+}
+export interface FrameworkPolicyRowDto {
+  mappingId: number;
+  policyId: number; code: string;
+  titleEn: string; titleAr?: string;
+  version?: string; category?: string; status?: string;
+  nextReviewDate?: string;
+  clauseRef?: string;
+  satisfaction: string;
+  notes?: string;
+}
+export interface FrameworkCoverageDto {
+  frameworkId: number; code: string;
+  nameEn: string; nameAr?: string;
+  family?: string;
+  policyCount: number;
+  full: number; partial: number;
+  outOfScope: number; notApplicable: number;
+}
+export const frameworkApi = {
+  list:           ()                 => api.get<FrameworkDto[]>('/api/v1/compliance/frameworks'),
+  policiesFor:    (frameworkId: number) => api.get<FrameworkPolicyRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/policies`),
+  mappingsFor:    (policyId: number) => api.get<PolicyMappingDto[]>(`/api/v1/compliance/policies/${policyId}/mappings`),
+  addMapping:     (policyId: number, body: { frameworkId: number; clauseRef?: string; satisfaction?: string; notes?: string }) =>
+                    api.post<PolicyMappingDto>(`/api/v1/compliance/policies/${policyId}/mappings`, body),
+  updateMapping:  (mappingId: number, body: { clauseRef?: string; satisfaction?: string; notes?: string }) =>
+                    api.put<PolicyMappingDto>(`/api/v1/compliance/policies/mappings/${mappingId}`, body),
+  deleteMapping:  (mappingId: number) => api.delete<void>(`/api/v1/compliance/policies/mappings/${mappingId}`),
+  coverage:       () => api.get<FrameworkCoverageDto[]>('/api/v1/compliance/frameworks/coverage'),
+};
+
 // External audit engagement DTO — §5.3 #3
 export interface AuditEngagementDto {
   id: number;

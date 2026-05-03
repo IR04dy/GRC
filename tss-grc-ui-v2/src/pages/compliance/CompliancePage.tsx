@@ -21,18 +21,19 @@ import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import {
-  complianceApi, reportingApi, ApiError,
+  complianceApi, frameworkApi, reportingApi, ApiError,
   type ComplianceControlDto, type ComplianceControlRequest,
   type ComplianceAssessmentDto, type ComplianceFindingDto,
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
   type PolicyDto, type PolicyRequest,
   type AuditEngagementDto, type AuditEngagementRequest,
+  type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto,
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
 import { COMPLIANCE_CONTROLS } from './mockCompliance';
 
-type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements';
+type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks';
 
 // External audit lifecycle stages — assessment §5.3 #3
 const AUDIT_TYPE_OPTIONS = [
@@ -264,6 +265,7 @@ export function CompliancePage() {
     { id: 'controls',    label: t('complianceTabControls') },
     { id: 'changes',     label: t('complianceTabChanges') },
     { id: 'policies',    label: t('complianceTabPolicies') },
+    { id: 'frameworks',  label: t('complianceTabFrameworks') },
     { id: 'engagements', label: t('complianceTabEngagements') },
     { id: 'internal',    label: t('complianceTabInternal') },
     { id: 'external',    label: t('complianceTabExternal') },
@@ -699,6 +701,7 @@ export function CompliancePage() {
           }
         </Card>
       )}
+      {tab === 'frameworks' && <FrameworkAnchorView t={t} toast={toast} />}
       {tab === 'scorecard' && (
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
           {['ISO_27001','NCA_ECC','PDPL','ISO_22301','SAMA_CSF','ISO_27701'].map(fw => {
@@ -789,4 +792,150 @@ function ScorePillCompliance({ score }: { score: number }) {
 function LoadingRow() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+// ─── Framework anchor view (IA-1 — policies organised by framework sheets) ──
+type SatisfactionTone = 'success' | 'primary' | 'neutral' | 'warning' | 'danger';
+const SATISFACTION_TONE: Record<string, SatisfactionTone> = {
+  FULL: 'success', PARTIAL: 'warning', OUT_OF_SCOPE: 'neutral', NOT_APPLICABLE: 'neutral',
+};
+const FAMILY_LABELS: Record<string, string> = {
+  SECURITY: 'Security', PRIVACY: 'Privacy', BCM: 'Business Continuity',
+  FINANCIAL: 'Financial', LABOUR: 'Labour', TAX: 'Tax', TELECOM: 'Telecom',
+};
+
+function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: ReturnType<typeof useToast> }) {
+  const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
+  const [coverage, setCoverage] = useState<Record<number, FrameworkCoverageDto>>({});
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [policies, setPolicies] = useState<FrameworkPolicyRowDto[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [fs, cov] = await Promise.all([frameworkApi.list(), frameworkApi.coverage()]);
+        setFrameworks(fs);
+        setCoverage(Object.fromEntries(cov.map(c => [c.frameworkId, c])));
+        if (fs.length > 0 && activeId == null) setActiveId(fs[0].id);
+      } catch { /* silent — likely demo mode */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (activeId == null) return;
+    setLoading(true);
+    frameworkApi.policiesFor(activeId)
+      .then(setPolicies)
+      .catch(() => setPolicies([]))
+      .finally(() => setLoading(false));
+  }, [activeId]);
+
+  async function deleteMapping(mappingId: number) {
+    if (!window.confirm(t('frameworkConfirmRemoveMapping'))) return;
+    try {
+      await frameworkApi.deleteMapping(mappingId);
+      toast.success(t('frameworkMappingRemoved'));
+      if (activeId != null) setPolicies(await frameworkApi.policiesFor(activeId));
+      const cov = await frameworkApi.coverage();
+      setCoverage(Object.fromEntries(cov.map(c => [c.frameworkId, c])));
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  // Group framework chips by family
+  const byFamily = new Map<string, FrameworkDto[]>();
+  for (const f of frameworks) {
+    const key = f.family ?? 'OTHER';
+    if (!byFamily.has(key)) byFamily.set(key, []);
+    byFamily.get(key)!.push(f);
+  }
+  const active = frameworks.find(f => f.id === activeId) ?? null;
+  const activeCov = activeId != null ? coverage[activeId] : null;
+  const total = activeCov?.policyCount ?? policies.length;
+  const fullPct = total > 0 ? Math.round(((activeCov?.full ?? 0) / total) * 100) : 0;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+      {/* Left rail — frameworks grouped by family */}
+      <Card title={t('complianceTabFrameworks')} Icon={BookOpenCheck} padded={false}>
+        <div style={{ maxHeight: 540, overflowY: 'auto' }}>
+          {Array.from(byFamily.entries()).map(([family, list]) => (
+            <div key={family}>
+              <div style={{ padding: '10px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'var(--surface-2)' }}>
+                {FAMILY_LABELS[family] ?? family}
+              </div>
+              {list.map(f => {
+                const cov = coverage[f.id];
+                const isActive = f.id === activeId;
+                return (
+                  <button key={f.id} onClick={() => setActiveId(f.id)} style={{
+                    display: 'block', width: '100%', textAlign: 'start',
+                    padding: '8px 12px', background: isActive ? 'var(--primary-50)' : 'transparent',
+                    border: 'none', borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer', color: 'var(--ink-1)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{f.code}</span>
+                      <Badge tone={cov && cov.policyCount > 0 ? 'primary' : 'neutral'}>{cov?.policyCount ?? 0}</Badge>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{f.nameEn}{f.version && ` · ${f.version}`}</div>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+          {frameworks.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>{t('frameworkEmpty')}</div>}
+        </div>
+      </Card>
+
+      {/* Right pane — active framework sheet */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {active && (
+          <Card title={`${active.code} · ${active.nameEn}`} Icon={Award}
+                action={<>
+                  {active.version && <Badge tone="primary">{active.version}</Badge>}
+                  {active.family   && <Badge tone="info">{FAMILY_LABELS[active.family] ?? active.family}</Badge>}
+                </>}>
+            {active.issuer && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>{t('frameworkIssuer')}: {active.issuer}</div>}
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(120px, 1fr))', gap: 8 }}>
+              <Kpi Icon={BookCopy}      label={t('frameworkKpiPolicies')} value={total}                                   tone="primary" />
+              <Kpi Icon={CheckCheck}    label={t('frameworkKpiFull')}     value={activeCov?.full ?? 0}                    tone="success" />
+              <Kpi Icon={Flag}          label={t('frameworkKpiPartial')}  value={activeCov?.partial ?? 0}                 tone="accent" />
+              <Kpi Icon={Award}         label={t('frameworkKpiCoverage')} value={`${fullPct}%`}                            tone={fullPct >= 80 ? 'success' : fullPct >= 50 ? 'primary' : 'warning'} />
+            </div>
+          </Card>
+        )}
+
+        <Card padded={false}>
+          {loading ? <LoadingRow /> :
+            policies.length === 0
+              ? <EmptyState Icon={BookCopy} title={t('frameworkSheetEmptyTitle')} sub={t('frameworkSheetEmptySub')} />
+              : (
+                <DataTable<FrameworkPolicyRowDto>
+                  columns={[
+                    { header: t('fldCode'),       cell: p => <span className="mono" style={{ fontWeight: 600 }}>{p.code}</span>, width: '120px' },
+                    { header: t('colTitle'),      cell: p => <span style={{ fontWeight: 600 }}>{p.titleEn}</span> },
+                    { header: t('frameworkClauseRef'), cell: p => <span className="mono">{p.clauseRef ?? '—'}</span>, width: '140px' },
+                    { header: t('frameworkSatisfaction'), cell: p => <Badge tone={SATISFACTION_TONE[p.satisfaction] ?? 'neutral'} dot>{p.satisfaction.replace(/_/g, ' ')}</Badge>, width: '140px' },
+                    { header: t('fldVersion'),    cell: p => p.version ?? '—', mono: true, width: '90px' },
+                    { header: t('colStatus'),     cell: p => <Badge tone={p.status === 'PUBLISHED' ? 'success' : p.status === 'RETIRED' ? 'neutral' : 'info'} dot>{(p.status ?? '').replace(/_/g, ' ')}</Badge>, width: '130px' },
+                    { header: t('fldNextReviewDate'), cell: p => p.nextReviewDate ?? '—', mono: true, width: '120px' },
+                    { header: '', align: 'end', width: '60px',
+                      cell: p => (
+                        <button onClick={() => deleteMapping(p.mappingId)} title={t('frameworkRemoveMapping')}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger-fg)', padding: 4 }}>
+                          <XIcon size={14} />
+                        </button>
+                      ) },
+                  ]}
+                  rows={policies}
+                  empty={<EmptyState />}
+                />
+              )
+          }
+        </Card>
+      </div>
+    </div>
+  );
 }
