@@ -36,6 +36,9 @@ import { useToast } from '../../lib/toast';
 import {
   COMPLIANCE_CONTROLS, COMPLIANCE_ASSESSMENTS, COMPLIANCE_FINDINGS,
   REGULATORY_CHANGES, POLICIES, AUDIT_ENGAGEMENTS,
+  FRAMEWORKS, FRAMEWORK_COVERAGE,
+  FRAMEWORK_POLICIES_BY_ID, FRAMEWORK_FINDINGS_BY_ID, FRAMEWORK_CONTROLS_BY_ID,
+  FRAMEWORK_DPIAS_BY_ID, FRAMEWORK_KRIS_BY_ID, FRAMEWORK_RISKS_BY_ID,
 } from './mockCompliance';
 
 type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks';
@@ -854,7 +857,13 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
         setFrameworks(fs);
         setCoverage(Object.fromEntries(cov.map(c => [c.frameworkId, c])));
         if (fs.length > 0 && activeId == null) setActiveId(fs[0].id);
-      } catch { /* silent — likely demo mode */ }
+      } catch {
+        // Demo mode — fall back to bundled mock catalogue + coverage so the
+        // frameworks tab is fully populated without authentication.
+        setFrameworks(FRAMEWORKS);
+        setCoverage(Object.fromEntries(FRAMEWORK_COVERAGE.map(c => [c.frameworkId, c])));
+        if (activeId == null) setActiveId(FRAMEWORKS[0]?.id ?? null);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -863,12 +872,12 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
     if (activeId == null) return;
     setLoading(true);
     Promise.all([
-      frameworkApi.policiesFor(activeId).catch(() => [] as FrameworkPolicyRowDto[]),
-      frameworkApi.findingsFor(activeId).catch(() => [] as FrameworkFindingRowDto[]),
-      frameworkApi.controlsFor(activeId).catch(() => [] as FrameworkControlRowDto[]),
-      frameworkApi.dpiasFor(activeId).catch(() => [] as FrameworkDpiaRowDto[]),
-      frameworkApi.krisFor(activeId).catch(() => [] as FrameworkKriRowDto[]),
-      frameworkApi.risksFor(activeId).catch(() => [] as FrameworkRiskRowDto[]),
+      frameworkApi.policiesFor(activeId).catch(() => FRAMEWORK_POLICIES_BY_ID[activeId] ?? [] as FrameworkPolicyRowDto[]),
+      frameworkApi.findingsFor(activeId).catch(() => FRAMEWORK_FINDINGS_BY_ID[activeId] ?? [] as FrameworkFindingRowDto[]),
+      frameworkApi.controlsFor(activeId).catch(() => FRAMEWORK_CONTROLS_BY_ID[activeId] ?? [] as FrameworkControlRowDto[]),
+      frameworkApi.dpiasFor(activeId).catch(() => FRAMEWORK_DPIAS_BY_ID[activeId] ?? [] as FrameworkDpiaRowDto[]),
+      frameworkApi.krisFor(activeId).catch(() => FRAMEWORK_KRIS_BY_ID[activeId] ?? [] as FrameworkKriRowDto[]),
+      frameworkApi.risksFor(activeId).catch(() => FRAMEWORK_RISKS_BY_ID[activeId] ?? [] as FrameworkRiskRowDto[]),
     ]).then(([p, f, c, d, k, r]) => { setPolicies(p); setFindings(f); setControls(c); setDpias(d); setKris(k); setRisks(r); }).finally(() => setLoading(false));
   }, [activeId]);
 

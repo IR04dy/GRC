@@ -267,7 +267,23 @@ export function ScmPage() {
 
   const [stats, setStats] = useState<ScmStats | null>(null);
   useEffect(() => {
-    if (!isAuthenticated()) return;
+    if (!isAuthenticated()) {
+      // Demo mode — surface derived counts so KPIs and overview cards never
+      // read 0 just because we have no backend.
+      setStats({
+        totalVendors: SUPPLIERS.length,
+        criticalVendors: SUPPLIERS.filter(v => v.criticality === 'CRITICAL' || v.criticality === 'HIGH').length,
+        activeVendors: SUPPLIERS.filter(v => v.status === 'ACTIVE').length,
+        pendingOnboarding: ONBOARDING.filter(o => o.status === 'IN_PROGRESS' || o.status === 'ON_HOLD').length,
+        totalDependencies: DEPENDENCIES.length,
+        highDependencies: DEPENDENCIES.filter(d => (d.dependencyLevel ?? '').toUpperCase() === 'HIGH').length,
+        openIncidents: DISRUPTIONS.filter(i => i.status !== 'CLOSED' && i.status !== 'RESOLVED').length,
+        slaBreaches: DISRUPTIONS.filter(i => i.slaBreached).length,
+        activeContracts: CONTRACTS.filter(c => (c.status ?? 'ACTIVE') !== 'EXPIRED').length,
+        expiringContracts: CONTRACTS.filter(c => c.status === 'EXPIRING_SOON').length,
+      } as ScmStats);
+      return;
+    }
     scmApi.stats().then(setStats).catch(() => setStats(null));
   }, []);
 

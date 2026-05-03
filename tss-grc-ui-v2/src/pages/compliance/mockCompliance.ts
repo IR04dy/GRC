@@ -4,25 +4,28 @@
 import type {
   ComplianceControlDto, ComplianceAssessmentDto, ComplianceFindingDto,
   RegulatoryChangeDto, PolicyDto, AuditEngagementDto,
+  FrameworkDto, FrameworkCoverageDto, FrameworkPolicyRowDto,
+  FrameworkFindingRowDto, FrameworkControlRowDto, FrameworkDpiaRowDto,
+  FrameworkKriRowDto, FrameworkRiskRowDto,
 } from '../../lib/api';
 
 // ── Controls ──────────────────────────────────────────────────────────────
 export const COMPLIANCE_CONTROLS: ComplianceControlDto[] = [
-  { id: 1, code: 'A.5.1',   nameEn: 'Information security policies',          framework: 'ISO 27001', domain: 'Organizational', maturityLevel: 5, status: 'IMPLEMENTED',     owner: 'CISO' },
-  { id: 2, code: 'A.5.7',   nameEn: 'Threat intelligence',                    framework: 'ISO 27001', domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',         owner: 'soc.lead@tss.sa' },
+  { id: 1, code: 'A.5.1',   nameEn: 'Information security policies',          framework: 'ISO_27001', domain: 'Organizational', maturityLevel: 5, status: 'IMPLEMENTED',     owner: 'CISO' },
+  { id: 2, code: 'A.5.7',   nameEn: 'Threat intelligence',                    framework: 'ISO_27001', domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',         owner: 'soc.lead@tss.sa' },
   { id: 3, code: 'AC-2',    nameEn: 'Account management lifecycle',           framework: 'NCA_ECC',   domain: 'Identity',       maturityLevel: 4, status: 'IMPLEMENTED',     owner: 'iam.team@tss.sa' },
   { id: 4, code: 'IR-3',    nameEn: 'Incident response plan',                 framework: 'NCA_ECC',   domain: 'Incident',       maturityLevel: 4, status: 'IMPLEMENTED',     owner: 'csirt.lead@tss.sa' },
   { id: 5, code: 'PDPL-7',  nameEn: 'Cross-border transfer safeguards',       framework: 'PDPL',      domain: 'Cross-Border',   maturityLevel: 2, status: 'PARTIAL',         owner: 'dpo@tss.sa' },
   { id: 6, code: 'PDPL-12', nameEn: 'Data subject rights handling',           framework: 'PDPL',      domain: 'Subject Rights', maturityLevel: 4, status: 'IMPLEMENTED',     owner: 'dpo@tss.sa' },
   { id: 7, code: 'CYB-1.4', nameEn: 'Cryptographic key management',           framework: 'SAMA_CSF',  domain: 'Cryptography',   maturityLevel: 3, status: 'PARTIAL',         owner: 'pki.team@tss.sa' },
   { id: 8, code: '8.4',     nameEn: 'Business continuity strategies',         framework: 'ISO_22301', domain: 'Strategy',       maturityLevel: 2, status: 'PLANNED',         owner: 'bcm.team@tss.sa' },
-  { id: 9, code: 'A.8.16',  nameEn: 'Monitoring activities',                  framework: 'ISO 27001', domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',         owner: 'soc.lead@tss.sa' },
+  { id: 9, code: 'A.8.16',  nameEn: 'Monitoring activities',                  framework: 'ISO_27001', domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',         owner: 'soc.lead@tss.sa' },
   { id: 10, code: 'CC-3.1', nameEn: 'Information communicated to external',   framework: 'SOC_2',     domain: 'Communication',  maturityLevel: 4, status: 'IMPLEMENTED',     owner: 'audit.lead@tss.sa' },
 ];
 
 // ── Assessments ───────────────────────────────────────────────────────────
 export const COMPLIANCE_ASSESSMENTS: ComplianceAssessmentDto[] = [
-  { id: 21, framework: 'ISO 27001',  period: '2026-Q1', auditor: 'KPMG ME',         score: 92, status: 'COMPLETED',
+  { id: 21, framework: 'ISO_27001',  period: '2026-Q1', auditor: 'KPMG ME',         score: 92, status: 'COMPLETED',
     assessmentDate: '2026-03-28', notes: 'Annual surveillance audit; two minor non-conformities raised.' },
   { id: 22, framework: 'NCA_ECC',    period: '2026-Q1', auditor: 'Internal Audit',  score: 85, status: 'COMPLETED',
     assessmentDate: '2026-04-04', notes: 'Domain-by-domain self-assessment with management response.' },
@@ -187,7 +190,7 @@ export const POLICIES: PolicyDto[] = [
 // ── Audit engagements ─────────────────────────────────────────────────────
 export const AUDIT_ENGAGEMENTS: AuditEngagementDto[] = [
   { id: 61, engagementCode: 'AUD-2026-001', titleEn: 'ISO 27001 Annual Surveillance',
-    auditType: 'CERTIFICATION_AUDIT', framework: 'ISO 27001',
+    auditType: 'CERTIFICATION_AUDIT', framework: 'ISO_27001',
     auditorFirm: 'KPMG ME', leadAuditor: 'David Frost',
     engagementLetterDate: '2026-01-12', openingMeetingDate: '2026-03-15',
     fieldworkStartDate: '2026-03-15', fieldworkEndDate: '2026-03-25',
@@ -226,9 +229,198 @@ export const AUDIT_ENGAGEMENTS: AuditEngagementDto[] = [
     scopeSummary: 'Cardholder Data Environment; 12 PCI-DSS requirements.',
     status: 'CLOSED', findingsCount: 0 },
   { id: 66, engagementCode: 'AUD-2026-006', titleEn: 'Internal Audit — Cyber Operations',
-    auditType: 'INTERNAL_AUDIT', framework: 'ISO 27001',
+    auditType: 'INTERNAL_AUDIT', framework: 'ISO_27001',
     auditorFirm: 'Internal Audit', leadAuditor: 'Mona Al-Bishi',
     engagementLetterDate: '2026-04-15',
     scopeSummary: 'Half-year internal review of cyber operations effectiveness.',
     status: 'PLANNED', findingsCount: 0 },
 ];
+
+// ── Frameworks catalogue ──────────────────────────────────────────────────
+export const FRAMEWORKS: FrameworkDto[] = [
+  { id: 1, code: 'ISO_27001',  nameEn: 'ISO/IEC 27001',  nameAr: 'الآيزو 27001',  version: '2022', issuer: 'ISO',     family: 'INFOSEC',     isActive: true },
+  { id: 2, code: 'NCA_ECC',    nameEn: 'NCA ECC',        nameAr: 'الضوابط الأساسية للأمن السيبراني', version: '1.0',  issuer: 'NCA',     family: 'CYBER_REG',   isActive: true },
+  { id: 3, code: 'PDPL',       nameEn: 'Saudi PDPL',     nameAr: 'نظام حماية البيانات', version: '1.1', issuer: 'SDAIA',  family: 'PRIVACY',     isActive: true },
+  { id: 4, code: 'SAMA_CSF',   nameEn: 'SAMA CSF',       nameAr: 'إطار البنك المركزي', version: '1.0',  issuer: 'SAMA',     family: 'CYBER_REG',   isActive: true },
+  { id: 5, code: 'ISO_22301',  nameEn: 'ISO 22301',      nameAr: 'الآيزو 22301',  version: '2019', issuer: 'ISO',     family: 'BCM',         isActive: true },
+  { id: 6, code: 'SOC_2',      nameEn: 'SOC 2',          nameAr: 'سوك 2',          version: 'TSC 2017', issuer: 'AICPA', family: 'AUDIT',       isActive: true },
+  { id: 7, code: 'PCI_DSS',    nameEn: 'PCI DSS',        nameAr: 'بي سي آي دي إس إس', version: 'v4.0', issuer: 'PCI SSC', family: 'INFOSEC',     isActive: true },
+  { id: 8, code: 'NIST_CSF',   nameEn: 'NIST CSF',       nameAr: 'إطار نيست',      version: '2.0',  issuer: 'NIST',     family: 'CYBER_REG',   isActive: true },
+  { id: 9, code: 'ISO_31000',  nameEn: 'ISO 31000',      nameAr: 'الآيزو 31000',  version: '2018', issuer: 'ISO',     family: 'RISK',        isActive: true },
+  { id: 10, code: 'COSO_ERM',  nameEn: 'COSO ERM',       nameAr: 'كوزو إي آر إم', version: '2017', issuer: 'COSO',    family: 'RISK',        isActive: true },
+  { id: 11, code: 'SAMA_AML',  nameEn: 'SAMA AML',       nameAr: 'مكافحة غسل الأموال', version: '2024', issuer: 'SAMA', family: 'AML_AB',    isActive: true },
+  { id: 12, code: 'FATF',      nameEn: 'FATF Recommendations', nameAr: 'توصيات فاتف', version: '2023', issuer: 'FATF',  family: 'AML_AB',    isActive: true },
+  { id: 13, code: 'ISO_37001', nameEn: 'ISO 37001',      nameAr: 'الآيزو 37001',  version: '2016', issuer: 'ISO',     family: 'AML_AB',    isActive: true },
+];
+
+// ── Coverage stats per framework ──────────────────────────────────────────
+export const FRAMEWORK_COVERAGE: FrameworkCoverageDto[] = [
+  { frameworkId: 1, code: 'ISO_27001',  nameEn: 'ISO/IEC 27001', family: 'INFOSEC',
+    policyCount: 6, full: 4, partial: 2, outOfScope: 0, notApplicable: 0,
+    openFindings: 3, closedFindings: 11,
+    controlCount: 14, implementedControls: 11, avgMaturity: 3.6,
+    dpiaCount: 0, kriCount: 1, riskCount: 4, riskAsRiskFw: 1, riskAsCompFw: 4 },
+  { frameworkId: 2, code: 'NCA_ECC',    nameEn: 'NCA ECC',       family: 'CYBER_REG',
+    policyCount: 5, full: 3, partial: 2, outOfScope: 0, notApplicable: 0,
+    openFindings: 2, closedFindings: 8,
+    controlCount: 12, implementedControls: 9, avgMaturity: 3.4,
+    dpiaCount: 1, kriCount: 3, riskCount: 5, riskAsRiskFw: 1, riskAsCompFw: 5 },
+  { frameworkId: 3, code: 'PDPL',       nameEn: 'Saudi PDPL',     family: 'PRIVACY',
+    policyCount: 3, full: 1, partial: 2, outOfScope: 0, notApplicable: 0,
+    openFindings: 1, closedFindings: 4,
+    controlCount: 8, implementedControls: 5, avgMaturity: 2.9,
+    dpiaCount: 5, kriCount: 1, riskCount: 3, riskAsRiskFw: 0, riskAsCompFw: 3 },
+  { frameworkId: 4, code: 'SAMA_CSF',   nameEn: 'SAMA CSF',       family: 'CYBER_REG',
+    policyCount: 4, full: 3, partial: 1, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 6,
+    controlCount: 10, implementedControls: 8, avgMaturity: 3.7,
+    dpiaCount: 0, kriCount: 1, riskCount: 2, riskAsRiskFw: 0, riskAsCompFw: 2 },
+  { frameworkId: 5, code: 'ISO_22301',  nameEn: 'ISO 22301',      family: 'BCM',
+    policyCount: 3, full: 2, partial: 1, outOfScope: 0, notApplicable: 0,
+    openFindings: 1, closedFindings: 3,
+    controlCount: 7, implementedControls: 5, avgMaturity: 3.2,
+    dpiaCount: 0, kriCount: 2, riskCount: 2, riskAsRiskFw: 1, riskAsCompFw: 1 },
+  { frameworkId: 6, code: 'SOC_2',      nameEn: 'SOC 2',          family: 'AUDIT',
+    policyCount: 3, full: 3, partial: 0, outOfScope: 0, notApplicable: 1,
+    openFindings: 0, closedFindings: 2,
+    controlCount: 6, implementedControls: 6, avgMaturity: 4.2,
+    dpiaCount: 0, kriCount: 0, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
+  { frameworkId: 7, code: 'PCI_DSS',    nameEn: 'PCI DSS',        family: 'INFOSEC',
+    policyCount: 4, full: 3, partial: 1, outOfScope: 0, notApplicable: 1,
+    openFindings: 0, closedFindings: 4,
+    controlCount: 12, implementedControls: 11, avgMaturity: 4.1,
+    dpiaCount: 0, kriCount: 0, riskCount: 2, riskAsRiskFw: 0, riskAsCompFw: 2 },
+  { frameworkId: 8, code: 'NIST_CSF',   nameEn: 'NIST CSF',       family: 'CYBER_REG',
+    policyCount: 4, full: 2, partial: 2, outOfScope: 0, notApplicable: 0,
+    openFindings: 1, closedFindings: 5,
+    controlCount: 10, implementedControls: 7, avgMaturity: 3.0,
+    dpiaCount: 0, kriCount: 2, riskCount: 3, riskAsRiskFw: 1, riskAsCompFw: 3 },
+  { frameworkId: 9, code: 'ISO_31000',  nameEn: 'ISO 31000',      family: 'RISK',
+    policyCount: 2, full: 2, partial: 0, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 2,
+    controlCount: 4, implementedControls: 4, avgMaturity: 4.0,
+    dpiaCount: 0, kriCount: 4, riskCount: 12, riskAsRiskFw: 12, riskAsCompFw: 0 },
+  { frameworkId: 10, code: 'COSO_ERM', nameEn: 'COSO ERM',       family: 'RISK',
+    policyCount: 2, full: 2, partial: 0, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 1,
+    controlCount: 3, implementedControls: 3, avgMaturity: 4.0,
+    dpiaCount: 0, kriCount: 0, riskCount: 7, riskAsRiskFw: 7, riskAsCompFw: 0 },
+  { frameworkId: 11, code: 'SAMA_AML', nameEn: 'SAMA AML',       family: 'AML_AB',
+    policyCount: 2, full: 2, partial: 0, outOfScope: 0, notApplicable: 0,
+    openFindings: 1, closedFindings: 5,
+    controlCount: 8, implementedControls: 7, avgMaturity: 3.6,
+    dpiaCount: 0, kriCount: 1, riskCount: 2, riskAsRiskFw: 0, riskAsCompFw: 2 },
+  { frameworkId: 12, code: 'FATF',     nameEn: 'FATF',           family: 'AML_AB',
+    policyCount: 1, full: 1, partial: 0, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 1,
+    controlCount: 4, implementedControls: 3, avgMaturity: 3.2,
+    dpiaCount: 0, kriCount: 0, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
+  { frameworkId: 13, code: 'ISO_37001', nameEn: 'ISO 37001',     family: 'AML_AB',
+    policyCount: 2, full: 1, partial: 1, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 2,
+    controlCount: 5, implementedControls: 4, avgMaturity: 3.4,
+    dpiaCount: 0, kriCount: 0, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
+];
+
+// ── Per-framework drill-down rows (sample for ISO_27001 = 1) ───────────────
+export const FRAMEWORK_POLICIES_BY_ID: Record<number, FrameworkPolicyRowDto[]> = {
+  1: [
+    { mappingId: 9001, policyId: 51, code: 'POL-ISMS-001', titleEn: 'Information Security Policy',
+      version: '3.2', category: 'SECURITY', status: 'PUBLISHED', nextReviewDate: '2027-04-01',
+      clauseRef: 'A.5.1', satisfaction: 'FULL' },
+    { mappingId: 9002, policyId: 58, code: 'POL-LEG-002', titleEn: 'Legacy Crypto Sunset Policy',
+      version: '1.0', category: 'SECURITY', status: 'REVIEW_DUE', nextReviewDate: '2026-04-30',
+      clauseRef: 'A.8.24', satisfaction: 'PARTIAL' },
+  ],
+  2: [
+    { mappingId: 9011, policyId: 51, code: 'POL-ISMS-001', titleEn: 'Information Security Policy',
+      version: '3.2', category: 'SECURITY', status: 'PUBLISHED', nextReviewDate: '2027-04-01',
+      clauseRef: 'CY-1.2', satisfaction: 'FULL' },
+  ],
+  3: [
+    { mappingId: 9021, policyId: 52, code: 'POL-PDPL-001', titleEn: 'Privacy & Personal Data Policy',
+      version: '2.1', category: 'PRIVACY', status: 'PUBLISHED', nextReviewDate: '2027-02-15',
+      clauseRef: 'PDPL-7', satisfaction: 'FULL' },
+  ],
+};
+
+export const FRAMEWORK_FINDINGS_BY_ID: Record<number, FrameworkFindingRowDto[]> = {
+  1: [
+    { id: 33, title: 'SIEM tuning false-positive rate above threshold',
+      severity: 'MEDIUM', owner: 'soc.lead@tss.sa', dueDate: '2026-06-30',
+      status: 'OPEN', capaStage: 'OWNER_TESTED', clauseRef: 'A.8.16', createdAt: '2026-04-04' },
+    { id: 32, title: 'Privileged session recording not extended to DBA bastion',
+      severity: 'MEDIUM', owner: 'pam.team@tss.sa', dueDate: '2026-05-31',
+      status: 'OPEN', capaStage: 'IMPLEMENTING', clauseRef: 'A.5.15', createdAt: '2026-04-08' },
+    { id: 37, title: 'Risk-acceptance for legacy SSL not time-bound',
+      severity: 'MEDIUM', owner: 'security.officer@tss.sa', dueDate: '2026-06-15',
+      status: 'OPEN', capaStage: 'IMPLEMENTING', clauseRef: 'A.8.24', createdAt: '2026-04-12' },
+  ],
+  3: [
+    { id: 31, title: 'Cross-border data transfer mechanism not formalised',
+      severity: 'HIGH', owner: 'dpo@tss.sa', dueDate: '2026-06-30',
+      status: 'OPEN', capaStage: 'IMPLEMENTING', clauseRef: 'PDPL-29', createdAt: '2026-04-15' },
+  ],
+};
+
+export const FRAMEWORK_CONTROLS_BY_ID: Record<number, FrameworkControlRowDto[]> = {
+  1: [
+    { id: 1,  code: 'A.5.1',  nameEn: 'Information security policies', domain: 'Organizational', maturityLevel: 5, status: 'IMPLEMENTED',  owner: 'CISO' },
+    { id: 9,  code: 'A.8.16', nameEn: 'Monitoring activities',          domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',      owner: 'soc.lead@tss.sa' },
+  ],
+  2: [
+    { id: 3,  code: 'AC-2',   nameEn: 'Account management lifecycle', domain: 'Identity',  maturityLevel: 4, status: 'IMPLEMENTED', owner: 'iam.team@tss.sa' },
+    { id: 4,  code: 'IR-3',   nameEn: 'Incident response plan',       domain: 'Incident',  maturityLevel: 4, status: 'IMPLEMENTED', owner: 'csirt.lead@tss.sa' },
+  ],
+};
+
+export const FRAMEWORK_DPIAS_BY_ID: Record<number, FrameworkDpiaRowDto[]> = {
+  3: [
+    { id: 41, titleEn: 'AI-based credit scoring',          triggerReason: 'AUTOMATED_DECISION_MAKING', status: 'APPROVED',
+      overallResidualRisk: 'MEDIUM', assessmentDate: '2026-02-10', nextReviewDate: '2026-08-10', clauseRef: 'PDPL-22' },
+    { id: 42, titleEn: 'Cross-border payroll vendor',     triggerReason: 'CROSS_BORDER_TRANSFER', status: 'IN_REVIEW',
+      overallResidualRisk: 'HIGH', assessmentDate: '2026-04-12', clauseRef: 'PDPL-29' },
+    { id: 45, titleEn: 'Employee wellness programme',     triggerReason: 'SPECIAL_CATEGORY', status: 'DRAFT',
+      overallResidualRisk: 'MEDIUM', assessmentDate: '2026-04-25', clauseRef: 'PDPL-6' },
+  ],
+};
+
+export const FRAMEWORK_KRIS_BY_ID: Record<number, FrameworkKriRowDto[]> = {
+  1: [
+    { id: 1002, code: 'KRI-CYB-02', nameEn: 'Critical vulnerabilities open beyond SLA',
+      unit: 'CVEs', direction: 'HIGHER_IS_WORSE', greenMax: 0, amberMax: 3,
+      frequency: 'DAILY', owner: 'patch.team@tss.sa', clauseRef: 'A.8.8' },
+  ],
+  2: [
+    { id: 1001, code: 'KRI-CYB-01', nameEn: 'Failed login attempts (24h)',
+      unit: 'events', direction: 'HIGHER_IS_WORSE', greenMax: 500, amberMax: 1500,
+      frequency: 'DAILY', owner: 'soc.lead@tss.sa', clauseRef: 'CY-3.1' },
+    { id: 1006, code: 'KRI-COM-01', nameEn: 'Open audit findings beyond due date',
+      unit: 'findings', direction: 'HIGHER_IS_WORSE', greenMax: 2, amberMax: 5,
+      frequency: 'WEEKLY', owner: 'audit.lead@tss.sa', clauseRef: 'GO-2.1' },
+  ],
+  3: [
+    { id: 1007, code: 'KRI-PRV-01', nameEn: 'DSR responses past PDPL 30-day SLA',
+      unit: 'DSRs', direction: 'HIGHER_IS_WORSE', greenMax: 0, amberMax: 2,
+      frequency: 'WEEKLY', owner: 'dpo@tss.sa', clauseRef: 'PDPL-23' },
+  ],
+};
+
+export const FRAMEWORK_RISKS_BY_ID: Record<number, FrameworkRiskRowDto[]> = {
+  1: [
+    { id: 1, titleEn: 'Sensitive Data Breach',  status: 'OPEN', inherentScore: 20, residualScore: 9,
+      riskLevel: 'CRITICAL', matchedAsComplianceFramework: true, complianceFrameworkClause: 'A.5.34' },
+    { id: 4, titleEn: 'Phishing Campaign',      status: 'CLOSED', inherentScore: 9, residualScore: 4,
+      riskLevel: 'LOW', matchedAsComplianceFramework: true, complianceFrameworkClause: 'A.6.3' },
+  ],
+  3: [
+    { id: 10, titleEn: 'Cross-Border Data Transfer Compliance', status: 'UNDER_ASSESSMENT', inherentScore: 20, residualScore: 12,
+      riskLevel: 'HIGH', matchedAsComplianceFramework: true, complianceFrameworkClause: 'PDPL-29' },
+  ],
+  9: [
+    { id: 1, titleEn: 'Sensitive Data Breach',  status: 'OPEN', inherentScore: 20, residualScore: 9,
+      riskLevel: 'CRITICAL', matchedAsRiskFramework: true, riskFrameworkClause: '6.4.3' },
+    { id: 8, titleEn: 'Insider Misuse of Privileged Access', status: 'TREATMENT_IN_PROGRESS', inherentScore: 15, residualScore: 8,
+      riskLevel: 'HIGH', matchedAsRiskFramework: true, riskFrameworkClause: '6.4.3' },
+  ],
+};

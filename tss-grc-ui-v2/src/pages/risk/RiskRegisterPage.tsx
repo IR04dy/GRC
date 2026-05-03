@@ -20,7 +20,10 @@ import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { NewRiskModal } from './NewRiskModal';
-import { MOCK_RISKS } from './mockRisks';
+import {
+  MOCK_RISKS, KRIS, KRI_LATEST_BANDS, KRI_BREACHES, KRI_DASHBOARD_STATS,
+  APPETITES, APPETITE_BREACHES, APPETITE_DASHBOARD_STATS,
+} from './mockRisks';
 
 type TabId = 'register' | 'heatmap' | 'kri' | 'appetite';
 
@@ -345,7 +348,7 @@ export function RiskRegisterPage() {
 // ─── KRI Dashboard (W3 — assessment §5.1 ERM #5) ────────────────────────────
 const BAND_TONE: Record<string, BadgeTone> = { GREEN: 'success', AMBER: 'warning', RED: 'danger' };
 
-function KriDashboard({ demoMode, risks }: { demoMode: boolean; risks: RiskResponse[] }) {
+function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }) {
   const [kris, setKris] = useState<KriDefinitionDto[]>([]);
   const [latest, setLatest] = useState<Record<number, string>>({});
   const [breaches, setBreaches] = useState<Record<number, KriBreachEventDto[]>>({});
@@ -354,7 +357,8 @@ function KriDashboard({ demoMode, risks }: { demoMode: boolean; risks: RiskRespo
 
   async function loadAll() {
     if (demoMode) {
-      setKris([]); setStats({ totalKris: 0, green: 0, amber: 0, red: 0, noData: 0, openBreaches: 0 });
+      setKris(KRIS); setStats(KRI_DASHBOARD_STATS);
+      setLatest(KRI_LATEST_BANDS); setBreaches(KRI_BREACHES);
       return;
     }
     setLoading(true);
@@ -400,19 +404,13 @@ function KriDashboard({ demoMode, risks }: { demoMode: boolean; risks: RiskRespo
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
   }
 
-  if (demoMode) {
-    return (
-      <Card title="KRI engine">
-        <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>
-          Sign in to view live KRI thresholds, readings and breach events.
-          <div style={{ marginTop: 8, fontSize: 12 }}>Open risks (demo): {risks.filter(r => r.status === 'OPEN').length}</div>
-        </div>
-      </Card>
-    );
-  }
-
   return (
     <>
+      {demoMode && (
+        <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--ink-3)' }}>
+          Demo mode · sample KRIs shown. Sign in for live thresholds and readings.
+        </div>
+      )}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
         <Kpi Icon={Activity}      label="Total KRIs"   value={stats?.totalKris ?? 0} tone="primary" />
         <Kpi Icon={ShieldCheck}   label="Green"        value={stats?.green ?? 0}     tone="success" />
@@ -463,7 +461,7 @@ const SEVERITY_TONE_APP: Record<string, BadgeTone> = {
   WITHIN_TOLERANCE: 'success', EXCEEDED: 'warning', CRITICAL: 'danger',
 };
 
-function AppetiteDashboard({ demoMode, risks }: { demoMode: boolean; risks: RiskResponse[] }) {
+function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }) {
   const [items, setItems] = useState<RiskAppetiteStatementDto[]>([]);
   const [breaches, setBreaches] = useState<Record<number, AppetiteBreachEventDto[]>>({});
   const [stats, setStats] = useState<{ total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number } | null>(null);
@@ -471,7 +469,7 @@ function AppetiteDashboard({ demoMode, risks }: { demoMode: boolean; risks: Risk
   const toast = useToast();
 
   async function loadAll() {
-    if (demoMode) { setItems([]); setStats({ total: 0, withinTolerance: 0, exceeded: 0, critical: 0, noExposure: 0 }); return; }
+    if (demoMode) { setItems(APPETITES); setBreaches(APPETITE_BREACHES); setStats(APPETITE_DASHBOARD_STATS); return; }
     setLoading(true);
     try {
       const [page, dash] = await Promise.all([
@@ -518,19 +516,13 @@ function AppetiteDashboard({ demoMode, risks }: { demoMode: boolean; risks: Risk
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
-  if (demoMode) {
-    return (
-      <Card title="Risk appetite">
-        <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>
-          Sign in to view live appetite statements with exposure tracking and breach events.
-          <div style={{ marginTop: 8, fontSize: 12 }}>Risks in scope (demo): {risks.length}</div>
-        </div>
-      </Card>
-    );
-  }
-
   return (
     <>
+      {demoMode && (
+        <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--ink-3)' }}>
+          Demo mode · sample appetite statements shown. Sign in for live exposure tracking.
+        </div>
+      )}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
         <Kpi Icon={Target}        label="Statements"        value={stats?.total ?? 0} tone="primary" />
         <Kpi Icon={ShieldCheck}   label="Within tolerance"  value={stats?.withinTolerance ?? 0} tone="success" />
