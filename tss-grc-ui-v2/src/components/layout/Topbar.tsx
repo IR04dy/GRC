@@ -8,7 +8,7 @@ import { Button } from '../ui/Button';
 import { useTheme, type ThemeMode } from '../../lib/theme';
 import { useToast } from '../../lib/toast';
 
-export function Topbar({ title, sub }: { title: string; sub?: string }) {
+export function Topbar({ title, sub, onOpenPalette }: { title: string; sub?: string; onOpenPalette?: () => void }) {
   const { t, lang, toggleLang } = useI18n();
   const navigate = useNavigate();
   const user = getUser();
@@ -29,11 +29,21 @@ export function Topbar({ title, sub }: { title: string; sub?: string }) {
       </div>
 
       <div className="topbar-right">
-        <div className="search-box">
+        <button type="button"
+          className="search-box"
+          onClick={() => onOpenPalette?.()}
+          aria-label="Open command palette"
+          style={{
+            cursor: 'pointer',
+            border: '1px solid var(--border)',
+            background: 'var(--surface-1)',
+            font: 'inherit',
+            color: 'inherit',
+          }}>
           <Search size={14} />
-          <input placeholder={t('searchPlaceholder')} />
+          <span style={{ flex: 1, color: 'var(--ink-3)', fontSize: 12 }}>{t('searchPlaceholder')}</span>
           <kbd>{lang === 'ar' ? 'Ctrl+K' : '⌘K'}</kbd>
-        </div>
+        </button>
 
         <OrgSwitcher />
 
