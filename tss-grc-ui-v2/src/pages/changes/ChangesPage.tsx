@@ -26,6 +26,7 @@ import {
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
+import { CHANGE_REQUESTS, CHANGE_ANALYTICS } from './mockChanges';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations';
 
@@ -96,17 +97,22 @@ export function ChangesPage() {
 
   const [detailId, setDetailId] = useState<number | null>(null);
 
+  function applyDemoChanges() { setItems(CHANGE_REQUESTS); setAnalytics(CHANGE_ANALYTICS); }
+
   async function load() {
-    if (demoMode) { setItems([]); setAnalytics(null); return; }
+    if (demoMode) { applyDemoChanges(); return; }
     setLoading(true);
     try {
       const [page, an] = await Promise.all([
         changeApi.list({ size: 200 }),
         changeApi.analytics().catch(() => null),
       ]);
-      setItems(page.content ?? []);
+      const list = page.content ?? [];
+      if (list.length === 0) { applyDemoChanges(); return; }
+      setItems(list);
       setAnalytics(an);
-    } finally { setLoading(false); }
+    } catch { applyDemoChanges(); }
+    finally { setLoading(false); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 

@@ -26,6 +26,12 @@ import {
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
+import {
+  ETHICS_CASES, ETHICS_ANALYTICS,
+  DISCLOSURES,
+  KYC_SUBJECTS, KYC_HITS_BY_SUBJECT,
+  AML_ALERTS, AML_ANALYTICS,
+} from './mockEthics';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'aml' | 'analytics' | 'integrations';
 
@@ -91,8 +97,10 @@ export function EthicsPage() {
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
 
+  function applyDemoCases() { setItems(ETHICS_CASES); setAnalytics(ETHICS_ANALYTICS); }
+
   async function load() {
-    if (demoMode) { setItems([]); setAnalytics(null); return; }
+    if (demoMode) { applyDemoCases(); return; }
     setLoading(true);
     try {
       const [page, an, fws] = await Promise.all([
@@ -100,10 +108,13 @@ export function EthicsPage() {
         ethicsCaseApi.analytics().catch(() => null),
         frameworkApi.list().catch(() => [] as FrameworkDto[]),
       ]);
-      setItems(page.content ?? []);
+      const list = page.content ?? [];
+      if (list.length === 0) { applyDemoCases(); setFrameworks(fws); return; }
+      setItems(list);
       setAnalytics(an);
       setFrameworks(fws);
-    } finally { setLoading(false); }
+    } catch { applyDemoCases(); }
+    finally { setLoading(false); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
@@ -599,17 +610,22 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   const [confirmDel, setConfirmDel] = useState<AmlAlertDto | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function applyDemoAml() { setItems(AML_ALERTS); setAnalytics(AML_ANALYTICS); }
+
   async function load() {
-    if (demoMode) { setItems([]); setAnalytics(null); return; }
+    if (demoMode) { applyDemoAml(); return; }
     setLoading(true);
     try {
       const [page, an] = await Promise.all([
         amlAlertApi.list({ size: 200 }),
         amlAlertApi.analytics().catch(() => null),
       ]);
-      setItems(page.content ?? []);
+      const list = page.content ?? [];
+      if (list.length === 0) { applyDemoAml(); return; }
+      setItems(list);
       setAnalytics(an);
-    } finally { setLoading(false); }
+    } catch { applyDemoAml(); }
+    finally { setLoading(false); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
@@ -803,17 +819,36 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   const [busy, setBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
+  function applyDemoKyc() {
+    setItems(KYC_SUBJECTS);
+    setAnalytics({
+      total: KYC_SUBJECTS.length,
+      approved: KYC_SUBJECTS.filter(s => s.status === 'APPROVED').length,
+      rejected: KYC_SUBJECTS.filter(s => s.status === 'REJECTED').length,
+      pending: KYC_SUBJECTS.filter(s => s.status === 'PENDING').length,
+      underReview: KYC_SUBJECTS.filter(s => s.status === 'UNDER_REVIEW').length,
+      highRisk: KYC_SUBJECTS.filter(s => s.riskRating === 'HIGH').length,
+      prohibited: KYC_SUBJECTS.filter(s => s.riskRating === 'PROHIBITED').length,
+      peps: KYC_SUBJECTS.filter(s => s.isPep).length,
+      sanctioned: KYC_SUBJECTS.filter(s => s.isSanctioned).length,
+    });
+    setHits(KYC_HITS_BY_SUBJECT);
+  }
+
   async function load() {
-    if (demoMode) { setItems([]); setAnalytics(null); return; }
+    if (demoMode) { applyDemoKyc(); return; }
     setLoading(true);
     try {
       const [page, an] = await Promise.all([
         kycApi.list({ size: 200 }),
         kycApi.analytics().catch(() => null),
       ]);
-      setItems(page.content ?? []);
+      const list = page.content ?? [];
+      if (list.length === 0) { applyDemoKyc(); return; }
+      setItems(list);
       setAnalytics(an);
-    } finally { setLoading(false); }
+    } catch { applyDemoKyc(); }
+    finally { setLoading(false); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
@@ -1006,9 +1041,12 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    if (demoMode) { setItems([]); return; }
+    if (demoMode) { setItems(DISCLOSURES); return; }
     setLoading(true);
-    try { setItems((await disclosureApi.list({ size: 200 })).content ?? []); }
+    try {
+      const list = (await disclosureApi.list({ size: 200 })).content ?? [];
+      setItems(list.length === 0 ? DISCLOSURES : list);
+    } catch { setItems(DISCLOSURES); }
     finally { setLoading(false); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);

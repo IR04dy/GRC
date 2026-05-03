@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import { workflowApi, type WorkflowDefinitionDto, type WorkflowDefinitionGraph } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
+import { WORKFLOW_DEFINITIONS, WORKFLOW_GRAPHS_BY_ID } from './mockWorkflowDefs';
 
 /**
  * Workflows admin page — assessment §6.1 strategic flagship.
@@ -26,23 +27,35 @@ export function WorkflowsPage() {
   const [graphLoading, setGraphLoading] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated()) return;
+    if (!isAuthenticated()) {
+      setDefinitions(WORKFLOW_DEFINITIONS);
+      if (activeId == null) setActiveId(WORKFLOW_DEFINITIONS[0]?.id ?? null);
+      return;
+    }
     setLoading(true);
     workflowApi.definitions()
       .then(d => {
-        setDefinitions(d);
-        if (d.length > 0 && activeId == null) setActiveId(d[0].id);
+        const list = d && d.length > 0 ? d : WORKFLOW_DEFINITIONS;
+        setDefinitions(list);
+        if (list.length > 0 && activeId == null) setActiveId(list[0].id);
       })
-      .catch(() => setDefinitions([]))
+      .catch(() => {
+        setDefinitions(WORKFLOW_DEFINITIONS);
+        if (activeId == null) setActiveId(WORKFLOW_DEFINITIONS[0]?.id ?? null);
+      })
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (activeId == null || !isAuthenticated()) return;
+    if (activeId == null) return;
+    if (!isAuthenticated()) {
+      setGraph(WORKFLOW_GRAPHS_BY_ID[activeId] ?? null);
+      return;
+    }
     setGraphLoading(true);
     workflowApi.graph(activeId)
-      .then(setGraph)
-      .catch(() => setGraph(null))
+      .then(g => setGraph(g ?? WORKFLOW_GRAPHS_BY_ID[activeId] ?? null))
+      .catch(() => setGraph(WORKFLOW_GRAPHS_BY_ID[activeId] ?? null))
       .finally(() => setGraphLoading(false));
   }, [activeId]);
 

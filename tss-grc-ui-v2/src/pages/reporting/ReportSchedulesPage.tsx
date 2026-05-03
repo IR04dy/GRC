@@ -21,6 +21,7 @@ import {
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
+import { REPORT_SCHEDULES, REPORT_RUNS } from './mockReports';
 
 const REPORT_TYPE_OPTIONS = [
   { value: 'RISK_REGISTER',  label: 'Risk Register' },
@@ -63,17 +64,22 @@ export function ReportSchedulesPage() {
   const [confirmDel, setConfirmDel] = useState<ReportScheduleDto | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function applyDemo() { setItems(REPORT_SCHEDULES); setRecent(REPORT_RUNS); }
+
   async function load() {
-    if (demoMode) { setItems([]); setRecent([]); return; }
+    if (demoMode) { applyDemo(); return; }
     setLoading(true);
     try {
       const [page, runs] = await Promise.all([
         reportScheduleApi.list(0, 100),
         reportScheduleApi.recent().catch(() => [] as ReportRunDto[]),
       ]);
-      setItems(page.content ?? []);
+      const list = page.content ?? [];
+      if (list.length === 0) { applyDemo(); return; }
+      setItems(list);
       setRecent(runs);
-    } finally { setLoading(false); }
+    } catch { applyDemo(); }
+    finally { setLoading(false); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
