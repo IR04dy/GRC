@@ -624,6 +624,12 @@ export const ar = {
   rsEmptyTitle:        'لا توجد جدولات',
   rsEmptySub:          'أنشئ أول جدولة لإرسال سجل المخاطر أو تقرير تقادم الملاحظات أو لوحة المؤشرات تلقائيًا.',
 
+  // S1 — حزمة المجلس
+  boardPackPdfBtn:    'حزمة المجلس · PDF',
+  boardPackPptxBtn:   'حزمة المجلس · PPTX',
+  boardPackStarted:   'بدأ إنشاء حزمة المجلس — سيبدأ التنزيل قريبًا',
+  boardPackFailed:    'فشل إنشاء حزمة المجلس',
+
   // مهام التدقيق الخارجي (§5.3 توصية رقم ٣)
   engagementFldCode:           'الرمز',
   engagementFldType:           'نوع التدقيق',

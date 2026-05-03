@@ -26,8 +26,13 @@ const REPORT_TYPE_OPTIONS = [
   { value: 'RISK_REGISTER',  label: 'Risk Register' },
   { value: 'FINDINGS_AGING', label: 'Findings Aging' },
   { value: 'KRI_DASHBOARD',  label: 'KRI Dashboard' },
+  { value: 'BOARD_PACK',     label: 'Board Pack (multi-section)' },
 ];
-const FORMAT_OPTIONS  = [{ value: 'PDF', label: 'PDF' }, { value: 'XLSX', label: 'Excel' }];
+const FORMAT_OPTIONS = [
+  { value: 'PDF',  label: 'PDF' },
+  { value: 'XLSX', label: 'Excel' },
+  { value: 'PPTX', label: 'PowerPoint (board-pack only)' },
+];
 const LANGUAGE_OPTIONS = [{ value: 'en', label: 'English' }, { value: 'ar', label: 'العربية' }];
 const CADENCE_OPTIONS = [
   { value: 'DAILY',     label: 'Daily' },

@@ -1,5 +1,7 @@
 package com.tss.grc.module.reporting.controller;
 
+import com.tss.grc.module.reporting.service.BoardPackPptxService;
+import com.tss.grc.module.reporting.service.BoardPackService;
 import com.tss.grc.module.reporting.service.ExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -27,9 +29,13 @@ import java.time.LocalDate;
 public class ExportController {
 
     private final ExportService exportService;
+    private final BoardPackService boardPackService;
+    private final BoardPackPptxService boardPackPptxService;
 
     private static final MediaType XLSX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    private static final MediaType PPTX_TYPE =
+        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.presentationml.presentation");
 
     // ── PDF (Q1) ──────────────────────────────────────────────────────────
 
@@ -78,6 +84,25 @@ public class ExportController {
         return xlsx(exportService.kriDashboardXlsx(), "kri-dashboard-" + LocalDate.now() + ".xlsx");
     }
 
+    // ── Board pack (S1) ───────────────────────────────────────────────────
+
+    @GetMapping("/board-pack.pdf")
+    @PreAuthorize("hasPermission('REPORTING','READ') or hasPermission('RISK','READ')")
+    @Operation(summary = "Multi-section board pack PDF combining risks, findings, KRIs, " +
+        "framework coverage, change management and ethics highlights. Pass ?lang=ar for RTL.")
+    public ResponseEntity<byte[]> boardPackPdf(@RequestParam(defaultValue = "en") String lang) {
+        byte[] body = boardPackService.generatePdf(lang);
+        return pdf(body, "board-pack-" + LocalDate.now() + ".pdf");
+    }
+
+    @GetMapping("/board-pack.pptx")
+    @PreAuthorize("hasPermission('REPORTING','READ') or hasPermission('RISK','READ')")
+    @Operation(summary = "Multi-slide 16:9 board pack PowerPoint deck. Pass ?lang=ar for RTL.")
+    public ResponseEntity<byte[]> boardPackPptx(@RequestParam(defaultValue = "en") String lang) {
+        byte[] body = boardPackPptxService.generatePptx(lang);
+        return pptx(body, "board-pack-" + LocalDate.now() + ".pptx");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> pdf(byte[] body, String filename) {
@@ -89,6 +114,12 @@ public class ExportController {
     private ResponseEntity<byte[]> xlsx(byte[] body, String filename) {
         return ResponseEntity.ok()
             .contentType(XLSX_TYPE)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .body(body);
+    }
+    private ResponseEntity<byte[]> pptx(byte[] body, String filename) {
+        return ResponseEntity.ok()
+            .contentType(PPTX_TYPE)
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
             .body(body);
     }

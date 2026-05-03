@@ -511,6 +511,9 @@ export const reportingApi = {
   findingsXlsx:     () => downloadFile('/api/v1/reporting/findings-aging.xlsx', 'findings.xlsx'),
   kriPdf:           (lang: string) => downloadFile(`/api/v1/reporting/kri-dashboard.pdf?lang=${encodeURIComponent(lang)}`, 'kri-dashboard.pdf'),
   kriXlsx:          () => downloadFile('/api/v1/reporting/kri-dashboard.xlsx', 'kri-dashboard.xlsx'),
+  // S1 — board pack
+  boardPackPdf:     (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pdf?lang=${encodeURIComponent(lang)}`, 'board-pack.pdf'),
+  boardPackPptx:    (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pptx?lang=${encodeURIComponent(lang)}`, 'board-pack.pptx'),
 };
 
 // ─── Spring Page<T> wrapper ─────────────────────────────────────────────────

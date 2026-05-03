@@ -41,6 +41,8 @@ public class ReportSchedulerService {
     private final ReportScheduleRepository scheduleRepo;
     private final ReportRunRepository runRepo;
     private final ExportService exportService;
+    private final BoardPackService boardPackService;
+    private final BoardPackPptxService boardPackPptxService;
     /** Optional — JavaMailSender bean exists only when spring.mail.* is configured. */
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
 
@@ -77,9 +79,7 @@ public class ReportSchedulerService {
             TenantContext.setCurrentTenant(s.getOrganisationId());
             byte[] body = renderBody(s);
             String filename = filenameFor(s);
-            String mime = "PDF".equalsIgnoreCase(s.getFormat())
-                ? "application/pdf"
-                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            String mime = mimeFor(s.getFormat());
             String message = sendEmail(s, filename, mime, body);
 
             long duration = System.currentTimeMillis() - start;
@@ -120,14 +120,28 @@ public class ReportSchedulerService {
             case "KRI_DASHBOARD"  -> "PDF".equalsIgnoreCase(fmt)
                 ? exportService.kriDashboardPdf(lang)
                 : exportService.kriDashboardXlsx();
+            case "BOARD_PACK"     -> "PPTX".equalsIgnoreCase(fmt)
+                ? boardPackPptxService.generatePptx(lang)
+                : boardPackService.generatePdf(lang);
             default -> throw new IllegalArgumentException("Unknown report type: " + type);
         };
     }
 
     private String filenameFor(ReportSchedule s) {
         String date = LocalDate.now().toString();
-        String ext = "PDF".equalsIgnoreCase(s.getFormat()) ? "pdf" : "xlsx";
+        String ext = switch (s.getFormat() == null ? "PDF" : s.getFormat().toUpperCase()) {
+            case "PPTX" -> "pptx";
+            case "XLSX" -> "xlsx";
+            default     -> "pdf";
+        };
         return s.getReportType().toLowerCase().replace('_', '-') + "-" + date + "." + ext;
+    }
+    private String mimeFor(String format) {
+        return switch (format == null ? "PDF" : format.toUpperCase()) {
+            case "PPTX" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            case "XLSX" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            default     -> "application/pdf";
+        };
     }
 
     /** Returns a status message describing what happened (sent, dry-run, etc.). */

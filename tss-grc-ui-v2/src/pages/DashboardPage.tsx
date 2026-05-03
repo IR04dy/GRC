@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Layers, RotateCcw, GripVertical, X as XIcon, Plus, Maximize2, Minimize2 } from 'lucide-react';
+import { RefreshCw, Layers, RotateCcw, GripVertical, X as XIcon, Plus, Maximize2, Minimize2, FileText, Presentation } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import { Shell } from '../components/layout/Shell';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { ExportMenu } from '../components/ui/ExportMenu';
 import { type HeatCell } from '../components/viz/HeatMap';
-import { dashboardApi, reportingApi, type DashboardStats } from '../lib/api';
+import { dashboardApi, reportingApi, ApiError, type DashboardStats } from '../lib/api';
 import { isAuthenticated } from '../lib/auth';
 import { useToast } from '../lib/toast';
 import { WIDGETS, WIDGETS_BY_ID, type WidgetSize } from './dashboard/widgets';
@@ -69,6 +69,16 @@ export function DashboardPage() {
               {customising ? t('dashDoneCustomising') : t('dashCustomise')}
             </Button>
             {customising && <Button variant="ghost" Icon={RotateCcw} onClick={() => layout.reset()}>{t('dashResetLayout')}</Button>}
+            <Button variant="secondary" Icon={FileText} disabled={isDemo}
+              onClick={async () => {
+                try { await reportingApi.boardPackPdf(lang); toast.success(t('boardPackStarted')); }
+                catch (e) { toast.danger(e instanceof ApiError ? e.message : t('boardPackFailed')); }
+              }}>{t('boardPackPdfBtn')}</Button>
+            <Button variant="secondary" Icon={Presentation} disabled={isDemo}
+              onClick={async () => {
+                try { await reportingApi.boardPackPptx(lang); toast.success(t('boardPackStarted')); }
+                catch (e) { toast.danger(e instanceof ApiError ? e.message : t('boardPackFailed')); }
+              }}>{t('boardPackPptxBtn')}</Button>
             <ExportMenu
               demoMode={isDemo} t={t} toast={toast}
               onPdf={() => reportingApi.riskRegisterPdf(lang)}

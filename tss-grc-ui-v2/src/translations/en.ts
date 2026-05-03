@@ -632,6 +632,12 @@ export const en = {
   rsEmptyTitle:        'No schedules yet',
   rsEmptySub:          'Create your first schedule to email a recurring risk register, findings aging or KRI report PDF on autopilot.',
 
+  // S1 — Board pack
+  boardPackPdfBtn:    'Board Pack · PDF',
+  boardPackPptxBtn:   'Board Pack · PPTX',
+  boardPackStarted:   'Board pack started — your download should begin shortly',
+  boardPackFailed:    'Board pack generation failed',
+
   // Audit engagement (assessment §5.3 #3)
   engagementFldCode:           'Code',
   engagementFldType:           'Audit Type',
