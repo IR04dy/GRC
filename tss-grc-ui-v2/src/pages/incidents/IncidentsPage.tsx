@@ -67,7 +67,7 @@ export function IncidentsPage() {
   // Saudi regulatory-report templates state
   const [templatesOpen, setTemplatesOpen] = useState<{ incident: IncidentDto; templates: RegulatoryTemplate[] } | null>(null);
 
-  const incidents = useApiList<IncidentDto>(() => incidentApi.list(0, 100), INCIDENTS as unknown as IncidentDto[]);
+  const incidents = useApiList<IncidentDto>(() => incidentApi.list(0, 100), INCIDENTS);
 
   // ── NIST 800-61 phase + Saudi regulator workflow handlers ──
   async function advancePhase(r: IncidentDto) {

@@ -29,7 +29,7 @@ import {
 import { Modal } from '../../components/ui/Modal';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { EVIDENCE } from './mockEvidence';
+import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS } from './mockEvidence';
 
 type TabId = 'overview' | 'frameworks' | 'connectors' | 'catalog' | 'requests' | 'review' | 'expired';
 
@@ -69,9 +69,9 @@ export function EvidencePage() {
   const [confirmDel, setConfirmDel] = useState<EvidenceItemDto | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const items    = useApiList<EvidenceItemDto>(()    => evidenceApi.items(0, 100),    EVIDENCE as unknown as EvidenceItemDto[]);
-  const requests = useApiList<EvidenceRequestDto>(() => evidenceApi.requests(0, 100), []);
-  const reviews  = useApiList<EvidenceReviewDto>(()  => evidenceApi.reviews(0, 100),  []);
+  const items    = useApiList<EvidenceItemDto>(()    => evidenceApi.items(0, 100),    EVIDENCE);
+  const requests = useApiList<EvidenceRequestDto>(() => evidenceApi.requests(0, 100), EVIDENCE_REQUESTS);
+  const reviews  = useApiList<EvidenceReviewDto>(()  => evidenceApi.reviews(0, 100),  EVIDENCE_REVIEWS);
 
   // ── Matrix (frameworks → controls → sub-controls), Connectors, Version history ──
   const [matrix, setMatrix] = useState<FrameworkBlock[]>([]);

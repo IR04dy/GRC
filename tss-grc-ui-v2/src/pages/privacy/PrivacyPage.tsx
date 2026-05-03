@@ -20,7 +20,7 @@ import { useApiList } from '../../lib/useApiResource';
 import { privacyApi, dpiaApi, ApiError, type PrivacyDsrDto, type PrivacyDsrRequest, type PrivacyBreachDto, type PrivacyRopaDto, type DpiaDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { DSRS } from './mockPrivacy';
+import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
 
 type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent';
 
@@ -56,9 +56,9 @@ export function PrivacyPage() {
   const [confirmDel, setConfirmDel] = useState<PrivacyDsrDto | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const dsrs     = useApiList<PrivacyDsrDto>(()    => privacyApi.dsrs(0, 100),     DSRS as unknown as PrivacyDsrDto[]);
-  const breaches = useApiList<PrivacyBreachDto>(() => privacyApi.breaches(0, 100), []);
-  const ropa     = useApiList<PrivacyRopaDto>(()   => privacyApi.ropa(0, 100),     []);
+  const dsrs     = useApiList<PrivacyDsrDto>(()    => privacyApi.dsrs(0, 100),     DSRS);
+  const breaches = useApiList<PrivacyBreachDto>(() => privacyApi.breaches(0, 100), BREACHES);
+  const ropa     = useApiList<PrivacyRopaDto>(()   => privacyApi.ropa(0, 100),     ROPA);
 
   const FIELDS: FieldDef[] = [
     { kind: 'text',   key: 'requesterName',  label: t('privacyFldReqName') + ' *', required: true, maxLength: 200, span: 6 },
@@ -317,11 +317,11 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
   const [loading, setLoading] = useState(false);
 
   function reload() {
-    if (!isAuthenticated()) { setItems([]); return; }
+    if (!isAuthenticated()) { setItems(DPIAS); return; }
     setLoading(true);
     dpiaApi.list(0, 100)
       .then(p => setItems(p.content))
-      .catch(() => setItems([]))
+      .catch(() => setItems(DPIAS))
       .finally(() => setLoading(false));
   }
   useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps

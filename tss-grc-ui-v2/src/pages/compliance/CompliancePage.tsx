@@ -33,7 +33,10 @@ import {
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
-import { COMPLIANCE_CONTROLS } from './mockCompliance';
+import {
+  COMPLIANCE_CONTROLS, COMPLIANCE_ASSESSMENTS, COMPLIANCE_FINDINGS,
+  REGULATORY_CHANGES, POLICIES, AUDIT_ENGAGEMENTS,
+} from './mockCompliance';
 
 type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks';
 
@@ -240,12 +243,12 @@ export function CompliancePage() {
   const [confirmDel, setConfirmDel] = useState<ComplianceControlDto | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const controls    = useApiList<ComplianceControlDto>(()    => complianceApi.controls(0, 100),    COMPLIANCE_CONTROLS as unknown as ComplianceControlDto[]);
-  const assessments = useApiList<ComplianceAssessmentDto>(() => complianceApi.assessments(0, 100), []);
-  const findings    = useApiList<ComplianceFindingDto>(()    => complianceApi.findings(0, 100),    []);
-  const changes     = useApiList<RegulatoryChangeDto>(()     => complianceApi.regulatoryChanges(0, 100), []);
-  const policies    = useApiList<PolicyDto>(()               => complianceApi.policies(0, 100),    []);
-  const engagements = useApiList<AuditEngagementDto>(()      => complianceApi.auditEngagements(0, 100), []);
+  const controls    = useApiList<ComplianceControlDto>(()    => complianceApi.controls(0, 100),    COMPLIANCE_CONTROLS);
+  const assessments = useApiList<ComplianceAssessmentDto>(() => complianceApi.assessments(0, 100), COMPLIANCE_ASSESSMENTS);
+  const findings    = useApiList<ComplianceFindingDto>(()    => complianceApi.findings(0, 100),    COMPLIANCE_FINDINGS);
+  const changes     = useApiList<RegulatoryChangeDto>(()     => complianceApi.regulatoryChanges(0, 100), REGULATORY_CHANGES);
+  const policies    = useApiList<PolicyDto>(()               => complianceApi.policies(0, 100),    POLICIES);
+  const engagements = useApiList<AuditEngagementDto>(()      => complianceApi.auditEngagements(0, 100), AUDIT_ENGAGEMENTS);
 
   const changeS = useEntityState<RegulatoryChangeDto>();
   const policyS = useEntityState<PolicyDto>();

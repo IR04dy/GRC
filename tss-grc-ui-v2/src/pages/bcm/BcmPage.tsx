@@ -30,7 +30,7 @@ import {
 } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { BCM_PLANS } from './mockBcm';
+import { BCM_PLANS, BCM_PROCESSES, BCM_BIA, BCM_EXERCISES } from './mockBcm';
 
 type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms';
 
@@ -137,11 +137,11 @@ export function BcmPage() {
   const biaS  = useEntityState<BcmBiaDto>();
   const exerS = useEntityState<BcmExerciseDto>();
 
-  const plans = useApiList<BcmPlanDto>(() => bcmApi.plans(0, 100), BCM_PLANS as unknown as BcmPlanDto[]);
-  const procs = useApiList<BcmProcessDto>(() => bcmApi.processes(0, 100), []);
+  const plans = useApiList<BcmPlanDto>(() => bcmApi.plans(0, 100), BCM_PLANS);
+  const procs = useApiList<BcmProcessDto>(() => bcmApi.processes(0, 100), BCM_PROCESSES);
   // /bia returns a plain array — adapt to the Page<T> shape useApiList expects.
-  const bia   = useApiList<BcmBiaDto>(() => bcmApi.bia().then(arr => ({ content: arr })), []);
-  const exercises = useApiList<BcmExerciseDto>(() => bcmApi.exercises(0, 200), []);
+  const bia   = useApiList<BcmBiaDto>(() => bcmApi.bia().then(arr => ({ content: arr })), BCM_BIA);
+  const exercises = useApiList<BcmExerciseDto>(() => bcmApi.exercises(0, 200), BCM_EXERCISES);
 
   // ── Field defs (built per-render so labels translate via t()) ──
   const PLAN_FIELDS: FieldDef[] = [

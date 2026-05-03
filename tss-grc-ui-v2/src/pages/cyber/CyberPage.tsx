@@ -35,7 +35,10 @@ import {
   type CyberActionPlanDto, type CyberActionPlanRequest,
 } from '../../lib/api';
 import { useToast } from '../../lib/toast';
-import { CONTROLS, VULNS } from './mockCyber';
+import {
+  CONTROLS, VULNS, SUB_CONTROLS, ASSESSMENTS, EXCEPTIONS,
+  INCIDENTS, ASSETS, EVIDENCE, ACTION_PLANS,
+} from './mockCyber';
 
 type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions';
 
@@ -402,15 +405,15 @@ export function CyberPage() {
   const evS      = useEntityState<CyberEvidenceDto>();
   const apS      = useEntityState<CyberActionPlanDto>();
 
-  const controls       = useApiList<CyberControlDto>(()    => cyberApi.controls(0, 200),    CONTROLS as unknown as CyberControlDto[]);
-  const subControls    = useApiList<CyberSubControlDto>(() => cyberApi.subControls(0, 200), []);
-  const assessments    = useApiList<CyberAssessmentDto>(() => cyberApi.assessments(0, 200), []);
-  const vulns          = useApiList<CyberVulnDto>(()       => cyberApi.vulns(0, 200),       VULNS as unknown as CyberVulnDto[]);
-  const exceptions     = useApiList<CyberExceptionDto>(()  => cyberApi.exceptions(0, 200),  []);
-  const cyberIncidents = useApiList<CyberIncidentDto>(()   => cyberApi.incidents(0, 200),   []);
-  const assets         = useApiList<CyberAssetDto>(()      => cyberApi.assets(0, 200),      []);
-  const cyberEvidence  = useApiList<CyberEvidenceDto>(()   => cyberApi.evidence(0, 200),    []);
-  const actionPlans    = useApiList<CyberActionPlanDto>(() => cyberApi.actionPlans(0, 200), []);
+  const controls       = useApiList<CyberControlDto>(()    => cyberApi.controls(0, 200),    CONTROLS);
+  const subControls    = useApiList<CyberSubControlDto>(() => cyberApi.subControls(0, 200), SUB_CONTROLS);
+  const assessments    = useApiList<CyberAssessmentDto>(() => cyberApi.assessments(0, 200), ASSESSMENTS);
+  const vulns          = useApiList<CyberVulnDto>(()       => cyberApi.vulns(0, 200),       VULNS);
+  const exceptions     = useApiList<CyberExceptionDto>(()  => cyberApi.exceptions(0, 200),  EXCEPTIONS);
+  const cyberIncidents = useApiList<CyberIncidentDto>(()   => cyberApi.incidents(0, 200),   INCIDENTS);
+  const assets         = useApiList<CyberAssetDto>(()      => cyberApi.assets(0, 200),      ASSETS);
+  const cyberEvidence  = useApiList<CyberEvidenceDto>(()   => cyberApi.evidence(0, 200),    EVIDENCE);
+  const actionPlans    = useApiList<CyberActionPlanDto>(() => cyberApi.actionPlans(0, 200), ACTION_PLANS);
 
   const isDemo = controls.isDemo || vulns.isDemo;
 
