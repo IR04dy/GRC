@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface KriDefinitionRepository extends JpaRepository<KriDefinition, Long> {
     Page<KriDefinition> findByOrganisationIdOrderByCodeAsc(Long organisationId, Pageable pageable);
     long countByOrganisationId(Long organisationId);
+    java.util.List<KriDefinition> findByOrganisationIdAndFrameworkId(Long organisationId, Long frameworkId);
+    long countByOrganisationIdAndFrameworkId(Long organisationId, Long frameworkId);
 }

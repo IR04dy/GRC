@@ -13,6 +13,10 @@ import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository
 import com.tss.grc.module.compliance.repository.PolicyRepository;
 import com.tss.grc.module.privacy.entity.Dpia;
 import com.tss.grc.module.privacy.repository.DpiaRepository;
+import com.tss.grc.module.risk.entity.KriDefinition;
+import com.tss.grc.module.risk.entity.Risk;
+import com.tss.grc.module.risk.repository.KriDefinitionRepository;
+import com.tss.grc.module.risk.repository.RiskRepository;
 import org.springframework.data.domain.PageRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -53,6 +57,8 @@ public class FrameworkAnchorController {
     private final AuditFindingRepository findingRepo;
     private final ControlRepository controlRepo;
     private final DpiaRepository dpiaRepo;
+    private final KriDefinitionRepository kriRepo;
+    private final RiskRepository riskRepo;
 
     @GetMapping("/frameworks")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
@@ -191,6 +197,14 @@ public class FrameworkAnchorController {
             r.put("implementedControls", implemented);
             r.put("avgMaturity",    avgMaturity);
             r.put("dpiaCount",      dpiaRepo.countByOrganisationIdAndFrameworkId(org, f.getId()));
+            r.put("kriCount",       kriRepo.countByOrganisationIdAndFrameworkId(org, f.getId()));
+            // Risk count = union of risks tagged on either dimension
+            long riskAsRiskFw = riskRepo.countByOrganisationIdAndRiskFrameworkId(org, f.getId());
+            long riskAsCompFw = riskRepo.countByOrganisationIdAndComplianceFrameworkId(org, f.getId());
+            // Note: this double-counts risks tagged on BOTH dimensions to the same framework — rare in practice.
+            r.put("riskCount",      riskAsRiskFw + riskAsCompFw);
+            r.put("riskAsRiskFw",   riskAsRiskFw);
+            r.put("riskAsCompFw",   riskAsCompFw);
             out.add(r);
         }
         return out;
@@ -213,6 +227,64 @@ public class FrameworkAnchorController {
             row.put("maturityLevel", c.getMaturityLevel());
             row.put("status",        c.getStatus());
             row.put("owner",         c.getOwner());
+            out.add(row);
+        }
+        return out;
+    }
+
+    @GetMapping("/frameworks/{id}/kris")
+    @PreAuthorize("hasPermission('RISK','READ')")
+    @Operation(summary = "All KRIs anchored on a given framework (IA-5).")
+    public List<Map<String, Object>> krisForFramework(@PathVariable Long id) {
+        Long org = TenantContext.getCurrentTenant();
+        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndFrameworkId(org, id);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (KriDefinition k : kris) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id",          k.getId());
+            row.put("code",        k.getCode());
+            row.put("nameEn",      k.getNameEn());
+            row.put("nameAr",      k.getNameAr());
+            row.put("unit",        k.getUnit());
+            row.put("direction",   k.getDirection());
+            row.put("greenMax",    k.getGreenMax());
+            row.put("amberMax",    k.getAmberMax());
+            row.put("frequency",   k.getFrequency());
+            row.put("owner",       k.getOwner());
+            row.put("clauseRef",   k.getClauseRef());
+            out.add(row);
+        }
+        return out;
+    }
+
+    @GetMapping("/frameworks/{id}/risks")
+    @PreAuthorize("hasPermission('RISK','READ')")
+    @Operation(summary = "All risks anchored on a given framework (IA-5). " +
+        "Returns risks where EITHER risk_framework_id OR compliance_framework_id matches.")
+    public List<Map<String, Object>> risksForFramework(@PathVariable Long id) {
+        Long org = TenantContext.getCurrentTenant();
+        List<Risk> riskFw = riskRepo.findByOrganisationIdAndRiskFrameworkId(org, id);
+        List<Risk> compFw = riskRepo.findByOrganisationIdAndComplianceFrameworkId(org, id);
+        // Union by id
+        Map<Long, Risk> union = new HashMap<>();
+        for (Risk r : riskFw) union.put(r.getId(), r);
+        for (Risk r : compFw) union.put(r.getId(), r);
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Risk r : union.values()) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id",                r.getId());
+            row.put("titleEn",           r.getTitleEn());
+            row.put("titleAr",           r.getTitleAr());
+            row.put("status",            r.getStatus());
+            row.put("inherentScore",     r.getInherentScore());
+            row.put("residualScore",     r.getResidualScore());
+            row.put("riskLevel",         r.getRiskLevel());
+            // Indicate which dimension(s) matched so the UI can show a badge
+            row.put("matchedAsRiskFramework",       r.getRiskFrameworkId() != null && r.getRiskFrameworkId().equals(id));
+            row.put("matchedAsComplianceFramework", r.getComplianceFrameworkId() != null && r.getComplianceFrameworkId().equals(id));
+            row.put("riskFrameworkClause",       r.getRiskFrameworkClause());
+            row.put("complianceFrameworkClause", r.getComplianceFrameworkClause());
             out.add(row);
         }
         return out;

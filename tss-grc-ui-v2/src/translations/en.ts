@@ -579,6 +579,20 @@ export const en = {
   dpiaTrigger:                 'Trigger',
   dpiaResidualRisk:            'Residual Risk',
 
+  // IA-5 — KRI + Risk framework anchor sub-tabs
+  frameworkSheetKris:          'KRIs',
+  frameworkSheetRisks:         'Risks',
+  frameworkKrisEmptyTitle:     'No KRIs anchored to this framework',
+  frameworkKrisEmptySub:       'Tag a KRI to this framework from the Risk module to see it here.',
+  frameworkRisksEmptyTitle:    'No risks anchored to this framework',
+  frameworkRisksEmptySub:      'Risks can be anchored on TWO dimensions — the risk-management taxonomy (ISO 31000, COSO ERM, NIST RMF) AND the regulatory mandate they threaten.',
+  kriDirection:                'Direction',
+  kriThresholds:               'Green / Amber',
+  kriFrequency:                'Cadence',
+  riskMatchedAs:               'Matched as',
+  riskFwBadge:                 'Risk FW',
+  complianceFwBadge:           'Compliance FW',
+
   // Audit engagement (assessment §5.3 #3)
   engagementFldCode:           'Code',
   engagementFldType:           'Audit Type',

@@ -78,6 +78,13 @@ public class KriDefinition {
     @Column(name = "framework", length = 100)
     private String framework;
 
+    /** Typed FK to {@code compliance.frameworks} — IA-5 anchor. */
+    @Column(name = "framework_id")
+    private Long frameworkId;
+
+    @Column(name = "clause_ref", length = 100)
+    private String clauseRef;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

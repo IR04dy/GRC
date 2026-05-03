@@ -1253,6 +1253,8 @@ export interface FrameworkCoverageDto {
   openFindings?: number; closedFindings?: number;
   controlCount?: number; implementedControls?: number; avgMaturity?: number;
   dpiaCount?: number;
+  kriCount?: number;
+  riskCount?: number; riskAsRiskFw?: number; riskAsCompFw?: number;
 }
 export interface FrameworkFindingRowDto {
   id: number; title: string;
@@ -1276,12 +1278,33 @@ export interface FrameworkDpiaRowDto {
   assessmentDate?: string; nextReviewDate?: string;
   clauseRef?: string;
 }
+export interface FrameworkKriRowDto {
+  id: number; code?: string;
+  nameEn: string; nameAr?: string;
+  unit?: string; direction?: string;
+  greenMax?: number; amberMax?: number;
+  frequency?: string; owner?: string;
+  clauseRef?: string;
+}
+export interface FrameworkRiskRowDto {
+  id: number;
+  titleEn: string; titleAr?: string;
+  status?: string;
+  inherentScore?: number; residualScore?: number;
+  riskLevel?: string;
+  matchedAsRiskFramework?: boolean;
+  matchedAsComplianceFramework?: boolean;
+  riskFrameworkClause?: string;
+  complianceFrameworkClause?: string;
+}
 export const frameworkApi = {
   list:           ()                 => api.get<FrameworkDto[]>('/api/v1/compliance/frameworks'),
   policiesFor:    (frameworkId: number) => api.get<FrameworkPolicyRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/policies`),
   findingsFor:    (frameworkId: number) => api.get<FrameworkFindingRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/findings`),
   controlsFor:    (frameworkId: number) => api.get<FrameworkControlRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/controls`),
   dpiasFor:       (frameworkId: number) => api.get<FrameworkDpiaRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/dpias`),
+  krisFor:        (frameworkId: number) => api.get<FrameworkKriRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/kris`),
+  risksFor:       (frameworkId: number) => api.get<FrameworkRiskRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/risks`),
   mappingsFor:    (policyId: number) => api.get<PolicyMappingDto[]>(`/api/v1/compliance/policies/${policyId}/mappings`),
   addMapping:     (policyId: number, body: { frameworkId: number; clauseRef?: string; satisfaction?: string; notes?: string }) =>
                     api.post<PolicyMappingDto>(`/api/v1/compliance/policies/${policyId}/mappings`, body),

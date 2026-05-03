@@ -571,6 +571,20 @@ export const ar = {
   dpiaTrigger:                 'المُحفّز',
   dpiaResidualRisk:            'المخاطر المتبقية',
 
+  // IA-5 — تبويبات الإطار للمؤشرات والمخاطر
+  frameworkSheetKris:          'مؤشرات المخاطر',
+  frameworkSheetRisks:         'المخاطر',
+  frameworkKrisEmptyTitle:     'لا توجد مؤشرات مرتبطة بهذا الإطار',
+  frameworkKrisEmptySub:       'اربط المؤشر بهذا الإطار من وحدة المخاطر لظهوره هنا.',
+  frameworkRisksEmptyTitle:    'لا توجد مخاطر مرتبطة بهذا الإطار',
+  frameworkRisksEmptySub:      'يمكن ربط المخاطر بُبعدَين — تصنيف إدارة المخاطر (ISO 31000، COSO ERM، NIST RMF) والإطار التنظيمي المُهَدَّد.',
+  kriDirection:                'الاتجاه',
+  kriThresholds:               'حد أخضر / أصفر',
+  kriFrequency:                'التكرار',
+  riskMatchedAs:               'مطابقة كـ',
+  riskFwBadge:                 'إطار مخاطر',
+  complianceFwBadge:           'إطار امتثال',
+
   // مهام التدقيق الخارجي (§5.3 توصية رقم ٣)
   engagementFldCode:           'الرمز',
   engagementFldType:           'نوع التدقيق',

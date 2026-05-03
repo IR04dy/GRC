@@ -28,6 +28,7 @@ import {
   type PolicyDto, type PolicyRequest,
   type AuditEngagementDto, type AuditEngagementRequest,
   type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto, type FrameworkControlRowDto, type FrameworkDpiaRowDto,
+  type FrameworkKriRowDto, type FrameworkRiskRowDto,
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
@@ -820,11 +821,13 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
   const [coverage, setCoverage] = useState<Record<number, FrameworkCoverageDto>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
-  const [sheet, setSheet] = useState<'controls' | 'policies' | 'findings' | 'dpias'>('controls');
+  const [sheet, setSheet] = useState<'controls' | 'policies' | 'findings' | 'dpias' | 'kris' | 'risks'>('controls');
   const [policies, setPolicies] = useState<FrameworkPolicyRowDto[]>([]);
   const [findings, setFindings] = useState<FrameworkFindingRowDto[]>([]);
   const [controls, setControls] = useState<FrameworkControlRowDto[]>([]);
   const [dpias, setDpias] = useState<FrameworkDpiaRowDto[]>([]);
+  const [kris, setKris] = useState<FrameworkKriRowDto[]>([]);
+  const [risks, setRisks] = useState<FrameworkRiskRowDto[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -847,7 +850,9 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
       frameworkApi.findingsFor(activeId).catch(() => [] as FrameworkFindingRowDto[]),
       frameworkApi.controlsFor(activeId).catch(() => [] as FrameworkControlRowDto[]),
       frameworkApi.dpiasFor(activeId).catch(() => [] as FrameworkDpiaRowDto[]),
-    ]).then(([p, f, c, d]) => { setPolicies(p); setFindings(f); setControls(c); setDpias(d); }).finally(() => setLoading(false));
+      frameworkApi.krisFor(activeId).catch(() => [] as FrameworkKriRowDto[]),
+      frameworkApi.risksFor(activeId).catch(() => [] as FrameworkRiskRowDto[]),
+    ]).then(([p, f, c, d, k, r]) => { setPolicies(p); setFindings(f); setControls(c); setDpias(d); setKris(k); setRisks(r); }).finally(() => setLoading(false));
   }, [activeId]);
 
   async function deleteMapping(mappingId: number) {
@@ -944,6 +949,16 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                 {t('frameworkSheetDpias')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{dpias.length}</span>
               </button>
             )}
+            {(activeCov?.kriCount ?? 0) > 0 && (
+              <button onClick={() => setSheet('kris')} style={sheetTabStyle(sheet === 'kris')}>
+                {t('frameworkSheetKris')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{kris.length}</span>
+              </button>
+            )}
+            {(activeCov?.riskCount ?? 0) > 0 && (
+              <button onClick={() => setSheet('risks')} style={sheetTabStyle(sheet === 'risks')}>
+                {t('frameworkSheetRisks')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{risks.length}</span>
+              </button>
+            )}
           </div>
           {loading ? <LoadingRow /> : sheet === 'controls' ?
             (controls.length === 0
@@ -1006,7 +1021,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                     empty={<EmptyState />}
                   />
                 )
-            ) : (
+            ) : sheet === 'dpias' ? (
               dpias.length === 0
                 ? <EmptyState Icon={Search} title={t('frameworkDpiasEmptyTitle')} sub={t('frameworkDpiasEmptySub')} />
                 : (
@@ -1021,6 +1036,46 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                       { header: t('colStatus'),   cell: d => <Badge tone={d.status === 'APPROVED' ? 'success' : d.status === 'REJECTED' ? 'danger' : 'info'} dot>{d.status}</Badge>, width: '120px' },
                     ]}
                     rows={dpias}
+                    empty={<EmptyState />}
+                  />
+                )
+            ) : sheet === 'kris' ? (
+              kris.length === 0
+                ? <EmptyState Icon={Award} title={t('frameworkKrisEmptyTitle')} sub={t('frameworkKrisEmptySub')} />
+                : (
+                  <DataTable<FrameworkKriRowDto>
+                    columns={[
+                      { header: t('fldCode'),    cell: k => <span className="mono" style={{ fontWeight: 600 }}>{k.code ?? '—'}</span>, width: '120px' },
+                      { header: t('colTitle'),   cell: k => <span style={{ fontWeight: 600 }}>{k.nameEn}</span> },
+                      { header: t('frameworkClauseRef'), cell: k => <span className="mono">{k.clauseRef ?? '—'}</span>, width: '140px' },
+                      { header: t('kriDirection'), cell: k => <Badge tone={k.direction === 'HIGHER_IS_WORSE' ? 'danger' : 'success'}>{k.direction?.replace(/_/g, ' ')}</Badge>, width: '160px' },
+                      { header: t('kriThresholds'), cell: k => <span className="mono">{k.greenMax ?? '—'} / {k.amberMax ?? '—'} {k.unit ?? ''}</span>, width: '160px' },
+                      { header: t('kriFrequency'), cell: k => k.frequency ?? '—', width: '100px' },
+                      { header: t('colOwner'),   cell: k => k.owner ?? '—', width: '180px' },
+                    ]}
+                    rows={kris}
+                    empty={<EmptyState />}
+                  />
+                )
+            ) : (
+              risks.length === 0
+                ? <EmptyState Icon={Search} title={t('frameworkRisksEmptyTitle')} sub={t('frameworkRisksEmptySub')} />
+                : (
+                  <DataTable<FrameworkRiskRowDto>
+                    columns={[
+                      { header: t('colTitle'),   cell: r => <span style={{ fontWeight: 600 }}>{r.titleEn}</span> },
+                      { header: t('riskMatchedAs'), cell: r => (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {r.matchedAsRiskFramework       && <Badge tone="primary">{t('riskFwBadge')}</Badge>}
+                            {r.matchedAsComplianceFramework && <Badge tone="accent">{t('complianceFwBadge')}</Badge>}
+                          </div>
+                        ), width: '170px' },
+                      { header: t('frameworkClauseRef'), cell: r => <span className="mono">{r.matchedAsRiskFramework ? (r.riskFrameworkClause ?? '—') : (r.complianceFrameworkClause ?? '—')}</span>, width: '140px' },
+                      { header: t('riskColInherent'), cell: r => <span className="mono">{r.inherentScore ?? '—'}</span>, width: '110px' },
+                      { header: t('riskColResidual'), cell: r => <span className="mono">{r.residualScore ?? '—'}</span>, width: '110px' },
+                      { header: t('colStatus'),   cell: r => <Badge tone={r.status === 'CLOSED' || r.status === 'TREATED' ? 'success' : r.status === 'ACCEPTED' ? 'accent' : 'warning'} dot>{r.status?.replace(/_/g, ' ') ?? '—'}</Badge>, width: '130px' },
+                    ]}
+                    rows={risks}
                     empty={<EmptyState />}
                   />
                 )

@@ -26,4 +26,10 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
 
     @Query("SELECT rc.nameEn, COUNT(r) FROM Risk r JOIN RiskCategory rc ON r.categoryId = rc.id WHERE r.organisationId = :orgId GROUP BY rc.nameEn ORDER BY COUNT(r) DESC")
     List<Object[]> countByCategory(@Param("orgId") Long orgId);
+
+    // Framework anchor (IA-5)
+    List<Risk> findByOrganisationIdAndRiskFrameworkId(Long organisationId, Long riskFrameworkId);
+    List<Risk> findByOrganisationIdAndComplianceFrameworkId(Long organisationId, Long complianceFrameworkId);
+    long countByOrganisationIdAndRiskFrameworkId(Long organisationId, Long riskFrameworkId);
+    long countByOrganisationIdAndComplianceFrameworkId(Long organisationId, Long complianceFrameworkId);
 }
