@@ -17,6 +17,7 @@ import { EvidencePage } from './pages/evidence/EvidencePage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { ScmPage } from './pages/scm/ScmPage';
 import { WorkflowsPage } from './pages/workflow/WorkflowsPage';
+import { ChangesPage } from './pages/changes/ChangesPage';
 
 export function App() {
   return (
@@ -43,6 +44,7 @@ export function App() {
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />
               <Route path="/workflows"  element={<WorkflowsPage />} />
+              <Route path="/changes"    element={<ChangesPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />

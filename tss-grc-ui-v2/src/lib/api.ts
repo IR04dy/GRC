@@ -82,6 +82,123 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
 }
 
+// ─── Change Management (ITIL v4) ────────────────────────────────────────────
+export interface ChangeRequestDto {
+  id: number; organisationId?: number;
+  changeCode?: string;
+  titleEn: string; titleAr?: string;
+  descriptionEn?: string; descriptionAr?: string;
+  changeType: string;     // STANDARD | NORMAL | EMERGENCY
+  category?: string;
+  riskLevel?: string;     // LOW | MEDIUM | HIGH | CRITICAL
+  impactSummary?: string;
+  rollbackPlan?: string;
+  testPlan?: string;
+  businessJustification?: string;
+  requestedByName?: string;
+  changeOwnerName?: string;
+  implementerName?: string;
+  requestedDate?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  implementationStarted?: string;
+  implementationEnded?: string;
+  postReviewDate?: string;
+  closureDate?: string;
+  status: string;
+  cabDecisionAt?: string;
+  cabDecisionNotes?: string;
+  outcome?: string;
+  createdAt?: string;
+}
+export interface ChangeApprovalDto {
+  id?: number; changeRequestId?: number;
+  approverId?: number;
+  approverName: string; approverRole?: string;
+  decision: 'APPROVE' | 'REJECT' | 'DEFER' | 'ABSTAIN';
+  comments?: string;
+  decidedAt?: string;
+}
+export interface ChangeTaskDto {
+  id?: number; changeRequestId?: number;
+  sortOrder?: number;
+  titleEn: string; titleAr?: string;
+  ownerName?: string;
+  status: string;          // PENDING | IN_PROGRESS | DONE | BLOCKED | SKIPPED
+  dueAt?: string; completedAt?: string;
+  notes?: string;
+}
+export interface ChangeLinkDto {
+  id?: number; changeRequestId?: number;
+  entityType: string; entityId: number;
+  linkType: string;        // AFFECTS | TRIGGERED_BY | MITIGATES | TARGETS | REMEDIATES | DEPENDS_ON | INFORMS
+  notes?: string;
+  createdAt?: string;
+}
+export interface ChangeCommentDto {
+  id?: number; changeRequestId?: number;
+  authorName: string; body: string;
+  createdAt?: string;
+}
+export interface ChangeAnalyticsDto {
+  total: number;
+  byStatus: Record<string, number>;
+  byType: Record<string, number>;
+  byOutcome: Record<string, number>;
+  successRatePct: number;
+}
+/** Used by other modules to render a "Linked Changes" panel for any entity. */
+export interface LinkedChangeView {
+  linkId: number;
+  linkType: string;
+  changeId: number;
+  changeCode?: string;
+  titleEn: string;
+  titleAr?: string;
+  status: string;
+  changeType: string;
+  riskLevel?: string;
+  scheduledStart?: string;
+}
+
+export const changeApi = {
+  list:        (qs: { status?: string; type?: string; risk?: string; category?: string; page?: number; size?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (qs.status)   p.set('status', qs.status);
+    if (qs.type)     p.set('type', qs.type);
+    if (qs.risk)     p.set('risk', qs.risk);
+    if (qs.category) p.set('category', qs.category);
+    p.set('page', String(qs.page ?? 0));
+    p.set('size', String(qs.size ?? 100));
+    return api.get<PageResponse<ChangeRequestDto>>(`/api/v1/changes?${p.toString()}`);
+  },
+  get:         (id: number) => api.get<ChangeRequestDto>(`/api/v1/changes/${id}`),
+  create:      (body: Partial<ChangeRequestDto>) => api.post<ChangeRequestDto>('/api/v1/changes', body),
+  update:      (id: number, body: Partial<ChangeRequestDto>) => api.put<ChangeRequestDto>(`/api/v1/changes/${id}`, body),
+  remove:      (id: number) => api.delete<void>(`/api/v1/changes/${id}`),
+  transition:  (id: number, body: { target: string; notes?: string; outcome?: string }) =>
+                 api.post<ChangeRequestDto>(`/api/v1/changes/${id}/transition`, body),
+
+  approvals:   (id: number) => api.get<ChangeApprovalDto[]>(`/api/v1/changes/${id}/approvals`),
+  approve:     (id: number, body: ChangeApprovalDto) => api.post<ChangeApprovalDto>(`/api/v1/changes/${id}/approvals`, body),
+
+  tasks:       (id: number) => api.get<ChangeTaskDto[]>(`/api/v1/changes/${id}/tasks`),
+  addTask:     (id: number, body: Partial<ChangeTaskDto>) => api.post<ChangeTaskDto>(`/api/v1/changes/${id}/tasks`, body),
+  updateTask:  (taskId: number, body: Partial<ChangeTaskDto>) => api.put<ChangeTaskDto>(`/api/v1/changes/tasks/${taskId}`, body),
+  deleteTask:  (taskId: number) => api.delete<void>(`/api/v1/changes/tasks/${taskId}`),
+
+  links:       (id: number) => api.get<ChangeLinkDto[]>(`/api/v1/changes/${id}/links`),
+  addLink:     (id: number, body: Partial<ChangeLinkDto>) => api.post<ChangeLinkDto>(`/api/v1/changes/${id}/links`, body),
+  deleteLink:  (linkId: number) => api.delete<void>(`/api/v1/changes/links/${linkId}`),
+  linksForEntity: (entityType: string, entityId: number) =>
+                  api.get<LinkedChangeView[]>(`/api/v1/changes/links/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
+
+  comments:    (id: number) => api.get<ChangeCommentDto[]>(`/api/v1/changes/${id}/comments`),
+  comment:     (id: number, body: Partial<ChangeCommentDto>) => api.post<ChangeCommentDto>(`/api/v1/changes/${id}/comments`, body),
+
+  analytics:   () => api.get<ChangeAnalyticsDto>('/api/v1/changes/analytics'),
+};
+
 export const reportingApi = {
   riskRegisterPdf:  (lang: string) => downloadFile(`/api/v1/reporting/risk-register.pdf?lang=${encodeURIComponent(lang)}`, 'risk-register.pdf'),
   riskRegisterXlsx: () => downloadFile('/api/v1/reporting/risk-register.xlsx', 'risk-register.xlsx'),
