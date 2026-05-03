@@ -29,11 +29,13 @@ import {
 import { Modal } from '../../components/ui/Modal';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS } from './mockEvidence';
+import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS, EVIDENCE_ANCHORS_BY_ID } from './mockEvidence';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { EVIDENCE_WORKFLOWS } from '../../lib/mockWorkflows';
 import { EVIDENCE_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { AnchorChips } from '../../components/authority/AnchorChips';
+import { RegulatorPostureCard } from '../../components/authority/RegulatorPostureCard';
 
 type TabId = 'overview' | 'frameworks' | 'connectors' | 'catalog' | 'requests' | 'review' | 'expired' | 'workflows';
 
@@ -175,7 +177,7 @@ export function EvidencePage() {
     { header: t('colCode'),      cell: r => r.evidenceCode, mono: true },
     { header: t('colTitle'),     cell: r => <span style={{ fontWeight: 600 }}>{r.titleEn}</span> },
     { header: t('colType'),      cell: r => <Badge tone="neutral">{(r.evidenceType ?? '').replace(/_/g, ' ')}</Badge> },
-    { header: t('colFramework'), cell: r => <Badge tone="primary">{r.frameworkCode ?? '—'}</Badge> },
+    { header: 'Regulator anchors', cell: r => <AnchorChips anchors={EVIDENCE_ANCHORS_BY_ID[r.id] ?? []} max={3} /> },
     { header: t('colExpiry'),    cell: r => <span className="mono">{r.expiryDate ?? '—'}</span> },
     { header: t('colStatus'),    cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '120px',
@@ -259,24 +261,29 @@ export function EvidencePage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
-        <div className="dash-grid">
-          <Card title={t('evidenceTabCatalog')} Icon={BarChart3} action={<Badge tone="primary">By framework</Badge>}>
-            {frameworks.length === 0
-              ? <Progress label="No data yet" value={0} tone="primary" />
-              : frameworks.slice(0, 6).map(fw => {
-                  const cnt = items.data.filter(i => i.frameworkCode === fw).length;
-                  const p2 = Math.round((cnt / items.data.length) * 100);
-                  return <Progress key={fw} label={`${fw} · ${cnt} items`} value={p2} tone="primary" />;
-                })}
-          </Card>
-          <Card title="Type Mix" Icon={FileText}>
-            {['POLICY','DOCUMENT','SCREENSHOT','AUDIT_REPORT','CONFIGURATION','CERTIFICATE'].map(type => {
-              const cnt = items.data.filter(i => i.evidenceType === type).length;
-              const p2 = Math.round((cnt / Math.max(1, items.data.length)) * 100);
-              return <Progress key={type} label={`${type.replace(/_/g, ' ')} · ${cnt}`} value={p2} tone={type === 'POLICY' ? 'primary' : type === 'CERTIFICATE' ? 'success' : 'accent'} />;
-            })}
-          </Card>
-        </div>
+        <>
+          <RegulatorPostureCard
+            title="Regulator Posture · Evidence Coverage"
+            anchors={items.data.flatMap(i => EVIDENCE_ANCHORS_BY_ID[i.id] ?? [])} />
+          <div className="dash-grid" style={{ marginTop: 16 }}>
+            <Card title={t('evidenceTabCatalog')} Icon={BarChart3} action={<Badge tone="primary">By framework</Badge>}>
+              {frameworks.length === 0
+                ? <Progress label="No data yet" value={0} tone="primary" />
+                : frameworks.slice(0, 6).map(fw => {
+                    const cnt = items.data.filter(i => i.frameworkCode === fw).length;
+                    const p2 = Math.round((cnt / items.data.length) * 100);
+                    return <Progress key={fw} label={`${fw} · ${cnt} items`} value={p2} tone="primary" />;
+                  })}
+            </Card>
+            <Card title="Type Mix" Icon={FileText}>
+              {['POLICY','DOCUMENT','SCREENSHOT','AUDIT_REPORT','CONFIGURATION','CERTIFICATE'].map(type => {
+                const cnt = items.data.filter(i => i.evidenceType === type).length;
+                const p2 = Math.round((cnt / Math.max(1, items.data.length)) * 100);
+                return <Progress key={type} label={`${type.replace(/_/g, ' ')} · ${cnt}`} value={p2} tone={type === 'POLICY' ? 'primary' : type === 'CERTIFICATE' ? 'success' : 'accent'} />;
+              })}
+            </Card>
+          </div>
+        </>
       )}
       {/* ── Frameworks tab — control/sub-control as prime key, framework as tab ── */}
       {tab === 'frameworks' && (

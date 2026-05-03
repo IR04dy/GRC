@@ -2,6 +2,24 @@
 // DTOs in lib/api.ts so framework-readiness charts and review workflow render
 // without authentication.
 import type { EvidenceItemDto, EvidenceRequestDto, EvidenceReviewDto } from '../../lib/api';
+import { ANCHOR_PACKS, type RegulatorAnchor } from '../../lib/evidenceAnchors';
+
+/**
+ * Multi-authority anchor map: each evidence id is bound to one or more
+ * authority + framework + control citations, tracking the control-status
+ * each authority sees. ServiceNow IRM "Citation" pattern.
+ */
+export const EVIDENCE_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
+  1: ANCHOR_PACKS.ISMS_POLICY,
+  2: ANCHOR_PACKS.VULN_SCAN,
+  3: ANCHOR_PACKS.FIREWALL_RULES,
+  4: ANCHOR_PACKS.PDPL_INVENTORY,
+  5: ANCHOR_PACKS.BACKUP_VALIDATION,
+  6: ANCHOR_PACKS.SAMA_ATTESTATION,
+  7: ANCHOR_PACKS.PAM_RECERT,
+  8: ANCHOR_PACKS.AUDIT_PLAN,
+  9: ANCHOR_PACKS.AWARENESS,
+};
 
 // ── Catalog (evidence items) ────────────────────────────────────────────────
 export const EVIDENCE: EvidenceItemDto[] = [
