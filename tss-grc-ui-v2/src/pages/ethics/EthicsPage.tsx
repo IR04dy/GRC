@@ -18,15 +18,15 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import {
-  ethicsCaseApi, disclosureApi, frameworkApi, ApiError,
+  ethicsCaseApi, disclosureApi, kycApi, frameworkApi, ApiError,
   type EthicsCaseDto, type CaseActionDto, type CaseLinkDto, type EthicsAnalyticsDto,
-  type DisclosureDto, type FrameworkDto,
+  type DisclosureDto, type KycSubjectDto, type ScreeningHitDto, type KycAnalyticsDto, type FrameworkDto,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 
-type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'analytics' | 'integrations';
+type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'analytics' | 'integrations';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   INTAKE: 'neutral', TRIAGE: 'info', INVESTIGATION: 'accent',
@@ -124,6 +124,7 @@ export function EthicsPage() {
     { id: 'kanban',       label: t('ethicsTabKanban') },
     { id: 'workflow',     label: t('ethicsTabWorkflow') },
     { id: 'disclosures',  label: t('ethicsTabDisclosures') },
+    { id: 'kyc',          label: t('ethicsTabKyc') },
     { id: 'analytics',    label: t('ethicsTabAnalytics') },
     { id: 'integrations', label: t('ethicsTabIntegrations') },
   ];
@@ -245,6 +246,8 @@ export function EthicsPage() {
       )}
 
       {tab === 'disclosures' && <DisclosuresTab t={t} lang={lang} toast={toast} demoMode={demoMode} ethicsFwOptions={ethicsFwOptions} />}
+
+      {tab === 'kyc' && <KycTab t={t} lang={lang} toast={toast} demoMode={demoMode} ethicsFwOptions={ethicsFwOptions} />}
 
       {tab === 'analytics' && <AnalyticsPanel analytics={analytics} t={t} />}
 
@@ -557,6 +560,221 @@ function IntegrationsPanel({ items, detailId, setDetailId, t, toast }: {
 function Loading() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+// ─── KYC (Sanctions / PEP / CDD / EDD) ─────────────────────────────────────
+const RISK_RATING_TONE: Record<string, BadgeTone> = {
+  LOW: 'success', STANDARD: 'info', HIGH: 'warning', PROHIBITED: 'danger',
+};
+const KYC_STATUS_TONE: Record<string, BadgeTone> = {
+  PENDING: 'neutral', UNDER_REVIEW: 'warning', APPROVED: 'success',
+  REJECTED: 'danger', OFFBOARDED: 'neutral',
+};
+const SUBJECT_TYPE_OPTIONS = [
+  { value: 'INDIVIDUAL',   label: 'Individual' },
+  { value: 'LEGAL_ENTITY', label: 'Legal entity' },
+];
+const RISK_RATING_OPTIONS = [
+  { value: 'LOW', label: 'Low' }, { value: 'STANDARD', label: 'Standard' },
+  { value: 'HIGH', label: 'High' }, { value: 'PROHIBITED', label: 'Prohibited' },
+];
+const CDD_LEVEL_OPTIONS = [
+  { value: 'SIMPLIFIED', label: 'Simplified' }, { value: 'STANDARD', label: 'Standard' }, { value: 'ENHANCED', label: 'Enhanced' },
+];
+const KYC_EMPTY: Partial<KycSubjectDto> = {
+  subjectType: 'INDIVIDUAL', riskRating: 'STANDARD', cddLevel: 'STANDARD',
+  status: 'PENDING', isPep: false, isSanctioned: false, eddRequired: false,
+  fullName: '',
+};
+
+function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
+  t: (k: string) => string;
+  lang: string;
+  toast: ReturnType<typeof useToast>;
+  demoMode: boolean;
+  ethicsFwOptions: { value: string; label: string }[];
+}) {
+  const [items, setItems] = useState<KycSubjectDto[]>([]);
+  const [analytics, setAnalytics] = useState<KycAnalyticsDto | null>(null);
+  const [hits, setHits] = useState<Record<number, ScreeningHitDto[]>>({});
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<KycSubjectDto | null>(null);
+  const [confirmDel, setConfirmDel] = useState<KycSubjectDto | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  async function load() {
+    if (demoMode) { setItems([]); setAnalytics(null); return; }
+    setLoading(true);
+    try {
+      const [page, an] = await Promise.all([
+        kycApi.list({ size: 200 }),
+        kycApi.analytics().catch(() => null),
+      ]);
+      setItems(page.content ?? []);
+      setAnalytics(an);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+
+  async function loadHits(id: number) {
+    if (hits[id]) return;
+    try { setHits(h => ({ ...h, [id]: [] })); /* placeholder */
+      const list = await kycApi.hits(id);
+      setHits(h => ({ ...h, [id]: list }));
+    } catch { setHits(h => ({ ...h, [id]: [] })); }
+  }
+
+  const FIELDS: FieldDef[] = [
+    { kind: 'text',     key: 'subjectCode',      label: t('kycFldCode'), span: 4, placeholder: 'KYC-IND-0001' },
+    { kind: 'select',   key: 'subjectType',      label: t('kycFldType') + ' *', required: true, options: SUBJECT_TYPE_OPTIONS, span: 4 },
+    { kind: 'select',   key: 'riskRating',       label: t('kycFldRisk'), options: RISK_RATING_OPTIONS, span: 4 },
+    { kind: 'text',     key: 'fullName',         label: t('kycFldFullName') + ' *', required: true, span: 6 },
+    { kind: 'text',     key: 'fullNameAr',       label: t('kycFldFullNameAr'), span: 6 },
+    { kind: 'text',     key: 'nationality',      label: t('kycFldNationality'), span: 3, placeholder: 'SAU' },
+    { kind: 'text',     key: 'countryOfResidence', label: t('kycFldResidence'), span: 3, placeholder: 'SAU' },
+    { kind: 'text',     key: 'nationalId',       label: t('kycFldNationalId'), span: 3 },
+    { kind: 'text',     key: 'commercialRegistration', label: t('kycFldCR'), span: 3 },
+    { kind: 'select',   key: 'cddLevel',         label: t('kycFldCddLevel'), options: CDD_LEVEL_OPTIONS, span: 4 },
+    { kind: 'select',   key: 'frameworkId',      label: t('ethicsFldFramework'), options: ethicsFwOptions, span: 4 },
+    { kind: 'date',     key: 'nextReviewDate',   label: t('fldNextReviewDate'), span: 4 },
+    { kind: 'textarea', key: 'notes',            label: t('kycFldNotes'), rows: 2, span: 12 },
+  ];
+
+  function reqFromDto(s: KycSubjectDto): Partial<KycSubjectDto> { return { ...s }; }
+
+  async function submitForm(values: Partial<KycSubjectDto>) {
+    try {
+      const v: Partial<KycSubjectDto> = { ...values };
+      if (typeof v.frameworkId === 'string') v.frameworkId = Number(v.frameworkId);
+      if (editing) await kycApi.update(editing.id, v);
+      else await kycApi.create(v);
+      toast.success(editing ? t('kycUpdated') : t('kycCreated'));
+      setModalOpen(false); setEditing(null); await load();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  async function executeDelete() {
+    if (!confirmDel) return;
+    setBusy(true);
+    try { await kycApi.remove(confirmDel.id); toast.success('Subject deleted'); await load(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Delete failed'); }
+    finally { setBusy(false); setConfirmDel(null); }
+  }
+
+  async function action(fn: () => Promise<unknown>, msg: string) {
+    try { await fn(); toast.success(msg); await load(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  const cols: Column<KycSubjectDto>[] = [
+    { header: t('kycFldCode'),    cell: s => <span className="mono" style={{ fontWeight: 600 }}>{s.subjectCode ?? '—'}</span>, width: '130px' },
+    { header: t('kycFldFullName'), cell: s => (
+      <div>
+        <div style={{ fontWeight: 600 }}>{lang === 'ar' && s.fullNameAr ? s.fullNameAr : s.fullName}</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.subjectType.replace(/_/g, ' ')}{s.nationality && ` · ${s.nationality}`}</div>
+      </div>
+    ) },
+    { header: t('kycFldRisk'),    cell: s => <Badge tone={RISK_RATING_TONE[s.riskRating] ?? 'neutral'} dot>{s.riskRating}</Badge>, width: '120px' },
+    { header: t('kycFldFlags'),   cell: s => (
+      <div style={{ display: 'flex', gap: 4 }}>
+        {s.isPep && <Badge tone="warning">PEP</Badge>}
+        {s.isSanctioned && <Badge tone="danger">SANCTIONED</Badge>}
+        {s.eddRequired && <Badge tone="accent">EDD</Badge>}
+      </div>
+    ), width: '180px' },
+    { header: t('kycFldCdd'),     cell: s => s.cddCompletedAt ? <Badge tone="success" dot>{t('kycCddDone')}</Badge> : <Badge tone="neutral">—</Badge>, width: '110px' },
+    { header: t('colStatus'),     cell: s => <Badge tone={KYC_STATUS_TONE[s.status] ?? 'neutral'} dot>{s.status.replace(/_/g, ' ')}</Badge>, width: '130px' },
+    { header: t('kycFldLastScreen'), cell: s => s.lastScreenedAt ? new Date(s.lastScreenedAt).toLocaleDateString() : '—', mono: true, width: '120px' },
+    { header: '', align: 'end', width: '300px',
+      cell: s => {
+        const extras: Array<{ Icon: typeof CheckCheck; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (!s.cddCompletedAt) extras.push({ Icon: CheckCheck, onClick: () => action(() => kycApi.completeCdd(s.id), t('kycCddCompleted')), title: t('kycCompleteCdd'), tone: 'primary' });
+        if (s.eddRequired && !s.eddCompletedAt) extras.push({ Icon: Stamp, onClick: () => action(() => kycApi.completeEdd(s.id), t('kycEddCompleted')), title: t('kycCompleteEdd'), tone: 'accent' });
+        extras.push({ Icon: Search, onClick: () => action(() => kycApi.runScreening(s.id), t('kycScreeningDone')), title: t('kycRunScreening'), tone: 'primary' });
+        if (s.status !== 'APPROVED' && s.status !== 'REJECTED') {
+          extras.push({ Icon: CheckCheck, onClick: () => action(() => kycApi.approve(s.id), t('kycApproved')), title: t('kycApprove'), tone: 'success' });
+          extras.push({ Icon: XIcon, onClick: () => {
+            const reason = window.prompt(t('kycRejectReason'), '') ?? '';
+            if (!reason) return;
+            void action(() => kycApi.reject(s.id, reason), t('kycRejected'));
+          }, title: t('kycReject') });
+        }
+        extras.push({ Icon: ChevronRight, onClick: () => { setExpandedId(prev => prev === s.id ? null : s.id); void loadHits(s.id); }, title: t('kycViewHits'), tone: 'accent' });
+        return <RowActions extras={extras} onEdit={() => { setEditing(s); setModalOpen(true); }} onDelete={() => setConfirmDel(s)} />;
+      } },
+  ];
+
+  return (
+    <>
+      {analytics && (
+        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))', marginBottom: 12 }}>
+          <Kpi Icon={Activity}    label={t('kycKpiTotal')}      value={analytics.total}      tone="primary" />
+          <Kpi Icon={CheckCheck}  label={t('kycKpiApproved')}   value={analytics.approved}   tone="success" />
+          <Kpi Icon={Stamp}       label={t('kycKpiPep')}        value={analytics.peps}       tone="accent" />
+          <Kpi Icon={ShieldAlert} label={t('kycKpiSanctioned')} value={analytics.sanctioned} tone="danger" />
+          <Kpi Icon={Lock}        label={t('kycKpiProhibited')} value={analytics.prohibited} tone="danger" />
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('kycDescription')}</div>
+        <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('kycNew')}</Button>
+      </div>
+      <Card padded={false}>
+        {loading ? <Loading /> :
+          items.length === 0
+            ? <EmptyState Icon={Search} title={t('kycEmptyTitle')} sub={t('kycEmptySub')} />
+            : (
+              <>
+                <DataTable columns={cols} rows={items} empty={<EmptyState />} />
+                {expandedId != null && (
+                  <div style={{ borderTop: '1px solid var(--border)', padding: 12, background: 'var(--surface-2)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--ink-2)' }}>
+                      {t('kycHitsFor')} #{expandedId}
+                    </div>
+                    {(hits[expandedId] ?? []).length === 0
+                      ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('kycNoHits')}</div>
+                      : (
+                        <div style={{ display: 'grid', gap: 6 }}>
+                          {(hits[expandedId] ?? []).map(h => (
+                            <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, background: 'var(--surface)', borderRadius: 'var(--r-sm)', fontSize: 12 }}>
+                              <Badge tone="primary">{h.listSource.replace(/_/g, ' ')}</Badge>
+                              <span className="mono" style={{ fontSize: 11 }}>{h.matchScore}%</span>
+                              <Badge tone={h.disposition === 'TRUE_MATCH' ? 'danger' : h.disposition === 'FALSE_POSITIVE' ? 'success' : 'warning'}>{h.disposition.replace(/_/g, ' ')}</Badge>
+                              {h.sarFiled && <Badge tone="accent">SAR {h.sarReference ? `· ${h.sarReference}` : ''}</Badge>}
+                              <span style={{ flex: 1, color: 'var(--ink-1)' }}>{h.matchSummary ?? '—'}</span>
+                              {h.decidedByName && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>— {h.decidedByName}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    }
+                  </div>
+                )}
+              </>
+            )
+        }
+      </Card>
+
+      <FormModal<Partial<KycSubjectDto>>
+        open={modalOpen}
+        title={editing ? `${t('editPrefix')} · ${editing.subjectCode ?? editing.fullName}` : t('kycNew')}
+        fields={FIELDS}
+        initial={editing ? reqFromDto(editing) : KYC_EMPTY}
+        onClose={() => { setModalOpen(false); setEditing(null); }}
+        onSubmit={submitForm}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDel} destructive busy={busy}
+        title={t('kycConfirmDelete')}
+        message={confirmDel ? `${confirmDel.fullName} ${t('confirmDeleteSuffix')}` : ''}
+        confirmLabel={t('deleteBtn')}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={executeDelete}
+      />
+    </>
+  );
 }
 
 // ─── Disclosures (CoI / Gifts / Hospitality / Outside Business) ────────────

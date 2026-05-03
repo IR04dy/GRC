@@ -217,6 +217,77 @@ export const disclosureApi = {
   analytics:  () => api.get<DisclosureAnalyticsDto>('/api/v1/ethics/disclosures/analytics'),
 };
 
+// ─── Ethics — Sanctions / PEP / CDD / EDD (KYC) ────────────────────────────
+export interface KycSubjectDto {
+  id: number; organisationId?: number;
+  subjectCode?: string;
+  subjectType: string;
+  fullName: string; fullNameAr?: string;
+  nationality?: string;
+  countryOfResidence?: string;
+  dateOfBirth?: string;
+  nationalId?: string;
+  commercialRegistration?: string;
+  subjectLinkType?: string; subjectLinkId?: number;
+  riskRating: string;
+  isPep?: boolean; isSanctioned?: boolean;
+  cddLevel: string;
+  cddCompletedAt?: string;
+  eddRequired?: boolean;
+  eddCompletedAt?: string;
+  lastScreenedAt?: string;
+  nextReviewDate?: string;
+  status: string;
+  frameworkId?: number;
+  notes?: string;
+  createdAt?: string;
+}
+export interface ScreeningHitDto {
+  id?: number; subjectId?: number;
+  listSource: string;
+  listEntryRef?: string;
+  matchScore: number;
+  matchSummary?: string;
+  screenedAt?: string;
+  disposition: string;
+  dispositionNotes?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  sarFiled?: boolean;
+  sarReference?: string;
+}
+export interface KycAnalyticsDto {
+  total: number; approved: number; rejected: number;
+  pending: number; underReview: number;
+  highRisk: number; prohibited: number;
+  peps: number; sanctioned: number;
+}
+export const kycApi = {
+  list: (qs: { type?: string; status?: string; risk?: string; page?: number; size?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (qs.type)   p.set('type', qs.type);
+    if (qs.status) p.set('status', qs.status);
+    if (qs.risk)   p.set('risk', qs.risk);
+    p.set('page', String(qs.page ?? 0));
+    p.set('size', String(qs.size ?? 100));
+    return api.get<PageResponse<KycSubjectDto>>(`/api/v1/ethics/kyc?${p.toString()}`);
+  },
+  get:        (id: number) => api.get<KycSubjectDto>(`/api/v1/ethics/kyc/${id}`),
+  create:     (body: Partial<KycSubjectDto>) => api.post<KycSubjectDto>('/api/v1/ethics/kyc', body),
+  update:     (id: number, body: Partial<KycSubjectDto>) => api.put<KycSubjectDto>(`/api/v1/ethics/kyc/${id}`, body),
+  remove:     (id: number) => api.delete<void>(`/api/v1/ethics/kyc/${id}`),
+  completeCdd:(id: number) => api.post<KycSubjectDto>(`/api/v1/ethics/kyc/${id}/cdd-complete`),
+  completeEdd:(id: number) => api.post<KycSubjectDto>(`/api/v1/ethics/kyc/${id}/edd-complete`),
+  approve:    (id: number) => api.post<KycSubjectDto>(`/api/v1/ethics/kyc/${id}/approve`),
+  reject:     (id: number, reason: string) => api.post<KycSubjectDto>(`/api/v1/ethics/kyc/${id}/reject`, { reason }),
+  runScreening:(id: number) => api.post<KycSubjectDto>(`/api/v1/ethics/kyc/${id}/screen`),
+  hits:       (id: number) => api.get<ScreeningHitDto[]>(`/api/v1/ethics/kyc/${id}/hits`),
+  recordHit:  (id: number, body: Partial<ScreeningHitDto>) => api.post<ScreeningHitDto>(`/api/v1/ethics/kyc/${id}/hits`, body),
+  disposition:(hitId: number, body: { disposition: string; notes?: string; decidedBy?: string; sarFiled?: boolean; sarReference?: string }) =>
+                api.post<ScreeningHitDto>(`/api/v1/ethics/kyc/hits/${hitId}/disposition`, body),
+  analytics:  () => api.get<KycAnalyticsDto>('/api/v1/ethics/kyc/analytics'),
+};
+
 // ─── Change Management (ITIL v4) ────────────────────────────────────────────
 export interface ChangeRequestDto {
   id: number; organisationId?: number;
