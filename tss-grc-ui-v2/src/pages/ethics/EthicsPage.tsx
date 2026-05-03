@@ -1076,7 +1076,7 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     { kind: 'text',     key: 'counterpartyName', label: t('discFldCounterparty'), span: 6 },
     { kind: 'text',     key: 'counterpartyRelationship', label: t('discFldCpRel'), span: 6 },
     { kind: 'number',   key: 'monetaryValue',  label: t('discFldValue'), span: 4 },
-    { kind: 'text',     key: 'currency',       label: t('discFldCurrency'), span: 2 },
+    { kind: 'text',     key: 'currency',       label: t('discFldCurrency'), span: 3 },
     { kind: 'date',     key: 'occurredOn',     label: t('discFldOccurredOn'), span: 6 },
     { kind: 'text',     key: 'clauseRef',      label: t('frameworkClauseRef'), span: 6 },
     { kind: 'textarea', key: 'description',    label: t('discFldDescription') + ' *', rows: 3, span: 12 },

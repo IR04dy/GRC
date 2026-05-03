@@ -27,11 +27,6 @@ const KIND_LABEL: Record<EntityKind, string> = {
   INCIDENT: 'Incident', CHANGE: 'Change',
 };
 
-const KIND_ORDER: EntityKind[] = [
-  'PAGE', 'RISK', 'FINDING', 'CONTROL', 'POLICY', 'EVIDENCE',
-  'AUTHORITY', 'VENDOR', 'DPIA', 'KRI', 'ENGAGEMENT', 'INCIDENT', 'CHANGE',
-];
-
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);

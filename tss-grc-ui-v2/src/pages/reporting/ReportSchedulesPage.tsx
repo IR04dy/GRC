@@ -102,7 +102,7 @@ export function ReportSchedulesPage() {
     { kind: 'select',   key: 'cadence',       label: t('rsFldCadence') + ' *', required: true, options: CADENCE_OPTIONS, span: 4 },
     { kind: 'text',     key: 'cadenceAnchor', label: t('rsFldAnchor'), span: 4, placeholder: t('rsAnchorPlaceholder') },
     { kind: 'text',     key: 'timeOfDay',     label: t('rsFldTimeOfDay') + ' (UTC)', span: 4, placeholder: '06:00' },
-    { kind: 'textarea', key: 'recipients',    label: t('rsFldRecipients') + ' *', required: true, rows: 2, span: 12, placeholder: 'a@x.com, b@y.com' },
+    { kind: 'textarea', key: 'recipients',    label: t('rsFldRecipients') + ' *', rows: 2, span: 12 },
     { kind: 'textarea', key: 'ccRecipients',  label: t('rsFldCc'), rows: 1, span: 12 },
     { kind: 'textarea', key: 'description',   label: t('rsFldDescription'), rows: 2, span: 12 },
   ];
@@ -201,7 +201,7 @@ export function ReportSchedulesPage() {
         <Kpi Icon={Calendar}     label={t('rsKpiTotal')}   value={items.length} tone="primary" />
         <Kpi Icon={Clock}        label={t('rsKpiActive')}  value={totalActive}  tone="success" />
         <Kpi Icon={CheckCheck}   label={t('rsKpiSent7d')}  value={sentLast7d}   tone="info" />
-        <Kpi Icon={AlertTriangle} label={t('rsKpiFailedToday')} value={failedToday} tone={failedToday > 0 ? 'danger' : 'neutral'} />
+        <Kpi Icon={AlertTriangle} label={t('rsKpiFailedToday')} value={failedToday} tone={failedToday > 0 ? 'danger' : 'success'} />
       </div>
 
       <Card padded={false}>

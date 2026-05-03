@@ -1029,7 +1029,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
             (policies.length === 0
               ? <EmptyState Icon={BookCopy} title={t('frameworkSheetEmptyTitle')} sub={t('frameworkSheetEmptySub')} />
               : (
-                <DataTable<FrameworkPolicyRowDto>
+                <DataTable<FrameworkPolicyRowDto & { id: number }>
                   columns={[
                     { header: t('fldCode'),       cell: p => <span className="mono" style={{ fontWeight: 600 }}>{p.code}</span>, width: '120px' },
                     { header: t('colTitle'),      cell: p => <span style={{ fontWeight: 600 }}>{p.titleEn}</span> },
@@ -1046,7 +1046,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                         </button>
                       ) },
                   ]}
-                  rows={policies}
+                  rows={policies.map(p => ({ ...p, id: p.mappingId }))}
                   empty={<EmptyState />}
                 />
               )

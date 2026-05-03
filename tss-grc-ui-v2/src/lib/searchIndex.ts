@@ -186,7 +186,7 @@ function buildEntityItems(): SearchItem[] {
       ref: i.incidentNumber,
       href: `/cyber?tab=incidents`,
       Icon: Flame,
-      keywords: [i.severity, i.status, i.incidentType ?? ''],
+      keywords: [i.severity ?? '', i.status ?? '', i.incidentType ?? ''],
     });
   }
 
