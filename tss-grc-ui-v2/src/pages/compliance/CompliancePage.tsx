@@ -27,7 +27,7 @@ import {
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
   type PolicyDto, type PolicyRequest,
   type AuditEngagementDto, type AuditEngagementRequest,
-  type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto, type FrameworkControlRowDto,
+  type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto, type FrameworkControlRowDto, type FrameworkDpiaRowDto,
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
@@ -819,10 +819,11 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
   const [coverage, setCoverage] = useState<Record<number, FrameworkCoverageDto>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
-  const [sheet, setSheet] = useState<'controls' | 'policies' | 'findings'>('controls');
+  const [sheet, setSheet] = useState<'controls' | 'policies' | 'findings' | 'dpias'>('controls');
   const [policies, setPolicies] = useState<FrameworkPolicyRowDto[]>([]);
   const [findings, setFindings] = useState<FrameworkFindingRowDto[]>([]);
   const [controls, setControls] = useState<FrameworkControlRowDto[]>([]);
+  const [dpias, setDpias] = useState<FrameworkDpiaRowDto[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -844,7 +845,8 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
       frameworkApi.policiesFor(activeId).catch(() => [] as FrameworkPolicyRowDto[]),
       frameworkApi.findingsFor(activeId).catch(() => [] as FrameworkFindingRowDto[]),
       frameworkApi.controlsFor(activeId).catch(() => [] as FrameworkControlRowDto[]),
-    ]).then(([p, f, c]) => { setPolicies(p); setFindings(f); setControls(c); }).finally(() => setLoading(false));
+      frameworkApi.dpiasFor(activeId).catch(() => [] as FrameworkDpiaRowDto[]),
+    ]).then(([p, f, c, d]) => { setPolicies(p); setFindings(f); setControls(c); setDpias(d); }).finally(() => setLoading(false));
   }, [activeId]);
 
   async function deleteMapping(mappingId: number) {
@@ -936,6 +938,11 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
             <button onClick={() => setSheet('findings')} style={sheetTabStyle(sheet === 'findings')}>
               {t('complianceTabFindings')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{findings.length}</span>
             </button>
+            {(activeCov?.dpiaCount ?? 0) > 0 && (
+              <button onClick={() => setSheet('dpias')} style={sheetTabStyle(sheet === 'dpias')}>
+                {t('frameworkSheetDpias')} <span style={{ marginInlineStart: 6, fontSize: 10, opacity: 0.7 }}>{dpias.length}</span>
+              </button>
+            )}
           </div>
           {loading ? <LoadingRow /> : sheet === 'controls' ?
             (controls.length === 0
@@ -980,7 +987,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                   empty={<EmptyState />}
                 />
               )
-            ) : (
+            ) : sheet === 'findings' ? (
               findings.length === 0
                 ? <EmptyState Icon={AlertTriangle} title={t('frameworkFindingsEmptyTitle')} sub={t('frameworkFindingsEmptySub')} />
                 : (
@@ -995,6 +1002,24 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                       { header: t('colStatus'),   cell: f => <Badge tone={f.status === 'CLOSED' ? 'success' : 'warning'} dot>{f.status}</Badge>, width: '110px' },
                     ]}
                     rows={findings}
+                    empty={<EmptyState />}
+                  />
+                )
+            ) : (
+              dpias.length === 0
+                ? <EmptyState Icon={Search} title={t('frameworkDpiasEmptyTitle')} sub={t('frameworkDpiasEmptySub')} />
+                : (
+                  <DataTable<FrameworkDpiaRowDto>
+                    columns={[
+                      { header: t('colTitle'),    cell: d => <span style={{ fontWeight: 600 }}>{d.titleEn}</span> },
+                      { header: t('frameworkClauseRef'), cell: d => <span className="mono">{d.clauseRef ?? '—'}</span>, width: '120px' },
+                      { header: t('dpiaTrigger'), cell: d => d.triggerReason ? <Badge tone="info">{d.triggerReason.replace(/_/g, ' ')}</Badge> : '—', width: '180px' },
+                      { header: t('dpiaResidualRisk'), cell: d => d.overallResidualRisk ? <Badge tone={RISK_TONE_BADGE[d.overallResidualRisk] ?? 'neutral'} dot>{d.overallResidualRisk}</Badge> : '—', width: '120px' },
+                      { header: t('colDate'),     cell: d => d.assessmentDate ?? '—', mono: true, width: '110px' },
+                      { header: t('fldNextReviewDate'), cell: d => d.nextReviewDate ?? '—', mono: true, width: '120px' },
+                      { header: t('colStatus'),   cell: d => <Badge tone={d.status === 'APPROVED' ? 'success' : d.status === 'REJECTED' ? 'danger' : 'info'} dot>{d.status}</Badge>, width: '120px' },
+                    ]}
+                    rows={dpias}
                     empty={<EmptyState />}
                   />
                 )

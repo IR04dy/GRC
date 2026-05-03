@@ -403,6 +403,11 @@ export const en = {
   frameworkFindingsEmptySub:   'When new findings are tagged with this framework, they appear here automatically.',
   frameworkControlsEmptyTitle: 'No controls anchored to this framework',
   frameworkControlsEmptySub:   'Open the Controls tab and create controls scoped to this framework — they will appear here.',
+  frameworkSheetDpias:         'DPIAs',
+  frameworkDpiasEmptyTitle:    'No DPIAs filed under this framework',
+  frameworkDpiasEmptySub:      'Privacy assessments anchored on this framework (typically PDPL or GDPR for cross-border transfers) will appear here.',
+  dpiaTrigger:                 'Trigger',
+  dpiaResidualRisk:            'Residual Risk',
 
   // Audit engagement (assessment §5.3 #3)
   engagementFldCode:           'Code',

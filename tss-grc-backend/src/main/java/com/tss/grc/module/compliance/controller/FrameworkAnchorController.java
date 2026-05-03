@@ -11,6 +11,8 @@ import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
 import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
 import com.tss.grc.module.compliance.repository.PolicyRepository;
+import com.tss.grc.module.privacy.entity.Dpia;
+import com.tss.grc.module.privacy.repository.DpiaRepository;
 import org.springframework.data.domain.PageRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -50,6 +52,7 @@ public class FrameworkAnchorController {
     private final PolicyFrameworkMappingRepository mappingRepo;
     private final AuditFindingRepository findingRepo;
     private final ControlRepository controlRepo;
+    private final DpiaRepository dpiaRepo;
 
     @GetMapping("/frameworks")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
@@ -187,6 +190,7 @@ public class FrameworkAnchorController {
             r.put("controlCount",   ctrls.size());
             r.put("implementedControls", implemented);
             r.put("avgMaturity",    avgMaturity);
+            r.put("dpiaCount",      dpiaRepo.countByOrganisationIdAndFrameworkId(org, f.getId()));
             out.add(r);
         }
         return out;
@@ -209,6 +213,29 @@ public class FrameworkAnchorController {
             row.put("maturityLevel", c.getMaturityLevel());
             row.put("status",        c.getStatus());
             row.put("owner",         c.getOwner());
+            out.add(row);
+        }
+        return out;
+    }
+
+    @GetMapping("/frameworks/{id}/dpias")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
+    @Operation(summary = "All DPIAs anchored on a given framework (IA-4).")
+    public List<Map<String, Object>> dpiasForFramework(@PathVariable Long id) {
+        Long org = TenantContext.getCurrentTenant();
+        List<Dpia> dpias = dpiaRepo.findByOrganisationIdAndFrameworkId(org, id);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Dpia d : dpias) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id",                  d.getId());
+            row.put("titleEn",             d.getTitleEn());
+            row.put("titleAr",             d.getTitleAr());
+            row.put("triggerReason",       d.getTriggerReason());
+            row.put("status",              d.getStatus());
+            row.put("overallResidualRisk", d.getOverallResidualRisk());
+            row.put("assessmentDate",      d.getAssessmentDate());
+            row.put("nextReviewDate",      d.getNextReviewDate());
+            row.put("clauseRef",           d.getClauseRef());
             out.add(row);
         }
         return out;

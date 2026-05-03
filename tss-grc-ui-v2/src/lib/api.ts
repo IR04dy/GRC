@@ -988,6 +988,7 @@ export interface FrameworkCoverageDto {
   outOfScope: number; notApplicable: number;
   openFindings?: number; closedFindings?: number;
   controlCount?: number; implementedControls?: number; avgMaturity?: number;
+  dpiaCount?: number;
 }
 export interface FrameworkFindingRowDto {
   id: number; title: string;
@@ -1002,11 +1003,21 @@ export interface FrameworkControlRowDto {
   domain?: string; maturityLevel?: number;
   status?: string; owner?: string;
 }
+export interface FrameworkDpiaRowDto {
+  id: number;
+  titleEn: string; titleAr?: string;
+  triggerReason?: string;
+  status?: string;
+  overallResidualRisk?: string;
+  assessmentDate?: string; nextReviewDate?: string;
+  clauseRef?: string;
+}
 export const frameworkApi = {
   list:           ()                 => api.get<FrameworkDto[]>('/api/v1/compliance/frameworks'),
   policiesFor:    (frameworkId: number) => api.get<FrameworkPolicyRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/policies`),
   findingsFor:    (frameworkId: number) => api.get<FrameworkFindingRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/findings`),
   controlsFor:    (frameworkId: number) => api.get<FrameworkControlRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/controls`),
+  dpiasFor:       (frameworkId: number) => api.get<FrameworkDpiaRowDto[]>(`/api/v1/compliance/frameworks/${frameworkId}/dpias`),
   mappingsFor:    (policyId: number) => api.get<PolicyMappingDto[]>(`/api/v1/compliance/policies/${policyId}/mappings`),
   addMapping:     (policyId: number, body: { frameworkId: number; clauseRef?: string; satisfaction?: string; notes?: string }) =>
                     api.post<PolicyMappingDto>(`/api/v1/compliance/policies/${policyId}/mappings`, body),

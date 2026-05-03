@@ -80,4 +80,11 @@ public class Dpia {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /** Framework anchor (IA-4) — defaults to PDPL for Saudi-resident DPIAs. */
+    @Column(name = "framework_id")
+    private Long frameworkId;
+
+    @Column(name = "clause_ref", length = 100)
+    private String clauseRef;
 }

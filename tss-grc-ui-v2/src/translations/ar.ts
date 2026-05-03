@@ -395,6 +395,11 @@ export const ar = {
   frameworkFindingsEmptySub:   'عند تسجيل ملاحظات جديدة بهذا الإطار ستظهر هنا تلقائيًا.',
   frameworkControlsEmptyTitle: 'لا توجد ضوابط مرتبطة بهذا الإطار',
   frameworkControlsEmptySub:   'افتح تبويب الضوابط وأنشئ ضوابط ضمن هذا الإطار لتظهر هنا.',
+  frameworkSheetDpias:         'تقييمات أثر الخصوصية',
+  frameworkDpiasEmptyTitle:    'لا توجد تقييمات أثر مرتبطة بهذا الإطار',
+  frameworkDpiasEmptySub:      'تقييمات أثر الخصوصية المرتبطة بهذا الإطار (عادة PDPL أو GDPR للتحويلات العابرة) ستظهر هنا.',
+  dpiaTrigger:                 'المُحفّز',
+  dpiaResidualRisk:            'المخاطر المتبقية',
 
   // مهام التدقيق الخارجي (§5.3 توصية رقم ٣)
   engagementFldCode:           'الرمز',
