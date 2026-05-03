@@ -8,6 +8,14 @@ export const ar = {
   navTools: 'الأدوات',
   navSettings: 'الإعدادات',
 
+  // مجموعات الشريط الجانبي (نمط مساحات العمل)
+  navWorkspaces:        'مساحات العمل',
+  navRiskResilience:    'المخاطر والصمود',
+  navCompliancePrivacy: 'الامتثال والخصوصية',
+  navCyberInfra:        'الأمن السيبراني والبنية التحتية',
+  navThirdPartySupply:  'الأطراف الثالثة وسلسلة الإمداد',
+  navConfigure:         'الإعداد',
+
   itemDashboard: 'لوحة المعلومات',
   itemModules: 'الوحدات',
   itemAbout: 'حول',

@@ -10,6 +10,14 @@ export const en = {
   navTools: 'Tools',
   navSettings: 'Settings',
 
+  // Sidebar groups (role-workspace pattern)
+  navWorkspaces:        'Workspaces',
+  navRiskResilience:    'Risk & Resilience',
+  navCompliancePrivacy: 'Compliance & Privacy',
+  navCyberInfra:        'Cybersecurity & Infrastructure',
+  navThirdPartySupply:  'Third-Party & Supply Chain',
+  navConfigure:         'Configure',
+
   itemDashboard: 'Dashboard',
   itemModules: 'Modules',
   itemAbout: 'About',
