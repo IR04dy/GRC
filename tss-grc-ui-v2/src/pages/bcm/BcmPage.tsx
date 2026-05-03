@@ -32,7 +32,9 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { BCM_PLANS, BCM_PROCESSES, BCM_BIA, BCM_EXERCISES } from './mockBcm';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { BCM_WORKFLOWS } from '../../lib/mockWorkflows';
+import { BCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows';
 
@@ -388,6 +390,12 @@ export function BcmPage() {
         <Kpi Icon={Gauge}      label={t('bcmKpiExercises')} value="92%" trend={{ dir: 'up', value: '+5%' }} tone="success" />
         <Kpi Icon={TimerReset} label={t('bcmKpiRto')}       value="76%" trend={{ dir: 'down', value: '−2%' }} tone="warning" />
       </div>
+
+      <ProcessLifecycleBar
+        title="Business Continuity — Processes & Lifecycles"
+        subtitle="ISO 22301 + ISO 22313 + ISO 22361 — every named process active in this domain."
+        lifecycles={BCM_LIFECYCLES} lang="en" />
+
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (

@@ -31,7 +31,9 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS } from './mockEvidence';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { EVIDENCE_WORKFLOWS } from '../../lib/mockWorkflows';
+import { EVIDENCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'overview' | 'frameworks' | 'connectors' | 'catalog' | 'requests' | 'review' | 'expired' | 'workflows';
 
@@ -248,6 +250,12 @@ export function EvidencePage() {
         <Kpi Icon={CalendarX}  label={t('evidenceKpiExpiring')} value={expiredItems.length} tone="danger" />
         <Kpi Icon={BadgeCheck} label={t('evidenceKpiApproved')} value={`${pct}%`} tone="success" />
       </div>
+
+      <ProcessLifecycleBar
+        title="Evidence Management — Processes & Lifecycles"
+        subtitle="ISO 19011 + IIA Std 2330 + ISACA CCM — every named process active in this domain."
+        lifecycles={EVIDENCE_LIFECYCLES} lang="en" />
+
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (

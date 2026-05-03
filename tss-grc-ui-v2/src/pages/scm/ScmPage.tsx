@@ -34,6 +34,8 @@ import {
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { SUPPLIERS, ONBOARDING, ASSESSMENTS, DEPENDENCIES, CONTRACTS, DISRUPTIONS } from './mockScm';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
+import { SCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'overview' | 'suppliers' | 'onboarding' | 'workflow' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
 
@@ -675,6 +677,11 @@ export function ScmPage() {
         <Kpi Icon={FileSignature} label={t('scmKpiExpiringContracts')} value={expiringContracts} tone="info" />
         <Kpi Icon={Star}          label={t('scmKpiAvgScore')}          value={String(avgAssessmentScore(assessments.data))} tone="success" />
       </div>
+      <ProcessLifecycleBar
+        title="Supply Chain — Processes & Lifecycles"
+        subtitle="ISO 28001 + ISO 28000 + ISO 31000 + OCC concentration — every named process active in this domain."
+        lifecycles={SCM_LIFECYCLES} lang="en" />
+
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (

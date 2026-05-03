@@ -32,6 +32,8 @@ import {
   KYC_SUBJECTS, KYC_HITS_BY_SUBJECT,
   AML_ALERTS, AML_ANALYTICS,
 } from './mockEthics';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
+import { ETHICS_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'aml' | 'analytics' | 'integrations';
 
@@ -232,6 +234,11 @@ export function EthicsPage() {
         <Kpi Icon={Flame}          label={t('ethicsKpiCritical')}     value={critical}  tone="danger" />
         <Kpi Icon={Stamp}          label={t('ethicsKpiSubstantiated')} value={`${substantPct}%`} tone="accent" />
       </div>
+
+      <ProcessLifecycleBar
+        title="Ethics & Financial Crime — Processes & Lifecycles"
+        subtitle="ISO 37001 / ISO 37002 + Saudi Anti-Corruption Law + SAMA AML + FATF — every named process active in this domain."
+        lifecycles={ETHICS_LIFECYCLES} lang={lang} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

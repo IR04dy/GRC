@@ -24,6 +24,8 @@ import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type Reg
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
+import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'overview' | 'register' | 'timeline' | 'lessons';
 
@@ -209,6 +211,12 @@ export function IncidentsPage() {
         <Kpi Icon={Timer}        label={t('incidentsKpiMttr')}     value="4.2h" trend={{ dir: 'down', value: '−1.1h' }} tone="success" />
         <Kpi Icon={CheckCircle2} label={t('incidentsKpiClosed')}   value={closed} tone="primary" />
       </div>
+
+      <ProcessLifecycleBar
+        title="Incident Management — Processes & Lifecycles"
+        subtitle="NIST SP 800-61 + ISO 27035 + Saudi regulator (NCA HEY 24-hr / SDA 72-hr / CITC 24-hr) — every named process active in this domain."
+        lifecycles={INCIDENT_LIFECYCLES} lang="en" />
+
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (

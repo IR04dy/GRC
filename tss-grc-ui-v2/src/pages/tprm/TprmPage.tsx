@@ -20,7 +20,9 @@ import { tprmApi, ApiError, type TprmVendorDto, type TprmVendorRequest } from '.
 import { useToast } from '../../lib/toast';
 import { VENDORS } from './mockTprm';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { TPRM_WORKFLOWS } from '../../lib/mockWorkflows';
+import { TPRM_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'overview' | 'vendors' | 'assessments' | 'contracts' | 'workflows';
 
@@ -142,6 +144,12 @@ export function TprmPage() {
         <Kpi Icon={AlertTriangle} label={t('tprmKpiOpenRisks')}  value={vendors.data.filter(v => v.status === 'UNDER_REVIEW').length} tone="warning" />
         <Kpi Icon={CalendarClock} label={t('tprmKpiReviews')}    value={expiringContracts.filter(c => c.days <= 90).length} tone="info" />
       </div>
+
+      <ProcessLifecycleBar
+        title="Third-Party Risk — Processes & Lifecycles"
+        subtitle="NIST SP 800-161 + ISO 27036 + OCC 2013-29 — every named process active in this domain."
+        lifecycles={TPRM_LIFECYCLES} lang="en" />
+
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (

@@ -41,7 +41,9 @@ import {
   FRAMEWORK_DPIAS_BY_ID, FRAMEWORK_KRIS_BY_ID, FRAMEWORK_RISKS_BY_ID,
 } from './mockCompliance';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { COMPLIANCE_WORKFLOWS } from '../../lib/mockWorkflows';
+import { COMPLIANCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks' | 'workflows';
 
@@ -656,6 +658,11 @@ export function CompliancePage() {
         <Kpi Icon={FileCheck2}     label={t('complianceKpiEvidence')}   value="1,283" tone="info" onClick={() => setTab('findings')} />
         <Kpi Icon={Award}          label={t('complianceKpiScore')}      value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" onClick={() => setTab('scorecard')} />
       </div>
+      <ProcessLifecycleBar
+        title="Compliance & Audit — Processes & Lifecycles"
+        subtitle="ISO 19011 + IIA + COSO IC + SOX 404 — every named process active in this domain."
+        lifecycles={COMPLIANCE_LIFECYCLES} lang="en" />
+
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (

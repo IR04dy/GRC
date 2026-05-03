@@ -22,7 +22,9 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
+import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
 
 type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows';
 
@@ -225,6 +227,12 @@ export function PrivacyPage() {
         <Kpi Icon={Users}       label={t('privacyKpiConsent')}    value="98%" tone="success" />
         <Kpi Icon={ShieldAlert} label={t('privacyKpiBreaches')}   value={breaches.data.filter(b => b.status !== 'CLOSED').length} tone="danger" />
       </div>
+
+      <ProcessLifecycleBar
+        title="Privacy & PDPL — Processes & Lifecycles"
+        subtitle="Saudi PDPL + GDPR + ISO 27701 — every named process active in this domain."
+        lifecycles={PRIVACY_LIFECYCLES} lang="en" />
+
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
