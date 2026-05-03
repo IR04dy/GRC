@@ -1,11 +1,16 @@
 import { Link } from 'react-router-dom';
-import { Landmark, ArrowRight } from 'lucide-react';
+import { Landmark, ArrowRight, Grid3x3 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { AUTHORITIES, type AuthorityDto } from '../../lib/authorities';
+import { AUTHORITIES, type AuthorityDto, type AuthorityDomain } from '../../lib/authorities';
 import { useI18n } from '../../lib/i18n';
+import { CoverageMatrix, type MatrixRow } from '../../components/viz/CoverageMatrix';
+import {
+  RISK_ANCHORS, CYBER_ANCHORS, PRIVACY_ANCHORS, BCM_ANCHORS,
+  TPRM_ANCHORS, SCM_ANCHORS, ETHICS_ANCHORS, INCIDENT_ANCHORS, CHANGE_ANCHORS,
+} from '../../lib/moduleAnchors';
 
 /**
  * Directory of every regulatory + advisory authority the platform tracks.
@@ -46,7 +51,61 @@ export function AuthoritiesIndexPage() {
           {intl.map(a => <AuthorityCard key={a.code} a={a} lang={lang} />)}
         </div>
       </Card>
+
+      {/* Cross-authority coverage matrix — every authority × every domain */}
+      <CrossAuthorityMatrix />
     </Shell>
+  );
+}
+
+// Domain columns shown in the cross-authority matrix
+const DOMAIN_COLS: AuthorityDomain[] = [
+  'CYBER', 'PRIVACY', 'BCM', 'RISK', 'TPRM', 'SCM',
+  'ETHICS', 'AML', 'COMPLIANCE', 'GOVERNANCE', 'CLOUD', 'TELECOM', 'FINANCE', 'TAX', 'HR',
+];
+
+function CrossAuthorityMatrix() {
+  const allAnchors = [
+    ...RISK_ANCHORS, ...CYBER_ANCHORS, ...PRIVACY_ANCHORS, ...BCM_ANCHORS,
+    ...TPRM_ANCHORS, ...SCM_ANCHORS, ...ETHICS_ANCHORS, ...INCIDENT_ANCHORS, ...CHANGE_ANCHORS,
+  ];
+  // Build per-authority per-domain cited-control counts.
+  const counts = new Map<string, Map<AuthorityDomain, number>>();
+  for (const a of allAnchors) {
+    const auth = AUTHORITIES.find(x => x.code === a.authorityCode);
+    if (!auth) continue;
+    if (!counts.has(a.authorityCode)) counts.set(a.authorityCode, new Map());
+    const m = counts.get(a.authorityCode)!;
+    for (const d of auth.domains) m.set(d, (m.get(d) ?? 0) + 1);
+  }
+
+  const rows: MatrixRow[] = AUTHORITIES
+    .filter(a => counts.has(a.code))
+    .map(a => ({
+      label: a.code,
+      sublabel: a.nameEn,
+      href: `/authority/${a.code}`,
+      cells: DOMAIN_COLS.map(d => ({
+        tone: a.domains.includes(d)
+          ? (counts.get(a.code)?.get(d) ?? 0) > 0 ? 'primary' : 'neutral'
+          : 'neutral',
+        value: counts.get(a.code)?.get(d) ?? 0,
+        href: `/authority/${a.code}`,
+        title: `${a.nameEn} — ${d}: ${counts.get(a.code)?.get(d) ?? 0} cited control(s)`,
+      })),
+    }));
+
+  return (
+    <Card title="Cross-authority coverage matrix" Icon={Grid3x3}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+        Cell value = cited controls anchored to that authority across that domain. Click any row to drill into the authority workspace.
+      </div>
+      <CoverageMatrix
+        rowHeaderLabel="Authority"
+        columnLabels={DOMAIN_COLS}
+        rows={rows}
+      />
+    </Card>
   );
 }
 

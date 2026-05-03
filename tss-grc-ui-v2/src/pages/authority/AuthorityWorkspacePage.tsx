@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Landmark, FileText, AlertTriangle, ClipboardCheck, Briefcase,
-  ArrowLeft, ExternalLink, BookCopy, ScrollText,
+  ArrowLeft, ExternalLink, BookCopy, ScrollText, Layers,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { Card } from '../../components/ui/Card';
@@ -12,6 +12,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Donut } from '../../components/viz/Donut';
+import { CoverageMatrix } from '../../components/viz/CoverageMatrix';
 import { findAuthority } from '../../lib/authorities';
 import {
   RISK_ANCHORS, CYBER_ANCHORS, PRIVACY_ANCHORS, BCM_ANCHORS,
@@ -183,6 +184,31 @@ export function AuthorityWorkspacePage() {
               </div>}
         </Card>
       </div>
+
+      {/* Framework × Status heatmap */}
+      <Card title="Framework × Status matrix" Icon={Layers}>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+          Cell value = number of cited controls in that framework with that status. Cells shaded by status colour, intensity proportional to count.
+        </div>
+        <CoverageMatrix
+          rowHeaderLabel="Framework"
+          columnLabels={['Implemented', 'Partial', 'Compensating', 'Not implemented', 'N/A']}
+          rows={authority.frameworkCodes.map(fw => {
+            const fwAnchors = myAnchors.filter(a => a.frameworkCode === fw);
+            return {
+              label: fw.replace(/_/g, ' '),
+              sublabel: `${fwAnchors.length} cited control${fwAnchors.length !== 1 ? 's' : ''}`,
+              cells: [
+                { tone: 'success', value: fwAnchors.filter(a => a.controlStatus === 'IMPLEMENTED').length },
+                { tone: 'warning', value: fwAnchors.filter(a => a.controlStatus === 'PARTIAL').length },
+                { tone: 'accent',  value: fwAnchors.filter(a => a.controlStatus === 'COMPENSATING').length },
+                { tone: 'danger',  value: fwAnchors.filter(a => a.controlStatus === 'NOT_IMPLEMENTED').length },
+                { tone: 'neutral', value: fwAnchors.filter(a => a.controlStatus === 'NOT_APPLICABLE').length },
+              ],
+            };
+          })}
+        />
+      </Card>
 
       {/* Citation library */}
       <Card title="Citation library" Icon={ScrollText} action={<Badge tone="primary">{citationLib.length}</Badge>}>
