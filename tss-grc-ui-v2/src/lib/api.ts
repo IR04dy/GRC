@@ -170,6 +170,53 @@ export const ethicsCaseApi = {
   analytics:  () => api.get<EthicsAnalyticsDto>('/api/v1/ethics/cases/analytics'),
 };
 
+// ─── Ethics — Disclosures (CoI / Gifts / Hospitality / Outside Business) ──
+export interface DisclosureDto {
+  id: number; organisationId?: number;
+  disclosureCode?: string;
+  disclosureType: string;
+  titleEn: string; titleAr?: string;
+  description: string;
+  discloserName: string;
+  discloserEmail?: string;
+  discloserDepartment?: string;
+  discloserRole?: string;
+  counterpartyName?: string;
+  counterpartyRelationship?: string;
+  monetaryValue?: number;
+  currency?: string;
+  occurredOn?: string;
+  status: string;
+  decision?: string;
+  decisionNotes?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  frameworkId?: number;
+  clauseRef?: string;
+  createdAt?: string;
+}
+export interface DisclosureAnalyticsDto {
+  total: number;
+  byStatus: Record<string, number>;
+  byType: Record<string, number>;
+}
+export const disclosureApi = {
+  list: (qs: { type?: string; status?: string; page?: number; size?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (qs.type)   p.set('type', qs.type);
+    if (qs.status) p.set('status', qs.status);
+    p.set('page', String(qs.page ?? 0));
+    p.set('size', String(qs.size ?? 100));
+    return api.get<PageResponse<DisclosureDto>>(`/api/v1/ethics/disclosures?${p.toString()}`);
+  },
+  get:        (id: number) => api.get<DisclosureDto>(`/api/v1/ethics/disclosures/${id}`),
+  create:     (body: Partial<DisclosureDto>) => api.post<DisclosureDto>('/api/v1/ethics/disclosures', body),
+  update:     (id: number, body: Partial<DisclosureDto>) => api.put<DisclosureDto>(`/api/v1/ethics/disclosures/${id}`, body),
+  remove:     (id: number) => api.delete<void>(`/api/v1/ethics/disclosures/${id}`),
+  transition: (id: number, body: Record<string, unknown>) => api.post<DisclosureDto>(`/api/v1/ethics/disclosures/${id}/transition`, body),
+  analytics:  () => api.get<DisclosureAnalyticsDto>('/api/v1/ethics/disclosures/analytics'),
+};
+
 // ─── Change Management (ITIL v4) ────────────────────────────────────────────
 export interface ChangeRequestDto {
   id: number; organisationId?: number;

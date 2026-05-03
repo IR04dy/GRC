@@ -18,15 +18,15 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import {
-  ethicsCaseApi, frameworkApi, ApiError,
+  ethicsCaseApi, disclosureApi, frameworkApi, ApiError,
   type EthicsCaseDto, type CaseActionDto, type CaseLinkDto, type EthicsAnalyticsDto,
-  type FrameworkDto,
+  type DisclosureDto, type FrameworkDto,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 
-type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations';
+type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'analytics' | 'integrations';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   INTAKE: 'neutral', TRIAGE: 'info', INVESTIGATION: 'accent',
@@ -123,6 +123,7 @@ export function EthicsPage() {
     { id: 'register',     label: t('ethicsTabRegister') },
     { id: 'kanban',       label: t('ethicsTabKanban') },
     { id: 'workflow',     label: t('ethicsTabWorkflow') },
+    { id: 'disclosures',  label: t('ethicsTabDisclosures') },
     { id: 'analytics',    label: t('ethicsTabAnalytics') },
     { id: 'integrations', label: t('ethicsTabIntegrations') },
   ];
@@ -242,6 +243,8 @@ export function EthicsPage() {
                        t={t} lang={lang} toast={toast}
                        reload={load} />
       )}
+
+      {tab === 'disclosures' && <DisclosuresTab t={t} lang={lang} toast={toast} demoMode={demoMode} ethicsFwOptions={ethicsFwOptions} />}
 
       {tab === 'analytics' && <AnalyticsPanel analytics={analytics} t={t} />}
 
@@ -554,4 +557,151 @@ function IntegrationsPanel({ items, detailId, setDetailId, t, toast }: {
 function Loading() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+// ─── Disclosures (CoI / Gifts / Hospitality / Outside Business) ────────────
+const DISCLOSURE_TYPE_OPTIONS = [
+  'CONFLICT_OF_INTEREST', 'GIFT_RECEIVED', 'GIFT_GIVEN', 'HOSPITALITY',
+  'OUTSIDE_BUSINESS', 'RELATED_PARTY', 'POLITICAL_DONATION', 'CHARITABLE',
+].map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
+const DISCLOSURE_STATUS_TONE: Record<string, BadgeTone> = {
+  DRAFT: 'neutral', SUBMITTED: 'info', REVIEW: 'warning',
+  APPROVED: 'success', REJECTED: 'danger', RECUSED: 'accent', MITIGATED: 'primary',
+};
+
+const DISCLOSURE_EMPTY: Partial<DisclosureDto> = {
+  disclosureType: 'CONFLICT_OF_INTEREST', status: 'DRAFT',
+  titleEn: '', description: '', discloserName: '', currency: 'SAR',
+};
+
+function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
+  t: (k: string) => string;
+  lang: string;
+  toast: ReturnType<typeof useToast>;
+  demoMode: boolean;
+  ethicsFwOptions: { value: string; label: string }[];
+}) {
+  const [items, setItems] = useState<DisclosureDto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<DisclosureDto | null>(null);
+  const [confirmDel, setConfirmDel] = useState<DisclosureDto | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    if (demoMode) { setItems([]); return; }
+    setLoading(true);
+    try { setItems((await disclosureApi.list({ size: 200 })).content ?? []); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+
+  const FIELDS: FieldDef[] = [
+    { kind: 'text',     key: 'disclosureCode', label: t('discFldCode'), span: 4, placeholder: 'DISC-2025-0042' },
+    { kind: 'select',   key: 'disclosureType', label: t('discFldType') + ' *', required: true, options: DISCLOSURE_TYPE_OPTIONS, span: 4 },
+    { kind: 'select',   key: 'frameworkId',    label: t('ethicsFldFramework'), options: ethicsFwOptions, span: 4 },
+    { kind: 'text',     key: 'titleEn',        label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'titleAr',        label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'discloserName',  label: t('discFldDiscloser') + ' *', required: true, span: 6 },
+    { kind: 'text',     key: 'discloserEmail', label: t('discFldDiscloserEmail'), span: 6 },
+    { kind: 'text',     key: 'discloserDepartment', label: t('discFldDept'), span: 6 },
+    { kind: 'text',     key: 'discloserRole',  label: t('discFldRole'), span: 6 },
+    { kind: 'text',     key: 'counterpartyName', label: t('discFldCounterparty'), span: 6 },
+    { kind: 'text',     key: 'counterpartyRelationship', label: t('discFldCpRel'), span: 6 },
+    { kind: 'number',   key: 'monetaryValue',  label: t('discFldValue'), span: 4 },
+    { kind: 'text',     key: 'currency',       label: t('discFldCurrency'), span: 2 },
+    { kind: 'date',     key: 'occurredOn',     label: t('discFldOccurredOn'), span: 6 },
+    { kind: 'text',     key: 'clauseRef',      label: t('frameworkClauseRef'), span: 6 },
+    { kind: 'textarea', key: 'description',    label: t('discFldDescription') + ' *', rows: 3, span: 12 },
+  ];
+
+  function reqFromDto(d: DisclosureDto): Partial<DisclosureDto> { return { ...d }; }
+
+  async function submitForm(values: Partial<DisclosureDto>) {
+    try {
+      const v: Partial<DisclosureDto> = { ...values };
+      if (typeof v.frameworkId === 'string') v.frameworkId = Number(v.frameworkId);
+      if (typeof v.monetaryValue === 'string') v.monetaryValue = Number(v.monetaryValue);
+      if (editing) await disclosureApi.update(editing.id, v);
+      else await disclosureApi.create(v);
+      toast.success(editing ? t('discUpdated') : t('discCreated'));
+      setModalOpen(false); setEditing(null); await load();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  async function executeDelete() {
+    if (!confirmDel) return;
+    setBusy(true);
+    try { await disclosureApi.remove(confirmDel.id); toast.success('Disclosure deleted'); await load(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Delete failed'); }
+    finally { setBusy(false); setConfirmDel(null); }
+  }
+  async function transition(d: DisclosureDto, target: string) {
+    const decidedBy = ['APPROVED','REJECTED','RECUSED','MITIGATED'].includes(target)
+      ? (window.prompt(t('discDecidedByPrompt'), '') ?? '') : '';
+    const notes = ['APPROVED','REJECTED','RECUSED','MITIGATED'].includes(target)
+      ? (window.prompt(t('discDecisionNotesPrompt'), '') ?? '') : '';
+    try { await disclosureApi.transition(d.id, { target, decidedBy, notes }); toast.success(`→ ${target}`); await load(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Transition failed'); }
+  }
+  function nextDiscStatus(d: DisclosureDto): string | null {
+    switch (d.status) {
+      case 'DRAFT':     return 'SUBMITTED';
+      case 'SUBMITTED': return 'REVIEW';
+      case 'REVIEW':    return 'APPROVED';
+      default:          return null;
+    }
+  }
+
+  const cols: Column<DisclosureDto>[] = [
+    { header: t('discFldCode'),    cell: d => <span className="mono" style={{ fontWeight: 600 }}>{d.disclosureCode ?? '—'}</span>, width: '130px' },
+    { header: t('colTitle'),       cell: d => <span style={{ fontWeight: 600 }}>{lang === 'ar' && d.titleAr ? d.titleAr : d.titleEn}</span> },
+    { header: t('discFldType'),    cell: d => <Badge tone="primary">{d.disclosureType.replace(/_/g, ' ')}</Badge>, width: '180px' },
+    { header: t('discFldDiscloser'), cell: d => d.discloserName, width: '180px' },
+    { header: t('discFldValue'),   cell: d => d.monetaryValue ? `${d.monetaryValue.toLocaleString()} ${d.currency ?? 'SAR'}` : '—', mono: true, width: '130px' },
+    { header: t('colStatus'),      cell: d => <Badge tone={DISCLOSURE_STATUS_TONE[d.status] ?? 'neutral'} dot>{d.status}</Badge>, width: '120px' },
+    { header: '', align: 'end', width: '180px',
+      cell: d => {
+        const next = nextDiscStatus(d);
+        const extras: Array<{ Icon: typeof ArrowRight; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (next) extras.push({ Icon: ArrowRight, onClick: () => transition(d, next), title: `${t('changeAdvanceTo')} ${next}`, tone: 'primary' });
+        if (d.status === 'REVIEW') extras.push({ Icon: XIcon, onClick: () => transition(d, 'RECUSED'), title: t('discActionRecuse'), tone: 'accent' });
+        return <RowActions extras={extras} onEdit={() => { setEditing(d); setModalOpen(true); }} onDelete={() => setConfirmDel(d)} />;
+      }
+    },
+  ];
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+          {t('discDescription')}
+        </div>
+        <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('discNew')}</Button>
+      </div>
+      <Card padded={false}>
+        {loading ? <Loading /> :
+          <DataTable columns={cols} rows={items}
+                     empty={<EmptyState Icon={Stamp} title={t('discEmptyTitle')} sub={t('discEmptySub')} />} />
+        }
+      </Card>
+
+      <FormModal<Partial<DisclosureDto>>
+        open={modalOpen}
+        title={editing ? `${t('editPrefix')} · ${editing.disclosureCode ?? editing.titleEn}` : t('discNew')}
+        fields={FIELDS}
+        initial={editing ? reqFromDto(editing) : DISCLOSURE_EMPTY}
+        onClose={() => { setModalOpen(false); setEditing(null); }}
+        onSubmit={submitForm}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDel} destructive busy={busy}
+        title={t('discConfirmDelete')}
+        message={confirmDel ? `${confirmDel.titleEn} ${t('confirmDeleteSuffix')}` : ''}
+        confirmLabel={t('deleteBtn')}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={executeDelete}
+      />
+    </>
+  );
 }
