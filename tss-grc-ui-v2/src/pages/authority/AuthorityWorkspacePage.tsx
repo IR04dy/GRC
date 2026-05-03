@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Landmark, FileText, AlertTriangle, ClipboardCheck, Briefcase,
-  ArrowLeft, ExternalLink, BookCopy, ScrollText, Layers,
+  ArrowLeft, ExternalLink, BookCopy, ScrollText, Layers, Megaphone, ListChecks,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { Card } from '../../components/ui/Card';
@@ -23,7 +23,10 @@ import {
   STATUS_LABEL, type RegulatorAnchor, type ControlStatus,
 } from '../../lib/evidenceAnchors';
 import { EVIDENCE, EVIDENCE_ANCHORS_BY_ID } from '../evidence/mockEvidence';
-import { COMPLIANCE_FINDINGS, AUDIT_ENGAGEMENTS } from '../compliance/mockCompliance';
+import { COMPLIANCE_FINDINGS, AUDIT_ENGAGEMENTS, REGULATORY_CHANGES } from '../compliance/mockCompliance';
+import {
+  AUTHORITY_OBLIGATIONS_BY_CODE, STATUS_LABEL_OBLIGATION, STATUS_TONE_OBLIGATION,
+} from '../../lib/authorityObligations';
 import { useI18n } from '../../lib/i18n';
 
 /**
@@ -90,6 +93,22 @@ export function AuthorityWorkspacePage() {
     if (a.controlStatus === 'IMPLEMENTED') cur.implemented += 1;
     perFramework.set(a.frameworkCode, cur);
   }
+
+  // Regulatory updates published by this authority
+  const regulatoryUpdates = useMemo(
+    () => REGULATORY_CHANGES
+      .filter(r => r.sourceAuthority === authority.code)
+      .sort((a, b) => (b.publishedDate ?? '').localeCompare(a.publishedDate ?? '')),
+    [authority.code],
+  );
+
+  // Obligations the org must fulfil
+  const obligations = AUTHORITY_OBLIGATIONS_BY_CODE[authority.code] ?? [];
+  const obligationStats = {
+    compliant: obligations.filter(o => o.internalStatus === 'COMPLIANT').length,
+    inProgress: obligations.filter(o => o.internalStatus === 'IN_PROGRESS').length,
+    gap: obligations.filter(o => o.internalStatus === 'GAP').length,
+  };
 
   return (
     <Shell title={`Authority · ${authority.code}`} sub={authority.taglineEn}>
@@ -208,6 +227,100 @@ export function AuthorityWorkspacePage() {
             };
           })}
         />
+      </Card>
+
+      {/* Regulatory updates lane */}
+      <Card title={`Regulatory updates from ${authority.code}`} Icon={Megaphone}
+        action={<Badge tone={regulatoryUpdates.filter(r => r.status !== 'CLOSED').length > 0 ? 'warning' : 'success'}>
+          {regulatoryUpdates.filter(r => r.status !== 'CLOSED').length} active
+        </Badge>}>
+        {regulatoryUpdates.length === 0
+          ? <EmptyState Icon={Megaphone} title="No published changes on file"
+              sub={`No regulatory changes from ${authority.code} have been ingested yet.`} />
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {regulatoryUpdates.map(r => (
+                <div key={r.id} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '160px 1fr auto auto auto',
+                  gap: 12, alignItems: 'center',
+                  padding: '8px 10px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-sm)',
+                  background: 'var(--surface-1)',
+                }}>
+                  <div>
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      {r.publishedDate ?? '—'}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+                      eff. {r.effectiveDate ?? '—'}
+                    </div>
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                      {lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                      {r.citation ?? '—'} · {r.summaryEn ?? ''}
+                    </div>
+                    {r.impactSummary && (
+                      <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, fontStyle: 'italic' }}>
+                        Impact: {r.impactSummary}
+                      </div>
+                    )}
+                  </div>
+                  <Badge tone={r.applicability === 'IN_SCOPE' ? 'primary' : r.applicability === 'OUT_OF_SCOPE' ? 'neutral' : 'warning'}>
+                    {(r.applicability ?? '').replace(/_/g, ' ')}
+                  </Badge>
+                  <Badge tone={r.impactLevel === 'HIGH' ? 'danger' : r.impactLevel === 'MEDIUM' ? 'warning' : r.impactLevel === 'LOW' ? 'success' : 'neutral'}>
+                    {r.impactLevel} impact
+                  </Badge>
+                  <Badge tone={r.status === 'CLOSED' ? 'success' : r.status === 'CONTROLS_UPDATED' ? 'success' : r.status === 'IMPACT_ASSESSED' ? 'info' : 'warning'}>
+                    {(r.status ?? '').replace(/_/g, ' ')}
+                  </Badge>
+                </div>
+              ))}
+            </div>}
+      </Card>
+
+      {/* Obligations lane */}
+      <Card title={`Obligations under ${authority.code}`} Icon={ListChecks}
+        action={<div style={{ display: 'inline-flex', gap: 6 }}>
+          <Badge tone="success">{obligationStats.compliant} compliant</Badge>
+          <Badge tone="info">{obligationStats.inProgress} in progress</Badge>
+          {obligationStats.gap > 0 && <Badge tone="danger">{obligationStats.gap} gap</Badge>}
+        </div>}>
+        {obligations.length === 0
+          ? <EmptyState Icon={ListChecks} title="No obligation register on file"
+              sub={`Per-clause obligations for ${authority.code} have not been catalogued yet — start with the Citation library and Frameworks panels above.`} />
+          : <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {obligations.map(o => (
+                <div key={o.code} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '180px 1fr 110px 130px 110px',
+                  gap: 10, alignItems: 'center',
+                  padding: '8px 0',
+                  borderBottom: '1px dashed var(--border)',
+                }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{o.code}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                      {lang === 'ar' ? o.titleAr : o.titleEn}
+                    </div>
+                    {o.noteEn && (
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{o.noteEn}</div>
+                    )}
+                  </div>
+                  <Badge tone="primary">{o.frameworkCode.replace(/_/g, ' ')}</Badge>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    {o.internalRef ?? '—'}
+                  </span>
+                  <Badge tone={STATUS_TONE_OBLIGATION[o.internalStatus]} dot>
+                    {STATUS_LABEL_OBLIGATION[o.internalStatus]}
+                  </Badge>
+                </div>
+              ))}
+            </div>}
       </Card>
 
       {/* Citation library */}
