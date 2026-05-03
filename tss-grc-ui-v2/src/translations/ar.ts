@@ -90,6 +90,11 @@ export const ar = {
   riskHeatMapHint:   'انقر على أي خلية للتعمق — سيعرض السجل المخاطر المطابقة لتقاطع الاحتمال × الأثر.',
   riskFilterLabel:   'مفلتر بـ',
   riskClearFilters:  'مسح الكل',
+  exportPdf:           'تصدير PDF',
+  exportXlsx:          'تصدير Excel',
+  exportStarted:       'بدأ التصدير — سيبدأ التنزيل بعد لحظات',
+  exportFailed:        'فشل التصدير',
+  exportSignInRequired:'سجل الدخول للتصدير',
   riskLoading: 'جاري تحميل المخاطر…',
   riskLoadError: 'تعذر تحميل المخاطر.',
 

@@ -96,6 +96,11 @@ export const en = {
   riskHeatMapHint:   'Click any cell to drill down — the register will show only risks with that likelihood × impact combination.',
   riskFilterLabel:   'Filtered by',
   riskClearFilters:  'Clear all',
+  exportPdf:           'Export as PDF',
+  exportXlsx:          'Export as Excel',
+  exportStarted:       'Export started — your download should begin shortly',
+  exportFailed:        'Export failed',
+  exportSignInRequired:'Sign in to export',
   riskLoading: 'Loading risks…',
   riskLoadError: 'Could not load risks.',
 

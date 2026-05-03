@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Filter, Download, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon } from 'lucide-react';
+import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
@@ -13,8 +13,9 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { ExportMenu } from '../../components/ui/ExportMenu';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
-import { riskApi, ermAdvancedApi, ApiError, type RiskResponse, type KriDefinitionDto, type KriBreachEventDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
+import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type KriBreachEventDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -260,7 +261,11 @@ export function RiskRegisterPage() {
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter}>{t('riskFilter')}</Button>
-            <Button variant="secondary" Icon={Download}>{t('riskExport')}</Button>
+            <ExportMenu
+              demoMode={demoMode} t={t} toast={toast}
+              onPdf={() => reportingApi.riskRegisterPdf(lang)}
+              onXlsx={() => reportingApi.riskRegisterXlsx()}
+            />
             <Button variant="primary"   Icon={Plus} onClick={startCreate}>{t('riskNew')}</Button>
           </>
         }

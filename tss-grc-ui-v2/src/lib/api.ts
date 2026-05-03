@@ -55,6 +55,42 @@ export const api = {
   delete: <T>(p: string, opts?: FetchOpts) => request<T>(p, { ...opts, method: 'DELETE' }),
 };
 
+/**
+ * Download a binary file from the API as a browser-triggered save.
+ * The filename is taken from the Content-Disposition header when present,
+ * otherwise falls back to the supplied `fallbackName`.
+ */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'GET',
+    headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    if (res.status === 401) clearSession();
+    throw new ApiError(res.status, res.statusText || 'Download failed');
+  }
+  const cd = res.headers.get('Content-Disposition') ?? '';
+  const m = /filename="?([^";]+)"?/i.exec(cd);
+  const name = m ? m[1] : fallbackName;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
+export const reportingApi = {
+  riskRegisterPdf:  (lang: string) => downloadFile(`/api/v1/reporting/risk-register.pdf?lang=${encodeURIComponent(lang)}`, 'risk-register.pdf'),
+  riskRegisterXlsx: () => downloadFile('/api/v1/reporting/risk-register.xlsx', 'risk-register.xlsx'),
+  findingsPdf:      (lang: string) => downloadFile(`/api/v1/reporting/findings-aging.pdf?lang=${encodeURIComponent(lang)}`, 'findings.pdf'),
+  findingsXlsx:     () => downloadFile('/api/v1/reporting/findings-aging.xlsx', 'findings.xlsx'),
+  kriPdf:           (lang: string) => downloadFile(`/api/v1/reporting/kri-dashboard.pdf?lang=${encodeURIComponent(lang)}`, 'kri-dashboard.pdf'),
+  kriXlsx:          () => downloadFile('/api/v1/reporting/kri-dashboard.xlsx', 'kri-dashboard.xlsx'),
+};
+
 // ─── Spring Page<T> wrapper ─────────────────────────────────────────────────
 export interface PageResponse<T> {
   content: T[];

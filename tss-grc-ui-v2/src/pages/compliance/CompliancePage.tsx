@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Download, Plus, BarChart3, Building2, AlertTriangle,
+  ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Plus, BarChart3, Building2, AlertTriangle,
   ScrollText, BookCopy, Send, CheckCheck, Archive, RotateCcw, X as XIcon, Wrench, Flag, Search,
   Briefcase, ShieldCheck, Stamp, ChevronRight, Lock,
 } from 'lucide-react';
@@ -21,13 +21,14 @@ import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import {
-  complianceApi, ApiError,
+  complianceApi, reportingApi, ApiError,
   type ComplianceControlDto, type ComplianceControlRequest,
   type ComplianceAssessmentDto, type ComplianceFindingDto,
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
   type PolicyDto, type PolicyRequest,
   type AuditEngagementDto, type AuditEngagementRequest,
 } from '../../lib/api';
+import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
 import { COMPLIANCE_CONTROLS } from './mockCompliance';
 
@@ -614,7 +615,11 @@ export function CompliancePage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download}>{t('actionExport')}</Button>
+            <ExportMenu
+              demoMode={isDemo} t={t} toast={toast}
+              onPdf={() => reportingApi.findingsPdf((typeof navigator !== 'undefined' && navigator.language?.startsWith('ar')) ? 'ar' : 'en')}
+              onXlsx={() => reportingApi.findingsXlsx()}
+            />
             {showNewButton && <Button variant="primary" Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>}
           </>
         }
