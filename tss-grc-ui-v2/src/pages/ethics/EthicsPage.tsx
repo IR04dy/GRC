@@ -18,15 +18,16 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import {
-  ethicsCaseApi, disclosureApi, kycApi, frameworkApi, ApiError,
+  ethicsCaseApi, disclosureApi, kycApi, amlAlertApi, frameworkApi, ApiError,
   type EthicsCaseDto, type CaseActionDto, type CaseLinkDto, type EthicsAnalyticsDto,
-  type DisclosureDto, type KycSubjectDto, type ScreeningHitDto, type KycAnalyticsDto, type FrameworkDto,
+  type DisclosureDto, type KycSubjectDto, type ScreeningHitDto, type KycAnalyticsDto,
+  type AmlAlertDto, type AmlAnalyticsDto, type FrameworkDto,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 
-type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'analytics' | 'integrations';
+type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'aml' | 'analytics' | 'integrations';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   INTAKE: 'neutral', TRIAGE: 'info', INVESTIGATION: 'accent',
@@ -125,6 +126,7 @@ export function EthicsPage() {
     { id: 'workflow',     label: t('ethicsTabWorkflow') },
     { id: 'disclosures',  label: t('ethicsTabDisclosures') },
     { id: 'kyc',          label: t('ethicsTabKyc') },
+    { id: 'aml',          label: t('ethicsTabAml') },
     { id: 'analytics',    label: t('ethicsTabAnalytics') },
     { id: 'integrations', label: t('ethicsTabIntegrations') },
   ];
@@ -248,6 +250,8 @@ export function EthicsPage() {
       {tab === 'disclosures' && <DisclosuresTab t={t} lang={lang} toast={toast} demoMode={demoMode} ethicsFwOptions={ethicsFwOptions} />}
 
       {tab === 'kyc' && <KycTab t={t} lang={lang} toast={toast} demoMode={demoMode} ethicsFwOptions={ethicsFwOptions} />}
+
+      {tab === 'aml' && <AmlAlertsTab t={t} lang={lang} toast={toast} demoMode={demoMode} ethicsFwOptions={ethicsFwOptions} />}
 
       {tab === 'analytics' && <AnalyticsPanel analytics={analytics} t={t} />}
 
@@ -560,6 +564,201 @@ function IntegrationsPanel({ items, detailId, setDetailId, t, toast }: {
 function Loading() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+// ─── AML transaction alerts (case management) ──────────────────────────────
+const AML_ALERT_TYPE_OPTIONS = [
+  'STRUCTURING', 'UNUSUAL_VOLUME', 'UNUSUAL_VELOCITY', 'HIGH_RISK_GEO',
+  'SANCTIONS_HIT', 'PEP_TRANSACTION', 'RAPID_MOVEMENT', 'CASH_INTENSIVE',
+  'UNKNOWN_COUNTERPARTY', 'POLITICAL_EXPOSURE', 'OTHER',
+].map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
+const AML_STATUS_TONE: Record<string, BadgeTone> = {
+  OPEN: 'warning', INVESTIGATING: 'info', CLEARED: 'success',
+  ESCALATED: 'accent', STR_FILED: 'danger', CLOSED: 'neutral',
+};
+const AML_SEVERITY_TONE: Record<string, BadgeTone> = {
+  LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
+};
+const AML_EMPTY: Partial<AmlAlertDto> = {
+  alertType: 'STRUCTURING', severity: 'MEDIUM', status: 'OPEN',
+  titleEn: '', description: '', currency: 'SAR',
+};
+
+function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
+  t: (k: string) => string;
+  lang: string;
+  toast: ReturnType<typeof useToast>;
+  demoMode: boolean;
+  ethicsFwOptions: { value: string; label: string }[];
+}) {
+  const [items, setItems] = useState<AmlAlertDto[]>([]);
+  const [analytics, setAnalytics] = useState<AmlAnalyticsDto | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<AmlAlertDto | null>(null);
+  const [confirmDel, setConfirmDel] = useState<AmlAlertDto | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    if (demoMode) { setItems([]); setAnalytics(null); return; }
+    setLoading(true);
+    try {
+      const [page, an] = await Promise.all([
+        amlAlertApi.list({ size: 200 }),
+        amlAlertApi.analytics().catch(() => null),
+      ]);
+      setItems(page.content ?? []);
+      setAnalytics(an);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+
+  const FIELDS: FieldDef[] = [
+    { kind: 'text',     key: 'alertCode',      label: t('amlFldCode'), span: 4, placeholder: 'AML-2025-0042' },
+    { kind: 'select',   key: 'alertType',      label: t('amlFldType') + ' *', required: true, options: AML_ALERT_TYPE_OPTIONS, span: 4 },
+    { kind: 'select',   key: 'severity',       label: t('amlFldSeverity'), options: SEVERITY_OPTIONS, span: 4 },
+    { kind: 'text',     key: 'titleEn',        label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'titleAr',        label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'ruleId',         label: t('amlFldRuleId'), span: 4, placeholder: 'TM-007' },
+    { kind: 'text',     key: 'ruleName',       label: t('amlFldRuleName'), span: 8 },
+    { kind: 'text',     key: 'subjectName',    label: t('amlFldSubjectName'), span: 6 },
+    { kind: 'text',     key: 'counterpartyName', label: t('amlFldCounterparty'), span: 6 },
+    { kind: 'text',     key: 'counterpartyCountry', label: t('amlFldCpCountry'), span: 3, placeholder: 'SAU' },
+    { kind: 'number',   key: 'transactionCount', label: t('amlFldTxnCount'), span: 3 },
+    { kind: 'number',   key: 'aggregateAmount',  label: t('amlFldAmount'), span: 3 },
+    { kind: 'text',     key: 'currency',         label: t('discFldCurrency'), span: 3 },
+    { kind: 'date',     key: 'periodFrom',       label: t('amlFldPeriodFrom'), span: 6 },
+    { kind: 'date',     key: 'periodTo',         label: t('amlFldPeriodTo'), span: 6 },
+    { kind: 'select',   key: 'frameworkId',      label: t('ethicsFldFramework'), options: ethicsFwOptions, span: 6 },
+    { kind: 'text',     key: 'clauseRef',        label: t('frameworkClauseRef'), span: 6 },
+    { kind: 'textarea', key: 'description',      label: t('ethicsFldDescription') + ' *', rows: 3, span: 12 },
+  ];
+
+  function reqFromDto(a: AmlAlertDto): Partial<AmlAlertDto> { return { ...a }; }
+
+  async function submitForm(values: Partial<AmlAlertDto>) {
+    try {
+      const v: Partial<AmlAlertDto> = { ...values };
+      if (typeof v.frameworkId === 'string') v.frameworkId = Number(v.frameworkId);
+      if (typeof v.aggregateAmount === 'string') v.aggregateAmount = Number(v.aggregateAmount);
+      if (typeof v.transactionCount === 'string') v.transactionCount = Number(v.transactionCount);
+      if (editing) await amlAlertApi.update(editing.id, v);
+      else await amlAlertApi.create(v);
+      toast.success(editing ? t('amlUpdated') : t('amlCreated'));
+      setModalOpen(false); setEditing(null); await load();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  async function executeDelete() {
+    if (!confirmDel) return;
+    setBusy(true);
+    try { await amlAlertApi.remove(confirmDel.id); toast.success('Alert deleted'); await load(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Delete failed'); }
+    finally { setBusy(false); setConfirmDel(null); }
+  }
+  async function transition(a: AmlAlertDto, target: string) {
+    let body: Record<string, unknown> = { target };
+    if (target === 'CLEARED') {
+      const notes = window.prompt(t('amlCleardNotesPrompt'), '') ?? '';
+      const decidedBy = window.prompt(t('amlDecidedByPrompt'), '') ?? '';
+      body = { ...body, disposition: 'FALSE_POSITIVE', notes, decidedBy };
+    }
+    if (target === 'STR_FILED') {
+      const ref = window.prompt(t('amlStrRefPrompt'), '');
+      if (!ref) return;
+      const notes = window.prompt(t('amlStrNotesPrompt'), '') ?? '';
+      const decidedBy = window.prompt(t('amlDecidedByPrompt'), '') ?? '';
+      body = { ...body, disposition: 'TRUE_POSITIVE', strReference: ref, notes, decidedBy };
+    }
+    if (target === 'ESCALATED') {
+      const notes = window.prompt(t('amlEscalateNotesPrompt'), '') ?? '';
+      body = { ...body, notes, disposition: 'TRUE_POSITIVE' };
+    }
+    try { await amlAlertApi.transition(a.id, body); toast.success(`→ ${target}`); await load(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Transition failed'); }
+  }
+  async function assign(a: AmlAlertDto) {
+    const name = window.prompt(t('amlAssignPrompt'), a.analystName ?? '');
+    if (!name) return;
+    try { await amlAlertApi.assign(a.id, name); toast.success(t('amlAssigned')); await load(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  const cols: Column<AmlAlertDto>[] = [
+    { header: t('amlFldCode'),     cell: a => <span className="mono" style={{ fontWeight: 600 }}>{a.alertCode ?? `#${a.id}`}</span>, width: '130px' },
+    { header: t('colTitle'),       cell: a => (
+      <div>
+        <div style={{ fontWeight: 600 }}>{lang === 'ar' && a.titleAr ? a.titleAr : a.titleEn}</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+          {a.alertType.replace(/_/g, ' ')}{a.ruleId && ` · ${a.ruleId}`}
+        </div>
+      </div>
+    ) },
+    { header: t('amlFldSubjectName'), cell: a => a.subjectName ?? '—', width: '180px' },
+    { header: t('amlFldAmount'),   cell: a => a.aggregateAmount
+        ? <span className="mono">{a.aggregateAmount.toLocaleString()} {a.currency ?? 'SAR'}</span>
+        : '—', width: '160px' },
+    { header: t('amlFldSeverity'), cell: a => <Badge tone={AML_SEVERITY_TONE[a.severity] ?? 'neutral'} dot>{a.severity}</Badge>, width: '110px' },
+    { header: t('colStatus'),      cell: a => <Badge tone={AML_STATUS_TONE[a.status] ?? 'neutral'} dot>{a.status.replace(/_/g, ' ')}</Badge>, width: '140px' },
+    { header: t('amlFldStr'),      cell: a => a.strFiled ? <Badge tone="danger">{a.strReference ?? 'STR'}</Badge> : '—', width: '120px' },
+    { header: '', align: 'end', width: '300px',
+      cell: a => {
+        const extras: Array<{ Icon: typeof CheckCheck; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        if (a.status === 'OPEN') extras.push({ Icon: Send, onClick: () => assign(a), title: t('amlAssign'), tone: 'primary' });
+        if (a.status === 'OPEN') extras.push({ Icon: Activity, onClick: () => transition(a, 'INVESTIGATING'), title: t('amlInvestigate'), tone: 'primary' });
+        if (a.status === 'INVESTIGATING') {
+          extras.push({ Icon: CheckCheck, onClick: () => transition(a, 'CLEARED'),     title: t('amlClear'),     tone: 'success' });
+          extras.push({ Icon: Send,       onClick: () => transition(a, 'ESCALATED'),  title: t('amlEscalate'),  tone: 'accent' });
+          extras.push({ Icon: Stamp,      onClick: () => transition(a, 'STR_FILED'), title: t('amlFileStr'),  tone: 'accent' });
+        }
+        if (['CLEARED','ESCALATED','STR_FILED'].includes(a.status))
+          extras.push({ Icon: Lock, onClick: () => transition(a, 'CLOSED'), title: t('amlClose') });
+        return <RowActions extras={extras} onEdit={() => { setEditing(a); setModalOpen(true); }} onDelete={() => setConfirmDel(a)} />;
+      }
+    },
+  ];
+
+  return (
+    <>
+      {analytics && (
+        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))', marginBottom: 12 }}>
+          <Kpi Icon={Activity}    label={t('amlKpiTotal')}     value={analytics.total}      tone="primary" />
+          <Kpi Icon={AlertTriangle} label={t('amlKpiOpen')}    value={analytics.openAlerts} tone="warning" />
+          <Kpi Icon={Flame}       label={t('amlKpiCritical')}  value={analytics.bySeverity?.CRITICAL ?? 0} tone="danger" />
+          <Kpi Icon={Stamp}       label={t('amlKpiStrFiled')}  value={analytics.strFiled}   tone="danger" />
+          <Kpi Icon={CheckCheck}  label={t('amlKpiCleared')}   value={analytics.byStatus?.CLEARED ?? 0} tone="success" />
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('amlDescription')}</div>
+        <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('amlNew')}</Button>
+      </div>
+      <Card padded={false}>
+        {loading ? <Loading /> :
+          items.length === 0
+            ? <EmptyState Icon={ShieldAlert} title={t('amlEmptyTitle')} sub={t('amlEmptySub')} />
+            : <DataTable columns={cols} rows={items} empty={<EmptyState />} />
+        }
+      </Card>
+
+      <FormModal<Partial<AmlAlertDto>>
+        open={modalOpen}
+        title={editing ? `${t('editPrefix')} · ${editing.alertCode ?? editing.titleEn}` : t('amlNew')}
+        fields={FIELDS}
+        initial={editing ? reqFromDto(editing) : AML_EMPTY}
+        onClose={() => { setModalOpen(false); setEditing(null); }}
+        onSubmit={submitForm}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDel} destructive busy={busy}
+        title={t('amlConfirmDelete')}
+        message={confirmDel ? `${confirmDel.titleEn} ${t('confirmDeleteSuffix')}` : ''}
+        confirmLabel={t('deleteBtn')}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={executeDelete}
+      />
+    </>
+  );
 }
 
 // ─── KYC (Sanctions / PEP / CDD / EDD) ─────────────────────────────────────

@@ -288,6 +288,64 @@ export const kycApi = {
   analytics:  () => api.get<KycAnalyticsDto>('/api/v1/ethics/kyc/analytics'),
 };
 
+// ─── Ethics — AML transaction alerts ───────────────────────────────────────
+export interface AmlAlertDto {
+  id: number; organisationId?: number;
+  alertCode?: string;
+  alertType: string;
+  severity: string;
+  ruleId?: string; ruleName?: string;
+  titleEn: string; titleAr?: string;
+  description: string;
+  subjectId?: number;
+  subjectName?: string;
+  counterpartyName?: string;
+  counterpartyCountry?: string;
+  transactionCount?: number;
+  aggregateAmount?: number;
+  currency?: string;
+  periodFrom?: string;
+  periodTo?: string;
+  firstDetectedAt?: string;
+  status: string;
+  analystName?: string;
+  slaDueAt?: string;
+  disposition?: string;
+  dispositionNotes?: string;
+  decidedAt?: string;
+  decidedByName?: string;
+  strFiled?: boolean;
+  strReference?: string;
+  strFiledAt?: string;
+  frameworkId?: number;
+  clauseRef?: string;
+}
+export interface AmlAnalyticsDto {
+  total: number;
+  byStatus: Record<string, number>;
+  bySeverity: Record<string, number>;
+  openAlerts: number;
+  strFiled: number;
+}
+export const amlAlertApi = {
+  list: (qs: { status?: string; type?: string; severity?: string; page?: number; size?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (qs.status)   p.set('status', qs.status);
+    if (qs.type)     p.set('type', qs.type);
+    if (qs.severity) p.set('severity', qs.severity);
+    p.set('page', String(qs.page ?? 0));
+    p.set('size', String(qs.size ?? 100));
+    return api.get<PageResponse<AmlAlertDto>>(`/api/v1/ethics/aml-alerts?${p.toString()}`);
+  },
+  get:        (id: number) => api.get<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}`),
+  create:     (body: Partial<AmlAlertDto>) => api.post<AmlAlertDto>('/api/v1/ethics/aml-alerts', body),
+  update:     (id: number, body: Partial<AmlAlertDto>) => api.put<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}`, body),
+  remove:     (id: number) => api.delete<void>(`/api/v1/ethics/aml-alerts/${id}`),
+  assign:     (id: number, analystName: string) => api.post<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}/assign`, { analystName }),
+  transition: (id: number, body: Record<string, unknown>) => api.post<AmlAlertDto>(`/api/v1/ethics/aml-alerts/${id}/transition`, body),
+  analytics:  () => api.get<AmlAnalyticsDto>('/api/v1/ethics/aml-alerts/analytics'),
+};
+
 // ─── Change Management (ITIL v4) ────────────────────────────────────────────
 export interface ChangeRequestDto {
   id: number; organisationId?: number;
