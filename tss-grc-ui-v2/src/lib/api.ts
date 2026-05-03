@@ -82,6 +82,94 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
 }
 
+// ─── Ethics & Compliance — Cases (whistleblower + investigations) ──────────
+export interface EthicsCaseDto {
+  id: number; organisationId?: number;
+  caseCode?: string;
+  titleEn: string; titleAr?: string;
+  category: string;
+  severity: string;
+  intakeChannel: string;
+  reporterName?: string; reporterEmail?: string; reporterEmployeeId?: number;
+  isAnonymous?: boolean;
+  subjectSummary?: string;
+  description: string;
+  location?: string;
+  dateOfIncident?: string;
+  frameworkId?: number;
+  clauseRef?: string;
+  status: string;
+  triageDecision?: string;
+  investigatorName?: string;
+  committeeName?: string;
+  triagedAt?: string;
+  investigationStarted?: string;
+  investigationEnded?: string;
+  outcome?: string;
+  outcomeSummary?: string;
+  regulatorNotified?: boolean;
+  regulatorReference?: string;
+  retaliationCheckAt?: string;
+  retaliationObserved?: boolean;
+  closureDate?: string;
+  createdAt?: string;
+}
+export interface CaseActionDto {
+  id?: number; caseId?: number;
+  actionType: string;
+  title: string;
+  description?: string;
+  actionAt?: string;
+  actorName?: string;
+  isConfidential?: boolean;
+}
+export interface CaseLinkDto {
+  id?: number; caseId?: number;
+  entityType: string; entityId: number;
+  linkType: string;
+  notes?: string;
+  createdAt?: string;
+}
+export interface EthicsAnalyticsDto {
+  total: number;
+  byStatus: Record<string, number>;
+  byCategory: Record<string, number>;
+  open: number; closed: number; substantiated: number;
+}
+export interface LinkedEthicsCaseView {
+  linkId: number; linkType: string;
+  caseId: number; caseCode?: string;
+  titleEn: string; titleAr?: string;
+  status: string; severity: string; category: string;
+}
+export const ethicsCaseApi = {
+  list:        (qs: { status?: string; category?: string; severity?: string; page?: number; size?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (qs.status)   p.set('status', qs.status);
+    if (qs.category) p.set('category', qs.category);
+    if (qs.severity) p.set('severity', qs.severity);
+    p.set('page', String(qs.page ?? 0));
+    p.set('size', String(qs.size ?? 100));
+    return api.get<PageResponse<EthicsCaseDto>>(`/api/v1/ethics/cases?${p.toString()}`);
+  },
+  get:        (id: number) => api.get<EthicsCaseDto>(`/api/v1/ethics/cases/${id}`),
+  create:     (body: Partial<EthicsCaseDto>) => api.post<EthicsCaseDto>('/api/v1/ethics/cases', body),
+  update:     (id: number, body: Partial<EthicsCaseDto>) => api.put<EthicsCaseDto>(`/api/v1/ethics/cases/${id}`, body),
+  remove:     (id: number) => api.delete<void>(`/api/v1/ethics/cases/${id}`),
+  transition: (id: number, body: Record<string, unknown>) => api.post<EthicsCaseDto>(`/api/v1/ethics/cases/${id}/transition`, body),
+
+  actions:    (id: number) => api.get<CaseActionDto[]>(`/api/v1/ethics/cases/${id}/actions`),
+  addAction:  (id: number, body: Partial<CaseActionDto>) => api.post<CaseActionDto>(`/api/v1/ethics/cases/${id}/actions`, body),
+
+  links:      (id: number) => api.get<CaseLinkDto[]>(`/api/v1/ethics/cases/${id}/links`),
+  addLink:    (id: number, body: Partial<CaseLinkDto>) => api.post<CaseLinkDto>(`/api/v1/ethics/cases/${id}/links`, body),
+  deleteLink: (linkId: number) => api.delete<void>(`/api/v1/ethics/cases/links/${linkId}`),
+  linksForEntity: (entityType: string, entityId: number) =>
+                  api.get<LinkedEthicsCaseView[]>(`/api/v1/ethics/cases/links/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
+
+  analytics:  () => api.get<EthicsAnalyticsDto>('/api/v1/ethics/cases/analytics'),
+};
+
 // ─── Change Management (ITIL v4) ────────────────────────────────────────────
 export interface ChangeRequestDto {
   id: number; organisationId?: number;

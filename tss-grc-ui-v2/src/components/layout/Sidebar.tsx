@@ -1,6 +1,6 @@
 import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
-         GitBranch, Settings, type LucideIcon } from 'lucide-react';
+         GitBranch, ShieldAlert, Settings, type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
@@ -18,6 +18,7 @@ const MODULE_ITEMS: NavItem[] = [
   { id: 'bcm',        to: '/bcm',        Icon: RefreshCw,      labelKey: 'modBcm' },
   { id: 'privacy',    to: '/privacy',    Icon: Fingerprint,    labelKey: 'modPdpl' },
   { id: 'compliance', to: '/compliance', Icon: ClipboardCheck, labelKey: 'modCompliance' },
+  { id: 'ethics',     to: '/ethics',     Icon: ShieldAlert,    labelKey: 'modEthics' },
   { id: 'tprm',       to: '/tprm',       Icon: Workflow,       labelKey: 'modThirdParty' },
   { id: 'incidents',  to: '/incidents',  Icon: AlertOctagon,   labelKey: 'incidentsTitle' },
   { id: 'evidence',   to: '/evidence',   Icon: Files,          labelKey: 'evidenceTitle' },
