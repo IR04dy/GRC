@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Filter, Download, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Filter, Download, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
@@ -21,6 +22,32 @@ import { NewRiskModal } from './NewRiskModal';
 import { MOCK_RISKS } from './mockRisks';
 
 type TabId = 'register' | 'heatmap' | 'kri' | 'appetite';
+
+interface RiskFilters {
+  l?: number; i?: number;       // heatmap drill-down
+  status?: string;              // status chip
+  category?: string;            // category chip
+}
+
+function readFiltersFromQs(qs: URLSearchParams): RiskFilters {
+  const f: RiskFilters = {};
+  const l = qs.get('l'); const i = qs.get('i');
+  if (l && /^[1-5]$/.test(l)) f.l = Number(l);
+  if (i && /^[1-5]$/.test(i)) f.i = Number(i);
+  const s = qs.get('status');   if (s) f.status = s;
+  const c = qs.get('category'); if (c) f.category = c;
+  return f;
+}
+
+function writeFiltersToQs(qs: URLSearchParams, f: RiskFilters, tab: TabId): URLSearchParams {
+  const next = new URLSearchParams(qs);
+  if (f.l != null) next.set('l', String(f.l));         else next.delete('l');
+  if (f.i != null) next.set('i', String(f.i));         else next.delete('i');
+  if (f.status)    next.set('status', f.status);       else next.delete('status');
+  if (f.category)  next.set('category', f.category);   else next.delete('category');
+  if (tab !== 'register') next.set('tab', tab); else next.delete('tab');
+  return next;
+}
 
 const STATUS_TONES: Record<string, BadgeTone> = {
   OPEN: 'danger',
@@ -50,7 +77,21 @@ function ScorePill({ score }: { score: number }) {
 export function RiskRegisterPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const [tab, setTab] = useState<TabId>('register');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as TabId | null) ?? 'register';
+  const [tab, setTabState] = useState<TabId>(initialTab === 'register' || initialTab === 'heatmap' || initialTab === 'kri' || initialTab === 'appetite' ? initialTab : 'register');
+  const [filters, setFiltersState] = useState<RiskFilters>(() => readFiltersFromQs(searchParams));
+  function setTab(next: TabId) {
+    setTabState(next);
+    setSearchParams(writeFiltersToQs(searchParams, filters, next), { replace: true });
+  }
+  function setFilters(updater: (prev: RiskFilters) => RiskFilters) {
+    setFiltersState(prev => {
+      const next = updater(prev);
+      setSearchParams(writeFiltersToQs(searchParams, next, tab), { replace: true });
+      return next;
+    });
+  }
   const [risks, setRisks] = useState<RiskResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,9 +188,30 @@ export function RiskRegisterPage() {
     return Array.from(buckets.values());
   }, [risks]);
 
+  const filteredRisks = useMemo(() => {
+    return risks.filter(r => {
+      if (filters.l != null && r.inherentLikelihood !== filters.l) return false;
+      if (filters.i != null && r.inherentImpact     !== filters.i) return false;
+      if (filters.status   && r.status !== filters.status) return false;
+      if (filters.category) {
+        const cat = r.categoryNameEn ?? r.categoryName ?? '';
+        if (!cat.toLowerCase().includes(filters.category.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [risks, filters]);
+
   const criticalCount = risks.filter(r => r.inherentScore >= 16).length;
   const treatedCount  = risks.filter(r => r.status === 'TREATED' || r.status === 'CLOSED').length;
   const openCount     = risks.filter(r => r.status === 'OPEN').length;
+
+  function onHeatCellClick(l: number, i: number) {
+    // Toggle: clicking the same cell again clears it
+    const same = filters.l === l && filters.i === i;
+    setFilters(prev => same ? { ...prev, l: undefined, i: undefined } : { ...prev, l, i });
+    if (!same) setTab('register');
+  }
+  const hasFilters = filters.l != null || filters.i != null || !!filters.status || !!filters.category;
 
   const tabs = [
     { id: 'register' as const, label: t('riskTabRegister') },
@@ -214,17 +276,25 @@ export function RiskRegisterPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'register' && (
-        <Card padded={false}>
-          {error && <div style={{ padding: 12, color: 'var(--danger-fg)', background: 'var(--danger-bg)', borderBottom: '1px solid #ECCFCC', fontSize: 13 }}>{error}</div>}
-          {loading
-            ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>
-            : <DataTable columns={cols} rows={risks} empty={<EmptyState Icon={AlertTriangle} title={t('riskEmpty')} sub={t('riskEmptySub')} />} />}
-        </Card>
+        <>
+          {hasFilters && <FilterChips filters={filters} setFilters={setFilters} t={t} totalShown={filteredRisks.length} totalAll={risks.length} />}
+          <Card padded={false}>
+            {error && <div style={{ padding: 12, color: 'var(--danger-fg)', background: 'var(--danger-bg)', borderBottom: '1px solid #ECCFCC', fontSize: 13 }}>{error}</div>}
+            {loading
+              ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>
+              : <DataTable columns={cols} rows={filteredRisks} empty={<EmptyState Icon={AlertTriangle} title={hasFilters ? t('riskNoMatchTitle') : t('riskEmpty')} sub={hasFilters ? t('riskNoMatchSub') : t('riskEmptySub')} />} />}
+          </Card>
+        </>
       )}
 
       {tab === 'heatmap' && (
         <Card title={t('riskTabHeatMap')} action={<Badge tone="primary">5 × 5</Badge>}>
-          <HeatMap data={heatData} />
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>{t('riskHeatMapHint')}</div>
+          <HeatMap
+            data={heatData}
+            onCellClick={onHeatCellClick}
+            selected={filters.l != null && filters.i != null ? { l: filters.l, i: filters.i } : null}
+          />
         </Card>
       )}
 
@@ -485,5 +555,46 @@ function AppetiteDashboard({ demoMode, risks }: { demoMode: boolean; risks: Risk
           )
       }
     </>
+  );
+}
+
+
+function FilterChips({ filters, setFilters, t, totalShown, totalAll }: { filters: RiskFilters; setFilters: (u: (p: RiskFilters) => RiskFilters) => void; t: (k: string) => string; totalShown: number; totalAll: number }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+      <span style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {t('riskFilterLabel')} ·
+      </span>
+      {filters.l != null && filters.i != null && (
+        <Chip label={`L${filters.l} × I${filters.i}`} onClear={() => setFilters(p => ({ ...p, l: undefined, i: undefined }))} />
+      )}
+      {filters.status && <Chip label={`${t('riskColStatus')}: ${filters.status}`} onClear={() => setFilters(p => ({ ...p, status: undefined }))} />}
+      {filters.category && <Chip label={`${t('riskColCategory')}: ${filters.category}`} onClear={() => setFilters(p => ({ ...p, category: undefined }))} />}
+      <span style={{ fontSize: 11, color: 'var(--ink-3)', marginInlineStart: 'auto', fontFamily: 'var(--font-mono)' }}>
+        {totalShown} / {totalAll}
+      </span>
+      <button className="lang-toggle" onClick={() => setFilters(() => ({}))} style={{ fontSize: 11 }}>
+        {t('riskClearFilters')}
+      </button>
+    </div>
+  );
+}
+
+function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '4px 8px', background: 'var(--surface-2)', border: '1px solid var(--border)',
+      borderRadius: 'var(--r-pill)', fontSize: 11, fontWeight: 600,
+    }}>
+      {label}
+      <button onClick={onClear} aria-label="Remove" style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 14, height: 14, padding: 0, border: 'none', background: 'transparent',
+        cursor: 'pointer', color: 'var(--ink-3)',
+      }}>
+        <XIcon size={11} />
+      </button>
+    </span>
   );
 }

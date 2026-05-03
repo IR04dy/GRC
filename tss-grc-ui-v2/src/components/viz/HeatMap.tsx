@@ -11,7 +11,13 @@ function colorFor(score: number): string {
   return 'var(--risk-crit)';
 }
 
-export function HeatMap({ data }: { data: HeatCell[] }) {
+export interface HeatMapProps {
+  data: HeatCell[];
+  onCellClick?: (l: number, i: number) => void;
+  selected?: { l: number; i: number } | null;
+}
+
+export function HeatMap({ data, onCellClick, selected }: HeatMapProps) {
   const { t } = useI18n();
   const levels = t('heatLevels').split(',');
   const rows = [5, 4, 3, 2, 1];
@@ -27,12 +33,28 @@ export function HeatMap({ data }: { data: HeatCell[] }) {
               {[1, 2, 3, 4, 5].map(c => {
                 const cell = data.find(d => d.l === c && d.i === r);
                 const score = c * r;
+                const isSelected = selected != null && selected.l === c && selected.i === r;
+                const clickable = !!onCellClick;
                 return (
                   <td
                     key={c}
                     className="heatmap-cell"
-                    style={{ background: colorFor(score) }}
+                    style={{
+                      background: colorFor(score),
+                      cursor: clickable ? 'pointer' : 'default',
+                      outline: isSelected ? '3px solid var(--accent-700)' : undefined,
+                      outlineOffset: isSelected ? '-3px' : undefined,
+                      transition: 'transform var(--dur-fast) var(--ease-standard)',
+                      transform: isSelected ? 'scale(1.04)' : undefined,
+                    }}
+                    role={clickable ? 'button' : undefined}
+                    tabIndex={clickable ? 0 : undefined}
+                    onClick={clickable ? () => onCellClick!(c, r) : undefined}
+                    onKeyDown={clickable ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCellClick!(c, r); }
+                    } : undefined}
                     title={`L${c} × I${r} = ${score}${cell ? ` (${cell.count})` : ''}`}
+                    aria-pressed={clickable ? isSelected : undefined}
                   >
                     {cell
                       ? <span className="heatmap-count">{cell.count}</span>

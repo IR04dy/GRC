@@ -85,6 +85,11 @@ export const ar = {
 
   riskEmpty: 'لا توجد مخاطر بعد',
   riskEmptySub: 'انقر "مخاطرة جديدة" لتسجيل أول مخاطرة.',
+  riskNoMatchTitle:  'لا توجد مخاطر تطابق المعايير الحالية',
+  riskNoMatchSub:    'عدّل أو امسح المرشحات لرؤية المزيد من النتائج.',
+  riskHeatMapHint:   'انقر على أي خلية للتعمق — سيعرض السجل المخاطر المطابقة لتقاطع الاحتمال × الأثر.',
+  riskFilterLabel:   'مفلتر بـ',
+  riskClearFilters:  'مسح الكل',
   riskLoading: 'جاري تحميل المخاطر…',
   riskLoadError: 'تعذر تحميل المخاطر.',
 

@@ -91,6 +91,11 @@ export const en = {
 
   riskEmpty: 'No risks yet',
   riskEmptySub: 'Click "New Risk" to register the first one.',
+  riskNoMatchTitle:  'No risks match the current filters',
+  riskNoMatchSub:    'Adjust or clear the filters to see more results.',
+  riskHeatMapHint:   'Click any cell to drill down — the register will show only risks with that likelihood × impact combination.',
+  riskFilterLabel:   'Filtered by',
+  riskClearFilters:  'Clear all',
   riskLoading: 'Loading risks…',
   riskLoadError: 'Could not load risks.',
 
