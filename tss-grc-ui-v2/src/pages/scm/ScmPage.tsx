@@ -36,6 +36,9 @@ import { useToast } from '../../lib/toast';
 import { SUPPLIERS, ONBOARDING, ASSESSMENTS, DEPENDENCIES, CONTRACTS, DISRUPTIONS } from './mockScm';
 import { ProcessLifecycleBar } from '../../components/workflows/ProcessLifecycleBar';
 import { SCM_LIFECYCLES } from '../../lib/moduleLifecycles';
+import { TierMapPanel } from './TierMapPanel';
+import { SUPPLY_CHAIN_TIERS } from './tierMap';
+import { Layers } from 'lucide-react';
 
 type TabId = 'overview' | 'suppliers' | 'onboarding' | 'workflow' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
 
@@ -678,9 +681,63 @@ export function ScmPage() {
         <Kpi Icon={Star}          label={t('scmKpiAvgScore')}          value={String(avgAssessmentScore(assessments.data))} tone="success" />
       </div>
       <ProcessLifecycleBar
-        title="Supply Chain — Processes & Lifecycles"
-        subtitle="ISO 28001 + ISO 28000 + ISO 31000 + OCC concentration — every named process active in this domain."
-        lifecycles={SCM_LIFECYCLES} lang="en" />
+        title="Supply Chain — Process Center"
+        subtitle="ISO 28001 + ISO 28000 + ISO 31000 + Saudi NRC + NIST SP 800-161 — pick a process to launch it."
+        lifecycles={[
+          // ── 1. Supplier Onboarding (6-stage) ──
+          // Workflow: REGISTRATION → CRITICALITY_CLASSIFICATION → SECURITY → OPERATIONAL → LEGAL → APPROVAL
+          // Trigger: opens the Start Onboarding modal so a new supplier
+          // immediately enters the 6-stage onboarding pipeline.
+          { ...SCM_LIFECYCLES[0],
+            primary:   { label: 'Start',     onClick: onbS.startCreate },
+            secondary: { label: 'Pipeline',  href: '/scm?tab=onboarding' } },
+
+          // ── 2. Supply Chain Tier Mapping (Saudi NRC requirement) ──
+          // Workflow: Tier-1 mapped → Tier-2 identified → SPOF analysis → Geographic concentration → Validated
+          // Trigger: jumps to the Workflow & Map tab where the multi-tier
+          // map (Tier-1 → Tier-N) lives — Saudi NRC + NIST SP 800-161 +
+          // ISO 28001 require this annually.
+          { name: 'Supply Chain Tier Mapping',
+            nameAr: 'تعيين طبقات سلسلة الإمداد',
+            reference: 'Saudi NRC + NIST SP 800-161 + ISO 28001',
+            Icon: Layers,
+            activeCount: SUPPLY_CHAIN_TIERS.length,
+            overdueCount: SUPPLY_CHAIN_TIERS.filter(s => !!s.spof).length,
+            steward: 'Supply Chain Risk Office',
+            sla: 'Annual review',
+            primary:   { label: 'Map',      onClick: () => setTab('workflow') },
+            secondary: { label: 'Open map', onClick: () => setTab('workflow') } },
+
+          // ── 3. Supplier Risk Re-assessment ──
+          // Workflow: TRIGGERED → QUESTIONNAIRE → SCORED → ESCALATED (if needed)
+          // Trigger: opens New Risk Assessment modal scoped to a supplier.
+          { ...SCM_LIFECYCLES[1],
+            primary:   { label: 'Trigger',     onClick: asmS.startCreate },
+            secondary: { label: 'Assessments', href: '/scm?tab=assessments' } },
+
+          // ── 4. Disruption Response & Recovery ──
+          // Workflow: REPORT → CONTAIN → RECOVER → CAPA → CLOSE
+          // Trigger: opens Report Disruption modal — incident enters the
+          // 5-stage response workflow visible on the Workflow & Map tab.
+          { ...SCM_LIFECYCLES[2],
+            primary:   { label: 'Report',      onClick: incS.startCreate },
+            secondary: { label: 'Disruptions', href: '/scm?tab=disruptions' } },
+
+          // ── 5. Dependency & Concentration Risk ──
+          // Workflow: MAPPED → RISK_RATED → TREATED → MONITORED
+          // Trigger: opens New Dependency modal so the user can register a
+          // service-to-vendor binding (with Tier-1 / has-alternative flags).
+          { ...SCM_LIFECYCLES[3],
+            primary:   { label: 'Map',          onClick: depS.startCreate },
+            secondary: { label: 'Dependencies', href: '/scm?tab=dependencies' } },
+
+          // ── 6. Contract Renewal & SLA Management ──
+          // Workflow: EXPIRING → RFP → NEGOTIATION → SIGNED
+          // Trigger: opens New Contract modal for the active supplier set.
+          { ...SCM_LIFECYCLES[4],
+            primary:   { label: 'Add',         onClick: conS.startCreate },
+            secondary: { label: 'Contracts',   href: '/scm?tab=contracts' } },
+        ]} lang="en" />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
@@ -899,6 +956,9 @@ function ScmWorkflowMap({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* 0. Multi-tier supply-chain map — Saudi NRC requirement */}
+      <TierMapPanel t={t} lang="en" />
+
       {/* 1. Onboarding pipeline */}
       <Card title={t('scmWfPanelOnboarding')} Icon={Workflow} action={<Badge tone="info">{inFlight.length}</Badge>}>
         {inFlight.length === 0
