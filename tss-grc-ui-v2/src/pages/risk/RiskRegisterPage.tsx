@@ -22,8 +22,10 @@ import { useToast } from '../../lib/toast';
 import { NewRiskModal } from './NewRiskModal';
 import {
   MOCK_RISKS, KRIS, KRI_LATEST_BANDS, KRI_BREACHES, KRI_DASHBOARD_STATS,
+  KRI_TRENDS_BY_ID,
   APPETITES, APPETITE_BREACHES, APPETITE_DASHBOARD_STATS,
 } from './mockRisks';
+import { TimeSeries } from '../../components/viz/TimeSeries';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
 import { RISK_WORKFLOWS } from '../../lib/mockWorkflows';
 import { RISK_LIFECYCLES } from '../../lib/moduleLifecycles';
@@ -504,6 +506,16 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
                       {k.framework && <span>{k.framework} · </span>}
                       {k.frequency} · {k.owner ?? '—'}
                     </div>
+                    {/* 12-week trend sparkline (KRI Performance Analytics pattern) */}
+                    {(KRI_TRENDS_BY_ID[k.id] ?? []).length > 0 && (
+                      <div style={{ margin: '8px 0' }}>
+                        <TimeSeries
+                          width={300} height={60}
+                          color={band === 'RED' ? 'var(--danger)' : band === 'AMBER' ? 'var(--accent-700)' : 'var(--success)'}
+                          threshold={k.amberMax != null ? { value: k.amberMax, color: 'var(--accent-700)', label: `Amber ≤ ${k.amberMax}` } : undefined}
+                          series={KRI_TRENDS_BY_ID[k.id].map((v, i) => ({ label: `W${i - 11 + 12}`, value: v }))} />
+                      </div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', justifyContent: 'space-between' }}>
                       <span>Green ≤ <span className="mono">{k.greenMax ?? '—'}</span> · Amber ≤ <span className="mono">{k.amberMax ?? '—'}</span></span>
                       <span>{k.unit ?? ''}</span>

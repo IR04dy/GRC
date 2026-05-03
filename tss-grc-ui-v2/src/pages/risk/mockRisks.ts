@@ -121,6 +121,18 @@ export const KRIS: KriDefinitionDto[] = [
     framework: 'SAMA_AML', isActive: true },
 ];
 
+// 12-week trend per KRI — feeds the TimeSeries sparkline on each KRI card.
+export const KRI_TRENDS_BY_ID: Record<number, number[]> = {
+  1001: [ 320, 380, 410, 540, 720, 980, 880, 760, 920, 1100, 1180, 1240 ], // Failed logins (24h) — climbing into amber
+  1002: [   0,   0,   1,   0,   2,   0,   1,   0,   0,   0,    0,    0 ], // Critical CVEs open beyond SLA
+  1003: [  18,  22,  19,  25,  28,  30,  21,  19,  23,  24,   22,   22 ], // Critical service downtime (mins)
+  1004: [  82,  85,  88,  84,  86,  82,  79,  80,  78,  79,   81,   81 ], // BCP exercise pass-rate (%)
+  1005: [   3,   3,   3,   3,   3,   3,   3,   4,   4,   4,    4,    4 ], // Critical vendors w/o backup — drifting RED
+  1006: [   3,   2,   2,   2,   1,   1,   2,   2,   1,   1,    1,    1 ], // Open audit findings beyond due date
+  1007: [   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0 ], // DSR responses past PDPL SLA
+  1008: [  88,  85,  82,  79,  76,  74,  78,  77,  76,  78,   79,   78 ], // AML alerts cleared within 5d (%)
+};
+
 // Latest band per KRI (used by KriDashboard.latest map)
 export const KRI_LATEST_BANDS: Record<number, string> = {
   1001: 'AMBER',

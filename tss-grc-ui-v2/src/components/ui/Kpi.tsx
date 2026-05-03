@@ -1,4 +1,5 @@
-import { type LucideIcon, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
+import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Link } from 'react-router-dom';
 
 type KpiTone = 'primary' | 'danger' | 'success' | 'warning' | 'info' | 'accent';
@@ -70,7 +71,7 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
             display: 'inline-flex',
             transition: 'transform var(--dur-fast) var(--ease-standard), color var(--dur-fast)',
           }} className="kpi-arrow">
-            <ArrowRight size={14} />
+            <DirectionalArrow size={14} />
           </span>
         )}
       </div>

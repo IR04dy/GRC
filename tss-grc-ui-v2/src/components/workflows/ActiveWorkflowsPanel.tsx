@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Activity, AlertTriangle, Flame, Clock, ArrowRight, CheckCheck, ShieldAlert, Briefcase } from 'lucide-react';
+import { Activity, AlertTriangle, Flame, Clock, CheckCheck, ShieldAlert, Briefcase } from 'lucide-react';
+import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Card } from '../ui/Card';
 import { Kpi } from '../ui/Kpi';
 import { Badge } from '../ui/Badge';
@@ -117,7 +118,7 @@ function WorkflowRow({ w }: { w: WorkflowInstance }) {
       <Stepper steps={stepperSteps} active={w.currentStage} />
       {w.nextStep && (
         <div style={{ marginTop: 6, fontSize: 11, color: 'var(--primary-700)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <ArrowRight size={11} /> Next: {w.nextStep}
+          <DirectionalArrow size={11} /> Next: {w.nextStep}
         </div>
       )}
     </div>

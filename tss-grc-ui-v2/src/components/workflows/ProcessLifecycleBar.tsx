@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Workflow, Play, ArrowRight } from 'lucide-react';
+import { Workflow, Play } from 'lucide-react';
+import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Card } from '../ui/Card';
 
 /**
@@ -323,7 +324,7 @@ function SecondaryButton({ action }: { action: ProcessAction }) {
   const content = (
     <>
       <span style={{ fontSize: 11 }}>{action.label}</span>
-      <ArrowRight size={11} />
+      <DirectionalArrow size={11} />
     </>
   );
   const style: React.CSSProperties = {
