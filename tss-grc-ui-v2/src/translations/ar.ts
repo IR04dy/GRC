@@ -101,6 +101,7 @@ export const ar = {
   riskColScore: 'الدرجة',
   riskColStatus: 'الحالة',
   riskColOwner: 'المالك',
+  riskColLevel: 'مستوى الخطر',
 
   riskEmpty: 'لا توجد مخاطر بعد',
   riskEmptySub: 'انقر "مخاطرة جديدة" لتسجيل أول مخاطرة.',
@@ -663,6 +664,7 @@ export const ar = {
   detailReviewDate:           'تاريخ المراجعة',
   detailQuickActions:         'إجراءات سريعة',
   detailEditInRegister:       'تعديل في السجل ←',
+  detailAtAGlance:            'لمحة سريعة',
   detailAssessmentsHint:      'تظهر هنا إعادة التقييمات الدورية للمخاطر.',
   detailTreatmentsHint:       'تظهر هنا معالجات المخاطر — تخفيف، نقل، قبول، تجنّب.',
   detailKrisHint:             'مؤشرات الخطر المرتبطة وحالات تجاوز العتبات.',

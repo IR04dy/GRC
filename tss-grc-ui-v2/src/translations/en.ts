@@ -107,6 +107,7 @@ export const en = {
   riskColScore: 'Score',
   riskColStatus: 'Status',
   riskColOwner: 'Owner',
+  riskColLevel: 'Risk Level',
 
   riskEmpty: 'No risks yet',
   riskEmptySub: 'Click "New Risk" to register the first one.',
@@ -671,6 +672,7 @@ export const en = {
   detailReviewDate:           'Review Date',
   detailQuickActions:         'Quick Actions',
   detailEditInRegister:       'Edit in register →',
+  detailAtAGlance:            'At a glance',
   detailAssessmentsHint:      'Periodic risk re-assessments and re-scorings appear here.',
   detailTreatmentsHint:       'Risk treatments — mitigate, transfer, accept, avoid — appear here.',
   detailKrisHint:             'Linked Key Risk Indicators and threshold breaches.',

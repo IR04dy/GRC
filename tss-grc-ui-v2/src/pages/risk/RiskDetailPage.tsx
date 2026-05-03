@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { AlertTriangle, Activity, ListChecks, MessageSquare, Link2, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -109,35 +111,52 @@ export function RiskDetailPage() {
         <FieldTile label={t('detailIdentified')} value={risk.identifiedDate ?? '—'} />
       </div>
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <DetailLayout
+        rail={<>
+          <Card title={t('detailAtAGlance')} Icon={AlertTriangle}>
+            <RailFieldGroup>
+              <RailField
+                label={t('fldStatus')}
+                accent
+                value={<Badge tone={STATUS_TONE[risk.status] ?? 'neutral'} dot>{risk.status.replace(/_/g, ' ')}</Badge>}
+              />
+              {risk.riskLevel && (
+                <RailField
+                  label={t('riskColLevel')}
+                  value={<Badge tone={RISK_LEVEL_TONE[risk.riskLevel] ?? 'neutral'}>{risk.riskLevel}</Badge>}
+                />
+              )}
+              <RailField label={t('riskColInherent')} value={`L${risk.inherentLikelihood} × I${risk.inherentImpact} = ${risk.inherentScore}`} mono />
+              <RailField
+                label={t('riskColResidual')}
+                value={risk.residualScore != null
+                  ? `L${risk.residualLikelihood} × I${risk.residualImpact} = ${risk.residualScore}`
+                  : '—'}
+                mono
+              />
+              <RailField label={t('riskColOwner')}    value={risk.ownerFullNameEn ?? risk.ownerName ?? '—'} />
+              <RailField label={t('riskColCategory')} value={lang === 'ar' && risk.categoryNameAr ? risk.categoryNameAr : (risk.categoryNameEn ?? risk.categoryName ?? '—')} />
+              <RailField label={t('detailIdentified')} value={risk.identifiedDate ?? '—'} mono />
+              <RailField label={t('detailReviewDate')} value={risk.reviewDate ?? '—'} mono />
+            </RailFieldGroup>
+          </Card>
+          <EntityAnchorsPanel
+            anchors={RISK_ANCHORS_BY_ID[risk.id] ?? []}
+            subtitle="Authorities this risk threatens." />
+          <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
+          <Card title={t('detailQuickActions')} Icon={Edit}>
+            <Link to={`/risk?focus=${risk.id}`} style={{ fontSize: 13, color: 'var(--primary)' }}>{t('detailEditInRegister')}</Link>
+          </Card>
+        </>}
+        main={<>
+          <Tabs items={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'overview' && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+          {tab === 'overview' && (
             <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
               <Field label={t('riskColName')} value={title} bold />
               <Field label={t('detailDescription')} value={risk.descriptionEn ?? '—'} multiline />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-                <Field label={t('riskColInherent')} value={`L${risk.inherentLikelihood} × I${risk.inherentImpact} = ${risk.inherentScore}`} />
-                <Field label={t('riskColResidual')} value={risk.residualScore != null ? `L${risk.residualLikelihood} × I${risk.residualImpact} = ${risk.residualScore}` : '—'} />
-                <Field label={t('riskColCategory')} value={lang === 'ar' && risk.categoryNameAr ? risk.categoryNameAr : (risk.categoryNameEn ?? risk.categoryName ?? '—')} />
-                <Field label={t('detailReviewDate')} value={risk.reviewDate ?? '—'} mono />
-              </div>
             </Card>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
-              <Card title={t('detailQuickActions')} Icon={Edit}>
-                <Link to={`/risk?focus=${risk.id}`} style={{ fontSize: 13, color: 'var(--primary)' }}>{t('detailEditInRegister')}</Link>
-              </Card>
-            </div>
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <EntityAnchorsPanel
-              anchors={RISK_ANCHORS_BY_ID[risk.id] ?? []}
-              subtitle="Authorities whose mandates this risk threatens. Click any anchor to open the authority workspace." />
-          </div>
-        </>
-      )}
+          )}
 
       {tab === 'assessments' && (
         <Card title={t('detailTabAssessments')} Icon={Activity}
@@ -212,26 +231,23 @@ export function RiskDetailPage() {
       )}
 
       {tab === 'links' && (
-        <div style={{ display: 'grid', gap: 16 }}>
-          <Card title={t('detailTabLinks')} Icon={Link2}
-            action={<Badge tone="primary">{(RISK_LINKS_BY_ID[risk.id] ?? []).length}</Badge>}>
-            {(RISK_LINKS_BY_ID[risk.id] ?? []).length === 0
-              ? <EmptyState Icon={Link2} title="No links" sub={t('detailLinksHint')} />
-              : <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {(RISK_LINKS_BY_ID[risk.id] ?? []).map(lk => (
-                    <Link key={lk.id} to={lk.href} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', textDecoration: 'none', color: 'inherit' }}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <Badge tone="info">{lk.type}</Badge>
-                        <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{lk.ref}</span>
-                        <span style={{ fontSize: 13, fontWeight: 600 }}>{lk.title}</span>
-                      </div>
-                      {lk.status && <Badge tone={lk.status === 'IMPLEMENTED' ? 'success' : lk.status === 'AMBER' ? 'warning' : lk.status === 'RED' ? 'danger' : 'neutral'}>{lk.status}</Badge>}
-                    </Link>
-                  ))}
-                </div>}
-          </Card>
-          <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
-        </div>
+        <Card title={t('detailTabLinks')} Icon={Link2}
+          action={<Badge tone="primary">{(RISK_LINKS_BY_ID[risk.id] ?? []).length}</Badge>}>
+          {(RISK_LINKS_BY_ID[risk.id] ?? []).length === 0
+            ? <EmptyState Icon={Link2} title="No links" sub={t('detailLinksHint')} />
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(RISK_LINKS_BY_ID[risk.id] ?? []).map(lk => (
+                  <Link key={lk.id} to={lk.href} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <Badge tone="info">{lk.type}</Badge>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{lk.ref}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{lk.title}</span>
+                    </div>
+                    {lk.status && <Badge tone={lk.status === 'IMPLEMENTED' ? 'success' : lk.status === 'AMBER' ? 'warning' : lk.status === 'RED' ? 'danger' : 'neutral'}>{lk.status}</Badge>}
+                  </Link>
+                ))}
+              </div>}
+        </Card>
       )}
 
       {tab === 'history' && (
@@ -253,6 +269,8 @@ export function RiskDetailPage() {
               </div>}
         </Card>
       )}
+        </>}
+      />
 
     </Shell>
   );
