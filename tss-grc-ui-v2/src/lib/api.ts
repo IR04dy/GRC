@@ -326,6 +326,15 @@ export const bcmApi = {
   deleteExercise:   (id: number) => api.delete<void>(`/api/v1/bcm/exercises/${id}`),
   completeExercise: (id: number, score: number, findings: string) =>
     api.post<BcmExerciseDto>(`/api/v1/bcm/exercises/${id}/complete`, { score, findings }),
+  // BIA dependency graph (M3)
+  dependencyGraph: () => api.get<{
+    nodes: Array<{ id: number; nameEn: string; nameAr?: string; criticality?: string }>;
+    edges: Array<{ id: number; from: number; to: number; dependencyType: string; criticalityImpact?: string; notes?: string }>;
+  }>('/api/v1/bcm/dependency-graph'),
+  listDependencies:  () => api.get<Array<{ id: number; processId: number; dependsOnProcessId: number; dependencyType: string; criticalityImpact?: string; notes?: string }>>('/api/v1/bcm/dependencies'),
+  createDependency:  (body: { processId: number; dependsOnProcessId: number; dependencyType?: string; criticalityImpact?: string; notes?: string }) =>
+                       api.post<unknown>('/api/v1/bcm/dependencies', body),
+  deleteDependency:  (id: number) => api.delete<void>(`/api/v1/bcm/dependencies/${id}`),
   stats:        () => api.get<unknown>('/api/v1/bcm/stats'),
 };
 

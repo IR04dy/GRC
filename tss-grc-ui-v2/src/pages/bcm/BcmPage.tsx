@@ -32,7 +32,7 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { BCM_PLANS } from './mockBcm';
 
-type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'exercises' | 'comms';
+type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms';
 
 const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' }, { value: 'UNDER_REVIEW', label: 'Under Review' },
@@ -211,6 +211,7 @@ export function BcmPage() {
     { id: 'plans',     label: t('bcmTabPlans') },
     { id: 'processes', label: t('bcmTabProcesses') },
     { id: 'bia',       label: t('bcmTabBia') },
+    { id: 'graph',     label: t('bcmTabDepGraph') },
     { id: 'exercises', label: t('bcmTabExercises') },
     { id: 'comms',     label: t('bcmTabComms') },
   ];
@@ -453,6 +454,8 @@ export function BcmPage() {
         </Card>
       )}
 
+      {tab === 'graph'  && <DependencyGraphTab t={t} />}
+
       {tab === 'comms' && <CrisisCommsTab toast={toast} t={t} />}
 
       {/* ── Modals ── */}
@@ -629,4 +632,221 @@ function CrisisCommsTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: R
 function LoadingRow() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+// ─── BIA dependency graph (M3) ──────────────────────────────────────────────
+type GraphNode = { id: number; nameEn: string; nameAr?: string; criticality?: string };
+type GraphEdge = { id: number; from: number; to: number; dependencyType: string; criticalityImpact?: string; notes?: string };
+
+const CRIT_COLOR: Record<string, string> = {
+  CRITICAL: 'var(--risk-crit)',
+  HIGH:     'var(--risk-vhigh)',
+  MEDIUM:   'var(--risk-med)',
+  LOW:      'var(--risk-low)',
+};
+const DEP_TYPE_DASH: Record<string, string> = {
+  INTERNAL_PROCESS: '0',
+  UPSTREAM_VENDOR:  '6,4',
+  INFRASTRUCTURE:   '2,4',
+  DATA_FEED:        '8,2,2,2',
+  PEOPLE_SKILL:     '1,4',
+};
+
+function DependencyGraphTab({ t }: { t: (k: string) => string }) {
+  const { lang } = useI18n();
+  const [nodes, setNodes] = useState<GraphNode[]>([]);
+  const [edges, setEdges] = useState<GraphEdge[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [focusId, setFocusId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    setLoading(true);
+    bcmApi.dependencyGraph()
+      .then(d => { setNodes(d.nodes); setEdges(d.edges); })
+      .catch(() => { setNodes([]); setEdges([]); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Layered layout: longest-path from any source. Sources have no incoming edges.
+  const layout = layeredLayout(nodes, edges);
+  const w = Math.max(720, layout.cols * 240 + 80);
+  const h = Math.max(360, layout.maxRows * 80 + 80);
+
+  // Compute upstream/downstream chain for the focused node
+  const upstreamIds = focusId != null ? closure(focusId, edges, 'up')   : new Set<number>();
+  const downstreamIds = focusId != null ? closure(focusId, edges, 'down') : new Set<number>();
+
+  if (!isAuthenticated()) {
+    return <Card title={t('bcmTabDepGraph')}><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>{t('signInToView')}</div></Card>;
+  }
+  if (loading) return <Card><LoadingRow /></Card>;
+  if (nodes.length === 0) {
+    return <Card title={t('bcmTabDepGraph')}>
+      <EmptyState Icon={Activity} title={t('bcmDepGraphEmptyTitle')} sub={t('bcmDepGraphEmptySub')} />
+    </Card>;
+  }
+
+  return (
+    <Card title={t('bcmTabDepGraph')} action={<>
+      <Badge tone="primary">{nodes.length} {t('bcmDepGraphProcesses')}</Badge>
+      <Badge tone="info">{edges.length} {t('bcmDepGraphEdges')}</Badge>
+    </>}>
+      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--ink-3)', marginBottom: 8, flexWrap: 'wrap' }}>
+        <span>{t('bcmDepGraphLegend')}:</span>
+        <LegendDot color="var(--risk-crit)"  label={t('critCritical')} />
+        <LegendDot color="var(--risk-vhigh)" label={t('critHigh')} />
+        <LegendDot color="var(--risk-med)"   label={t('critMedium')} />
+        <LegendDot color="var(--risk-low)"   label={t('critLow')} />
+        <span style={{ marginLeft: 'auto' }}>
+          {focusId != null && <button onClick={() => setFocusId(null)} className="lang-toggle">{t('bcmDepGraphClearFocus')}</button>}
+        </span>
+      </div>
+      <div style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface)' }}>
+        <svg width={w} height={h} style={{ display: 'block' }}>
+          <defs>
+            <marker id="arrowDefault" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-4)" />
+            </marker>
+            <marker id="arrowFocus" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-500)" />
+            </marker>
+          </defs>
+          {edges.map(e => {
+            const a = layout.pos.get(e.from);
+            const b = layout.pos.get(e.to);
+            if (!a || !b) return null;
+            const focused = focusId != null && (e.from === focusId || e.to === focusId
+              || (upstreamIds.has(e.from) && upstreamIds.has(e.to))
+              || (downstreamIds.has(e.from) && downstreamIds.has(e.to)));
+            const dim = focusId != null && !focused;
+            const color = focused ? 'var(--accent-500)' : 'var(--ink-4)';
+            const x1 = a.x + 120, y1 = a.y + 24;
+            const x2 = b.x,       y2 = b.y + 24;
+            const cx = (x1 + x2) / 2;
+            return (
+              <g key={e.id} opacity={dim ? 0.18 : 1}>
+                <path d={`M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`}
+                      stroke={color} strokeWidth={focused ? 2 : 1.4} fill="none"
+                      strokeDasharray={DEP_TYPE_DASH[e.dependencyType] ?? '0'}
+                      markerEnd={focused ? 'url(#arrowFocus)' : 'url(#arrowDefault)'} />
+              </g>
+            );
+          })}
+          {nodes.map(n => {
+            const p = layout.pos.get(n.id);
+            if (!p) return null;
+            const isFocus  = n.id === focusId;
+            const inChain  = focusId != null && (upstreamIds.has(n.id) || downstreamIds.has(n.id));
+            const dim      = focusId != null && !isFocus && !inChain;
+            const fill     = CRIT_COLOR[n.criticality ?? ''] ?? 'var(--surface-2)';
+            const label    = lang === 'ar' && n.nameAr ? n.nameAr : n.nameEn;
+            return (
+              <g key={n.id} opacity={dim ? 0.25 : 1} style={{ cursor: 'pointer' }} onClick={() => setFocusId(prev => prev === n.id ? null : n.id)}>
+                <rect x={p.x} y={p.y} width={120} height={48} rx={8} ry={8}
+                      fill={fill} stroke={isFocus ? 'var(--accent-700)' : 'var(--border-strong)'} strokeWidth={isFocus ? 2.5 : 1} />
+                <text x={p.x + 60} y={p.y + 22} textAnchor="middle" fontSize="11" fontWeight="600" fill="var(--ink-1)">
+                  <tspan>{truncate(label, 18)}</tspan>
+                </text>
+                <text x={p.x + 60} y={p.y + 38} textAnchor="middle" fontSize="9" fill="var(--ink-2)">
+                  {n.criticality}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      {focusId != null && (
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--ink-2)' }}>
+          <strong>{t('bcmDepGraphUpstream')}:</strong> {Array.from(upstreamIds).filter(id => id !== focusId).map(id => nodes.find(n => n.id === id)?.nameEn).filter(Boolean).join(', ') || '—'}
+          <br/>
+          <strong>{t('bcmDepGraphDownstream')}:</strong> {Array.from(downstreamIds).filter(id => id !== focusId).map(id => nodes.find(n => n.id === id)?.nameEn).filter(Boolean).join(', ') || '—'}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+    <span style={{ width: 10, height: 10, borderRadius: 2, background: color, display: 'inline-block' }} />{label}
+  </span>;
+}
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+/** Compute longest-path layered layout; returns positions per node id. */
+function layeredLayout(nodes: GraphNode[], edges: GraphEdge[]): { pos: Map<number, { x: number; y: number }>; cols: number; maxRows: number } {
+  // depth[id] = longest chain from any source ending at id
+  const depth = new Map<number, number>();
+  const incoming = new Map<number, number[]>();
+  const outgoing = new Map<number, number[]>();
+  for (const n of nodes) { incoming.set(n.id, []); outgoing.set(n.id, []); }
+  for (const e of edges) {
+    incoming.get(e.to)?.push(e.from);
+    outgoing.get(e.from)?.push(e.to);
+  }
+  // Topological order via Kahn's
+  const order: number[] = [];
+  const indeg = new Map<number, number>();
+  for (const n of nodes) indeg.set(n.id, (incoming.get(n.id) ?? []).length);
+  const queue: number[] = [];
+  for (const [id, d] of indeg.entries()) if (d === 0) queue.push(id);
+  while (queue.length) {
+    const id = queue.shift()!;
+    order.push(id);
+    for (const nx of outgoing.get(id) ?? []) {
+      const nd = (indeg.get(nx) ?? 0) - 1;
+      indeg.set(nx, nd);
+      if (nd === 0) queue.push(nx);
+    }
+  }
+  for (const id of order) {
+    const ins = incoming.get(id) ?? [];
+    if (ins.length === 0) depth.set(id, 0);
+    else depth.set(id, Math.max(...ins.map(p => (depth.get(p) ?? 0) + 1)));
+  }
+  // Cycle fallback — any unset gets depth 0
+  for (const n of nodes) if (!depth.has(n.id)) depth.set(n.id, 0);
+
+  // Group by depth column
+  const byCol = new Map<number, number[]>();
+  for (const n of nodes) {
+    const c = depth.get(n.id) ?? 0;
+    if (!byCol.has(c)) byCol.set(c, []);
+    byCol.get(c)!.push(n.id);
+  }
+  // Sort each column by id for stable layout
+  for (const arr of byCol.values()) arr.sort((a, b) => a - b);
+
+  const cols = Math.max(...byCol.keys()) + 1;
+  let maxRows = 0;
+  for (const arr of byCol.values()) maxRows = Math.max(maxRows, arr.length);
+
+  const pos = new Map<number, { x: number; y: number }>();
+  for (const [c, ids] of byCol.entries()) {
+    ids.forEach((id, i) => {
+      pos.set(id, { x: 40 + c * 220, y: 40 + i * 80 });
+    });
+  }
+  return { pos, cols, maxRows };
+}
+
+/** BFS closure of nodes upstream OR downstream from the seed. */
+function closure(seed: number, edges: GraphEdge[], dir: 'up' | 'down'): Set<number> {
+  const out = new Set<number>([seed]);
+  const queue: number[] = [seed];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const e of edges) {
+      const next = dir === 'up' ? (e.to === cur ? e.from : null) : (e.from === cur ? e.to : null);
+      if (next != null && !out.has(next)) {
+        out.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return out;
 }
