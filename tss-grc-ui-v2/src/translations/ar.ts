@@ -26,6 +26,10 @@ export const ar = {
 
   searchPlaceholder: 'بحث في المخاطر، الضوابط، السياسات…',
   notifications: 'الإشعارات',
+  themeMode:        'السمة',
+  themeModeLight:   'فاتح',
+  themeModeDark:    'داكن',
+  themeModeSystem:  'حسب النظام',
   langToggle: 'EN',
   signOut: 'تسجيل الخروج',
 

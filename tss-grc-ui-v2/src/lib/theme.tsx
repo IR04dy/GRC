@@ -78,6 +78,9 @@ export const PRESETS: Preset[] = [
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'grc.theme';
+const MODE_STORAGE_KEY = 'grc.theme.mode';
+
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 interface ThemeContextValue {
   overrides: ThemeOverrides;
@@ -88,6 +91,11 @@ interface ThemeContextValue {
   resolve: (key: TokenKey) => string;
   /** True when a token has a user-supplied override. */
   isCustom: (key: TokenKey) => boolean;
+  /** Light/dark/system mode — persisted across sessions. */
+  mode: ThemeMode;
+  setMode: (mode: ThemeMode) => void;
+  /** Resolved mode: 'light' or 'dark' (system → OS preference). */
+  effectiveMode: 'light' | 'dark';
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -99,6 +107,29 @@ function readStored(): ThemeOverrides {
     const parsed = JSON.parse(raw) as ThemeOverrides;
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch { return {}; }
+}
+
+function readStoredMode(): ThemeMode {
+  try {
+    const raw = localStorage.getItem(MODE_STORAGE_KEY);
+    if (raw === 'light' || raw === 'dark' || raw === 'system') return raw;
+  } catch { /* ignore */ }
+  return 'system';
+}
+
+function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function applyMode(mode: ThemeMode): 'light' | 'dark' {
+  const effective: 'light' | 'dark' = mode === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : mode;
+  if (typeof document !== 'undefined') {
+    if (effective === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  return effective;
 }
 
 /** Apply CSS overrides synchronously — used both initially and on every change. */
@@ -122,6 +153,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return stored;
   });
 
+  const [mode, setModeState] = useState<ThemeMode>(() => {
+    const stored = readStoredMode();
+    if (typeof document !== 'undefined') applyMode(stored);
+    return stored;
+  });
+  const [effectiveMode, setEffectiveMode] = useState<'light' | 'dark'>(
+    () => mode === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : mode
+  );
+
   const prevRef = useRef<ThemeOverrides>(overrides);
 
   useEffect(() => {
@@ -129,6 +169,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     prevRef.current = overrides;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides)); } catch { /* quota — ignore */ }
   }, [overrides]);
+
+  // Apply mode + persist whenever it changes
+  useEffect(() => {
+    setEffectiveMode(applyMode(mode));
+    try { localStorage.setItem(MODE_STORAGE_KEY, mode); } catch { /* quota — ignore */ }
+  }, [mode]);
+
+  // Re-apply on OS-level theme changes when in 'system' mode
+  useEffect(() => {
+    if (mode !== 'system' || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setEffectiveMode(applyMode('system'));
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, [mode]);
 
   const setOverride = useCallback((key: TokenKey, value: string | undefined) => {
     setOverridesState(prev => {
@@ -145,12 +200,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const reset = useCallback(() => setOverridesState({}), []);
 
+  const setMode = useCallback((m: ThemeMode) => setModeState(m), []);
+
   const resolve = useCallback((key: TokenKey) => overrides[key] ?? DEFAULT_VALUES[key], [overrides]);
   const isCustom = useCallback((key: TokenKey) => overrides[key] !== undefined, [overrides]);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ overrides, setOverride, applyPreset, reset, resolve, isCustom }),
-    [overrides, setOverride, applyPreset, reset, resolve, isCustom]
+    () => ({ overrides, setOverride, applyPreset, reset, resolve, isCustom, mode, setMode, effectiveMode }),
+    [overrides, setOverride, applyPreset, reset, resolve, isCustom, mode, setMode, effectiveMode]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

@@ -1,9 +1,10 @@
-import { Search, Bell, Languages, LogOut } from 'lucide-react';
+import { Search, Bell, Languages, LogOut, Sun, Moon, Monitor } from 'lucide-react';
 import { useI18n } from '../../lib/i18n';
 import { getUser, clearSession } from '../../lib/auth';
 import { logout } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
+import { useTheme, type ThemeMode } from '../../lib/theme';
 
 export function Topbar({ title, sub }: { title: string; sub?: string }) {
   const { t, lang, toggleLang } = useI18n();
@@ -37,6 +38,8 @@ export function Topbar({ title, sub }: { title: string; sub?: string }) {
           <span className="dot" />
         </button>
 
+        <ThemeToggle />
+
         <button className="lang-toggle" onClick={toggleLang} aria-label="Toggle language">
           <Languages size={14} />
           {t('langToggle')}
@@ -52,5 +55,24 @@ export function Topbar({ title, sub }: { title: string; sub?: string }) {
           : <div className="avatar">{initials}</div>}
       </div>
     </header>
+  );
+}
+
+function ThemeToggle() {
+  const { t } = useI18n();
+  const { mode, setMode, effectiveMode } = useTheme();
+  // Cycle: light → dark → system → light
+  const next: Record<ThemeMode, ThemeMode> = { light: 'dark', dark: 'system', system: 'light' };
+  const Icon = mode === 'system' ? Monitor : (effectiveMode === 'dark' ? Moon : Sun);
+  const label = mode === 'system' ? t('themeModeSystem') : (mode === 'dark' ? t('themeModeDark') : t('themeModeLight'));
+  return (
+    <button
+      className="icon-btn"
+      title={`${t('themeMode')}: ${label}`}
+      aria-label={`${t('themeMode')}: ${label}`}
+      onClick={() => setMode(next[mode])}
+    >
+      <Icon size={16} />
+    </button>
   );
 }

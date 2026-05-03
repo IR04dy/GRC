@@ -29,6 +29,10 @@ export const en = {
   // Topbar
   searchPlaceholder: 'Search risks, controls, policies…',
   notifications: 'Notifications',
+  themeMode:        'Theme',
+  themeModeLight:   'Light',
+  themeModeDark:    'Dark',
+  themeModeSystem:  'System',
   langToggle: 'العربية',
   signOut: 'Sign out',
 

@@ -181,3 +181,105 @@
 [dir="rtl"] {
   --font-sans: "IBM Plex Sans Arabic", "Plus Jakarta Sans", system-ui, sans-serif;
 }
+
+/* ============================================================
+   Dark mode — eye-comfort enterprise dark palette.
+   Activated by [data-theme="dark"] on <html>.
+   Per-token user overrides on :root still win because inline
+   style.setProperty wins over stylesheet rules.
+   ============================================================ */
+[data-theme="dark"] {
+  /* Surface */
+  --bg:           #0E1614;
+  --surface:      #131D1B;
+  --surface-2:    #182724;
+  --surface-3:    #1F302C;
+  --border:       #28403B;
+  --border-strong:#3B5B54;
+
+  /* Ink — inverted for dark */
+  --ink-0: #0B1410;
+  --ink-1: #ECEFEC;
+  --ink-2: #C9D2CE;
+  --ink-3: #93A19B;
+  --ink-4: #6E7E78;
+  --ink-5: #46524E;
+
+  /* Brand — slightly lifted so they pop on dark surfaces */
+  --primary-50:  #103838;
+  --primary-100: #154848;
+  --primary-200: #1E5C5C;
+  --primary-300: #2E8888;
+  --primary-400: #3FA5A5;
+  --primary-500: #5FBCBC;
+  --primary-600: #7CCDCD;
+  --primary-700: #9BDDDD;
+  --primary:        var(--primary-500);
+  --primary-hover:  var(--primary-400);
+  --primary-press:  var(--primary-300);
+  --primary-soft:   var(--primary-50);
+
+  --accent-50:  #3A2A0E;
+  --accent-100: #4D3712;
+  --accent-200: #6B4E1C;
+  --accent-300: #C8932A;
+  --accent-400: #E5B547;
+  --accent-500: #EFCE7A;
+  --accent-600: #F6E4B0;
+  --accent:        var(--accent-400);
+  --accent-hover:  var(--accent-500);
+
+  /* Semantic — readable on dark */
+  --success:    #6FBF8E;
+  --success-bg: #15291E;
+  --success-fg: #9CE0B5;
+  --warning:    #E5B547;
+  --warning-bg: #2C2110;
+  --warning-fg: #F6E4B0;
+  --danger:     #E47B73;
+  --danger-bg:  #2A1614;
+  --danger-fg:  #F1A39C;
+  --info:       #7AA0B5;
+  --info-bg:    #16242C;
+  --info-fg:    #B8CFDC;
+  --neutral-bg: #1F2A27;
+  --neutral-fg: #93A19B;
+
+  /* Risk severity (heat-map) — slightly desaturated for dark */
+  --risk-vlow:  #2D4A37;
+  --risk-low:   #3F6E51;
+  --risk-med:   #8C7035;
+  --risk-high:  #A86E45;
+  --risk-vhigh: #B8554A;
+  --risk-crit:  #D04942;
+
+  /* Sidebar — already dark, keep it the same family */
+  --sb-bg:        #060F11;
+  --sb-bg-2:      #0B1A1D;
+  --sb-text:      #DCE6E4;
+  --sb-text-2:    #7E928F;
+  --sb-text-3:    #4A5C58;
+  --sb-active-bg: rgba(95,188,188,0.22);
+  --sb-active-fg: #FFFFFF;
+  --sb-hover-bg:  rgba(255,255,255,0.06);
+  --sb-border:    rgba(220,230,228,0.08);
+
+  /* Gradients */
+  --grad-hero:   linear-gradient(135deg, #0B2A2A 0%, #154848 55%, #2E8888 100%);
+  --grad-aurora: radial-gradient(circle at 85% 12%, rgba(229,181,71,0.10), transparent 55%);
+
+  /* Shadows — inset glow on dark, no heavy drop shadow */
+  --shadow-1: 0 1px 2px rgba(0,0,0,.36), 0 4px 12px rgba(0,0,0,.18);
+  --shadow-2: 0 4px 16px rgba(0,0,0,.36), 0 2px 4px rgba(0,0,0,.20);
+  --shadow-3: 0 16px 48px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.30);
+  --focus-ring: 0 0 0 3px color-mix(in oklab, var(--primary) 30%, transparent);
+}
+
+/* Smooth transition between modes (skip if user prefers reduced motion). */
+@media (prefers-reduced-motion: no-preference) {
+  html, html * {
+    transition: background-color var(--dur-normal) var(--ease-standard),
+                border-color var(--dur-normal) var(--ease-standard),
+                color var(--dur-fast) var(--ease-standard);
+  }
+}
