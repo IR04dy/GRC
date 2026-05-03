@@ -9,6 +9,8 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { complianceApi, type ComplianceControlDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
+import { CONTROL_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 
 type TabId = 'overview' | 'subcontrols' | 'evidence' | 'tests' | 'links';
 
@@ -65,20 +67,27 @@ export function ControlDetailPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-          <Card title={t('detailTabOverview')} Icon={ClipboardCheck}>
-            <Field label={t('fldCode')}     value={item.code} mono bold />
-            <Field label={t('colControl')}  value={name} bold />
-            <Field label={t('fldDomain')}   value={item.domain ?? '—'} />
-            <Field label={t('colMaturity')} value={`L${item.maturityLevel ?? 0}`} mono />
-            <Field label={t('colOwner')}    value={item.owner ?? '—'} />
-            <Field label={t('colFramework')} value={(item.framework ?? '').replace(/_/g, ' ')} />
-            <Field label={t('detailDescription')} value={item.description ?? '—'} multiline />
-          </Card>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <LinkedChangesPanel entityType="CONTROL" entityId={item.id} />
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+            <Card title={t('detailTabOverview')} Icon={ClipboardCheck}>
+              <Field label={t('fldCode')}     value={item.code} mono bold />
+              <Field label={t('colControl')}  value={name} bold />
+              <Field label={t('fldDomain')}   value={item.domain ?? '—'} />
+              <Field label={t('colMaturity')} value={`L${item.maturityLevel ?? 0}`} mono />
+              <Field label={t('colOwner')}    value={item.owner ?? '—'} />
+              <Field label={t('colFramework')} value={(item.framework ?? '').replace(/_/g, ' ')} />
+              <Field label={t('detailDescription')} value={item.description ?? '—'} multiline />
+            </Card>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <LinkedChangesPanel entityType="CONTROL" entityId={item.id} />
+            </div>
           </div>
-        </div>
+          <div style={{ marginTop: 16 }}>
+            <EntityAnchorsPanel
+              anchors={CONTROL_ANCHORS_BY_ID[item.id] ?? []}
+              subtitle="Authorities + control references this control satisfies. Click any anchor to open the authority workspace." />
+          </div>
+        </>
       )}
 
       {tab === 'subcontrols' && <Card title={t('detailTabSubControls')} Icon={ListChecks}><div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailSubControlsHint')}</div></Card>}

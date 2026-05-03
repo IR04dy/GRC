@@ -11,6 +11,8 @@ import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { riskApi, ApiError, type RiskResponse } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
+import { RISK_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 
 type TabId = 'overview' | 'assessments' | 'treatments' | 'kris' | 'links' | 'history';
 
@@ -105,24 +107,31 @@ export function RiskDetailPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-          <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
-            <Field label={t('riskColName')} value={title} bold />
-            <Field label={t('detailDescription')} value={risk.descriptionEn ?? '—'} multiline />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-              <Field label={t('riskColInherent')} value={`L${risk.inherentLikelihood} × I${risk.inherentImpact} = ${risk.inherentScore}`} />
-              <Field label={t('riskColResidual')} value={risk.residualScore != null ? `L${risk.residualLikelihood} × I${risk.residualImpact} = ${risk.residualScore}` : '—'} />
-              <Field label={t('riskColCategory')} value={lang === 'ar' && risk.categoryNameAr ? risk.categoryNameAr : (risk.categoryNameEn ?? risk.categoryName ?? '—')} />
-              <Field label={t('detailReviewDate')} value={risk.reviewDate ?? '—'} mono />
-            </div>
-          </Card>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
-            <Card title={t('detailQuickActions')} Icon={Edit}>
-              <Link to={`/risk?focus=${risk.id}`} style={{ fontSize: 13, color: 'var(--primary)' }}>{t('detailEditInRegister')}</Link>
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+            <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
+              <Field label={t('riskColName')} value={title} bold />
+              <Field label={t('detailDescription')} value={risk.descriptionEn ?? '—'} multiline />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                <Field label={t('riskColInherent')} value={`L${risk.inherentLikelihood} × I${risk.inherentImpact} = ${risk.inherentScore}`} />
+                <Field label={t('riskColResidual')} value={risk.residualScore != null ? `L${risk.residualLikelihood} × I${risk.residualImpact} = ${risk.residualScore}` : '—'} />
+                <Field label={t('riskColCategory')} value={lang === 'ar' && risk.categoryNameAr ? risk.categoryNameAr : (risk.categoryNameEn ?? risk.categoryName ?? '—')} />
+                <Field label={t('detailReviewDate')} value={risk.reviewDate ?? '—'} mono />
+              </div>
             </Card>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
+              <Card title={t('detailQuickActions')} Icon={Edit}>
+                <Link to={`/risk?focus=${risk.id}`} style={{ fontSize: 13, color: 'var(--primary)' }}>{t('detailEditInRegister')}</Link>
+              </Card>
+            </div>
           </div>
-        </div>
+          <div style={{ marginTop: 16 }}>
+            <EntityAnchorsPanel
+              anchors={RISK_ANCHORS_BY_ID[risk.id] ?? []}
+              subtitle="Authorities whose mandates this risk threatens. Click any anchor to open the authority workspace." />
+          </div>
+        </>
       )}
 
       {tab === 'assessments' && (

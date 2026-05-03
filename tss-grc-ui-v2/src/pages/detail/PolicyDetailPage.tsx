@@ -9,6 +9,8 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { complianceApi, frameworkApi, type PolicyDto, type PolicyMappingDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
+import { POLICY_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 
 type TabId = 'overview' | 'mappings' | 'lifecycle' | 'links';
 
@@ -65,32 +67,39 @@ export function PolicyDetailPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-          <Card title={t('detailTabOverview')} Icon={BookCopy}>
-            <Field label={t('fldCode')}     value={item.code ?? '—'} mono bold />
-            <Field label={t('colTitle')}    value={title} bold />
-            <Field label={t('fldVersion')}  value={item.version ?? '—'} mono />
-            <Field label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
-            <Field label={t('complianceFldEffectiveFrom')} value={item.effectiveFrom ?? '—'} mono />
-            <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
-            <Field label={t('complianceFldPolicyContent')} value={item.contentEn ?? '—'} multiline />
-          </Card>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card title={t('detailTabMappings')} Icon={Award}>
-              {mappings.length === 0
-                ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('detailMappingsEmpty')}</div>
-                : mappings.map(m => (
-                  <div key={m.mappingId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
-                    <Badge tone="primary">{m.frameworkCode}</Badge>
-                    {m.clauseRef && <span className="mono" style={{ fontSize: 11 }}>{m.clauseRef}</span>}
-                    <Badge tone={m.satisfaction === 'FULL' ? 'success' : m.satisfaction === 'PARTIAL' ? 'warning' : 'neutral'}>{m.satisfaction.replace(/_/g, ' ')}</Badge>
-                  </div>
-                ))
-              }
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+            <Card title={t('detailTabOverview')} Icon={BookCopy}>
+              <Field label={t('fldCode')}     value={item.code ?? '—'} mono bold />
+              <Field label={t('colTitle')}    value={title} bold />
+              <Field label={t('fldVersion')}  value={item.version ?? '—'} mono />
+              <Field label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
+              <Field label={t('complianceFldEffectiveFrom')} value={item.effectiveFrom ?? '—'} mono />
+              <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
+              <Field label={t('complianceFldPolicyContent')} value={item.contentEn ?? '—'} multiline />
             </Card>
-            <LinkedChangesPanel entityType="POLICY" entityId={item.id} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <Card title={t('detailTabMappings')} Icon={Award}>
+                {mappings.length === 0
+                  ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('detailMappingsEmpty')}</div>
+                  : mappings.map(m => (
+                    <div key={m.mappingId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+                      <Badge tone="primary">{m.frameworkCode}</Badge>
+                      {m.clauseRef && <span className="mono" style={{ fontSize: 11 }}>{m.clauseRef}</span>}
+                      <Badge tone={m.satisfaction === 'FULL' ? 'success' : m.satisfaction === 'PARTIAL' ? 'warning' : 'neutral'}>{m.satisfaction.replace(/_/g, ' ')}</Badge>
+                    </div>
+                  ))
+                }
+              </Card>
+              <LinkedChangesPanel entityType="POLICY" entityId={item.id} />
+            </div>
           </div>
-        </div>
+          <div style={{ marginTop: 16 }}>
+            <EntityAnchorsPanel
+              anchors={POLICY_ANCHORS_BY_ID[item.id] ?? []}
+              subtitle="Authorities + clauses this policy satisfies. Click any anchor to open the authority workspace." />
+          </div>
+        </>
       )}
 
       {tab === 'mappings' && (

@@ -12,6 +12,8 @@ import { complianceApi, ApiError, type ComplianceFindingDto } from '../../lib/ap
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
+import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
+import { FINDING_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 
 type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history';
 
@@ -92,20 +94,27 @@ export function FindingDetailPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
-          <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
-            <Field label={t('colTitle')}    value={item.title} bold />
-            <Field label={t('colCapa')}     value={item.capa ?? '—'} multiline />
-            <Field label={t('colDue')}      value={item.dueDate ?? '—'} mono />
-            <Field label={t('colOwner')}    value={item.owner ?? '—'} />
-          </Card>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card title={t('detailCapaStage')} Icon={ListChecks}>
-              <CapaStepper stage={stage} t={t} />
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+            <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
+              <Field label={t('colTitle')}    value={item.title} bold />
+              <Field label={t('colCapa')}     value={item.capa ?? '—'} multiline />
+              <Field label={t('colDue')}      value={item.dueDate ?? '—'} mono />
+              <Field label={t('colOwner')}    value={item.owner ?? '—'} />
             </Card>
-            <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <Card title={t('detailCapaStage')} Icon={ListChecks}>
+                <CapaStepper stage={stage} t={t} />
+              </Card>
+              <LinkedChangesPanel entityType="AUDIT_FINDING" entityId={item.id} />
+            </div>
           </div>
-        </div>
+          <div style={{ marginTop: 16 }}>
+            <EntityAnchorsPanel
+              anchors={FINDING_ANCHORS_BY_ID[item.id] ?? []}
+              subtitle="Authorities + control references this finding addresses. Click any anchor to open the authority workspace." />
+          </div>
+        </>
       )}
 
       {tab === 'capa' && (
