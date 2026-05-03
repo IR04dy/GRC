@@ -62,7 +62,7 @@ export function TprmPage() {
   const [confirmDel, setConfirmDel] = useState<TprmVendorDto | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const vendors = useApiList<TprmVendorDto>(() => tprmApi.vendors(0, 100), VENDORS as unknown as TprmVendorDto[]);
+  const vendors = useApiList<TprmVendorDto>(() => tprmApi.vendors(0, 100), VENDORS);
 
   const FIELDS: FieldDef[] = [
     { kind: 'text',     key: 'vendorName',      label: `${t('tprmFldVendorName')} (${t('fldTitleEnLbl').match(/\(([^)]+)\)/)?.[1] ?? 'EN'}) *`, required: true, maxLength: 200, span: 6 },

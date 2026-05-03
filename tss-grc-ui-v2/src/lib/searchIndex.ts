@@ -134,11 +134,11 @@ function buildEntityItems(): SearchItem[] {
   for (const v of VENDORS) {
     items.push({
       id: `vendor-${v.id}`, kind: 'VENDOR',
-      title: v.name,
-      subtitle: `${v.service} · ${v.tier} · score ${v.score}`,
+      title: v.vendorName,
+      subtitle: `${v.vendorType ?? '—'} · ${v.riskRating} · ${v.status}`,
       href: `/vendors/${v.id}`,
       Icon: Truck,
-      keywords: [v.tier, v.status, v.service],
+      keywords: [v.riskRating, v.status, v.vendorType ?? '', v.country ?? ''],
     });
   }
 
