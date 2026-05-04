@@ -3,6 +3,9 @@ dist
 dist-ssr
 .vite
 *.tsbuildinfo
+# composite-build artefacts emitted by `tsc -b` for vite.config.ts
+vite.config.d.ts
+vite.config.js
 .env
 .env.local
 .env.*.local
