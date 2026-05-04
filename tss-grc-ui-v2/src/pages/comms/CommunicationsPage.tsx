@@ -27,8 +27,14 @@ import { generatePeriodicPending, findPeriodicFiling } from '../../lib/notificat
 import { useCommsMutations } from '../../lib/useCommsMutations';
 import { AcknowledgeModal } from '../../components/comms/AcknowledgeModal';
 import { ComposeModal } from '../../components/comms/ComposeModal';
+import { NewCommunicationModal } from '../../components/comms/NewCommunicationModal';
+import {
+  useCommunications, FORWARD_TRANSITIONS, STATUS_TONE_COMM, STATUS_LABEL_COMM,
+  type Communication, type CommStatus,
+} from '../../lib/communications';
+import { Plus, FileText, ArrowRight } from 'lucide-react';
 
-type TabId = 'pending' | 'sent' | 'matrix' | 'directory' | 'raci';
+type TabId = 'pending' | 'sent' | 'lifecycle' | 'matrix' | 'directory' | 'raci';
 
 const CHANNEL_ICONS: Record<CommChannel, LucideIcon> = {
   PORTAL:            ExternalLink,
@@ -89,6 +95,11 @@ export function CommunicationsPage() {
   const [ackTarget, setAckTarget] = useState<{ recordKey: string; entry: CommLogEntry; spec: NotificationSpec } | null>(null);
   // Modal state for "Compose" flow.
   const [composeTarget, setComposeTarget] = useState<{ recordKey: string; entry: CommLogEntry; spec: NotificationSpec; recordTitle?: string } | null>(null);
+  // Modal state for "New Communication" — entry point for ad-hoc + lifecycle-managed comms.
+  const [newCommOpen, setNewCommOpen] = useState(false);
+
+  // Communication-record store (DD-32 — first-class entity with lifecycle).
+  const comms = useCommunications();
 
   // Flatten all comm-log entries with their record keys + spec lookup.
   // Includes both the static seed (event-driven) and the scheduler output
@@ -142,9 +153,12 @@ export function CommunicationsPage() {
     return ageDays <= 7;
   }).length;
 
+  const lifecycleCount = comms.items.filter(c => c.status !== 'CLOSED' && c.status !== 'RETRACTED').length;
+
   const tabs: TabItem<TabId>[] = [
     { id: 'pending',   label: `${t('commsTabPending')} (${pending.length})` },
     { id: 'sent',      label: `${t('commsTabSent')} (${sent.length})` },
+    { id: 'lifecycle', label: `${t('commsTabLifecycle')} (${comms.items.length})${lifecycleCount > 0 ? ' • ' + lifecycleCount : ''}` },
     { id: 'matrix',    label: t('commsTabMatrix') },
     { id: 'directory', label: t('commsTabDirectory') },
     { id: 'raci',      label: t('commsTabRaci') },
@@ -156,6 +170,11 @@ export function CommunicationsPage() {
         eyebrow={t('commsEyebrow')}
         title={t('commsTitle')}
         sub={t('commsHeaderSub')}
+        actions={
+          <Button variant="primary" Icon={Plus} onClick={() => setNewCommOpen(true)}>
+            {t('newCommCta')}
+          </Button>
+        }
       />
 
       <div className="kpi-grid">
@@ -196,6 +215,15 @@ export function CommunicationsPage() {
                 {sent.map(s => <SentRowCmp key={`${s.recordKey}-${s.logEntry.id}`} row={s} lang={lang} />)}
               </div>}
         </Card>
+      )}
+
+      {tab === 'lifecycle' && (
+        <LifecycleView
+          comms={comms.items}
+          onAdvance={(id, to) => comms.advance(id, to, 'GRC Operator')}
+          onRemove={comms.remove}
+          onNewClick={() => setNewCommOpen(true)}
+          lang={lang} t={t} />
       )}
 
       {tab === 'matrix' && <NotificationMatrixView lang={lang} t={t} />}
@@ -240,7 +268,125 @@ export function CommunicationsPage() {
           });
           setComposeTarget(null);
         }} />
+
+      <NewCommunicationModal
+        open={newCommOpen}
+        onClose={() => setNewCommOpen(false)}
+        onCreate={(init) => comms.create(init)} />
     </Shell>
+  );
+}
+
+// ── Lifecycle view (Communication records — DD-32) ─────────────────────────
+function LifecycleView({
+  comms, onAdvance, onRemove, onNewClick, lang, t,
+}: {
+  comms: Communication[];
+  onAdvance: (id: string, to: CommStatus) => void;
+  onRemove: (id: string) => void;
+  onNewClick: () => void;
+  lang: 'en' | 'ar';
+  t: (k: string) => string;
+}) {
+  if (comms.length === 0) {
+    return (
+      <Card title={t('commsTabLifecycle')} Icon={FileText}
+        action={<Button variant="ghost" Icon={Plus} size="sm" onClick={onNewClick}>{t('newCommCta')}</Button>}>
+        <EmptyState Icon={FileText}
+          title={t('commsLifecycleEmpty')}
+          sub={t('commsLifecycleEmptySub')} />
+      </Card>
+    );
+  }
+
+  // Group by status (Drafts / In review / Approved / Sent / Acknowledged / Closed / Retracted)
+  const order: CommStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'SENT', 'ACKNOWLEDGED', 'CLOSED', 'RETRACTED'];
+  const grouped = new Map<CommStatus, Communication[]>();
+  for (const status of order) grouped.set(status, []);
+  for (const c of comms) grouped.get(c.status)?.push(c);
+
+  return (
+    <Card title={t('commsTabLifecycle')} Icon={FileText}
+      action={<Button variant="ghost" Icon={Plus} size="sm" onClick={onNewClick}>{t('newCommCta')}</Button>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {order.filter(s => (grouped.get(s) ?? []).length > 0).map(status => {
+          const list = grouped.get(status) ?? [];
+          return (
+            <div key={status}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <Badge tone={STATUS_TONE_COMM[status]} dot>{lang === 'ar' ? STATUS_LABEL_COMM[status].ar : STATUS_LABEL_COMM[status].en}</Badge>
+                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{list.length}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {list.map(c => <CommRow key={c.id} c={c} onAdvance={onAdvance} onRemove={onRemove} lang={lang} t={t} />)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function CommRow({ c, onAdvance, onRemove, lang, t }: {
+  c: Communication;
+  onAdvance: (id: string, to: CommStatus) => void;
+  onRemove: (id: string) => void;
+  lang: 'en' | 'ar';
+  t: (k: string) => string;
+}) {
+  const recipient = STAKEHOLDERS.find(s => s.code === c.recipientCode);
+  const Icon = CHANNEL_ICONS[c.channel];
+  const transitions = FORWARD_TRANSITIONS[c.status] ?? [];
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '32px 1fr auto',
+      gap: 10, alignItems: 'flex-start',
+      padding: '10px 12px',
+      borderRadius: 'var(--r-sm)',
+      border: '1px solid var(--border)',
+      background: 'var(--surface-1)',
+    }}>
+      <div style={{
+        width: 30, height: 30, borderRadius: 'var(--r-sm)',
+        background: 'var(--surface-2)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--primary-700)',
+      }}>
+        <Icon size={14} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>{c.subject}</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+          → {lang === 'ar' ? recipient?.nameAr : recipient?.nameEn}
+          {' · '}<span className="mono">{c.channel.replace(/_/g, ' ')}</span>
+          {c.sourceRecordKey && <> · <span className="mono">{c.sourceRecordKey}</span></>}
+          {c.sourceSpecId && <> · <span className="mono">{c.sourceSpecId}</span></>}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 4 }}>
+          {t('commsLifecycleCreated')} {c.createdAt.replace('T', ' ').slice(0, 16)} {t('commsLifecycleBy')} {c.createdBy}
+          {c.reviewedAt && <> · {t('commsLifecycleReviewed')} {c.reviewedAt.replace('T', ' ').slice(0, 16)}</>}
+          {c.approvedAt && <> · {t('commsLifecycleApproved')} {c.approvedAt.replace('T', ' ').slice(0, 16)}</>}
+          {c.sentAt && <> · {t('commsLifecycleSent')} {c.sentAt.replace('T', ' ').slice(0, 16)}</>}
+          {c.receiptRef && <> · ref <span className="mono">{c.receiptRef}</span></>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {transitions.map(to => (
+          <Button key={to} variant={to === 'RETRACTED' ? 'ghost' : 'secondary'} size="sm"
+            Icon={to === 'RETRACTED' ? undefined : ArrowRight}
+            onClick={() => onAdvance(c.id, to)}>
+            {lang === 'ar' ? STATUS_LABEL_COMM[to].ar : STATUS_LABEL_COMM[to].en}
+          </Button>
+        ))}
+        {(c.status === 'DRAFT' || c.status === 'RETRACTED') && (
+          <Button variant="ghost" size="sm" onClick={() => onRemove(c.id)}>
+            {t('actionDelete') ?? 'Delete'}
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
