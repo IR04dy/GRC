@@ -21,6 +21,7 @@ import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, SEVERITY_TONE, statusLabel, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type RegulatoryTemplate, type SaudiRegulator } from '../../lib/api';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
@@ -73,6 +74,28 @@ export function IncidentsPage() {
   const [templatesOpen, setTemplatesOpen] = useState<{ incident: IncidentDto; templates: RegulatoryTemplate[] } | null>(null);
 
   const incidents = useApiList<IncidentDto>(() => incidentApi.list(0, 100), INCIDENTS);
+
+  // ── DD-47: filter modal state + predicate ─────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filteredIncidents = useMemo(() => incidents.data.filter(i => {
+    if (advFilters.severity && i.severity !== advFilters.severity) return false;
+    if (advFilters.status   && i.status !== advFilters.status) return false;
+    if (advFilters.category && i.category !== advFilters.category) return false;
+    if (advFilters.assignee && !(i.assignee ?? '').toLowerCase().includes(advFilters.assignee.toLowerCase())) return false;
+    if (advFilters.discoveredAfter  && (i.discoveryDate ?? '') < advFilters.discoveredAfter) return false;
+    if (advFilters.discoveredBefore && (i.discoveryDate ?? '') > advFilters.discoveredBefore) return false;
+    return true;
+  }), [incidents.data, advFilters]);
+  const incidentFilterFields: FilterField[] = [
+    { key: 'severity', label: t('filterFieldSeverity'), kind: 'select',
+      options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
+    { key: 'status',   label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(incidents.data, 'status') },
+    { key: 'category', label: t('filterFieldCategory'), kind: 'select', options: distinctValues(incidents.data, 'category') },
+    { key: 'assignee', label: t('filterFieldAssignee'), kind: 'text', placeholder: 'e.g. soc.lead@tss.sa' },
+    { key: 'discoveredAfter',  label: t('filterFieldDiscoveredAfter'),  kind: 'date' },
+    { key: 'discoveredBefore', label: t('filterFieldDiscoveredBefore'), kind: 'date' },
+  ];
 
   // ── NIST 800-61 phase + Saudi regulator workflow handlers ──
   async function advancePhase(r: IncidentDto) {
@@ -203,9 +226,11 @@ export function IncidentsPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
-              downloadCsv(incidents.data as unknown as ExportRow[], stampFilename('incidents-register', 'csv'));
+              downloadCsv(filteredIncidents as unknown as ExportRow[], stampFilename('incidents-register', 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
@@ -252,7 +277,7 @@ export function IncidentsPage() {
       )}
       {tab === 'register' && (
         <Card padded={false}>
-          {incidents.loading ? <LoadingRow /> : <DataTable columns={cols} rows={incidents.data} empty={<EmptyState />} />}
+          {incidents.loading ? <LoadingRow /> : <DataTable columns={cols} rows={filteredIncidents} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'timeline' && (
@@ -375,6 +400,9 @@ export function IncidentsPage() {
           </div>
         )}
       </Modal>
+      <FilterModal open={filterOpen} fields={incidentFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

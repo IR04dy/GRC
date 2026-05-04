@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   RefreshCw, Activity, TimerReset, Gauge, Filter, Download, Plus, BarChart3, Cpu, Calendar,
   CheckCheck, PlayCircle, RotateCcw, FileCheck2, Megaphone, Send,
@@ -20,6 +20,7 @@ import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
   bcmApi, crisisCommsApi,
   type BcmPlanDto, type BcmPlanRequest,
@@ -148,6 +149,30 @@ export function BcmPage() {
   // /bia returns a plain array — adapt to the Page<T> shape useApiList expects.
   const bia   = useApiList<BcmBiaDto>(() => bcmApi.bia().then(arr => ({ content: arr })), BCM_BIA);
   const exercises = useApiList<BcmExerciseDto>(() => bcmApi.exercises(0, 200), BCM_EXERCISES);
+
+  // ── DD-47: filter modal — tab-aware ──────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filteredPlans = useMemo(() => plans.data.filter(p => {
+    if (advFilters.status   && p.status !== advFilters.status) return false;
+    if (advFilters.planType && (p.planType ?? '') !== advFilters.planType) return false;
+    return true;
+  }), [plans.data, advFilters]);
+  const filteredExercises = useMemo(() => exercises.data.filter(e => {
+    if (advFilters.status   && (e.status ?? '') !== advFilters.status) return false;
+    if (advFilters.exerciseType && (e.exerciseType ?? '') !== advFilters.exerciseType) return false;
+    return true;
+  }), [exercises.data, advFilters]);
+  const bcmFilterFields: FilterField[] = (() => {
+    if (tab === 'exercises') return [
+      { key: 'status',       label: t('filterFieldStatus'), kind: 'select', options: distinctValues(exercises.data, 'status') },
+      { key: 'exerciseType', label: t('filterFieldType'),   kind: 'select', options: distinctValues(exercises.data, 'exerciseType') },
+    ];
+    return [
+      { key: 'status',   label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(plans.data, 'status') },
+      { key: 'planType', label: t('filterFieldPlanType'), kind: 'select', options: distinctValues(plans.data, 'planType') },
+    ];
+  })();
 
   // ── Field defs (built per-render so labels translate via t()) ──
   const PLAN_FIELDS: FieldDef[] = [
@@ -378,13 +403,15 @@ export function BcmPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
               const map: Record<string, { rows: ExportRow[]; name: string }> = {
-                plans:     { rows: plans.data as unknown as ExportRow[],     name: 'bcm-plans' },
-                processes: { rows: procs.data as unknown as ExportRow[],     name: 'bcm-processes' },
-                bia:       { rows: bia.data as unknown as ExportRow[],       name: 'bcm-bia' },
-                exercises: { rows: exercises.data as unknown as ExportRow[], name: 'bcm-exercises' },
+                plans:     { rows: filteredPlans as unknown as ExportRow[],      name: 'bcm-plans' },
+                processes: { rows: procs.data as unknown as ExportRow[],         name: 'bcm-processes' },
+                bia:       { rows: bia.data as unknown as ExportRow[],           name: 'bcm-bia' },
+                exercises: { rows: filteredExercises as unknown as ExportRow[],  name: 'bcm-exercises' },
               };
               const cur = map[tab] ?? map.plans;
               downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
@@ -434,7 +461,7 @@ export function BcmPage() {
       )}
       {tab === 'plans' && (
         <Card padded={false}>
-          {plans.loading ? <LoadingRow /> : <DataTable columns={planCols} rows={plans.data} empty={<EmptyState />} />}
+          {plans.loading ? <LoadingRow /> : <DataTable columns={planCols} rows={filteredPlans} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'processes' && (
@@ -455,7 +482,7 @@ export function BcmPage() {
             ? <EmptyState Icon={Calendar} title={t('bcmExercisesEmpty')} sub={t('bcmExercisesEmptySub')} />
             : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {exercises.data.map(e => {
+                {filteredExercises.map(e => {
                   const score = e.score ?? 0;
                   const date = e.executedDate ?? e.scheduledDate ?? '—';
                   return (
@@ -548,6 +575,9 @@ export function BcmPage() {
         onCancel={exerS.closeConfirm}
         onConfirm={() => execDelete(exerS.confirmDel, bcmApi.deleteExercise, exerS.closeConfirm, exercises.reload, 'Exercise')}
       />
+      <FilterModal open={filterOpen} fields={bcmFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

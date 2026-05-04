@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Files, Inbox, CalendarX, BadgeCheck, Filter, Download, Plus, BarChart3, FileText, Send, ClipboardCheck,
   Layers, Plug, ChevronDown, ChevronRight, History, Power, Zap,
@@ -20,6 +20,7 @@ import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
   evidenceApi, ApiError,
   type EvidenceItemDto, type EvidenceItemRequest,
@@ -78,6 +79,23 @@ export function EvidencePage() {
   const items    = useApiList<EvidenceItemDto>(()    => evidenceApi.items(0, 100),    EVIDENCE);
   const requests = useApiList<EvidenceRequestDto>(() => evidenceApi.requests(0, 100), EVIDENCE_REQUESTS);
   const reviews  = useApiList<EvidenceReviewDto>(()  => evidenceApi.reviews(0, 100),  EVIDENCE_REVIEWS);
+
+  // ── DD-47: filter modal ────────────────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filteredEvidence = useMemo(() => items.data.filter(i => {
+    if (advFilters.status && i.status !== advFilters.status) return false;
+    if (advFilters.evidenceType && (i.evidenceType ?? '') !== advFilters.evidenceType) return false;
+    if (advFilters.framework && (i.frameworkCode ?? '') !== advFilters.framework) return false;
+    if (advFilters.expiringBefore && (i.expiryDate ?? '9999-12-31') > advFilters.expiringBefore) return false;
+    return true;
+  }), [items.data, advFilters]);
+  const evidenceFilterFields: FilterField[] = [
+    { key: 'status',         label: t('filterFieldStatus'),    kind: 'select', options: distinctValues(items.data, 'status') },
+    { key: 'evidenceType',   label: t('filterFieldType'),      kind: 'select', options: distinctValues(items.data, 'evidenceType') },
+    { key: 'framework',      label: t('filterFieldFramework'), kind: 'select', options: distinctValues(items.data.filter(i => i.frameworkCode), 'frameworkCode') },
+    { key: 'expiringBefore', label: 'Expiring before', kind: 'date' },
+  ];
 
   // ── Matrix (frameworks → controls → sub-controls), Connectors, Version history ──
   const [matrix, setMatrix] = useState<FrameworkBlock[]>([]);
@@ -240,9 +258,11 @@ export function EvidencePage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
-              downloadCsv(items.data as unknown as ExportRow[], stampFilename('evidence-register', 'csv'));
+              downloadCsv(filteredEvidence as unknown as ExportRow[], stampFilename('evidence-register', 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
@@ -432,7 +452,7 @@ export function EvidencePage() {
 
       {tab === 'catalog' && (
         <Card padded={false}>
-          {items.loading ? <LoadingRow /> : <DataTable columns={itemCols} rows={items.data} empty={<EmptyState />} />}
+          {items.loading ? <LoadingRow /> : <DataTable columns={itemCols} rows={filteredEvidence} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'requests' && (
@@ -517,6 +537,9 @@ export function EvidencePage() {
           </div>
         )}
       </Modal>
+      <FilterModal open={filterOpen} fields={evidenceFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

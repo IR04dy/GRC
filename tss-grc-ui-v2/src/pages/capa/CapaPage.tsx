@@ -13,6 +13,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Progress } from '../../components/ui/Progress';
 import { useI18n } from '../../lib/i18n';
@@ -50,6 +51,8 @@ export function CapaPage() {
   const [filterType, setFilterType] = useState<'ALL' | 'CORRECTIVE' | 'PREVENTIVE'>('ALL');
   const [rcaTarget, setRcaTarget] = useState<Capa | null>(null);
   const [triggerTarget, setTriggerTarget] = useState<PaTrigger | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
 
   const triggers = useMemo(() => scanPaTriggers(items), [items]);
   const openTriggers = triggers.filter(t => !t.alreadyCovered);
@@ -62,6 +65,15 @@ export function CapaPage() {
     return items.filter(c => {
       if (filterStatus !== 'ALL' && c.status !== filterStatus) return false;
       if (filterType !== 'ALL' && c.type !== filterType) return false;
+      // Advanced filters from the FilterModal
+      if (advFilters.severity      && c.severity !== advFilters.severity) return false;
+      if (advFilters.source        && c.source !== advFilters.source) return false;
+      if (advFilters.rootCauseCategory && c.rootCauseCategory !== advFilters.rootCauseCategory) return false;
+      if (advFilters.owner) {
+        if (!c.owner.toLowerCase().includes(advFilters.owner.toLowerCase())) return false;
+      }
+      if (advFilters.dueAfter && c.dueDate < advFilters.dueAfter) return false;
+      if (advFilters.dueBefore && c.dueDate > advFilters.dueBefore) return false;
       if (!ql) return true;
       return (
         c.code.toLowerCase().includes(ql) ||
@@ -71,7 +83,26 @@ export function CapaPage() {
         (c.rootCause ?? '').toLowerCase().includes(ql)
       );
     });
-  }, [items, q, filterStatus, filterType]);
+  }, [items, q, filterStatus, filterType, advFilters]);
+
+  // ── Filter modal config — DD-47 ────────────────────────────────────────
+  const filterFields: FilterField[] = [
+    { key: 'severity', label: t('capaFilterFieldSeverity'), kind: 'select',
+      options: [
+        { value: 'LOW',      label: 'LOW' },
+        { value: 'MEDIUM',   label: 'MEDIUM' },
+        { value: 'HIGH',     label: 'HIGH' },
+        { value: 'CRITICAL', label: 'CRITICAL' },
+      ] },
+    { key: 'source', label: t('capaFilterFieldSource'), kind: 'select',
+      options: distinctValues(items, 'source') },
+    { key: 'rootCauseCategory', label: t('capaFilterFieldRcCategory'), kind: 'select',
+      options: distinctValues(items.filter(c => c.rootCauseCategory), 'rootCauseCategory' as const) },
+    { key: 'owner', label: t('capaFilterFieldOwner'), kind: 'text',
+      placeholder: 'e.g. dpo@tss.sa' },
+    { key: 'dueAfter',  label: t('capaFilterFieldDueAfter'),  kind: 'date' },
+    { key: 'dueBefore', label: t('capaFilterFieldDueBefore'), kind: 'date' },
+  ];
 
   // KPI rollups
   const open = items.filter(c => c.status !== 'CLOSED' && c.status !== 'CANCELLED');
@@ -107,7 +138,9 @@ export function CapaPage() {
         title={t('capaTitle')}
         sub={t('capaPageSub')}
         actions={<>
-          <Button variant="ghost" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+          <Button variant="ghost" Icon={Filter} onClick={() => setFilterOpen(true)}>
+            {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+          </Button>
           <Button variant="ghost" Icon={Download} onClick={() => {
             const rows: ExportRow[] = filtered.map(c => ({
               code: c.code,
@@ -232,6 +265,15 @@ export function CapaPage() {
           }}
         />
       )}
+
+      <FilterModal
+        open={filterOpen}
+        fields={filterFields}
+        value={advFilters}
+        hint={t('capaFilterModalHint')}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)}
+      />
     </Shell>
   );
 }

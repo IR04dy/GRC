@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database, PlayCircle, CheckCheck, X as XIcon, Clock, Send, ShieldCheck, Archive, ScrollText, Shield } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -22,6 +22,7 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
@@ -66,6 +67,31 @@ export function PrivacyPage() {
   const dsrs     = useApiList<PrivacyDsrDto>(()    => privacyApi.dsrs(0, 100),     DSRS);
   const breaches = useApiList<PrivacyBreachDto>(() => privacyApi.breaches(0, 100), BREACHES);
   const ropa     = useApiList<PrivacyRopaDto>(()   => privacyApi.ropa(0, 100),     ROPA);
+
+  // ── DD-47: filter modal — applies tab-specific filters ─────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filteredDsrs = useMemo(() => dsrs.data.filter(d => {
+    if (advFilters.status      && d.status !== advFilters.status) return false;
+    if (advFilters.requestType && d.requestType !== advFilters.requestType) return false;
+    return true;
+  }), [dsrs.data, advFilters]);
+  const filteredBreaches = useMemo(() => breaches.data.filter(b => {
+    if (advFilters.severity && b.severity !== advFilters.severity) return false;
+    if (advFilters.status   && b.status !== advFilters.status) return false;
+    return true;
+  }), [breaches.data, advFilters]);
+  const privacyFilterFields: FilterField[] = (() => {
+    if (tab === 'breaches') return [
+      { key: 'severity', label: t('filterFieldSeverity'), kind: 'select',
+        options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
+      { key: 'status',   label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(breaches.data, 'status') },
+    ];
+    return [
+      { key: 'status',      label: t('filterFieldStatus'),       kind: 'select', options: distinctValues(dsrs.data, 'status') },
+      { key: 'requestType', label: t('filterFieldType'),         kind: 'select', options: distinctValues(dsrs.data, 'requestType') },
+    ];
+  })();
 
   const FIELDS: FieldDef[] = [
     { kind: 'text',   key: 'requesterName',  label: t('privacyFldReqName') + ' *', required: true, maxLength: 200, span: 6 },
@@ -219,13 +245,15 @@ export function PrivacyPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
               const map: Record<string, { rows: ExportRow[]; name: string }> = {
-                dsr:      { rows: dsrs.data as unknown as ExportRow[],     name: 'privacy-dsrs' },
-                breaches: { rows: breaches.data as unknown as ExportRow[], name: 'privacy-breaches' },
-                ropa:     { rows: ropa.data as unknown as ExportRow[],     name: 'privacy-ropa' },
-                dpia:     { rows: DPIAS as unknown as ExportRow[],         name: 'privacy-dpias' },
+                dsr:      { rows: filteredDsrs as unknown as ExportRow[],     name: 'privacy-dsrs' },
+                breaches: { rows: filteredBreaches as unknown as ExportRow[], name: 'privacy-breaches' },
+                ropa:     { rows: ropa.data as unknown as ExportRow[],        name: 'privacy-ropa' },
+                dpia:     { rows: DPIAS as unknown as ExportRow[],            name: 'privacy-dpias' },
               };
               const cur = map[tab] ?? map.dsr;
               downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
@@ -276,12 +304,12 @@ export function PrivacyPage() {
       )}
       {tab === 'dsr' && (
         <Card padded={false}>
-          {dsrs.loading ? <LoadingRow /> : <DataTable columns={dsrCols} rows={dsrs.data} empty={<EmptyState Icon={Inbox} />} />}
+          {dsrs.loading ? <LoadingRow /> : <DataTable columns={dsrCols} rows={filteredDsrs} empty={<EmptyState Icon={Inbox} />} />}
         </Card>
       )}
       {tab === 'breaches' && (
         <Card padded={false}>
-          {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={breaches.data} empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}
+          {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={filteredBreaches} empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}
         </Card>
       )}
       {tab === 'ropa' && (
@@ -328,6 +356,9 @@ export function PrivacyPage() {
         confirmLabel="Delete"
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
       />
+      <FilterModal open={filterOpen} fields={privacyFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

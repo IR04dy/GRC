@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Workflow, Building2, AlertTriangle, CalendarClock, Filter, Download, Plus, BarChart3, FileText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,6 +17,7 @@ import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { tprmApi, ApiError, type TprmVendorDto, type TprmVendorRequest } from '../../lib/api';
 import { useToast } from '../../lib/toast';
 import { VENDORS } from './mockTprm';
@@ -65,6 +66,28 @@ export function TprmPage() {
   const [busy, setBusy] = useState(false);
 
   const vendors = useApiList<TprmVendorDto>(() => tprmApi.vendors(0, 100), VENDORS);
+
+  // ── DD-47: filter modal ──────────────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filteredVendors = useMemo(() => vendors.data.filter(v => {
+    if (advFilters.riskRating && v.riskRating !== advFilters.riskRating) return false;
+    if (advFilters.status     && v.status !== advFilters.status) return false;
+    if (advFilters.vendorType && (v.vendorType ?? '') !== advFilters.vendorType) return false;
+    if (advFilters.country    && (v.country ?? '') !== advFilters.country) return false;
+    if (advFilters.contractEndAfter  && (v.contractEndDate ?? '') < advFilters.contractEndAfter) return false;
+    if (advFilters.contractEndBefore && (v.contractEndDate ?? '') > advFilters.contractEndBefore) return false;
+    return true;
+  }), [vendors.data, advFilters]);
+  const tprmFilterFields: FilterField[] = [
+    { key: 'riskRating', label: t('filterFieldRisk'),       kind: 'select',
+      options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
+    { key: 'status',     label: t('filterFieldStatus'),     kind: 'select', options: distinctValues(vendors.data, 'status') },
+    { key: 'vendorType', label: t('filterFieldVendorType'), kind: 'select', options: distinctValues(vendors.data.filter(v => v.vendorType), 'vendorType') },
+    { key: 'country',    label: t('filterFieldCountry'),    kind: 'select', options: distinctValues(vendors.data.filter(v => v.country), 'country') },
+    { key: 'contractEndAfter',  label: 'Contract end after',  kind: 'date' },
+    { key: 'contractEndBefore', label: 'Contract end before', kind: 'date' },
+  ];
 
   const FIELDS: FieldDef[] = [
     { kind: 'text',     key: 'vendorName',      label: `${t('tprmFldVendorName')} (${t('fldTitleEnLbl').match(/\(([^)]+)\)/)?.[1] ?? 'EN'}) *`, required: true, maxLength: 200, span: 6 },
@@ -137,9 +160,11 @@ export function TprmPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
-              downloadCsv(vendors.data as unknown as ExportRow[], stampFilename('tprm-vendors', 'csv'));
+              downloadCsv(filteredVendors as unknown as ExportRow[], stampFilename('tprm-vendors', 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
@@ -186,7 +211,7 @@ export function TprmPage() {
       )}
       {tab === 'vendors' && (
         <Card padded={false}>
-          {vendors.loading ? <LoadingRow /> : <DataTable columns={cols} rows={vendors.data} rowHref={r => `/vendors/${r.id}`} empty={<EmptyState />} />}
+          {vendors.loading ? <LoadingRow /> : <DataTable columns={cols} rows={filteredVendors} rowHref={r => `/vendors/${r.id}`} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'assessments' && (
@@ -251,6 +276,9 @@ export function TprmPage() {
         confirmLabel={t('tprmConfirmDeleteCta')}
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
       />
+      <FilterModal open={filterOpen} fields={tprmFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }
