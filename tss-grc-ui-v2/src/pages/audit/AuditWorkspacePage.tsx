@@ -33,9 +33,13 @@ import {
   AUDITORS, INDEPENDENCE_TONE, INDEPENDENCE_LABEL, ROLE_LABEL,
   rotationStatus, ROTATION_TONE, ROTATION_LABEL,
 } from '../../lib/auditors';
-import { Users, CalendarDays, AlertOctagon } from 'lucide-react';
+import {
+  AUDIT_APPOINTMENTS, APPOINTMENT_STATUS_TONE,
+  feesByFirmYear,
+} from '../../lib/auditAppointments';
+import { Users, CalendarDays, AlertOctagon, Banknote, FileSignature } from 'lucide-react';
 
-type WsTabId = 'inbox' | 'plan' | 'auditors';
+type WsTabId = 'inbox' | 'plan' | 'auditors' | 'appointments';
 
 /**
  * Auditor Workspace — ServiceNow IRM "Audit Workspace" homepage.
@@ -107,9 +111,10 @@ export function AuditWorkspacePage() {
 
   const [tab, setTab] = useState<WsTabId>('inbox');
   const tabs: TabItem<WsTabId>[] = [
-    { id: 'inbox',    label: t('audwsTabInbox') },
-    { id: 'plan',     label: t('audwsTabPlan') },
-    { id: 'auditors', label: t('audwsTabAuditors') },
+    { id: 'inbox',        label: t('audwsTabInbox') },
+    { id: 'plan',         label: t('audwsTabPlan') },
+    { id: 'auditors',     label: t('audwsTabAuditors') },
+    { id: 'appointments', label: t('audwsTabAppointments') },
   ];
 
   return (
@@ -124,6 +129,7 @@ export function AuditWorkspacePage() {
 
       {tab === 'plan' && <PlanAndUniverseTab t={t} lang={lang} />}
       {tab === 'auditors' && <AuditorsAndCalendarTab t={t} lang={lang} />}
+      {tab === 'appointments' && <AppointmentsAndFeesTab t={t} lang={lang} />}
 
       {tab === 'inbox' && <>
 
@@ -690,6 +696,107 @@ function AuditorsAndCalendarTab({ t, lang }: { t: (k: string) => string; lang: '
               </div>
             );
           })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── Appointments & Fees tab (DD-37) ───────────────────────────────────────
+function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar' }) {
+  const active   = AUDIT_APPOINTMENTS.filter(a => a.status === 'ACTIVE').length;
+  const inFlight = AUDIT_APPOINTMENTS.filter(a => a.status !== 'ACTIVE' && a.status !== 'CLOSED').length;
+  const fees2026 = feesByFirmYear(2026);
+  const total2026 = Array.from(fees2026.values()).reduce((s, v) => s + v.total, 0);
+  const audit2026 = Array.from(fees2026.values()).reduce((s, v) => s + v.audit, 0);
+  const nonAudit2026 = Array.from(fees2026.values()).reduce((s, v) => s + v.nonAudit, 0);
+  const ratioPct = audit2026 > 0 ? Math.round((nonAudit2026 / audit2026) * 100) : 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <Kpi Icon={FileSignature} label={t('audwsAppActive')}     value={active}                     tone="success" />
+        <Kpi Icon={Clock}         label={t('audwsAppInFlight')}   value={inFlight}                   tone="warning" />
+        <Kpi Icon={Banknote}      label={t('audwsAppFeeTotal')}   value={`${(total2026 / 1_000_000).toFixed(2)}M`} tone="primary" />
+        <Kpi Icon={ShieldCheck}   label={t('audwsAppFeeAudit')}   value={`${(audit2026 / 1_000_000).toFixed(2)}M`} tone="info" />
+        <Kpi Icon={AlertOctagon}  label={t('audwsAppFeeNonAuditRatio')} value={`${ratioPct}%`}        tone={ratioPct > 30 ? 'danger' : ratioPct > 15 ? 'warning' : 'success'} />
+      </div>
+
+      <Card title={`${t('audwsAppTitle')} (${AUDIT_APPOINTMENTS.length})`} Icon={FileSignature}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {AUDIT_APPOINTMENTS.map(a => (
+            <div key={a.id} style={{
+              padding: '10px 0', borderBottom: '1px dashed var(--border)',
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 130px 90px 130px', gap: 10, alignItems: 'center' }}>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{a.appointmentCode}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                    {lang === 'ar' ? a.titleAr : a.titleEn}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                    {a.frameworks.join(' · ')} · {a.termYears}y · {a.candidates.length} {t('audwsAppCandidates')}
+                  </div>
+                  {a.noteEn && (
+                    <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, fontStyle: 'italic' }}>{a.noteEn}</div>
+                  )}
+                </div>
+                <Badge tone={APPOINTMENT_STATUS_TONE[a.status]} dot>{a.status.replace(/_/g, ' ')}</Badge>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'end' }}>
+                  {a.contractedFeeSar ? `${(a.contractedFeeSar / 1_000_000).toFixed(2)}M SAR` : '—'}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>{a.selectedFirmCode ?? '—'}</span>
+              </div>
+              {a.candidates.length > 1 && (
+                <div style={{ marginTop: 6, paddingInlineStart: 10, fontSize: 11, color: 'var(--ink-3)' }}>
+                  {a.candidates.map(c => (
+                    <span key={c.firmCode} style={{ display: 'inline-block', marginInlineEnd: 12 }}>
+                      <span className="mono" style={{ color: c.firmCode === a.selectedFirmCode ? 'var(--success-fg)' : 'var(--ink-3)', fontWeight: c.firmCode === a.selectedFirmCode ? 700 : 400 }}>
+                        {c.firmCode}
+                      </span>
+                      {c.totalScore != null && <> · {c.totalScore}/100</>}
+                      {' · '}{(c.feeBidSar / 1_000_000).toFixed(2)}M
+                      {c.independenceDeclared === false && <> · <span style={{ color: 'var(--danger-fg)' }}>{t('audwsAppIndepConcern')}</span></>}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title={`${t('audwsFeesTitle')} 2026`} Icon={Banknote}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {Array.from(fees2026.entries()).sort((a, b) => b[1].total - a[1].total).map(([firm, f]) => (
+            <div key={firm} style={{
+              display: 'grid',
+              gridTemplateColumns: '110px 1fr 110px 110px 110px',
+              gap: 10, alignItems: 'center',
+              padding: '8px 0', borderBottom: '1px dashed var(--border)',
+              fontSize: 12,
+            }}>
+              <span className="mono" style={{ fontWeight: 700 }}>{firm}</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Badge tone="success">{(f.audit / 1_000).toFixed(0)}k {t('audwsFeesAudit')}</Badge>
+                {f.nonAudit > 0 && <Badge tone="warning">{(f.nonAudit / 1_000).toFixed(0)}k {t('audwsFeesNonAudit')}</Badge>}
+              </div>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)', textAlign: 'end' }}>
+                {(f.total / 1_000_000).toFixed(2)}M SAR
+              </span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'end' }}>
+                {f.ratio}% {t('audwsFeesRatioSuffix')}
+              </span>
+              {f.ratio > 30
+                ? <Badge tone="danger">{t('audwsFeesIndepRisk')}</Badge>
+                : f.ratio > 15
+                  ? <Badge tone="warning">{t('audwsFeesIndepReview')}</Badge>
+                  : <Badge tone="success">{t('audwsFeesIndepClean')}</Badge>}
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 8, fontStyle: 'italic' }}>
+          {t('audwsFeesNote')}
         </div>
       </Card>
     </div>

@@ -1736,4 +1736,23 @@ export const en = {
   audwsAuditorsPartnerY:     'Partner',
   audwsAuditorsFirmY:        'Firm',
   audwsCalendarTitle:        'Audit calendar —',
+
+  // Audit Workspace — Appointments & Fees tab (DD-37)
+  audwsTabAppointments:      'Appointments & Fees',
+  audwsAppActive:            'Active appointments',
+  audwsAppInFlight:          'In-flight RFPs',
+  audwsAppFeeTotal:          'Total fees 2026',
+  audwsAppFeeAudit:          'Audit fees 2026',
+  audwsAppFeeNonAuditRatio:  'Non-audit ratio',
+  audwsAppTitle:             'Appointment register',
+  audwsAppCandidates:        'candidates',
+  audwsAppIndepConcern:      'independence concern',
+  audwsFeesTitle:            'Audit fees by firm —',
+  audwsFeesAudit:            'audit',
+  audwsFeesNonAudit:         'non-audit',
+  audwsFeesRatioSuffix:      'NA / audit',
+  audwsFeesIndepRisk:        'Independence risk',
+  audwsFeesIndepReview:      'Review',
+  audwsFeesIndepClean:       'Clean',
+  audwsFeesNote:             'Non-audit-services ratio above 30% triggers IFAC §600 review; above 15% requires Audit Committee notice.',
 } as const;

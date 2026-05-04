@@ -1726,4 +1726,23 @@ export const ar = {
   audwsAuditorsPartnerY:     'الشريك',
   audwsAuditorsFirmY:        'المكتب',
   audwsCalendarTitle:        'جدول المراجعة —',
+
+  // Audit Workspace — Appointments & Fees tab
+  audwsTabAppointments:      'التعيينات والأتعاب',
+  audwsAppActive:            'تعيينات فعّالة',
+  audwsAppInFlight:          'طلبات RFP جارية',
+  audwsAppFeeTotal:          'إجمالي الأتعاب 2026',
+  audwsAppFeeAudit:          'أتعاب المراجعة 2026',
+  audwsAppFeeNonAuditRatio:  'نسبة غير التدقيقي',
+  audwsAppTitle:             'سجل التعيينات',
+  audwsAppCandidates:        'مرشّحون',
+  audwsAppIndepConcern:      'تحفّظ على الاستقلالية',
+  audwsFeesTitle:            'أتعاب المراجعة حسب المكتب —',
+  audwsFeesAudit:            'تدقيق',
+  audwsFeesNonAudit:         'غير تدقيقي',
+  audwsFeesRatioSuffix:      'غير تدقيقي / تدقيق',
+  audwsFeesIndepRisk:        'مخاطر استقلالية',
+  audwsFeesIndepReview:      'مراجعة',
+  audwsFeesIndepClean:       'سليم',
+  audwsFeesNote:             'نسبة الخدمات غير التدقيقية فوق 30% تستوجب مراجعة وفق IFAC §600؛ وفوق 15% تستوجب إشعار لجنة المراجعة.',
 } as const;
