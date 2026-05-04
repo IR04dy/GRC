@@ -3,6 +3,7 @@ import {
   ListChecks, Hourglass, BarChart3, Network, Workflow, Zap,
   Plus, Search, Send, CheckCheck, Repeat, AlertTriangle,
   Filter, Download, ShieldCheck, TrendingUp, Activity,
+  Stamp, Bell, FileText,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -23,8 +24,9 @@ import {
   type Capa, type CapaStatus, type RcaMethod, type RootCauseCategory,
 } from '../../lib/capa';
 import { scanPaTriggers, type PaTrigger } from '../../lib/paTriggers';
+import { deriveCapaNotifs, audCommitteeDigest, type CapaNotif } from '../../lib/capaNotifications';
 
-type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers';
+type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers' | 'committee';
 
 const ROOT_CAUSE_CATS: { id: RootCauseCategory; en: string; ar: string }[] = [
   { id: 'PEOPLE',     en: 'People',     ar: 'بشري' },
@@ -50,6 +52,9 @@ export function CapaPage() {
 
   const triggers = useMemo(() => scanPaTriggers(items), [items]);
   const openTriggers = triggers.filter(t => !t.alreadyCovered);
+  const notifs = useMemo(() => deriveCapaNotifs(items), [items]);
+  const criticalNotifs = notifs.filter(n => n.severity === 'CRITICAL');
+  const digest = useMemo(() => audCommitteeDigest(items), [items]);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -75,11 +80,12 @@ export function CapaPage() {
   const preventive = items.filter(c => c.type === 'PREVENTIVE');
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'register', label: t('capaTabRegister') },
-    { id: 'triggers', label: `${t('capaTabTriggers')}${openTriggers.length ? ` · ${openTriggers.length}` : ''}` },
-    { id: 'aging',    label: t('capaTabAging') },
-    { id: 'pareto',   label: t('capaTabPareto') },
-    { id: 'workflow', label: t('capaTabWorkflow') },
+    { id: 'register',  label: t('capaTabRegister') },
+    { id: 'triggers',  label: `${t('capaTabTriggers')}${openTriggers.length ? ` · ${openTriggers.length}` : ''}` },
+    { id: 'aging',     label: t('capaTabAging') },
+    { id: 'pareto',    label: t('capaTabPareto') },
+    { id: 'workflow',  label: t('capaTabWorkflow') },
+    { id: 'committee', label: `${t('capaTabCommittee')}${criticalNotifs.length ? ` · ${criticalNotifs.length}` : ''}` },
   ];
 
   function quickAdvance(c: Capa) {
@@ -115,6 +121,29 @@ export function CapaPage() {
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
+
+      {tab === 'register' && criticalNotifs.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: 12, marginBottom: 12,
+          background: 'var(--danger-bg)',
+          border: '1px solid var(--danger-fg)',
+          borderRadius: 'var(--r-sm)',
+        }}>
+          <AlertTriangle size={18} color="var(--danger-fg)" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger-fg)' }}>
+              {criticalNotifs.length} {t('capaAlertsStripTitle')}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>
+              {t('capaAlertsStripBody')}
+            </div>
+          </div>
+          <Button variant="primary" size="sm" Icon={Send} onClick={() => setTab('committee')}>
+            {t('capaAlertsStripCta')}
+          </Button>
+        </div>
+      )}
 
       {tab === 'register' && (
         <Card title={t('capaTabRegister')} Icon={ListChecks}
@@ -157,6 +186,9 @@ export function CapaPage() {
       {tab === 'workflow' && <WorkflowTab items={items} />}
       {tab === 'triggers' && (
         <TriggersTab triggers={triggers} onOpenPa={setTriggerTarget} />
+      )}
+      {tab === 'committee' && (
+        <CommitteeTab notifs={notifs} digest={digest} />
       )}
 
       {rcaTarget && (
@@ -708,6 +740,144 @@ function Field({ label, value, onChange, multiline }: { label: string; value: st
         : <input value={value} onChange={e => onChange(e.target.value)}
             style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
       }
+    </div>
+  );
+}
+
+// ── Audit Committee tab — derived notifications + quarterly digest ──
+// Combines two readouts in a single "tell the Audit Committee" pane:
+//   1. The live notification stream (DUE_SOON / OVERDUE / VERIFICATION
+//      _FAILED / etc) sorted newest-first
+//   2. The current-quarter rollup digest (opened, closed, overdue,
+//      recurrent, customer disclosures, top root causes)
+
+function CommitteeTab({ notifs, digest }: {
+  notifs: CapaNotif[];
+  digest: ReturnType<typeof audCommitteeDigest>;
+}) {
+  const { t, lang } = useI18n();
+  const toast = useToast();
+
+  const KIND_LABEL: Record<string, { en: string; ar: string }> = {
+    NEW_CRITICAL:           { en: 'New critical CAPA',          ar: 'إجراء حرج جديد' },
+    DUE_SOON:               { en: 'Due in ≤ 7 days',            ar: 'يستحق خلال ≤ 7 أيام' },
+    OVERDUE:                { en: 'Overdue',                    ar: 'متأخر' },
+    EFFECTIVENESS_OVERDUE:  { en: 'Effectiveness re-test due',  ar: 'استحقاق إعادة اختبار الفاعلية' },
+    VERIFICATION_FAILED:    { en: 'Verification failed',        ar: 'فشل التحقق' },
+    CUSTOMER_DISCLOSURE:    { en: 'Customer disclosure window', ar: 'نافذة إبلاغ العميل' },
+  };
+  const KIND_TONE: Record<string, 'danger' | 'warning' | 'info' | 'accent'> = {
+    NEW_CRITICAL: 'danger', OVERDUE: 'danger', VERIFICATION_FAILED: 'danger',
+    DUE_SOON: 'warning', EFFECTIVENESS_OVERDUE: 'warning',
+    CUSTOMER_DISCLOSURE: 'info',
+  };
+
+  const ROOT_CAUSE_LABEL: Record<string, { en: string; ar: string }> = {
+    PEOPLE: { en: 'People', ar: 'بشري' }, PROCESS: { en: 'Process', ar: 'عملية' },
+    TECHNOLOGY: { en: 'Technology', ar: 'تقنية' }, POLICY: { en: 'Policy', ar: 'سياسة' },
+    TRAINING: { en: 'Training', ar: 'تدريب' }, EXTERNAL: { en: 'External', ar: 'خارجية' },
+    MANAGEMENT: { en: 'Management', ar: 'إدارة' }, UNKNOWN: { en: 'Unknown', ar: 'غير محدد' },
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Quarterly digest card */}
+      <Card title={`${t('capaCommitteeDigest')} — ${digest.quarterLabel}`} Icon={Stamp}
+        action={<Button variant="ghost" size="sm" Icon={FileText}
+          onClick={() => toast.info(t('capaCommitteeExportHint'))}>
+          {t('capaCommitteeExport')}
+        </Button>}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+          {t('capaCommitteeDigestPeriod')}: <span className="mono">{digest.quarterStart} → {digest.quarterEnd}</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          <DigestStat label={t('capaCommitteeOpened')}              value={digest.opened}            tone="info" />
+          <DigestStat label={t('capaCommitteeClosed')}              value={digest.closed}            tone="success" />
+          <DigestStat label={t('capaCommitteeInFlight')}            value={digest.inFlight}          tone="primary" />
+          <DigestStat label={t('capaCommitteeOverdue')}             value={digest.overdue}           tone={digest.overdue > 0 ? 'danger' : 'success'} />
+          <DigestStat label={t('capaCommitteeVerificationFailed')}  value={digest.verificationFailed} tone={digest.verificationFailed > 0 ? 'danger' : 'success'} />
+          <DigestStat label={t('capaCommitteeRecurrent')}           value={digest.recurrent}         tone={digest.recurrent > 0 ? 'warning' : 'success'} />
+          <DigestStat label={t('capaCommitteePreventive')}          value={digest.preventive}        tone="accent" />
+          <DigestStat label={t('capaCommitteeCustomerDisclosures')} value={digest.customerDisclosures} tone={digest.customerDisclosures > 0 ? 'warning' : 'success'} />
+        </div>
+        {digest.topRootCauses.length > 0 && (
+          <div style={{ marginTop: 16, padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              {t('capaCommitteeTopRootCauses')}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {digest.topRootCauses.map(rc => {
+                const lbl = ROOT_CAUSE_LABEL[rc.category];
+                return (
+                  <div key={rc.category} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--surface-1)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-1)' }}>
+                      {lbl ? (lang === 'ar' ? lbl.ar : lbl.en) : rc.category}
+                    </span>
+                    <Badge tone="primary">{rc.count} ({rc.pct}%)</Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12, padding: 8, borderTop: '1px solid var(--border)' }}>
+          {t('capaCommitteeFootnote')}
+        </div>
+      </Card>
+
+      {/* Live notification stream */}
+      <Card title={t('capaCommitteeLiveStream')} Icon={Bell}
+        action={<Badge tone={notifs.some(n => n.severity === 'CRITICAL') ? 'danger' : 'primary'}>
+          {notifs.length}
+        </Badge>}>
+        {notifs.length === 0
+          ? <EmptyState Icon={ShieldCheck} title={t('capaCommitteeNoAlerts')} sub={t('capaCommitteeNoAlertsBody')} />
+          : <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {notifs.map(n => (
+                <div key={n.id} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '110px 180px 1fr 160px 90px',
+                  gap: 10,
+                  padding: '10px 0',
+                  borderBottom: '1px dashed var(--border)',
+                  alignItems: 'center',
+                }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{n.firedAt}</span>
+                  <Badge tone={KIND_TONE[n.kind]}>
+                    {KIND_LABEL[n.kind][lang === 'ar' ? 'ar' : 'en']}
+                  </Badge>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)' }}>{n.capaCode}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-1)', marginTop: 2, lineHeight: 1.4 }}>
+                      {lang === 'ar' ? n.messageAr : n.messageEn}
+                    </div>
+                  </div>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{n.recipient}</span>
+                  <Badge tone={n.severity === 'CRITICAL' ? 'danger' : n.severity === 'WARN' ? 'warning' : 'info'}>
+                    {n.severity}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+        }
+      </Card>
+    </div>
+  );
+}
+
+function DigestStat({ label, value, tone }: { label: string; value: number; tone: 'info' | 'success' | 'primary' | 'danger' | 'warning' | 'accent' }) {
+  const toneVar = {
+    info: 'var(--info-fg)', success: 'var(--success-fg)', primary: 'var(--primary)',
+    danger: 'var(--danger-fg)', warning: 'var(--warning-fg)', accent: 'var(--accent-700)',
+  }[tone];
+  const bgVar = {
+    info: 'var(--info-bg)', success: 'var(--success-bg)', primary: 'var(--primary-50)',
+    danger: 'var(--danger-bg)', warning: 'var(--warning-bg)', accent: 'var(--accent-50)',
+  }[tone];
+  return (
+    <div style={{ background: bgVar, padding: 12, borderRadius: 'var(--r-sm)' }}>
+      <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: toneVar }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{label}</div>
     </div>
   );
 }
