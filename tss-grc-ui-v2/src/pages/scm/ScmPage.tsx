@@ -22,6 +22,7 @@ import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
   scmApi, ApiError,
   type ScmVendorDto, type ScmVendorRequest,
@@ -271,6 +272,67 @@ export function ScmPage() {
   const dependencies = useApiList<ScmDependencyDto>(()  => scmApi.dependencies(0, 200), DEPENDENCIES);
   const contracts    = useApiList<ScmContractDto>(()    => scmApi.contracts(0, 200),    CONTRACTS);
   const incidents    = useApiList<ScmIncidentDto>(()    => scmApi.incidents(0, 200),    DISRUPTIONS);
+
+  // ── DD-48: filter modal — tab-aware ─────────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  function scmMatches(row: any): boolean {
+    for (const [k, v] of Object.entries(advFilters)) {
+      if (!v) continue;
+      const cell = (row[k] ?? '').toString();
+      if (k.includes('contains') || k === 'assignee' || k === 'assessor') {
+        if (!cell.toLowerCase().includes(v.toLowerCase())) return false;
+      } else if (cell !== v) return false;
+    }
+    return true;
+  }
+  const scmDataset = (() => {
+    switch (tab) {
+      case 'suppliers':    return vendors.data;
+      case 'onboarding':   return onboarding.data;
+      case 'assessments':  return assessments.data;
+      case 'dependencies': return dependencies.data;
+      case 'contracts':    return contracts.data;
+      case 'disruptions':  return incidents.data;
+      default:             return vendors.data;
+    }
+  })();
+  const filteredScm = scmDataset.filter(scmMatches);
+  const scmFilterFields: FilterField[] = (() => {
+    switch (tab) {
+      case 'suppliers': return [
+        { key: 'criticality', label: 'Criticality',                kind: 'select', options: distinctValues(vendors.data, 'criticality') },
+        { key: 'status',      label: t('filterFieldStatus'),       kind: 'select', options: distinctValues(vendors.data, 'status') },
+        { key: 'category',    label: t('filterFieldCategory'),     kind: 'select', options: distinctValues(vendors.data, 'category') },
+        { key: 'country',     label: t('filterFieldCountry'),      kind: 'select', options: distinctValues(vendors.data, 'country') },
+      ];
+      case 'onboarding': return [
+        { key: 'status',       label: t('filterFieldStatus'), kind: 'select', options: distinctValues(onboarding.data, 'status') },
+        { key: 'currentStage', label: 'Stage',                kind: 'select', options: distinctValues(onboarding.data, 'currentStage') },
+      ];
+      case 'assessments': return [
+        { key: 'status',          label: t('filterFieldStatus'), kind: 'select', options: distinctValues(assessments.data, 'status') },
+        { key: 'assessmentType',  label: t('filterFieldType'),   kind: 'select', options: distinctValues(assessments.data, 'assessmentType') },
+      ];
+      case 'dependencies': return [
+        { key: 'dependencyType',  label: t('filterFieldType'),   kind: 'select', options: distinctValues(dependencies.data, 'dependencyType') },
+        { key: 'dependencyLevel', label: 'Level',                kind: 'select', options: distinctValues(dependencies.data, 'dependencyLevel') },
+        { key: 'status',          label: t('filterFieldStatus'), kind: 'select', options: distinctValues(dependencies.data, 'status') },
+      ];
+      case 'contracts': return [
+        { key: 'status',       label: t('filterFieldStatus'), kind: 'select', options: distinctValues(contracts.data, 'status') },
+        { key: 'contractType', label: t('filterFieldType'),   kind: 'select', options: distinctValues(contracts.data, 'contractType') },
+      ];
+      case 'disruptions': return [
+        { key: 'impact', label: t('filterFieldSeverity'), kind: 'select', options: distinctValues(incidents.data, 'impact') },
+        { key: 'status', label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(incidents.data, 'status') },
+        { key: 'incidentType', label: t('filterFieldType'), kind: 'select', options: distinctValues(incidents.data, 'incidentType') },
+      ];
+      default: return [
+        { key: 'status', label: t('filterFieldStatus'), kind: 'select', options: distinctValues(vendors.data, 'status') },
+      ];
+    }
+  })();
 
   const [stats, setStats] = useState<ScmStats | null>(null);
   useEffect(() => {
@@ -666,18 +728,17 @@ export function ScmPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
-              const map: Record<string, { rows: ExportRow[]; name: string }> = {
-                suppliers:    { rows: vendors.data as unknown as ExportRow[],      name: 'scm-suppliers' },
-                onboarding:   { rows: onboarding.data as unknown as ExportRow[],   name: 'scm-onboarding' },
-                assessments:  { rows: assessments.data as unknown as ExportRow[],  name: 'scm-assessments' },
-                dependencies: { rows: dependencies.data as unknown as ExportRow[], name: 'scm-dependencies' },
-                contracts:    { rows: contracts.data as unknown as ExportRow[],    name: 'scm-contracts' },
-                disruptions:  { rows: incidents.data as unknown as ExportRow[],    name: 'scm-disruptions' },
+              const nameMap: Record<string, string> = {
+                suppliers: 'scm-suppliers', onboarding: 'scm-onboarding',
+                assessments: 'scm-assessments', dependencies: 'scm-dependencies',
+                contracts: 'scm-contracts', disruptions: 'scm-disruptions',
               };
-              const cur = map[tab] ?? map.suppliers;
-              downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
+              const name = nameMap[tab] ?? 'scm-suppliers';
+              downloadCsv(filteredScm as unknown as ExportRow[], stampFilename(name, 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
             {showNewButton && (
@@ -814,36 +875,36 @@ export function ScmPage() {
       )}
       {tab === 'suppliers' && (
         <Card padded={false}>
-          {vendors.loading ? <LoadingRow /> : <DataTable columns={supplierCols} rows={vendors.data} empty={<EmptyState />} />}
+          {vendors.loading ? <LoadingRow /> : <DataTable columns={supplierCols} rows={filteredScm as ScmVendorDto[]} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'onboarding' && (
         <Card padded={false}>
-          {onboarding.loading ? <LoadingRow /> : <DataTable columns={onbCols} rows={onboarding.data}
+          {onboarding.loading ? <LoadingRow /> : <DataTable columns={onbCols} rows={filteredScm as ScmOnboardingDto[]}
             empty={<EmptyState Icon={Workflow} title={t('scmEmptyOnboarding')} sub={t('scmEmptyOnboardingSub')} />} />}
         </Card>
       )}
       {tab === 'assessments' && (
         <Card padded={false}>
-          {assessments.loading ? <LoadingRow /> : <DataTable columns={assessCols} rows={assessments.data}
+          {assessments.loading ? <LoadingRow /> : <DataTable columns={assessCols} rows={filteredScm as ScmAssessmentDto[]}
             empty={<EmptyState Icon={ClipboardCheck} title={t('scmEmptyAssessments')} sub={t('scmEmptyAssessmentsSub')} />} />}
         </Card>
       )}
       {tab === 'dependencies' && (
         <Card padded={false}>
-          {dependencies.loading ? <LoadingRow /> : <DataTable columns={depCols} rows={dependencies.data}
+          {dependencies.loading ? <LoadingRow /> : <DataTable columns={depCols} rows={filteredScm as ScmDependencyDto[]}
             empty={<EmptyState Icon={Network} title={t('scmEmptyDependencies')} sub={t('scmEmptyDependenciesSub')} />} />}
         </Card>
       )}
       {tab === 'contracts' && (
         <Card padded={false}>
-          {contracts.loading ? <LoadingRow /> : <DataTable columns={contractCols} rows={contracts.data}
+          {contracts.loading ? <LoadingRow /> : <DataTable columns={contractCols} rows={filteredScm as ScmContractDto[]}
             empty={<EmptyState Icon={FileSignature} title={t('scmEmptyContracts')} sub={t('scmEmptyContractsSub')} />} />}
         </Card>
       )}
       {tab === 'disruptions' && (
         <Card padded={false}>
-          {incidents.loading ? <LoadingRow /> : <DataTable columns={incidentCols} rows={incidents.data}
+          {incidents.loading ? <LoadingRow /> : <DataTable columns={incidentCols} rows={filteredScm as ScmIncidentDto[]}
             empty={<EmptyState Icon={AlertOctagon} title={t('scmEmptyDisruptions')} sub={t('scmEmptyDisruptionsSub')} />} />}
         </Card>
       )}
@@ -908,6 +969,9 @@ export function ScmPage() {
         onCancel={depS.closeConfirm}
         onConfirm={() => execDelete(depS.confirmDel, scmApi.deleteDependency, depS.closeConfirm, dependencies.reload, 'Dependency')}
       />
+      <FilterModal open={filterOpen} fields={scmFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

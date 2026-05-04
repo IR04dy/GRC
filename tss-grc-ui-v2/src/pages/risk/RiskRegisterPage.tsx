@@ -14,6 +14,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ExportMenu } from '../../components/ui/ExportMenu';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type KriBreachEventDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
@@ -121,6 +122,20 @@ export function RiskRegisterPage() {
   const [confirmDelete, setConfirmDelete] = useState<RiskResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
   const demoMode = !isAuthenticated();
+
+  // ── DD-48: filter modal — drives the existing RiskFilters via URL ─────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const riskFilterFields: FilterField[] = [
+    { key: 'status',   label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(risks, 'status') },
+    { key: 'category', label: t('filterFieldCategory'), kind: 'select', options: distinctValues(risks.filter(r => r.categoryNameEn), 'categoryNameEn') },
+    { key: 'level',    label: t('filterFieldRisk'),     kind: 'select',
+      options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
+  ];
+  const riskFilterValues: Record<string, string | undefined> = {
+    status:   filters.status,
+    category: filters.category,
+    level:    filters.level,
+  };
 
   async function load() {
     if (demoMode) { setRisks(MOCK_RISKS); return; }
@@ -282,7 +297,9 @@ export function RiskRegisterPage() {
         actions={
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('riskFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('riskFilter')}{Object.values(riskFilterValues).filter(Boolean).length > 0 ? ` · ${Object.values(riskFilterValues).filter(Boolean).length}` : ''}
+            </Button>
             <ExportMenu
               demoMode={demoMode} t={t} toast={toast}
               onPdf={() => reportingApi.riskRegisterPdf(lang)}
@@ -407,6 +424,17 @@ export function RiskRegisterPage() {
         onCancel={() => setConfirmDelete(null)}
         onConfirm={executeDelete}
       />
+      <FilterModal open={filterOpen} fields={riskFilterFields} value={riskFilterValues}
+        onApply={v => {
+          setFilters(prev => ({
+            ...prev,
+            status:   v.status,
+            category: v.category,
+            level:    v.level,
+          }));
+          toast.success(t('filterModalApplied'));
+        }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

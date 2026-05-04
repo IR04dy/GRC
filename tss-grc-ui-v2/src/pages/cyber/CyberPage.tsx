@@ -23,6 +23,7 @@ import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
   cyberApi, ApiError,
   type CyberControlDto, type CyberControlRequest,
@@ -843,21 +844,104 @@ export function CyberPage() {
 
   const focusVuln = vulns.data.find(v => v.workflowStatus !== 'CLOSED' && v.workflowStatus !== 'VERIFICATION') ?? vulns.data[0];
 
-  // ── CSV export of the active tab — DD-46 ──────────────────────────────────
+  // ── DD-47: filter modal — tab-aware schema + predicate ────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filterDataset = (() => {
+    switch (tab) {
+      case 'controls':    return controls.data;
+      case 'subcontrols': return subControls.data;
+      case 'assessments': return assessments.data;
+      case 'vuln':        return vulns.data;
+      case 'exceptions':  return exceptions.data;
+      case 'incidents':   return cyberIncidents.data;
+      case 'assets':      return assets.data;
+      case 'evidence':    return cyberEvidence.data;
+      case 'actions':     return actionPlans.data;
+      default:            return controls.data;
+    }
+  })();
+  function matches(row: any): boolean {
+    for (const [k, v] of Object.entries(advFilters)) {
+      if (!v) continue;
+      const cell = (row[k] ?? '').toString();
+      if (k === 'owner' || k === 'assignee' || k === 'leadAuditor') {
+        if (!cell.toLowerCase().includes(v.toLowerCase())) return false;
+      } else if (k.endsWith('After')) {
+        const dateField = k.slice(0, -5);
+        if ((row[dateField] ?? '') < v) return false;
+      } else if (k.endsWith('Before')) {
+        const dateField = k.slice(0, -6);
+        if ((row[dateField] ?? '9999-12-31') > v) return false;
+      } else {
+        if (cell !== v) return false;
+      }
+    }
+    return true;
+  }
+  const filteredCyberData = filterDataset.filter(matches);
+  const cyberFilterFields: FilterField[] = (() => {
+    switch (tab) {
+      case 'controls': return [
+        { key: 'status',    label: t('filterFieldStatus'),    kind: 'select', options: distinctValues(controls.data, 'status') },
+        { key: 'frameworkName', label: t('filterFieldFramework'), kind: 'select', options: distinctValues(controls.data, 'frameworkName') },
+        { key: 'domain',    label: 'Domain', kind: 'select', options: distinctValues(controls.data.filter(c => c.domain), 'domain') },
+      ];
+      case 'vuln': return [
+        { key: 'severity',       label: t('filterFieldSeverity'), kind: 'select',
+          options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
+        { key: 'workflowStatus', label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(vulns.data, 'workflowStatus') },
+        { key: 'ownerName',      label: t('filterFieldOwner'),    kind: 'text', placeholder: 'e.g. patch.team@tss.sa' },
+      ];
+      case 'incidents': return [
+        { key: 'severity',       label: t('filterFieldSeverity'), kind: 'select',
+          options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
+        { key: 'workflowStatus', label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(cyberIncidents.data, 'workflowStatus') },
+        { key: 'incidentType',   label: t('filterFieldType'),     kind: 'select', options: distinctValues(cyberIncidents.data, 'incidentType') },
+      ];
+      case 'assessments': return [
+        { key: 'status',    label: t('filterFieldStatus'), kind: 'select', options: distinctValues(assessments.data, 'status') },
+        { key: 'riskLevel', label: t('filterFieldRisk'),   kind: 'select', options: distinctValues(assessments.data, 'riskLevel') },
+      ];
+      case 'exceptions': return [
+        { key: 'workflowStatus', label: t('filterFieldStatus'), kind: 'select', options: distinctValues(exceptions.data, 'workflowStatus') },
+        { key: 'ownerName',      label: t('filterFieldOwner'),  kind: 'text' },
+      ];
+      case 'assets': return [
+        { key: 'criticality',    label: 'Criticality',           kind: 'select', options: distinctValues(assets.data, 'criticality') },
+        { key: 'status',         label: t('filterFieldStatus'),  kind: 'select', options: distinctValues(assets.data, 'status') },
+        { key: 'classification', label: 'Classification',        kind: 'select', options: distinctValues(assets.data, 'classification') },
+      ];
+      case 'evidence': return [
+        { key: 'status',                label: t('filterFieldStatus'),    kind: 'select', options: distinctValues(cyberEvidence.data, 'status') },
+        { key: 'evidenceType',          label: t('filterFieldType'),      kind: 'select', options: distinctValues(cyberEvidence.data, 'evidenceType') },
+        { key: 'frameworkRequirement',  label: t('filterFieldFramework'), kind: 'select', options: distinctValues(cyberEvidence.data.filter(e => e.frameworkRequirement), 'frameworkRequirement') },
+      ];
+      case 'actions': return [
+        { key: 'workflowStatus', label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(actionPlans.data, 'workflowStatus') },
+        { key: 'priority',       label: 'Priority',               kind: 'select', options: distinctValues(actionPlans.data, 'priority') },
+        { key: 'sourceType',     label: 'Source type',            kind: 'select', options: distinctValues(actionPlans.data, 'sourceType') },
+      ];
+      case 'subcontrols': return [
+        { key: 'implementationStatus', label: t('filterFieldStatus'), kind: 'select', options: distinctValues(subControls.data, 'implementationStatus') },
+      ];
+      default: return [
+        { key: 'status', label: t('filterFieldStatus'), kind: 'select', options: distinctValues(controls.data, 'status') },
+      ];
+    }
+  })();
+
+  // ── CSV export of the active tab — DD-46 (now filter-aware via DD-47) ────
   function exportActiveTab() {
-    const map: Record<string, { rows: ExportRow[]; name: string }> = {
-      controls:    { rows: controls.data    as unknown as ExportRow[], name: 'cyber-controls' },
-      subcontrols: { rows: subControls.data as unknown as ExportRow[], name: 'cyber-subcontrols' },
-      assessments: { rows: assessments.data as unknown as ExportRow[], name: 'cyber-assessments' },
-      vuln:        { rows: vulns.data       as unknown as ExportRow[], name: 'cyber-vulnerabilities' },
-      exceptions:  { rows: exceptions.data  as unknown as ExportRow[], name: 'cyber-exceptions' },
-      incidents:   { rows: cyberIncidents.data as unknown as ExportRow[], name: 'cyber-incidents' },
-      assets:      { rows: assets.data      as unknown as ExportRow[], name: 'cyber-assets' },
-      evidence:    { rows: cyberEvidence.data as unknown as ExportRow[], name: 'cyber-evidence' },
-      actions:     { rows: actionPlans.data as unknown as ExportRow[], name: 'cyber-action-plans' },
+    const nameMap: Record<string, string> = {
+      controls: 'cyber-controls', subcontrols: 'cyber-subcontrols',
+      assessments: 'cyber-assessments', vuln: 'cyber-vulnerabilities',
+      exceptions: 'cyber-exceptions', incidents: 'cyber-incidents',
+      assets: 'cyber-assets', evidence: 'cyber-evidence',
+      actions: 'cyber-action-plans',
     };
-    const cur = map[tab] ?? map.controls;
-    downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
+    const name = nameMap[tab] ?? 'cyber-controls';
+    downloadCsv(filteredCyberData as unknown as ExportRow[], stampFilename(name, 'csv'));
     toast.success(t('exportCsvDone'));
   }
 
@@ -868,7 +952,9 @@ export function CyberPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => exportActiveTab()}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>
           </>
@@ -918,14 +1004,14 @@ export function CyberPage() {
         </>
       )}
 
-      {tab === 'controls'    && <Card padded={false}>{controls.loading    ? <LoadingRow /> : <DataTable columns={controlCols}  rows={controls.data}    empty={<EmptyState />} />}</Card>}
-      {tab === 'subcontrols' && <Card padded={false}>{subControls.loading ? <LoadingRow /> : <DataTable columns={subCtrlCols}  rows={subControls.data} empty={<EmptyState Icon={Shield}        title={t('cyberEmptySubControls')} />} />}</Card>}
-      {tab === 'assessments' && <Card padded={false}>{assessments.loading ? <LoadingRow /> : <DataTable columns={assessCols}   rows={assessments.data} empty={<EmptyState Icon={ClipboardCheck} title={t('cyberEmptyAssessments')} />} />}</Card>}
-      {tab === 'vuln'        && <Card padded={false}>{vulns.loading       ? <LoadingRow /> : <DataTable columns={vulnCols}     rows={vulns.data}       empty={<EmptyState Icon={Bug} />} />}</Card>}
-      {tab === 'exceptions'  && <Card padded={false}>{exceptions.loading  ? <LoadingRow /> : <DataTable columns={excCols}      rows={exceptions.data}  empty={<EmptyState Icon={ShieldOff}      title={t('cyberEmptyExceptions')} sub={t('cyberEmptyExceptionsSub')} />} />}</Card>}
+      {tab === 'controls'    && <Card padded={false}>{controls.loading    ? <LoadingRow /> : <DataTable columns={controlCols}  rows={filteredCyberData as CyberControlDto[]}     empty={<EmptyState />} />}</Card>}
+      {tab === 'subcontrols' && <Card padded={false}>{subControls.loading ? <LoadingRow /> : <DataTable columns={subCtrlCols}  rows={filteredCyberData as CyberSubControlDto[]} empty={<EmptyState Icon={Shield}        title={t('cyberEmptySubControls')} />} />}</Card>}
+      {tab === 'assessments' && <Card padded={false}>{assessments.loading ? <LoadingRow /> : <DataTable columns={assessCols}   rows={filteredCyberData as CyberAssessmentDto[]} empty={<EmptyState Icon={ClipboardCheck} title={t('cyberEmptyAssessments')} />} />}</Card>}
+      {tab === 'vuln'        && <Card padded={false}>{vulns.loading       ? <LoadingRow /> : <DataTable columns={vulnCols}     rows={filteredCyberData as CyberVulnDto[]}       empty={<EmptyState Icon={Bug} />} />}</Card>}
+      {tab === 'exceptions'  && <Card padded={false}>{exceptions.loading  ? <LoadingRow /> : <DataTable columns={excCols}      rows={filteredCyberData as CyberExceptionDto[]}  empty={<EmptyState Icon={ShieldOff}      title={t('cyberEmptyExceptions')} sub={t('cyberEmptyExceptionsSub')} />} />}</Card>}
       {tab === 'incidents'   && (
         <>
-          <Card padded={false}>{cyberIncidents.loading ? <LoadingRow /> : <DataTable columns={incidentCols} rows={cyberIncidents.data} empty={<EmptyState Icon={Flame} title={t('cyberEmptyIncidents')} />} />}</Card>
+          <Card padded={false}>{cyberIncidents.loading ? <LoadingRow /> : <DataTable columns={incidentCols} rows={filteredCyberData as CyberIncidentDto[]} empty={<EmptyState Icon={Flame} title={t('cyberEmptyIncidents')} />} />}</Card>
           {cyberIncidents.data[0] && (
             <div style={{ marginTop: 16 }}>
               <Card title={t('cardRespWorkflow')} Icon={Target} action={<Badge tone="info">{cyberIncidents.data[0].incidentNumber}</Badge>}>
@@ -935,9 +1021,9 @@ export function CyberPage() {
           )}
         </>
       )}
-      {tab === 'assets'   && <Card padded={false}>{assets.loading        ? <LoadingRow /> : <DataTable columns={assetCols}    rows={assets.data}        empty={<EmptyState Icon={Cpu}        title={t('cyberEmptyAssets')} />} />}</Card>}
-      {tab === 'evidence' && <Card padded={false}>{cyberEvidence.loading ? <LoadingRow /> : <DataTable columns={evidenceCols} rows={cyberEvidence.data} empty={<EmptyState Icon={FileCheck2} title={t('cyberEmptyEvidence')} />} />}</Card>}
-      {tab === 'actions'  && <Card padded={false}>{actionPlans.loading   ? <LoadingRow /> : <DataTable columns={actionCols}   rows={actionPlans.data}   empty={<EmptyState Icon={ListTodo}   title={t('cyberEmptyActions')} />} />}</Card>}
+      {tab === 'assets'   && <Card padded={false}>{assets.loading        ? <LoadingRow /> : <DataTable columns={assetCols}    rows={filteredCyberData as CyberAssetDto[]}      empty={<EmptyState Icon={Cpu}        title={t('cyberEmptyAssets')} />} />}</Card>}
+      {tab === 'evidence' && <Card padded={false}>{cyberEvidence.loading ? <LoadingRow /> : <DataTable columns={evidenceCols} rows={filteredCyberData as CyberEvidenceDto[]}   empty={<EmptyState Icon={FileCheck2} title={t('cyberEmptyEvidence')} />} />}</Card>}
+      {tab === 'actions'  && <Card padded={false}>{actionPlans.loading   ? <LoadingRow /> : <DataTable columns={actionCols}   rows={filteredCyberData as CyberActionPlanDto[]} empty={<EmptyState Icon={ListTodo}   title={t('cyberEmptyActions')} />} />}</Card>}
       {tab === 'workflows' && <ActiveWorkflowsPanel
         workflows={CYBER_WORKFLOWS}
         title={t('cyberTabWorkflows') ?? 'Workflows'}
@@ -1010,6 +1096,9 @@ export function CyberPage() {
       <ConfirmDialog open={!!assetS.confirmDel}   destructive busy={busy} title="Delete this asset?"           message={assetS.confirmDel   ? `Asset "${assetS.confirmDel.assetName}" will be removed.` : ''}                                                confirmLabel="Delete" onCancel={assetS.closeConfirm}   onConfirm={() => execDelete(assetS.confirmDel,   cyberApi.deleteAsset,      assetS.closeConfirm,   assets.reload, 'Asset')} />
       <ConfirmDialog open={!!evS.confirmDel}      destructive busy={busy} title="Delete this evidence?"        message={evS.confirmDel      ? `Evidence "${evS.confirmDel.titleEn}" will be removed.` : ''}                                                  confirmLabel="Delete" onCancel={evS.closeConfirm}      onConfirm={() => execDelete(evS.confirmDel,      cyberApi.deleteEvidence,   evS.closeConfirm,      cyberEvidence.reload, 'Evidence')} />
       <ConfirmDialog open={!!apS.confirmDel}      destructive busy={busy} title="Delete this action plan?"     message={apS.confirmDel      ? `Action plan "${apS.confirmDel.titleEn}" will be removed.` : ''}                                              confirmLabel="Delete" onCancel={apS.closeConfirm}      onConfirm={() => execDelete(apS.confirmDel,      cyberApi.deleteActionPlan, apS.closeConfirm,      actionPlans.reload, 'Action plan')} />
+      <FilterModal open={filterOpen} fields={cyberFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

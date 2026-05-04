@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Users, UserCheck, UserPlus, Shield, Filter, Download, Plus, Building2, ScrollText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -16,6 +16,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { useApiList } from '../../lib/useApiResource';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { adminApi, ApiError, type AdminUserDto, type AdminUserRequest, type AdminRoleDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
@@ -70,6 +71,23 @@ export function AdminPage() {
   const [busy, setBusy] = useState(false);
 
   const users = useApiList<AdminUserDto>(() => adminApi.users(0, 100), ADMIN_USERS);
+
+  // ── DD-48: filter modal — users only ────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filteredUsers = useMemo(() => users.data.filter(u => {
+    if (advFilters.isActive && String(u.isActive) !== advFilters.isActive) return false;
+    if (advFilters.isLocked && String(u.isLocked) !== advFilters.isLocked) return false;
+    if (advFilters.role && !(u.roles ?? []).includes(advFilters.role)) return false;
+    if (advFilters.username && !(u.username ?? '').toLowerCase().includes(advFilters.username.toLowerCase())) return false;
+    return true;
+  }), [users.data, advFilters]);
+  const adminFilterFields: FilterField[] = [
+    { key: 'isActive', label: 'Active', kind: 'select', options: [{value:'true',label:'Active'},{value:'false',label:'Inactive'}] },
+    { key: 'isLocked', label: 'Locked', kind: 'select', options: [{value:'true',label:'Locked'},{value:'false',label:'Unlocked'}] },
+    { key: 'role',     label: 'Role',   kind: 'select', options: distinctValues(users.data.flatMap(u => (u.roles ?? []).map(r => ({ role: r }))), 'role') },
+    { key: 'username', label: 'Username contains', kind: 'text' },
+  ];
 
   const [roles, setRoles] = useState<AdminRoleDto[]>([]);
   const [rolesLoading, setRolesLoading] = useState<boolean>(isAuthenticated());
@@ -171,13 +189,18 @@ export function AdminPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter}
+              disabled={tab !== 'users'}
+              title={tab !== 'users' ? 'Filter is currently only available on the Users tab' : undefined}
+              onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
               const map: Record<string, { rows: ExportRow[]; name: string }> = {
-                users:  { rows: users.data as unknown as ExportRow[], name: 'admin-users' },
-                roles:  { rows: roles as unknown as ExportRow[],      name: 'admin-roles' },
-                orgs:   { rows: orgs as unknown as ExportRow[],       name: 'admin-organisations' },
-                audit:  { rows: auditEvents as unknown as ExportRow[], name: 'admin-audit-trail' },
+                users:  { rows: filteredUsers as unknown as ExportRow[], name: 'admin-users' },
+                roles:  { rows: roles as unknown as ExportRow[],         name: 'admin-roles' },
+                orgs:   { rows: orgs as unknown as ExportRow[],          name: 'admin-organisations' },
+                audit:  { rows: auditEvents as unknown as ExportRow[],   name: 'admin-audit-trail' },
               };
               const cur = map[tab] ?? map.users;
               downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
@@ -197,7 +220,7 @@ export function AdminPage() {
 
       {tab === 'users' && (
         <Card padded={false}>
-          {users.loading ? <LoadingRow /> : <DataTable columns={userCols} rows={users.data} empty={<EmptyState />} />}
+          {users.loading ? <LoadingRow /> : <DataTable columns={userCols} rows={filteredUsers} empty={<EmptyState />} />}
         </Card>
       )}
       {tab === 'roles' && (
@@ -243,6 +266,9 @@ export function AdminPage() {
         confirmLabel="Delete"
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
       />
+      <FilterModal open={filterOpen} fields={adminFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }

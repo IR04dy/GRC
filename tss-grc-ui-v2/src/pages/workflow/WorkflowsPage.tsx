@@ -12,6 +12,7 @@ import { workflowApi, type WorkflowDefinitionDto, type WorkflowDefinitionGraph }
 import { isAuthenticated } from '../../lib/auth';
 import { WORKFLOW_DEFINITIONS, WORKFLOW_GRAPHS_BY_ID } from './mockWorkflowDefs';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 
 /**
  * Workflows admin page — assessment §6.1 strategic flagship.
@@ -63,6 +64,21 @@ export function WorkflowsPage() {
   }, [activeId]);
 
   const isDemo = !isAuthenticated();
+
+  // ── DD-48: filter modal — workflow definitions ────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
+  const filteredDefinitions = definitions.filter(d => {
+    if (advFilters.targetModule && d.targetModule !== advFilters.targetModule) return false;
+    if (advFilters.targetEntity && d.targetEntity !== advFilters.targetEntity) return false;
+    if (advFilters.isActive && String(d.isActive) !== advFilters.isActive) return false;
+    return true;
+  });
+  const wfFilterFields: FilterField[] = [
+    { key: 'targetModule', label: 'Module', kind: 'select', options: distinctValues(definitions, 'targetModule') },
+    { key: 'targetEntity', label: 'Entity', kind: 'select', options: distinctValues(definitions, 'targetEntity') },
+    { key: 'isActive',     label: 'Status', kind: 'select', options: [{value:'true',label:'Active'},{value:'false',label:'Inactive'}] },
+  ];
   const stateColour = (color: string | undefined) => {
     switch (color) {
       case 'success': return { bg: 'var(--success-bg)', fg: 'var(--success-fg)', border: 'var(--success-fg)' };
@@ -84,9 +100,11 @@ export function WorkflowsPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">Demo</Badge>}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
+              {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
+            </Button>
             <Button variant="secondary" Icon={Download} onClick={() => {
-              downloadCsv(definitions as unknown as ExportRow[], stampFilename('workflow-definitions', 'csv'));
+              downloadCsv(filteredDefinitions as unknown as ExportRow[], stampFilename('workflow-definitions', 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
           </>
@@ -103,7 +121,7 @@ export function WorkflowsPage() {
             ? <div style={{ padding: 24, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
             : definitions.length === 0
               ? <EmptyState Icon={Workflow} title="No workflows defined" sub="Reference workflows are seeded by the V_workflow_engine_ddl.sql migration." />
-              : definitions.map(d => (
+              : filteredDefinitions.map(d => (
                 <button key={d.id}
                   onClick={() => setActiveId(d.id)}
                   style={{
@@ -207,6 +225,9 @@ export function WorkflowsPage() {
               )}
         </Card>
       </div>
+      <FilterModal open={filterOpen} fields={wfFilterFields} value={advFilters}
+        onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
+        onClose={() => setFilterOpen(false)} />
     </Shell>
   );
 }
