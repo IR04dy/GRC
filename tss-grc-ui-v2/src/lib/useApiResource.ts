@@ -9,6 +9,10 @@ interface UseApiResourceState<T> {
   /** True when the data on screen comes from the mock fallback (not the live API). */
   isDemo: boolean;
   reload: () => void;
+  /** Demo-mode optimistic update — lets the page mutate the local list when
+   *  the backend write fails (typically auth-gated). Real API writes should
+   *  reload() instead. */
+  replace: (updater: (prev: T) => T) => void;
 }
 
 /**
@@ -56,5 +60,9 @@ export function useApiList<T>(
 
   useEffect(() => { load(); }, [load]);
 
-  return { data, loading, error, isDemo, reload: load };
+  const replace = useCallback((updater: (prev: T[]) => T[]) => {
+    setData(prev => updater(prev));
+  }, []);
+
+  return { data, loading, error, isDemo, reload: load, replace };
 }
