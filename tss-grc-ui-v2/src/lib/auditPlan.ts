@@ -144,9 +144,26 @@ export const PLAN_STATUS_TONE: Record<PlanStatus, 'neutral' | 'info' | 'primary'
   IN_FLIGHT: 'warning', CLOSED: 'success',
 };
 
+export const PLAN_STATUS_LABEL: Record<PlanStatus, { en: string; ar: string }> = {
+  DRAFT:            { en: 'Draft',            ar: 'مسودة' },
+  COMMITTEE_REVIEW: { en: 'Committee review', ar: 'مراجعة اللجنة' },
+  APPROVED:         { en: 'Approved',         ar: 'مُعتمدة' },
+  IN_FLIGHT:        { en: 'In flight',        ar: 'قيد التنفيذ' },
+  CLOSED:           { en: 'Closed',           ar: 'مُغلقة' },
+};
+
 export const PLAN_ROW_STATUS_TONE: Record<PlanRowStatus, 'neutral' | 'info' | 'warning' | 'accent' | 'success' | 'danger'> = {
   PLANNED: 'neutral', IN_FIELDWORK: 'warning', REPORT: 'accent',
   COMPLETED: 'success', DEFERRED: 'info', CANCELLED: 'danger',
+};
+
+export const PLAN_ROW_STATUS_LABEL: Record<PlanRowStatus, { en: string; ar: string }> = {
+  PLANNED:      { en: 'Planned',       ar: 'مُخطَّطة' },
+  IN_FIELDWORK: { en: 'In fieldwork',  ar: 'عمل ميداني' },
+  REPORT:       { en: 'Report',        ar: 'إصدار التقرير' },
+  COMPLETED:    { en: 'Completed',     ar: 'مُنتهية' },
+  DEFERRED:     { en: 'Deferred',      ar: 'مُؤجَّلة' },
+  CANCELLED:    { en: 'Cancelled',     ar: 'مُلغاة' },
 };
 
 /** Plan-vs-actual coverage stats — what % of planned rows have been

@@ -27,19 +27,20 @@ import {
 } from '../../lib/auditUniverse';
 import {
   AUDIT_PLANS, planCoverage,
-  PLAN_STATUS_TONE, PLAN_ROW_STATUS_TONE,
+  PLAN_STATUS_TONE, PLAN_STATUS_LABEL,
+  PLAN_ROW_STATUS_TONE, PLAN_ROW_STATUS_LABEL,
 } from '../../lib/auditPlan';
 import {
   AUDITORS, INDEPENDENCE_TONE, INDEPENDENCE_LABEL, ROLE_LABEL,
   rotationStatus, ROTATION_TONE, ROTATION_LABEL,
 } from '../../lib/auditors';
 import {
-  AUDIT_APPOINTMENTS, APPOINTMENT_STATUS_TONE,
+  AUDIT_APPOINTMENTS, APPOINTMENT_STATUS_TONE, APPOINTMENT_STATUS_LABEL,
   feesByFirmYear,
 } from '../../lib/auditAppointments';
 import {
   AUDIT_COMMITTEE_MEMBERS, AUDIT_COMMITTEE_CHARTER,
-  AUDIT_COMMITTEE_MEETINGS, MEETING_STATUS_TONE, ROLE_LABEL_CTE,
+  AUDIT_COMMITTEE_MEETINGS, MEETING_STATUS_TONE, MEETING_STATUS_LABEL, ROLE_LABEL_CTE,
   complianceCheck, meetingsHeldThisYear,
 } from '../../lib/auditCommittee';
 import { Users, CalendarDays, AlertOctagon, Banknote, FileSignature, Gavel, Scale } from 'lucide-react';
@@ -415,7 +416,7 @@ function PlanAndUniverseTab({ t, lang }: { t: (k: string) => string; lang: 'en' 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Plan summary */}
       <Card title={`${t('audwsPlanTitle')} ${activePlan.year}`} Icon={Compass}
-        action={<Badge tone={PLAN_STATUS_TONE[activePlan.status]} dot>{activePlan.status.replace(/_/g, ' ')}</Badge>}>
+        action={<Badge tone={PLAN_STATUS_TONE[activePlan.status]} dot>{PLAN_STATUS_LABEL[activePlan.status][lang === 'ar' ? 'ar' : 'en']}</Badge>}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}>
           <div>
             <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
@@ -474,7 +475,7 @@ function PlanAndUniverseTab({ t, lang }: { t: (k: string) => string; lang: 'en' 
                 <Badge tone="info">{r.framework.replace(/_/g, ' ')}</Badge>
                 <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>{r.plannedAuditor}</span>
                 <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.plannedDays}d</span>
-                <Badge tone={PLAN_ROW_STATUS_TONE[r.status]} dot>{r.status.replace(/_/g, ' ')}</Badge>
+                <Badge tone={PLAN_ROW_STATUS_TONE[r.status]} dot>{PLAN_ROW_STATUS_LABEL[r.status][lang === 'ar' ? 'ar' : 'en']}</Badge>
                 {r.linkedEngagementId
                   ? <Link to={`/audit-workspace/engagement/${r.linkedEngagementId}`}
                       style={{ fontSize: 11, color: 'var(--primary)', textDecoration: 'none' }}>
@@ -748,7 +749,7 @@ function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: '
                     <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, fontStyle: 'italic' }}>{a.noteEn}</div>
                   )}
                 </div>
-                <Badge tone={APPOINTMENT_STATUS_TONE[a.status]} dot>{a.status.replace(/_/g, ' ')}</Badge>
+                <Badge tone={APPOINTMENT_STATUS_TONE[a.status]} dot>{APPOINTMENT_STATUS_LABEL[a.status][lang === 'ar' ? 'ar' : 'en']}</Badge>
                 <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'end' }}>
                   {a.contractedFeeSar ? `${(a.contractedFeeSar / 1_000_000).toFixed(2)}M SAR` : '—'}
                 </span>
@@ -917,7 +918,7 @@ function CommitteeTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar'
                   {m.minuteRef ? ' · ' + m.minuteRef : ''}
                 </div>
               </div>
-              <Badge tone={MEETING_STATUS_TONE[m.status]} dot>{m.status.replace(/_/g, ' ')}</Badge>
+              <Badge tone={MEETING_STATUS_TONE[m.status]} dot>{MEETING_STATUS_LABEL[m.status][lang === 'ar' ? 'ar' : 'en']}</Badge>
               <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.agenda.length} {t('audwsCteAgendaItems')}</span>
             </div>
             {m.agenda.length > 0 && (

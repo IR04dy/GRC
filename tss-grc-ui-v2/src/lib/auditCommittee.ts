@@ -245,6 +245,13 @@ export const MEETING_STATUS_TONE: Record<MeetingStatus, 'neutral' | 'info' | 'wa
   CONCLUDED: 'success', CANCELLED: 'neutral',
 };
 
+export const MEETING_STATUS_LABEL: Record<MeetingStatus, { en: string; ar: string }> = {
+  SCHEDULED:    { en: 'Scheduled',    ar: 'مُجدوَل' },
+  IN_PROGRESS:  { en: 'In progress',  ar: 'قيد الانعقاد' },
+  CONCLUDED:    { en: 'Concluded',    ar: 'مُنتهٍ' },
+  CANCELLED:    { en: 'Cancelled',    ar: 'مُلغى' },
+};
+
 export const ROLE_LABEL_CTE: Record<CommitteeRole, { en: string; ar: string }> = {
   CHAIR:                { en: 'Chair',                ar: 'الرئيس' },
   INDEPENDENT_MEMBER:   { en: 'Independent member',   ar: 'عضو مستقل' },

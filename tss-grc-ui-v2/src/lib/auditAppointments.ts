@@ -192,6 +192,17 @@ export const APPOINTMENT_STATUS_TONE: Record<AppointmentStatus, 'neutral' | 'inf
   ACTIVE: 'success', CLOSED: 'success',
 };
 
+export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, { en: string; ar: string }> = {
+  RFP_DRAFT:         { en: 'RFP draft',         ar: 'مسودة طلب العروض' },
+  RFP_PUBLISHED:     { en: 'RFP published',     ar: 'نُشر طلب العروض' },
+  SHORTLIST:         { en: 'Shortlist',         ar: 'القائمة المختصرة' },
+  EVALUATION:        { en: 'Evaluation',        ar: 'تقييم العروض' },
+  SELECTION:         { en: 'Selection',         ar: 'الاختيار' },
+  ENGAGEMENT_LETTER: { en: 'Engagement letter', ar: 'خطاب الارتباط' },
+  ACTIVE:            { en: 'Active',            ar: 'فعّال' },
+  CLOSED:            { en: 'Closed',            ar: 'مُنتهٍ' },
+};
+
 export const FEE_CATEGORY_LABEL: Record<FeeCategory, { en: string; ar: string }> = {
   AUDIT:              { en: 'Audit',              ar: 'مراجعة' },
   NON_AUDIT_TAX:      { en: 'Non-audit · Tax',    ar: 'غير تدقيقي · ضرائب' },

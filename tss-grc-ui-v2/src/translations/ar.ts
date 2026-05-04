@@ -1238,7 +1238,7 @@ export const ar = {
   colClassification: 'التصنيف',
   colCve: 'رقم CVE',
   colCvss: 'CVSS',
-  colSla: 'SLA',
+  colSla: 'اتفاقية مستوى الخدمة',
   colGap: 'الفجوة',
   colResult: 'النتيجة',
   colReviewer: 'المراجع',
@@ -1730,7 +1730,7 @@ export const ar = {
   // Audit Workspace — Appointments & Fees tab
   audwsTabAppointments:      'التعيينات والأتعاب',
   audwsAppActive:            'تعيينات فعّالة',
-  audwsAppInFlight:          'طلبات RFP جارية',
+  audwsAppInFlight:          'طلبات عروض جارية',
   audwsAppFeeTotal:          'إجمالي الأتعاب 2026',
   audwsAppFeeAudit:          'أتعاب المراجعة 2026',
   audwsAppFeeNonAuditRatio:  'نسبة غير التدقيقي',
