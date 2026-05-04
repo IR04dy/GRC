@@ -9,6 +9,8 @@ interface ToastContextValue {
   show: (message: string, variant?: ToastVariant) => void;
   success: (message: string) => void;
   danger: (message: string) => void;
+  /** Neutral info-toast — renders the default variant. */
+  info: (message: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -27,6 +29,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     show,
     success: (m) => show(m, 'success'),
     danger:  (m) => show(m, 'danger'),
+    info:    (m) => show(m, 'default'),
   }), [show]);
 
   return (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { BookCopy, History, Award, Link2 } from 'lucide-react';
+import { BookCopy, History, Award, Link2, Send, CheckCheck, Megaphone, RefreshCw, Archive } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
@@ -8,12 +8,14 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { complianceApi, frameworkApi, type PolicyDto, type PolicyMappingDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { POLICY_ANCHORS_BY_ID } from '../../lib/entityAnchors';
-import { POLICY_LIFECYCLE_EVENTS_BY_ID } from '../compliance/mockCompliance';
+import { POLICIES, POLICY_LIFECYCLE_EVENTS_BY_ID } from '../compliance/mockCompliance';
 
 type TabId = 'overview' | 'mappings' | 'lifecycle' | 'links';
 
@@ -25,6 +27,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
 export function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
+  const toast = useToast();
   const [item, setItem] = useState<PolicyDto | null>(null);
   const [mappings, setMappings] = useState<PolicyMappingDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,10 +37,22 @@ export function PolicyDetailPage() {
     if (!id) return;
     setLoading(true);
     Promise.all([
-      complianceApi.policies(0, 200).then(p => p.content?.find(p => p.id === Number(id)) ?? null),
+      complianceApi.policies(0, 200)
+        .then(p => p.content?.find(p => p.id === Number(id)) ?? null)
+        .catch(() => POLICIES.find(p => p.id === Number(id)) ?? null),
       frameworkApi.mappingsFor(Number(id)).catch(() => [] as PolicyMappingDto[]),
     ]).then(([p, m]) => { setItem(p); setMappings(m); }).finally(() => setLoading(false));
   }, [id]);
+
+  // Demo-mode workflow transitions — mutate local item.status + audit toast.
+  // (Real backend wires would call complianceApi.policy{SubmitForReview,Approve,Publish,…}
+  //  but those don't exist; in this build we surface the lifecycle so the
+  //  detail page is no longer read-only.)
+  function transitionPolicy(toStatus: string, msgKey: string) {
+    if (!item) return;
+    setItem({ ...item, status: toStatus });
+    toast.success(t(msgKey));
+  }
 
   if (loading) return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
@@ -64,6 +79,14 @@ export function PolicyDetailPage() {
           <Badge tone={STATUS_TONE[item.status] ?? 'neutral'} dot>{(item.status ?? '').replace(/_/g, ' ')}</Badge>
           {item.version && <Badge tone="primary">v{item.version}</Badge>}
           {item.category && <Badge tone="info">{item.category.replace(/_/g, ' ')}</Badge>}
+        </>}
+        actions={<>
+          {item.status === 'DRAFT' && <Button variant="primary"   Icon={Send}      onClick={() => transitionPolicy('LEGAL_REVIEW',  'policyActSubmitLegal')}>{t('policyActSubmitLegal')}</Button>}
+          {item.status === 'LEGAL_REVIEW' && <Button variant="primary"   Icon={CheckCheck} onClick={() => transitionPolicy('EXEC_APPROVAL', 'policyActSendExec')}>{t('policyActSendExec')}</Button>}
+          {item.status === 'EXEC_APPROVAL' && <Button variant="primary" Icon={Megaphone}  onClick={() => transitionPolicy('PUBLISHED',     'policyActPublish')}>{t('policyActPublish')}</Button>}
+          {item.status === 'PUBLISHED' && <Button variant="secondary" Icon={RefreshCw} onClick={() => transitionPolicy('REVIEW_DUE',    'policyActMarkReview')}>{t('policyActMarkReview')}</Button>}
+          {item.status === 'REVIEW_DUE' && <Button variant="primary"   Icon={CheckCheck} onClick={() => transitionPolicy('PUBLISHED',     'policyActReaffirm')}>{t('policyActReaffirm')}</Button>}
+          {(item.status === 'PUBLISHED' || item.status === 'REVIEW_DUE') && <Button variant="ghost" Icon={Archive} onClick={() => transitionPolicy('RETIRED',       'policyActRetire')}>{t('policyActRetire')}</Button>}
         </>}
       />
 

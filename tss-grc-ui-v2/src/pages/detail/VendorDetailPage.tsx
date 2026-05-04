@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Truck, ListChecks, FileCheck2, Link2 } from 'lucide-react';
+import { Truck, ListChecks, FileCheck2, Link2, RefreshCw, ShieldOff, CheckCheck, Archive } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
@@ -8,10 +8,12 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { tprmApi, type TprmVendorDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
-import { VENDOR_ASSESSMENTS_BY_ID, VENDOR_CONTRACTS_BY_ID } from '../tprm/mockTprm';
+import { useToast } from '../../lib/toast';
+import { VENDORS, VENDOR_ASSESSMENTS_BY_ID, VENDOR_CONTRACTS_BY_ID } from '../tprm/mockTprm';
 
 type TabId = 'overview' | 'assessments' | 'contracts' | 'links';
 
@@ -22,6 +24,7 @@ const RISK_TONE: Record<string, BadgeTone> = {
 export function VendorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
+  const toast = useToast();
   const [item, setItem] = useState<TprmVendorDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabId>('overview');
@@ -31,9 +34,15 @@ export function VendorDetailPage() {
     setLoading(true);
     tprmApi.vendors(0, 200)
       .then(p => setItem(p.content?.find(v => v.id === Number(id)) ?? null))
-      .catch(() => setItem(null))
+      .catch(() => setItem(VENDORS.find(v => v.id === Number(id)) ?? null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  function transitionVendor(toStatus: string, msgKey: string) {
+    if (!item) return;
+    setItem({ ...item, status: toStatus });
+    toast.success(t(msgKey));
+  }
 
   if (loading) return <Shell title={t('modThirdParty')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
   if (!item)   return <Shell title={t('modThirdParty')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
@@ -58,6 +67,12 @@ export function VendorDetailPage() {
           <Badge tone={item.status === 'ACTIVE' ? 'success' : 'neutral'}>{item.status}</Badge>
           {item.vendorType && <Badge tone="primary">{item.vendorType}</Badge>}
           {item.country && <Badge tone="info">{item.country}</Badge>}
+        </>}
+        actions={<>
+          <Button variant="secondary" Icon={RefreshCw} onClick={() => transitionVendor('UNDER_REVIEW', 'vendorActReassess')}>{t('vendorActReassess')}</Button>
+          {item.status !== 'ACTIVE' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionVendor('ACTIVE', 'vendorActActivate')}>{t('vendorActActivate')}</Button>}
+          {item.status === 'ACTIVE' && <Button variant="ghost" Icon={ShieldOff} onClick={() => transitionVendor('UNDER_REVIEW', 'vendorActFlagRisk')}>{t('vendorActFlagRisk')}</Button>}
+          {item.status !== 'CLOSED' && <Button variant="ghost" Icon={Archive} onClick={() => transitionVendor('CLOSED', 'vendorActOffboard')}>{t('vendorActOffboard')}</Button>}
         </>}
       />
 

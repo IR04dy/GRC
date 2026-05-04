@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Fingerprint, ListChecks, ShieldCheck, MessageSquare, Link2 } from 'lucide-react';
+import { Fingerprint, ListChecks, ShieldCheck, MessageSquare, Link2, Send, CheckCheck, X as XIcon, RefreshCw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
@@ -8,11 +8,13 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { dpiaApi, type DpiaDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import {
-  DPIA_QUESTIONS_BY_ID, DPIA_MITIGATIONS_BY_ID, DPIA_REVIEWS_BY_ID,
+  DPIAS, DPIA_QUESTIONS_BY_ID, DPIA_MITIGATIONS_BY_ID, DPIA_REVIEWS_BY_ID,
 } from '../privacy/mockPrivacy';
 
 type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'links';
@@ -27,6 +29,7 @@ const RISK_TONE: Record<string, BadgeTone> = {
 export function DpiaDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
+  const toast = useToast();
   const [item, setItem] = useState<DpiaDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabId>('overview');
@@ -36,9 +39,15 @@ export function DpiaDetailPage() {
     setLoading(true);
     dpiaApi.get(Number(id))
       .then(r => { setItem(r.dpia); })
-      .catch(() => setItem(null))
+      .catch(() => setItem(DPIAS.find(d => d.id === Number(id)) as DpiaDto ?? null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  function transitionDpia(toStatus: string, msgKey: string) {
+    if (!item) return;
+    setItem({ ...item, status: toStatus });
+    toast.success(t(msgKey));
+  }
 
   if (loading) return <Shell title={t('modPdpl')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
   if (!item)   return <Shell title={t('modPdpl')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
@@ -63,6 +72,12 @@ export function DpiaDetailPage() {
           <Badge tone={STATUS_TONE[item.status] ?? 'neutral'} dot>{item.status.replace(/_/g, ' ')}</Badge>
           <Badge tone="primary">{item.triggerReason.replace(/_/g, ' ')}</Badge>
           {item.overallResidualRisk && <Badge tone={RISK_TONE[item.overallResidualRisk] ?? 'neutral'}>{item.overallResidualRisk}</Badge>}
+        </>}
+        actions={<>
+          {item.status === 'DRAFT' && <Button variant="primary" Icon={Send} onClick={() => transitionDpia('IN_REVIEW', 'dpiaActSubmitReview')}>{t('dpiaActSubmitReview')}</Button>}
+          {item.status === 'IN_REVIEW' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionDpia('APPROVED', 'dpiaActApprove')}>{t('dpiaActApprove')}</Button>}
+          {item.status === 'IN_REVIEW' && <Button variant="ghost" Icon={XIcon} onClick={() => transitionDpia('REJECTED', 'dpiaActReject')}>{t('dpiaActReject')}</Button>}
+          {(item.status === 'APPROVED' || item.status === 'EXPIRED') && <Button variant="secondary" Icon={RefreshCw} onClick={() => transitionDpia('IN_REVIEW', 'dpiaActPeriodicReview')}>{t('dpiaActPeriodicReview')}</Button>}
         </>}
       />
 

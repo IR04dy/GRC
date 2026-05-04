@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ClipboardCheck, FileCheck2, ListChecks, Link2 } from 'lucide-react';
+import { ClipboardCheck, FileCheck2, ListChecks, Link2, CheckCheck, AlertTriangle, ShieldOff, Calendar } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
@@ -8,13 +8,15 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { complianceApi, type ComplianceControlDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { CONTROL_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 import {
-  CONTROL_SUBCONTROLS_BY_ID, CONTROL_EVIDENCE_BY_ID, CONTROL_TESTS_BY_ID,
+  COMPLIANCE_CONTROLS, CONTROL_SUBCONTROLS_BY_ID, CONTROL_EVIDENCE_BY_ID, CONTROL_TESTS_BY_ID,
 } from '../compliance/mockCompliance';
 
 type TabId = 'overview' | 'subcontrols' | 'evidence' | 'tests' | 'links';
@@ -26,6 +28,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
 export function ControlDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
+  const toast = useToast();
   const [item, setItem] = useState<ComplianceControlDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabId>('overview');
@@ -35,9 +38,15 @@ export function ControlDetailPage() {
     setLoading(true);
     complianceApi.controls(0, 200)
       .then(p => setItem(p.content?.find(c => c.id === Number(id)) ?? null))
-      .catch(() => setItem(null))
+      .catch(() => setItem(COMPLIANCE_CONTROLS.find(c => c.id === Number(id)) ?? null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  function transitionControl(toStatus: string, msgKey: string) {
+    if (!item) return;
+    setItem({ ...item, status: toStatus });
+    toast.success(t(msgKey));
+  }
 
   if (loading) return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
@@ -66,6 +75,12 @@ export function ControlDetailPage() {
           <Badge tone="primary">{(item.framework ?? '').replace(/_/g, ' ')}</Badge>
           <Badge tone={STATUS_TONE[item.status] ?? 'neutral'} dot>{(item.status ?? '').replace(/_/g, ' ')}</Badge>
           <Badge tone="info">L{item.maturityLevel ?? 0}</Badge>
+        </>}
+        actions={<>
+          {item.status !== 'IMPLEMENTED' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionControl('IMPLEMENTED', 'controlActMarkImplemented')}>{t('controlActMarkImplemented')}</Button>}
+          {item.status !== 'PARTIAL' && <Button variant="secondary" Icon={AlertTriangle} onClick={() => transitionControl('PARTIAL', 'controlActMarkPartial')}>{t('controlActMarkPartial')}</Button>}
+          {item.status !== 'NOT_APPLICABLE' && <Button variant="ghost" Icon={ShieldOff} onClick={() => transitionControl('NOT_APPLICABLE', 'controlActMarkNA')}>{t('controlActMarkNA')}</Button>}
+          <Button variant="ghost" Icon={Calendar} onClick={() => toast.info(t('controlActScheduleTestHint'))}>{t('controlActScheduleTest')}</Button>
         </>}
       />
 
