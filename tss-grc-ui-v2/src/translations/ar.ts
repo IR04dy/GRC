@@ -1653,4 +1653,16 @@ export const ar = {
   commsAckNotePlaceholder: 'أي سياق يستحق الحفظ في سلسلة العهدة…',
   commsScheduledBadge:     'مجدول',
   actionCancel:            'إلغاء',
+
+  // Compose modal
+  commsComposeCta:         'تحرير',
+  commsComposeTitle:       'تحرير الإشعار',
+  commsComposeReset:       'استعادة القالب',
+  commsComposeSend:        'إرسال',
+  commsComposeSubject:     'الموضوع',
+  commsComposeBody:        'النص',
+  commsComposeBodyHint:    'حرّر القالب المُعبّأ مسبقاً قبل الإرسال. الأقسام بين القوسين [استكمال] تحتاج إلى تعبئة.',
+  commsComposeAfter:       'بعد الإرسال',
+  commsComposeAfterSent:   'تسجيل بـ "أُرسل"',
+  commsComposeAfterInFlight: 'قيد الإرسال (بانتظار التأكيد)',
 } as const;

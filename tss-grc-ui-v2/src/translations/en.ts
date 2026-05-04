@@ -1663,4 +1663,16 @@ export const en = {
   commsAckNotePlaceholder: 'Any context worth carrying with the audit trail entry…',
   commsScheduledBadge:     'Scheduled',
   actionCancel:            'Cancel',
+
+  // Compose modal (DD-29)
+  commsComposeCta:         'Compose',
+  commsComposeTitle:       'Compose notification',
+  commsComposeReset:       'Reset to template',
+  commsComposeSend:        'Send',
+  commsComposeSubject:     'Subject',
+  commsComposeBody:        'Body',
+  commsComposeBodyHint:    'Edit the pre-filled template before sending. Square-bracketed sections [populate] need filling in.',
+  commsComposeAfter:       'After sending',
+  commsComposeAfterSent:   'Mark as sent',
+  commsComposeAfterInFlight: 'Mark in flight (awaiting acknowledgement)',
 } as const;

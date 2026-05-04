@@ -26,6 +26,7 @@ import {
 import { generatePeriodicPending, findPeriodicFiling } from '../../lib/notificationScheduler';
 import { useCommsMutations } from '../../lib/useCommsMutations';
 import { AcknowledgeModal } from '../../components/comms/AcknowledgeModal';
+import { ComposeModal } from '../../components/comms/ComposeModal';
 
 type TabId = 'pending' | 'sent' | 'matrix' | 'directory' | 'raci';
 
@@ -86,6 +87,8 @@ export function CommunicationsPage() {
 
   // Modal state for "Mark sent" / acknowledge flow.
   const [ackTarget, setAckTarget] = useState<{ recordKey: string; entry: CommLogEntry; spec: NotificationSpec } | null>(null);
+  // Modal state for "Compose" flow.
+  const [composeTarget, setComposeTarget] = useState<{ recordKey: string; entry: CommLogEntry; spec: NotificationSpec; recordTitle?: string } | null>(null);
 
   // Flatten all comm-log entries with their record keys + spec lookup.
   // Includes both the static seed (event-driven) and the scheduler output
@@ -171,11 +174,16 @@ export function CommunicationsPage() {
           {pending.length === 0
             ? <EmptyState Icon={CheckCheck} title={t('commsPendingEmpty')} sub={t('commsPendingEmptySub')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {pending.map(p => (
-                  <PendingRowCmp key={`${p.recordKey}-${p.spec.id}-${p.logEntry.id}`}
-                    row={p} lang={lang} t={t}
-                    onMarkSent={() => setAckTarget({ recordKey: p.recordKey, entry: p.logEntry, spec: p.spec })} />
-                ))}
+                {pending.map(p => {
+                  const periodic = findPeriodicFiling(p.recordKey);
+                  const recordTitle = periodic ? (lang === 'ar' ? periodic.titleAr : periodic.titleEn) : undefined;
+                  return (
+                    <PendingRowCmp key={`${p.recordKey}-${p.spec.id}-${p.logEntry.id}`}
+                      row={p} lang={lang} t={t}
+                      onCompose={() => setComposeTarget({ recordKey: p.recordKey, entry: p.logEntry, spec: p.spec, recordTitle })}
+                      onMarkSent={() => setAckTarget({ recordKey: p.recordKey, entry: p.logEntry, spec: p.spec })} />
+                  );
+                })}
               </div>}
         </Card>
       )}
@@ -212,18 +220,39 @@ export function CommunicationsPage() {
           });
           setAckTarget(null);
         }} />
+
+      <ComposeModal
+        open={!!composeTarget}
+        spec={composeTarget?.spec ?? null}
+        recordKey={composeTarget?.recordKey ?? null}
+        entry={composeTarget?.entry ?? null}
+        recordTitle={composeTarget?.recordTitle}
+        onClose={() => setComposeTarget(null)}
+        onSend={(update) => {
+          if (!composeTarget) return;
+          muts.upsert({
+            recordKey: composeTarget.recordKey,
+            entryId: composeTarget.entry.id,
+            state: update.state,
+            receiptRef: composeTarget.entry.receiptRef,
+            noteEn: `${update.subject}\n\n${update.body}`,
+            sentAt: new Date().toISOString(),
+          });
+          setComposeTarget(null);
+        }} />
     </Shell>
   );
 }
 
 // ── Pending row ────────────────────────────────────────────────────────────
 function PendingRowCmp({
-  row, lang, t, onMarkSent,
+  row, lang, t, onMarkSent, onCompose,
 }: {
   row: PendingRow;
   lang: 'en' | 'ar';
   t: (k: string) => string;
   onMarkSent: () => void;
+  onCompose: () => void;
 }) {
   const stakeholder = STAKEHOLDERS.find(s => s.code === row.spec.toStakeholderCode);
   const Icon = CHANNEL_ICONS[row.spec.channel];
@@ -236,7 +265,7 @@ function PendingRowCmp({
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '32px 1fr auto auto auto auto',
+      gridTemplateColumns: '32px 1fr auto auto auto auto auto',
       gap: 10, alignItems: 'center',
       padding: '8px 10px',
       borderRadius: 'var(--r-sm)',
@@ -282,6 +311,9 @@ function PendingRowCmp({
       <Badge tone={STATE_BADGE[row.logEntry.state].tone} dot>
         {lang === 'ar' ? STATE_BADGE[row.logEntry.state].ar : STATE_BADGE[row.logEntry.state].en}
       </Badge>
+      <Button variant="ghost" size="sm" Icon={Send} onClick={onCompose}>
+        {t('commsComposeCta')}
+      </Button>
       <Button variant="ghost" size="sm" Icon={CheckCheck} onClick={onMarkSent}>
         {t('commsAckCta')}
       </Button>
