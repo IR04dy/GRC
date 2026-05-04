@@ -1,29 +1,86 @@
-export interface AdminUser {
-  id: number;
-  initials: string;
-  name: string;
-  username: string;
-  email: string;
-  role: string;
-  lastLogin: string;
-  status: 'ACTIVE' | 'PENDING' | 'CLOSED';
-}
+// Aligned with AdminUserDto in lib/api.ts so AdminPage's user table renders
+// fullNameEn / roles[] / isActive / isLocked / lastLoginAt without nulls.
+import type { AdminUserDto } from '../../lib/api';
 
-export const ADMIN_USERS: AdminUser[] = [
-  { id: 1, initials: 'AA', name: 'Ahmed Al-Qahtani',     username: 'admin',        email: 'admin@tss-grc.local',         role: 'Platform Admin',  lastLogin: '2026-04-30 09:14', status: 'ACTIVE' },
-  { id: 2, initials: 'LS', name: 'Layla Al-Saud',         username: 'riskmanager',  email: 'layla.s@tss-grc.local',       role: 'Risk Manager',    lastLogin: '2026-04-29 17:02', status: 'ACTIVE' },
-  { id: 3, initials: 'MO', name: 'Mohammed Al-Otaibi',    username: 'auditor',      email: 'm.otaibi@tss-grc.local',      role: 'Internal Auditor',lastLogin: '2026-04-28 11:38', status: 'ACTIVE' },
-  { id: 4, initials: 'SD', name: 'Sara Al-Dosari',        username: 'sara.d',       email: 'sara.d@tss-grc.local',        role: 'Privacy Officer', lastLogin: '2026-04-27 14:20', status: 'ACTIVE' },
-  { id: 5, initials: 'KG', name: 'Khalid Al-Ghamdi',      username: 'khalid.g',     email: 'khalid.g@tss-grc.local',      role: 'Compliance Lead', lastLogin: '2026-04-26 09:55', status: 'ACTIVE' },
-  { id: 6, initials: 'NH', name: 'Noura Al-Harbi',        username: 'noura.h',      email: 'noura.h@tss-grc.local',       role: 'BCM Coordinator', lastLogin: '—',                 status: 'PENDING' },
-  { id: 7, initials: 'OD', name: 'Omar Al-Dawsari',       username: 'omar.d',       email: 'omar.d@tss-grc.local',        role: 'Cyber Analyst',   lastLogin: '2026-04-25 16:10', status: 'ACTIVE' },
+export const ADMIN_USERS: AdminUserDto[] = [
+  { id: 1, username: 'admin',
+    email: 'admin@tss-grc.local',
+    fullNameEn: 'Ahmed Al-Qahtani',  fullNameAr: 'أحمد القحطاني',
+    isActive: true, isLocked: false,
+    roles: ['PLATFORM_ADMIN'],
+    createdAt: '2024-01-15T08:00:00', lastLoginAt: '2026-05-03T09:14:00' },
+  { id: 2, username: 'riskmanager',
+    email: 'layla.s@tss-grc.local',
+    fullNameEn: 'Layla Al-Saud',     fullNameAr: 'ليلى آل سعود',
+    isActive: true, isLocked: false,
+    roles: ['RISK_MANAGER'],
+    createdAt: '2024-02-08T10:00:00', lastLoginAt: '2026-05-02T17:02:00' },
+  { id: 3, username: 'auditor',
+    email: 'm.otaibi@tss-grc.local',
+    fullNameEn: 'Mohammed Al-Otaibi', fullNameAr: 'محمد العتيبي',
+    isActive: true, isLocked: false,
+    roles: ['INTERNAL_AUDITOR'],
+    createdAt: '2024-03-22T09:30:00', lastLoginAt: '2026-05-01T11:38:00' },
+  { id: 4, username: 'sara.d',
+    email: 'sara.d@tss-grc.local',
+    fullNameEn: 'Sara Al-Dosari',    fullNameAr: 'سارة الدوسري',
+    isActive: true, isLocked: false,
+    roles: ['PRIVACY_OFFICER'],
+    createdAt: '2024-05-10T14:00:00', lastLoginAt: '2026-04-30T14:20:00' },
+  { id: 5, username: 'khalid.g',
+    email: 'khalid.g@tss-grc.local',
+    fullNameEn: 'Khalid Al-Ghamdi',  fullNameAr: 'خالد الغامدي',
+    isActive: true, isLocked: false,
+    roles: ['COMPLIANCE_LEAD'],
+    createdAt: '2024-06-12T11:00:00', lastLoginAt: '2026-04-29T09:55:00' },
+  { id: 6, username: 'noura.h',
+    email: 'noura.h@tss-grc.local',
+    fullNameEn: 'Noura Al-Harbi',    fullNameAr: 'نورة الحربي',
+    isActive: false, isLocked: false,
+    roles: ['BCM_COORDINATOR'],
+    createdAt: '2026-04-30T09:42:00' },
+  { id: 7, username: 'omar.d',
+    email: 'omar.d@tss-grc.local',
+    fullNameEn: 'Omar Al-Dawsari',   fullNameAr: 'عمر الدوسري',
+    isActive: true, isLocked: false,
+    roles: ['CYBER_ANALYST'],
+    createdAt: '2024-09-04T13:00:00', lastLoginAt: '2026-04-28T16:10:00' },
+  { id: 8, username: 'faisal.m',
+    email: 'faisal.m@tss-grc.local',
+    fullNameEn: 'Faisal Al-Maliki',  fullNameAr: 'فيصل المالكي',
+    isActive: true, isLocked: false,
+    roles: ['AML_ANALYST'],
+    createdAt: '2025-01-20T10:00:00', lastLoginAt: '2026-05-02T08:42:00' },
+  { id: 9, username: 'sami.q',
+    email: 'sami.q@tss-grc.local',
+    fullNameEn: 'Sami Al-Qahtani',   fullNameAr: 'سامي القحطاني',
+    isActive: true, isLocked: false,
+    roles: ['TPRM_LEAD'],
+    createdAt: '2025-02-14T09:00:00', lastLoginAt: '2026-05-01T15:18:00' },
+  { id: 10, username: 'mona.b',
+    email: 'mona.b@tss-grc.local',
+    fullNameEn: 'Mona Al-Bishi',     fullNameAr: 'منى البيشي',
+    isActive: true, isLocked: false,
+    roles: ['INTERNAL_AUDITOR', 'COMPLIANCE_LEAD'],
+    createdAt: '2025-04-08T12:30:00', lastLoginAt: '2026-05-03T07:55:00' },
+  { id: 11, username: 'hassan.s',
+    email: 'hassan.s@tss-grc.local',
+    fullNameEn: 'Hassan Al-Saud',    fullNameAr: 'حسن آل سعود',
+    isActive: true, isLocked: true,
+    roles: ['CYBER_ANALYST'],
+    createdAt: '2025-06-22T11:00:00', lastLoginAt: '2026-04-25T22:11:00' },
+  { id: 12, username: 'audit.ext',
+    email: 'k.frost@kpmg.example',
+    fullNameEn: 'David Frost (KPMG)', fullNameAr: 'ديفيد فروست (كي بي إم جي)',
+    isActive: true, isLocked: false,
+    roles: ['EXTERNAL_AUDITOR'],
+    createdAt: '2026-01-12T08:00:00', lastLoginAt: '2026-04-26T14:00:00' },
 ];
 
 // ── Roles & permissions (RBAC) — shape matches AdminRoleDto ─────────────
-export interface AdminRoleRow {
-  id: number; roleName: string; displayNameEn: string; displayNameAr: string; isSystemRole?: boolean; isActive?: boolean;
-}
-export const ADMIN_ROLES: AdminRoleRow[] = [
+import type { AdminRoleDto } from '../../lib/api';
+
+export const ADMIN_ROLES: AdminRoleDto[] = [
   { id: 1, roleName: 'PLATFORM_ADMIN',  displayNameEn: 'Platform Administrator', displayNameAr: 'مسؤول النظام',           isSystemRole: true,  isActive: true },
   { id: 2, roleName: 'RISK_MANAGER',    displayNameEn: 'Risk Manager',           displayNameAr: 'مدير المخاطر',            isSystemRole: true,  isActive: true },
   { id: 3, roleName: 'CYBER_ANALYST',   displayNameEn: 'Cybersecurity Analyst',  displayNameAr: 'محلل الأمن السيبراني',  isSystemRole: true,  isActive: true },

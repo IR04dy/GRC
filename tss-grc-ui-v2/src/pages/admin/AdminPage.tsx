@@ -68,19 +68,19 @@ export function AdminPage() {
   const [confirmDel, setConfirmDel] = useState<AdminUserDto | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const users = useApiList<AdminUserDto>(() => adminApi.users(0, 100), ADMIN_USERS as unknown as AdminUserDto[]);
+  const users = useApiList<AdminUserDto>(() => adminApi.users(0, 100), ADMIN_USERS);
 
   const [roles, setRoles] = useState<AdminRoleDto[]>([]);
   const [rolesLoading, setRolesLoading] = useState<boolean>(isAuthenticated());
   useEffect(() => {
     if (!isAuthenticated()) {
-      setRoles(ADMIN_ROLES as unknown as AdminRoleDto[]);
+      setRoles(ADMIN_ROLES);
       setRolesLoading(false);
       return;
     }
     adminApi.roles()
-      .then(r => setRoles(r && r.length > 0 ? r : (ADMIN_ROLES as unknown as AdminRoleDto[])))
-      .catch(() => setRoles(ADMIN_ROLES as unknown as AdminRoleDto[]))
+      .then(r => setRoles(r && r.length > 0 ? r : (ADMIN_ROLES)))
+      .catch(() => setRoles(ADMIN_ROLES))
       .finally(() => setRolesLoading(false));
   }, []);
 
