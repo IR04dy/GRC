@@ -1780,4 +1780,9 @@ export const en = {
   audwsCteMeetingsTitle:     'Meetings register',
   audwsCteAttendees:         'attendees',
   audwsCteAgendaItems:       'agenda items',
+
+  // DD-39: stub buttons → real toast feedback (was: silent no-ops)
+  actionFilterHint:    'Use the search box above for quick text filtering. Column-header filters appear on registers with multiple columns. Advanced filters coming in a future release.',
+  actionExportHint:    'Workpaper export — pick a register-style page (Risk · Compliance · Changes · Dashboard) to use the PDF/XLSX export menu. Per-page export coming soon.',
+  notifEmptyHint:      'No new notifications. Critical alerts surface on the Audit Workspace inbox and on each module’s Stakeholders & Comms tab.',
 } as const;

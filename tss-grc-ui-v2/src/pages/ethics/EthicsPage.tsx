@@ -223,7 +223,7 @@ export function EthicsPage() {
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={RefreshCw} onClick={load} disabled={loading}>{t('dashRefresh')}</Button>
-            <Button variant="secondary" Icon={Filter}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
             <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('ethicsNew')}</Button>
           </>
         }

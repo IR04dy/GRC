@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import { workflowApi, type WorkflowDefinitionDto, type WorkflowDefinitionGraph } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { WORKFLOW_DEFINITIONS, WORKFLOW_GRAPHS_BY_ID } from './mockWorkflowDefs';
@@ -20,6 +21,7 @@ import { WORKFLOW_DEFINITIONS, WORKFLOW_GRAPHS_BY_ID } from './mockWorkflowDefs'
  */
 export function WorkflowsPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const [definitions, setDefinitions] = useState<WorkflowDefinitionDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -81,8 +83,8 @@ export function WorkflowsPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">Demo</Badge>}
-            <Button variant="secondary" Icon={Filter}>Filter</Button>
-            <Button variant="secondary" Icon={Download}>Export</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
           </>
         }
       />

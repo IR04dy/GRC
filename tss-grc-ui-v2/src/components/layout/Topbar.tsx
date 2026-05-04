@@ -11,6 +11,7 @@ import { useToast } from '../../lib/toast';
 export function Topbar({ title, sub, onOpenPalette }: { title: string; sub?: string; onOpenPalette?: () => void }) {
   const { t, lang, toggleLang } = useI18n();
   const navigate = useNavigate();
+  const toast = useToast();
   const user = getUser();
   const initials = user?.username
     ? user.username.slice(0, 2).toUpperCase()
@@ -65,7 +66,8 @@ export function Topbar({ title, sub, onOpenPalette }: { title: string; sub?: str
           <Send size={18} />
         </button>
 
-        <button className="icon-btn" title={t('notifications')} aria-label={t('notifications')}>
+        <button className="icon-btn" title={t('notifications')} aria-label={t('notifications')}
+          onClick={() => toast.info(t('notifEmptyHint'))}>
           <Bell size={18} />
           <span className="dot" />
         </button>

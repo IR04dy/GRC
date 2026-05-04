@@ -282,7 +282,7 @@ export function RiskRegisterPage() {
         actions={
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
-            <Button variant="secondary" Icon={Filter}>{t('riskFilter')}</Button>
+            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('riskFilter')}</Button>
             <ExportMenu
               demoMode={demoMode} t={t} toast={toast}
               onPdf={() => reportingApi.riskRegisterPdf(lang)}
