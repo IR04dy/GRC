@@ -17,6 +17,7 @@ import { useToast } from '../../lib/toast';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { RISK_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 import {
+  MOCK_RISKS,
   RISK_ASSESSMENTS_BY_ID, RISK_TREATMENTS_BY_ID,
   RISK_KRIS_BY_ID, RISK_HISTORY_BY_ID, RISK_LINKS_BY_ID,
 } from './mockRisks';
@@ -44,9 +45,17 @@ export function RiskDetailPage() {
   async function load() {
     if (!id) return;
     setLoading(true); setError(null);
-    try { setRisk(await riskApi.get(Number(id))); }
-    catch (e) { setError(e instanceof ApiError ? e.message : 'Failed to load'); }
-    finally { setLoading(false); }
+    try {
+      setRisk(await riskApi.get(Number(id)));
+    } catch (e) {
+      // Demo-mode fallback: when no JWT is present (or the backend is
+      // unreachable), fall back to MOCK_RISKS so the detail page renders.
+      const fallback = MOCK_RISKS.find(r => r.id === Number(id));
+      if (fallback) setRisk(fallback);
+      else setError(e instanceof ApiError ? e.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [id]);
 

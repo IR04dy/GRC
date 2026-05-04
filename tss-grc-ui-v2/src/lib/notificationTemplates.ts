@@ -409,8 +409,8 @@ A full update will be circulated within 24 hours, or sooner if material developm
 
   // ── Internal — quarterly Audit Committee briefing ───────────────────────
   { specId: 'AUDIT-CTE',
-    subjectEn: 'Quarterly Audit Committee briefing — {recordTitle}',
-    subjectAr: 'الإحاطة الفصلية للجنة المراجعة — {recordTitle}',
+    subjectEn: '{recordTitle}',
+    subjectAr: '{recordTitle}',
     bodyEn: `Audit Committee,
 
 This is the standing quarterly briefing covering:
