@@ -44,7 +44,7 @@ const ROOT_CAUSE_CATS: { id: RootCauseCategory; en: string; ar: string }[] = [
 export function CapaPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { items, advance, create } = useCapas();
+  const { items, advance, create, update } = useCapas();
   const [tab, setTab] = useState<TabId>('register');
   const [q, setQ] = useState('');
   const [filterStatus, setFilterStatus] = useState<CapaStatus | 'ALL'>('ALL');
@@ -252,6 +252,7 @@ export function CapaPage() {
         <RcaModal
           c={rcaTarget}
           onClose={() => setRcaTarget(null)}
+          update={update}
         />
       )}
       {triggerTarget && (
@@ -472,10 +473,13 @@ function WorkflowTab({ items }: { items: Capa[] }) {
 // FIVE_WHYS / FISHBONE / PARETO content. New CAPAs can pick a method
 // and capture answers; the captured RCA is persisted via useCapas.update.
 
-function RcaModal({ c, onClose }: { c: Capa; onClose: () => void }) {
+function RcaModal({ c, onClose, update }: {
+  c: Capa;
+  onClose: () => void;
+  update: (id: string, patch: Partial<Capa>) => void;
+}) {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { update } = useCapas();
   const [method, setMethod] = useState<RcaMethod>(c.rcaMethod);
   const [steps, setSteps] = useState<string[]>(c.rcaSteps.length ? c.rcaSteps : initialStepsFor(method));
   const [rootCause, setRootCause] = useState(c.rootCause ?? '');
