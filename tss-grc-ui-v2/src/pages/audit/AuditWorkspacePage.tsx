@@ -1,14 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase, ClipboardCheck, FileCheck2, BookCopy,
   Stamp, Clock, ArrowRight, Flame, ShieldCheck, ScrollText,
-  Activity, BarChart3,
+  Activity, BarChart3, Layers, Compass,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Kpi } from '../../components/ui/Kpi';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Donut } from '../../components/viz/Donut';
@@ -20,6 +21,16 @@ import {
   RISK_ANCHORS, CYBER_ANCHORS, PRIVACY_ANCHORS, BCM_ANCHORS,
   TPRM_ANCHORS, SCM_ANCHORS, ETHICS_ANCHORS, INCIDENT_ANCHORS, CHANGE_ANCHORS,
 } from '../../lib/moduleAnchors';
+import {
+  AUDIT_UNIVERSE, RISK_TONE_UNIVERSE,
+  isAuditDueSoon, monthsOverdue,
+} from '../../lib/auditUniverse';
+import {
+  AUDIT_PLANS, planCoverage,
+  PLAN_STATUS_TONE, PLAN_ROW_STATUS_TONE,
+} from '../../lib/auditPlan';
+
+type WsTabId = 'inbox' | 'plan';
 
 /**
  * Auditor Workspace — ServiceNow IRM "Audit Workspace" homepage.
@@ -35,7 +46,7 @@ import {
  *   6. Recent reviews — chain-of-custody trail
  */
 export function AuditWorkspacePage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   // ─── Sign-off queue: findings ready for audit signoff or closure ────────
   const signoffQueue = useMemo(() =>
@@ -89,6 +100,12 @@ export function AuditWorkspacePage() {
     EVIDENCE_REVIEWS.slice().sort((a, b) => (b.reviewDate ?? '').localeCompare(a.reviewDate ?? ''))
   , []);
 
+  const [tab, setTab] = useState<WsTabId>('inbox');
+  const tabs: TabItem<WsTabId>[] = [
+    { id: 'inbox', label: t('audwsTabInbox') },
+    { id: 'plan',  label: t('audwsTabPlan') },
+  ];
+
   return (
     <Shell title={t('audwsTitle')} sub={t('audwsSub')}>
       <PageHeader
@@ -96,6 +113,12 @@ export function AuditWorkspacePage() {
         title={t('audwsHeader')}
         sub={t('audwsHeaderSub')}
       />
+
+      <Tabs items={tabs} active={tab} onChange={setTab} />
+
+      {tab === 'plan' && <PlanAndUniverseTab t={t} lang={lang} />}
+
+      {tab === 'inbox' && <>
 
       {/* KPI strip */}
       <div className="kpi-grid">
@@ -350,7 +373,142 @@ export function AuditWorkspacePage() {
         </div>
         <CoverageQuickLinks />
       </Card>
+      </>}
     </Shell>
+  );
+}
+
+// ── Plan & Universe tab (DD-35) ───────────────────────────────────────────
+function PlanAndUniverseTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar' }) {
+  // Most-current plan to show first
+  const activePlan = AUDIT_PLANS.find(p => p.status === 'IN_FLIGHT')
+    ?? AUDIT_PLANS.find(p => p.status === 'APPROVED')
+    ?? AUDIT_PLANS[0];
+  const cov = planCoverage(activePlan);
+
+  // Universe entities sorted by overdue-ness
+  const universeSorted = [...AUDIT_UNIVERSE].sort((a, b) => monthsOverdue(b) - monthsOverdue(a));
+  const overdueCount  = universeSorted.filter(e => monthsOverdue(e) > 0).length;
+  const dueSoonCount  = universeSorted.filter(e => isAuditDueSoon(e) && monthsOverdue(e) <= 0).length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Plan summary */}
+      <Card title={`${t('audwsPlanTitle')} ${activePlan.year}`} Icon={Compass}
+        action={<Badge tone={PLAN_STATUS_TONE[activePlan.status]} dot>{activePlan.status.replace(/_/g, ' ')}</Badge>}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}>
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+              {lang === 'ar' ? activePlan.summaryAr : activePlan.summaryEn}
+            </div>
+            {activePlan.approvedAt && (
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+                {t('audwsPlanApprovedOn')} <span className="mono">{activePlan.approvedAt.slice(0, 10)}</span>
+                {activePlan.approvedMinuteRef && <> · <span className="mono">{activePlan.approvedMinuteRef}</span></>}
+              </div>
+            )}
+            <div className="kpi-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(5, 1fr)' }}>
+              <Kpi Icon={ClipboardCheck} label={t('audwsPlanCompleted')} value={cov.completed} tone="success" />
+              <Kpi Icon={Activity}       label={t('audwsPlanInFlight')}  value={cov.inFlight}  tone="warning" />
+              <Kpi Icon={Clock}          label={t('audwsPlanPlanned')}   value={cov.planned}   tone="info" />
+              <Kpi Icon={Layers}         label={t('audwsPlanTotal')}     value={cov.total}     tone="primary" />
+              <Kpi Icon={ShieldCheck}    label={`${t('audwsPlanCompletePct')}`}  value={`${cov.completedPct}%`} tone="success" />
+            </div>
+          </div>
+          <Donut
+            segments={[
+              { label: t('audwsPlanCompleted'), value: cov.completed, color: 'var(--success)' },
+              { label: t('audwsPlanInFlight'),  value: cov.inFlight,  color: 'var(--cat-2)' },
+              { label: t('audwsPlanPlanned'),   value: cov.planned,   color: 'var(--primary)' },
+              { label: t('audwsPlanDeferred'),  value: cov.deferred,  color: 'var(--accent-700)' },
+              { label: t('audwsPlanCancelled'), value: cov.cancelled, color: 'var(--ink-4)' },
+            ].filter(s => s.value > 0)}
+            centerLabel={`${cov.completedPct}%`}
+            centerSub={t('audwsPlanCompleteSub')} />
+        </div>
+      </Card>
+
+      {/* Plan rows */}
+      <Card title={`${t('audwsPlanRowsTitle')} (${activePlan.rows.length})`} Icon={Briefcase}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {activePlan.rows.map(r => {
+            const universeEntity = AUDIT_UNIVERSE.find(u => u.code === r.universeCode);
+            return (
+              <div key={r.id} style={{
+                display: 'grid',
+                gridTemplateColumns: '70px 1fr 110px 130px 80px 100px 110px',
+                gap: 10, alignItems: 'center',
+                padding: '8px 0', borderBottom: '1px dashed var(--border)',
+                fontSize: 12,
+              }}>
+                <Badge tone="primary">{r.plannedQuarter}</Badge>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--ink-1)',
+                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {universeEntity ? (lang === 'ar' ? universeEntity.nameAr : universeEntity.nameEn) : r.universeCode}
+                  </div>
+                  {r.rationaleEn && (
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{r.rationaleEn}</div>
+                  )}
+                </div>
+                <Badge tone="info">{r.framework.replace(/_/g, ' ')}</Badge>
+                <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>{r.plannedAuditor}</span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.plannedDays}d</span>
+                <Badge tone={PLAN_ROW_STATUS_TONE[r.status]} dot>{r.status.replace(/_/g, ' ')}</Badge>
+                {r.linkedEngagementId
+                  ? <Link to={`/audit-workspace/engagement/${r.linkedEngagementId}`}
+                      style={{ fontSize: 11, color: 'var(--primary)', textDecoration: 'none' }}>
+                      {t('audwsPlanOpenEngagement')} →
+                    </Link>
+                  : <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Audit universe */}
+      <Card title={`${t('audwsUniverseTitle')} (${AUDIT_UNIVERSE.length})`} Icon={Layers}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            {overdueCount > 0 && <Badge tone="danger">{overdueCount} {t('audwsUniverseOverdue')}</Badge>}
+            {dueSoonCount > 0 && <Badge tone="warning">{dueSoonCount} {t('audwsUniverseDueSoon')}</Badge>}
+          </div>
+        }>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {universeSorted.map(e => {
+            const overdue = monthsOverdue(e);
+            return (
+              <div key={e.code} style={{
+                display: 'grid',
+                gridTemplateColumns: '110px 1fr 130px 80px 100px 100px',
+                gap: 10, alignItems: 'center',
+                padding: '8px 0', borderBottom: '1px dashed var(--border)',
+                fontSize: 12,
+              }}>
+                <Badge tone="neutral">{e.type.replace(/_/g, ' ')}</Badge>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>
+                    {lang === 'ar' ? e.nameAr : e.nameEn}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }} className="mono">{e.code}</div>
+                </div>
+                <Badge tone={RISK_TONE_UNIVERSE[e.riskRating]}>{e.riskRating}</Badge>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.cycleMonths}m {t('audwsUniverseCycle')}</span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+                  {e.lastAuditedAt ?? '—'}
+                </span>
+                {overdue > 0
+                  ? <Badge tone="danger" dot>{overdue}m {t('audwsUniverseOverdue')}</Badge>
+                  : isAuditDueSoon(e)
+                    ? <Badge tone="warning" dot>{t('audwsUniverseDueSoon')}</Badge>
+                    : <Badge tone="success" dot>{t('audwsUniverseOnTrack')}</Badge>}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
   );
 }
 
