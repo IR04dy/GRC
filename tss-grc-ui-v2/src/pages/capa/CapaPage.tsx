@@ -1,0 +1,506 @@
+import { useMemo, useState } from 'react';
+import {
+  ListChecks, Hourglass, BarChart3, Network, Workflow,
+  Plus, Search, Send, CheckCheck, Repeat, AlertTriangle,
+  Filter, Download,
+} from 'lucide-react';
+import { Shell } from '../../components/layout/Shell';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { Tabs, type TabItem } from '../../components/ui/Tabs';
+import { Card } from '../../components/ui/Card';
+import { Kpi } from '../../components/ui/Kpi';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { Progress } from '../../components/ui/Progress';
+import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
+import {
+  useCapas, CAPA_STATUS_LABEL, CAPA_STATUS_TONE, CAPA_SEVERITY_TONE,
+  CAPA_FORWARD_TRANSITIONS, agingBucket, daysUntilDue, paretoCauses,
+  effectivenessOverdue,
+  type Capa, type CapaStatus, type RcaMethod, type RootCauseCategory,
+} from '../../lib/capa';
+
+type TabId = 'register' | 'aging' | 'pareto' | 'workflow';
+
+const ROOT_CAUSE_CATS: { id: RootCauseCategory; en: string; ar: string }[] = [
+  { id: 'PEOPLE',     en: 'People',     ar: 'بشري' },
+  { id: 'PROCESS',    en: 'Process',    ar: 'عملية' },
+  { id: 'TECHNOLOGY', en: 'Technology', ar: 'تقنية' },
+  { id: 'POLICY',     en: 'Policy',     ar: 'سياسة' },
+  { id: 'TRAINING',   en: 'Training',   ar: 'تدريب' },
+  { id: 'EXTERNAL',   en: 'External',   ar: 'خارجية' },
+  { id: 'MANAGEMENT', en: 'Management', ar: 'إدارة' },
+  { id: 'UNKNOWN',    en: 'Unknown',    ar: 'غير محدّد' },
+];
+
+export function CapaPage() {
+  const { t, lang } = useI18n();
+  const toast = useToast();
+  const { items, advance } = useCapas();
+  const [tab, setTab] = useState<TabId>('register');
+  const [q, setQ] = useState('');
+  const [filterStatus, setFilterStatus] = useState<CapaStatus | 'ALL'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'CORRECTIVE' | 'PREVENTIVE'>('ALL');
+  const [rcaTarget, setRcaTarget] = useState<Capa | null>(null);
+
+  const filtered = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    return items.filter(c => {
+      if (filterStatus !== 'ALL' && c.status !== filterStatus) return false;
+      if (filterType !== 'ALL' && c.type !== filterType) return false;
+      if (!ql) return true;
+      return (
+        c.code.toLowerCase().includes(ql) ||
+        c.titleEn.toLowerCase().includes(ql) ||
+        (c.titleAr ?? '').toLowerCase().includes(ql) ||
+        c.owner.toLowerCase().includes(ql) ||
+        (c.rootCause ?? '').toLowerCase().includes(ql)
+      );
+    });
+  }, [items, q, filterStatus, filterType]);
+
+  // KPI rollups
+  const open = items.filter(c => c.status !== 'CLOSED' && c.status !== 'CANCELLED');
+  const overdue = open.filter(c => daysUntilDue(c) < 0);
+  const failed = items.filter(c => c.status === 'VERIFICATION_FAILED');
+  const effectivenessDue = items.filter(c => effectivenessOverdue(c));
+  const preventive = items.filter(c => c.type === 'PREVENTIVE');
+
+  const tabs: TabItem<TabId>[] = [
+    { id: 'register', label: t('capaTabRegister') },
+    { id: 'aging',    label: t('capaTabAging') },
+    { id: 'pareto',   label: t('capaTabPareto') },
+    { id: 'workflow', label: t('capaTabWorkflow') },
+  ];
+
+  function quickAdvance(c: Capa) {
+    const allowed = CAPA_FORWARD_TRANSITIONS[c.status];
+    const to = allowed.find(s => s !== 'CANCELLED' && s !== 'VERIFICATION_FAILED');
+    if (!to) {
+      toast.info(t('capaNoTransition'));
+      return;
+    }
+    advance(c.id, to, 'demo.user@tss.sa');
+    toast.success(`${c.code} → ${CAPA_STATUS_LABEL[to][lang === 'ar' ? 'ar' : 'en']}`);
+  }
+
+  return (
+    <Shell title={t('modCapa')} sub={t('capaSub')}>
+      <PageHeader
+        eyebrow={t('modCapa')}
+        title={t('capaTitle')}
+        sub={t('capaPageSub')}
+        actions={<>
+          <Button variant="ghost" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+          <Button variant="ghost" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+          <Button variant="primary" Icon={Plus} onClick={() => toast.info(t('capaNewHint'))}>{t('capaNew')}</Button>
+        </>}
+      />
+
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <Kpi Icon={ListChecks}    label={t('capaKpiOpen')}            value={open.length}                tone="primary" />
+        <Kpi Icon={AlertTriangle} label={t('capaKpiOverdue')}         value={overdue.length}             tone="danger" />
+        <Kpi Icon={Repeat}        label={t('capaKpiVerificationFail')} value={failed.length}             tone="warning" />
+        <Kpi Icon={Hourglass}     label={t('capaKpiEffectiveness')}    value={effectivenessDue.length}   tone="warning" />
+        <Kpi Icon={Workflow}      label={t('capaKpiPreventive')}      value={preventive.length}          tone="info" />
+      </div>
+
+      <Tabs items={tabs} active={tab} onChange={setTab} />
+
+      {tab === 'register' && (
+        <Card title={t('capaTabRegister')} Icon={ListChecks}
+          action={<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', insetInlineStart: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-4)' }} />
+              <input
+                value={q} onChange={e => setQ(e.target.value)}
+                placeholder={t('capaSearchPh')}
+                style={{ paddingInlineStart: 28, paddingInlineEnd: 8, paddingBlock: 6, fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)' }}
+              />
+            </div>
+            <select value={filterType} onChange={e => setFilterType(e.target.value as any)}
+              style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)' }}>
+              <option value="ALL">{t('capaFilterTypeAll')}</option>
+              <option value="CORRECTIVE">{t('capaFilterTypeCA')}</option>
+              <option value="PREVENTIVE">{t('capaFilterTypePA')}</option>
+            </select>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}
+              style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)' }}>
+              <option value="ALL">{t('capaFilterStatusAll')}</option>
+              {(Object.keys(CAPA_STATUS_LABEL) as CapaStatus[]).map(s =>
+                <option key={s} value={s}>{CAPA_STATUS_LABEL[s][lang === 'ar' ? 'ar' : 'en']}</option>)}
+            </select>
+            <Badge tone="primary">{filtered.length}</Badge>
+          </div>}>
+          {filtered.length === 0
+            ? <EmptyState Icon={ListChecks} title={t('capaEmptyTitle')} sub={t('capaEmptyBody')} />
+            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {filtered.map(c => (
+                  <CapaRow key={c.id} c={c} onAdvance={() => quickAdvance(c)} onRca={() => setRcaTarget(c)} />
+                ))}
+              </div>
+          }
+        </Card>
+      )}
+
+      {tab === 'aging' && <AgingTab items={items} />}
+      {tab === 'pareto' && <ParetoTab items={items} />}
+      {tab === 'workflow' && <WorkflowTab items={items} />}
+
+      {rcaTarget && (
+        <RcaModal
+          c={rcaTarget}
+          onClose={() => setRcaTarget(null)}
+        />
+      )}
+    </Shell>
+  );
+}
+
+function CapaRow({ c, onAdvance, onRca }: { c: Capa; onAdvance: () => void; onRca: () => void }) {
+  const { t, lang } = useI18n();
+  const dueIn = daysUntilDue(c);
+  const overdue = dueIn < 0 && c.status !== 'CLOSED' && c.status !== 'CANCELLED';
+  const title = lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn;
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '120px 1fr 100px 90px 110px 130px 1fr 120px',
+      gap: 10,
+      padding: '12px 0',
+      borderBottom: '1px dashed var(--border)',
+      alignItems: 'center',
+    }}>
+      <div>
+        <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)' }}>{c.code}</div>
+        <Badge tone={c.type === 'PREVENTIVE' ? 'info' : 'primary'}>{c.type === 'PREVENTIVE' ? 'PA' : 'CA'}</Badge>
+      </div>
+
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        {c.sourceRecordTitle && (
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+            {t('capaSourceLabel')}: <span style={{ color: 'var(--ink-2)' }}>{c.sourceRecordTitle}</span>
+          </div>
+        )}
+        {c.parentCapaId && (
+          <div style={{ fontSize: 11, color: 'var(--warning-fg)', marginTop: 2 }}>
+            ↑ {t('capaRecurrenceOf')} {c.parentCapaId}
+          </div>
+        )}
+      </div>
+
+      <Badge tone={CAPA_SEVERITY_TONE[c.severity]}>{c.severity}</Badge>
+
+      <Badge tone={CAPA_STATUS_TONE[c.status]} dot>
+        {CAPA_STATUS_LABEL[c.status][lang === 'ar' ? 'ar' : 'en']}
+      </Badge>
+
+      <div>
+        <Progress label={t('capaProgressLabel')} value={c.progressPct} />
+      </div>
+
+      <div>
+        <div className="mono" style={{ fontSize: 12, color: overdue ? 'var(--danger-fg)' : 'var(--ink-2)', fontWeight: overdue ? 700 : 500 }}>
+          {c.dueDate}
+        </div>
+        <div style={{ fontSize: 11, color: overdue ? 'var(--danger-fg)' : 'var(--ink-3)' }}>
+          {overdue ? `${Math.abs(dueIn)}d ${t('capaOverdue')}` : c.status === 'CLOSED' ? t('capaClosed') : `${dueIn}d ${t('capaRemaining')}`}
+        </div>
+      </div>
+
+      <div style={{ minWidth: 0 }}>
+        {c.rcaMethod !== 'NONE' && c.rootCause
+          ? <>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{t('capaRootCauseLabel')} · <Badge tone="neutral">{c.rcaMethod.replace('_', '-')}</Badge></div>
+              <div style={{ fontSize: 12, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.rootCause}</div>
+            </>
+          : <Button variant="ghost" size="sm" Icon={Network} onClick={onRca}>{t('capaStartRca')}</Button>
+        }
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        {c.rcaMethod !== 'NONE' && <Button variant="ghost" size="sm" Icon={Network} onClick={onRca}>{t('capaViewRca')}</Button>}
+        {CAPA_FORWARD_TRANSITIONS[c.status].length > 0 && (c.status !== 'CLOSED') && (
+          <Button variant="primary" size="sm" Icon={Send} onClick={onAdvance}>{t('capaAdvance')}</Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AgingTab({ items }: { items: Capa[] }) {
+  const { t } = useI18n();
+  const buckets: Record<string, Capa[]> = { OVERDUE: [], '0-30': [], '31-60': [], '61-90': [], '90+': [] };
+  for (const c of items) {
+    const b = agingBucket(c);
+    if (b === 'CLOSED') continue;
+    buckets[b].push(c);
+  }
+  const order: Array<keyof typeof buckets> = ['OVERDUE', '0-30', '31-60', '61-90', '90+'];
+  return (
+    <Card title={t('capaTabAging')} Icon={Hourglass}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+        {order.map(b => (
+          <div key={b} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', padding: 12, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Badge tone={b === 'OVERDUE' ? 'danger' : b === '90+' ? 'warning' : b === '61-90' ? 'warning' : b === '31-60' ? 'info' : 'success'}>
+                {b === 'OVERDUE' ? t('capaAgingOverdue') : `${b} ${t('capaDaysSuffix')}`}
+              </Badge>
+              <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink-1)' }}>{buckets[b].length}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {buckets[b].map(c => (
+                <div key={c.id} style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  <span className="mono" style={{ color: 'var(--ink-2)', fontWeight: 600 }}>{c.code}</span> · {c.severity}
+                </div>
+              ))}
+              {buckets[b].length === 0 && <span style={{ fontSize: 11, color: 'var(--ink-4)', fontStyle: 'italic' }}>—</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function ParetoTab({ items }: { items: Capa[] }) {
+  const { t, lang } = useI18n();
+  const withCause = items.filter(c => c.rootCauseCategory);
+  const top = paretoCauses(withCause, 8);
+  const max = top[0]?.count ?? 1;
+
+  return (
+    <Card title={t('capaTabPareto')} Icon={BarChart3}
+      action={<Badge tone="primary">{withCause.length} {t('capaParetoCausedTotal')}</Badge>}>
+      {top.length === 0
+        ? <EmptyState Icon={BarChart3} title={t('capaParetoEmpty')} sub={t('capaParetoEmptyBody')} />
+        : <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 8 }}>
+            {top.map(row => {
+              const cat = ROOT_CAUSE_CATS.find(c => c.id === row.category);
+              return (
+                <div key={row.category} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 80px', gap: 10, alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                    {cat ? (lang === 'ar' ? cat.ar : cat.en) : row.category}
+                  </div>
+                  <div style={{ height: 18, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${(row.count / max) * 100}%`,
+                      background: 'var(--primary)',
+                      transition: 'width 200ms',
+                    }} />
+                  </div>
+                  <div className="mono" style={{ fontSize: 12, fontWeight: 700, textAlign: 'end' }}>{row.count} ({row.pct}%)</div>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, padding: 8, borderTop: '1px solid var(--border)' }}>
+              {t('capaParetoFootnote')}
+            </div>
+          </div>
+      }
+    </Card>
+  );
+}
+
+function WorkflowTab({ items }: { items: Capa[] }) {
+  const { t, lang } = useI18n();
+  const stages: CapaStatus[] = ['IDENTIFIED','IMPLEMENTING','OWNER_TESTED','INDEPENDENT_TESTED','AUDIT_SIGNED_OFF','CLOSED'];
+
+  return (
+    <Card title={t('capaTabWorkflow')} Icon={Workflow}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, 1fr)`, gap: 8 }}>
+        {stages.map(s => {
+          const lane = items.filter(c => c.status === s);
+          return (
+            <div key={s} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', padding: 10, border: '1px solid var(--border)', minHeight: 200 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Badge tone={CAPA_STATUS_TONE[s]} dot>{CAPA_STATUS_LABEL[s][lang === 'ar' ? 'ar' : 'en']}</Badge>
+                <span className="mono" style={{ fontSize: 12, fontWeight: 700 }}>{lane.length}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {lane.map(c => (
+                  <div key={c.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: 8 }}>
+                    <div className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-3)' }}>{c.code}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-1)', marginTop: 2, lineHeight: 1.3 }}>
+                      {(lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn).slice(0, 60)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                      <Badge tone={CAPA_SEVERITY_TONE[c.severity]}>{c.severity}</Badge>
+                      <Badge tone={c.type === 'PREVENTIVE' ? 'info' : 'neutral'}>{c.type === 'PREVENTIVE' ? 'PA' : 'CA'}</Badge>
+                    </div>
+                  </div>
+                ))}
+                {lane.length === 0 && <div style={{ fontSize: 11, color: 'var(--ink-4)', fontStyle: 'italic' }}>—</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12 }}>
+        {t('capaWorkflowFootnote')}
+      </div>
+    </Card>
+  );
+}
+
+// ── RCA wizard modal ──────────────────────────────────────────────────
+// Read + edit a CAPA's root-cause analysis. Demo mode: shows the seeded
+// FIVE_WHYS / FISHBONE / PARETO content. New CAPAs can pick a method
+// and capture answers; the captured RCA is persisted via useCapas.update.
+
+function RcaModal({ c, onClose }: { c: Capa; onClose: () => void }) {
+  const { t, lang } = useI18n();
+  const toast = useToast();
+  const { update } = useCapas();
+  const [method, setMethod] = useState<RcaMethod>(c.rcaMethod);
+  const [steps, setSteps] = useState<string[]>(c.rcaSteps.length ? c.rcaSteps : initialStepsFor(method));
+  const [rootCause, setRootCause] = useState(c.rootCause ?? '');
+  const [category, setCategory] = useState<RootCauseCategory>(c.rootCauseCategory ?? 'PROCESS');
+
+  function initialStepsFor(m: RcaMethod): string[] {
+    if (m === 'FIVE_WHYS') return ['', '', '', '', ''];
+    if (m === 'FISHBONE') return ['', '', '', '', '', ''];
+    if (m === 'PARETO') return [''];
+    return [];
+  }
+
+  function setMethodAndSeed(m: RcaMethod) {
+    setMethod(m);
+    setSteps(prev => prev.length ? prev : initialStepsFor(m));
+  }
+
+  function save() {
+    update(c.id, {
+      rcaMethod: method,
+      rcaSteps: steps,
+      rootCause: rootCause.trim(),
+      rootCauseCategory: category,
+    });
+    toast.success(t('capaRcaSaved'));
+    onClose();
+  }
+
+  const fishboneLabels = ['People', 'Process', 'Technology', 'Materials', 'Environment', 'Management'];
+  const fishboneLabelsAr = ['بشري', 'عملية', 'تقنية', 'مواد', 'بيئة', 'إدارة'];
+
+  return (
+    <Modal open onClose={onClose} title={`${c.code} — ${t('capaRcaTitle')}`} size="lg"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
+        <Button variant="primary" Icon={CheckCheck} onClick={save}>{t('actionSave')}</Button>
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 'var(--r-sm)' }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('capaSubject')}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginTop: 4 }}>
+            {lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>
+            {lang === 'ar' && c.descriptionAr ? c.descriptionAr : c.descriptionEn}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaMethod')}</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['FIVE_WHYS', 'FISHBONE', 'PARETO', 'NONE'] as RcaMethod[]).map(m => (
+              <button key={m} onClick={() => setMethodAndSeed(m)}
+                style={{
+                  padding: '6px 10px', fontSize: 12,
+                  borderRadius: 'var(--r-sm)',
+                  border: method === m ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  background: method === m ? 'var(--primary-50)' : 'var(--surface-2)',
+                  color: method === m ? 'var(--primary)' : 'var(--ink-2)',
+                  cursor: 'pointer',
+                  fontWeight: method === m ? 600 : 500,
+                }}>
+                {m === 'FIVE_WHYS' ? t('capaRcaFiveWhys') :
+                 m === 'FISHBONE' ? t('capaRcaFishbone') :
+                 m === 'PARETO' ? t('capaRcaPareto') : t('capaRcaNone')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {method === 'FIVE_WHYS' && (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaFiveWhys')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {steps.slice(0, 5).map((s, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: 8, alignItems: 'center' }}>
+                  <Badge tone="primary">{t('capaRcaWhy')} {i + 1}</Badge>
+                  <input value={s} onChange={e => setSteps(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                    placeholder={t('capaRcaWhyPh')}
+                    style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {method === 'FISHBONE' && (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaFishbone')} (6M)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {fishboneLabels.map((label, i) => (
+                <div key={i}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 4 }}>
+                    {lang === 'ar' ? fishboneLabelsAr[i] : label}
+                  </div>
+                  <input value={steps[i] ?? ''} onChange={e => setSteps(prev => {
+                      const next = [...prev]; while (next.length < 6) next.push(''); next[i] = e.target.value; return next;
+                    })}
+                    placeholder={t('capaRcaFishbonePh')}
+                    style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {method === 'PARETO' && (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaPareto')}</div>
+            <textarea value={steps.join('\n')} onChange={e => setSteps(e.target.value.split('\n'))}
+              placeholder={t('capaRcaParetoPh')}
+              rows={6}
+              style={{ padding: 8, fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%', resize: 'vertical' }} />
+          </div>
+        )}
+
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRootCauseLabel')}</div>
+          <input value={rootCause} onChange={e => setRootCause(e.target.value)}
+            placeholder={t('capaRootCausePh')}
+            style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaCategory')}</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {ROOT_CAUSE_CATS.filter(c => c.id !== 'UNKNOWN').map(cat => (
+              <button key={cat.id} onClick={() => setCategory(cat.id)}
+                style={{
+                  padding: '4px 10px', fontSize: 11,
+                  borderRadius: 'var(--r-sm)',
+                  border: category === cat.id ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  background: category === cat.id ? 'var(--primary-50)' : 'var(--surface-2)',
+                  color: category === cat.id ? 'var(--primary)' : 'var(--ink-2)',
+                  cursor: 'pointer',
+                  fontWeight: category === cat.id ? 600 : 500,
+                }}>
+                {lang === 'ar' ? cat.ar : cat.en}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}

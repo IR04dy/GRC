@@ -31,6 +31,7 @@ import { AuthoritiesIndexPage } from './pages/authority/AuthoritiesIndexPage';
 import { AuditWorkspacePage } from './pages/audit/AuditWorkspacePage';
 import { EngagementDetailPage } from './pages/audit/EngagementDetailPage';
 import { CommunicationsPage } from './pages/comms/CommunicationsPage';
+import { CapaPage } from './pages/capa/CapaPage';
 
 export function App() {
   return (
@@ -79,6 +80,9 @@ export function App() {
 
               {/* Communications + Stakeholder workspace (DD-22..26) */}
               <Route path="/communications"     element={<CommunicationsPage />} />
+
+              {/* CAPA register (DD-42) */}
+              <Route path="/capa"               element={<CapaPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />
