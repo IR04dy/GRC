@@ -1884,6 +1884,18 @@ export const ar = {
   // DD-64
   overviewStripShow:           'إظهار النظرة العامة',
   overviewStripHide:           'إخفاء النظرة العامة',
+  // DD-65
+  processDetailReference:      'المعيار / الجهة التنظيمية',
+  processDetailSteward:        'المسؤول',
+  processDetailSla:            'الموعد النظامي',
+  processDetailStages:         'مراحل دورة الحياة',
+  processDetailActive:         'قيد التنفيذ',
+  processDetailOverdue:        'متأخر / مخالف للموعد',
+  processDetailOpenRegister:   'فتح السجل',
+  processDetailHowToUse:       'كيفية استخدام هذه العملية',
+  processDetailStartExplain:   'يبدأ سير عمل جديد لـ "{name}" بالمراحل الموضحة أعلاه. في الوضع التجريبي يُعرَض تنبيه يشير إلى نموذج الاستلام المعني.',
+  processDetailRegisterExplain:'ينقلك إلى السجل المُصفّى لترى كل سجل يتحرّك حالياً عبر هذه العملية.',
+  processDetailStartHint:      'استلام / معالج "{name}" مُسجَّل في الكتالوج — ربطه بنموذج حقيقي سيُنفَّذ في DD-66.',
   complianceProcessBarTitle:   'الامتثال والمراجعة — العمليات ودورات الحياة',
   complianceProcessBarSub:     'ISO 19011 وIIA وCOSO IC وSOX 404 — كل عملية مُسمّاة فعّالة في هذا النطاق.',
   compliancePostureTitle:      'الموقف التنظيمي · جميع الجهات',

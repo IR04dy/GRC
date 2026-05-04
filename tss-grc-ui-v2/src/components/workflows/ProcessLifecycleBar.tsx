@@ -1,8 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { Workflow, Play } from 'lucide-react';
 import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Card } from '../ui/Card';
+import { ProcessDetailModal } from './ProcessDetailModal';
 
 /**
  * ProcessAction — a single click target on a process tile.
@@ -105,7 +107,7 @@ export function ProcessLifecycleBar({
 
 /** Tight one-line chip used by the compact / collapsed bar. */
 function ProcessChip({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
-  const navigate = useNavigate();
+  const [detailOpen, setDetailOpen] = useState(false);
   const { Icon } = lc;
   const overdue = lc.overdueCount;
   const stripe =
@@ -116,14 +118,19 @@ function ProcessChip({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   const label = lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name;
   const primaryLabel = lang === 'ar' && lc.primary.labelAr ? lc.primary.labelAr : lc.primary.label;
 
+  // Click opens the process-detail modal so the user sees the lifecycle
+  // stages, regulatory anchor, steward, SLA and a primary "Start" button
+  // — rather than just navigating to a tab. Modelled on ServiceNow IRM
+  // "Process Details" pop-out.
   const trigger = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault();
     if (lc.primary.disabled) return;
-    if (lc.primary.onClick) lc.primary.onClick();
-    else if (lc.primary.href) navigate(lc.primary.href);
+    setDetailOpen(true);
   };
 
   return (
+    <>
+    {detailOpen && <ProcessDetailModal lc={lc} onClose={() => setDetailOpen(false)} />}
     <button type="button"
       onClick={trigger}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') trigger(e); }}
@@ -177,10 +184,12 @@ function ProcessChip({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
         }}>{overdue}!</span>
       )}
     </button>
+    </>
   );
 }
 
 function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
+  const [detailOpen, setDetailOpen] = useState(false);
   const { Icon } = lc;
   const overdue = lc.overdueCount;
   const active  = lc.activeCount;
@@ -199,8 +208,16 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   ].filter(Boolean).join(' · ');
 
   return (
+    <>
+    {detailOpen && <ProcessDetailModal lc={lc} onClose={() => setDetailOpen(false)} />}
     <div
       title={tooltip}
+      onClick={(e) => {
+        // Click anywhere on the tile (except inside the action buttons) opens the detail modal.
+        const target = e.target as HTMLElement;
+        if (target.closest('button, a')) return;
+        setDetailOpen(true);
+      }}
       style={{
         display: 'grid',
         gridTemplateColumns: '4px 36px 1fr auto auto',
@@ -211,6 +228,7 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
         border: '1px solid var(--border)',
         background: 'var(--surface-1)',
         overflow: 'hidden',
+        cursor: 'pointer',
         transition: 'box-shadow var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard)',
       }}
       onMouseEnter={(e) => {
@@ -284,6 +302,7 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
         {lc.secondary && <SecondaryButton action={lc.secondary} lang={lang} />}
       </div>
     </div>
+    </>
   );
 }
 

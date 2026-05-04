@@ -1894,6 +1894,18 @@ export const en = {
   // DD-64: middle-bar consistency fixes
   overviewStripShow:           'Show overview',
   overviewStripHide:           'Hide overview',
+  // DD-65: process detail modal
+  processDetailReference:      'Standard / regulator',
+  processDetailSteward:        'Steward',
+  processDetailSla:            'SLA',
+  processDetailStages:         'Lifecycle stages',
+  processDetailActive:         'In flight',
+  processDetailOverdue:        'Overdue / SLA-breached',
+  processDetailOpenRegister:   'Open register',
+  processDetailHowToUse:       'How to use this process',
+  processDetailStartExplain:   'Kicks off a new "{name}" workflow with the canonical stages above. In demo mode this surfaces a hint pointing at the relevant intake form.',
+  processDetailRegisterExplain:'Jumps to the filtered register so you can see every record currently moving through this process.',
+  processDetailStartHint:      'The "{name}" intake / wizard is registered in the catalog — wiring it to a live form ships in DD-66.',
   complianceProcessBarTitle:   'Compliance & Audit — Processes & Lifecycles',
   complianceProcessBarSub:     'ISO 19011 + IIA + COSO IC + SOX 404 — every named process active in this domain.',
   compliancePostureTitle:      'Regulator Posture · All Authorities',
