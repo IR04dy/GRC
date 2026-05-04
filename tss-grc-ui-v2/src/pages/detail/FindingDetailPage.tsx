@@ -17,8 +17,9 @@ import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { FINDING_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 import { FINDING_EVIDENCE_BY_ID, FINDING_HISTORY_BY_ID } from '../compliance/mockCompliance';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 
-type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history';
+type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history' | 'comms';
 
 const CAPA_STAGE_TONE: Record<string, BadgeTone> = {
   IDENTIFIED: 'neutral', IMPLEMENTING: 'info', OWNER_TESTED: 'primary',
@@ -59,6 +60,7 @@ export function FindingDetailPage() {
     { id: 'evidence', label: t('detailTabEvidence') },
     { id: 'links',    label: t('detailTabLinks') },
     { id: 'history',  label: t('detailTabHistory') },
+    { id: 'comms',    label: t('detailTabComms') },
   ];
 
   const stage = item.capaStage ?? 'IDENTIFIED';
@@ -189,6 +191,15 @@ export function FindingDetailPage() {
                 ))}
               </div>}
         </Card>
+      )}
+
+      {tab === 'comms' && (
+        <CommsPanel
+          module="AUDIT"
+          eventKind={item.severity === 'CRITICAL' || item.severity === 'HIGH' ? 'AUDIT_CRITICAL_FINDING' : undefined}
+          severity={item.severity as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'}
+          eventDetectedAt={item.dueDate ? `${item.dueDate}T00:00:00` : undefined}
+          recordKey={`AUDIT_FINDING:${item.id}`} />
       )}
         </>}
       />

@@ -657,6 +657,7 @@ export const en = {
   detailTabKris:              'KRIs',
   detailTabLinks:             'Links',
   detailTabHistory:           'History',
+  detailTabComms:             'Stakeholders & Comms',
   detailTabCapa:              'CAPA',
   detailTabEvidence:          'Evidence',
   detailTabSubControls:       'Sub-Controls',

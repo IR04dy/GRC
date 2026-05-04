@@ -649,6 +649,7 @@ export const ar = {
   detailTabKris:              'مؤشرات الخطر',
   detailTabLinks:             'الروابط',
   detailTabHistory:           'السجل',
+  detailTabComms:             'أصحاب المصلحة والاتصالات',
   detailTabCapa:              'CAPA',
   detailTabEvidence:          'الأدلة',
   detailTabSubControls:       'الضوابط الفرعية',

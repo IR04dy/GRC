@@ -17,8 +17,9 @@ import {
 } from '../compliance/mockCompliance';
 import { EVIDENCE } from '../evidence/mockEvidence';
 import { useI18n } from '../../lib/i18n';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 
-type TabId = 'timeline' | 'scope' | 'findings' | 'workpapers';
+type TabId = 'timeline' | 'scope' | 'findings' | 'workpapers' | 'comms';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   PLANNED: 'info', FIELDWORK: 'warning', REPORT_ISSUED: 'accent',
@@ -75,6 +76,7 @@ export function EngagementDetailPage() {
     { id: 'scope',      label: t('engTabScope') },
     { id: 'findings',   label: `${t('engTabFindings')} (${findings.length})` },
     { id: 'workpapers', label: `${t('engTabWorkpapers')} (${evidence.length})` },
+    { id: 'comms',      label: t('detailTabComms') },
   ];
 
   return (
@@ -242,6 +244,10 @@ export function EngagementDetailPage() {
                     ))}
                   </div>}
             </Card>
+          )}
+
+          {tab === 'comms' && (
+            <CommsPanel module="AUDIT" />
           )}
         </>}
       />

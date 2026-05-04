@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { AlertTriangle, Activity, ListChecks, MessageSquare, Link2, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw } from 'lucide-react';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
@@ -21,7 +22,7 @@ import {
 } from './mockRisks';
 import { EmptyState } from '../../components/ui/EmptyState';
 
-type TabId = 'overview' | 'assessments' | 'treatments' | 'kris' | 'links' | 'history';
+type TabId = 'overview' | 'assessments' | 'treatments' | 'kris' | 'links' | 'history' | 'comms';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   OPEN: 'danger', UNDER_ASSESSMENT: 'warning', TREATMENT_IN_PROGRESS: 'info',
@@ -75,6 +76,7 @@ export function RiskDetailPage() {
     { id: 'kris',        label: t('detailTabKris') },
     { id: 'links',       label: t('detailTabLinks') },
     { id: 'history',     label: t('detailTabHistory') },
+    { id: 'comms',       label: t('detailTabComms') },
   ];
 
   return (
@@ -268,6 +270,15 @@ export function RiskDetailPage() {
                 ))}
               </div>}
         </Card>
+      )}
+
+      {tab === 'comms' && (
+        <CommsPanel
+          module="RISK"
+          eventKind={risk.riskLevel === 'CRITICAL' ? 'BOARD_RISK_ESCALATION' : undefined}
+          severity={(risk.riskLevel as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL') ?? undefined}
+          eventDetectedAt={risk.identifiedDate ? `${risk.identifiedDate}T09:00:00` : undefined}
+          recordKey={`RISK:${risk.id}`} />
       )}
         </>}
       />
