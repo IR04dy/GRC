@@ -194,7 +194,7 @@ export function IncidentsPage() {
   const isDemo = incidents.isDemo;
 
   return (
-    <Shell title="Incidents" sub="Detection · Triage · Containment · Recovery">
+    <Shell title={t('incidentsTitleHeader')} sub={t('incidentsSub')}>
       <PageHeader
         eyebrow={t('incidentsEyebrow')} title={t('incidentsTitle')} sub={t('incidentsSub')}
         actions={
@@ -215,10 +215,10 @@ export function IncidentsPage() {
 
       <OverviewStrip
         storageKey="overview.incidents"
-        processBarTitle="Incident Management — Processes & Lifecycles"
-        processBarSubtitle="NIST SP 800-61 + ISO 27035 + Saudi regulator (NCA HEY 24-hr / SDA 72-hr / CITC 24-hr) — every named process active in this domain."
+        processBarTitle={t('incidentsProcessBarTitle')}
+        processBarSubtitle={t('incidentsProcessBarSub')}
         lifecycles={INCIDENT_LIFECYCLES}
-        postureTitle="Regulator Posture · Incident Management"
+        postureTitle={t('incidentsPostureTitle')}
         anchors={INCIDENT_ANCHORS}
         lang="en" />
 
@@ -226,20 +226,20 @@ export function IncidentsPage() {
 
       {tab === 'overview' && (
         <div className="dash-grid">
-          <Card title={t('incidentsKpiOpen')} Icon={BarChart3} action={<Badge tone="primary">By severity</Badge>}>
+          <Card title={t('incidentsKpiOpen')} Icon={BarChart3} action={<Badge tone="primary">{t('incidentsCardBySeverity')}</Badge>}>
             <BarChart3D items={[
-              { label: 'Critical', value: incidents.data.filter(i => i.severity === 'CRITICAL').length, color: 'var(--danger)', shade: '#7E2A25' },
-              { label: 'High',     value: incidents.data.filter(i => i.severity === 'HIGH').length,     color: 'var(--cat-6)',  shade: '#5C3220' },
-              { label: 'Medium',   value: incidents.data.filter(i => i.severity === 'MEDIUM').length,   color: 'var(--cat-2)',  shade: '#7A5612' },
-              { label: 'Low',      value: incidents.data.filter(i => i.severity === 'LOW').length,      color: 'var(--cat-3)',  shade: '#324754' },
+              { label: t('sevCritical'), value: incidents.data.filter(i => i.severity === 'CRITICAL').length, color: 'var(--danger)', shade: '#7E2A25' },
+              { label: t('sevHigh'),     value: incidents.data.filter(i => i.severity === 'HIGH').length,     color: 'var(--cat-6)',  shade: '#5C3220' },
+              { label: t('sevMedium'),   value: incidents.data.filter(i => i.severity === 'MEDIUM').length,   color: 'var(--cat-2)',  shade: '#7A5612' },
+              { label: t('sevLow'),      value: incidents.data.filter(i => i.severity === 'LOW').length,      color: 'var(--cat-3)',  shade: '#324754' },
             ]} />
           </Card>
-          <Card title="By Category" Icon={Activity}>
+          <Card title={t('incidentsCardByCategory')} Icon={Activity}>
             <BarChart3D items={[
-              { label: 'Cyber',    value: incidents.data.filter(i => i.category === 'CYBER').length,    color: 'var(--cat-1)', shade: '#062E2E' },
-              { label: 'Privacy',  value: incidents.data.filter(i => i.category === 'PRIVACY').length,  color: 'var(--cat-4)', shade: '#522F45' },
-              { label: 'Ops',      value: incidents.data.filter(i => i.category === 'OPS').length,      color: 'var(--cat-2)', shade: '#7A5612' },
-              { label: 'Physical', value: incidents.data.filter(i => i.category === 'PHYSICAL').length, color: 'var(--cat-3)', shade: '#324754' },
+              { label: t('incidentsCatCyber'),    value: incidents.data.filter(i => i.category === 'CYBER').length,    color: 'var(--cat-1)', shade: '#062E2E' },
+              { label: t('incidentsCatPrivacy'),  value: incidents.data.filter(i => i.category === 'PRIVACY').length,  color: 'var(--cat-4)', shade: '#522F45' },
+              { label: t('incidentsCatOps'),      value: incidents.data.filter(i => i.category === 'OPS').length,      color: 'var(--cat-2)', shade: '#7A5612' },
+              { label: t('incidentsCatPhysical'), value: incidents.data.filter(i => i.category === 'PHYSICAL').length, color: 'var(--cat-3)', shade: '#324754' },
             ]} />
           </Card>
         </div>
@@ -250,17 +250,17 @@ export function IncidentsPage() {
         </Card>
       )}
       {tab === 'timeline' && (
-        <Card title="Recent Activity" Icon={Activity} action={<Badge tone="primary">Last 12</Badge>}>
+        <Card title={t('incidentsCardTimeline')} Icon={Activity} action={<Badge tone="primary">{t('incidentsBadgeLast12')}</Badge>}>
           {timelineEvents.length === 0
-            ? <EmptyState Icon={Activity} title="No incidents yet" sub="Recent incidents will form a chronological timeline here." />
+            ? <EmptyState Icon={Activity} title={t('incidentsEmptyTitle')} sub={t('incidentsEmptySub')} />
             : <Timeline events={timelineEvents} />}
         </Card>
       )}
       {tab === 'lessons' && (
         <div className="dash-grid">
-          <Card title="Lessons Learned" Icon={Lightbulb} action={<Badge tone="primary">{lessons.length} closed</Badge>}>
+          <Card title={t('incidentsCardLessons')} Icon={Lightbulb} action={<Badge tone="primary">{lessons.length} {t('incidentsLessonsClosed')}</Badge>}>
             {lessons.length === 0
-              ? <EmptyState Icon={Lightbulb} title="No closed incidents yet" sub="Once incidents close, lessons feed back into preventive controls." />
+              ? <EmptyState Icon={Lightbulb} title={t('incidentsLessonsEmpty')} sub={t('incidentsLessonsEmptySub')} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {lessons.map(l => (
                     <div key={l.id} style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
@@ -273,7 +273,7 @@ export function IncidentsPage() {
                   ))}
                 </div>}
           </Card>
-          <Card title="CAPA Themes (90d)" Icon={FileText}>
+          <Card title={t('incidentsCardCapa')} Icon={FileText}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
               {[
                 { theme: 'Phishing simulation cadence',  count: 7 },

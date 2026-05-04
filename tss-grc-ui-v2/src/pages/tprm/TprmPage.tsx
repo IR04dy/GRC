@@ -113,7 +113,8 @@ export function TprmPage() {
   }
 
   const sampleAssessments = vendors.data.slice(0, 6).map((v, i) => ({
-    id: v.id, vendor: v.vendorName, type: i % 2 === 0 ? 'Annual Renewal' : 'Onboarding',
+    id: v.id, vendor: v.vendorName,
+    type: i % 2 === 0 ? t('tprmAssessTypeAnnual') : t('tprmAssessTypeOnboarding'),
     score: Math.max(20, 92 - (i * 8) - (v.riskRating === 'CRITICAL' ? 30 : 0)),
     next: new Date(Date.now() + (60 + i * 30) * 86400_000).toISOString().slice(0, 10),
   }));
@@ -148,10 +149,10 @@ export function TprmPage() {
 
       <OverviewStrip
         storageKey="overview.tprm"
-        processBarTitle="Third-Party Risk — Processes & Lifecycles"
-        processBarSubtitle="NIST SP 800-161 + ISO 27036 + OCC 2013-29 — every named process active in this domain."
+        processBarTitle={t('tprmProcessBarTitle')}
+        processBarSubtitle={t('tprmProcessBarSub')}
         lifecycles={TPRM_LIFECYCLES}
-        postureTitle="Regulator Posture · Third-Party Risk"
+        postureTitle={t('tprmPostureTitle')}
         anchors={TPRM_ANCHORS}
         lang="en" />
 
@@ -159,20 +160,20 @@ export function TprmPage() {
 
       {tab === 'overview' && (
         <div className="dash-grid">
-          <Card title="Vendors by Risk" Icon={BarChart3}>
+          <Card title={t('tprmCardByRisk')} Icon={BarChart3}>
             <BarChart3D items={[
-              { label: 'Critical', value: vendors.data.filter(v => v.riskRating === 'CRITICAL').length, color: 'var(--danger)', shade: '#7E2A25' },
-              { label: 'High',     value: vendors.data.filter(v => v.riskRating === 'HIGH').length,     color: 'var(--cat-2)',  shade: '#7A5612' },
-              { label: 'Medium',   value: vendors.data.filter(v => v.riskRating === 'MEDIUM').length,   color: 'var(--primary)',shade: '#062E2E' },
-              { label: 'Low',      value: vendors.data.filter(v => v.riskRating === 'LOW').length,      color: 'var(--cat-3)',  shade: '#324754' },
+              { label: t('sevCritical'), value: vendors.data.filter(v => v.riskRating === 'CRITICAL').length, color: 'var(--danger)', shade: '#7E2A25' },
+              { label: t('sevHigh'),     value: vendors.data.filter(v => v.riskRating === 'HIGH').length,     color: 'var(--cat-2)',  shade: '#7A5612' },
+              { label: t('sevMedium'),   value: vendors.data.filter(v => v.riskRating === 'MEDIUM').length,   color: 'var(--primary)',shade: '#062E2E' },
+              { label: t('sevLow'),      value: vendors.data.filter(v => v.riskRating === 'LOW').length,      color: 'var(--cat-3)',  shade: '#324754' },
             ]} />
           </Card>
-          <Card title="Status Distribution" Icon={AlertTriangle}>
+          <Card title={t('tprmCardByStatus')} Icon={AlertTriangle}>
             <BarChart3D items={[
-              { label: 'Active',   value: vendors.data.filter(v => v.status === 'ACTIVE').length,       color: 'var(--success)', shade: '#23522F' },
-              { label: 'Review',   value: vendors.data.filter(v => v.status === 'UNDER_REVIEW').length, color: 'var(--cat-2)',   shade: '#7A5612' },
-              { label: 'Pending',  value: vendors.data.filter(v => v.status === 'PENDING').length,      color: 'var(--cat-6)',   shade: '#5C3220' },
-              { label: 'Closed',   value: vendors.data.filter(v => v.status === 'CLOSED').length,       color: 'var(--ink-4)',   shade: '#3F4A50' },
+              { label: t('statActive'),  value: vendors.data.filter(v => v.status === 'ACTIVE').length,       color: 'var(--success)', shade: '#23522F' },
+              { label: t('statReview'),  value: vendors.data.filter(v => v.status === 'UNDER_REVIEW').length, color: 'var(--cat-2)',   shade: '#7A5612' },
+              { label: t('statPending'), value: vendors.data.filter(v => v.status === 'PENDING').length,      color: 'var(--cat-6)',   shade: '#5C3220' },
+              { label: t('statClosed'),  value: vendors.data.filter(v => v.status === 'CLOSED').length,       color: 'var(--ink-4)',   shade: '#3F4A50' },
             ]} />
           </Card>
         </div>
@@ -185,22 +186,22 @@ export function TprmPage() {
       {tab === 'assessments' && (
         <Card padded={false}>
           {sampleAssessments.length === 0
-            ? <EmptyState Icon={FileText} title="No assessments" sub="Vendor assessments populate as you complete due-diligence questionnaires." />
+            ? <EmptyState Icon={FileText} title={t('tprmAssessmentsEmpty')} sub={t('tprmAssessmentsEmptySub')} />
             : <DataTable
                 columns={[
-                  { header: 'Vendor',  cell: (r: { vendor: string }) => <span style={{ fontWeight: 600 }}>{r.vendor}</span> },
-                  { header: 'Type',    cell: (r: { type: string }) => <Badge tone="info">{r.type}</Badge> },
-                  { header: 'Score',   cell: (r: { score: number }) => <ScorePill score={r.score} /> },
-                  { header: 'Next',    cell: (r: { next: string }) => r.next, mono: true },
+                  { header: t('colVendor'),         cell: (r: { vendor: string }) => <span style={{ fontWeight: 600 }}>{r.vendor}</span> },
+                  { header: t('tprmAssessColType'), cell: (r: { type: string }) => <Badge tone="info">{r.type}</Badge> },
+                  { header: t('tprmAssessColScore'),cell: (r: { score: number }) => <ScorePill score={r.score} /> },
+                  { header: t('tprmAssessColNext'), cell: (r: { next: string }) => r.next, mono: true },
                 ]}
                 rows={sampleAssessments} />}
         </Card>
       )}
       {tab === 'contracts' && (
         <div className="dash-grid">
-          <Card title="Contracts Expiring" Icon={CalendarClock} action={<Badge tone="warning">Next 90 days</Badge>}>
+          <Card title={t('tprmCardContractsExpiring')} Icon={CalendarClock} action={<Badge tone="warning">{t('tprmContractsBadgeWindow')}</Badge>}>
             {expiringContracts.length === 0
-              ? <EmptyState Icon={CalendarClock} title="No upcoming contract renewals" sub="Contracts due in the next 90 days surface here." />
+              ? <EmptyState Icon={CalendarClock} title={t('tprmContractsEmpty')} sub={t('tprmContractsEmptySub')} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {expiringContracts.map(c => {
                     const dueTone = c.days <= 30 ? 'danger' : c.days <= 90 ? 'warning' : 'info';
@@ -208,16 +209,16 @@ export function TprmPage() {
                       <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center', padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{c.vendor}</div>
-                          <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>Ends {c.end}</div>
+                          <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{t('tprmContractsEnds')} {c.end}</div>
                         </div>
                         <Badge tone={RISK_TONE[c.risk]}>{c.risk}</Badge>
-                        <Badge tone={dueTone}>{c.days < 0 ? `${-c.days}d ago` : `${c.days}d`}</Badge>
+                        <Badge tone={dueTone}>{c.days < 0 ? `${-c.days}${t('tprmContractsDaysAgo')}` : `${c.days}${t('tprmContractsDays')}`}</Badge>
                       </div>
                     );
                   })}
                 </div>}
           </Card>
-          <Card title="Contract Health" Icon={FileText}>
+          <Card title={t('tprmCardContractHealth')} Icon={FileText}>
             <div style={{ height: 8 }} />
           </Card>
         </div>
@@ -225,7 +226,7 @@ export function TprmPage() {
       {tab === 'workflows' && <ActiveWorkflowsPanel
         workflows={TPRM_WORKFLOWS}
         title={t('tprmTabWorkflows') ?? 'Workflows'}
-        sub="Vendor onboarding, periodic re-assessment and contract renewal."
+        sub={t('tprmWorkflowsSub')}
         t={t} />}
 
       <FormModal<TprmVendorRequest>
@@ -238,9 +239,9 @@ export function TprmPage() {
       />
       <ConfirmDialog
         open={!!confirmDel} destructive busy={busy}
-        title="Delete this vendor?"
-        message={confirmDel ? `Vendor "${confirmDel.vendorName}" will be removed. This cannot be undone.` : ''}
-        confirmLabel="Delete"
+        title={t('tprmConfirmDeleteTitle')}
+        message={confirmDel ? `"${confirmDel.vendorName}" — ${t('tprmConfirmDeleteSuffix')}` : ''}
+        confirmLabel={t('tprmConfirmDeleteCta')}
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
       />
     </Shell>

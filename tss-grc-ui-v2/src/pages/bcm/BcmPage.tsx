@@ -394,10 +394,10 @@ export function BcmPage() {
 
       <OverviewStrip
         storageKey="overview.bcm"
-        processBarTitle="Business Continuity — Processes & Lifecycles"
-        processBarSubtitle="ISO 22301 + ISO 22313 + ISO 22361 — every named process active in this domain."
+        processBarTitle={t('bcmProcessBarTitle')}
+        processBarSubtitle={t('bcmProcessBarSub')}
         lifecycles={BCM_LIFECYCLES}
-        postureTitle="Regulator Posture · Business Continuity"
+        postureTitle={t('bcmPostureTitle')}
         anchors={BCM_ANCHORS}
         lang="en" />
 
@@ -406,9 +406,9 @@ export function BcmPage() {
       {tab === 'overview' && (
         <div className="dash-grid">
           <Card title={t('bcmKpiPlans')} Icon={BarChart3}>
-            <Progress label="Approved"  value={Math.round(plans.data.filter(p => p.status === 'APPROVED').length / Math.max(1, plans.data.length) * 100)} tone="success" />
-            <Progress label="In Review" value={Math.round(plans.data.filter(p => p.status === 'UNDER_REVIEW').length / Math.max(1, plans.data.length) * 100)} tone="accent" />
-            <Progress label="Draft"     value={Math.round(plans.data.filter(p => p.status === 'DRAFT').length / Math.max(1, plans.data.length) * 100)} tone="primary" />
+            <Progress label={t('bcmProgressApproved')}  value={Math.round(plans.data.filter(p => p.status === 'APPROVED').length / Math.max(1, plans.data.length) * 100)} tone="success" />
+            <Progress label={t('bcmProgressInReview')} value={Math.round(plans.data.filter(p => p.status === 'UNDER_REVIEW').length / Math.max(1, plans.data.length) * 100)} tone="accent" />
+            <Progress label={t('bcmProgressDraft')}     value={Math.round(plans.data.filter(p => p.status === 'DRAFT').length / Math.max(1, plans.data.length) * 100)} tone="primary" />
           </Card>
           <Card title={t('bcmTabExercises')}>
             {exercises.data.filter(e => e.score != null).slice(0, 4).map(e => (
@@ -416,7 +416,7 @@ export function BcmPage() {
                 tone={(e.score ?? 0) >= 90 ? 'success' : (e.score ?? 0) >= 70 ? 'primary' : 'accent'} />
             ))}
             {exercises.data.filter(e => e.score != null).length === 0 && (
-              <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>No completed exercises yet.</div>
+              <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('bcmExercisesEmptyInline')}</div>
             )}
           </Card>
         </div>
@@ -428,20 +428,20 @@ export function BcmPage() {
       )}
       {tab === 'processes' && (
         <Card padded={false}>
-          {procs.loading ? <LoadingRow /> : <DataTable columns={procCols} rows={procs.data} empty={<EmptyState Icon={Activity} title="No critical processes" sub="Map critical processes here to drive BIA, RTO and BCP planning." />} />}
+          {procs.loading ? <LoadingRow /> : <DataTable columns={procCols} rows={procs.data} empty={<EmptyState Icon={Activity} title={t('bcmProcessesEmpty')} sub={t('bcmProcessesEmptySub')} />} />}
         </Card>
       )}
       {tab === 'bia' && (
         <Card padded={false}>
           {bia.loading ? <LoadingRow /> : bia.data.length === 0
-            ? <EmptyState Icon={Cpu} title="No BIA records" sub="Run a Business Impact Analysis on a critical process to populate this view." />
+            ? <EmptyState Icon={Cpu} title={t('bcmBiaEmpty')} sub={t('bcmBiaEmptySub')} />
             : <DataTable columns={biaCols} rows={bia.data.map((b, i) => ({ ...b, id: b.id ?? i }))} />}
         </Card>
       )}
       {tab === 'exercises' && (
         <Card title={t('cardExerciseCalendar')} Icon={Calendar} padded>
           {exercises.loading ? <LoadingRow /> : exercises.data.length === 0
-            ? <EmptyState Icon={Calendar} title="No exercises scheduled" sub="Schedule tabletop, functional or full exercises to validate plans." />
+            ? <EmptyState Icon={Calendar} title={t('bcmExercisesEmpty')} sub={t('bcmExercisesEmptySub')} />
             : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {exercises.data.map(e => {
@@ -457,7 +457,7 @@ export function BcmPage() {
                       <Badge tone={STATUS_TONE[e.status] ?? 'neutral'} dot>{statusLabel(t, e.status)}</Badge>
                       {e.score != null
                         ? <span className="mono" style={{ fontWeight: 700, color: score >= 90 ? 'var(--success-fg)' : score >= 70 ? 'var(--primary-700)' : 'var(--accent-700)' }}>{score}%</span>
-                        : <Badge tone="neutral">{e.status === 'SCHEDULED' ? 'Scheduled' : '—'}</Badge>}
+                        : <Badge tone="neutral">{e.status === 'SCHEDULED' ? t('bcmExerciseScheduled') : '—'}</Badge>}
                       {e.status !== 'COMPLETED' && e.status !== 'CANCELLED'
                         ? <Button variant="ghost" size="sm" Icon={FileCheck2} onClick={() => completeExercise(e)}>{t('bcmActCompleteExercise')}</Button>
                         : <span />}

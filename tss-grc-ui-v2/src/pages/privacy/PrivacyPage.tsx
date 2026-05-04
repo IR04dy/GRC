@@ -124,7 +124,7 @@ export function PrivacyPage() {
       cell: r => {
         if (r.status === 'CLOSED') return <span style={{ color: 'var(--ink-3)' }}>—</span>;
         const reportedToAuthority = (r as PrivacyBreachDto & { reportedToAuthority?: boolean }).reportedToAuthority ?? false;
-        if (reportedToAuthority) return <Badge tone="success" dot>Notified</Badge>;
+        if (reportedToAuthority) return <Badge tone="success" dot>{t('privacyBreachNotified')}</Badge>;
         if (!r.occurredAt) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
         const ms = Date.now() - new Date(r.occurredAt).getTime();
         const hours = Math.floor(ms / 3600000);
@@ -231,10 +231,10 @@ export function PrivacyPage() {
 
       <OverviewStrip
         storageKey="overview.privacy"
-        processBarTitle="Privacy & PDPL — Processes & Lifecycles"
-        processBarSubtitle="Saudi PDPL + GDPR + ISO 27701 — every named process active in this domain."
+        processBarTitle={t('privacyProcessBarTitle')}
+        processBarSubtitle={t('privacyProcessBarSub')}
         lifecycles={PRIVACY_LIFECYCLES}
-        postureTitle="Regulator Posture · Privacy & PDPL"
+        postureTitle={t('privacyPostureTitle')}
         anchors={PRIVACY_ANCHORS}
         lang="en" />
 
@@ -242,7 +242,7 @@ export function PrivacyPage() {
 
       {tab === 'overview' && (
         <div className="dash-grid">
-          <Card title={t('privacyTabDsr')} Icon={BarChart3} action={<Badge tone="primary">SLA · 30d</Badge>}>
+          <Card title={t('privacyTabDsr')} Icon={BarChart3} action={<Badge tone="primary">{t('privacySlaBadge')}</Badge>}>
             {['ACCESS','ERASURE','RECTIFICATION','PORTABILITY','OBJECTION'].map(type => {
               const count = dsrs.data.filter(d => d.requestType === type).length;
               const pct = Math.round((count / Math.max(1, dsrs.data.length)) * 100);
@@ -268,25 +268,25 @@ export function PrivacyPage() {
       )}
       {tab === 'breaches' && (
         <Card padded={false}>
-          {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={breaches.data} empty={<EmptyState Icon={ShieldAlert} title="No data breaches recorded" sub="Report breaches here within the 72-hour PDPL deadline." />} />}
+          {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={breaches.data} empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}
         </Card>
       )}
       {tab === 'ropa' && (
         <Card padded={false}>
-          {ropa.loading ? <LoadingRow /> : <DataTable columns={ropaCols} rows={ropa.data} empty={<EmptyState Icon={Database} title="No processing activities" sub="Article 30 RoPA — every processing activity must be recorded." />} />}
+          {ropa.loading ? <LoadingRow /> : <DataTable columns={ropaCols} rows={ropa.data} empty={<EmptyState Icon={Database} title={t('privacyRopaEmpty')} sub={t('privacyRopaEmptySub')} />} />}
         </Card>
       )}
       {tab === 'dpia' && <DpiaTab toast={toast} t={t} />}
       {tab === 'consent' && (
         <div className="dash-grid">
-          <Card title="Consent Coverage" Icon={Users} action={<Badge tone="primary">By channel</Badge>}>
-            <Progress label="Web sign-up form"   value={98} tone="success" />
-            <Progress label="Mobile app onboarding" value={94} tone="success" />
-            <Progress label="Branch / paper form"   value={71} tone="accent" />
-            <Progress label="Phone (recorded)"       value={62} tone="primary" />
+          <Card title={t('privacyConsentCard')} Icon={Users} action={<Badge tone="primary">{t('privacyConsentChannel')}</Badge>}>
+            <Progress label={t('privacyChannelWeb')}    value={98} tone="success" />
+            <Progress label={t('privacyChannelMobile')} value={94} tone="success" />
+            <Progress label={t('privacyChannelBranch')} value={71} tone="accent" />
+            <Progress label={t('privacyChannelPhone')}  value={62} tone="primary" />
           </Card>
-          <Card title="Withdrawals (90d)" Icon={ShieldAlert}>
-            <Progress label="Marketing emails" value={6}  tone="accent" />
+          <Card title={t('privacyWithdrawalsCard')} Icon={ShieldAlert}>
+            <Progress label={t('privacyWithdrawMarketing')} value={6}  tone="accent" />
             <Progress label="SMS notifications" value={4}  tone="primary" />
             <Progress label="Profiling"         value={2}  tone="success" />
             <Progress label="3rd-party sharing" value={1}  tone="success" />
