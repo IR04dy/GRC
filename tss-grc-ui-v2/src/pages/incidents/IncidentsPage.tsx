@@ -251,7 +251,7 @@ export function IncidentsPage() {
         lifecycles={INCIDENT_LIFECYCLES}
         postureTitle={t('incidentsPostureTitle')}
         anchors={INCIDENT_ANCHORS}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

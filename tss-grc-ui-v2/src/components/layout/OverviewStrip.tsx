@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { ProcessLifecycleBar, type ProcessLifecycle } from '../workflows/ProcessLifecycleBar';
 import { RegulatorPostureCard } from '../authority/RegulatorPostureCard';
 import type { RegulatorAnchor } from '../../lib/evidenceAnchors';
+import { useI18n } from '../../lib/i18n';
 
 /**
  * OverviewStrip — collapsible upper area on every module page.
@@ -22,7 +23,7 @@ export function OverviewStrip({
   storageKey,
   processBarTitle, processBarSubtitle, lifecycles,
   postureTitle, anchors,
-  lang,
+  lang: langProp,
 }: {
   /** localStorage key per module (e.g. "overview.risk", "overview.cyber"). */
   storageKey: string;
@@ -31,8 +32,13 @@ export function OverviewStrip({
   lifecycles: ProcessLifecycle[];
   postureTitle: string;
   anchors: RegulatorAnchor[];
-  lang: string;
+  /** Optional explicit lang prop. When omitted, reads from useI18n() — the
+   *  preferred path so toggle stays live with the language switch. */
+  lang?: string;
 }) {
+  const i18n = useI18n();
+  const lang = langProp ?? i18n.lang;
+  const t = i18n.t;
   const [expanded, setExpanded] = useState<boolean>(() => {
     try { return localStorage.getItem(storageKey) === '1'; } catch { return false; }
   });
@@ -73,7 +79,7 @@ export function OverviewStrip({
           el.style.color = 'var(--ink-3)';
         }}
       >
-        {expanded ? <><ChevronUp size={12} /> Hide overview</> : <><ChevronDown size={12} /> Show overview</>}
+        {expanded ? <><ChevronUp size={12} /> {t('overviewStripHide')}</> : <><ChevronDown size={12} /> {t('overviewStripShow')}</>}
       </button>
     </div>
   );

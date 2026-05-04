@@ -1881,6 +1881,16 @@ export const ar = {
   exportCsvDone:               'تم تنزيل ملف CSV',
 
   // DD-54..58
+  // DD-64
+  overviewStripShow:           'إظهار النظرة العامة',
+  overviewStripHide:           'إخفاء النظرة العامة',
+  complianceProcessBarTitle:   'الامتثال والمراجعة — العمليات ودورات الحياة',
+  complianceProcessBarSub:     'ISO 19011 وIIA وCOSO IC وSOX 404 — كل عملية مُسمّاة فعّالة في هذا النطاق.',
+  compliancePostureTitle:      'الموقف التنظيمي · جميع الجهات',
+  changeProcessBarTitle:       'تمكين التغيير — العمليات ودورات الحياة',
+  changeProcessBarSub:         'إطار ITIL v4 لتمكين التغيير — كل عملية مُسمّاة فعّالة في هذا النطاق.',
+  changePostureTitle:          'الموقف التنظيمي · تمكين التغيير',
+
   publicPortalLabel:           'بوابة العملاء وأصحاب المصلحة',
   publicFooterPrivacy:         '© منصة TSS GRC · تخضع لنظام حماية البيانات الشخصية وضوابط NCA ECC وإطار SAMA CSF',
   publicFooterTrustCenter:     'مركز الثقة',

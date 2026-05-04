@@ -254,7 +254,7 @@ function contractToReq(c: ScmContractDto): ScmContractRequest {
 
 // ── Component ─────────────────────────────────────────────────────────────
 export function ScmPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const [tab, setTab] = useState<TabId>('overview');
   const [busy, setBusy] = useState(false);
@@ -761,7 +761,7 @@ export function ScmPage() {
         processBarSubtitle="ISO 28001 + ISO 28000 + ISO 31000 + Saudi NRC + NIST SP 800-161 — pick a process to launch it."
         postureTitle="Regulator Posture · Supply Chain"
         anchors={SCM_ANCHORS}
-        lang="en"
+       
         lifecycles={[
           // ── 1. Supplier Onboarding (6-stage) ──
           // Workflow: REGISTRATION → CRITICALITY_CLASSIFICATION → SECURITY → OPERATIONAL → LEGAL → APPROVAL
@@ -912,7 +912,7 @@ export function ScmPage() {
         <ScmWorkflowMap
           vendors={vendors.data} onboarding={onboarding.data}
           dependencies={dependencies.data} incidents={incidents.data}
-          stages={ONBOARDING_STAGES} t={t} />
+          stages={ONBOARDING_STAGES} t={t} lang={lang} />
       )}
 
       {/* ── Modals ── */}
@@ -1010,7 +1010,7 @@ function LoadingRow() {
 //  2. Supply-chain dependency map (Service → Vendor → Alternative)
 //  3. Disruption response workflow (REPORT → CONTAIN → RECOVER → CAPA → CLOSE)
 function ScmWorkflowMap({
-  onboarding, dependencies, incidents, stages, t,
+  onboarding, dependencies, incidents, stages, t, lang,
 }: {
   vendors: ScmVendorDto[];
   onboarding: ScmOnboardingDto[];
@@ -1018,6 +1018,7 @@ function ScmWorkflowMap({
   incidents: ScmIncidentDto[];
   stages: { id: string; label: string }[];
   t: (k: string) => string;
+  lang: string;
 }) {
   const inFlight = onboarding.filter(o => o.status === 'IN_PROGRESS' || o.status === 'ON_HOLD');
   const responseSteps = [
@@ -1039,7 +1040,7 @@ function ScmWorkflowMap({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* 0. Multi-tier supply-chain map — Saudi NRC requirement */}
-      <TierMapPanel t={t} lang="en" />
+      <TierMapPanel t={t} lang={lang} />
 
       {/* 1. Onboarding pipeline */}
       <Card title={t('scmWfPanelOnboarding')} Icon={Workflow} action={<Badge tone="info">{inFlight.length}</Badge>}>

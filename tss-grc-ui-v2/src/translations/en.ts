@@ -1891,6 +1891,16 @@ export const en = {
   exportCsvDone:               'CSV downloaded',
 
   // DD-54..58: intake substrate, public portals, case tracker, triager inbox
+  // DD-64: middle-bar consistency fixes
+  overviewStripShow:           'Show overview',
+  overviewStripHide:           'Hide overview',
+  complianceProcessBarTitle:   'Compliance & Audit — Processes & Lifecycles',
+  complianceProcessBarSub:     'ISO 19011 + IIA + COSO IC + SOX 404 — every named process active in this domain.',
+  compliancePostureTitle:      'Regulator Posture · All Authorities',
+  changeProcessBarTitle:       'Change Enablement — Processes & Lifecycles',
+  changeProcessBarSub:         'ITIL v4 Change Enablement — every named process active in this domain.',
+  changePostureTitle:          'Regulator Posture · Change Enablement',
+
   publicPortalLabel:           'Customer & Stakeholder Portal',
   publicFooterPrivacy:         '© TSS GRC Platform · governed by PDPL, NCA ECC and SAMA CSF',
   publicFooterTrustCenter:     'Trust Center',

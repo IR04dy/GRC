@@ -437,7 +437,7 @@ export function BcmPage() {
         lifecycles={BCM_LIFECYCLES}
         postureTitle={t('bcmPostureTitle')}
         anchors={BCM_ANCHORS}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

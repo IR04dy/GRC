@@ -661,12 +661,12 @@ export function CompliancePage() {
       </div>
       <OverviewStrip
         storageKey="overview.compliance"
-        processBarTitle="Compliance & Audit — Processes & Lifecycles"
-        processBarSubtitle="ISO 19011 + IIA + COSO IC + SOX 404 — every named process active in this domain."
+        processBarTitle={t('complianceProcessBarTitle')}
+        processBarSubtitle={t('complianceProcessBarSub')}
         lifecycles={COMPLIANCE_LIFECYCLES}
-        postureTitle="Regulator Posture · All Authorities"
+        postureTitle={t('compliancePostureTitle')}
         anchors={COMPLIANCE_ANCHORS}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

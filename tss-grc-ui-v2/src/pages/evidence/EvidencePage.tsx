@@ -283,7 +283,7 @@ export function EvidencePage() {
         lifecycles={EVIDENCE_LIFECYCLES}
         postureTitle="Regulator Posture · Evidence Coverage"
         anchors={items.data.flatMap(i => EVIDENCE_ANCHORS_BY_ID[i.id] ?? [])}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

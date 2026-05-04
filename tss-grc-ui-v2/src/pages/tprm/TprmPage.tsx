@@ -185,7 +185,7 @@ export function TprmPage() {
         lifecycles={TPRM_LIFECYCLES}
         postureTitle={t('tprmPostureTitle')}
         anchors={TPRM_ANCHORS}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

@@ -974,7 +974,7 @@ export function CyberPage() {
         lifecycles={CYBER_LIFECYCLES}
         postureTitle="Regulator Posture · Cybersecurity"
         anchors={CYBER_ANCHORS}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

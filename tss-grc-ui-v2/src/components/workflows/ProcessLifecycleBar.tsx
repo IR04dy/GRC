@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { Workflow, Play } from 'lucide-react';
 import { DirectionalArrow } from '../rtl/DirectionalArrow';
@@ -13,6 +13,8 @@ import { Card } from '../ui/Card';
  */
 export interface ProcessAction {
   label: string;
+  /** Arabic label — falls back to `label` if not provided. */
+  labelAr?: string;
   href?: string;
   onClick?: () => void;
   /** When true, the action is disabled (greyed-out, non-interactive). */
@@ -103,6 +105,7 @@ export function ProcessLifecycleBar({
 
 /** Tight one-line chip used by the compact / collapsed bar. */
 function ProcessChip({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
+  const navigate = useNavigate();
   const { Icon } = lc;
   const overdue = lc.overdueCount;
   const stripe =
@@ -111,18 +114,20 @@ function ProcessChip({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
     'var(--success)';
 
   const label = lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name;
+  const primaryLabel = lang === 'ar' && lc.primary.labelAr ? lc.primary.labelAr : lc.primary.label;
 
   const trigger = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault();
+    if (lc.primary.disabled) return;
     if (lc.primary.onClick) lc.primary.onClick();
-    else if (lc.primary.href) window.location.href = lc.primary.href;
+    else if (lc.primary.href) navigate(lc.primary.href);
   };
 
   return (
     <button type="button"
       onClick={trigger}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') trigger(e); }}
-      title={`${label} — ${lc.primary.label}`}
+      title={`${label} — ${primaryLabel}`}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '4px 10px 4px 0',
@@ -275,19 +280,20 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
 
       {/* Action buttons: primary "Start ..." + secondary register icon link */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginInlineStart: 4 }}>
-        <PrimaryButton action={lc.primary} />
-        {lc.secondary && <SecondaryButton action={lc.secondary} />}
+        <PrimaryButton action={lc.primary} lang={lang} />
+        {lc.secondary && <SecondaryButton action={lc.secondary} lang={lang} />}
       </div>
     </div>
   );
 }
 
 /** ServiceNow-style green/blue primary button. */
-function PrimaryButton({ action }: { action: ProcessAction }) {
+function PrimaryButton({ action, lang }: { action: ProcessAction; lang: string }) {
+  const label = lang === 'ar' && action.labelAr ? action.labelAr : action.label;
   const content = (
     <>
       <Play size={11} strokeWidth={2.6} fill="currentColor" />
-      <span style={{ fontWeight: 600, fontSize: 12 }}>{action.label}</span>
+      <span style={{ fontWeight: 600, fontSize: 12 }}>{label}</span>
     </>
   );
   const style: React.CSSProperties = {
@@ -320,10 +326,11 @@ function PrimaryButton({ action }: { action: ProcessAction }) {
 }
 
 /** Quiet secondary "View register" affordance. */
-function SecondaryButton({ action }: { action: ProcessAction }) {
+function SecondaryButton({ action, lang }: { action: ProcessAction; lang: string }) {
+  const label = lang === 'ar' && action.labelAr ? action.labelAr : action.label;
   const content = (
     <>
-      <span style={{ fontSize: 11 }}>{action.label}</span>
+      <span style={{ fontSize: 11 }}>{label}</span>
       <DirectionalArrow size={11} />
     </>
   );

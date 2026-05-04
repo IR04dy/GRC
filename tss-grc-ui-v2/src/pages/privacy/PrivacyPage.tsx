@@ -295,7 +295,7 @@ export function PrivacyPage() {
         lifecycles={PRIVACY_LIFECYCLES}
         postureTitle={t('privacyPostureTitle')}
         anchors={PRIVACY_ANCHORS}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

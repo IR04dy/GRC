@@ -226,12 +226,12 @@ export function ChangesPage() {
 
       <OverviewStrip
         storageKey="overview.changes"
-        processBarTitle="Change Enablement — Processes & Lifecycles"
-        processBarSubtitle="ITIL v4 Change Enablement — every named process active in this domain."
+        processBarTitle={t('changeProcessBarTitle')}
+        processBarSubtitle={t('changeProcessBarSub')}
         lifecycles={CHANGE_LIFECYCLES}
-        postureTitle="Regulator Posture · Change Enablement"
+        postureTitle={t('changePostureTitle')}
         anchors={CHANGE_ANCHORS}
-        lang="en" />
+        />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
