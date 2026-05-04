@@ -1843,6 +1843,26 @@ export const en = {
   capaRcaSaved:                'Root-cause analysis saved',
   actionSave:                  'Save',
 
+  // DD-43: PA triggers
+  capaTabTriggers:             'PA Triggers',
+  capaTriggersIntro:           'Live signals from KRIs, risk-treatment posture and recurrence patterns. Each row suggests opening a Preventive Action before the underlying risk materialises.',
+  capaTriggersOpen:            'open',
+  capaTriggersFootnote:        'Sources: KRI amber/red bands · open risks where residual ≈ inherent · root-cause categories that account for ≥30% of CAPA history. Refreshes whenever the register changes.',
+  capaTriggersEmpty:           'No active PA triggers',
+  capaTriggersEmptyBody:       'All KRIs in green, all open risks under treatment, no recurring root-cause clusters.',
+  capaTriggerCovered:          'Covered',
+  capaTriggerOpenPa:           'Open PA',
+  capaPaCreated:               'Preventive Action created',
+  capaNewPaTitle:              'Open Preventive Action',
+  capaNewPaTriggerLabel:       'Triggered by',
+  capaNewPaTitleEn:            'Title (English)',
+  capaNewPaTitleAr:            'Title (Arabic)',
+  capaNewPaDescription:        'Description / rationale',
+  capaNewPaOwner:              'Owner',
+  capaNewPaSeverity:           'Severity',
+  capaNewPaDueDate:            'Target due date',
+  capaNewPaCreate:             'Create PA',
+
   // DD-40: workflow-bar actions on read-only detail pages (Policy / Vendor / Control / DPIA)
   policyActSubmitLegal:        'Submit for legal review',
   policyActSendExec:           'Send to executive approval',

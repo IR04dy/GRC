@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
-  ListChecks, Hourglass, BarChart3, Network, Workflow,
+  ListChecks, Hourglass, BarChart3, Network, Workflow, Zap,
   Plus, Search, Send, CheckCheck, Repeat, AlertTriangle,
-  Filter, Download,
+  Filter, Download, ShieldCheck, TrendingUp, Activity,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -22,8 +22,9 @@ import {
   effectivenessOverdue,
   type Capa, type CapaStatus, type RcaMethod, type RootCauseCategory,
 } from '../../lib/capa';
+import { scanPaTriggers, type PaTrigger } from '../../lib/paTriggers';
 
-type TabId = 'register' | 'aging' | 'pareto' | 'workflow';
+type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers';
 
 const ROOT_CAUSE_CATS: { id: RootCauseCategory; en: string; ar: string }[] = [
   { id: 'PEOPLE',     en: 'People',     ar: 'بشري' },
@@ -39,12 +40,16 @@ const ROOT_CAUSE_CATS: { id: RootCauseCategory; en: string; ar: string }[] = [
 export function CapaPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { items, advance } = useCapas();
+  const { items, advance, create } = useCapas();
   const [tab, setTab] = useState<TabId>('register');
   const [q, setQ] = useState('');
   const [filterStatus, setFilterStatus] = useState<CapaStatus | 'ALL'>('ALL');
   const [filterType, setFilterType] = useState<'ALL' | 'CORRECTIVE' | 'PREVENTIVE'>('ALL');
   const [rcaTarget, setRcaTarget] = useState<Capa | null>(null);
+  const [triggerTarget, setTriggerTarget] = useState<PaTrigger | null>(null);
+
+  const triggers = useMemo(() => scanPaTriggers(items), [items]);
+  const openTriggers = triggers.filter(t => !t.alreadyCovered);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -71,6 +76,7 @@ export function CapaPage() {
 
   const tabs: TabItem<TabId>[] = [
     { id: 'register', label: t('capaTabRegister') },
+    { id: 'triggers', label: `${t('capaTabTriggers')}${openTriggers.length ? ` · ${openTriggers.length}` : ''}` },
     { id: 'aging',    label: t('capaTabAging') },
     { id: 'pareto',   label: t('capaTabPareto') },
     { id: 'workflow', label: t('capaTabWorkflow') },
@@ -149,11 +155,25 @@ export function CapaPage() {
       {tab === 'aging' && <AgingTab items={items} />}
       {tab === 'pareto' && <ParetoTab items={items} />}
       {tab === 'workflow' && <WorkflowTab items={items} />}
+      {tab === 'triggers' && (
+        <TriggersTab triggers={triggers} onOpenPa={setTriggerTarget} />
+      )}
 
       {rcaTarget && (
         <RcaModal
           c={rcaTarget}
           onClose={() => setRcaTarget(null)}
+        />
+      )}
+      {triggerTarget && (
+        <NewPaModal
+          trig={triggerTarget}
+          onClose={() => setTriggerTarget(null)}
+          onCreate={(newPa) => {
+            create(newPa);
+            toast.success(t('capaPaCreated'));
+            setTriggerTarget(null);
+          }}
         />
       )}
     </Shell>
@@ -502,5 +522,192 @@ function RcaModal({ c, onClose }: { c: Capa; onClose: () => void }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ── PA Triggers tab + new-PA modal ────────────────────────────────
+// Triggers are derived from KRIs in amber/red, residual-equals-
+// inherent open risks, and root-cause categories that account for
+// >= 30% of CAPA history. Each trigger row offers a one-click
+// "Open PA" action that pre-fills a PREVENTIVE Capa via useCapas.
+// create — DD-43.
+
+function TriggersTab({ triggers, onOpenPa }: { triggers: PaTrigger[]; onOpenPa: (t: PaTrigger) => void }) {
+  const { t, lang } = useI18n();
+  const KIND_ICON: Record<string, typeof Zap> = {
+    KRI_BREACH: TrendingUp, RISK_TREND: Activity, RECURRENCE_PATTERN: Repeat,
+  };
+  const KIND_LABEL: Record<string, { en: string; ar: string }> = {
+    KRI_BREACH:         { en: 'KRI breach',          ar: 'تجاوز مؤشر' },
+    RISK_TREND:         { en: 'Risk trend',          ar: 'اتجاه الخطر' },
+    RECURRENCE_PATTERN: { en: 'Recurrence pattern',  ar: 'نمط تكرار' },
+  };
+
+  if (triggers.length === 0) {
+    return (
+      <Card title={t('capaTabTriggers')} Icon={Zap}>
+        <EmptyState Icon={ShieldCheck} title={t('capaTriggersEmpty')} sub={t('capaTriggersEmptyBody')} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card title={t('capaTabTriggers')} Icon={Zap}
+      action={<Badge tone={triggers.some(t => !t.alreadyCovered) ? 'warning' : 'success'}>
+        {triggers.filter(t => !t.alreadyCovered).length} {t('capaTriggersOpen')}
+      </Badge>}>
+      <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '0 0 12px 0', borderBottom: '1px dashed var(--border)' }}>
+        {t('capaTriggersIntro')}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {triggers.map(trig => {
+          const Icon = KIND_ICON[trig.kind] ?? Zap;
+          return (
+            <div key={trig.id} style={{
+              display: 'grid',
+              gridTemplateColumns: '32px 130px 1fr 90px 110px 130px',
+              gap: 10,
+              padding: '14px 0',
+              borderBottom: '1px dashed var(--border)',
+              alignItems: 'center',
+            }}>
+              <Icon size={20} strokeWidth={1.8} color="var(--warning-fg)" />
+              <Badge tone={trig.kind === 'KRI_BREACH' ? 'warning' : trig.kind === 'RISK_TREND' ? 'info' : 'accent'}>
+                {KIND_LABEL[trig.kind][lang === 'ar' ? 'ar' : 'en']}
+              </Badge>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  {lang === 'ar' ? trig.titleAr : trig.titleEn}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4, lineHeight: 1.4 }}>
+                  {lang === 'ar' ? trig.rationaleAr : trig.rationaleEn}
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                  {trig.frameworkRefs.map(ref => <Badge key={ref} tone="neutral">{ref}</Badge>)}
+                </div>
+              </div>
+              <Badge tone={trig.suggestedSeverity === 'CRITICAL' ? 'danger' : trig.suggestedSeverity === 'HIGH' ? 'warning' : 'info'}>
+                {trig.suggestedSeverity}
+              </Badge>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {trig.suggestedOwner}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                {trig.alreadyCovered
+                  ? <Badge tone="success" dot>{t('capaTriggerCovered')}</Badge>
+                  : <Button variant="primary" size="sm" Icon={Plus} onClick={() => onOpenPa(trig)}>{t('capaTriggerOpenPa')}</Button>
+                }
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12, padding: 8 }}>
+        {t('capaTriggersFootnote')}
+      </div>
+    </Card>
+  );
+}
+
+function NewPaModal({ trig, onClose, onCreate }: {
+  trig: PaTrigger;
+  onClose: () => void;
+  onCreate: (init: Parameters<ReturnType<typeof useCapas>['create']>[0]) => void;
+}) {
+  const { t, lang } = useI18n();
+  const [titleEn, setTitleEn] = useState(`PA — ${trig.titleEn}`);
+  const [titleAr, setTitleAr] = useState(`إجراء وقائي — ${trig.titleAr}`);
+  const [descriptionEn, setDescriptionEn] = useState(trig.rationaleEn);
+  const [owner, setOwner] = useState(trig.suggestedOwner);
+  const [severity, setSeverity] = useState<PaTrigger['suggestedSeverity']>(trig.suggestedSeverity);
+  // Default due date: 90 days out — typical PA implementation horizon
+  const [dueDate, setDueDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 90); return d.toISOString().slice(0, 10);
+  });
+
+  function submit() {
+    const today = new Date().toISOString().slice(0, 10);
+    onCreate({
+      code: `CAPA-${new Date().getFullYear()}-PA-${Math.floor(Math.random() * 900 + 100)}`,
+      titleEn, titleAr, descriptionEn,
+      type: 'PREVENTIVE',
+      source: trig.kind === 'KRI_BREACH' ? 'KRI_BREACH' : trig.kind === 'RISK_TREND' ? 'RISK_TREND' : 'PROCESS_REVIEW',
+      sourceRecordKey: trig.sourceRecordKey,
+      sourceRecordTitle: trig.sourceRecordTitle,
+      frameworkRefs: trig.frameworkRefs,
+      severity,
+      owner,
+      status: 'IDENTIFIED',
+      openedAt: today,
+      dueDate,
+      rcaMethod: 'NONE',
+      rcaSteps: [],
+    });
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t('capaNewPaTitle')} size="lg"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
+        <Button variant="primary" Icon={Plus} onClick={submit}>{t('capaNewPaCreate')}</Button>
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ background: 'var(--warning-bg)', padding: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--warning-fg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--warning-fg)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+            <Zap size={14} /> {t('capaNewPaTriggerLabel')}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', marginTop: 4 }}>
+            {lang === 'ar' ? trig.titleAr : trig.titleEn}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.5 }}>
+            {lang === 'ar' ? trig.rationaleAr : trig.rationaleEn}
+          </div>
+        </div>
+
+        <Field label={t('capaNewPaTitleEn')} value={titleEn} onChange={setTitleEn} />
+        <Field label={t('capaNewPaTitleAr')} value={titleAr} onChange={setTitleAr} />
+        <Field label={t('capaNewPaDescription')} value={descriptionEn} onChange={setDescriptionEn} multiline />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          <Field label={t('capaNewPaOwner')} value={owner} onChange={setOwner} />
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaNewPaSeverity')}</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['LOW','MEDIUM','HIGH','CRITICAL'] as const).map(s =>
+                <button key={s} onClick={() => setSeverity(s)}
+                  style={{
+                    padding: '4px 8px', fontSize: 11,
+                    borderRadius: 'var(--r-sm)',
+                    border: severity === s ? '1px solid var(--primary)' : '1px solid var(--border)',
+                    background: severity === s ? 'var(--primary-50)' : 'var(--surface-2)',
+                    color: severity === s ? 'var(--primary)' : 'var(--ink-2)',
+                    cursor: 'pointer',
+                    fontWeight: severity === s ? 700 : 500,
+                  }}>{s}</button>
+              )}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaNewPaDueDate')}</div>
+            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+              style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function Field({ label, value, onChange, multiline }: { label: string; value: string; onChange: (v: string) => void; multiline?: boolean }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+      {multiline
+        ? <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
+            style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%', resize: 'vertical' }} />
+        : <input value={value} onChange={e => onChange(e.target.value)}
+            style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+      }
+    </div>
   );
 }

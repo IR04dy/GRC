@@ -1833,6 +1833,26 @@ export const ar = {
   capaRcaSaved:                'تم حفظ تحليل السبب الجذري',
   actionSave:                  'حفظ',
 
+  // DD-43
+  capaTabTriggers:             'محفّزات الإجراء الوقائي',
+  capaTriggersIntro:           'إشارات حيّة من المؤشرات وحالة معالجة المخاطر وأنماط التكرار. كل صف يقترح فتح إجراء وقائي قبل أن يتحقّق الخطر الكامن.',
+  capaTriggersOpen:            'مفتوحة',
+  capaTriggersFootnote:        'المصادر: مؤشرات في الكهرماني/الأحمر · مخاطر مفتوحة الخطر المتبقي فيها ≈ المتأصّل · فئات أسباب جذرية تمثّل ≥30% من سجل الإجراءات. تتحدّث ديناميكياً مع تغير السجل.',
+  capaTriggersEmpty:           'لا توجد محفّزات نشطة',
+  capaTriggersEmptyBody:       'جميع المؤشرات خضراء، وكل المخاطر المفتوحة قيد المعالجة، ولا توجد أنماط تكرار للأسباب الجذرية.',
+  capaTriggerCovered:          'مُغطّى',
+  capaTriggerOpenPa:           'فتح إجراء وقائي',
+  capaPaCreated:               'تم إنشاء إجراء وقائي',
+  capaNewPaTitle:              'فتح إجراء وقائي',
+  capaNewPaTriggerLabel:       'مُحفَّز بواسطة',
+  capaNewPaTitleEn:            'العنوان (إنجليزي)',
+  capaNewPaTitleAr:            'العنوان (عربي)',
+  capaNewPaDescription:        'الوصف / المبرّر',
+  capaNewPaOwner:              'المالك',
+  capaNewPaSeverity:           'الخطورة',
+  capaNewPaDueDate:            'تاريخ الاستحقاق المستهدف',
+  capaNewPaCreate:             'إنشاء إجراء وقائي',
+
   // DD-40
   policyActSubmitLegal:        'إرسال للمراجعة القانونية',
   policyActSendExec:           'الإرسال للاعتماد التنفيذي',
