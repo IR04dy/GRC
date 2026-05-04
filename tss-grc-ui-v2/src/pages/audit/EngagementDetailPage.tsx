@@ -35,7 +35,6 @@ interface Milestone {
 export function EngagementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
-  void t;
   const [tab, setTab] = useState<TabId>('timeline');
 
   const engagement = useMemo(
@@ -45,9 +44,9 @@ export function EngagementDetailPage() {
 
   if (!engagement) {
     return (
-      <Shell title="Audit Engagement">
+      <Shell title={t('engTitle')}>
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>
-          Engagement not found. <Link to="/audit-workspace">Return to workspace</Link>
+          {t('engNotFound')} <Link to="/audit-workspace">{t('engReturnToWorkspace')}</Link>
         </div>
       </Shell>
     );
@@ -62,27 +61,27 @@ export function EngagementDetailPage() {
   const evidence = EVIDENCE.filter(ev => !!e.framework && ev.frameworkCode === e.framework);
 
   const milestones: Milestone[] = [
-    { key: 'letter',     labelEn: 'Engagement letter',  date: e.engagementLetterDate,  Icon: ScrollText  },
-    { key: 'opening',    labelEn: 'Opening meeting',    date: e.openingMeetingDate,    Icon: CalendarDays },
-    { key: 'fwStart',    labelEn: 'Fieldwork start',    date: e.fieldworkStartDate,    Icon: Activity    },
-    { key: 'fwEnd',      labelEn: 'Fieldwork end',      date: e.fieldworkEndDate,      Icon: Activity    },
-    { key: 'report',     labelEn: 'Report issued',      date: e.reportIssuedDate,      Icon: ScrollText  },
-    { key: 'closure',    labelEn: 'Closure',            date: e.closureDate,           Icon: Stamp       },
-    { key: 'followup',   labelEn: 'Next follow-up',     date: e.nextFollowupDate,      Icon: CalendarDays },
+    { key: 'letter',     labelEn: t('engMilestoneLetter'),    date: e.engagementLetterDate,  Icon: ScrollText  },
+    { key: 'opening',    labelEn: t('engMilestoneOpening'),   date: e.openingMeetingDate,    Icon: CalendarDays },
+    { key: 'fwStart',    labelEn: t('engMilestoneFwStart'),   date: e.fieldworkStartDate,    Icon: Activity    },
+    { key: 'fwEnd',      labelEn: t('engMilestoneFwEnd'),     date: e.fieldworkEndDate,      Icon: Activity    },
+    { key: 'report',     labelEn: t('engMilestoneReport'),    date: e.reportIssuedDate,      Icon: ScrollText  },
+    { key: 'closure',    labelEn: t('engMilestoneClosure'),   date: e.closureDate,           Icon: Stamp       },
+    { key: 'followup',   labelEn: t('engMilestoneFollowup'),  date: e.nextFollowupDate,      Icon: CalendarDays },
   ];
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'timeline',   label: 'Timeline' },
-    { id: 'scope',      label: 'Scope' },
-    { id: 'findings',   label: `Findings (${findings.length})` },
-    { id: 'workpapers', label: `Workpapers (${evidence.length})` },
+    { id: 'timeline',   label: t('engTabTimeline') },
+    { id: 'scope',      label: t('engTabScope') },
+    { id: 'findings',   label: `${t('engTabFindings')} (${findings.length})` },
+    { id: 'workpapers', label: `${t('engTabWorkpapers')} (${evidence.length})` },
   ];
 
   return (
-    <Shell title="Audit Engagement" sub={e.framework?.replace(/_/g, ' ')}>
+    <Shell title={t('engTitle')} sub={e.framework?.replace(/_/g, ' ')}>
       <DetailHeader
         breadcrumbs={[
-          { label: 'Audit Workspace', to: '/audit-workspace' },
+          { label: t('modAuditWorkspace'), to: '/audit-workspace' },
           { label: e.engagementCode ?? `#${e.id}` },
         ]}
         eyebrow={e.engagementCode}
@@ -97,32 +96,32 @@ export function EngagementDetailPage() {
 
       <DetailLayout
         rail={<>
-          <Card title="At a glance" Icon={Briefcase}>
+          <Card title={t('detailAtAGlance')} Icon={Briefcase}>
             <RailFieldGroup>
               <RailField
-                label="Status"
+                label={t('fldStatus')}
                 accent
                 value={<Badge tone={STATUS_TONE[e.status] ?? 'neutral'} dot>{e.status.replace(/_/g, ' ')}</Badge>}
               />
-              <RailField label="Code"          value={e.engagementCode ?? '—'} mono />
-              <RailField label="Type"          value={e.auditType.replace(/_/g, ' ')} />
-              <RailField label="Framework"     value={(e.framework ?? '').replace(/_/g, ' ')} />
-              <RailField label="Auditor firm"  value={e.auditorFirm ?? '—'} />
-              <RailField label="Lead auditor"  value={e.leadAuditor ?? '—'} />
-              <RailField label="Findings"      value={String(findings.length)} mono />
+              <RailField label={t('fldCode')}        value={e.engagementCode ?? '—'} mono />
+              <RailField label={t('engRailType')}    value={e.auditType.replace(/_/g, ' ')} />
+              <RailField label={t('engRailFramework')} value={(e.framework ?? '').replace(/_/g, ' ')} />
+              <RailField label={t('engRailFirm')}    value={e.auditorFirm ?? '—'} />
+              <RailField label={t('engRailLead')}    value={e.leadAuditor ?? '—'} />
+              <RailField label={t('engRailFindings')} value={String(findings.length)} mono />
             </RailFieldGroup>
           </Card>
 
-          <Card title="Schedule" Icon={CalendarDays}>
+          <Card title={t('engCardSchedule')} Icon={CalendarDays}>
             <RailFieldGroup>
-              <RailField label="Letter"         value={e.engagementLetterDate ?? '—'} mono />
-              <RailField label="Opening"        value={e.openingMeetingDate ?? '—'}  mono />
-              <RailField label="Fieldwork"      value={e.fieldworkStartDate && e.fieldworkEndDate
+              <RailField label={t('engRailLetter')}    value={e.engagementLetterDate ?? '—'} mono />
+              <RailField label={t('engRailOpening')}   value={e.openingMeetingDate ?? '—'}  mono />
+              <RailField label={t('engRailFieldwork')} value={e.fieldworkStartDate && e.fieldworkEndDate
                 ? `${e.fieldworkStartDate} → ${e.fieldworkEndDate}`
                 : (e.fieldworkStartDate ?? '—')} mono />
-              <RailField label="Report"         value={e.reportIssuedDate ?? '—'}    mono />
-              <RailField label="Closure"        value={e.closureDate ?? '—'}         mono />
-              <RailField label="Follow-up"      value={e.nextFollowupDate ?? '—'}    mono />
+              <RailField label={t('engRailReport')}    value={e.reportIssuedDate ?? '—'}    mono />
+              <RailField label={t('engRailClosure')}   value={e.closureDate ?? '—'}         mono />
+              <RailField label={t('engRailFollowup')}  value={e.nextFollowupDate ?? '—'}    mono />
             </RailFieldGroup>
           </Card>
         </>}
@@ -130,7 +129,7 @@ export function EngagementDetailPage() {
           <Tabs items={tabs} active={tab} onChange={setTab} />
 
           {tab === 'timeline' && (
-            <Card title="Engagement timeline" Icon={Activity}>
+            <Card title={t('engCardTimeline')} Icon={Activity}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {milestones.map((m, i) => {
                   const passed = !!m.date;
@@ -156,7 +155,7 @@ export function EngagementDetailPage() {
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>{m.labelEn}</div>
                         <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                          {passed ? 'Recorded' : 'Pending'}
+                          {passed ? t('engMilestoneRecorded') : t('engMilestonePending')}
                         </div>
                       </div>
                       <span className="mono" style={{
@@ -173,19 +172,19 @@ export function EngagementDetailPage() {
           )}
 
           {tab === 'scope' && (
-            <Card title="Scope summary" Icon={ScrollText}>
+            <Card title={t('engCardScope')} Icon={ScrollText}>
               <div style={{ fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {e.scopeSummary ?? 'Scope summary not yet recorded for this engagement.'}
+                {e.scopeSummary ?? t('engScopeMissing')}
               </div>
             </Card>
           )}
 
           {tab === 'findings' && (
-            <Card title={`Findings raised on ${(e.framework ?? '').replace(/_/g, ' ')}`} Icon={AlertTriangle}
+            <Card title={`${t('engFindingsHeader')} ${(e.framework ?? '').replace(/_/g, ' ')}`} Icon={AlertTriangle}
               action={<Badge tone={findings.length > 0 ? 'warning' : 'success'}>{findings.length}</Badge>}>
               {findings.length === 0
-                ? <EmptyState Icon={AlertTriangle} title="No findings yet"
-                    sub="No compliance findings are linked to this engagement's framework." />
+                ? <EmptyState Icon={AlertTriangle} title={t('engFindingsEmpty')}
+                    sub={t('engFindingsEmptySub')} />
                 : <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {findings.map(f => (
                       <Link key={f.id} to={`/findings/${f.id}`} style={{
@@ -216,11 +215,11 @@ export function EngagementDetailPage() {
           )}
 
           {tab === 'workpapers' && (
-            <Card title={`Evidence on ${(e.framework ?? '').replace(/_/g, ' ')}`} Icon={FileCheck2}
+            <Card title={`${t('engWorkpapersHeader')} ${(e.framework ?? '').replace(/_/g, ' ')}`} Icon={FileCheck2}
               action={<Badge tone="primary">{evidence.length}</Badge>}>
               {evidence.length === 0
-                ? <EmptyState Icon={FileCheck2} title="No workpapers"
-                    sub="No evidence items are tagged to this engagement's framework." />
+                ? <EmptyState Icon={FileCheck2} title={t('engWorkpapersEmpty')}
+                    sub={t('engWorkpapersEmptySub')} />
                 : <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {evidence.map(ev => (
                       <div key={ev.id} style={{

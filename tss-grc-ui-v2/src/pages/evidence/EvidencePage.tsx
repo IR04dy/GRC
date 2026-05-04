@@ -275,7 +275,7 @@ export function EvidencePage() {
                     return <Progress key={fw} label={`${fw} · ${cnt} items`} value={p2} tone="primary" />;
                   })}
             </Card>
-            <Card title="Type Mix" Icon={FileText}>
+            <Card title={t('evCardTypeMix')} Icon={FileText}>
               {['POLICY','DOCUMENT','SCREENSHOT','AUDIT_REPORT','CONFIGURATION','CERTIFICATE'].map(type => {
                 const cnt = items.data.filter(i => i.evidenceType === type).length;
                 const p2 = Math.round((cnt / Math.max(1, items.data.length)) * 100);
@@ -291,7 +291,7 @@ export function EvidencePage() {
           {matrixLoading
             ? <LoadingRow />
             : matrix.length === 0
-              ? <EmptyState Icon={Layers} title="No frameworks loaded" sub="Frameworks live in the evidence schema; seed data ships with NCA ECC, NCA CCC, NCA DCC and others." />
+              ? <EmptyState Icon={Layers} title={t('evFrameworksEmpty')} sub="NCA ECC · NCA CCC · NCA DCC · ISO 27001 · PDPL" />
               : (
                 <>
                   {/* Framework selector tabs (sub-tabs) */}
@@ -382,7 +382,7 @@ export function EvidencePage() {
           {connectorsLoading
             ? <LoadingRow />
             : connectors.length === 0
-              ? <EmptyState Icon={Plug} title="No connectors registered" sub="Connectors automate evidence collection from source systems (AD, Defender, AWS Config, NCA HEY, etc.)." />
+              ? <EmptyState Icon={Plug} title={t('evConnectorsEmpty')} sub="AD · Defender · AWS Config · NCA HEY" />
               : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {connectors.map(c => (
@@ -433,18 +433,18 @@ export function EvidencePage() {
       )}
       {tab === 'requests' && (
         <Card padded={false}>
-          {requests.loading ? <LoadingRow /> : <DataTable columns={reqCols} rows={requests.data} empty={<EmptyState Icon={Send} title="No evidence requests" sub="Auditors raise requests here; owners upload artifacts in response." />} />}
+          {requests.loading ? <LoadingRow /> : <DataTable columns={reqCols} rows={requests.data} empty={<EmptyState Icon={Send} title={t('evReqEmpty')} sub={t('evReqEmptySub')} />} />}
         </Card>
       )}
       {tab === 'review' && (
         <Card padded={false}>
-          {reviews.loading ? <LoadingRow /> : <DataTable columns={reviewCols} rows={reviews.data} empty={<EmptyState Icon={ClipboardCheck} title="No reviews yet" sub="Each evidence item gets at least one reviewer sign-off." />} />}
+          {reviews.loading ? <LoadingRow /> : <DataTable columns={reviewCols} rows={reviews.data} empty={<EmptyState Icon={ClipboardCheck} title={t('evReviewsEmpty')} sub={t('evReviewsEmptySub')} />} />}
         </Card>
       )}
       {tab === 'expired' && (
-        <Card padded={false} title="Expired Evidence" Icon={CalendarX} action={<Badge tone="danger">{expiredItems.length} expired</Badge>}>
+        <Card padded={false} title={t('evCardExpired')} Icon={CalendarX} action={<Badge tone="danger">{expiredItems.length}</Badge>}>
           {expiredItems.length === 0
-            ? <EmptyState Icon={CalendarX} title="Nothing expired" sub="All evidence is currently within its validity window." />
+            ? <EmptyState Icon={CalendarX} title={t('evExpiredEmpty')} sub={t('evExpiredEmptySub')} />
             : <DataTable columns={itemCols} rows={expiredItems} />}
         </Card>
       )}

@@ -192,7 +192,7 @@ export function AdminPage() {
       {tab === 'roles' && (
         <Card padded={false}>
           {rolesLoading ? <LoadingRow /> : roles.length === 0
-            ? <EmptyState Icon={Shield} title="No roles loaded" sub="Roles cluster permissions per module · action." />
+            ? <EmptyState Icon={Shield} title={t('adminRolesEmpty')} sub={t('adminRolesEmptySub')} />
             : <DataTable columns={roleCols} rows={roles} />}
         </Card>
       )}

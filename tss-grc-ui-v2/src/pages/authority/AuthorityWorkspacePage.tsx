@@ -48,9 +48,9 @@ export function AuthorityWorkspacePage() {
   const authority = code ? findAuthority(code) : undefined;
   if (!authority) {
     return (
-      <Shell title="Authority Workspace">
-        <EmptyState Icon={Landmark} title="Authority not found"
-          sub="Pick a known regulatory authority code (NCA, SAMA, SDAIA, NRC, ISO, …)." />
+      <Shell title={t('authwsTitle')}>
+        <EmptyState Icon={Landmark} title={t('authwsAuthorityNotFound')}
+          sub="NCA, SAMA, SDAIA, NRC, ISO, …" />
       </Shell>
     );
   }
@@ -160,7 +160,7 @@ export function AuthorityWorkspacePage() {
 
       {/* Coverage donut + per-framework breakdown */}
       <div className="dash-grid" style={{ marginTop: 12 }}>
-        <Card title="Control coverage" Icon={Landmark}
+        <Card title={t('authwsCoverage')} Icon={Landmark}
           action={<Badge tone={coveragePct >= 80 ? 'success' : coveragePct >= 60 ? 'primary' : coveragePct >= 40 ? 'warning' : 'danger'}>{coveragePct}%</Badge>}>
           <Donut
             segments={[
@@ -173,9 +173,9 @@ export function AuthorityWorkspacePage() {
             centerLabel={`${coveragePct}%`} centerSub="Coverage" />
         </Card>
 
-        <Card title="Frameworks" Icon={BookCopy} action={<Badge tone="primary">{authority.frameworkCodes.length}</Badge>}>
+        <Card title={t('authwsFrameworks')} Icon={BookCopy} action={<Badge tone="primary">{authority.frameworkCodes.length}</Badge>}>
           {authority.frameworkCodes.length === 0
-            ? <EmptyState Icon={BookCopy} title="No frameworks registered" />
+            ? <EmptyState Icon={BookCopy} title={t('authwsFrameworksEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {authority.frameworkCodes.map(fw => {
                   const stats = perFramework.get(fw) ?? { count: 0, implemented: 0 };
@@ -235,8 +235,8 @@ export function AuthorityWorkspacePage() {
           {regulatoryUpdates.filter(r => r.status !== 'CLOSED').length} active
         </Badge>}>
         {regulatoryUpdates.length === 0
-          ? <EmptyState Icon={Megaphone} title="No published changes on file"
-              sub={`No regulatory changes from ${authority.code} have been ingested yet.`} />
+          ? <EmptyState Icon={Megaphone} title={t('authwsRegUpdatesEmpty')}
+              sub={authority.code} />
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {regulatoryUpdates.map(r => (
                 <div key={r.id} style={{
@@ -291,8 +291,8 @@ export function AuthorityWorkspacePage() {
           {obligationStats.gap > 0 && <Badge tone="danger">{obligationStats.gap} gap</Badge>}
         </div>}>
         {obligations.length === 0
-          ? <EmptyState Icon={ListChecks} title="No obligation register on file"
-              sub={`Per-clause obligations for ${authority.code} have not been catalogued yet — start with the Citation library and Frameworks panels above.`} />
+          ? <EmptyState Icon={ListChecks} title={t('authwsObligationsEmpty')}
+              sub={authority.code} />
           : <div style={{ display: 'flex', flexDirection: 'column' }}>
               {obligations.map(o => (
                 <div key={o.code} style={{
@@ -324,9 +324,9 @@ export function AuthorityWorkspacePage() {
       </Card>
 
       {/* Citation library */}
-      <Card title="Citation library" Icon={ScrollText} action={<Badge tone="primary">{citationLib.length}</Badge>}>
+      <Card title={t('authwsCitationLib')} Icon={ScrollText} action={<Badge tone="primary">{citationLib.length}</Badge>}>
         {citationLib.length === 0
-          ? <EmptyState Icon={ScrollText} title="No citations on file" />
+          ? <EmptyState Icon={ScrollText} title={t('authwsCitationsEmpty')} />
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {citationLib.map((a, i) => (
                 <div key={i} style={{
@@ -348,9 +348,9 @@ export function AuthorityWorkspacePage() {
       </Card>
 
       {/* Anchored evidence */}
-      <Card title="Anchored evidence" Icon={FileText} action={<Badge tone="primary">{evidenceForMe.length}</Badge>} padded={false}>
+      <Card title={t('authwsAnchoredEvidence')} Icon={FileText} action={<Badge tone="primary">{evidenceForMe.length}</Badge>} padded={false}>
         {evidenceForMe.length === 0
-          ? <EmptyState Icon={FileText} title="No evidence anchored to this authority yet" />
+          ? <EmptyState Icon={FileText} title={t('authwsAnchoredEmpty')} />
           : <DataTable
               columns={[
                 { header: 'Code',     cell: r => r.evidenceCode, mono: true },
@@ -373,10 +373,10 @@ export function AuthorityWorkspacePage() {
 
       {/* Findings + Engagements */}
       <div className="dash-grid" style={{ marginTop: 12 }}>
-        <Card title="Findings under this authority" Icon={AlertTriangle}
-          action={<Badge tone="danger">{findingsForMe.filter(f => f.status !== 'CLOSED').length} open</Badge>}>
+        <Card title={t('authwsFindings')} Icon={AlertTriangle}
+          action={<Badge tone="danger">{findingsForMe.filter(f => f.status !== 'CLOSED').length} {t('audwsAgingCenterSub')}</Badge>}>
           {findingsForMe.length === 0
-            ? <EmptyState Icon={AlertTriangle} title="No findings tagged" />
+            ? <EmptyState Icon={AlertTriangle} title={t('authwsFindingsEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {findingsForMe.slice(0, 8).map(f => (
                   <Link key={f.id} to={`/findings/${f.id}`} style={{ textDecoration: 'none', color: 'inherit',
@@ -402,10 +402,10 @@ export function AuthorityWorkspacePage() {
               </div>}
         </Card>
 
-        <Card title="Audit engagements" Icon={Briefcase}
+        <Card title={t('authwsEngagements')} Icon={Briefcase}
           action={<Badge tone="primary">{engagementsForMe.length}</Badge>}>
           {engagementsForMe.length === 0
-            ? <EmptyState Icon={Briefcase} title="No engagements recorded" />
+            ? <EmptyState Icon={Briefcase} title={t('authwsEngagementsEmpty')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {engagementsForMe.slice(0, 8).map(e => (
                   <div key={e.id} style={{

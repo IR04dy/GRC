@@ -898,13 +898,13 @@ export function CyberPage() {
       )}
 
       {tab === 'controls'    && <Card padded={false}>{controls.loading    ? <LoadingRow /> : <DataTable columns={controlCols}  rows={controls.data}    empty={<EmptyState />} />}</Card>}
-      {tab === 'subcontrols' && <Card padded={false}>{subControls.loading ? <LoadingRow /> : <DataTable columns={subCtrlCols}  rows={subControls.data} empty={<EmptyState Icon={Shield}        title="No sub-controls" />} />}</Card>}
-      {tab === 'assessments' && <Card padded={false}>{assessments.loading ? <LoadingRow /> : <DataTable columns={assessCols}   rows={assessments.data} empty={<EmptyState Icon={ClipboardCheck} title="No assessments" />} />}</Card>}
+      {tab === 'subcontrols' && <Card padded={false}>{subControls.loading ? <LoadingRow /> : <DataTable columns={subCtrlCols}  rows={subControls.data} empty={<EmptyState Icon={Shield}        title={t('cyberEmptySubControls')} />} />}</Card>}
+      {tab === 'assessments' && <Card padded={false}>{assessments.loading ? <LoadingRow /> : <DataTable columns={assessCols}   rows={assessments.data} empty={<EmptyState Icon={ClipboardCheck} title={t('cyberEmptyAssessments')} />} />}</Card>}
       {tab === 'vuln'        && <Card padded={false}>{vulns.loading       ? <LoadingRow /> : <DataTable columns={vulnCols}     rows={vulns.data}       empty={<EmptyState Icon={Bug} />} />}</Card>}
-      {tab === 'exceptions'  && <Card padded={false}>{exceptions.loading  ? <LoadingRow /> : <DataTable columns={excCols}      rows={exceptions.data}  empty={<EmptyState Icon={ShieldOff}      title="No exceptions" sub="Risk acceptance for vulnerabilities that cannot be remediated yet." />} />}</Card>}
+      {tab === 'exceptions'  && <Card padded={false}>{exceptions.loading  ? <LoadingRow /> : <DataTable columns={excCols}      rows={exceptions.data}  empty={<EmptyState Icon={ShieldOff}      title={t('cyberEmptyExceptions')} sub={t('cyberEmptyExceptionsSub')} />} />}</Card>}
       {tab === 'incidents'   && (
         <>
-          <Card padded={false}>{cyberIncidents.loading ? <LoadingRow /> : <DataTable columns={incidentCols} rows={cyberIncidents.data} empty={<EmptyState Icon={Flame} title="No cyber incidents" />} />}</Card>
+          <Card padded={false}>{cyberIncidents.loading ? <LoadingRow /> : <DataTable columns={incidentCols} rows={cyberIncidents.data} empty={<EmptyState Icon={Flame} title={t('cyberEmptyIncidents')} />} />}</Card>
           {cyberIncidents.data[0] && (
             <div style={{ marginTop: 16 }}>
               <Card title={t('cardRespWorkflow')} Icon={Target} action={<Badge tone="info">{cyberIncidents.data[0].incidentNumber}</Badge>}>
@@ -914,9 +914,9 @@ export function CyberPage() {
           )}
         </>
       )}
-      {tab === 'assets'   && <Card padded={false}>{assets.loading        ? <LoadingRow /> : <DataTable columns={assetCols}    rows={assets.data}        empty={<EmptyState Icon={Cpu}        title="No assets" />} />}</Card>}
-      {tab === 'evidence' && <Card padded={false}>{cyberEvidence.loading ? <LoadingRow /> : <DataTable columns={evidenceCols} rows={cyberEvidence.data} empty={<EmptyState Icon={FileCheck2} title="No evidence" />} />}</Card>}
-      {tab === 'actions'  && <Card padded={false}>{actionPlans.loading   ? <LoadingRow /> : <DataTable columns={actionCols}   rows={actionPlans.data}   empty={<EmptyState Icon={ListTodo}   title="No action plans" />} />}</Card>}
+      {tab === 'assets'   && <Card padded={false}>{assets.loading        ? <LoadingRow /> : <DataTable columns={assetCols}    rows={assets.data}        empty={<EmptyState Icon={Cpu}        title={t('cyberEmptyAssets')} />} />}</Card>}
+      {tab === 'evidence' && <Card padded={false}>{cyberEvidence.loading ? <LoadingRow /> : <DataTable columns={evidenceCols} rows={cyberEvidence.data} empty={<EmptyState Icon={FileCheck2} title={t('cyberEmptyEvidence')} />} />}</Card>}
+      {tab === 'actions'  && <Card padded={false}>{actionPlans.loading   ? <LoadingRow /> : <DataTable columns={actionCols}   rows={actionPlans.data}   empty={<EmptyState Icon={ListTodo}   title={t('cyberEmptyActions')} />} />}</Card>}
       {tab === 'workflows' && <ActiveWorkflowsPanel
         workflows={CYBER_WORKFLOWS}
         title={t('cyberTabWorkflows') ?? 'Workflows'}

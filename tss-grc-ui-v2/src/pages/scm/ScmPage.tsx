@@ -807,31 +807,31 @@ export function ScmPage() {
       {tab === 'onboarding' && (
         <Card padded={false}>
           {onboarding.loading ? <LoadingRow /> : <DataTable columns={onbCols} rows={onboarding.data}
-            empty={<EmptyState Icon={Workflow} title="No onboarding in progress" sub="New suppliers go through the 6-stage onboarding workflow." />} />}
+            empty={<EmptyState Icon={Workflow} title={t('scmEmptyOnboarding')} sub={t('scmEmptyOnboardingSub')} />} />}
         </Card>
       )}
       {tab === 'assessments' && (
         <Card padded={false}>
           {assessments.loading ? <LoadingRow /> : <DataTable columns={assessCols} rows={assessments.data}
-            empty={<EmptyState Icon={ClipboardCheck} title="No assessments" sub="Periodic and event-triggered assessments roll up to supplier risk." />} />}
+            empty={<EmptyState Icon={ClipboardCheck} title={t('scmEmptyAssessments')} sub={t('scmEmptyAssessmentsSub')} />} />}
         </Card>
       )}
       {tab === 'dependencies' && (
         <Card padded={false}>
           {dependencies.loading ? <LoadingRow /> : <DataTable columns={depCols} rows={dependencies.data}
-            empty={<EmptyState Icon={Network} title="No dependencies" sub="Map services and assets to suppliers; flag those with no alternative." />} />}
+            empty={<EmptyState Icon={Network} title={t('scmEmptyDependencies')} sub={t('scmEmptyDependenciesSub')} />} />}
         </Card>
       )}
       {tab === 'contracts' && (
         <Card padded={false}>
           {contracts.loading ? <LoadingRow /> : <DataTable columns={contractCols} rows={contracts.data}
-            empty={<EmptyState Icon={FileSignature} title="No contracts" sub="Contracts capture term, value, SLA and renewal posture." />} />}
+            empty={<EmptyState Icon={FileSignature} title={t('scmEmptyContracts')} sub={t('scmEmptyContractsSub')} />} />}
         </Card>
       )}
       {tab === 'disruptions' && (
         <Card padded={false}>
           {incidents.loading ? <LoadingRow /> : <DataTable columns={incidentCols} rows={incidents.data}
-            empty={<EmptyState Icon={AlertOctagon} title="No disruptions" sub="Supplier-side outages, SLA breaches and quality defects are tracked here." />} />}
+            empty={<EmptyState Icon={AlertOctagon} title={t('scmEmptyDisruptions')} sub={t('scmEmptyDisruptionsSub')} />} />}
         </Card>
       )}
       {tab === 'workflow' && (
