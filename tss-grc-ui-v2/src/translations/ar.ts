@@ -1608,4 +1608,13 @@ export const ar = {
   scmEmptyContractsSub:    'تلتقط العقود المدة والقيمة واتفاقية الخدمة وموقف التجديد.',
   scmEmptyDisruptions:     'لا توجد اضطرابات',
   scmEmptyDisruptionsSub:  'تُتابَع هنا انقطاعات الموردين، وخروقات اتفاقيات الخدمة، وعيوب الجودة.',
+
+  // Privacy page workflow prompts
+  privacyPromptExtendDsr:        'تمديد المهلة لطلب صاحب البيانات بعدد الأيام؟',
+  privacyPromptRejectDsr:        'رفض هذا الطلب؟ يجب إبلاغ صاحب البيانات بالأسباب وفق نظام PDPL.',
+  privacyPromptNotifyDataOffice: 'تأكيد إبلاغ هيئة البيانات السعودية؟ يتم ختم وقت الإبلاغ وإطلاق سجل التدقيق.',
+  privacyPromptDpiaConclusion:   'الخلاصة (اختياري)؟',
+  privacyPromptDpiaRejection:    'سبب الرفض؟',
+  privacyToastDsrExtended:       'تم تمديد المهلة بمقدار',
+  privacyToastDsrExtendedDays:   'يوم',
 } as const;

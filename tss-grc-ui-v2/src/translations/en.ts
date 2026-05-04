@@ -1618,4 +1618,13 @@ export const en = {
   scmEmptyContractsSub:    'Contracts capture term, value, SLA and renewal posture.',
   scmEmptyDisruptions:     'No disruptions',
   scmEmptyDisruptionsSub:  'Supplier-side outages, SLA breaches and quality defects are tracked here.',
+
+  // Privacy page workflow prompts (DD-21)
+  privacyPromptExtendDsr:        'Extend the DSR due date by how many days?',
+  privacyPromptRejectDsr:        'Reject this DSR? The data subject must be notified with reasoning per PDPL.',
+  privacyPromptNotifyDataOffice: 'Mark the Saudi Data Office as notified? This stamps the notification time and unlocks the audit trail.',
+  privacyPromptDpiaConclusion:   'Conclusion (optional)?',
+  privacyPromptDpiaRejection:    'Rejection reason?',
+  privacyToastDsrExtended:       'Due date extended by',
+  privacyToastDsrExtendedDays:   'days',
 } as const;

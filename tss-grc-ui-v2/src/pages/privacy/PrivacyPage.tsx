@@ -179,14 +179,14 @@ export function PrivacyPage() {
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function extendDsrAction(r: PrivacyDsrDto) {
-    const daysStr = window.prompt('Extend the DSR due date by how many days?', '30');
+    const daysStr = window.prompt(t('privacyPromptExtendDsr'), '30');
     if (daysStr === null) return;
     const days = Math.max(1, Number(daysStr) || 30);
-    try { await privacyApi.extendDsr(r.id, days); toast.success(`Due date extended by ${days} days`); dsrs.reload(); }
+    try { await privacyApi.extendDsr(r.id, days); toast.success(`${t('privacyToastDsrExtended')} ${days} ${t('privacyToastDsrExtendedDays')}`); dsrs.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Extend failed'); }
   }
   async function rejectDsrAction(r: PrivacyDsrDto) {
-    if (!window.confirm('Reject this DSR? The data subject must be notified with reasoning per PDPL.')) return;
+    if (!window.confirm(t('privacyPromptRejectDsr'))) return;
     try { await privacyApi.rejectDsr(r.id); toast.success('DSR rejected'); dsrs.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
@@ -197,7 +197,7 @@ export function PrivacyPage() {
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function notifyDataOfficeAction(r: PrivacyBreachDto) {
-    if (!window.confirm('Mark the Saudi Data Office as notified? This stamps the notification time and unlocks the audit trail.')) return;
+    if (!window.confirm(t('privacyPromptNotifyDataOffice'))) return;
     try { await privacyApi.notifyDataOffice(r.id); toast.success('Saudi Data Office notification recorded'); breaches.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
@@ -349,11 +349,11 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
 
   async function submit(d: DpiaDto)  { try { await dpiaApi.submitForReview(d.id); toast.success('DPIA submitted'); reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); } }
   async function approve(d: DpiaDto) {
-    const conclusion = window.prompt('Conclusion (optional)?', '') ?? '';
+    const conclusion = window.prompt(t('privacyPromptDpiaConclusion'), '') ?? '';
     try { await dpiaApi.approve(d.id, conclusion); toast.success('DPIA approved'); reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Approve failed'); }
   }
   async function reject(d: DpiaDto)  {
-    const reason = window.prompt('Rejection reason?', '') ?? '';
+    const reason = window.prompt(t('privacyPromptDpiaRejection'), '') ?? '';
     if (!reason.trim()) return;
     try { await dpiaApi.reject(d.id, reason); toast.success('DPIA rejected'); reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Reject failed'); }
   }
