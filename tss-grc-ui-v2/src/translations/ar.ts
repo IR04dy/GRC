@@ -1638,4 +1638,19 @@ export const ar = {
   commsPendingEmpty:       'الصندوق فارغ',
   commsPendingEmptySub:    'لا توجد التزامات إشعار نشطة على المنصة.',
   commsSentEmpty:          'لا توجد اتصالات في سلسلة العهدة بعد',
+
+  // Acknowledge modal
+  commsAckCta:             'وسم بـ "أُرسل"',
+  commsAckTitle:           'تسجيل إرسال الإشعار',
+  commsAckConfirm:         'حفظ',
+  commsAckState:           'الحالة',
+  commsAckStateSent:       'أُرسل',
+  commsAckStateAck:        'تم تأكيد الاستلام من الجهة المُستقبِلة',
+  commsAckReceipt:         'رقم الاستلام',
+  commsAckReceiptPlaceholder: 'مثال: HEY-2026-04220011',
+  commsAckReceiptHint:     'رقم تأكيد بوابة الجهة التنظيمية، أو مرجع PDF موقَّع، أو إيصال من الجهة المُستقبِلة.',
+  commsAckNote:            'ملاحظة',
+  commsAckNotePlaceholder: 'أي سياق يستحق الحفظ في سلسلة العهدة…',
+  commsScheduledBadge:     'مجدول',
+  actionCancel:            'إلغاء',
 } as const;

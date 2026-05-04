@@ -1648,4 +1648,19 @@ export const en = {
   commsPendingEmpty:       'Inbox clear',
   commsPendingEmptySub:    'No active SLAs across the platform.',
   commsSentEmpty:          'No comms in the audit trail yet',
+
+  // Acknowledge modal (DD-28)
+  commsAckCta:             'Mark sent',
+  commsAckTitle:           'Record notification as sent',
+  commsAckConfirm:         'Save',
+  commsAckState:           'Resolution',
+  commsAckStateSent:       'Sent',
+  commsAckStateAck:        'Acknowledged by counterparty',
+  commsAckReceipt:         'Receipt reference',
+  commsAckReceiptPlaceholder: 'e.g. HEY-2026-04220011',
+  commsAckReceiptHint:     'Regulator portal acknowledgement ID, signed PDF reference, or other counterparty receipt.',
+  commsAckNote:            'Note',
+  commsAckNotePlaceholder: 'Any context worth carrying with the audit trail entry…',
+  commsScheduledBadge:     'Scheduled',
+  actionCancel:            'Cancel',
 } as const;

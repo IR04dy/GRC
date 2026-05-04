@@ -12,6 +12,7 @@ import { Card } from '../../components/ui/Card';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import {
@@ -22,6 +23,9 @@ import {
   NOTIFICATION_MATRIX, COMMS_LOG_BY_RECORD, formatDeadline,
   type CommState, type CommLogEntry, type NotificationSpec,
 } from '../../lib/notificationMatrix';
+import { generatePeriodicPending, findPeriodicFiling } from '../../lib/notificationScheduler';
+import { useCommsMutations } from '../../lib/useCommsMutations';
+import { AcknowledgeModal } from '../../components/comms/AcknowledgeModal';
 
 type TabId = 'pending' | 'sent' | 'matrix' | 'directory' | 'raci';
 
@@ -78,18 +82,31 @@ export function CommunicationsPage() {
   const { t, lang } = useI18n();
   const [tab, setTab] = useState<TabId>('pending');
   const nowMs = Date.now();
+  const muts = useCommsMutations();
+
+  // Modal state for "Mark sent" / acknowledge flow.
+  const [ackTarget, setAckTarget] = useState<{ recordKey: string; entry: CommLogEntry; spec: NotificationSpec } | null>(null);
 
   // Flatten all comm-log entries with their record keys + spec lookup.
+  // Includes both the static seed (event-driven) and the scheduler output
+  // (calendar-driven periodic filings). Mutations are applied on top so
+  // an auditor's "mark sent" survives a reload.
   const allEntries = useMemo(() => {
     const out: Array<{ recordKey: string; logEntry: CommLogEntry; spec: NotificationSpec }> = [];
+    // Seed: event-driven entries
     for (const [recordKey, entries] of Object.entries(COMMS_LOG_BY_RECORD)) {
       for (const logEntry of entries) {
         const spec = NOTIFICATION_MATRIX.find(s => s.id === logEntry.specId);
-        if (spec) out.push({ recordKey, logEntry, spec });
+        if (spec) out.push({ recordKey, logEntry: muts.apply(recordKey, logEntry), spec });
       }
     }
+    // Scheduler: calendar-driven periodic filings
+    for (const { recordKey, entry } of generatePeriodicPending()) {
+      const spec = NOTIFICATION_MATRIX.find(s => s.id === entry.specId);
+      if (spec) out.push({ recordKey, logEntry: muts.apply(recordKey, entry), spec });
+    }
     return out;
-  }, []);
+  }, [muts]);
 
   const pending = useMemo<PendingRow[]>(() => {
     return allEntries
@@ -98,7 +115,11 @@ export function CommunicationsPage() {
         const detectedMs = new Date(e.logEntry.eventDetectedAt).getTime();
         const deadlineMs = detectedMs + e.spec.withinHours * 3600_000;
         const remainingHours = Math.round((deadlineMs - nowMs) / 3600_000);
-        return { recordKey: e.recordKey, spec: e.spec, logEntry: e.logEntry, remainingHours };
+        // Auto-flip PENDING → OVERDUE when deadline has passed.
+        const effective: CommLogEntry = (e.logEntry.state === 'PENDING' && remainingHours < 0)
+          ? { ...e.logEntry, state: 'OVERDUE' }
+          : e.logEntry;
+        return { recordKey: e.recordKey, spec: e.spec, logEntry: effective, remainingHours };
       })
       .sort((a, b) => a.remainingHours - b.remainingHours);
   }, [allEntries, nowMs]);
@@ -150,7 +171,11 @@ export function CommunicationsPage() {
           {pending.length === 0
             ? <EmptyState Icon={CheckCheck} title={t('commsPendingEmpty')} sub={t('commsPendingEmptySub')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {pending.map(p => <PendingRowCmp key={`${p.recordKey}-${p.spec.id}`} row={p} lang={lang} />)}
+                {pending.map(p => (
+                  <PendingRowCmp key={`${p.recordKey}-${p.spec.id}-${p.logEntry.id}`}
+                    row={p} lang={lang} t={t}
+                    onMarkSent={() => setAckTarget({ recordKey: p.recordKey, entry: p.logEntry, spec: p.spec })} />
+                ))}
               </div>}
         </Card>
       )}
@@ -168,23 +193,50 @@ export function CommunicationsPage() {
       {tab === 'matrix' && <NotificationMatrixView lang={lang} t={t} />}
       {tab === 'directory' && <StakeholderDirectory lang={lang} t={t} />}
       {tab === 'raci' && <RaciRegisterView lang={lang} />}
+
+      <AcknowledgeModal
+        open={!!ackTarget}
+        spec={ackTarget?.spec ?? null}
+        recordKey={ackTarget?.recordKey ?? null}
+        existing={ackTarget?.entry}
+        onClose={() => setAckTarget(null)}
+        onAcknowledge={(update) => {
+          if (!ackTarget) return;
+          muts.upsert({
+            recordKey: ackTarget.recordKey,
+            entryId: ackTarget.entry.id,
+            state: update.state,
+            receiptRef: update.receiptRef || undefined,
+            noteEn: update.note || ackTarget.entry.noteEn,
+            sentAt: new Date().toISOString(),
+          });
+          setAckTarget(null);
+        }} />
     </Shell>
   );
 }
 
 // ── Pending row ────────────────────────────────────────────────────────────
-function PendingRowCmp({ row, lang }: { row: PendingRow; lang: 'en' | 'ar' }) {
+function PendingRowCmp({
+  row, lang, t, onMarkSent,
+}: {
+  row: PendingRow;
+  lang: 'en' | 'ar';
+  t: (k: string) => string;
+  onMarkSent: () => void;
+}) {
   const stakeholder = STAKEHOLDERS.find(s => s.code === row.spec.toStakeholderCode);
   const Icon = CHANNEL_ICONS[row.spec.channel];
   const overdue = row.remainingHours < 0;
   const slaText = overdue
     ? `${formatDeadline(-row.remainingHours, lang)} ${lang === 'ar' ? 'متأخر' : 'overdue'}`
     : `${formatDeadline(row.remainingHours, lang)} ${lang === 'ar' ? 'متبقٍ' : 'left'}`;
+  const periodic = findPeriodicFiling(row.recordKey);
 
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '32px 1fr auto auto auto',
+      gridTemplateColumns: '32px 1fr auto auto auto auto',
       gap: 10, alignItems: 'center',
       padding: '8px 10px',
       borderRadius: 'var(--r-sm)',
@@ -204,14 +256,17 @@ function PendingRowCmp({ row, lang }: { row: PendingRow; lang: 'en' | 'ar' }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)',
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {lang === 'ar' ? row.spec.descriptionAr : row.spec.descriptionEn}
+          {periodic
+            ? (lang === 'ar' ? periodic.titleAr : periodic.titleEn)
+            : (lang === 'ar' ? row.spec.descriptionAr : row.spec.descriptionEn)}
         </div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
           <span className="mono">{row.recordKey}</span>
-          {' · '}
+          {' · → '}
           {lang === 'ar' ? stakeholder?.nameAr : stakeholder?.nameEn}
           {' · '}
           <span className="mono">{row.spec.regulatoryRef}</span>
+          {periodic && <> · <Badge tone="neutral">{t('commsScheduledBadge')}</Badge></>}
         </div>
         {row.logEntry.noteEn && (
           <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 2, fontStyle: 'italic' }}>
@@ -227,6 +282,9 @@ function PendingRowCmp({ row, lang }: { row: PendingRow; lang: 'en' | 'ar' }) {
       <Badge tone={STATE_BADGE[row.logEntry.state].tone} dot>
         {lang === 'ar' ? STATE_BADGE[row.logEntry.state].ar : STATE_BADGE[row.logEntry.state].en}
       </Badge>
+      <Button variant="ghost" size="sm" Icon={CheckCheck} onClick={onMarkSent}>
+        {t('commsAckCta')}
+      </Button>
     </div>
   );
 }
