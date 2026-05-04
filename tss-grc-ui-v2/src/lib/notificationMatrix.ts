@@ -22,21 +22,44 @@ export type EventKind =
   // Financial / AML
   | 'AML_SUSPICIOUS_TRANSACTION'
   | 'AML_SAR_FILING'
+  | 'AML_SANCTIONS_MATCH'
   | 'MATERIAL_EVENT_LISTED'
   // Operational / resilience
   | 'BCP_INVOCATION'
   | 'CRITICAL_TELECOM_OUTAGE'
   | 'CRITICAL_VENDOR_FAILURE'
+  | 'BCM_EXERCISE_OUTCOME'
+  | 'RTO_RPO_BREACH'
   // Audit / compliance
   | 'AUDIT_CRITICAL_FINDING'
   | 'CONTROL_SIGNIFICANT_FAILURE'
+  | 'REG_CHANGE_PUBLISHED'
+  // Risk
+  | 'KRI_RED_BREACH'
+  | 'APPETITE_BREACH'
+  // TPRM / SCM
+  | 'CRITICAL_VENDOR_OFFBOARD'
+  | 'SUB_PROCESSOR_CHANGE'
+  | 'VENDOR_SOC2_EXPIRY'
+  // Policy / DPIA
+  | 'POLICY_REVIEW_DUE'
+  | 'POLICY_EXCEPTION_APPROVED'
+  | 'DPIA_PRIOR_CONSULTATION'
+  // Change management
+  | 'CHANGE_EMERGENCY_EXECUTED'
+  | 'CHANGE_FAILED'
   // Ethics / governance
   | 'WHISTLEBLOWER_DISCLOSURE'
   | 'BOARD_RISK_ESCALATION'
+  // Evidence
+  | 'EVIDENCE_EXPIRY'
   // Periodic regulator filings
   | 'NRC_SEMI_ANNUAL_FILING'
   | 'SAMA_CSF_ANNUAL_ASSESSMENT'
-  | 'PDPL_DSR_RESPONSE';
+  | 'PDPL_ANNUAL_REPORT'
+  | 'PDPL_DSR_RESPONSE'
+  | 'AML_ANNUAL_REPORT'
+  | 'NAZAHA_ANNUAL_INTEGRITY';
 
 export type SeverityFilter = 'ANY' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'HIGH_OR_CRITICAL';
 
@@ -255,6 +278,201 @@ export const NOTIFICATION_MATRIX: NotificationSpec[] = [
     regulatoryRef: 'COSO ERM Component 1 + ISO 31000 §5.4.4',
     descriptionEn: 'Tabling at Board — risk acceptance / treatment decision.',
     descriptionAr: 'عرض على المجلس — قرار قبول أو معالجة المخاطرة.' },
+
+  // ── DD-27 expansion: closing the gap ────────────────────────────────────
+
+  // KRI red-band breach
+  { id: 'KRI-RED-RISK-CTE',
+    eventKind: 'KRI_RED_BREACH', triggerSeverity: 'ANY',
+    toStakeholderCode: 'RISK_CTE',           channel: 'IN_PERSON',
+    withinHours: 7 * 24, mandatory: true,
+    regulatoryRef: 'ISO 31000 §6.6 · COSO ERM Component 4',
+    descriptionEn: 'Tabling KRI red-band breach at Risk Committee.',
+    descriptionAr: 'عرض تجاوز مؤشر الخطر (نطاق أحمر) على لجنة المخاطر.' },
+  { id: 'KRI-RED-CRO',
+    eventKind: 'KRI_RED_BREACH', triggerSeverity: 'ANY',
+    toStakeholderCode: 'CRO',                channel: 'EMAIL',
+    withinHours: 1, mandatory: true,
+    regulatoryRef: 'Internal escalation matrix',
+    descriptionEn: 'Immediate KRI breach alert to CRO.',
+    descriptionAr: 'تنبيه فوري لرئيس المخاطر بتجاوز مؤشر الخطر.' },
+
+  // Appetite breach
+  { id: 'APPETITE-BOARD',
+    eventKind: 'APPETITE_BREACH', triggerSeverity: 'ANY',
+    toStakeholderCode: 'BOARD',              channel: 'IN_PERSON',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'COSO ERM Component 2 (appetite) · ISO 31000 §5.4.4',
+    descriptionEn: 'Risk appetite breach — Board re-affirmation required.',
+    descriptionAr: 'تجاوز مستوى تقبّل المخاطر — يستلزم اعتماد المجلس مجدداً.' },
+
+  // Regulatory change ingestion
+  { id: 'REGCHG-COMPLIANCE',
+    eventKind: 'REG_CHANGE_PUBLISHED', triggerSeverity: 'ANY',
+    toStakeholderCode: 'COMPLIANCE_LEAD',    channel: 'EMAIL',
+    withinHours: 7 * 24, mandatory: true,
+    regulatoryRef: 'COBIT MEA03 · Internal regulatory-watch',
+    descriptionEn: 'New / updated regulator publication — open impact assessment.',
+    descriptionAr: 'إصدار جديد من الجهة التنظيمية — فتح تقييم أثر.' },
+  { id: 'REGCHG-EXCO',
+    eventKind: 'REG_CHANGE_PUBLISHED', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'EXCO',               channel: 'IN_PERSON',
+    withinHours: 14 * 24, mandatory: true,
+    regulatoryRef: 'Internal escalation matrix',
+    descriptionEn: 'Briefing ExCo on HIGH-impact regulator change.',
+    descriptionAr: 'إحاطة اللجنة التنفيذية بتغيير تنظيمي عالي الأثر.' },
+
+  // Control failure
+  { id: 'CTRL-FAIL-RISKCTE',
+    eventKind: 'CONTROL_SIGNIFICANT_FAILURE', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'RISK_CTE',           channel: 'IN_PERSON',
+    withinHours: 14 * 24, mandatory: true,
+    regulatoryRef: 'COSO ERM Component 4 · NCA ECC 1.5',
+    descriptionEn: 'Significant control failure — Risk Committee escalation.',
+    descriptionAr: 'إخفاق ضابط جوهري — تصعيد إلى لجنة المخاطر.' },
+  { id: 'CTRL-FAIL-AUDITCTE',
+    eventKind: 'CONTROL_SIGNIFICANT_FAILURE', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'AUDIT_CTE',          channel: 'IN_PERSON',
+    withinHours: 14 * 24, mandatory: true,
+    regulatoryRef: 'IIA IPPF 2440',
+    descriptionEn: 'Significant control failure — Audit Committee briefing.',
+    descriptionAr: 'إخفاق ضابط جوهري — إحاطة لجنة المراجعة.' },
+
+  // BCM exercise outcome
+  { id: 'BCM-EX-AUDITCTE',
+    eventKind: 'BCM_EXERCISE_OUTCOME', triggerSeverity: 'ANY',
+    toStakeholderCode: 'AUDIT_CTE',          channel: 'IN_PERSON',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'ISO 22301 §8.5 + §9.3',
+    descriptionEn: 'BCP exercise outcome reporting — Audit Committee.',
+    descriptionAr: 'تقرير نتائج تمرين الاستمرارية — لجنة المراجعة.' },
+
+  // RTO/RPO breach
+  { id: 'RTO-EXCO',
+    eventKind: 'RTO_RPO_BREACH', triggerSeverity: 'ANY',
+    toStakeholderCode: 'EXCO',               channel: 'IN_PERSON',
+    withinHours: 4, mandatory: true,
+    regulatoryRef: 'ISO 22301 §8.4.4',
+    descriptionEn: 'RTO / RPO breach during invocation — ExCo escalation.',
+    descriptionAr: 'تجاوز مستهدفات الاستعادة أثناء التفعيل — تصعيد للجنة التنفيذية.' },
+
+  // Critical vendor off-boarding
+  { id: 'TPRM-OFFBOARD-EXCO',
+    eventKind: 'CRITICAL_VENDOR_OFFBOARD', triggerSeverity: 'ANY',
+    toStakeholderCode: 'EXCO',               channel: 'IN_PERSON',
+    withinHours: 7 * 24, mandatory: true,
+    regulatoryRef: 'ISO 27036 · NIST 800-161 §3.3.5',
+    descriptionEn: 'Critical-vendor off-boarding decision tabled at ExCo.',
+    descriptionAr: 'عرض قرار إنهاء التعاقد مع مورد حرج على اللجنة التنفيذية.' },
+
+  // Sub-processor change
+  { id: 'SUBPROC-DPO',
+    eventKind: 'SUB_PROCESSOR_CHANGE', triggerSeverity: 'ANY',
+    toStakeholderCode: 'DPO',                channel: 'EMAIL',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'PDPL Art.20 + Art.27',
+    descriptionEn: 'Notify DPO of sub-processor change for downstream review.',
+    descriptionAr: 'إبلاغ مسؤول حماية البيانات بتغيير المعالج الفرعي.' },
+
+  // Vendor SOC 2 expiry
+  { id: 'SOC2-EXPIRY-COMPLIANCE',
+    eventKind: 'VENDOR_SOC2_EXPIRY', triggerSeverity: 'ANY',
+    toStakeholderCode: 'COMPLIANCE_LEAD',    channel: 'EMAIL',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'AICPA SOC 2 attestation cycle',
+    descriptionEn: 'Vendor SOC 2 attestation due within 30 days — chase fresh report.',
+    descriptionAr: 'انتهاء شهادة SOC 2 للمورد خلال 30 يوماً — متابعة الحصول على شهادة جديدة.' },
+
+  // Policy review-due
+  { id: 'POLREVIEW-OWNER',
+    eventKind: 'POLICY_REVIEW_DUE', triggerSeverity: 'ANY',
+    toStakeholderCode: 'COMPLIANCE_LEAD',    channel: 'EMAIL',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'ISO 27001 A.5.1.2',
+    descriptionEn: 'Policy review-due — owner notification.',
+    descriptionAr: 'مراجعة السياسة مستحقة — إشعار المالك.' },
+
+  // Policy exception approved
+  { id: 'POLEXCEPT-RISKCTE',
+    eventKind: 'POLICY_EXCEPTION_APPROVED', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'RISK_CTE',           channel: 'IN_PERSON',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'NCA ECC 1.5',
+    descriptionEn: 'Policy exception (HIGH/CRITICAL impact) — Risk Committee briefing.',
+    descriptionAr: 'استثناء سياسة (عالي/حرج) — إحاطة لجنة المخاطر.' },
+
+  // DPIA prior consultation
+  { id: 'DPIA-PRIOR-SDAIA',
+    eventKind: 'DPIA_PRIOR_CONSULTATION', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'SDAIA',              channel: 'PORTAL',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'PDPL Art.26 IR §22',
+    descriptionEn: 'SDAIA prior consultation when residual HIGH risk in DPIA.',
+    descriptionAr: 'استشارة مسبقة مع هيئة البيانات عند وجود مخاطر متبقية عالية.' },
+
+  // AML sanctions match
+  { id: 'AML-SANC-LEGAL',
+    eventKind: 'AML_SANCTIONS_MATCH', triggerSeverity: 'ANY',
+    toStakeholderCode: 'GENERAL_COUNSEL',    channel: 'EMAIL',
+    withinHours: 4, mandatory: true,
+    regulatoryRef: 'SAMA AML §5 · FATF Rec 6',
+    descriptionEn: 'Sanctions match — immediate Legal review (no tipping-off).',
+    descriptionAr: 'تطابق عقوبات — مراجعة قانونية فورية (دون إخبار العميل).' },
+  { id: 'AML-SANC-SAMA',
+    eventKind: 'AML_SANCTIONS_MATCH', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'SAMA',               channel: 'SECURE_MSG',
+    withinHours: 24, mandatory: true,
+    regulatoryRef: 'SAMA AML §5.4',
+    descriptionEn: 'Confirmed sanctions match — SAMA notification.',
+    descriptionAr: 'تطابق عقوبات مؤكد — إبلاغ البنك المركزي.' },
+
+  // Change management
+  { id: 'CHGEMERG-BOARD',
+    eventKind: 'CHANGE_EMERGENCY_EXECUTED', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'BOARD',              channel: 'IN_PERSON',
+    withinHours: 7 * 24, mandatory: false,
+    regulatoryRef: 'ITIL 4 + Internal escalation',
+    descriptionEn: 'Emergency change executed — Board notification (CRITICAL only).',
+    descriptionAr: 'تنفيذ تغيير طارئ — إبلاغ المجلس (حرجة فقط).' },
+  { id: 'CHGFAIL-EXCO',
+    eventKind: 'CHANGE_FAILED', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'EXCO',               channel: 'IN_PERSON',
+    withinHours: 24, mandatory: true,
+    regulatoryRef: 'ITIL 4 · ISO 20000-1 §9.1.3',
+    descriptionEn: 'Failed change — ExCo brief + post-mortem trigger.',
+    descriptionAr: 'تغيير فاشل — إحاطة اللجنة التنفيذية وفتح تحليل سبب جذري.' },
+
+  // Evidence expiry
+  { id: 'EV-EXPIRY-OWNER',
+    eventKind: 'EVIDENCE_EXPIRY', triggerSeverity: 'ANY',
+    toStakeholderCode: 'COMPLIANCE_LEAD',    channel: 'EMAIL',
+    withinHours: 30 * 24, mandatory: true,
+    regulatoryRef: 'ISO 27001 A.7.5 · Audit-trail integrity',
+    descriptionEn: 'Evidence expiring within 30 days — owner re-collection.',
+    descriptionAr: 'انتهاء صلاحية الدليل خلال 30 يوماً — إعادة جمع من المالك.' },
+
+  // Periodic — annual reports
+  { id: 'PDPL-ANNUAL',
+    eventKind: 'PDPL_ANNUAL_REPORT', triggerSeverity: 'ANY',
+    toStakeholderCode: 'SDAIA',              channel: 'PORTAL',
+    withinHours: 365 * 24, mandatory: true,
+    regulatoryRef: 'PDPL IR §29',
+    descriptionEn: 'Annual PDPL compliance report submission to SDAIA.',
+    descriptionAr: 'تقديم التقرير السنوي للامتثال لنظام حماية البيانات.' },
+  { id: 'AML-ANNUAL-BOARD',
+    eventKind: 'AML_ANNUAL_REPORT', triggerSeverity: 'ANY',
+    toStakeholderCode: 'BOARD',              channel: 'IN_PERSON',
+    withinHours: 365 * 24, mandatory: true,
+    regulatoryRef: 'SAMA AML §10 · FATF Rec 18',
+    descriptionEn: 'Annual AML programme report to Board.',
+    descriptionAr: 'التقرير السنوي لبرنامج مكافحة غسل الأموال — المجلس.' },
+  { id: 'NAZAHA-INTEGRITY',
+    eventKind: 'NAZAHA_ANNUAL_INTEGRITY', triggerSeverity: 'ANY',
+    toStakeholderCode: 'NAZAHA',             channel: 'PORTAL',
+    withinHours: 365 * 24, mandatory: false,
+    regulatoryRef: 'Nazaha integrity framework',
+    descriptionEn: 'Annual integrity report — Nazaha submission.',
+    descriptionAr: 'التقرير السنوي للنزاهة — الإبلاغ لهيئة الرقابة.' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
