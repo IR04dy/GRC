@@ -37,9 +37,14 @@ import {
   AUDIT_APPOINTMENTS, APPOINTMENT_STATUS_TONE,
   feesByFirmYear,
 } from '../../lib/auditAppointments';
-import { Users, CalendarDays, AlertOctagon, Banknote, FileSignature } from 'lucide-react';
+import {
+  AUDIT_COMMITTEE_MEMBERS, AUDIT_COMMITTEE_CHARTER,
+  AUDIT_COMMITTEE_MEETINGS, MEETING_STATUS_TONE, ROLE_LABEL_CTE,
+  complianceCheck, meetingsHeldThisYear,
+} from '../../lib/auditCommittee';
+import { Users, CalendarDays, AlertOctagon, Banknote, FileSignature, Gavel, Scale } from 'lucide-react';
 
-type WsTabId = 'inbox' | 'plan' | 'auditors' | 'appointments';
+type WsTabId = 'inbox' | 'plan' | 'auditors' | 'appointments' | 'committee';
 
 /**
  * Auditor Workspace — ServiceNow IRM "Audit Workspace" homepage.
@@ -115,6 +120,7 @@ export function AuditWorkspacePage() {
     { id: 'plan',         label: t('audwsTabPlan') },
     { id: 'auditors',     label: t('audwsTabAuditors') },
     { id: 'appointments', label: t('audwsTabAppointments') },
+    { id: 'committee',    label: t('audwsTabCommittee') },
   ];
 
   return (
@@ -130,6 +136,7 @@ export function AuditWorkspacePage() {
       {tab === 'plan' && <PlanAndUniverseTab t={t} lang={lang} />}
       {tab === 'auditors' && <AuditorsAndCalendarTab t={t} lang={lang} />}
       {tab === 'appointments' && <AppointmentsAndFeesTab t={t} lang={lang} />}
+      {tab === 'committee' && <CommitteeTab t={t} lang={lang} />}
 
       {tab === 'inbox' && <>
 
@@ -798,6 +805,140 @@ function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: '
         <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 8, fontStyle: 'italic' }}>
           {t('audwsFeesNote')}
         </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── Audit Committee tab (DD-38) ───────────────────────────────────────────
+function CommitteeTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar' }) {
+  const compliance = complianceCheck();
+  const meetingsThisYear = meetingsHeldThisYear(2026);
+  const upcoming = AUDIT_COMMITTEE_MEETINGS.filter(m => m.status === 'SCHEDULED').length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <Kpi Icon={Users}        label={t('audwsCteMembers')}      value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role !== 'SECRETARY').length} tone="primary" />
+        <Kpi Icon={Scale}        label={t('audwsCteIndependent')}  value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role === 'CHAIR' || m.role === 'INDEPENDENT_MEMBER').length} tone="info" />
+        <Kpi Icon={ShieldCheck}  label={t('audwsCteCompliance')}   value={compliance.compliant ? '✓' : '✗'} tone={compliance.compliant ? 'success' : 'danger'} />
+        <Kpi Icon={CalendarDays} label={t('audwsCteMeetingsHeld')} value={meetingsThisYear} tone="success" />
+        <Kpi Icon={Clock}        label={t('audwsCteMeetingsUpcoming')} value={upcoming} tone="warning" />
+      </div>
+
+      {/* Composition */}
+      <Card title={t('audwsCteComposition')} Icon={Users}
+        action={<Badge tone={compliance.compliant ? 'success' : 'danger'} dot>
+          {compliance.compliant ? t('audwsCteCompliant') : t('audwsCteNonCompliant')}
+        </Badge>}>
+        {!compliance.compliant && (
+          <div style={{ padding: '8px 12px', borderRadius: 'var(--r-sm)',
+                        background: 'var(--danger-bg)', color: 'var(--danger-fg)',
+                        fontSize: 12, marginBottom: 10 }}>
+            {compliance.reasons.map((r, i) => <div key={i}>• {r}</div>)}
+          </div>
+        )}
+        {AUDIT_COMMITTEE_MEMBERS.map(m => (
+          <div key={m.nameEn} style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 130px 130px 110px 80px',
+            gap: 10, alignItems: 'center',
+            padding: '8px 0', borderBottom: '1px dashed var(--border)',
+            fontSize: 12,
+          }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                {lang === 'ar' ? m.nameAr : m.nameEn}
+              </div>
+              {m.noteEn && (
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{m.noteEn}</div>
+              )}
+            </div>
+            <Badge tone={m.role === 'CHAIR' ? 'primary' : m.role === 'INDEPENDENT_MEMBER' ? 'info' : m.role === 'SECRETARY' ? 'neutral' : 'accent'}>
+              {lang === 'ar' ? ROLE_LABEL_CTE[m.role].ar : ROLE_LABEL_CTE[m.role].en}
+            </Badge>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              {m.appointedAt} → {m.termEndsAt}
+            </span>
+            {m.financialExpert
+              ? <Badge tone="success">{t('audwsCteFinExpert')}</Badge>
+              : <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>}
+            <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.role === 'SECRETARY' ? t('audwsCteNonVoting') : t('audwsCteVoting')}</span>
+          </div>
+        ))}
+      </Card>
+
+      {/* Charter */}
+      <Card title={t('audwsCteCharter')} Icon={Gavel}
+        action={<Badge tone="info">
+          {t('audwsCteApprovedOn')} {AUDIT_COMMITTEE_CHARTER.approvedByBoardOn}
+        </Badge>}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 8 }}>
+              {t('audwsCteAuthority')}
+            </div>
+            <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.6 }}>
+              {(lang === 'ar' ? AUDIT_COMMITTEE_CHARTER.authorityAr : AUDIT_COMMITTEE_CHARTER.authorityEn).map((a, i) => (
+                <li key={i}>{a}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 8 }}>
+              {t('audwsCteResponsibilities')}
+            </div>
+            <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.6 }}>
+              {(lang === 'ar' ? AUDIT_COMMITTEE_CHARTER.responsibilitiesAr : AUDIT_COMMITTEE_CHARTER.responsibilitiesEn).map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 10 }}>
+          {t('audwsCteRules')}: ≥{AUDIT_COMMITTEE_CHARTER.minMembers} {t('audwsCteMembersWord')} · ≥{Math.round(AUDIT_COMMITTEE_CHARTER.minIndependentRatio * 100)}% {t('audwsCteIndependentWord')} · ≥{AUDIT_COMMITTEE_CHARTER.minMeetingsPerYear} {t('audwsCteMeetingsPerYear')}
+        </div>
+      </Card>
+
+      {/* Meetings */}
+      <Card title={`${t('audwsCteMeetingsTitle')} (${AUDIT_COMMITTEE_MEETINGS.length})`} Icon={CalendarDays}>
+        {[...AUDIT_COMMITTEE_MEETINGS].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)).map(m => (
+          <div key={m.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 110px 1fr 110px 130px', gap: 10, alignItems: 'center' }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.meetingCode}</span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{m.scheduledAt.replace('T', ' ').slice(0, 16)}</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  {lang === 'ar' ? m.titleAr : m.titleEn}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                  {m.attendeeCodes.length} {t('audwsCteAttendees')}
+                  {m.minuteRef ? ' · ' + m.minuteRef : ''}
+                </div>
+              </div>
+              <Badge tone={MEETING_STATUS_TONE[m.status]} dot>{m.status.replace(/_/g, ' ')}</Badge>
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.agenda.length} {t('audwsCteAgendaItems')}</span>
+            </div>
+            {m.agenda.length > 0 && (
+              <div style={{ marginTop: 6, marginInlineStart: 170, fontSize: 11, color: 'var(--ink-2)' }}>
+                {m.agenda.map((a, i) => (
+                  <div key={i} style={{ padding: '4px 0', borderTop: i > 0 ? '1px dashed var(--border)' : 'none' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>
+                      {i + 1}. {lang === 'ar' ? a.titleAr : a.titleEn}
+                      {a.ref && ' · ' + a.ref}
+                    </div>
+                    {(a.decisionEn ?? a.decisionAr) && (
+                      <div style={{ marginTop: 2, fontStyle: 'italic', color: 'var(--ink-3)' }}>
+                        → {lang === 'ar' ? (a.decisionAr ?? a.decisionEn) : a.decisionEn}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </Card>
     </div>
   );
