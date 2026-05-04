@@ -1721,4 +1721,19 @@ export const en = {
   audwsUniverseOverdue:      'overdue',
   audwsUniverseDueSoon:      'due soon',
   audwsUniverseOnTrack:      'on track',
+
+  // Audit Workspace — Auditors & Calendar tab (DD-36)
+  audwsTabAuditors:          'Auditors & Calendar',
+  audwsAuditorsTotal:        'Auditors',
+  audwsAuditorsExternal:     'External',
+  audwsAuditorsRotOverdue:   'Rotation overdue',
+  audwsAuditorsRotDueSoon:   'Rotation due soon',
+  audwsAuditorsBreaches:     'Independence breaches',
+  audwsAuditorsRegisterTitle:'Auditor register',
+  audwsAuditorsBreach:       'breach',
+  audwsAuditorsNAS:          'non-audit services',
+  audwsAuditorsCountry:      'Country',
+  audwsAuditorsPartnerY:     'Partner',
+  audwsAuditorsFirmY:        'Firm',
+  audwsCalendarTitle:        'Audit calendar —',
 } as const;

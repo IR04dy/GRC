@@ -1711,4 +1711,19 @@ export const ar = {
   audwsUniverseOverdue:      'متأخّر',
   audwsUniverseDueSoon:      'مستحقّ قريباً',
   audwsUniverseOnTrack:      'ضمن الجدول',
+
+  // Audit Workspace — Auditors & Calendar tab
+  audwsTabAuditors:          'المراجعون والجدول',
+  audwsAuditorsTotal:        'المراجعون',
+  audwsAuditorsExternal:     'خارجي',
+  audwsAuditorsRotOverdue:   'تدوير متأخّر',
+  audwsAuditorsRotDueSoon:   'تدوير مستحقّ قريباً',
+  audwsAuditorsBreaches:     'إخلال بالاستقلالية',
+  audwsAuditorsRegisterTitle:'سجل المراجعين',
+  audwsAuditorsBreach:       'إخلال',
+  audwsAuditorsNAS:          'خدمات غير تدقيقية',
+  audwsAuditorsCountry:      'الدولة',
+  audwsAuditorsPartnerY:     'الشريك',
+  audwsAuditorsFirmY:        'المكتب',
+  audwsCalendarTitle:        'جدول المراجعة —',
 } as const;

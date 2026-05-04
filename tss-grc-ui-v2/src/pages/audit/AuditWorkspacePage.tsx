@@ -29,8 +29,13 @@ import {
   AUDIT_PLANS, planCoverage,
   PLAN_STATUS_TONE, PLAN_ROW_STATUS_TONE,
 } from '../../lib/auditPlan';
+import {
+  AUDITORS, INDEPENDENCE_TONE, INDEPENDENCE_LABEL, ROLE_LABEL,
+  rotationStatus, ROTATION_TONE, ROTATION_LABEL,
+} from '../../lib/auditors';
+import { Users, CalendarDays, AlertOctagon } from 'lucide-react';
 
-type WsTabId = 'inbox' | 'plan';
+type WsTabId = 'inbox' | 'plan' | 'auditors';
 
 /**
  * Auditor Workspace — ServiceNow IRM "Audit Workspace" homepage.
@@ -102,8 +107,9 @@ export function AuditWorkspacePage() {
 
   const [tab, setTab] = useState<WsTabId>('inbox');
   const tabs: TabItem<WsTabId>[] = [
-    { id: 'inbox', label: t('audwsTabInbox') },
-    { id: 'plan',  label: t('audwsTabPlan') },
+    { id: 'inbox',    label: t('audwsTabInbox') },
+    { id: 'plan',     label: t('audwsTabPlan') },
+    { id: 'auditors', label: t('audwsTabAuditors') },
   ];
 
   return (
@@ -117,6 +123,7 @@ export function AuditWorkspacePage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'plan' && <PlanAndUniverseTab t={t} lang={lang} />}
+      {tab === 'auditors' && <AuditorsAndCalendarTab t={t} lang={lang} />}
 
       {tab === 'inbox' && <>
 
@@ -555,6 +562,136 @@ function CoverageQuickLinks() {
             </Link>
           );
         })}
+    </div>
+  );
+}
+
+// ── Auditors & Calendar tab (DD-36) ───────────────────────────────────────
+function AuditorsAndCalendarTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar' }) {
+  // Snapshot rotation status for each auditor
+  const auditorsWithStatus = AUDITORS.map(a => ({ a, ...rotationStatus(a) }));
+  const overdue   = auditorsWithStatus.filter(x => x.status === 'PARTNER_OVERDUE' || x.status === 'FIRM_OVERDUE');
+  const dueSoon   = auditorsWithStatus.filter(x => x.status === 'PARTNER_DUE_SOON' || x.status === 'FIRM_DUE_SOON');
+  const breaches  = AUDITORS.filter(a => a.independence === 'INDEPENDENCE_BREACH');
+  const nasFlags  = AUDITORS.filter(a => a.independence === 'NON_AUDIT_SERVICES');
+  const internal  = AUDITORS.filter(a => a.role === 'INTERNAL').length;
+  const external  = AUDITORS.length - internal;
+
+  // Build calendar rows from the active plan, grouped by quarter
+  const activePlan = AUDIT_PLANS.find(p => p.status === 'IN_FLIGHT') ?? AUDIT_PLANS[0];
+  const byQuarter = new Map<string, typeof activePlan.rows>();
+  for (const r of activePlan.rows) {
+    const list = byQuarter.get(r.plannedQuarter) ?? [];
+    list.push(r); byQuarter.set(r.plannedQuarter, list);
+  }
+  const quarters = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <Kpi Icon={Users}        label={t('audwsAuditorsTotal')}    value={AUDITORS.length} tone="primary" />
+        <Kpi Icon={ShieldCheck}  label={t('audwsAuditorsExternal')} value={external}        tone="info" />
+        <Kpi Icon={AlertOctagon} label={t('audwsAuditorsRotOverdue')} value={overdue.length} tone="danger" />
+        <Kpi Icon={Clock}        label={t('audwsAuditorsRotDueSoon')} value={dueSoon.length} tone="warning" />
+        <Kpi Icon={Flame}        label={t('audwsAuditorsBreaches')} value={breaches.length} tone="danger" />
+      </div>
+
+      {/* Auditor register */}
+      <Card title={`${t('audwsAuditorsRegisterTitle')} (${AUDITORS.length})`} Icon={Users}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            {breaches.length > 0 && <Badge tone="danger">{breaches.length} {t('audwsAuditorsBreach')}</Badge>}
+            {nasFlags.length > 0 && <Badge tone="warning">{nasFlags.length} {t('audwsAuditorsNAS')}</Badge>}
+          </div>
+        }>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {auditorsWithStatus.map(({ a, status, partnerYears, firmYears, rule }) => (
+            <div key={a.code} style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 130px 110px 110px 1fr 130px',
+              gap: 10, alignItems: 'center',
+              padding: '10px 0', borderBottom: '1px dashed var(--border)',
+              fontSize: 12,
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  {lang === 'ar' ? a.firmAr : a.firmEn}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                  {a.leadPartner} · {t('audwsAuditorsCountry')}: {a.country}
+                  {a.licenseRef && <> · <span className="mono">{a.licenseRef}</span></>}
+                </div>
+                {a.noteEn && (
+                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, fontStyle: 'italic' }}>
+                    {a.noteEn}
+                  </div>
+                )}
+              </div>
+              <Badge tone="info">{lang === 'ar' ? ROLE_LABEL[a.role].ar : ROLE_LABEL[a.role].en}</Badge>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+                {t('audwsAuditorsPartnerY')}: {partnerYears}y / {rule.partnerYears}y
+              </span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+                {rule.firmYears != null ? `${t('audwsAuditorsFirmY')}: ${firmYears}y / ${rule.firmYears}y` : '—'}
+              </span>
+              <Badge tone={ROTATION_TONE[status]} dot>
+                {lang === 'ar' ? ROTATION_LABEL[status].ar : ROTATION_LABEL[status].en}
+              </Badge>
+              <Badge tone={INDEPENDENCE_TONE[a.independence]} dot>
+                {lang === 'ar' ? INDEPENDENCE_LABEL[a.independence].ar : INDEPENDENCE_LABEL[a.independence].en}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Calendar (plan rows grouped by quarter) */}
+      <Card title={`${t('audwsCalendarTitle')} ${activePlan.year}`} Icon={CalendarDays}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {quarters.map(q => {
+            const list = byQuarter.get(q) ?? [];
+            return (
+              <div key={q} style={{
+                padding: '10px 12px',
+                borderRadius: 'var(--r-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--surface-1)',
+                minHeight: 200,
+              }}>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700,
+                              textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8,
+                              display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{q} {activePlan.year}</span>
+                  <span>{list.length}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {list.length === 0
+                    ? <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
+                    : list.map(r => (
+                      <div key={r.id} style={{
+                        padding: '6px 8px', borderRadius: 'var(--r-sm)',
+                        background: 'var(--surface-2)',
+                        borderInlineStartWidth: 3,
+                        borderInlineStartStyle: 'solid',
+                        borderInlineStartColor: r.status === 'COMPLETED' ? 'var(--success)' :
+                                                r.status === 'IN_FIELDWORK' ? 'var(--cat-2)' :
+                                                r.status === 'REPORT' ? 'var(--accent-700)' : 'var(--ink-4)',
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-1)' }}>
+                          {r.framework.replace(/_/g, ' ')}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>
+                          {r.plannedAuditor} · {r.plannedDays}d
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
     </div>
   );
 }
