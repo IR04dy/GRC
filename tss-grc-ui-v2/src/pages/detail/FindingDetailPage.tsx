@@ -16,7 +16,7 @@ import { useToast } from '../../lib/toast';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { FINDING_ANCHORS_BY_ID } from '../../lib/entityAnchors';
-import { FINDING_EVIDENCE_BY_ID, FINDING_HISTORY_BY_ID } from '../compliance/mockCompliance';
+import { COMPLIANCE_FINDINGS, FINDING_EVIDENCE_BY_ID, FINDING_HISTORY_BY_ID } from '../compliance/mockCompliance';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 
 type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history' | 'comms';
@@ -38,8 +38,8 @@ export function FindingDetailPage() {
     if (!id) return;
     setLoading(true);
     complianceApi.findings(0, 200)
-      .then(p => setItem(p.content?.find(f => f.id === Number(id)) ?? null))
-      .catch(() => setItem(null))
+      .then(p => setItem(p.content?.find(f => f.id === Number(id)) ?? COMPLIANCE_FINDINGS.find(f => f.id === Number(id)) ?? null))
+      .catch(() => setItem(COMPLIANCE_FINDINGS.find(f => f.id === Number(id)) ?? null))
       .finally(() => setLoading(false));
   }, [id]);
 
