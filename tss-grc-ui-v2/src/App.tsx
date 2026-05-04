@@ -32,6 +32,10 @@ import { AuditWorkspacePage } from './pages/audit/AuditWorkspacePage';
 import { EngagementDetailPage } from './pages/audit/EngagementDetailPage';
 import { CommunicationsPage } from './pages/comms/CommunicationsPage';
 import { CapaPage } from './pages/capa/CapaPage';
+import { DsrPortalPage } from './pages/portal/DsrPortalPage';
+import { SpeakUpPortalPage } from './pages/portal/SpeakUpPortalPage';
+import { CaseTrackerPage } from './pages/portal/CaseTrackerPage';
+import { IntakeInboxPage } from './pages/intake/IntakeInboxPage';
 
 export function App() {
   return (
@@ -83,6 +87,14 @@ export function App() {
 
               {/* CAPA register (DD-42) */}
               <Route path="/capa"               element={<CapaPage />} />
+
+              {/* Public-facing intake portals (DD-55..57) — no auth */}
+              <Route path="/portal/dsr"         element={<DsrPortalPage />} />
+              <Route path="/portal/speakup"     element={<SpeakUpPortalPage />} />
+              <Route path="/portal/track"       element={<CaseTrackerPage />} />
+
+              {/* Triager inbox (DD-58) */}
+              <Route path="/intake-inbox"       element={<IntakeInboxPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />
