@@ -1,6 +1,6 @@
 import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
-         GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, type LucideIcon } from 'lucide-react';
+         GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
@@ -27,6 +27,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'dashboard',    to: '/dashboard',       Icon: LayoutDashboard, labelKey: 'itemDashboard' },
       { id: 'audit-ws',     to: '/audit-workspace', Icon: Stamp,           labelKey: 'modAuditWorkspace' },
       { id: 'authorities',  to: '/authorities',     Icon: Landmark,        labelKey: 'modAuthorities' },
+      { id: 'comms',        to: '/communications',  Icon: Send,            labelKey: 'modCommunications' },
     ],
   },
   {

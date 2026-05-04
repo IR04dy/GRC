@@ -42,6 +42,7 @@ const PAGE_ITEMS: SearchItem[] = [
   { id: 'page-dashboard',  kind: 'PAGE', title: 'Dashboard',           href: '/dashboard',       Icon: LayoutDashboard, keywords: ['home', 'overview'] },
   { id: 'page-audit-ws',   kind: 'PAGE', title: 'Audit Workspace',     href: '/audit-workspace', Icon: Stamp,           keywords: ['auditor', 'sign-off', 'capa'] },
   { id: 'page-authorities',kind: 'PAGE', title: 'Regulatory Authorities', href: '/authorities',  Icon: Landmark,        keywords: ['regulators', 'nca', 'sama', 'sdaia'] },
+  { id: 'page-comms',      kind: 'PAGE', title: 'Communications',      href: '/communications',  Icon: Stamp,           keywords: ['stakeholders', 'notifications', 'raci', 'comms', 'sla'] },
   { id: 'page-risk',       kind: 'PAGE', title: 'Enterprise Risk',     href: '/risk',            Icon: AlertTriangle,   keywords: ['register', 'iso 31000'] },
   { id: 'page-compliance', kind: 'PAGE', title: 'Compliance & Audit',  href: '/compliance',      Icon: ClipboardCheck,  keywords: ['controls', 'findings', 'capa'] },
   { id: 'page-cyber',      kind: 'PAGE', title: 'Cybersecurity',       href: '/cyber',           Icon: LockKeyhole,     keywords: ['nca ecc', 'iso 27001'] },

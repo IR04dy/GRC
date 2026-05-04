@@ -30,6 +30,7 @@ import { AuthorityWorkspacePage } from './pages/authority/AuthorityWorkspacePage
 import { AuthoritiesIndexPage } from './pages/authority/AuthoritiesIndexPage';
 import { AuditWorkspacePage } from './pages/audit/AuditWorkspacePage';
 import { EngagementDetailPage } from './pages/audit/EngagementDetailPage';
+import { CommunicationsPage } from './pages/comms/CommunicationsPage';
 
 export function App() {
   return (
@@ -75,6 +76,9 @@ export function App() {
               {/* Auditor Workspace (Phase C — auditor's sign-off home) */}
               <Route path="/audit-workspace"    element={<AuditWorkspacePage />} />
               <Route path="/audit-workspace/engagement/:id" element={<EngagementDetailPage />} />
+
+              {/* Communications + Stakeholder workspace (DD-22..26) */}
+              <Route path="/communications"     element={<CommunicationsPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />
