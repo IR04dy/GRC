@@ -27,8 +27,9 @@ import { INCIDENTS } from './mockIncidents';
 import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { INCIDENT_ANCHORS } from '../../lib/moduleAnchors';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 
-type TabId = 'overview' | 'register' | 'timeline' | 'lessons';
+type TabId = 'overview' | 'register' | 'timeline' | 'lessons' | 'comms';
 
 const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
@@ -114,6 +115,7 @@ export function IncidentsPage() {
     { id: 'register', label: t('incidentsTabRegister') },
     { id: 'timeline', label: t('incidentsTabTimeline') },
     { id: 'lessons',  label: t('incidentsTabLessons') },
+    { id: 'comms',    label: t('detailTabComms') },
   ];
 
   const cols: Column<IncidentDto>[] = [
@@ -291,6 +293,7 @@ export function IncidentsPage() {
           </Card>
         </div>
       )}
+      {tab === 'comms' && <CommsPanel module="INCIDENT" />}
 
       <FormModal<IncidentRequest>
         open={open}

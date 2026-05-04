@@ -24,8 +24,9 @@ import { TPRM_WORKFLOWS } from '../../lib/mockWorkflows';
 import { TPRM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { TPRM_ANCHORS } from '../../lib/moduleAnchors';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 
-type TabId = 'overview' | 'vendors' | 'assessments' | 'contracts' | 'workflows';
+type TabId = 'overview' | 'vendors' | 'assessments' | 'contracts' | 'workflows' | 'comms';
 
 const RISK_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
@@ -81,6 +82,7 @@ export function TprmPage() {
     { id: 'assessments', label: t('tprmTabAssessments') },
     { id: 'contracts',   label: t('tprmTabContracts') },
     { id: 'workflows',   label: t('tprmTabWorkflows') ?? 'Workflows' },
+    { id: 'comms',       label: t('detailTabComms') },
   ];
 
   const cols: Column<TprmVendorDto>[] = [
@@ -228,6 +230,7 @@ export function TprmPage() {
         title={t('tprmTabWorkflows') ?? 'Workflows'}
         sub={t('tprmWorkflowsSub')}
         t={t} />}
+      {tab === 'comms' && <CommsPanel module="TPRM" />}
 
       <FormModal<TprmVendorRequest>
         open={open}

@@ -44,8 +44,9 @@ import { CYBER_WORKFLOWS } from '../../lib/mockWorkflows';
 import { CYBER_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CYBER_ANCHORS } from '../../lib/moduleAnchors';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 
-type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions' | 'workflows';
+type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions' | 'workflows' | 'comms';
 
 // ─── Workflow stage steppers (overview tab) ─────────────────────────────────
 const VULN_STAGES = [
@@ -561,6 +562,7 @@ export function CyberPage() {
     { id: 'evidence',    label: t('cyberTabEvidence') },
     { id: 'actions',     label: t('cyberTabActions') },
     { id: 'workflows',   label: t('cyberTabWorkflows') ?? 'Workflows' },
+    { id: 'comms',       label: t('detailTabComms') },
   ];
 
   // ── Submit handlers ──
@@ -922,6 +924,7 @@ export function CyberPage() {
         title={t('cyberTabWorkflows') ?? 'Workflows'}
         sub="Cyber incident response (NIST 800-61), vulnerability remediation, control assessments, and exception approvals."
         t={t} />}
+      {tab === 'comms' && <CommsPanel module="INCIDENT" />}
 
       {/* ── Modals ── */}
       <FormModal<CyberControlRequest> open={ctrlS.open}

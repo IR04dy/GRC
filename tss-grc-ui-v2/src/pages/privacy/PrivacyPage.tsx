@@ -26,8 +26,9 @@ import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { PRIVACY_ANCHORS } from '../../lib/moduleAnchors';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 
-type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows';
+type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows' | 'comms';
 
 const TYPE_OPTIONS = [
   { value: 'ACCESS', label: 'Access' }, { value: 'ERASURE', label: 'Erasure' },
@@ -83,6 +84,7 @@ export function PrivacyPage() {
     { id: 'dpia',     label: t('privacyTabDpia') },
     { id: 'consent',  label: t('privacyTabConsent') },
     { id: 'workflows', label: t('privacyTabWorkflows') ?? 'Workflows' },
+    { id: 'comms',     label: t('detailTabComms') },
   ];
 
   const dsrCols: Column<PrivacyDsrDto>[] = [
@@ -298,6 +300,7 @@ export function PrivacyPage() {
         title={t('privacyTabWorkflows') ?? 'Workflows'}
         sub="DSR fulfilment (PDPL 30-day), breach notification (PDPL 72-hour) and DPIA review."
         t={t} />}
+      {tab === 'comms' && <CommsPanel module="BREACH" />}
 
       <FormModal<PrivacyDsrRequest>
         open={open}
