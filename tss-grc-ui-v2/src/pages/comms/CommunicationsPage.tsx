@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Send, Inbox, CheckCheck, AlertOctagon, Users, Megaphone,
   Mail, Phone, ExternalLink, Building2, MessageSquare, FileSignature,
@@ -97,6 +97,21 @@ export function CommunicationsPage() {
   const [composeTarget, setComposeTarget] = useState<{ recordKey: string; entry: CommLogEntry; spec: NotificationSpec; recordTitle?: string } | null>(null);
   // Modal state for "New Communication" — entry point for ad-hoc + lifecycle-managed comms.
   const [newCommOpen, setNewCommOpen] = useState(false);
+  const [newCommSource, setNewCommSource] = useState<string | undefined>(undefined);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Auto-open the modal when arriving via the Topbar "New Comm" entry
+  // (?new=1[&source=KIND:ID]). Pre-fills the source-record key when given.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setNewCommSource(searchParams.get('source') ?? undefined);
+      setNewCommOpen(true);
+      // Clean up so refreshing doesn't re-open the modal.
+      const next = new URLSearchParams(searchParams);
+      next.delete('new'); next.delete('source');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Communication-record store (DD-32 — first-class entity with lifecycle).
   const comms = useCommunications();
@@ -271,7 +286,8 @@ export function CommunicationsPage() {
 
       <NewCommunicationModal
         open={newCommOpen}
-        onClose={() => setNewCommOpen(false)}
+        presetSourceRecordKey={newCommSource}
+        onClose={() => { setNewCommOpen(false); setNewCommSource(undefined); }}
         onCreate={(init) => comms.create(init)} />
     </Shell>
   );

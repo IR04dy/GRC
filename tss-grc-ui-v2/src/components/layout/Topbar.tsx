@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Bell, Languages, LogOut, Sun, Moon, Monitor, Building2, Check, ChevronDown } from 'lucide-react';
+import { Search, Bell, Languages, LogOut, Sun, Moon, Monitor, Building2, Check, ChevronDown, Send } from 'lucide-react';
 import { useI18n } from '../../lib/i18n';
 import { getUser, clearSession, updateAccessTokenAndOrg } from '../../lib/auth';
 import { logout, platformApi, ApiError, type OrganisationView } from '../../lib/api';
@@ -46,6 +46,24 @@ export function Topbar({ title, sub, onOpenPalette }: { title: string; sub?: str
         </button>
 
         <OrgSwitcher />
+
+        <button
+          type="button"
+          className="icon-btn"
+          title={t('newCommCta')}
+          aria-label={t('newCommCta')}
+          onClick={() => {
+            const here = window.location.pathname;
+            // Carry the current page as a source-record hint (best-effort).
+            const hint = here.match(/^\/risk\/(\d+)/) ? `RISK:${RegExp.$1}`
+                      : here.match(/^\/findings\/(\d+)/) ? `AUDIT_FINDING:${RegExp.$1}`
+                      : here.match(/^\/changes/) ? '' /* no specific change in URL */
+                      : '';
+            const target = `/communications?new=1${hint ? `&source=${encodeURIComponent(hint)}` : ''}`;
+            navigate(target);
+          }}>
+          <Send size={18} />
+        </button>
 
         <button className="icon-btn" title={t('notifications')} aria-label={t('notifications')}>
           <Bell size={18} />
