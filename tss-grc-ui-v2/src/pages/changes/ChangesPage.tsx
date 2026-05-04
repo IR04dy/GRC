@@ -30,8 +30,9 @@ import { CHANGE_REQUESTS, CHANGE_ANALYTICS } from './mockChanges';
 import { CHANGE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CHANGE_ANCHORS } from '../../lib/moduleAnchors';
+import { CommsPanel } from '../../components/comms/CommsPanel';
 
-type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations';
+type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations' | 'comms';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', SUBMITTED: 'info', IMPACT_ASSESSED: 'info',
@@ -130,6 +131,7 @@ export function ChangesPage() {
     { id: 'workflow',     label: t('changeTabWorkflow') },
     { id: 'analytics',    label: t('changeTabAnalytics') },
     { id: 'integrations', label: t('changeTabIntegrations') },
+    { id: 'comms',        label: t('detailTabComms') },
   ];
 
   const FIELDS: FieldDef[] = [
@@ -266,6 +268,8 @@ export function ChangesPage() {
           t={t} toast={toast}
         />
       )}
+
+      {tab === 'comms' && <CommsPanel module="CHANGE" />}
 
       <FormModal<Partial<ChangeRequestDto>>
         open={modalOpen}

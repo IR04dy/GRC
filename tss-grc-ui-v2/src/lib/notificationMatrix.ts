@@ -48,6 +48,12 @@ export type EventKind =
   // Change management
   | 'CHANGE_EMERGENCY_EXECUTED'
   | 'CHANGE_FAILED'
+  | 'CAB_FORWARD_SCHEDULE'
+  | 'CHANGE_CUSTOMER_PRE_ADVISORY'
+  | 'CHANGE_CUSTOMER_DURING'
+  | 'CHANGE_CUSTOMER_POST'
+  | 'CHANGE_FREEZE_ANNOUNCE'
+  | 'CHANGE_CAB_NOTICE'
   // Ethics / governance
   | 'WHISTLEBLOWER_DISCLOSURE'
   | 'BOARD_RISK_ESCALATION'
@@ -473,6 +479,58 @@ export const NOTIFICATION_MATRIX: NotificationSpec[] = [
     regulatoryRef: 'Nazaha integrity framework',
     descriptionEn: 'Annual integrity report — Nazaha submission.',
     descriptionAr: 'التقرير السنوي للنزاهة — الإبلاغ لهيئة الرقابة.' },
+
+  // ── DD-33 expansion: Change Management communication layer ──────────────
+  // Forward Schedule of Change (FSC) — weekly distribution to stakeholder
+  // groups so business + IT can plan around scheduled work.
+  { id: 'CAB-FSC-WEEKLY',
+    eventKind: 'CAB_FORWARD_SCHEDULE', triggerSeverity: 'ANY',
+    toStakeholderCode: 'EXCO',               channel: 'EMAIL',
+    withinHours: 7 * 24, mandatory: true,
+    regulatoryRef: 'ITIL 4 Change Enablement · ISO 20000-1 §9.1.4',
+    descriptionEn: 'Weekly Forward Schedule of Change — distribution to subscribers.',
+    descriptionAr: 'الجدول الأسبوعي للتغييرات المستقبلية — التوزيع على المشتركين.' },
+
+  // CAB notice — Normal change requires CAB before SCHEDULED status.
+  { id: 'CHG-CAB-NOTICE',
+    eventKind: 'CHANGE_CAB_NOTICE', triggerSeverity: 'ANY',
+    toStakeholderCode: 'EXCO',               channel: 'EMAIL',
+    withinHours: 48, mandatory: true,
+    regulatoryRef: 'ITIL 4 · NCA ECC 4-3-2',
+    descriptionEn: 'CAB approval notice — distribute decision to change-owner + sponsor.',
+    descriptionAr: 'إشعار اعتماد CAB — توزيع القرار على مالك التغيير والراعي.' },
+
+  // Customer-impact comms — three-stage cycle: pre / during / post.
+  { id: 'CHG-CUST-PRE',
+    eventKind: 'CHANGE_CUSTOMER_PRE_ADVISORY', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'AFFECTED_DATA_SUBJECTS', channel: 'EMAIL',
+    withinHours: 7 * 24, mandatory: true,
+    regulatoryRef: 'ITIL 4 (customer comms) · SAMA CSF 4.4.4',
+    descriptionEn: 'Customer pre-change advisory — outage window + impact summary.',
+    descriptionAr: 'إشعار العملاء قبل التغيير — نافذة الانقطاع وملخص الأثر.' },
+  { id: 'CHG-CUST-DURING',
+    eventKind: 'CHANGE_CUSTOMER_DURING', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'AFFECTED_DATA_SUBJECTS', channel: 'PUBLIC_DISCLOSURE',
+    withinHours: 1, mandatory: true,
+    regulatoryRef: 'ITIL 4 · Internal SLA',
+    descriptionEn: 'Status-page update during change window — service health.',
+    descriptionAr: 'تحديث صفحة الحالة أثناء نافذة التغيير — صحة الخدمة.' },
+  { id: 'CHG-CUST-POST',
+    eventKind: 'CHANGE_CUSTOMER_POST', triggerSeverity: 'HIGH_OR_CRITICAL',
+    toStakeholderCode: 'AFFECTED_DATA_SUBJECTS', channel: 'EMAIL',
+    withinHours: 4, mandatory: true,
+    regulatoryRef: 'ITIL 4 · Internal SLA',
+    descriptionEn: 'Customer post-change all-clear — outcome summary.',
+    descriptionAr: 'إشعار العملاء بعد التغيير — ملخص النتيجة وانتهاء العمل.' },
+
+  // Change freeze announcements — calendar-driven org-wide notice.
+  { id: 'CHG-FREEZE-ANNOUNCE',
+    eventKind: 'CHANGE_FREEZE_ANNOUNCE', triggerSeverity: 'ANY',
+    toStakeholderCode: 'EXCO',               channel: 'EMAIL',
+    withinHours: 30 * 24, mandatory: false,
+    regulatoryRef: 'ITIL 4 — change freeze · Internal release calendar',
+    descriptionEn: 'Change-freeze announcement — exception process + dates.',
+    descriptionAr: 'إعلان تجميد التغييرات — تواريخ الفترة وآلية الاستثناء.' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -566,6 +624,32 @@ export const COMMS_LOG_BY_RECORD: Record<string, CommLogEntry[]> = {
     { id: 'log-12', specId: 'PDPL-SDAIA-72H', eventDetectedAt: '2026-04-19T09:42:00',
       state: 'PENDING',      noteEn: 'Awaiting impact assessment — internal scope only, may not reach reporting threshold.' },
   ],
+  // Change requests — DD-33 demo seed
+  'CHANGE_REQUEST:1': [
+    { id: 'log-15', specId: 'CHG-CAB-NOTICE', eventDetectedAt: '2026-04-22T15:00:00',
+      state: 'SENT', sentAt: '2026-04-22T15:30:00',
+      noteEn: 'CAB approval circulated to change-owner + sponsor — PostgreSQL 16 upgrade.' },
+    { id: 'log-16', specId: 'CHG-CUST-PRE', eventDetectedAt: '2026-04-25T09:00:00',
+      state: 'SENT', sentAt: '2026-04-26T10:00:00',
+      noteEn: '7-day customer pre-advisory dispatched — financial-systems read-only window.' },
+    { id: 'log-17', specId: 'CHG-CUST-DURING', eventDetectedAt: '2026-05-04T22:00:00',
+      state: 'PENDING',
+      noteEn: 'Status-page update scheduled for cutover-window start (2026-05-04T22:00).' },
+    { id: 'log-18', specId: 'CHG-CUST-POST', eventDetectedAt: '2026-05-05T02:00:00',
+      state: 'PENDING',
+      noteEn: 'All-clear advisory queued for after the maintenance window.' },
+  ],
+  'CHANGE_REQUEST:2': [
+    { id: 'log-19', specId: 'CHG-CAB-NOTICE', eventDetectedAt: '2026-04-26T14:00:00',
+      state: 'SENT', sentAt: '2026-04-26T14:20:00',
+      noteEn: 'CAB approved firewall ruleset v3 — phased site-by-site rollout.' },
+  ],
+  'PERIODIC:CAB-FSC-2026-W18': [
+    { id: 'log-20', specId: 'CAB-FSC-WEEKLY', eventDetectedAt: '2026-04-27T00:00:00',
+      state: 'SENT', sentAt: '2026-04-27T08:00:00',
+      noteEn: 'Week-18 FSC distributed — 7 SCHEDULED changes + 2 EMERGENCY pre-approved.' },
+  ],
+
   // Audit findings (CRITICAL ones)
   'AUDIT_FINDING:31': [
     { id: 'log-13', specId: 'AUDIT-CTE',   eventDetectedAt: '2026-04-15T00:00:00',

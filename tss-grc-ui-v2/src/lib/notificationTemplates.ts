@@ -450,6 +450,250 @@ Internal Audit
 المراجعة الداخلية
 {orgName}` },
 
+  // ── Forward Schedule of Change (DD-33) ──────────────────────────────────
+  { specId: 'CAB-FSC-WEEKLY',
+    subjectEn: 'Forward Schedule of Change — week of {todayIso}',
+    subjectAr: 'جدول التغييرات المستقبلية — أسبوع {todayIso}',
+    bodyEn: `Subscribers,
+
+This is the weekly Forward Schedule of Change (FSC) covering the next
+7 days of approved Normal + Standard changes.
+
+Distribution: ITSM Users · Business Stakeholders · Service Owners
+
+Schedule
+[Auto-generated from CAB-approved changes — populate from CHANGE_REQUESTS
+where status = SCHEDULED + scheduledStart between today and today+7]
+
+Each row will show: change code · title · scheduled window · risk level
+· change owner · customer-impact summary.
+
+Change-freeze windows applicable to this period: [populate]
+
+Questions: route to Change Manager via the CAB inbox.
+
+{senderName} ({senderRole})
+{orgName}`,
+    bodyAr: `المشتركون،
+
+هذا هو الجدول الأسبوعي للتغييرات المستقبلية (FSC) ويغطي الأيام السبعة
+القادمة من التغييرات الطبيعية والقياسية المعتمدة.
+
+التوزيع: مستخدمو ITSM · أصحاب المصلحة في الأعمال · مالكو الخدمات
+
+الجدول
+[يُنشأ تلقائياً من التغييرات المعتمدة في CAB — التعبئة من CHANGE_REQUESTS
+حيث الحالة = SCHEDULED والتاريخ بين اليوم واليوم+7]
+
+كل صف يعرض: رمز التغيير · العنوان · نافذة الجدولة · مستوى الخطر
+· مالك التغيير · ملخص الأثر على العملاء.
+
+نوافذ تجميد التغييرات المنطبقة على هذه الفترة: [استكمال]
+
+للاستفسارات: يُحال إلى مدير التغيير عبر صندوق CAB.
+
+{senderName} ({senderRole})
+{orgName}` },
+
+  // CAB approval notice
+  { specId: 'CHG-CAB-NOTICE',
+    subjectEn: 'CAB decision — {recordKey}',
+    subjectAr: 'قرار CAB — {recordKey}',
+    bodyEn: `Change owner + sponsor,
+
+CAB has reviewed and DECISION the following change.
+
+Reference: {recordKey}
+Title: {recordTitle}
+
+Decision: [APPROVED / REJECTED / DEFERRED]
+Conditions: [populate]
+Risk concerns raised: [populate]
+
+Implementation window: [populate]
+Rollback gate: [populate]
+
+Next steps:
+- Communication plan publishing
+- Customer pre-advisory dispatch (if applicable)
+- Status-page update on day-of
+
+{senderName} ({senderRole})
+{orgName}`,
+    bodyAr: `إلى مالك التغيير والراعي،
+
+راجعت لجنة CAB التغيير التالي وأصدرت قرارها.
+
+المرجع: {recordKey}
+العنوان: {recordTitle}
+
+القرار: [موافقة / رفض / تأجيل]
+الشروط: [استكمال]
+المخاوف المُثارة: [استكمال]
+
+نافذة التنفيذ: [استكمال]
+بوابة التراجع: [استكمال]
+
+الخطوات التالية:
+- نشر خطة الاتصال
+- إرسال الإشعار المسبق للعملاء (إن وُجد)
+- تحديث صفحة الحالة في يوم التنفيذ
+
+{senderName} ({senderRole})
+{orgName}` },
+
+  // Customer pre-change advisory
+  { specId: 'CHG-CUST-PRE',
+    subjectEn: 'Scheduled maintenance — {recordTitle}',
+    subjectAr: 'أعمال صيانة مجدولة — {recordTitle}',
+    bodyEn: `Dear customer,
+
+We are writing to inform you of upcoming scheduled maintenance that
+may affect the services you rely on.
+
+What is happening
+{recordTitle}
+
+When
+[Populate — start + end + timezone]
+
+Expected impact
+[Populate — service availability, performance, customer-facing surfaces]
+
+What you can do
+- No action is required from you.
+- We will publish status updates at status.{orgName}.
+- A post-maintenance summary will be sent once work is complete.
+
+We apologise for any inconvenience.
+
+{orgName}`,
+    bodyAr: `عزيزنا العميل،
+
+نكتب إليك للإبلاغ عن أعمال صيانة مجدولة قادمة قد تؤثر على الخدمات
+التي تعتمد عليها.
+
+ما الذي يحدث
+{recordTitle}
+
+متى
+[استكمال — البدء + الانتهاء + المنطقة الزمنية]
+
+الأثر المتوقع
+[استكمال — توافر الخدمة، الأداء، الواجهات التي يستخدمها العميل]
+
+ما يمكنك فعله
+- لا يلزم أي إجراء من جانبك.
+- سننشر تحديثات الحالة على صفحة status.{orgName}.
+- سيتم إرسال ملخص بعد الانتهاء من الأعمال.
+
+نعتذر عن أي إزعاج قد ينتج.
+
+{orgName}` },
+
+  // Customer during-change status update (status page entry)
+  { specId: 'CHG-CUST-DURING',
+    subjectEn: 'Maintenance in progress — {recordTitle}',
+    subjectAr: 'الصيانة جارية الآن — {recordTitle}',
+    bodyEn: `Status: IN PROGRESS
+Started: {todayIso}
+Reference: {recordKey}
+
+We are currently performing the maintenance announced on [date]:
+{recordTitle}
+
+Current state: [populate — services degraded / down / nominal]
+Expected resolution: [populate]
+Next update: [populate — every 30/60 min]`,
+    bodyAr: `الحالة: قيد التنفيذ
+البدء: {todayIso}
+المرجع: {recordKey}
+
+نقوم حالياً بتنفيذ أعمال الصيانة التي أُعلن عنها بتاريخ [التاريخ]:
+{recordTitle}
+
+الحالة الراهنة: [استكمال — الخدمات متعطّلة / متراجعة / طبيعية]
+الانتهاء المتوقع: [استكمال]
+التحديث التالي: [استكمال — كل 30/60 دقيقة]` },
+
+  // Customer post-change all-clear
+  { specId: 'CHG-CUST-POST',
+    subjectEn: 'Maintenance complete — {recordTitle}',
+    subjectAr: 'اكتملت الصيانة — {recordTitle}',
+    bodyEn: `Dear customer,
+
+The scheduled maintenance referenced as {recordKey} is now complete.
+
+Summary
+{recordTitle}
+
+Outcome: [SUCCESS / PARTIAL / ROLLED-BACK]
+Total duration: [populate]
+Customer-visible impact: [populate]
+
+If you continue to experience issues, please contact support.
+
+Thank you for your patience.
+
+{orgName}`,
+    bodyAr: `عزيزنا العميل،
+
+اكتملت أعمال الصيانة المُسجَّلة برمز {recordKey}.
+
+الملخص
+{recordTitle}
+
+النتيجة: [نجاح / جزئي / تم التراجع]
+المدة الإجمالية: [استكمال]
+الأثر الذي ظهر للعميل: [استكمال]
+
+إذا استمررت في مواجهة أي مشاكل، يرجى التواصل مع الدعم.
+
+شكراً لصبركم.
+
+{orgName}` },
+
+  // Change freeze announcement
+  { specId: 'CHG-FREEZE-ANNOUNCE',
+    subjectEn: 'Change freeze — {recordTitle}',
+    subjectAr: 'تجميد التغييرات — {recordTitle}',
+    bodyEn: `Subscribers,
+
+A change freeze is in effect for the period below. During this window
+only Standard pre-approved + Emergency changes will be permitted.
+
+Period: [populate — start → end]
+Reason: [populate — release window / regulator audit / Hajj period / etc.]
+Approval path during freeze: [populate]
+
+Exception requests
+Submit via the change-management portal with:
+- Business justification
+- Risk assessment
+- Rollback plan
+- Pre-approval from [populate — ExCo / CIO / CISO]
+
+{senderName} ({senderRole})
+{orgName}`,
+    bodyAr: `المشتركون،
+
+سيتم تطبيق تجميد للتغييرات خلال الفترة أدناه. خلال هذه الفترة لن
+يُسمح إلا بالتغييرات القياسية المعتمدة مسبقاً والتغييرات الطارئة.
+
+الفترة: [استكمال — البدء → الانتهاء]
+السبب: [استكمال — نافذة إصدار / تدقيق تنظيمي / موسم الحج / إلخ]
+مسار الاعتماد خلال التجميد: [استكمال]
+
+طلبات الاستثناء
+تُقدَّم عبر بوابة إدارة التغيير مع:
+- المبرّر التجاري
+- تقييم المخاطر
+- خطة التراجع
+- اعتماد مسبق من [استكمال — اللجنة التنفيذية / الرئيس المعلوماتي / رئيس الأمن]
+
+{senderName} ({senderRole})
+{orgName}` },
+
   // ── Generic fallback — shown for any spec without a hand-written template
   { specId: '*',
     subjectEn: 'Notification — {recordTitle}',

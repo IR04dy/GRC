@@ -13,9 +13,10 @@
 import type { CommLogEntry } from './notificationMatrix';
 import { NOTIFICATION_MATRIX } from './notificationMatrix';
 
-export type Cadence = 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL';
+export type Cadence = 'WEEKLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL';
 
 export const CADENCE_DAYS: Record<Cadence, number> = {
+  WEEKLY:      7,
   QUARTERLY:   90,
   SEMI_ANNUAL: 180,
   ANNUAL:      365,
@@ -84,6 +85,12 @@ export const PERIODIC_FILINGS: PeriodicFiling[] = [
     lastFiledAt: '2025-12-15', cadence: 'QUARTERLY',
     titleEn: 'Quarterly Audit Committee briefing — Q1 2026',
     titleAr: 'الإحاطة الفصلية للجنة المراجعة — الربع الأول 2026' },
+
+  // Forward Schedule of Change (DD-33) — weekly distribution
+  { recordKey: 'PERIODIC:CAB-FSC-2026-W19', specId: 'CAB-FSC-WEEKLY',
+    lastFiledAt: '2026-04-27', cadence: 'WEEKLY',
+    titleEn: 'Forward Schedule of Change — week 19 of 2026',
+    titleAr: 'جدول التغييرات المستقبلية — أسبوع 19 من 2026' },
 ];
 
 /**
