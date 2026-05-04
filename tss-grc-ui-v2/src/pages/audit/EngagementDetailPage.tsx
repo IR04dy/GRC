@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Briefcase, Stamp, ScrollText, AlertTriangle, FileCheck2,
-  CalendarDays, Activity, ArrowRight,
+  CalendarDays, Activity, ArrowRight, Play, Send, Lock, RefreshCw,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -11,12 +11,14 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import {
   AUDIT_ENGAGEMENTS, COMPLIANCE_FINDINGS, FRAMEWORKS,
 } from '../compliance/mockCompliance';
 import { EVIDENCE } from '../evidence/mockEvidence';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 
 type TabId = 'timeline' | 'scope' | 'findings' | 'workpapers' | 'comms';
@@ -36,12 +38,21 @@ interface Milestone {
 export function EngagementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
+  const toast = useToast();
   const [tab, setTab] = useState<TabId>('timeline');
 
-  const engagement = useMemo(
+  const seed = useMemo(
     () => AUDIT_ENGAGEMENTS.find(e => e.id === Number(id)) ?? null,
     [id],
   );
+  const [statusOverlay, setStatusOverlay] = useState<string | null>(null);
+  const engagement = seed ? { ...seed, status: statusOverlay ?? seed.status } : null;
+
+  function transition(toStatus: string, msgKey: string) {
+    if (!engagement) return;
+    setStatusOverlay(toStatus);
+    toast.success(t(msgKey));
+  }
 
   if (!engagement) {
     return (
@@ -93,6 +104,12 @@ export function EngagementDetailPage() {
           <Badge tone={STATUS_TONE[e.status] ?? 'neutral'} dot>{e.status.replace(/_/g, ' ')}</Badge>
           <Badge tone="primary">{e.auditType.replace(/_/g, ' ')}</Badge>
           {e.framework && <Badge tone="info">{e.framework.replace(/_/g, ' ')}</Badge>}
+        </>}
+        actions={<>
+          {e.status === 'PLANNED' && <Button variant="primary" Icon={Play} onClick={() => transition('FIELDWORK', 'engActStartFieldwork')}>{t('engActStartFieldwork')}</Button>}
+          {e.status === 'FIELDWORK' && <Button variant="primary" Icon={Send} onClick={() => transition('REPORT_ISSUED', 'engActIssueReport')}>{t('engActIssueReport')}</Button>}
+          {e.status === 'REPORT_ISSUED' && <Button variant="primary" Icon={Lock} onClick={() => transition('CLOSED', 'engActCloseEngagement')}>{t('engActCloseEngagement')}</Button>}
+          {e.status === 'CLOSED' && <Button variant="secondary" Icon={RefreshCw} onClick={() => toast.info(t('engActFollowupHint'))}>{t('engActScheduleFollowup')}</Button>}
         </>}
       />
 

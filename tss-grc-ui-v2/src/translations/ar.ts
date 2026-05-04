@@ -1876,6 +1876,13 @@ export const ar = {
   capaCommitteeNoAlerts:       'لا توجد تنبيهات نشطة',
   capaCommitteeNoAlertsBody:   'جميع الإجراءات المفتوحة ضمن نافذة الاستحقاق ولم يُرصد أي تكرار.',
 
+  // DD-45
+  engActStartFieldwork:        'بدء العمل الميداني',
+  engActIssueReport:           'إصدار التقرير',
+  engActCloseEngagement:       'إغلاق المهمة',
+  engActScheduleFollowup:      'جدولة المتابعة',
+  engActFollowupHint:          'جدولة المتابعة ستُربط بخطة/تقويم مساحة عمل المراجعة في DD-46.',
+
   // DD-40
   policyActSubmitLegal:        'إرسال للمراجعة القانونية',
   policyActSendExec:           'الإرسال للاعتماد التنفيذي',

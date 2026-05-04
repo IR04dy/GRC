@@ -1886,6 +1886,13 @@ export const en = {
   capaCommitteeNoAlerts:       'No active alerts',
   capaCommitteeNoAlertsBody:   'All open CAPAs are within their due-date window and no recurrence has been detected.',
 
+  // DD-45: Audit-engagement workflow actions
+  engActStartFieldwork:        'Start fieldwork',
+  engActIssueReport:           'Issue report',
+  engActCloseEngagement:       'Close engagement',
+  engActScheduleFollowup:      'Schedule follow-up',
+  engActFollowupHint:          'Follow-up scheduling links to the audit-workspace plan/calendar in DD-46.',
+
   // DD-40: workflow-bar actions on read-only detail pages (Policy / Vendor / Control / DPIA)
   policyActSubmitLegal:        'Submit for legal review',
   policyActSendExec:           'Send to executive approval',
