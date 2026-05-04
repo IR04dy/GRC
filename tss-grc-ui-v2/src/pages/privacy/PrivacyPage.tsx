@@ -21,6 +21,7 @@ import { privacyApi, dpiaApi, ApiError, type PrivacyDsrDto, type PrivacyDsrReque
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
@@ -219,7 +220,17 @@ export function PrivacyPage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => {
+              const map: Record<string, { rows: ExportRow[]; name: string }> = {
+                dsr:      { rows: dsrs.data as unknown as ExportRow[],     name: 'privacy-dsrs' },
+                breaches: { rows: breaches.data as unknown as ExportRow[], name: 'privacy-breaches' },
+                ropa:     { rows: ropa.data as unknown as ExportRow[],     name: 'privacy-ropa' },
+                dpia:     { rows: DPIAS as unknown as ExportRow[],         name: 'privacy-dpias' },
+              };
+              const cur = map[tab] ?? map.dsr;
+              downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
+              toast.success(t('exportCsvDone'));
+            }}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
           </>
         }

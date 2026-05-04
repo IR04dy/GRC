@@ -22,6 +22,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import {
   cyberApi, ApiError,
   type CyberControlDto, type CyberControlRequest,
@@ -842,6 +843,24 @@ export function CyberPage() {
 
   const focusVuln = vulns.data.find(v => v.workflowStatus !== 'CLOSED' && v.workflowStatus !== 'VERIFICATION') ?? vulns.data[0];
 
+  // ── CSV export of the active tab — DD-46 ──────────────────────────────────
+  function exportActiveTab() {
+    const map: Record<string, { rows: ExportRow[]; name: string }> = {
+      controls:    { rows: controls.data    as unknown as ExportRow[], name: 'cyber-controls' },
+      subcontrols: { rows: subControls.data as unknown as ExportRow[], name: 'cyber-subcontrols' },
+      assessments: { rows: assessments.data as unknown as ExportRow[], name: 'cyber-assessments' },
+      vuln:        { rows: vulns.data       as unknown as ExportRow[], name: 'cyber-vulnerabilities' },
+      exceptions:  { rows: exceptions.data  as unknown as ExportRow[], name: 'cyber-exceptions' },
+      incidents:   { rows: cyberIncidents.data as unknown as ExportRow[], name: 'cyber-incidents' },
+      assets:      { rows: assets.data      as unknown as ExportRow[], name: 'cyber-assets' },
+      evidence:    { rows: cyberEvidence.data as unknown as ExportRow[], name: 'cyber-evidence' },
+      actions:     { rows: actionPlans.data as unknown as ExportRow[], name: 'cyber-action-plans' },
+    };
+    const cur = map[tab] ?? map.controls;
+    downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
+    toast.success(t('exportCsvDone'));
+  }
+
   return (
     <Shell title={t('modCyber')} sub="NCA ECC · ISO 27001:2022">
       <PageHeader
@@ -850,7 +869,7 @@ export function CyberPage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => exportActiveTab()}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>
           </>
         }

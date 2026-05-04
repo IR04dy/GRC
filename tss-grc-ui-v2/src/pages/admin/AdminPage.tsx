@@ -15,6 +15,7 @@ import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { useApiList } from '../../lib/useApiResource';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { adminApi, ApiError, type AdminUserDto, type AdminUserRequest, type AdminRoleDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
@@ -171,7 +172,17 @@ export function AdminPage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => {
+              const map: Record<string, { rows: ExportRow[]; name: string }> = {
+                users:  { rows: users.data as unknown as ExportRow[], name: 'admin-users' },
+                roles:  { rows: roles as unknown as ExportRow[],      name: 'admin-roles' },
+                orgs:   { rows: orgs as unknown as ExportRow[],       name: 'admin-organisations' },
+                audit:  { rows: auditEvents as unknown as ExportRow[], name: 'admin-audit-trail' },
+              };
+              const cur = map[tab] ?? map.users;
+              downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
+              toast.success(t('exportCsvDone'));
+            }}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
           </>
         }

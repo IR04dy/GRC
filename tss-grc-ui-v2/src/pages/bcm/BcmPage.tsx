@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import {
   bcmApi, crisisCommsApi,
   type BcmPlanDto, type BcmPlanRequest,
@@ -378,7 +379,17 @@ export function BcmPage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => {
+              const map: Record<string, { rows: ExportRow[]; name: string }> = {
+                plans:     { rows: plans.data as unknown as ExportRow[],     name: 'bcm-plans' },
+                processes: { rows: procs.data as unknown as ExportRow[],     name: 'bcm-processes' },
+                bia:       { rows: bia.data as unknown as ExportRow[],       name: 'bcm-bia' },
+                exercises: { rows: exercises.data as unknown as ExportRow[], name: 'bcm-exercises' },
+              };
+              const cur = map[tab] ?? map.plans;
+              downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
+              toast.success(t('exportCsvDone'));
+            }}>{t('actionExport')}</Button>
             {showNewButton && (
               <Button variant="primary" Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>
             )}

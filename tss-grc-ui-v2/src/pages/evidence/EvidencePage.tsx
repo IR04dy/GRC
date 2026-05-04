@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import {
   evidenceApi, ApiError,
   type EvidenceItemDto, type EvidenceItemRequest,
@@ -240,7 +241,10 @@ export function EvidencePage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => {
+              downloadCsv(items.data as unknown as ExportRow[], stampFilename('evidence-register', 'csv'));
+              toast.success(t('exportCsvDone'));
+            }}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
           </>
         }

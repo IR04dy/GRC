@@ -20,6 +20,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, SEVERITY_TONE, statusLabel, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type RegulatoryTemplate, type SaudiRegulator } from '../../lib/api';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
@@ -203,7 +204,10 @@ export function IncidentsPage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => {
+              downloadCsv(incidents.data as unknown as ExportRow[], stampFilename('incidents-register', 'csv'));
+              toast.success(t('exportCsvDone'));
+            }}>{t('actionExport')}</Button>
             <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
           </>
         }

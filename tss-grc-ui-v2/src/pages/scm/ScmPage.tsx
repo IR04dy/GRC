@@ -21,6 +21,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import {
   scmApi, ApiError,
   type ScmVendorDto, type ScmVendorRequest,
@@ -666,7 +667,19 @@ export function ScmPage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => {
+              const map: Record<string, { rows: ExportRow[]; name: string }> = {
+                suppliers:    { rows: vendors.data as unknown as ExportRow[],      name: 'scm-suppliers' },
+                onboarding:   { rows: onboarding.data as unknown as ExportRow[],   name: 'scm-onboarding' },
+                assessments:  { rows: assessments.data as unknown as ExportRow[],  name: 'scm-assessments' },
+                dependencies: { rows: dependencies.data as unknown as ExportRow[], name: 'scm-dependencies' },
+                contracts:    { rows: contracts.data as unknown as ExportRow[],    name: 'scm-contracts' },
+                disruptions:  { rows: incidents.data as unknown as ExportRow[],    name: 'scm-disruptions' },
+              };
+              const cur = map[tab] ?? map.suppliers;
+              downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
+              toast.success(t('exportCsvDone'));
+            }}>{t('actionExport')}</Button>
             {showNewButton && (
               <Button variant="primary" Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>
             )}

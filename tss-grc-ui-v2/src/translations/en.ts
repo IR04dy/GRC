@@ -1886,6 +1886,10 @@ export const en = {
   capaCommitteeNoAlerts:       'No active alerts',
   capaCommitteeNoAlertsBody:   'All open CAPAs are within their due-date window and no recurrence has been detected.',
 
+  // DD-46
+  capaExportDone:              'CSV downloaded',
+  exportCsvDone:               'CSV downloaded',
+
   // DD-45: Audit-engagement workflow actions
   engActStartFieldwork:        'Start fieldwork',
   engActIssueReport:           'Issue report',

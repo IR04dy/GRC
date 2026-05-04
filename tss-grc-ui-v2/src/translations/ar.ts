@@ -1876,6 +1876,10 @@ export const ar = {
   capaCommitteeNoAlerts:       'لا توجد تنبيهات نشطة',
   capaCommitteeNoAlertsBody:   'جميع الإجراءات المفتوحة ضمن نافذة الاستحقاق ولم يُرصد أي تكرار.',
 
+  // DD-46
+  capaExportDone:              'تم تنزيل ملف CSV',
+  exportCsvDone:               'تم تنزيل ملف CSV',
+
   // DD-45
   engActStartFieldwork:        'بدء العمل الميداني',
   engActIssueReport:           'إصدار التقرير',

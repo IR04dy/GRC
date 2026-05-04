@@ -11,6 +11,7 @@ import { useToast } from '../../lib/toast';
 import { workflowApi, type WorkflowDefinitionDto, type WorkflowDefinitionGraph } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { WORKFLOW_DEFINITIONS, WORKFLOW_GRAPHS_BY_ID } from './mockWorkflowDefs';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 
 /**
  * Workflows admin page — assessment §6.1 strategic flagship.
@@ -84,7 +85,10 @@ export function WorkflowsPage() {
           <>
             {isDemo && <Badge tone="warning">Demo</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => {
+              downloadCsv(definitions as unknown as ExportRow[], stampFilename('workflow-definitions', 'csv'));
+              toast.success(t('exportCsvDone'));
+            }}>{t('actionExport')}</Button>
           </>
         }
       />

@@ -25,6 +25,7 @@ import {
 } from '../../lib/capa';
 import { scanPaTriggers, type PaTrigger } from '../../lib/paTriggers';
 import { deriveCapaNotifs, audCommitteeDigest, type CapaNotif } from '../../lib/capaNotifications';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 
 type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers' | 'committee';
 
@@ -107,7 +108,30 @@ export function CapaPage() {
         sub={t('capaPageSub')}
         actions={<>
           <Button variant="ghost" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-          <Button variant="ghost" Icon={Download} onClick={() => toast.info(t('actionExportHint'))}>{t('actionExport')}</Button>
+          <Button variant="ghost" Icon={Download} onClick={() => {
+            const rows: ExportRow[] = filtered.map(c => ({
+              code: c.code,
+              type: c.type,
+              source: c.source,
+              titleEn: c.titleEn,
+              titleAr: c.titleAr ?? '',
+              status: c.status,
+              severity: c.severity,
+              owner: c.owner,
+              openedAt: c.openedAt,
+              dueDate: c.dueDate,
+              progressPct: c.progressPct,
+              rootCauseCategory: c.rootCauseCategory ?? '',
+              rootCause: c.rootCause ?? '',
+              rcaMethod: c.rcaMethod,
+              parentCapaId: c.parentCapaId ?? '',
+              effectivenessDueDate: c.effectivenessDueDate ?? '',
+              customerDisclosureRequired: c.customerDisclosureRequired ? 'Y' : 'N',
+              frameworkRefs: (c.frameworkRefs ?? []).join('; '),
+            }));
+            downloadCsv(rows, stampFilename('capa-register', 'csv'));
+            toast.success(t('capaExportDone'));
+          }}>{t('actionExport')}</Button>
           <Button variant="primary" Icon={Plus} onClick={() => toast.info(t('capaNewHint'))}>{t('capaNew')}</Button>
         </>}
       />
