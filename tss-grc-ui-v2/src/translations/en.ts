@@ -887,6 +887,8 @@ export const en = {
   scmTierMapTitle: 'Supply Chain Tier Mapping',
   scmTierMapSub:   'Saudi National Risk Center + NIST SP 800-161 + ISO 28001 — multi-tier visibility into the supply chain (Tier-1 → Tier-N) so single-points-of-failure, foreign-dependency and concentration risk can be quantified and treated.',
   processBarRisk:  'Enterprise Risk — Process Center',
+  processBarRiskSub: 'ISO 31000 + COSO ERM + NIST RMF — pick a process to launch it.',
+  postureTitleRisk: 'Regulator Posture · Enterprise Risk',
 
   // Per-module Workflows tab + ActiveWorkflowsPanel
   riskTabWorkflows:        'Workflows',

@@ -319,54 +319,38 @@ export function RiskRegisterPage() {
 
       <OverviewStrip
         storageKey="overview.risk"
-        processBarTitle={t('processBarRisk') ?? 'Enterprise Risk — Process Center'}
-        processBarSubtitle="ISO 31000 + COSO ERM + NIST RMF — pick a process to launch it."
-        postureTitle="Regulator Posture · Enterprise Risk"
+        processBarTitle={t('processBarRisk')}
+        processBarSubtitle={t('processBarRiskSub')}
+        postureTitle={t('postureTitleRisk')}
         anchors={RISK_ANCHORS}
-        lang={lang}
         lifecycles={[
           // ── 1. Risk Identification & Assessment ──
           // Workflow: OPEN → UNDER_ASSESSMENT → APPROVED_FOR_TREATMENT
           // Trigger: opens the New Risk modal so the user can register a
           // new risk that immediately enters the assessment workflow.
           { ...RISK_LIFECYCLES[0],
-            primary:   { label: 'Start',    onClick: startCreate },
-            secondary: { label: 'Register', href: '/risk?status=OPEN' } },
+            primary:   { label: 'Start',    labelAr: 'ابدأ',         onClick: startCreate },
+            secondary: { label: 'Register', labelAr: 'السجل',        href: '/risk?status=OPEN' } },
 
           // ── 2. Risk Treatment Plan ──
-          // Workflow: APPROVED_FOR_TREATMENT → TREATMENT_IN_PROGRESS → MONITORING → CLOSED
-          // Trigger: filters the register to risks needing treatment + jumps
-          // to the register tab so the owner can pick one and submit a plan.
           { ...RISK_LIFECYCLES[1],
-            primary:   { label: 'Plan',     onClick: () => { setFilters(prev => ({ ...prev, status: 'UNDER_REVIEW' })); setTab('register'); } },
-            secondary: { label: 'Treatments', href: '/risk?status=TREATMENT_IN_PROGRESS' } },
+            primary:   { label: 'Plan',       labelAr: 'خطة المعالجة', onClick: () => { setFilters(prev => ({ ...prev, status: 'UNDER_REVIEW' })); setTab('register'); } },
+            secondary: { label: 'Treatments', labelAr: 'المعالجات',    href: '/risk?status=TREATMENT_IN_PROGRESS' } },
 
           // ── 3. KRI Threshold Breach Response ──
-          // Workflow: BREACH_DETECTED → ACKNOWLEDGED → ACTION_PLAN → RESOLVED
-          // Trigger: opens the KRI Dashboard tab where the user can record
-          // a new reading; readings that exceed thresholds raise a breach
-          // event automatically.
           { ...RISK_LIFECYCLES[2],
-            primary:   { label: 'Record',   onClick: () => setTab('kri') },
-            secondary: { label: 'Dashboard',href: '/risk?tab=kri' } },
+            primary:   { label: 'Record',    labelAr: 'سجّل قراءة',   onClick: () => setTab('kri') },
+            secondary: { label: 'Dashboard', labelAr: 'لوحة المؤشرات', href: '/risk?tab=kri' } },
 
           // ── 4. Risk Appetite Breach Escalation ──
-          // Workflow: DETECTED → INVESTIGATED → TREATMENT → WITHIN_TOLERANCE
-          // Trigger: opens the Appetite Dashboard where the user can update
-          // current exposure for any statement; exposure beyond tolerance
-          // raises a breach event for CRO/CFO review.
           { ...RISK_LIFECYCLES[3],
-            primary:   { label: 'Update',   onClick: () => setTab('appetite') },
-            secondary: { label: 'Statements', href: '/risk?tab=appetite' } },
+            primary:   { label: 'Update',     labelAr: 'حدّث',        onClick: () => setTab('appetite') },
+            secondary: { label: 'Statements', labelAr: 'بيانات الشهية', href: '/risk?tab=appetite' } },
 
           // ── 5. Risk Acceptance Approval ──
-          // Workflow: SUBMITTED → REVIEWED → APPROVED (time-bound) → EXPIRED
-          // Trigger: filters the register to candidate risks. Acceptance
-          // is performed via the per-row "Accept" action on each risk —
-          // tile drives the user there.
           { ...RISK_LIFECYCLES[4],
-            primary:   { label: 'Submit',   onClick: () => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); } },
-            secondary: { label: 'Accepted', href: '/risk?status=ACCEPTED' } },
+            primary:   { label: 'Submit',   labelAr: 'تقديم للاعتماد', onClick: () => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); } },
+            secondary: { label: 'Accepted', labelAr: 'المُعتمدة',      href: '/risk?status=ACCEPTED' } },
         ]} />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
