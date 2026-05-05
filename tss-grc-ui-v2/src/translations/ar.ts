@@ -1994,7 +1994,12 @@ export const ar = {
 
   // DD-59
   intakeCatalogEyebrow:        'تقديم طلب',
-  intakeCatalogTitle:          'كتالوج الخدمات',
+  intakeCatalogTitle:          'مركز الخدمات',
+  intakeCatalogSectionCyberOps: 'الأمن السيبراني والعمليات',
+  intakeCatalogSectionRiskRes:  'المخاطر والصمود',
+  intakeCatalogSectionCompAud:  'الامتثال والمراجعة',
+  intakeCatalogSectionPrivacy:  'الخصوصية',
+  intakeCatalogSectionTpEthics: 'الأطراف الثالثة والأخلاقيات',
   intakeCatalogSub:            'نماذج الموظفين — ابدأ أي سير عمل في الحوكمة دون مغادرة المنصة',
   intakeCatalogPageSub:        'اختر النموذج المناسب لما تريد الإبلاغ عنه أو طلبه. كل بطاقة تُظهر المرجع التنظيمي ونافذة الموعد النظامي. تصل التقديمات إلى صندوق المُحقّق فوراً.',
   intakeCatalogDaysSla:        'يوم موعد نظامي',

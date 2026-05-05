@@ -1981,7 +1981,12 @@ export const en = {
 
   // DD-59: employee intake catalog + per-kind forms
   intakeCatalogEyebrow:        'Submit a request',
-  intakeCatalogTitle:          'Intake catalog',
+  intakeCatalogTitle:          'Services Center',
+  intakeCatalogSectionCyberOps: 'Cybersecurity & Operations',
+  intakeCatalogSectionRiskRes:  'Risk & Resilience',
+  intakeCatalogSectionCompAud:  'Compliance & Audit',
+  intakeCatalogSectionPrivacy:  'Privacy',
+  intakeCatalogSectionTpEthics: 'Third-Party & Ethics',
   intakeCatalogSub:            'Employee-facing forms — start any GRC workflow without leaving the platform',
   intakeCatalogPageSub:        'Pick the form that matches what you want to report or request. Each tile shows the regulator anchor and the SLA window. Submissions land in the triager inbox immediately.',
   intakeCatalogDaysSla:        'day SLA',
