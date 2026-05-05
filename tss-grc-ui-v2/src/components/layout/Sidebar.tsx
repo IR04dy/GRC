@@ -30,6 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'authorities',  to: '/authorities',     Icon: Landmark,        labelKey: 'modAuthorities' },
       { id: 'comms',        to: '/communications',  Icon: Send,            labelKey: 'modCommunications' },
       { id: 'capa',         to: '/capa',            Icon: Wrench,          labelKey: 'modCapa' },
+      { id: 'intake',       to: '/intake',          Icon: Send,            labelKey: 'intakeCatalogTitle' },
       { id: 'inbox',        to: '/intake-inbox',    Icon: Inbox,           labelKey: 'inboxTitle' },
     ],
   },

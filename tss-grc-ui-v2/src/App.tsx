@@ -36,6 +36,8 @@ import { DsrPortalPage } from './pages/portal/DsrPortalPage';
 import { SpeakUpPortalPage } from './pages/portal/SpeakUpPortalPage';
 import { CaseTrackerPage } from './pages/portal/CaseTrackerPage';
 import { IntakeInboxPage } from './pages/intake/IntakeInboxPage';
+import { IntakeCatalogPage } from './pages/intake/IntakeCatalogPage';
+import { IntakeFormPage } from './pages/intake/IntakeFormPage';
 
 export function App() {
   return (
@@ -95,6 +97,10 @@ export function App() {
 
               {/* Triager inbox (DD-58) */}
               <Route path="/intake-inbox"       element={<IntakeInboxPage />} />
+
+              {/* Authenticated employee intake catalog + per-kind forms (DD-59) */}
+              <Route path="/intake"             element={<IntakeCatalogPage />} />
+              <Route path="/intake/:kind"       element={<IntakeFormPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />

@@ -1892,6 +1892,32 @@ export const en = {
   capaExportDone:              'CSV downloaded',
   exportCsvDone:               'CSV downloaded',
 
+  // DD-59: employee intake catalog + per-kind forms
+  intakeCatalogEyebrow:        'Submit a request',
+  intakeCatalogTitle:          'Intake catalog',
+  intakeCatalogSub:            'Employee-facing forms — start any GRC workflow without leaving the platform',
+  intakeCatalogPageSub:        'Pick the form that matches what you want to report or request. Each tile shows the regulator anchor and the SLA window. Submissions land in the triager inbox immediately.',
+  intakeCatalogDaysSla:        'day SLA',
+  intakeCatalogHoursSla:       'hour SLA',
+  intakeCatalogSubmit:         'Open form',
+  intakeFormCardTitle:         'Your submission',
+  intakeFormReroutingHint:     'This will route to {assignee} for triage under {ref}. You will receive a reference code on submit so you can track status anonymously if needed.',
+  intakeFormSubmit:            'Submit',
+  intakeFormRequired:          'Please fill these required fields',
+  intakeFormSummaryTooShort:   'Please add at least 30 characters of detail in the description.',
+  intakeFormToastSubmitted:    'Submitted — reference code generated',
+  intakeFormAckTitle:          'Submission received',
+  intakeFormAckSub:            'Your reference code is below. Save it for status tracking.',
+  intakeFormAckHeading:        'Thank you',
+  intakeFormAckBody:           'Your submission has been routed to {assignee} for triage. The triager will accept (promote to a register record) or reject within the SLA window — you can check status any time using the reference code.',
+  intakeFormAckRefCode:        'Reference code',
+  intakeFormAckSlaPrefix:      'Decision due by',
+  intakeFormAckOpenInbox:      'Open my inbox',
+  intakeFormAckAnother:        'Submit another',
+  intakeFormBackToCatalog:     'Back to catalog',
+  intakeFormUnknownTitle:      'Unknown intake form',
+  intakeFormUnknownBody:       'No form is registered for that path. Please return to the catalog and pick a valid intake.',
+
   // DD-54..58: intake substrate, public portals, case tracker, triager inbox
   // DD-64: middle-bar consistency fixes
   overviewStripShow:           'Show overview',
