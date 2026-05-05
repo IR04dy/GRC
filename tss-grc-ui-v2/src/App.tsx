@@ -35,9 +35,12 @@ import { CapaPage } from './pages/capa/CapaPage';
 import { DsrPortalPage } from './pages/portal/DsrPortalPage';
 import { SpeakUpPortalPage } from './pages/portal/SpeakUpPortalPage';
 import { CaseTrackerPage } from './pages/portal/CaseTrackerPage';
+import { TrustCenterPage } from './pages/portal/TrustCenterPage';
 import { IntakeInboxPage } from './pages/intake/IntakeInboxPage';
 import { IntakeCatalogPage } from './pages/intake/IntakeCatalogPage';
 import { IntakeFormPage } from './pages/intake/IntakeFormPage';
+import { ConnectorsPage } from './pages/intake/ConnectorsPage';
+import { AttestationCampaignsPage } from './pages/intake/AttestationCampaignsPage';
 
 export function App() {
   return (
@@ -94,6 +97,7 @@ export function App() {
               <Route path="/portal/dsr"         element={<DsrPortalPage />} />
               <Route path="/portal/speakup"     element={<SpeakUpPortalPage />} />
               <Route path="/portal/track"       element={<CaseTrackerPage />} />
+              <Route path="/portal/trust-center" element={<TrustCenterPage />} />
 
               {/* Triager inbox (DD-58) */}
               <Route path="/intake-inbox"       element={<IntakeInboxPage />} />
@@ -101,6 +105,8 @@ export function App() {
               {/* Authenticated employee intake catalog + per-kind forms (DD-59) */}
               <Route path="/intake"             element={<IntakeCatalogPage />} />
               <Route path="/intake/:kind"       element={<IntakeFormPage />} />
+              <Route path="/connectors"         element={<ConnectorsPage />} />
+              <Route path="/attestations"       element={<AttestationCampaignsPage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />

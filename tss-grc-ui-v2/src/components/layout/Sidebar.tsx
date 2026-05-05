@@ -1,7 +1,7 @@
 import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
-         Inbox, type LucideIcon } from 'lucide-react';
+         Inbox, Plug, FileCheck2, type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
@@ -32,6 +32,8 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'capa',         to: '/capa',            Icon: Wrench,          labelKey: 'modCapa' },
       { id: 'intake',       to: '/intake',          Icon: Send,            labelKey: 'intakeCatalogTitle' },
       { id: 'inbox',        to: '/intake-inbox',    Icon: Inbox,           labelKey: 'inboxTitle' },
+      { id: 'connectors',   to: '/connectors',      Icon: Plug,            labelKey: 'connectorsTitle' },
+      { id: 'attestations', to: '/attestations',    Icon: FileCheck2,      labelKey: 'campaignsTitle' },
     ],
   },
   {
