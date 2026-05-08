@@ -3,6 +3,7 @@ package com.tss.grc.module.platform.controller;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
+import com.tss.grc.security.GrcUserDetails;
 import com.tss.grc.security.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -70,7 +71,15 @@ public class OrganisationController {
         if (target == null || !Boolean.TRUE.equals(target.getIsActive())) {
             return ResponseEntity.status(404).body(Map.of("message", "Organisation not found or inactive"));
         }
-        Long userId = Long.parseLong(auth.getName());
+        // auth.getName() is the username ("admin"), not a numeric id — pull
+        // the userId off the GrcUserDetails principal instead. Earlier code
+        // did Long.parseLong(auth.getName()) and threw NumberFormatException
+        // on the very first switch attempt → HTTP 400 every time.
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof GrcUserDetails)) {
+            return ResponseEntity.status(401).body(Map.of("message", "Authentication principal missing"));
+        }
+        Long userId = ((GrcUserDetails) principal).getUserId();
         String accessToken = tokenProvider.generateAccessTokenFromClaims(userId, id);
         Map<String, Object> body = new HashMap<>();
         body.put("accessToken",        accessToken);
