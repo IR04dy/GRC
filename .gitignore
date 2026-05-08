@@ -1,0 +1,67 @@
+# ─── Build output ──────────────────────────────────────────────────────
+# Maven (Spring Boot backend)
+**/target/
+*.jar
+*.war
+*.original
+
+# Node / Vite (frontend has its own .gitignore too — keeping these here as
+# a safety net for any new frontend project that lands at the repo root)
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.vite/
+*.tsbuildinfo
+
+# ─── Local dev tooling ─────────────────────────────────────────────────
+# .tools/ is committed (it holds intentional dev scripts), but the runtime
+# artefacts that land alongside them aren't. Stay specific to avoid
+# accidentally hiding new scripts.
+.tools/*.log
+.tools/*.pid
+.tools/*.err.log
+.tools/jwt.txt
+.tools/apache-maven*/
+.tools/backend.*
+.tools/vite.*
+.tmp/
+*.pid
+*.log
+!.tmp/extract.log
+
+# ─── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.python-version
+*.egg-info/
+
+# ─── IDE / editor state ────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.swp
+.project
+.classpath
+.settings/
+
+# ─── OS junk ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Secrets — never commit ────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# ─── Claude Code session state (per-worktree) ──────────────────────────
+.claude/settings.local.json
+.claude/launch.json
+.claude/start-dev.cmd
