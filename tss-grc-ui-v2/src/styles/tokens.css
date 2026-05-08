@@ -11,6 +11,10 @@
   /* ─── Color · Surface ─────────────────────────────── */
   --bg:           #F2EEE6;
   --surface:      #FAF8F4;
+  /* --surface-1 is an alias used by 100+ component styles. Keeping it as
+   * a `var(--surface)` reference means the dark theme's redefinition of
+   * --surface flows through automatically — no second mapping needed. */
+  --surface-1:    var(--surface);
   --surface-2:    #F5F1E9;
   --surface-3:    #EFEAE0;
   --border:       #E5DFD2;
