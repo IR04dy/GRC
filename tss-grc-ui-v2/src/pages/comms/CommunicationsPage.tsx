@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   Send, Inbox, CheckCheck, AlertOctagon, Users, Megaphone,
   Mail, Phone, ExternalLink, Building2, MessageSquare, FileSignature,
-  CalendarClock, Landmark,
+  CalendarClock, Landmark, Bell, Smartphone, MessageCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -45,6 +45,9 @@ const CHANNEL_ICONS: Record<CommChannel, LucideIcon> = {
   IN_PERSON:         Building2,
   TEAMS_SLACK:       MessageSquare,
   PUBLIC_DISCLOSURE: Megaphone,
+  IN_APP:            Bell,
+  SMS:               Smartphone,
+  WHATSAPP:          MessageCircle,
 };
 
 const STATE_BADGE: Record<CommState, { tone: BadgeTone; en: string; ar: string }> = {

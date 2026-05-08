@@ -210,6 +210,7 @@ export const AUDIT_ENGAGEMENTS: AuditEngagementDto[] = [
     auditorFirm: 'EY MENA', leadAuditor: 'Khaled Ahmad',
     engagementLetterDate: '2026-03-22', openingMeetingDate: '2026-04-22',
     fieldworkStartDate: '2026-04-22',
+    fieldworkEndDate: '2026-05-13',
     scopeSummary: 'Cybersecurity Framework v1.0 — all 4 main domains.',
     status: 'FIELDWORK', findingsCount: 0 },
   { id: 64, engagementCode: 'AUD-2026-004', titleEn: 'SOC 2 Type II Re-assessment',
@@ -251,6 +252,42 @@ export const FRAMEWORKS: FrameworkDto[] = [
   { id: 11, code: 'SAMA_AML',  nameEn: 'SAMA AML',       nameAr: 'مكافحة غسل الأموال', version: '2024', issuer: 'SAMA', family: 'AML_AB',    isActive: true },
   { id: 12, code: 'FATF',      nameEn: 'FATF Recommendations', nameAr: 'توصيات فاتف', version: '2023', issuer: 'FATF',  family: 'AML_AB',    isActive: true },
   { id: 13, code: 'ISO_37001', nameEn: 'ISO 37001',      nameAr: 'الآيزو 37001',  version: '2016', issuer: 'ISO',     family: 'AML_AB',    isActive: true },
+
+  // ── HRSD frameworks (DD-83) ───────────────────────────────────────────
+  // Saudi Ministry of Human Resources & Social Development owns three
+  // distinct compliance regimes that affect every private-sector employer:
+  //
+  //   • HRSD_LABOR    — Saudi Labor Law (نظام العمل) + WPS, work hours,
+  //                     end-of-service benefits, contracts, work permits.
+  //   • HRSD_GOSI     — General Organization for Social Insurance —
+  //                     mandatory social-insurance contributions.
+  //   • HRSD_NITAQAT  — Saudization quota program. Drives visa quotas,
+  //                     work-permit issuance, and government-tender
+  //                     eligibility. Bands: Platinum / Green High / Mid /
+  //                     Low / Yellow / Red, by sector × establishment size.
+  { id: 14, code: 'HRSD_LABOR',   nameEn: 'Saudi Labor Law',  nameAr: 'نظام العمل السعودي', version: '2023 (consolidated)', issuer: 'HRSD', family: 'HR',         isActive: true },
+  { id: 15, code: 'HRSD_GOSI',    nameEn: 'GOSI',             nameAr: 'التأمينات الاجتماعية',     version: '2024',  issuer: 'HRSD', family: 'HR',         isActive: true },
+  { id: 16, code: 'HRSD_NITAQAT', nameEn: 'Nitaqat (Saudization)', nameAr: 'نطاقات (السعودة)',  version: 'v3 — 2024', issuer: 'HRSD', family: 'HR',     isActive: true },
+
+  // ── DD-85: Ministry of Commerce frameworks ────────────────────────────
+  // Three regimes that touch every commercial entity in Saudi Arabia:
+  //   • MOC_TASATTUR              — Anti-Concealment Law (نظام مكافحة التستر)
+  //                                  governs the case where a Saudi national
+  //                                  fronts a business actually controlled by
+  //                                  a foreigner (تستر تجاري). Penalties:
+  //                                  fines up to SAR 5M, prison up to 5
+  //                                  years, deportation, asset confiscation.
+  //   • MOC_CONSUMER_PROTECTION   — Consumer Protection Law + e-Commerce Law
+  //                                  governs returns, refunds, deceptive
+  //                                  marketing, price labelling, warranty
+  //                                  obligations.
+  //   • MOC_COMMERCIAL_REGISTRY   — Commercial Registry obligations: keeping
+  //                                  the CR current, beneficial-ownership
+  //                                  disclosure, annual confirmation,
+  //                                  trade-name + activity-code accuracy.
+  { id: 17, code: 'MOC_TASATTUR',           nameEn: 'Anti-Concealment Law (Tasattur)', nameAr: 'نظام مكافحة التستر',  version: '2020',          issuer: 'MOC', family: 'COMPLIANCE', isActive: true },
+  { id: 18, code: 'MOC_CONSUMER_PROTECTION', nameEn: 'Consumer Protection Law',          nameAr: 'نظام حماية المستهلك', version: '2014 (e-Comm 2019)', issuer: 'MOC', family: 'COMPLIANCE', isActive: true },
+  { id: 19, code: 'MOC_COMMERCIAL_REGISTRY', nameEn: 'Commercial Registry obligations',  nameAr: 'التزامات السجل التجاري', version: '2024',         issuer: 'MOC', family: 'COMPLIANCE', isActive: true },
 ];
 
 // ── Coverage stats per framework ──────────────────────────────────────────
@@ -319,6 +356,40 @@ export const FRAMEWORK_COVERAGE: FrameworkCoverageDto[] = [
     policyCount: 2, full: 1, partial: 1, outOfScope: 0, notApplicable: 0,
     openFindings: 0, closedFindings: 2,
     controlCount: 5, implementedControls: 4, avgMaturity: 3.4,
+    dpiaCount: 0, kriCount: 0, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
+
+  // ── HRSD coverage (DD-83) ────────────────────────────────────────────
+  { frameworkId: 14, code: 'HRSD_LABOR',   nameEn: 'Saudi Labor Law', family: 'HR',
+    policyCount: 4, full: 3, partial: 1, outOfScope: 0, notApplicable: 0,
+    openFindings: 1, closedFindings: 3,
+    controlCount: 9, implementedControls: 7, avgMaturity: 3.5,
+    dpiaCount: 0, kriCount: 1, riskCount: 2, riskAsRiskFw: 0, riskAsCompFw: 2 },
+  { frameworkId: 15, code: 'HRSD_GOSI',    nameEn: 'GOSI', family: 'HR',
+    policyCount: 2, full: 2, partial: 0, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 1,
+    controlCount: 5, implementedControls: 5, avgMaturity: 4.0,
+    dpiaCount: 0, kriCount: 0, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
+  { frameworkId: 16, code: 'HRSD_NITAQAT', nameEn: 'Nitaqat', family: 'HR',
+    policyCount: 1, full: 1, partial: 0, outOfScope: 0, notApplicable: 0,
+    openFindings: 1, closedFindings: 2,
+    controlCount: 4, implementedControls: 3, avgMaturity: 3.2,
+    dpiaCount: 0, kriCount: 1, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
+
+  // ── DD-85: MOC coverage ──────────────────────────────────────────────
+  { frameworkId: 17, code: 'MOC_TASATTUR', nameEn: 'Tasattur', family: 'COMPLIANCE',
+    policyCount: 2, full: 1, partial: 1, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 1,
+    controlCount: 6, implementedControls: 5, avgMaturity: 3.6,
+    dpiaCount: 0, kriCount: 1, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
+  { frameworkId: 18, code: 'MOC_CONSUMER_PROTECTION', nameEn: 'Consumer Protection', family: 'COMPLIANCE',
+    policyCount: 3, full: 2, partial: 1, outOfScope: 0, notApplicable: 0,
+    openFindings: 1, closedFindings: 4,
+    controlCount: 8, implementedControls: 6, avgMaturity: 3.4,
+    dpiaCount: 0, kriCount: 1, riskCount: 2, riskAsRiskFw: 0, riskAsCompFw: 2 },
+  { frameworkId: 19, code: 'MOC_COMMERCIAL_REGISTRY', nameEn: 'Commercial Registry', family: 'COMPLIANCE',
+    policyCount: 2, full: 2, partial: 0, outOfScope: 0, notApplicable: 0,
+    openFindings: 0, closedFindings: 1,
+    controlCount: 5, implementedControls: 5, avgMaturity: 4.0,
     dpiaCount: 0, kriCount: 0, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
 ];
 

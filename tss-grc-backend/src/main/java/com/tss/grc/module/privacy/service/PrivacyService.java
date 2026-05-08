@@ -7,8 +7,10 @@ import com.tss.grc.module.privacy.entity.ProcessingActivity;
 import com.tss.grc.module.privacy.repository.DataBreachRepository;
 import com.tss.grc.module.privacy.repository.DataSubjectRequestRepository;
 import com.tss.grc.module.privacy.repository.ProcessingActivityRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,18 @@ public class PrivacyService {
     private final DataBreachRepository breachRepo;
     private final DataSubjectRequestRepository dsrRepo;
     private final ProcessingActivityRepository ropaRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
+    private void emitBreach(DataBreach b) {
+        if (bcast != null) bcast.entity(b.getOrganisationId(), "data_breach", b.getId(), b);
+    }
+    private void emitDsr(DataSubjectRequest r) {
+        if (bcast != null) bcast.entity(r.getOrganisationId(), "dsr_case", r.getId(), r);
+    }
+    private void emitRopa(ProcessingActivity a) {
+        if (bcast != null) bcast.entity(a.getOrganisationId(), "processing_activity", a.getId(), a);
+    }
 
     // ── Data Breaches ─────────────────────────────────────────────────────────
 
@@ -74,7 +88,9 @@ public class PrivacyService {
             throw new IllegalArgumentException("Breach must be OPEN to contain (was " + b.getStatus() + ")");
         }
         b.setStatus("INVESTIGATING");
-        return breachRepo.save(b);
+        DataBreach saved = breachRepo.save(b);
+        emitBreach(saved);
+        return saved;
     }
 
     /**
@@ -87,7 +103,9 @@ public class PrivacyService {
         DataBreach b = getBreach(id);
         b.setPdpcNotificationRequired(true);
         b.setPdpcNotifiedAt(java.time.LocalDateTime.now());
-        return breachRepo.save(b);
+        DataBreach saved = breachRepo.save(b);
+        emitBreach(saved);
+        return saved;
     }
 
     @Transactional
@@ -97,7 +115,9 @@ public class PrivacyService {
             throw new IllegalArgumentException("Breach must be OPEN or INVESTIGATING to close (was " + b.getStatus() + ")");
         }
         b.setStatus("CLOSED");
-        return breachRepo.save(b);
+        DataBreach saved = breachRepo.save(b);
+        emitBreach(saved);
+        return saved;
     }
 
     // ── Data Subject Requests ─────────────────────────────────────────────────
@@ -157,7 +177,9 @@ public class PrivacyService {
             java.time.LocalDateTime base = r.getReceivedAt() != null ? r.getReceivedAt() : java.time.LocalDateTime.now();
             r.setDueDate(base.toLocalDate().plusDays(30));
         }
-        return dsrRepo.save(r);
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
     }
 
     @Transactional
@@ -168,7 +190,9 @@ public class PrivacyService {
         }
         r.setStatus("FULFILLED");
         r.setCompletedAt(java.time.LocalDateTime.now());
-        return dsrRepo.save(r);
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
     }
 
     /**
@@ -182,7 +206,9 @@ public class PrivacyService {
         int n = (days == null || days <= 0) ? 30 : days;
         java.time.LocalDate base = r.getDueDate() != null ? r.getDueDate() : java.time.LocalDate.now();
         r.setDueDate(base.plusDays(n));
-        return dsrRepo.save(r);
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
     }
 
     @Transactional
@@ -193,7 +219,9 @@ public class PrivacyService {
         }
         r.setStatus("REJECTED");
         r.setCompletedAt(java.time.LocalDateTime.now());
-        return dsrRepo.save(r);
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
     }
 
     // ── Processing Activities (ROPA) ──────────────────────────────────────────

@@ -4,8 +4,10 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.incident.dto.*;
 import com.tss.grc.module.incident.entity.Incident;
 import com.tss.grc.module.incident.repository.IncidentRepository;
+import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +22,14 @@ import java.util.List;
 public class IncidentService {
 
     private final IncidentRepository incidentRepo;
+
+    /** Optional — null in unit tests, auto-wired by Spring at runtime. */
+    @Autowired(required = false)
+    private RealtimeBroadcaster broadcaster;
+
+    private void broadcast(Long orgId, Long id, Object payload) {
+        if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "incident", String.valueOf(id), payload);
+    }
 
     @Transactional(readOnly = true)
     public Page<IncidentResponse> list(String severity, String status, String category, Pageable pageable) {
@@ -37,24 +47,32 @@ public class IncidentService {
 
     @Transactional
     public IncidentResponse create(IncidentRequest req) {
+        Long orgId = TenantContext.getCurrentTenant();
         Incident i = new Incident();
-        i.setOrganisationId(TenantContext.getCurrentTenant());
+        i.setOrganisationId(orgId);
         apply(i, req);
-        return toResponse(incidentRepo.save(i));
+        IncidentResponse out = toResponse(incidentRepo.save(i));
+        broadcast(orgId, out.id(), out);
+        return out;
     }
 
     @Transactional
     public IncidentResponse update(Long id, IncidentRequest req) {
+        Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         apply(i, req);
-        return toResponse(incidentRepo.save(i));
+        IncidentResponse out = toResponse(incidentRepo.save(i));
+        broadcast(orgId, id, out);
+        return out;
     }
 
     @Transactional
     public void delete(Long id) {
+        Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         i.setIsDeleted(true);
         incidentRepo.save(i);
+        broadcast(orgId, id, java.util.Map.of("id", id, "deleted", true));
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +115,7 @@ public class IncidentService {
 
     @Transactional
     public java.util.Map<String, Object> advancePhase(Long id) {
+        Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         int idx = NIST_PHASES.indexOf(i.getNistPhase());
         if (idx < 0) idx = 0;
@@ -106,26 +125,34 @@ public class IncidentService {
         String next = NIST_PHASES.get(idx + 1);
         i.setNistPhase(next);
         i.setStatus(mapPhaseToStatus(next));
-        return phaseSnapshot(incidentRepo.save(i));
+        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        broadcast(orgId, id, snap);
+        return snap;
     }
 
     @Transactional
     public java.util.Map<String, Object> setPhase(Long id, String phase) {
+        Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         if (!NIST_PHASES.contains(phase)) {
             throw new IllegalArgumentException("phase must be one of " + NIST_PHASES);
         }
         i.setNistPhase(phase);
         i.setStatus(mapPhaseToStatus(phase));
-        return phaseSnapshot(incidentRepo.save(i));
+        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        broadcast(orgId, id, snap);
+        return snap;
     }
 
     @Transactional
     public java.util.Map<String, Object> closeIncident(Long id) {
+        Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         i.setStatus("CLOSED");
         if (i.getResolutionDate() == null) i.setResolutionDate(java.time.LocalDate.now());
-        return phaseSnapshot(incidentRepo.save(i));
+        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        broadcast(orgId, id, snap);
+        return snap;
     }
 
     private String mapPhaseToStatus(String phase) {
@@ -141,6 +168,7 @@ public class IncidentService {
 
     @Transactional
     public java.util.Map<String, Object> notifyRegulator(Long id, String regulator) {
+        Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         switch (regulator.toUpperCase()) {
@@ -151,7 +179,9 @@ public class IncidentService {
             case "HRSD"        -> i.setHrsdNotifiedAt(now);
             default -> throw new IllegalArgumentException("regulator must be one of NCA_HEY|DATA_OFFICE|CITC|SAMA|HRSD");
         }
-        return phaseSnapshot(incidentRepo.save(i));
+        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        broadcast(orgId, id, snap);
+        return snap;
     }
 
     /**

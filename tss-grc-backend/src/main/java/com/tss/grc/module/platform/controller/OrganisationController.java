@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +40,7 @@ public class OrganisationController {
     private final JwtTokenProvider tokenProvider;
 
     @GetMapping("/accessible")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "List organisations the current user can switch into")
     public List<Map<String, Object>> accessible(Authentication auth) {
         Long currentOrg = TenantContext.getCurrentTenant();
@@ -57,8 +59,10 @@ public class OrganisationController {
     }
 
     @PostMapping("/switch/{id}")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     @Operation(summary = "Re-issue an access token scoped to the requested org. Platform-admin only.")
     public ResponseEntity<?> switchOrg(@PathVariable Long id, Authentication auth) {
+        // @PreAuthorize already enforces; defensive belt-and-braces in case of misconfiguration:
         if (!isPlatformAdmin(auth)) {
             return ResponseEntity.status(403).body(Map.of("message", "Only platform admins can switch tenants"));
         }

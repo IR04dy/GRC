@@ -26,6 +26,7 @@ export const RISK_LIFECYCLES: ProcessLifecycle[] = [
     secondary:{ label: 'Workflow', labelAr: 'سير العمل',        href: '/risk?tab=workflows' },
     steward:  'Risk Manager',
     sla:      '14-day SLA',
+    intakeKind: 'RISK_ISSUE',
   },
   {
     name: 'Risk Treatment Plan',
@@ -37,6 +38,7 @@ export const RISK_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Open treatments', labelAr: 'خطط المعالجة', href: '/risk?status=TREATMENT_IN_PROGRESS' },
     steward:  'Risk Owner',
     sla:      '60-day SLA',
+    intakeKind: 'RISK_ISSUE',
   },
   {
     name: 'KRI Threshold Breach Response',
@@ -48,6 +50,7 @@ export const RISK_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'KRI dashboard', labelAr: 'لوحة المؤشرات',   href: '/risk?tab=kri' },
     steward:  'KRI Owner',
     sla:      '5-day SLA',
+    intakeKind: 'RISK_ISSUE',
   },
   {
     name: 'Risk Appetite Breach Escalation',
@@ -59,6 +62,7 @@ export const RISK_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Appetite dashboard', labelAr: 'لوحة شهية المخاطر', href: '/risk?tab=appetite' },
     steward:  'CRO Office',
     sla:      'CFO escalation',
+    intakeKind: 'RISK_ISSUE',
   },
   {
     name: 'Risk Acceptance Approval',
@@ -69,6 +73,7 @@ export const RISK_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 2, overdueCount: 0,
     primary:  { label: 'Pending approvals', labelAr: 'الاعتمادات المعلّقة', href: '/risk?status=ACCEPTED' },
     steward:  'Executive',
+    intakeKind: 'POLICY_EXCEPTION',
   },
 ];
 
@@ -85,6 +90,7 @@ export const COMPLIANCE_LIFECYCLES: ProcessLifecycle[] = [
     secondary:{ label: 'Workflow', labelAr: 'سير العمل',          href: '/compliance?tab=workflows' },
     steward:  'CAP Owner',
     sla:      '60-day SLA',
+    intakeKind: 'CONTROL_OBSERVATION',
   },
   {
     name: 'Audit Engagement Lifecycle',
@@ -95,6 +101,7 @@ export const COMPLIANCE_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 1, overdueCount: 0,
     primary:  { label: 'Engagements', labelAr: 'مهام المراجعة',     href: '/compliance?tab=engagements' },
     steward:  'Lead Auditor',
+    intakeKind: 'AUDIT_REQUEST',
   },
   {
     name: 'Policy Lifecycle Management',
@@ -106,6 +113,7 @@ export const COMPLIANCE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Policy register', labelAr: 'سجل السياسات', href: '/compliance?tab=policies' },
     steward:  'Policy Owner',
     sla:      '90-day legal',
+    intakeKind: 'POLICY_EXCEPTION',
   },
   {
     name: 'Regulatory Change Management',
@@ -117,6 +125,7 @@ export const COMPLIANCE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Reg changes', labelAr: 'التغييرات التنظيمية',     href: '/compliance?tab=changes' },
     steward:  'Compliance Office',
     sla:      '180-day window',
+    intakeKind: 'CHANGE_REQUEST',
   },
   {
     name: 'Control Testing & Attestation',
@@ -128,6 +137,7 @@ export const COMPLIANCE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Controls', labelAr: 'الضوابط',        href: '/compliance?tab=controls' },
     steward:  'Control Owner',
     sla:      'Quarterly',
+    intakeKind: 'CONTROL_ATTESTATION',
   },
   {
     name: 'Issue Management',
@@ -138,6 +148,7 @@ export const COMPLIANCE_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 6, overdueCount: 2,
     primary:  { label: 'Open issues', labelAr: 'الملاحظات المفتوحة',     href: '/compliance?tab=findings' },
     steward:  'Issue Owner',
+    intakeKind: 'CONTROL_OBSERVATION',
   },
 ];
 
@@ -154,6 +165,7 @@ export const CYBER_LIFECYCLES: ProcessLifecycle[] = [
     secondary:{ label: 'Workflow', labelAr: 'سير العمل',        href: '/cyber?tab=workflows' },
     steward:  'CSIRT Lead',
     sla:      '24-hr NCA HEY',
+    intakeKind: 'SECURITY_INCIDENT',
   },
   {
     name: 'Vulnerability Management',
@@ -165,6 +177,7 @@ export const CYBER_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Vuln register', labelAr: 'سجل الثغرات',   href: '/cyber?tab=vuln' },
     steward:  'AppSec / Patch Team',
     sla:      '7-day critical',
+    intakeKind: 'VRP_DISCLOSURE',
   },
   {
     name: 'Security Exception Approval',
@@ -175,6 +188,7 @@ export const CYBER_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 3, overdueCount: 0,
     primary:  { label: 'Exceptions', labelAr: 'الاستثناءات',      href: '/cyber?tab=exceptions' },
     steward:  'CISO',
+    intakeKind: 'POLICY_EXCEPTION',
   },
   {
     name: 'Control Self-Assessment (CSA)',
@@ -186,6 +200,7 @@ export const CYBER_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Assessments', labelAr: 'التقييمات',     href: '/cyber?tab=assessments' },
     steward:  'Control Owner',
     sla:      'Annual',
+    intakeKind: 'CONTROL_ATTESTATION',
   },
   {
     name: 'Asset Onboarding & Classification',
@@ -196,6 +211,7 @@ export const CYBER_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 8, overdueCount: 0,
     primary:  { label: 'Asset register', labelAr: 'سجل الأصول',  href: '/cyber?tab=assets' },
     steward:  'Asset Owner',
+    intakeKind: 'CONTROL_OBSERVATION',
   },
   {
     name: 'Security Action Plan (SAP) Tracking',
@@ -206,6 +222,7 @@ export const CYBER_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 6, overdueCount: 1,
     primary:  { label: 'Action plans', labelAr: 'خطط العمل',    href: '/cyber?tab=actions' },
     steward:  'Action Owner',
+    intakeKind: 'CONTROL_OBSERVATION',
   },
 ];
 
@@ -222,6 +239,7 @@ export const PRIVACY_LIFECYCLES: ProcessLifecycle[] = [
     secondary:{ label: 'Workflow', labelAr: 'سير العمل',        href: '/privacy?tab=workflows' },
     steward:  'DPO',
     sla:      '30-day PDPL',
+    intakeKind: 'DSR_REQUEST',
   },
   {
     name: 'Privacy Incident & Breach Response',
@@ -233,6 +251,7 @@ export const PRIVACY_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Breach register', labelAr: 'سجل الخروقات', href: '/privacy?tab=breaches' },
     steward:  'DPO + Legal',
     sla:      '72-hour SDA',
+    intakeKind: 'PRIVACY_BREACH',
   },
   {
     name: 'Data Protection Impact Assessment (DPIA)',
@@ -244,6 +263,7 @@ export const PRIVACY_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'DPIA register', labelAr: 'سجل تقييمات الأثر',   href: '/privacy?tab=dpia' },
     steward:  'DPO',
     sla:      'Annual review',
+    intakeKind: 'DPIA_INITIATION',
   },
   {
     name: 'Records of Processing Activities (RoPA)',
@@ -255,6 +275,7 @@ export const PRIVACY_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'RoPA register', labelAr: 'سجل أنشطة المعالجة',   href: '/privacy?tab=ropa' },
     steward:  'Data Steward',
     sla:      'Annual refresh',
+    intakeKind: 'DPIA_INITIATION',
   },
   {
     name: 'Consent Lifecycle Management',
@@ -265,6 +286,7 @@ export const PRIVACY_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 0, overdueCount: 0,
     primary:  { label: 'Consent dashboard', labelAr: 'لوحة الموافقات', href: '/privacy?tab=consent' },
     steward:  'DPO',
+    intakeKind: 'DSR_REQUEST',
   },
   {
     name: 'Cross-Border Transfer Approval',
@@ -276,6 +298,7 @@ export const PRIVACY_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Cross-border DPIAs', labelAr: 'تقييمات النقل عبر الحدود', href: '/privacy?tab=dpia' },
     steward:  'DPO + Legal',
     sla:      'SDAIA permit',
+    intakeKind: 'DPIA_INITIATION',
   },
 ];
 
@@ -291,6 +314,7 @@ export const BCM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'BIA records', labelAr: 'سجلات تقييم الأثر',     href: '/bcm?tab=bia' },
     steward:  'Process Owner',
     sla:      'Annual',
+    intakeKind: 'BIA_SUBMISSION',
   },
   {
     name: 'BCP Plan Lifecycle',
@@ -303,6 +327,7 @@ export const BCM_LIFECYCLES: ProcessLifecycle[] = [
     secondary:{ label: 'Workflow', labelAr: 'سير العمل',        href: '/bcm?tab=workflows' },
     steward:  'BCM Coordinator',
     sla:      'Semi-annual',
+    intakeKind: 'BIA_SUBMISSION',
   },
   {
     name: 'Recovery Strategy Validation',
@@ -313,6 +338,7 @@ export const BCM_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 0, overdueCount: 0,
     primary:  { label: 'Plans register', labelAr: 'سجل الخطط',  href: '/bcm?tab=plans' },
     steward:  'BCM + IT Recovery',
+    intakeKind: 'BIA_SUBMISSION',
   },
   {
     name: 'Exercise & Testing Programme',
@@ -324,6 +350,7 @@ export const BCM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Exercises', labelAr: 'التمارين',       href: '/bcm?tab=exercises' },
     steward:  'BCM Lead',
     sla:      'Quarterly',
+    intakeKind: 'BIA_SUBMISSION',
   },
   {
     name: 'Crisis Activation & Communications',
@@ -334,6 +361,7 @@ export const BCM_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 1, overdueCount: 0,
     primary:  { label: 'Crisis comms', labelAr: 'اتصالات الأزمات',    href: '/bcm?tab=comms' },
     steward:  'Crisis Manager',
+    intakeKind: 'SECURITY_INCIDENT',
   },
   {
     name: 'Process Dependency Mapping',
@@ -344,6 +372,7 @@ export const BCM_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 0, overdueCount: 0,
     primary:  { label: 'Dependency graph', labelAr: 'مخطط التبعيات', href: '/bcm?tab=graph' },
     steward:  'Process Owners',
+    intakeKind: 'BIA_SUBMISSION',
   },
 ];
 
@@ -360,6 +389,7 @@ export const TPRM_LIFECYCLES: ProcessLifecycle[] = [
     secondary:{ label: 'Workflow', labelAr: 'سير العمل',        href: '/tprm?tab=workflows' },
     steward:  'TPRM Analyst',
     sla:      '30-day onboarding',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
   {
     name: 'Continuous Vendor Monitoring',
@@ -371,6 +401,7 @@ export const TPRM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Assessments', labelAr: 'التقييمات',     href: '/tprm?tab=assessments' },
     steward:  'TPRM Lead',
     sla:      'Continuous',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
   {
     name: 'Vendor Re-assessment',
@@ -382,6 +413,7 @@ export const TPRM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Periodic reviews', labelAr: 'المراجعات الدورية', href: '/tprm?tab=assessments' },
     steward:  'TPRM Lead',
     sla:      'Annual',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
   {
     name: 'Contract Lifecycle Management',
@@ -393,6 +425,7 @@ export const TPRM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Contracts', labelAr: 'العقود',       href: '/tprm?tab=contracts' },
     steward:  'Procurement + Legal',
     sla:      '90-day notice',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
   {
     name: 'Vendor Off-boarding',
@@ -403,6 +436,7 @@ export const TPRM_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 0, overdueCount: 0,
     primary:  { label: 'Vendor exits', labelAr: 'إنهاء التعاقد',    href: '/tprm?tab=vendors' },
     steward:  'TPRM + IT',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
 ];
 
@@ -419,6 +453,7 @@ export const SCM_LIFECYCLES: ProcessLifecycle[] = [
     secondary:{ label: 'Workflow & Map',      href: '/scm?tab=workflow' },
     steward:  'Procurement Lead',
     sla:      '30-day SLA',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
   {
     name: 'Supplier Risk Re-assessment',
@@ -430,6 +465,7 @@ export const SCM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Assessments', labelAr: 'التقييمات',     href: '/scm?tab=assessments' },
     steward:  'TPRM Lead',
     sla:      'Annual',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
   {
     name: 'Disruption Response & Recovery',
@@ -441,6 +477,7 @@ export const SCM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Open disruptions', labelAr: 'الانقطاعات المفتوحة', href: '/scm?tab=disruptions' },
     steward:  'Network Lead',
     sla:      '24-hr response',
+    intakeKind: 'SECURITY_INCIDENT',
   },
   {
     name: 'Dependency & Concentration Risk',
@@ -451,6 +488,7 @@ export const SCM_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 1, overdueCount: 1,
     primary:  { label: 'Dependency map', labelAr: 'خريطة التبعيات',  href: '/scm?tab=dependencies' },
     steward:  'TPRM + BCM',
+    intakeKind: 'RISK_ISSUE',
   },
   {
     name: 'Contract Renewal & SLA Management',
@@ -462,6 +500,7 @@ export const SCM_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Contracts', labelAr: 'العقود',       href: '/scm?tab=contracts' },
     steward:  'Procurement',
     sla:      '90-day notice',
+    intakeKind: 'VENDOR_ONBOARDING',
   },
 ];
 
@@ -477,6 +516,7 @@ export const ETHICS_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Case register', labelAr: 'سجل القضايا',   href: '/ethics' },
     steward:  'Ethics Investigator',
     sla:      '60-day SLA',
+    intakeKind: 'SPEAKUP',
   },
   {
     name: 'Conflict of Interest Disclosure',
@@ -488,6 +528,7 @@ export const ETHICS_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Disclosures', labelAr: 'الإفصاحات',     href: '/ethics?tab=disclosures' },
     steward:  'Ethics Committee',
     sla:      '30-day SLA',
+    intakeKind: 'ETHICS_DISCLOSURE',
   },
   {
     name: 'Customer Due Diligence (CDD/EDD)',
@@ -499,6 +540,7 @@ export const ETHICS_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'KYC subjects', labelAr: 'الفحص الواجب للعملاء',    href: '/ethics?tab=kyc' },
     steward:  'KYC Analyst',
     sla:      '14-day onboarding',
+    intakeKind: 'ETHICS_DISCLOSURE',
   },
   {
     name: 'Transaction Monitoring (AML)',
@@ -510,6 +552,7 @@ export const ETHICS_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'AML alerts', labelAr: 'تنبيهات مكافحة غسل الأموال',      href: '/ethics?tab=aml' },
     steward:  'AML Team',
     sla:      '5-day critical',
+    intakeKind: 'ETHICS_DISCLOSURE',
   },
   {
     name: 'Sanctions / PEP Screening Resolution',
@@ -521,6 +564,7 @@ export const ETHICS_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Screening hits', labelAr: 'تطابقات الفحص',  href: '/ethics?tab=kyc' },
     steward:  'Compliance Officer',
     sla:      '24-hr critical',
+    intakeKind: 'ETHICS_DISCLOSURE',
   },
   {
     name: 'Code of Conduct Attestation',
@@ -532,6 +576,7 @@ export const ETHICS_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Attestations', labelAr: 'الإقرارات',    href: '/ethics?tab=analytics' },
     steward:  'Compliance Office',
     sla:      'Annual',
+    intakeKind: 'CONTROL_ATTESTATION',
   },
 ];
 
@@ -547,6 +592,7 @@ export const EVIDENCE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Evidence catalogue', labelAr: 'كتالوج الأدلة', href: '/evidence?tab=catalog' },
     steward:  'Control Owner',
     sla:      '14-day SLA',
+    intakeKind: 'CONTROL_ATTESTATION',
   },
   {
     name: 'Evidence Review & Approval',
@@ -558,6 +604,7 @@ export const EVIDENCE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Review queue', labelAr: 'قائمة المراجعة',    href: '/evidence?tab=review' },
     steward:  'Reviewer',
     sla:      '14-day review',
+    intakeKind: 'CONTROL_ATTESTATION',
   },
   {
     name: 'Continuous Control Monitoring (CCM)',
@@ -568,6 +615,7 @@ export const EVIDENCE_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 0, overdueCount: 0,
     primary:  { label: 'Connectors', labelAr: 'الموصِّلات',      href: '/evidence?tab=connectors' },
     steward:  'Automation Engineer',
+    intakeKind: 'CONTROL_ATTESTATION',
   },
   {
     name: 'Evidence Renewal & Refresh',
@@ -578,6 +626,7 @@ export const EVIDENCE_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 1, overdueCount: 1,
     primary:  { label: 'Expired items', labelAr: 'العناصر المنتهية',   href: '/evidence?tab=expired' },
     steward:  'Control Owner',
+    intakeKind: 'CONTROL_ATTESTATION',
   },
 ];
 
@@ -593,6 +642,7 @@ export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Change register', labelAr: 'سجل التغييرات', href: '/changes' },
     steward:  'Change Owner',
     sla:      '7-day CAB',
+    intakeKind: 'CHANGE_REQUEST',
   },
   {
     name: 'Emergency Change (E-CAB)',
@@ -604,6 +654,7 @@ export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Emergencies', labelAr: 'الطوارئ',     href: '/changes?tab=register' },
     steward:  'CAB Chair',
     sla:      'Same-day',
+    intakeKind: 'CHANGE_REQUEST',
   },
   {
     name: 'Post-Implementation Review (PIR)',
@@ -615,6 +666,7 @@ export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Closed changes', labelAr: 'التغييرات المغلقة',  href: '/changes' },
     steward:  'Change Manager',
     sla:      '5-day PIR',
+    intakeKind: 'CHANGE_REQUEST',
   },
 ];
 
@@ -630,6 +682,7 @@ export const INCIDENT_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Incident register', labelAr: 'سجل الحوادث', href: '/incidents' },
     steward:  'CSIRT',
     sla:      '24-hr critical',
+    intakeKind: 'SECURITY_INCIDENT',
   },
   {
     name: 'Saudi Regulator Notification',
@@ -638,9 +691,10 @@ export const INCIDENT_LIFECYCLES: ProcessLifecycle[] = [
     Icon: Stamp,
     stages: ['Triggered', 'Drafting', 'Notified', 'Acknowledged'],
     activeCount: 0, overdueCount: 0,
-    primary:  { label: 'Saudi templates', labelAr: 'قوالب الجهات السعودية', href: '/incidents' },
+    primary:  { label: 'Saudi templates', labelAr: 'قوالب الجهات السعودية', href: '/incidents?regulator=1' },
     steward:  'CSIRT + Legal',
     sla:      'Regulator-specific',
+    intakeKind: 'SECURITY_INCIDENT',
   },
   {
     name: 'Lessons-Learned Capture',
@@ -651,5 +705,6 @@ export const INCIDENT_LIFECYCLES: ProcessLifecycle[] = [
     activeCount: 0, overdueCount: 0,
     primary:  { label: 'Lessons archive', labelAr: 'أرشيف الدروس المستفادة', href: '/incidents' },
     steward:  'CSIRT Lead',
+    intakeKind: 'SECURITY_INCIDENT',
   },
 ];

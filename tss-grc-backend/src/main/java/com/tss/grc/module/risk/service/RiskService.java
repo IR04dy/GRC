@@ -9,8 +9,10 @@ import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,13 @@ public class RiskService {
     private final RiskRepository riskRepository;
     private final RiskCategoryRepository riskCategoryRepository;
     private final UserRepository userRepository;
+
+    /** Optional — null in unit tests, autowired by Spring at runtime. */
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
+    private void emit(Long orgId, Long id, Object payload) {
+        if (bcast != null) bcast.entity(orgId, "risk", id, payload);
+    }
 
     @Transactional(readOnly = true)
     public Page<RiskResponse> list(String status, Pageable pageable) {
@@ -52,7 +61,9 @@ public class RiskService {
         applyRequest(risk, req);
         risk.setIdentifiedDate(LocalDate.now());
         risk = riskRepository.save(risk);
-        return toResponse(risk);
+        RiskResponse out = toResponse(risk);
+        emit(orgId, risk.getId(), out);
+        return out;
     }
 
     @Transactional
@@ -63,7 +74,9 @@ public class RiskService {
             .orElseThrow(() -> new EntityNotFoundException("Risk not found: " + id));
         applyRequest(risk, req);
         risk = riskRepository.save(risk);
-        return toResponse(risk);
+        RiskResponse out = toResponse(risk);
+        emit(orgId, id, out);
+        return out;
     }
 
     @Transactional
@@ -74,6 +87,7 @@ public class RiskService {
             .orElseThrow(() -> new EntityNotFoundException("Risk not found: " + id));
         risk.setIsDeleted(true);
         riskRepository.save(risk);
+        emit(orgId, id, java.util.Map.of("id", id, "deleted", true));
     }
 
     // ── Risk lifecycle workflow (ISO 31000 / COSO ERM) ────────────────────────
@@ -87,7 +101,9 @@ public class RiskService {
         Risk r = mustGet(id);
         require(r, "OPEN");
         r.setStatus("UNDER_REVIEW");
-        return toResponse(riskRepository.save(r));
+        RiskResponse out = toResponse(riskRepository.save(r));
+        emit(r.getOrganisationId(), id, out);
+        return out;
     }
 
     @Transactional
@@ -95,7 +111,9 @@ public class RiskService {
         Risk r = mustGet(id);
         require(r, "UNDER_REVIEW");
         r.setStatus("MITIGATING");
-        return toResponse(riskRepository.save(r));
+        RiskResponse out = toResponse(riskRepository.save(r));
+        emit(r.getOrganisationId(), id, out);
+        return out;
     }
 
     @Transactional
@@ -103,7 +121,9 @@ public class RiskService {
         Risk r = mustGet(id);
         require(r, "OPEN", "UNDER_REVIEW");
         r.setStatus("ACCEPTED");
-        return toResponse(riskRepository.save(r));
+        RiskResponse out = toResponse(riskRepository.save(r));
+        emit(r.getOrganisationId(), id, out);
+        return out;
     }
 
     @Transactional
@@ -111,7 +131,9 @@ public class RiskService {
         Risk r = mustGet(id);
         require(r, "MITIGATING", "ACCEPTED");
         r.setStatus("CLOSED");
-        return toResponse(riskRepository.save(r));
+        RiskResponse out = toResponse(riskRepository.save(r));
+        emit(r.getOrganisationId(), id, out);
+        return out;
     }
 
     @Transactional
@@ -119,7 +141,9 @@ public class RiskService {
         Risk r = mustGet(id);
         require(r, "CLOSED");
         r.setStatus("OPEN");
-        return toResponse(riskRepository.save(r));
+        RiskResponse out = toResponse(riskRepository.save(r));
+        emit(r.getOrganisationId(), id, out);
+        return out;
     }
 
     /**

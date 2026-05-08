@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Workflow, Building2, AlertTriangle, CalendarClock, Filter, Download, Plus, BarChart3, FileText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -16,6 +17,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { LivePulse } from '../../components/ui/LivePulse';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { tprmApi, ApiError, type TprmVendorDto, type TprmVendorRequest } from '../../lib/api';
@@ -27,8 +30,12 @@ import { TPRM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { TPRM_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toVendorDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { PromotedBadge } from '../../components/intake/PromotedBadge';
+import { TprmOnboardingPipeline, TprmReassessmentDashboard } from './TprmOnboardingPanel';
 
-type TabId = 'overview' | 'vendors' | 'assessments' | 'contracts' | 'workflows' | 'comms';
+type TabId = 'overview' | 'vendors' | 'onboarding' | 'reassessment' | 'assessments' | 'contracts' | 'workflows' | 'comms';
 
 const RISK_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
@@ -59,6 +66,7 @@ function vendorToReq(v: TprmVendorDto): TprmVendorRequest {
 export function TprmPage() {
   const { t } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>('overview');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TprmVendorDto | null>(null);
@@ -66,11 +74,15 @@ export function TprmPage() {
   const [busy, setBusy] = useState(false);
 
   const vendors = useApiList<TprmVendorDto>(() => tprmApi.vendors(0, 100), VENDORS);
+  // DD-71: include intake-promoted vendors in the visible register.
+  const promotedVendors = usePromoted('VENDOR').map(toVendorDto);
+  const allVendors = useMemo(() => [...promotedVendors, ...vendors.data], [promotedVendors, vendors.data]);
+  const provenance = usePromotedProvenance('VENDOR');
 
   // ── DD-47: filter modal ──────────────────────────────────────
   const [filterOpen, setFilterOpen] = useState(false);
   const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
-  const filteredVendors = useMemo(() => vendors.data.filter(v => {
+  const filteredVendors = useMemo(() => allVendors.filter(v => {
     if (advFilters.riskRating && v.riskRating !== advFilters.riskRating) return false;
     if (advFilters.status     && v.status !== advFilters.status) return false;
     if (advFilters.vendorType && (v.vendorType ?? '') !== advFilters.vendorType) return false;
@@ -78,7 +90,7 @@ export function TprmPage() {
     if (advFilters.contractEndAfter  && (v.contractEndDate ?? '') < advFilters.contractEndAfter) return false;
     if (advFilters.contractEndBefore && (v.contractEndDate ?? '') > advFilters.contractEndBefore) return false;
     return true;
-  }), [vendors.data, advFilters]);
+  }), [allVendors, advFilters]);
   const tprmFilterFields: FilterField[] = [
     { key: 'riskRating', label: t('filterFieldRisk'),       kind: 'select',
       options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
@@ -101,16 +113,18 @@ export function TprmPage() {
   ];
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'overview',    label: t('tabOverview') },
-    { id: 'vendors',     label: t('tprmTabVendors') },
-    { id: 'assessments', label: t('tprmTabAssessments') },
-    { id: 'contracts',   label: t('tprmTabContracts') },
-    { id: 'workflows',   label: t('tprmTabWorkflows') ?? 'Workflows' },
-    { id: 'comms',       label: t('detailTabComms') },
+    { id: 'overview',     label: t('tabOverview') },
+    { id: 'vendors',      label: t('tprmTabVendors') },
+    { id: 'onboarding',   label: t('tprmTabOnboarding') },
+    { id: 'reassessment', label: t('tprmTabReassessment') },
+    { id: 'assessments',  label: t('tprmTabAssessments') },
+    { id: 'contracts',    label: t('tprmTabContracts') },
+    { id: 'workflows',    label: t('tprmTabWorkflows') ?? 'Workflows' },
+    { id: 'comms',        label: t('detailTabComms') },
   ];
 
   const cols: Column<TprmVendorDto>[] = [
-    { header: t('colVendor'),     cell: r => <span style={{ fontWeight: 600 }}>{r.vendorName}</span> },
+    { header: t('colVendor'),     cell: r => <span style={{ fontWeight: 600 }}>{r.vendorName}{provenance.has(r.id) && <PromotedBadge sourceReferenceCode={provenance.get(r.id)!} />}</span> },
     { header: t('colType'),       cell: r => <span style={{ color: 'var(--ink-2)' }}>{r.vendorType ?? '—'}</span> },
     { header: t('colCountry'),    cell: r => r.country ?? '—' },
     { header: t('colRisk'),       cell: r => <Badge tone={RISK_TONE[r.riskRating] ?? 'neutral'}>{r.riskRating}</Badge> },
@@ -150,8 +164,16 @@ export function TprmPage() {
     .sort((a, b) => a.days - b.days)
     .slice(0, 8);
 
-  const critical = vendors.data.filter(v => v.riskRating === 'CRITICAL').length;
+  const critical = allVendors.filter(v => v.riskRating === 'CRITICAL').length;
   const isDemo = vendors.isDemo;
+
+  // Sprint 4 §2.7 — live TPRM dashboard
+  const { pulse } = useLiveRefresh({
+    kinds: ['changed.vendor', 'changed.vendor_assessment', 'changed.supplier_incident'],
+    onRefresh: () => { vendors.reload(); },
+    waitMs: 600,
+    enabled: !isDemo,
+  });
 
   return (
     <Shell title={t('modThirdParty')} sub="ISO 27036">
@@ -160,6 +182,7 @@ export function TprmPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>
@@ -167,7 +190,9 @@ export function TprmPage() {
               downloadCsv(filteredVendors as unknown as ExportRow[], stampFilename('tprm-vendors', 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
-            <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
+            {/* DD-76: route new vendor onboarding through the Services Center
+                so it lands in the onboarding pipeline (DD-74) at INTAKE stage. */}
+            <Button variant="primary"   Icon={Plus} onClick={() => navigate('/intake/vendor_onboarding')}>{t('actionNew')}</Button>
           </>
         }
       />
@@ -213,6 +238,12 @@ export function TprmPage() {
         <Card padded={false}>
           {vendors.loading ? <LoadingRow /> : <DataTable columns={cols} rows={filteredVendors} rowHref={r => `/vendors/${r.id}`} empty={<EmptyState />} />}
         </Card>
+      )}
+      {tab === 'onboarding' && (
+        <TprmOnboardingPipeline vendors={allVendors} />
+      )}
+      {tab === 'reassessment' && (
+        <TprmReassessmentDashboard vendors={allVendors} />
       )}
       {tab === 'assessments' && (
         <Card padded={false}>

@@ -16,8 +16,11 @@ import { useToast } from '../../lib/toast';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { POLICY_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 import { POLICIES, POLICY_LIFECYCLE_EVENTS_BY_ID } from '../compliance/mockCompliance';
+import { PolicyLifecycleStrip } from '../../components/compliance/PolicyLifecycleStrip';
+import { PolicyVersionHistory } from '../../components/compliance/PolicyVersionHistory';
+import type { PolicyStage } from '../../lib/policyLifecycle';
 
-type TabId = 'overview' | 'mappings' | 'lifecycle' | 'links';
+type TabId = 'overview' | 'mappings' | 'lifecycle' | 'versions' | 'links';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', LEGAL_REVIEW: 'info', EXEC_APPROVAL: 'accent',
@@ -61,6 +64,7 @@ export function PolicyDetailPage() {
   const tabs: TabItem<TabId>[] = [
     { id: 'overview',  label: t('detailTabOverview') },
     { id: 'mappings',  label: t('detailTabMappings') },
+    { id: 'versions',  label: t('policyTabVersions') },
     { id: 'lifecycle', label: t('detailTabLifecycle') },
     { id: 'links',     label: t('detailTabLinks') },
   ];
@@ -115,15 +119,25 @@ export function PolicyDetailPage() {
           <Tabs items={tabs} active={tab} onChange={setTab} />
 
           {tab === 'overview' && (
-            <Card title={t('detailTabOverview')} Icon={BookCopy}>
-              <Field label={t('fldCode')}     value={item.code ?? '—'} mono bold />
-              <Field label={t('colTitle')}    value={title} bold />
-              <Field label={t('fldVersion')}  value={item.version ?? '—'} mono />
-              <Field label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
-              <Field label={t('complianceFldEffectiveFrom')} value={item.effectiveFrom ?? '—'} mono />
-              <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
-              <Field label={t('complianceFldPolicyContent')} value={item.contentEn ?? '—'} multiline />
-            </Card>
+            <>
+              {/* Sprint 6 — visual lifecycle strip on top of the overview */}
+              <div style={{ marginBottom: 16 }}>
+                <PolicyLifecycleStrip current={item.status as PolicyStage} />
+              </div>
+              <Card title={t('detailTabOverview')} Icon={BookCopy}>
+                <Field label={t('fldCode')}     value={item.code ?? '—'} mono bold />
+                <Field label={t('colTitle')}    value={title} bold />
+                <Field label={t('fldVersion')}  value={item.version ?? '—'} mono />
+                <Field label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
+                <Field label={t('complianceFldEffectiveFrom')} value={item.effectiveFrom ?? '—'} mono />
+                <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
+                <Field label={t('complianceFldPolicyContent')} value={item.contentEn ?? '—'} multiline />
+              </Card>
+            </>
+          )}
+
+          {tab === 'versions' && (
+            <PolicyVersionHistory policyId={item.id} />
           )}
 
       {tab === 'mappings' && (

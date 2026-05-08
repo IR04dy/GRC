@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   RefreshCw, Activity, TimerReset, Gauge, Filter, Download, Plus, BarChart3, Cpu, Calendar,
   CheckCheck, PlayCircle, RotateCcw, FileCheck2, Megaphone, Send,
@@ -19,6 +20,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { LivePulse } from '../../components/ui/LivePulse';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
@@ -38,6 +41,8 @@ import { BCM_WORKFLOWS } from '../../lib/mockWorkflows';
 import { BCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { BCM_ANCHORS } from '../../lib/moduleAnchors';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toBiaDto } from '../../lib/promotedAdapters';
 
 type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows';
 
@@ -133,10 +138,27 @@ function useEntityState<T>() {
   };
 }
 
+const VALID_BCM_TABS: TabId[] = ['overview', 'plans', 'processes', 'bia', 'graph', 'exercises', 'comms', 'workflows'];
+
+function isBcmTab(s: string | null): s is TabId {
+  return !!s && (VALID_BCM_TABS as string[]).includes(s);
+}
+
 export function BcmPage() {
   const { t } = useI18n();
   const toast = useToast();
-  const [tab, setTab] = useState<TabId>('overview');
+  const navigate = useNavigate();
+  // ?tab=<id> deep-link support — fixes the bug where /bcm?tab=plans
+  // would land on the overview because the URL param was ignored.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [tab, setTabState] = useState<TabId>(isBcmTab(initialTab) ? initialTab : 'overview');
+  function setTab(next: TabId) {
+    setTabState(next);
+    const sp = new URLSearchParams(searchParams);
+    sp.set('tab', next);
+    setSearchParams(sp, { replace: true });
+  }
   const [busy, setBusy] = useState(false);
 
   const planS = useEntityState<BcmPlanDto>();
@@ -148,6 +170,9 @@ export function BcmPage() {
   const procs = useApiList<BcmProcessDto>(() => bcmApi.processes(0, 100), BCM_PROCESSES);
   // /bia returns a plain array — adapt to the Page<T> shape useApiList expects.
   const bia   = useApiList<BcmBiaDto>(() => bcmApi.bia().then(arr => ({ content: arr })), BCM_BIA);
+  // DD-75: merge intake-promoted BIA submissions into the visible register.
+  const promotedBia = usePromoted('BIA').map(toBiaDto);
+  const allBia = useMemo(() => [...promotedBia, ...bia.data], [promotedBia, bia.data]);
   const exercises = useApiList<BcmExerciseDto>(() => bcmApi.exercises(0, 200), BCM_EXERCISES);
 
   // ── DD-47: filter modal — tab-aware ──────────────────────────────
@@ -381,12 +406,15 @@ export function BcmPage() {
   }
 
   // ── Tab-aware "New" button ──
+  // DD-79: BIA submissions originate from the Services Center so business
+  // owners use the same front door as every other intake. Plans / processes
+  // / exercises are admin-managed records — they keep the inline modal.
   function newAction() {
     return () => {
       switch (tab) {
+        case 'bia':       return navigate('/intake/bia_submission');
         case 'plans':     return planS.startCreate();
         case 'processes': return procS.startCreate();
-        case 'bia':       return biaS.startCreate();
         case 'exercises': return exerS.startCreate();
         default:          return planS.startCreate();
       }
@@ -396,6 +424,14 @@ export function BcmPage() {
 
   const isDemo = plans.isDemo;
 
+  // Sprint 4 §2.7 — live BCM dashboard
+  const { pulse } = useLiveRefresh({
+    kinds: ['changed.bcm_plan', 'changed.bcm_invocation', 'changed.bcm_exercise'],
+    onRefresh: () => { plans.reload(); exercises.reload(); },
+    waitMs: 600,
+    enabled: !isDemo,
+  });
+
   return (
     <Shell title={t('modBcm')} sub="ISO 22301:2019">
       <PageHeader
@@ -403,6 +439,7 @@ export function BcmPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>
@@ -471,9 +508,9 @@ export function BcmPage() {
       )}
       {tab === 'bia' && (
         <Card padded={false}>
-          {bia.loading ? <LoadingRow /> : bia.data.length === 0
+          {bia.loading ? <LoadingRow /> : allBia.length === 0
             ? <EmptyState Icon={Cpu} title={t('bcmBiaEmpty')} sub={t('bcmBiaEmptySub')} />
-            : <DataTable columns={biaCols} rows={bia.data.map((b, i) => ({ ...b, id: b.id ?? i }))} />}
+            : <DataTable columns={biaCols} rows={allBia.map((b, i) => ({ ...b, id: b.id ?? i }))} />}
         </Card>
       )}
       {tab === 'exercises' && (

@@ -1,6 +1,13 @@
 package com.tss.grc.module.reporting.service;
 
-import com.lowagie.text.*;
+// Explicit imports — wildcard com.lowagie.text.* collides with
+// org.apache.poi.ss.usermodel.* on Cell and Row.
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.*;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditFinding;

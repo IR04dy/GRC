@@ -28,6 +28,10 @@ import {
   AUTHORITY_OBLIGATIONS_BY_CODE, STATUS_LABEL_OBLIGATION, STATUS_TONE_OBLIGATION,
 } from '../../lib/authorityObligations';
 import { useI18n } from '../../lib/i18n';
+import { NitaqatPanel } from '../../components/compliance/NitaqatPanel';
+import { HrsdProcessInitiation } from '../../components/compliance/HrsdProcessInitiation';
+import { MocPanel } from '../../components/compliance/MocPanel';
+import { MocProcessInitiation } from '../../components/compliance/MocProcessInitiation';
 
 /**
  * Authority Workspace — ServiceNow IRM "Authority Document workspace"
@@ -157,6 +161,26 @@ export function AuthorityWorkspacePage() {
         <Kpi Icon={AlertTriangle}   label="Open findings"    value={findingsForMe.filter(f => f.status !== 'CLOSED').length} tone="danger" />
         <Kpi Icon={Briefcase}       label="Audit engagements" value={engagementsForMe.length} tone="accent" />
       </div>
+
+      {/* DD-83 + DD-88: HRSD-specific surface — process-initiation tiles
+          first (action-oriented), then the Nitaqat dashboard + requirements
+          (informational). Non-HRSD authorities skip this entire block. */}
+      {authority.code === 'HRSD' && (
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <HrsdProcessInitiation />
+          <NitaqatPanel />
+        </div>
+      )}
+
+      {/* DD-85: MOC-specific surface — Tasattur Risk Index + Consumer
+          Protection + Commercial Registry obligations. */}
+      {authority.code === 'MOC' && (
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* DD-94: MOC process-initiation card on top — launchable workflows */}
+          <MocProcessInitiation />
+          <MocPanel />
+        </div>
+      )}
 
       {/* Coverage donut + per-framework breakdown */}
       <div className="dash-grid" style={{ marginTop: 12 }}>

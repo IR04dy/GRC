@@ -39,6 +39,7 @@
 //   NIST 800-61 §3.2   — Incident reporting
 
 import { useCallback, useEffect, useState } from 'react';
+import { addPromoted, type PromotedRecord } from './promotedRecords';
 
 // ── Domain types ────────────────────────────────────────────────────────
 
@@ -62,7 +63,19 @@ export type IntakeKind =
   | 'AUDIT_REQUEST'       // BU requests internal audit — IIA IPPF 2010
   | 'CHANGE_REQUEST'      // RFC — ITIL v4
   | 'ETHICS_DISCLOSURE'   // COI / gift / outside employment — Nazaha, IFAC §150
-  | 'CONTROL_ATTESTATION';// Periodic attestation campaign response — ISO 27001 §9.2
+  | 'CONTROL_ATTESTATION' // Periodic attestation campaign response — ISO 27001 §9.2
+  // ── DD-88: HRSD (Saudi Ministry of HR) workflows ──
+  | 'SAUDIZATION_REPORT'  // Monthly Nitaqat headcount snapshot — Qiwa portal
+  | 'WORKPLACE_INJURY'    // 24-hour GOSI injury notification
+  | 'GOSI_EMPLOYEE_REGISTER' // Within 5 working days of hire — GOSI registration
+  | 'EMPLOYMENT_CONTRACT' // New contract / renewal — Saudi Labor Law Art. 51
+  | 'WPS_PAYROLL_RUN'     // Monthly Wage Protection System submission
+  // ── DD-94: MOC (Ministry of Commerce) workflows ──
+  | 'TASATTUR_SELF_ASSESSMENT'      // Annual Tasattur Risk Index self-assessment
+  | 'BENEFICIAL_OWNERSHIP_DISCLOSURE' // BO disclosure under MOC Commercial Registry
+  | 'CR_ANNUAL_CONFIRMATION'         // Annual commercial-registry confirmation
+  | 'CAPITAL_CHANGE_NOTIFICATION'    // Capital-change notification (15 days)
+  | 'CONSUMER_COMPLAINT_RESPONSE';   // MOC consumer-protection complaint response
 
 export type IntakeStatus =
   | 'SUBMITTED'      // just received, auto-acked, SLA started
@@ -300,6 +313,99 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
     titleEn: 'Attest to a control / policy', titleAr: 'إقرار بضابط/سياسة',
     blurbEn: 'Confirm operating effectiveness for the controls assigned to you.',
     blurbAr: 'تأكيد الفاعلية التشغيلية للضوابط المُسنَدة إليك.',
+  },
+
+  // ── DD-88: HRSD workflows ─────────────────────────────────────────────
+  SAUDIZATION_REPORT: {
+    kind: 'SAUDIZATION_REPORT', codePrefix: 'SR', slaHours: 24 * 5, defaultTarget: 'CONTROL_TEST',
+    defaultAssignee: 'HR_LEAD', reference: 'HRSD Nitaqat — Qiwa portal',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Submit monthly Saudization report',
+    titleAr: 'تقديم تقرير السعودة الشهري',
+    blurbEn: 'Headcount + Saudi/non-Saudi breakdown — Qiwa portal submission, due by the 5th of following month.',
+    blurbAr: 'إحصاء العمالة + توزيع السعوديين/غير السعوديين — يُقدَّم عبر بوابة قِوى قبل اليوم الخامس من الشهر التالي.',
+  },
+  WORKPLACE_INJURY: {
+    kind: 'WORKPLACE_INJURY', codePrefix: 'WI', slaHours: 24, defaultTarget: 'INCIDENT',
+    defaultAssignee: 'HR_LEAD', reference: 'HRSD GOSI — 24-hour notification',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Report a workplace injury / occupational illness',
+    titleAr: 'الإبلاغ عن إصابة عمل أو مرض مهني',
+    blurbEn: 'Mandatory 24-hour GOSI notification. Failure exposes the employer to medical-claim cost recovery.',
+    blurbAr: 'إبلاغ إلزامي للتأمينات خلال 24 ساعة. عدم الإبلاغ يُحمّل صاحب العمل تكاليف المطالبات الطبية.',
+  },
+  GOSI_EMPLOYEE_REGISTER: {
+    kind: 'GOSI_EMPLOYEE_REGISTER', codePrefix: 'GR', slaHours: 24 * 5, defaultTarget: 'CONTROL_TEST',
+    defaultAssignee: 'HR_LEAD', reference: 'HRSD GOSI — 5 working days of hire',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Register a new employee with GOSI',
+    titleAr: 'تسجيل موظف جديد في التأمينات الاجتماعية',
+    blurbEn: 'Mandatory within 5 working days of hire. Saudi: 22% combined contribution; non-Saudi: 2% occupational hazards.',
+    blurbAr: 'إلزامي خلال 5 أيام عمل من تاريخ التعيين. سعودي: اشتراك 22٪؛ غير سعودي: 2٪ تأمين الأخطار المهنية.',
+  },
+  EMPLOYMENT_CONTRACT: {
+    kind: 'EMPLOYMENT_CONTRACT', codePrefix: 'EC', slaHours: 24 * 7, defaultTarget: 'POLICY',
+    defaultAssignee: 'HR_LEAD', reference: 'Saudi Labor Law Art. 51, 52, 53',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Draft / renew employment contract',
+    titleAr: 'إعداد / تجديد عقد عمل',
+    blurbEn: 'Arabic-language contract with Saudi-compliant terms (probation ≤ 90 days, EOSB clause, weekly rest, annual leave).',
+    blurbAr: 'عقد باللغة العربية بشروط متوافقة (تجربة ≤ 90 يوماً، بند مكافأة نهاية الخدمة، راحة أسبوعية، إجازة سنوية).',
+  },
+  WPS_PAYROLL_RUN: {
+    kind: 'WPS_PAYROLL_RUN', codePrefix: 'WP', slaHours: 24 * 11, defaultTarget: 'CONTROL_TEST',
+    defaultAssignee: 'HR_LEAD', reference: 'HRSD WPS — by 11th of following month',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Confirm monthly WPS payroll run',
+    titleAr: 'تأكيد تشغيل نظام حماية الأجور الشهري',
+    blurbEn: 'Salary deposits via SAMA-licensed bank by the 11th of following month. Non-compliance suspends new hires + visa renewals.',
+    blurbAr: 'إيداع الرواتب عبر بنك مرخَّص من ساما قبل اليوم 11 من الشهر التالي. عدم الامتثال يوقف التوظيف الجديد + تجديد التأشيرات.',
+  },
+  // ── DD-94: MOC (Ministry of Commerce) intakes ──
+  TASATTUR_SELF_ASSESSMENT: {
+    kind: 'TASATTUR_SELF_ASSESSMENT', codePrefix: 'TA', slaHours: 24 * 30, defaultTarget: 'CONTROL_TEST',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'MOC Tasattur Risk Index — annual',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Submit annual Tasattur self-assessment',
+    titleAr: 'تقديم التقييم الذاتي السنوي للتستر',
+    blurbEn: 'Self-score the 6 Tasattur risk indicators and submit through the MOC portal. Bands: LOW / MEDIUM / HIGH / CRITICAL drive enforcement intensity.',
+    blurbAr: 'تقييم ذاتي للمؤشرات الستة للتستر التجاري وتقديمه عبر بوابة وزارة التجارة. النطاقات: منخفض / متوسط / عالي / حرج تحدّد مستوى التنفيذ.',
+  },
+  BENEFICIAL_OWNERSHIP_DISCLOSURE: {
+    kind: 'BENEFICIAL_OWNERSHIP_DISCLOSURE', codePrefix: 'BO', slaHours: 24 * 14, defaultTarget: 'POLICY',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'MOC Commercial Registry — BO disclosure',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'File beneficial-ownership disclosure',
+    titleAr: 'تقديم إفصاح المُستفيد الحقيقي',
+    blurbEn: 'Disclose every natural person owning ≥ 25% directly or indirectly. Required at incorporation, annually, and within 14 days of any change.',
+    blurbAr: 'الإفصاح عن كل شخص طبيعي يملك 25٪ أو أكثر مباشرةً أو غير مباشرة. مطلوب عند التأسيس وسنوياً وخلال 14 يوماً من أي تغيير.',
+  },
+  CR_ANNUAL_CONFIRMATION: {
+    kind: 'CR_ANNUAL_CONFIRMATION', codePrefix: 'CR', slaHours: 24 * 30, defaultTarget: 'CONTROL_TEST',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'MOC Commercial Registry — annual confirmation',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Confirm annual commercial-registry data',
+    titleAr: 'تأكيد البيانات السنوية للسجل التجاري',
+    blurbEn: 'Confirm or update CR data (activity codes, capital, address, manager, BO) within 30 days of CR-anniversary. Late confirmation incurs daily fines.',
+    blurbAr: 'تأكيد أو تحديث بيانات السجل التجاري (الأنشطة، رأس المال، العنوان، المدير، المُستفيد الحقيقي) خلال 30 يوماً من تاريخ السجل السنوي. التأخير يستوجب غرامات يومية.',
+  },
+  CAPITAL_CHANGE_NOTIFICATION: {
+    kind: 'CAPITAL_CHANGE_NOTIFICATION', codePrefix: 'CC', slaHours: 24 * 15, defaultTarget: 'POLICY',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'MOC Commercial Registry — capital change',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Notify MOC of capital change',
+    titleAr: 'إبلاغ وزارة التجارة بتغيّر رأس المال',
+    blurbEn: 'Capital increase or decrease must be reflected in the CR within 15 days, including auditor confirmation and shareholder resolution.',
+    blurbAr: 'الزيادة أو التخفيض في رأس المال يجب تسجيله في السجل التجاري خلال 15 يوماً، مع تأكيد المراجع وقرار الجمعية العامة.',
+  },
+  CONSUMER_COMPLAINT_RESPONSE: {
+    kind: 'CONSUMER_COMPLAINT_RESPONSE', codePrefix: 'CP', slaHours: 24 * 5, defaultTarget: 'INCIDENT',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'MOC Consumer Protection — 5-day response',
+    publicSurface: false, allowsAnonymous: false,
+    titleEn: 'Respond to MOC consumer complaint',
+    titleAr: 'الردّ على شكوى المستهلك من وزارة التجارة',
+    blurbEn: 'Substantive response within 5 working days of complaint receipt via "Maaroof" portal. Failure escalates to enforcement.',
+    blurbAr: 'ردّ موضوعي خلال 5 أيام عمل من استلام الشكوى عبر منصة "معروف". عدم الردّ يصعّد إلى التنفيذ.',
   },
 };
 
@@ -548,26 +654,60 @@ export function useIntake() {
   }, []);
 
   const triage = useCallback((id: string, decision: 'PROMOTE' | 'REJECT' | 'CLOSE', actor: string, extra?: Partial<IntakeRecord>) => {
-    setOverlay(prev => {
-      const seed = SEED_INTAKE.find(r => r.id === id);
-      const inAdded = prev.added.find(r => r.id === id);
-      const current = inAdded ?? (seed ? { ...seed, ...prev.patches[id] } : null);
-      if (!current) return prev;
-      const at = new Date().toISOString();
-      const status: IntakeStatus = decision === 'PROMOTE' ? 'PROMOTED' : decision === 'REJECT' ? 'REJECTED' : 'CLOSED';
-      const note = extra?.rejectionReason ?? (decision === 'PROMOTE' ? `Promoted to ${current.kind}` : decision === 'REJECT' ? 'Rejected' : 'Closed without promotion');
-      const newPatch: Partial<IntakeRecord> = {
-        ...(prev.patches[id] ?? {}),
-        ...(extra ?? {}),
-        status,
-        history: [...current.history, { at, status, actor, note }],
+    // Resolve the current record up-front so we can compute the promotion
+    // outcome before invoking setOverlay — avoids TS control-flow narrowing
+    // issues when reading state set inside the setOverlay callback.
+    const seed = SEED_INTAKE.find(r => r.id === id);
+    const inAdded = overlay.added.find(r => r.id === id);
+    const current = inAdded ?? (seed ? { ...seed, ...overlay.patches[id] } : null);
+    if (!current) return null;
+
+    const at = new Date().toISOString();
+    const status: IntakeStatus = decision === 'PROMOTE' ? 'PROMOTED' : decision === 'REJECT' ? 'REJECTED' : 'CLOSED';
+
+    // ── DD-69: when promoting, also create the downstream register
+    // record so the triager's action actually shows up in /incidents,
+    // /privacy, /risk etc. Synthesised record-id, payload mirrored
+    // from the intake submission, source-intake reference preserved.
+    let promotedTo: IntakeRecord['promotedTo'] | undefined = current.promotedTo;
+    let promotionResult: { entityType: RegisterTarget; recordId: string | number } | null = null;
+    if (decision === 'PROMOTE') {
+      const catalog = INTAKE_CATALOG[current.kind];
+      const entityType = catalog.defaultTarget;
+      const recordId = Date.now() % 1_000_000;
+      const promoted: PromotedRecord = {
+        id: recordId,
+        sourceIntakeId: current.id,
+        sourceReferenceCode: current.referenceCode,
+        promotedAt: at,
+        payload: { ...current.payload, _intakeKind: current.kind, _submitter: current.submitterName ?? current.submitterEmail ?? 'anonymous' },
       };
+      addPromoted(entityType, promoted);
+      promotedTo = { entityType, recordId, promotedAt: at };
+      promotionResult = { entityType, recordId };
+    }
+
+    const note = extra?.rejectionReason ?? (
+      decision === 'PROMOTE' ? `Promoted to ${promotionResult?.entityType ?? current.kind} #${promotionResult?.recordId ?? '?'}` :
+      decision === 'REJECT' ? 'Rejected' :
+      'Closed without promotion'
+    );
+    const newPatch: Partial<IntakeRecord> = {
+      ...(overlay.patches[id] ?? {}),
+      ...(extra ?? {}),
+      status,
+      promotedTo,
+      history: [...current.history, { at, status, actor, note }],
+    };
+
+    setOverlay(prev => {
       if (inAdded) {
         return { ...prev, added: prev.added.map(r => r.id === id ? { ...r, ...newPatch } : r) };
       }
       return { ...prev, patches: { ...prev.patches, [id]: newPatch } };
     });
-  }, []);
+    return promotionResult;
+  }, [overlay]);
 
   const findByReferenceCode = useCallback((code: string): IntakeRecord | null => {
     const trimmed = code.trim().toUpperCase();

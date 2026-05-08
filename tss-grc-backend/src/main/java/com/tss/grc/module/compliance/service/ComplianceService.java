@@ -4,8 +4,10 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.dto.*;
 import com.tss.grc.module.compliance.entity.*;
 import com.tss.grc.module.compliance.repository.*;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,9 @@ public class ComplianceService {
     private final ControlRepository controlRepo;
     private final ComplianceAssessmentRepository assessmentRepo;
     private final AuditFindingRepository findingRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
 
     // ── Controls ──────────────────────────────────────────────────────────────
 
@@ -42,17 +47,22 @@ public class ComplianceService {
 
     @Transactional
     public ControlResponse createControl(ControlRequest req) {
+        Long orgId = TenantContext.getCurrentTenant();
         Control c = new Control();
-        c.setOrganisationId(TenantContext.getCurrentTenant());
+        c.setOrganisationId(orgId);
         applyControl(c, req);
-        return toControlResponse(controlRepo.save(c));
+        ControlResponse out = toControlResponse(controlRepo.save(c));
+        if (bcast != null) bcast.entity(orgId, "compliance_control", out.id(), out);
+        return out;
     }
 
     @Transactional
     public ControlResponse updateControl(Long id, ControlRequest req) {
         Control c = requireControl(id);
         applyControl(c, req);
-        return toControlResponse(controlRepo.save(c));
+        ControlResponse out = toControlResponse(controlRepo.save(c));
+        if (bcast != null) bcast.entity(c.getOrganisationId(), "compliance_control", id, out);
+        return out;
     }
 
     @Transactional
@@ -60,6 +70,7 @@ public class ComplianceService {
         Control c = requireControl(id);
         c.setIsDeleted(true);
         controlRepo.save(c);
+        if (bcast != null) bcast.entity(c.getOrganisationId(), "compliance_control", id, java.util.Map.of("id", id, "deleted", true));
     }
 
     private void applyControl(Control c, ControlRequest req) {
@@ -100,10 +111,13 @@ public class ComplianceService {
 
     @Transactional
     public AssessmentResponse createAssessment(AssessmentRequest req) {
+        Long orgId = TenantContext.getCurrentTenant();
         ComplianceAssessment a = new ComplianceAssessment();
-        a.setOrganisationId(TenantContext.getCurrentTenant());
+        a.setOrganisationId(orgId);
         applyAssessment(a, req);
-        return toAssessmentResponse(assessmentRepo.save(a));
+        AssessmentResponse out = toAssessmentResponse(assessmentRepo.save(a));
+        if (bcast != null) bcast.entity(orgId, "compliance_assessment", a.getId(), out);
+        return out;
     }
 
     @Transactional
@@ -113,7 +127,9 @@ public class ComplianceService {
             .filter(x -> x.getOrganisationId().equals(orgId))
             .orElseThrow(() -> new EntityNotFoundException("Assessment not found: " + id));
         applyAssessment(a, req);
-        return toAssessmentResponse(assessmentRepo.save(a));
+        AssessmentResponse out = toAssessmentResponse(assessmentRepo.save(a));
+        if (bcast != null) bcast.entity(orgId, "compliance_assessment", id, out);
+        return out;
     }
 
     private void applyAssessment(ComplianceAssessment a, AssessmentRequest req) {
@@ -147,10 +163,13 @@ public class ComplianceService {
 
     @Transactional
     public FindingResponse createFinding(FindingRequest req) {
+        Long orgId = TenantContext.getCurrentTenant();
         AuditFinding f = new AuditFinding();
-        f.setOrganisationId(TenantContext.getCurrentTenant());
+        f.setOrganisationId(orgId);
         applyFinding(f, req);
-        return toFindingResponse(findingRepo.save(f));
+        FindingResponse out = toFindingResponse(findingRepo.save(f));
+        if (bcast != null) bcast.entity(orgId, "audit_finding", f.getId(), out);
+        return out;
     }
 
     @Transactional
@@ -160,7 +179,9 @@ public class ComplianceService {
             .filter(x -> x.getOrganisationId().equals(orgId))
             .orElseThrow(() -> new EntityNotFoundException("Finding not found: " + id));
         applyFinding(f, req);
-        return toFindingResponse(findingRepo.save(f));
+        FindingResponse out = toFindingResponse(findingRepo.save(f));
+        if (bcast != null) bcast.entity(orgId, "audit_finding", id, out);
+        return out;
     }
 
     @Transactional
@@ -171,6 +192,7 @@ public class ComplianceService {
             .orElseThrow(() -> new EntityNotFoundException("Finding not found: " + id));
         f.setIsDeleted(true);
         findingRepo.save(f);
+        if (bcast != null) bcast.entity(orgId, "audit_finding", id, java.util.Map.of("id", id, "deleted", true));
     }
 
     private void applyFinding(AuditFinding f, FindingRequest req) {

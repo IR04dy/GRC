@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Plus, BarChart3, Building2, AlertTriangle,
   ScrollText, BookCopy, Send, CheckCheck, Archive, RotateCcw, X as XIcon, Wrench, Flag, Search,
@@ -21,6 +21,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { LivePulse } from '../../components/ui/LivePulse';
 import {
   complianceApi, frameworkApi, reportingApi, ApiError,
   type ComplianceControlDto, type ComplianceControlRequest,
@@ -44,9 +46,12 @@ import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflows
 import { COMPLIANCE_WORKFLOWS } from '../../lib/mockWorkflows';
 import { COMPLIANCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toFindingDto, toEngagementDto, toPolicyDto } from '../../lib/promotedAdapters';
+import { NitaqatPanel } from '../../components/compliance/NitaqatPanel';
 import { COMPLIANCE_ANCHORS } from '../../lib/moduleAnchors';
 
-type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks' | 'workflows';
+type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks' | 'nitaqat' | 'workflows';
 
 // External audit lifecycle stages — assessment §5.3 #3
 const AUDIT_TYPE_OPTIONS = [
@@ -229,7 +234,7 @@ function ctrlToReq(c: ComplianceControlDto): ComplianceControlRequest {
   };
 }
 
-const TAB_IDS = ['overview', 'controls', 'internal', 'external', 'findings', 'scorecard', 'changes', 'policies', 'engagements', 'frameworks', 'workflows'] as const;
+const TAB_IDS = ['overview', 'controls', 'internal', 'external', 'findings', 'scorecard', 'changes', 'policies', 'engagements', 'frameworks', 'nitaqat', 'workflows'] as const;
 function isTabId(s: string | null): s is TabId {
   return s != null && (TAB_IDS as readonly string[]).includes(s);
 }
@@ -237,6 +242,7 @@ function isTabId(s: string | null): s is TabId {
 export function CompliancePage() {
   const { t } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab');
   const [tab, setTabState] = useState<TabId>(isTabId(initialTab) ? initialTab : 'overview');
@@ -257,6 +263,14 @@ export function CompliancePage() {
   const changes     = useApiList<RegulatoryChangeDto>(()     => complianceApi.regulatoryChanges(0, 100), REGULATORY_CHANGES);
   const policies    = useApiList<PolicyDto>(()               => complianceApi.policies(0, 100),    POLICIES);
   const engagements = useApiList<AuditEngagementDto>(()      => complianceApi.auditEngagements(0, 100), AUDIT_ENGAGEMENTS);
+
+  // DD-75: merge intake-promoted rows into findings, engagements, and policies.
+  const promotedFindings    = usePromoted('FINDING').map(toFindingDto);
+  const promotedEngagements = usePromoted('ENGAGEMENT').map(toEngagementDto);
+  const promotedPolicies    = usePromoted('POLICY').map(toPolicyDto);
+  const allFindings    = useMemo(() => [...promotedFindings, ...findings.data],       [promotedFindings, findings.data]);
+  const allEngagements = useMemo(() => [...promotedEngagements, ...engagements.data], [promotedEngagements, engagements.data]);
+  const allPolicies    = useMemo(() => [...promotedPolicies, ...policies.data],       [promotedPolicies, policies.data]);
 
   const changeS = useEntityState<RegulatoryChangeDto>();
   const policyS = useEntityState<PolicyDto>();
@@ -292,6 +306,7 @@ export function CompliancePage() {
     { id: 'changes',     label: t('complianceTabChanges') },
     { id: 'policies',    label: t('complianceTabPolicies') },
     { id: 'frameworks',  label: t('complianceTabFrameworks') },
+    { id: 'nitaqat',     label: t('complianceTabNitaqat') },
     { id: 'engagements', label: t('complianceTabEngagements') },
     { id: 'internal',    label: t('complianceTabInternal') },
     { id: 'external',    label: t('complianceTabExternal') },
@@ -503,13 +518,16 @@ export function CompliancePage() {
     finally { setBusy(false); onClose(); }
   }
 
-  // Tab-aware "New" dispatcher
+  // Tab-aware "New" dispatcher.
+  // DD-79: route audit-engagement creation through the Services Center
+  // so it gets a reference code + DPO/Audit-Lead triage. Policies and
+  // regulatory changes are admin-managed here; controls remain legacy.
   function newAction() {
     return () => {
       switch (tab) {
+        case 'engagements': return navigate('/intake/audit_request');
         case 'changes':     return changeS.startCreate();
         case 'policies':    return policyS.startCreate();
-        case 'engagements': return engageS.startCreate();
         default:            return setOpen(true);  // Controls modal (legacy)
       }
     };
@@ -636,6 +654,14 @@ export function CompliancePage() {
 
   const isDemo = controls.isDemo;
 
+  // Sprint 4 §2.7 — live compliance dashboard
+  const { pulse } = useLiveRefresh({
+    kinds: ['changed.compliance_assessment', 'changed.audit_finding', 'changed.policy', 'changed.regulatory_change', 'changed.audit_engagement'],
+    onRefresh: () => { findings.reload(); assessments.reload(); policies.reload(); changes.reload(); engagements.reload(); },
+    waitMs: 600,
+    enabled: !isDemo,
+  });
+
   return (
     <Shell title={t('modCompliance')} sub="ISO 27001 · NCA · SDAIA · SAMA">
       <PageHeader
@@ -643,6 +669,7 @@ export function CompliancePage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
             <ExportMenu
               demoMode={isDemo} t={t} toast={toast}
@@ -699,7 +726,7 @@ export function CompliancePage() {
       )}
       {tab === 'policies' && (
         <Card padded={false}>
-          {policies.loading ? <LoadingRow /> : <DataTable columns={policyCols} rows={policies.data} rowHref={r => `/policies/${r.id}`}
+          {policies.loading ? <LoadingRow /> : <DataTable columns={policyCols} rows={allPolicies} rowHref={r => `/policies/${r.id}`}
             empty={<EmptyState Icon={BookCopy} title="No policies on file" sub="Author, review, approve and publish enterprise policies through the lifecycle." />} />}
         </Card>
       )}
@@ -724,7 +751,7 @@ export function CompliancePage() {
           <Card padded={false}>
             {!agingLoaded ? <LoadingRow /> :
               aging.length === 0
-                ? <DataTable columns={findingCols} rows={findings.data} rowHref={r => `/findings/${r.id}`} empty={<EmptyState Icon={AlertTriangle} title="No open findings" sub="Findings link audit observations to remediation owners with due dates." />} />
+                ? <DataTable columns={findingCols} rows={allFindings} rowHref={r => `/findings/${r.id}`} empty={<EmptyState Icon={AlertTriangle} title="No open findings" sub="Findings link audit observations to remediation owners with due dates." />} />
                 : <DataTable columns={agingCols} rows={aging} rowHref={r => `/findings/${r.id}`} empty={<EmptyState />} />
             }
           </Card>
@@ -733,11 +760,12 @@ export function CompliancePage() {
       {tab === 'engagements' && (
         <Card padded={false}>
           {engagements.loading ? <LoadingRow /> :
-            <DataTable columns={engagementCols} rows={engagements.data} empty={<EmptyState Icon={Briefcase} title={t('engagementsEmptyTitle')} sub={t('engagementsEmptySub')} />} />
+            <DataTable columns={engagementCols} rows={allEngagements} empty={<EmptyState Icon={Briefcase} title={t('engagementsEmptyTitle')} sub={t('engagementsEmptySub')} />} />
           }
         </Card>
       )}
       {tab === 'frameworks' && <FrameworkAnchorView t={t} toast={toast} />}
+      {tab === 'nitaqat' && <NitaqatPanel />}
       {tab === 'scorecard' && (
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
           {['ISO_27001','NCA_ECC','PDPL','ISO_22301','SAMA_CSF','ISO_27701'].map(fw => {

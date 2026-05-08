@@ -13,6 +13,8 @@ import {
 } from '../../lib/intake';
 import { INTAKE_FORM_FIELDS } from '../../lib/intakeForms';
 import { IntakeFormRenderer } from '../../components/intake/IntakeFormRenderer';
+import { computeChangeRisk, type ChangeRiskBreakdown } from '../../lib/changeRisk';
+import { ChangeRiskPanel } from '../../components/intake/ChangeRiskPanel';
 
 /**
  * IntakeFormPage — DD-59.
@@ -31,7 +33,10 @@ export function IntakeFormPage() {
   const { kind: kindParam } = useParams<{ kind: string }>();
   const navigate = useNavigate();
   const { submit } = useIntake();
-  const [submitted, setSubmitted] = useState<{ refCode: string; slaDueAt: string } | null>(null);
+  const [submitted, setSubmitted] = useState<{ refCode: string; slaDueAt: string; risk?: ChangeRiskBreakdown } | null>(null);
+  // DD-73: live form-state mirror so we can recompute the change-risk
+  // panel on every keystroke. Only meaningful when kind === 'CHANGE_REQUEST'.
+  const [liveValues, setLiveValues] = useState<Record<string, string>>({});
 
   const kind = (kindParam ?? '').toUpperCase() as IntakeKind;
   const catalog = INTAKE_CATALOG[kind];
@@ -64,7 +69,10 @@ export function IntakeFormPage() {
       severity: severityCandidate ?? 'MEDIUM',
       locale: lang as 'en' | 'ar',
     });
-    setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '' });
+    // DD-70: for CHANGE_REQUEST, compute the risk score and CAB gate so
+    // the submitter sees the classification immediately on the ack screen.
+    const risk = kind === 'CHANGE_REQUEST' ? computeChangeRisk(payload) : undefined;
+    setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '', risk });
     toast.success(t('intakeFormToastSubmitted'));
   }
 
@@ -114,6 +122,8 @@ export function IntakeFormPage() {
             </div>
           </div>
 
+          {submitted.risk && <ChangeRiskPanel risk={submitted.risk} t={t} lang={lang} />}
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
             <Button variant="primary" Icon={ArrowRight} onClick={() => navigate('/intake-inbox')}>
               {t('intakeFormAckOpenInbox')}
@@ -152,12 +162,22 @@ export function IntakeFormPage() {
         }}>
           {t('intakeFormReroutingHint').replace('{assignee}', catalog.defaultAssignee).replace('{ref}', catalog.reference)}
         </div>
+        {/* DD-73: live change-risk preview rendered above the form when
+            the user is filling a CHANGE_REQUEST. Recomputes on every change
+            so submitters self-correct (pick MONTH_END_FREEZE → see CRITICAL
+            → switch to OFF_HOURS) before submitting. */}
+        {kind === 'CHANGE_REQUEST' && Object.keys(liveValues).length > 0 && (
+          <ChangeRiskPanel risk={computeChangeRisk(liveValues)} t={t} lang={lang} />
+        )}
+
         <IntakeFormRenderer
           fields={fields}
           submitLabel={t('intakeFormSubmit')}
           onSubmit={onSubmit}
+          onChange={kind === 'CHANGE_REQUEST' ? setLiveValues : undefined}
         />
       </Card>
     </Shell>
   );
 }
+

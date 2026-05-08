@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Link } from 'react-router-dom';
@@ -52,6 +53,35 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
   const effectiveTrend = trend ?? autoTrend(spark);
   const isInteractive = !!(to || onClick);
 
+  // Flash-on-change: when `value` prop changes, briefly highlight the tile so
+  // the user notices a live update arrived. First render is suppressed so the
+  // dashboard doesn't flicker on initial mount.
+  const previousValue = useRef(value);
+  const isFirstRender = useRef(true);
+  const [valueDelta, setValueDelta] = useState<'up' | 'down' | null>(null);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      previousValue.current = value;
+      return;
+    }
+    if (previousValue.current !== value) {
+      const prev = Number(previousValue.current);
+      const curr = Number(value);
+      const dir: 'up' | 'down' | null = !Number.isNaN(prev) && !Number.isNaN(curr)
+        ? (curr > prev ? 'up' : curr < prev ? 'down' : null)
+        : null;
+      setValueDelta(dir ?? 'up');
+      const t = setTimeout(() => setValueDelta(null), 1400);
+      previousValue.current = value;
+      return () => clearTimeout(t);
+    }
+  }, [value]);
+
+  const flashClass = valueDelta === 'up' ? 'kpi-flash-up'
+                    : valueDelta === 'down' ? 'kpi-flash-down'
+                    : '';
+
   const body = (
     <>
       <div className="kpi-top">
@@ -81,22 +111,26 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
     </>
   );
 
+  // Wrap classNames with the flash class so the kpi tile briefly highlights.
+  const baseClass = 'kpi' + (flashClass ? ' ' + flashClass : '');
+  const linkClass = baseClass + ' kpi-clickable';
+
   if (to) {
     return (
-      <Link to={to} className="kpi kpi-clickable" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+      <Link to={to} className={linkClass} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
         {body}
       </Link>
     );
   }
   if (onClick) {
     return (
-      <button onClick={onClick} className="kpi kpi-clickable"
+      <button onClick={onClick} className={linkClass}
         style={{ background: 'inherit', border: 'none', textAlign: 'inherit', padding: 'inherit', font: 'inherit', cursor: 'pointer', color: 'inherit', width: '100%' }}>
         {body}
       </button>
     );
   }
-  return <div className="kpi">{body}</div>;
+  return <div className={baseClass}>{body}</div>;
 }
 
 /** Tiny inline sparkline — pure SVG, no library. Rendered at 100% width × 28px. */

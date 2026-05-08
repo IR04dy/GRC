@@ -1,0 +1,143 @@
+/* SavedViewSelector + BulkActionsBar + ComingSoonBadge — Sprint 4 §2.5/§2.6/§3.4 */
+
+/* ─── SavedViewSelector ───────────────────────────────────────────────── */
+.sv-root { position: relative; display: inline-block; }
+
+.sv-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--ink-1);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sv-trigger:hover { border-color: var(--primary); }
+
+.sv-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline-start: 0;
+  z-index: 100;
+  width: 240px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.sv-empty { padding: 12px; text-align: center; color: var(--ink-3); font-size: 12px; }
+
+.sv-item {
+  display: flex; align-items: center; gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.sv-item:last-child { border-bottom: none; }
+.sv-item-active { background: var(--primary-50, rgba(12,84,96,0.06)); }
+
+.sv-apply {
+  flex: 1;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  background: transparent; border: none;
+  color: var(--ink-1); cursor: pointer; text-align: start;
+  font-size: 12px;
+}
+.sv-apply:hover { background: var(--surface-2); }
+
+.sv-delete {
+  background: none; border: none;
+  padding: 6px 8px;
+  color: var(--ink-3); cursor: pointer;
+}
+.sv-delete:hover { color: var(--danger); background: var(--surface-2); }
+
+.sv-foot {
+  padding: 6px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.sv-snap {
+  display: inline-flex; align-items: center; gap: 4px;
+  width: 100%; padding: 6px 8px;
+  background: transparent; border: 1px dashed var(--border);
+  border-radius: var(--r-sm); color: var(--primary);
+  cursor: pointer; font-size: 12px;
+}
+.sv-snap:hover { background: var(--surface-1); border-style: solid; }
+
+/* ─── BulkActionsBar ──────────────────────────────────────────────────── */
+.ba-root {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--ink-1);
+  color: white;
+  border-radius: 9999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  animation: ba-slide-up 200ms ease-out;
+}
+
+@keyframes ba-slide-up {
+  from { transform: translate(-50%, 32px); opacity: 0; }
+  to   { transform: translate(-50%, 0);    opacity: 1; }
+}
+
+.ba-count { font-size: 12px; font-weight: 600; padding-inline-end: 4px; }
+
+.ba-divider {
+  width: 1px; height: 18px; background: rgba(255,255,255,0.2);
+}
+
+.ba-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 10px;
+  background: transparent; border: none;
+  color: white; cursor: pointer;
+  font-size: 12px;
+  border-radius: var(--r-sm);
+}
+
+.ba-btn:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+.ba-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ba-btn-danger:hover:not(:disabled) { background: rgba(220,38,38,0.32); }
+
+.ba-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  background: rgba(255,255,255,0.12); border: none;
+  border-radius: 50%; color: white; cursor: pointer;
+}
+.ba-clear:hover { background: rgba(255,255,255,0.22); }
+
+/* ─── ComingSoonBadge ─────────────────────────────────────────────────── */
+.cs-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  background: var(--warning-50, #fef3c7);
+  color: var(--warning-700, #92400e);
+  border: 1px solid var(--warning-200, #fde68a);
+  border-radius: 9999px;
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cs-page-overlay {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 80px 24px; text-align: center; gap: 16px;
+  color: var(--ink-2);
+}
+.cs-page-overlay h2 { font-size: 24px; color: var(--ink-1); margin: 0; }
+.cs-page-overlay p { font-size: 14px; max-width: 480px; margin: 0; line-height: 1.6; }

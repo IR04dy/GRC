@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   Users, Send, Clock, AlertOctagon, CheckCheck, Mail, Phone, ExternalLink,
-  Building2, MessageSquare, Megaphone, FileSignature,
+  Building2, MessageSquare, Megaphone, FileSignature, Bell, Smartphone, MessageCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card } from '../ui/Card';
@@ -300,6 +300,9 @@ const CHANNEL_ICONS: Record<CommChannel, LucideIcon> = {
   IN_PERSON:         Building2,
   TEAMS_SLACK:       MessageSquare,
   PUBLIC_DISCLOSURE: Megaphone,
+  IN_APP:            Bell,
+  SMS:               Smartphone,
+  WHATSAPP:          MessageCircle,
 };
 
 function ChannelIcon({ channel }: { channel?: CommChannel }) {

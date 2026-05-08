@@ -39,12 +39,37 @@ export function ProcessDetailModal({ lc, onClose }: {
     : undefined;
 
   function startWorkflow() {
+    // Priority order:
+    //   1) Process has a registered intake-form kind → open the live form
+    //      at /intake/<kind-lowercase>. This is the canonical "Start" path:
+    //      the user lands on a fillable form that captures the new instance
+    //      and routes it through the intake substrate (DD-54..DD-58).
+    //   2) Host page wired its own onClick (legacy modal openers).
+    //   3) Process has a register href → navigate there. Most registers
+    //      have an in-page "New" button so this is a working path even
+    //      without a dedicated intake form.
+    //   4) Toast hint — process is genuinely catalog-only (no form, no
+    //      onClick, no href). Should be unreachable in practice.
+    if (lc.intakeKind) {
+      navigate(`/intake/${lc.intakeKind.toLowerCase()}`);
+      onClose();
+      return;
+    }
     if (lc.primary.onClick) {
       lc.primary.onClick();
       onClose();
       return;
     }
-    // Demo-mode fallback: explain that the start-flow modal would open here.
+    if (lc.primary.href) {
+      navigate(lc.primary.href);
+      onClose();
+      return;
+    }
+    if (lc.secondary?.href) {
+      navigate(lc.secondary.href);
+      onClose();
+      return;
+    }
     toast.info(t('processDetailStartHint').replace('{name}', name));
   }
 

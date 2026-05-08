@@ -15,6 +15,7 @@ import {
   CONNECTOR_STATUS_TONE, CONNECTOR_STATUS_LABEL,
   type ConnectorDefinition, type ConnectorStatus,
 } from '../../lib/connectors';
+import { CcmDashboard } from '../../components/compliance/CcmDashboard';
 
 /**
  * Connectors page — DD-62.
@@ -51,6 +52,14 @@ export function ConnectorsPage() {
         <Kpi Icon={Plug}     label={t('connectorsKpiConfigured')} value={configured.length} tone="info" />
         <Kpi Icon={Database} label={t('connectorsKpiTotal')}      value={connectors.length} tone="primary" />
         <Kpi Icon={Zap}      label={t('connectorsKpiIntake30d')}  value={intake30d}         tone="accent" />
+      </div>
+
+      {/* Sprint 4 — Continuous Control Monitoring panel sits above the
+          connector registry. Every check the connectors run is graded by
+          freshness; stale or expired evidence becomes a workflow instance
+          fed into the cross-module SLA pulse. */}
+      <div style={{ marginBottom: 16 }}>
+        <CcmDashboard />
       </div>
 
       <Card title={t('connectorsRegistryTitle')} Icon={Plug}

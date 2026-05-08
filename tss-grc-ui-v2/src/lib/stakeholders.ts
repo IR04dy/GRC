@@ -33,7 +33,11 @@ export type CommChannel =
   | 'FORMAL_LETTER'
   | 'IN_PERSON'     // Board / committee meeting
   | 'TEAMS_SLACK'   // Internal collaboration channel
-  | 'PUBLIC_DISCLOSURE';
+  | 'PUBLIC_DISCLOSURE'
+  // ── Sprint 6 dispatch-runtime channels ──
+  | 'WHATSAPP'      // WhatsApp Business Cloud API — Saudi default
+  | 'SMS'           // CITC-licensed SMS gateway
+  | 'IN_APP';       // In-app push (web + mobile)
 
 export interface Stakeholder {
   /** Stable code used by RACI + notification matrix joins. */

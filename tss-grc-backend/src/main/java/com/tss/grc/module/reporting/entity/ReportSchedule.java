@@ -30,10 +30,16 @@ public class ReportSchedule {
     private Long organisationId;
 
     @Column(name = "name", nullable = false, length = 255)
-    private String name;
+    private String name;             // English (legacy column)
+
+    @Column(name = "name_ar", length = 255)
+    private String nameAr;           // Arabic (added V20)
 
     @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")
-    private String description;
+    private String description;      // English (legacy column)
+
+    @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String descriptionAr;    // Arabic (added V20)
 
     @Column(name = "report_type", nullable = false, length = 40)
     private String reportType; // RISK_REGISTER | FINDINGS_AGING | KRI_DASHBOARD

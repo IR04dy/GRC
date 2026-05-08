@@ -55,7 +55,12 @@ public class EvidenceMatrixService {
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> matrix() {
-        Long org = TenantContext.getCurrentTenant();
+        Long org = TenantContext.requireOrganisationId();
+        // INTENTIONAL: EvidenceFramework is a PLATFORM-SHARED catalog (NCA ECC,
+        // ISO 27001, SAMA CSF, PCI-DSS, etc.) — same for every tenant. The entity
+        // has no organisation_id column. The tenant scoping happens at the
+        // EvidenceItem level (itemRepo.findBySubControl(org, ...)) below.
+        // Do not refactor to findByOrganisationId — that finder doesn't exist.
         List<EvidenceFramework> frameworks = frameworkRepo.findAll();
         List<Map<String, Object>> out = new ArrayList<>();
         LocalDate today = LocalDate.now();

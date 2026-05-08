@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  Briefcase, Stamp, ScrollText, AlertTriangle, FileCheck2,
-  CalendarDays, Activity, ArrowRight, Play, Send, Lock, RefreshCw,
+  Briefcase, ScrollText, AlertTriangle, FileCheck2,
+  CalendarDays, ArrowRight, Play, Send, Lock, RefreshCw,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -20,6 +20,8 @@ import { EVIDENCE } from '../evidence/mockEvidence';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { EngagementMilestonePanel } from '../../components/audit/EngagementMilestonePanel';
+import { HijriDate } from '../../components/ui/HijriDate';
 
 type TabId = 'timeline' | 'scope' | 'findings' | 'workpapers' | 'comms';
 
@@ -27,13 +29,6 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   PLANNED: 'info', FIELDWORK: 'warning', REPORT_ISSUED: 'accent',
   CLOSED: 'success',
 };
-
-interface Milestone {
-  key: string;
-  labelEn: string;
-  date?: string;
-  Icon: typeof CalendarDays;
-}
 
 export function EngagementDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -71,16 +66,6 @@ export function EngagementDetailPage() {
   );
   const findings = COMPLIANCE_FINDINGS.filter(f => frameworkId != null && f.frameworkId === frameworkId);
   const evidence = EVIDENCE.filter(ev => !!e.framework && ev.frameworkCode === e.framework);
-
-  const milestones: Milestone[] = [
-    { key: 'letter',     labelEn: t('engMilestoneLetter'),    date: e.engagementLetterDate,  Icon: ScrollText  },
-    { key: 'opening',    labelEn: t('engMilestoneOpening'),   date: e.openingMeetingDate,    Icon: CalendarDays },
-    { key: 'fwStart',    labelEn: t('engMilestoneFwStart'),   date: e.fieldworkStartDate,    Icon: Activity    },
-    { key: 'fwEnd',      labelEn: t('engMilestoneFwEnd'),     date: e.fieldworkEndDate,      Icon: Activity    },
-    { key: 'report',     labelEn: t('engMilestoneReport'),    date: e.reportIssuedDate,      Icon: ScrollText  },
-    { key: 'closure',    labelEn: t('engMilestoneClosure'),   date: e.closureDate,           Icon: Stamp       },
-    { key: 'followup',   labelEn: t('engMilestoneFollowup'),  date: e.nextFollowupDate,      Icon: CalendarDays },
-  ];
 
   const tabs: TabItem<TabId>[] = [
     { id: 'timeline',   label: t('engTabTimeline') },
@@ -133,14 +118,18 @@ export function EngagementDetailPage() {
 
           <Card title={t('engCardSchedule')} Icon={CalendarDays}>
             <RailFieldGroup>
-              <RailField label={t('engRailLetter')}    value={e.engagementLetterDate ?? '—'} mono />
-              <RailField label={t('engRailOpening')}   value={e.openingMeetingDate ?? '—'}  mono />
+              <RailField label={t('engRailLetter')}    value={<HijriDate iso={e.engagementLetterDate} layout="stacked" mono />} />
+              <RailField label={t('engRailOpening')}   value={<HijriDate iso={e.openingMeetingDate} layout="stacked" mono />} />
               <RailField label={t('engRailFieldwork')} value={e.fieldworkStartDate && e.fieldworkEndDate
-                ? `${e.fieldworkStartDate} → ${e.fieldworkEndDate}`
-                : (e.fieldworkStartDate ?? '—')} mono />
-              <RailField label={t('engRailReport')}    value={e.reportIssuedDate ?? '—'}    mono />
-              <RailField label={t('engRailClosure')}   value={e.closureDate ?? '—'}         mono />
-              <RailField label={t('engRailFollowup')}  value={e.nextFollowupDate ?? '—'}    mono />
+                ? <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <HijriDate iso={e.fieldworkStartDate} layout="stacked" mono />
+                    <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>→</span>
+                    <HijriDate iso={e.fieldworkEndDate} layout="stacked" mono />
+                  </div>
+                : <HijriDate iso={e.fieldworkStartDate} layout="stacked" mono />} />
+              <RailField label={t('engRailReport')}    value={<HijriDate iso={e.reportIssuedDate} layout="stacked" mono />} />
+              <RailField label={t('engRailClosure')}   value={<HijriDate iso={e.closureDate} layout="stacked" mono />} />
+              <RailField label={t('engRailFollowup')}  value={<HijriDate iso={e.nextFollowupDate} layout="stacked" mono />} />
             </RailFieldGroup>
           </Card>
         </>}
@@ -148,46 +137,11 @@ export function EngagementDetailPage() {
           <Tabs items={tabs} active={tab} onChange={setTab} />
 
           {tab === 'timeline' && (
-            <Card title={t('engCardTimeline')} Icon={Activity}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                {milestones.map((m, i) => {
-                  const passed = !!m.date;
-                  const M = m.Icon;
-                  return (
-                    <div key={m.key} style={{
-                      display: 'grid',
-                      gridTemplateColumns: '32px 1fr 130px',
-                      gap: 12,
-                      alignItems: 'center',
-                      padding: '10px 0',
-                      borderBottom: i < milestones.length - 1 ? '1px dashed var(--border)' : 'none',
-                    }}>
-                      <span style={{
-                        width: 28, height: 28,
-                        borderRadius: '50%',
-                        background: passed ? 'var(--success)' : 'var(--surface-3)',
-                        color: passed ? '#fff' : 'var(--ink-3)',
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <M size={14} />
-                      </span>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>{m.labelEn}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                          {passed ? t('engMilestoneRecorded') : t('engMilestonePending')}
-                        </div>
-                      </div>
-                      <span className="mono" style={{
-                        fontSize: 12,
-                        color: passed ? 'var(--ink-1)' : 'var(--ink-4)',
-                        fontWeight: 600,
-                        textAlign: 'end',
-                      }}>{m.date ?? '—'}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+            // Sprint 4 — replaces the static milestone checklist with a
+            // live timeline that runs the current milestone through the
+            // SLA engine (Saudi business calendar, Hijri tooltip,
+            // escalation tier).
+            <EngagementMilestonePanel engagement={e} />
           )}
 
           {tab === 'scope' && (

@@ -80,8 +80,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                // WebSocket handshake — JWT validation happens at the STOMP CONNECT
+                // frame via WebSocketJwtInterceptor; HTTP layer just permits the upgrade.
+                .requestMatchers("/ws/**").permitAll()
                 // Swagger UI — disabled in prod via springdoc.swagger-ui.enabled=false
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
+                // DD-82: public case-tracker — anonymous submitters look up their
+                // intake by reference code without logging in.
+                .requestMatchers(HttpMethod.GET, "/api/v1/intake/track/**").permitAll()
                 .anyRequest().authenticated()
             )
 

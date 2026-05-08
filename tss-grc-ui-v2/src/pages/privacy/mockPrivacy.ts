@@ -22,7 +22,20 @@ export const DSRS: PrivacyDsrDto[] = [
 ];
 
 // ── Data breaches ──────────────────────────────────────────────────────────
+// Sprint 4 — synthesise a "still in 72h window" breach at module load so
+// the PDPL response console always has an actively-counting case to show
+// in demo mode. The reportedAt anchors at "30 hours ago" relative to now,
+// landing the case in the AMBER tier with ~42h to SDAIA notification.
+const _now = new Date();
+const _thirtyHoursAgo = new Date(_now.getTime() - 30 * 3_600_000).toISOString();
+const _thirtyOneHoursAgo = new Date(_now.getTime() - 31 * 3_600_000).toISOString();
+
 export const BREACHES: PrivacyBreachDto[] = [
+  { id: 10, titleEn: 'Customer database export downloaded by terminated employee',
+    descriptionEn: 'Departing analyst downloaded a 47k-row customer export 18 hours before access revocation. Dataset contains name, mobile, IBAN-suffix.',
+    breachType: 'CONFIDENTIALITY', severity: 'HIGH', status: 'INVESTIGATING',
+    occurredAt: _thirtyOneHoursAgo, reportedAt: _thirtyHoursAgo,
+    affectedRecords: 47_220 },
   { id: 11, titleEn: 'Lost laptop with customer contact data',
     descriptionEn: 'Marketing exec laptop stolen at airport — encrypted at rest, 72h notification not required.',
     breachType: 'CONFIDENTIALITY', severity: 'LOW', status: 'CLOSED',

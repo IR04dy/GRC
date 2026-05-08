@@ -11,6 +11,12 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
+  // Sprint 4 §2.7 — sockjs-client (used by @stomp/stompjs) references `global`,
+  // which exists in Node.js but not in browsers. Shim it to globalThis so the
+  // CommonJS bundle loads cleanly. Also need to proxy `/ws` for STOMP.
+  define: {
+    global: 'globalThis',
+  },
   server: {
     port: 5173,
     strictPort: false,
@@ -18,6 +24,13 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8084',
         changeOrigin: true,
+        secure: false,
+      },
+      // STOMP / SockJS endpoint
+      '/ws': {
+        target: 'http://localhost:8084',
+        changeOrigin: true,
+        ws: true,
         secure: false,
       },
     },

@@ -144,12 +144,16 @@ export const AUTHORITIES: AuthorityDto[] = [
   },
   {
     code: 'HRSD', nameEn: 'Ministry of Human Resources & Social Development', nameAr: 'وزارة الموارد البشرية والتنمية الاجتماعية',
-    taglineEn: 'Labor, payroll, employee data',
-    taglineAr: 'العمل والرواتب وبيانات الموظفين',
+    taglineEn: 'Labor law, GOSI, Nitaqat (Saudization)',
+    taglineAr: 'نظام العمل والتأمينات الاجتماعية ونطاقات (السعودة)',
     jurisdiction: 'Saudi Arabia', authorityType: 'SAUDI_REGULATORY',
     domains: ['HR', 'PRIVACY'],
+    website: 'https://hrsd.gov.sa',
     colorToken: 'var(--cat-8)',
-    frameworkCodes: ['HRSD_LABOR', 'HRSD_GOSI'],
+    // DD-83: Nitaqat (نطاقات) is HRSD's third major regime — Saudization
+    // band classification driving visa quotas, work-permit issuance, and
+    // government-tender eligibility.
+    frameworkCodes: ['HRSD_LABOR', 'HRSD_GOSI', 'HRSD_NITAQAT'],
   },
   {
     code: 'NAZAHA', nameEn: 'Anti-Corruption Authority (Nazaha)', nameAr: 'هيئة الرقابة ومكافحة الفساد (نزاهة)',
@@ -160,6 +164,20 @@ export const AUTHORITIES: AuthorityDto[] = [
     website: 'https://nazaha.gov.sa',
     colorToken: 'var(--cat-3)',
     frameworkCodes: ['NAZAHA_ANTI_CORRUPTION'],
+  },
+  // DD-85: Ministry of Commerce — Tasattur (anti-concealment), Consumer
+  // Protection, and Commercial Registry. The most universal Saudi
+  // regulator: every commercial license touches MOC, and Tasattur is one
+  // of the most-cited violations in MOC enforcement reports.
+  {
+    code: 'MOC', nameEn: 'Ministry of Commerce', nameAr: 'وزارة التجارة',
+    taglineEn: 'Tasattur, Consumer Protection, Commercial Registry',
+    taglineAr: 'التستر، حماية المستهلك، السجل التجاري',
+    jurisdiction: 'Saudi Arabia', authorityType: 'SAUDI_REGULATORY',
+    domains: ['COMPLIANCE', 'GOVERNANCE'],
+    website: 'https://mc.gov.sa',
+    colorToken: 'var(--cat-5)',
+    frameworkCodes: ['MOC_TASATTUR', 'MOC_CONSUMER_PROTECTION', 'MOC_COMMERCIAL_REGISTRY'],
   },
 
   // ── International benchmarks ────────────────────────────────────────────

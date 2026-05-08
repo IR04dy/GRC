@@ -8,6 +8,10 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { RiskRegisterPage } from './pages/risk/RiskRegisterPage';
 import { CyberPage } from './pages/cyber/CyberPage';
+import { VulnerabilitiesV2Page } from './pages/cyber/VulnerabilitiesV2Page';
+import { KbHomePage } from './pages/knowledge-base/KbHomePage';
+import { KbArticlePage } from './pages/knowledge-base/KbArticlePage';
+import { KbEditorPage } from './pages/knowledge-base/KbEditorPage';
 import { BcmPage } from './pages/bcm/BcmPage';
 import { PrivacyPage } from './pages/privacy/PrivacyPage';
 import { CompliancePage } from './pages/compliance/CompliancePage';
@@ -40,7 +44,38 @@ import { IntakeInboxPage } from './pages/intake/IntakeInboxPage';
 import { IntakeCatalogPage } from './pages/intake/IntakeCatalogPage';
 import { IntakeFormPage } from './pages/intake/IntakeFormPage';
 import { ConnectorsPage } from './pages/intake/ConnectorsPage';
+import { ApprovalInboxPage } from './pages/approvals/ApprovalInboxPage';
+import { AssetRegisterPage } from './pages/assets/AssetRegisterPage';
+import { BoardPackPage } from './pages/board-pack/BoardPackPage';
+import { RegulatoryChangePage } from './pages/regulatory-change/RegulatoryChangePage';
+import { VendorPortalPage } from './pages/portal/VendorPortalPage';
+import { NcaEccExportPage } from './pages/nca-ecc/NcaEccExportPage';
+import { NotificationDispatchPage } from './pages/notifications/NotificationDispatchPage';
+import { ControlCrosswalkPage } from './pages/control-crosswalk/ControlCrosswalkPage';
+// ─── Sprint 4 §3.3 — Culled pages (imports removed; folders kept on disk
+//    for one cycle so cherry-picks can be reviewed before physical delete):
+//    process-mining · ai-governance · production-readiness · mfa · monitoring ·
+//    backup-dr · white-label · csv-import.
+import { BcmDependencyPage } from './pages/bcm-dependency/BcmDependencyPage';
+import { RopaPage } from './pages/ropa/RopaPage';
+import { EsgPage } from './pages/esg/EsgPage';
+import { WorkflowVersionsPage } from './pages/workflow-versions/WorkflowVersionsPage';
+import { CrisisManagementPage } from './pages/crisis/CrisisManagementPage';
+import { FileUploadDemoPage } from './pages/file-upload/FileUploadDemoPage';
+import { NotificationChannelsPage } from './pages/notifications-channels/NotificationChannelsPage';
+import { SsoConfigPage } from './pages/sso/SsoConfigPage';
+import { NafathLoginPage } from './pages/sso/NafathLoginPage';
 import { AttestationCampaignsPage } from './pages/intake/AttestationCampaignsPage';
+import { OnboardingPage } from './pages/onboarding/OnboardingPage';
+import { FrameworkPacksPage } from './pages/framework-packs/FrameworkPacksPage';
+import { PolicyTemplatesPage } from './pages/policy-templates/PolicyTemplatesPage';
+import { RiskLifecyclePage } from './pages/risk-lifecycle/RiskLifecyclePage';
+import { AuditLifecyclePage } from './pages/audit-lifecycle/AuditLifecyclePage';
+import { PrivacyLifecyclePage } from './pages/privacy-lifecycle/PrivacyLifecyclePage';
+import { BcmLifecyclePage } from './pages/bcm-lifecycle/BcmLifecyclePage';
+import { CyberLifecyclePage } from './pages/cyber-lifecycle/CyberLifecyclePage';
+import { LifecycleOverviewPage } from './pages/lifecycle-overview/LifecycleOverviewPage';
+import { NotificationOutboxPage } from './pages/notification-outbox/NotificationOutboxPage';
 
 export function App() {
   return (
@@ -56,7 +91,14 @@ export function App() {
 
               {/* Built modules. */}
               <Route path="/risk"       element={<RiskRegisterPage />} />
-              <Route path="/cyber"      element={<CyberPage />} />
+              <Route path="/cyber"            element={<CyberPage />} />
+              <Route path="/cyber/vulns/v2"   element={<VulnerabilitiesV2Page />} />
+
+              {/* Sprint 4 §2.9 — Knowledge Base */}
+              <Route path="/knowledge-base"             element={<KbHomePage />} />
+              <Route path="/knowledge-base/new"         element={<KbEditorPage />} />
+              <Route path="/knowledge-base/:slug/edit"  element={<KbEditorPage />} />
+              <Route path="/knowledge-base/:slug"       element={<KbArticlePage />} />
               <Route path="/bcm"        element={<BcmPage />} />
               <Route path="/privacy"    element={<PrivacyPage />} />
               <Route path="/pdpl"       element={<Navigate to="/privacy" replace />} />
@@ -99,6 +141,79 @@ export function App() {
               <Route path="/portal/track"       element={<CaseTrackerPage />} />
               <Route path="/portal/trust-center" element={<TrustCenterPage />} />
 
+              {/* Vendor self-service portal (Sprint 5) — public */}
+              <Route path="/portal/vendor"      element={<VendorPortalPage />} />
+
+              {/* NCA ECC self-assessment export (Sprint 6) */}
+              <Route path="/nca-ecc-export"     element={<NcaEccExportPage />} />
+
+              {/* Notification dispatch console (Sprint 6) */}
+              <Route path="/notifications/dispatch" element={<NotificationDispatchPage />} />
+
+              {/* Control inheritance / crosswalks (Sprint 6 follow-on B5) */}
+              <Route path="/control-crosswalk"  element={<ControlCrosswalkPage />} />
+
+              {/* Sprint 4 §3.3 culled: process-mining, ai-governance,
+                  production-readiness, mfa-setup, monitoring, backup-dr,
+                  white-label, csv-import. Routes removed; folders kept on
+                  disk for one cycle so cherry-picks can be reviewed before
+                  physical delete. */}
+
+              {/* BCM dependency map — B4 */}
+              <Route path="/bcm-dependency"     element={<BcmDependencyPage />} />
+
+              {/* ROPA + consent management — B2 */}
+              <Route path="/ropa"               element={<RopaPage />} />
+
+              {/* ESG / Saudi Green Initiative — C2 */}
+              <Route path="/esg"                element={<EsgPage />} />
+
+              {/* Workflow versioning — A3 */}
+              <Route path="/workflow-versions"  element={<WorkflowVersionsPage />} />
+
+              {/* Crisis management — C4 */}
+              <Route path="/crisis-management"  element={<CrisisManagementPage />} />
+
+              {/* File upload demo */}
+              <Route path="/file-upload"        element={<FileUploadDemoPage />} />
+
+              {/* Production hardening — channels */}
+              <Route path="/notifications/channels" element={<NotificationChannelsPage />} />
+
+              {/* SSO / SAML / Nafath */}
+              <Route path="/sso"                element={<SsoConfigPage />} />
+              <Route path="/sso/nafath"         element={<NafathLoginPage />} />
+
+              {/* Onboarding wizard */}
+              <Route path="/onboarding"         element={<OnboardingPage />} />
+
+              {/* Framework packs — Track D1 (content moat) */}
+              <Route path="/framework-packs"    element={<FrameworkPacksPage />} />
+
+              {/* Policy template library — Track D2 (content moat) */}
+              <Route path="/policy-templates"   element={<PolicyTemplatesPage />} />
+
+              {/* Risk lifecycle — Production hardening (Option 1) */}
+              <Route path="/risk-lifecycle"     element={<RiskLifecyclePage />} />
+
+              {/* Audit lifecycle — Production hardening (Option 2) */}
+              <Route path="/audit-lifecycle"    element={<AuditLifecyclePage />} />
+
+              {/* Privacy / PDPL lifecycle — Production hardening (Option 3) */}
+              <Route path="/privacy-lifecycle"  element={<PrivacyLifecyclePage />} />
+
+              {/* BCM lifecycle — Production hardening (Option 4) */}
+              <Route path="/bcm-lifecycle"      element={<BcmLifecyclePage />} />
+
+              {/* Cyber lifecycle — Production hardening (Option 5) */}
+              <Route path="/cyber-lifecycle"    element={<CyberLifecyclePage />} />
+
+              {/* Executive lifecycle overview — All 5 pipelines on one screen */}
+              <Route path="/lifecycle-overview" element={<LifecycleOverviewPage />} />
+
+              {/* Notification outbox — Phase E infrastructure */}
+              <Route path="/notifications/outbox" element={<NotificationOutboxPage />} />
+
               {/* Triager inbox (DD-58) */}
               <Route path="/intake-inbox"       element={<IntakeInboxPage />} />
 
@@ -107,6 +222,18 @@ export function App() {
               <Route path="/intake/:kind"       element={<IntakeFormPage />} />
               <Route path="/connectors"         element={<ConnectorsPage />} />
               <Route path="/attestations"       element={<AttestationCampaignsPage />} />
+
+              {/* Cross-module approval inbox (Sprint 5) */}
+              <Route path="/approvals"          element={<ApprovalInboxPage />} />
+
+              {/* Unified asset register / CMDB-lite (Sprint 5) */}
+              <Route path="/assets"             element={<AssetRegisterPage />} />
+
+              {/* Executive board pack export (Sprint 5) */}
+              <Route path="/board-pack"         element={<BoardPackPage />} />
+
+              {/* Saudi regulatory-change feed (Sprint 5) */}
+              <Route path="/regulatory-change"  element={<RegulatoryChangePage />} />
 
               {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
               <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />

@@ -11,6 +11,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { HijriDate } from '../../components/ui/HijriDate';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -158,13 +159,13 @@ export function ReportSchedulesPage() {
         {s.timeOfDay && <span className="mono" style={{ color: 'var(--ink-3)' }}> @ {s.timeOfDay}</span>}
       </span>
     ), width: '200px' },
-    { header: t('rsFldNextRun'),    cell: s => s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '—', mono: true, width: '170px' },
+    { header: t('rsFldNextRun'),    cell: s => <HijriDate iso={s.nextRunAt} layout="stacked" mono />, width: '180px' },
     { header: t('rsFldLastRun'),    cell: s => s.lastRunAt
         ? <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Badge tone={STATUS_TONE[s.lastRunStatus ?? ''] ?? 'neutral'} dot>{s.lastRunStatus ?? '—'}</Badge>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{new Date(s.lastRunAt).toLocaleDateString()}</span>
+            <HijriDate iso={s.lastRunAt} layout="stacked" mono />
           </div>
-        : '—', width: '170px' },
+        : '—', width: '180px' },
     { header: t('rsFldActive'),     cell: s => s.isActive
         ? <Badge tone="success" dot>{t('rsActiveLabel')}</Badge>
         : <Badge tone="neutral">{t('rsPausedLabel')}</Badge>,

@@ -3,6 +3,8 @@ import {
   ShieldAlert, Lock, AlertTriangle, ClipboardCheck, Shield,
   Truck, Fingerprint, Activity, Briefcase, GitBranch, Award, FileCheck2,
   ArrowRight, Inbox,
+  AlertOctagon, UserPlus, FileSignature, Banknote,
+  Eye, Building2, RefreshCw, TrendingUp, MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -36,6 +38,18 @@ const KIND_ICON: Record<IntakeKind, LucideIcon> = {
   CHANGE_REQUEST:     GitBranch,
   ETHICS_DISCLOSURE:  Award,
   CONTROL_ATTESTATION: FileCheck2,
+  // DD-88: HRSD workflows
+  SAUDIZATION_REPORT:     Activity,
+  WORKPLACE_INJURY:       AlertOctagon,
+  GOSI_EMPLOYEE_REGISTER: UserPlus,
+  EMPLOYMENT_CONTRACT:    FileSignature,
+  WPS_PAYROLL_RUN:        Banknote,
+  // DD-91+: Saudi-regulator workflows (CITC / MoC / Nazaha)
+  TASATTUR_SELF_ASSESSMENT:        Eye,
+  BENEFICIAL_OWNERSHIP_DISCLOSURE: Building2,
+  CR_ANNUAL_CONFIRMATION:          RefreshCw,
+  CAPITAL_CHANGE_NOTIFICATION:     TrendingUp,
+  CONSUMER_COMPLAINT_RESPONSE:     MessageSquare,
   // Public-only — never surfaced here
   DSR_REQUEST:        Lock,
   BREACH_REPORT:      Lock,
@@ -54,6 +68,7 @@ export function IntakeCatalogPage() {
     { titleKey: 'intakeCatalogSectionCompAud',  kinds: ['CONTROL_OBSERVATION', 'POLICY_EXCEPTION', 'CONTROL_ATTESTATION', 'AUDIT_REQUEST'] },
     { titleKey: 'intakeCatalogSectionPrivacy',  kinds: ['PRIVACY_BREACH', 'DPIA_INITIATION'] },
     { titleKey: 'intakeCatalogSectionTpEthics', kinds: ['VENDOR_ONBOARDING', 'ETHICS_DISCLOSURE'] },
+    { titleKey: 'intakeCatalogSectionHrsd',     kinds: ['SAUDIZATION_REPORT', 'WORKPLACE_INJURY', 'GOSI_EMPLOYEE_REGISTER', 'EMPLOYMENT_CONTRACT', 'WPS_PAYROLL_RUN'] },
   ];
 
   return (

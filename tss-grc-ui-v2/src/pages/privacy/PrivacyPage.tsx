@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database, PlayCircle, CheckCheck, X as XIcon, Clock, Send, ShieldCheck, Archive, ScrollText, Shield } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,6 +17,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { LivePulse } from '../../components/ui/LivePulse';
 import { privacyApi, dpiaApi, ApiError, type PrivacyDsrDto, type PrivacyDsrRequest, type PrivacyBreachDto, type PrivacyRopaDto, type DpiaDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
@@ -29,6 +31,10 @@ import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { PRIVACY_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toDsrDto, toBreachDto, toDpiaDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { PdplBreachConsole } from '../../components/privacy/PdplBreachConsole';
+import { PromotedBadge } from '../../components/intake/PromotedBadge';
 
 type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows' | 'comms';
 
@@ -58,6 +64,7 @@ function dsrToReq(d: PrivacyDsrDto): PrivacyDsrRequest {
 export function PrivacyPage() {
   const { t } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>('overview');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<PrivacyDsrDto | null>(null);
@@ -68,19 +75,27 @@ export function PrivacyPage() {
   const breaches = useApiList<PrivacyBreachDto>(() => privacyApi.breaches(0, 100), BREACHES);
   const ropa     = useApiList<PrivacyRopaDto>(()   => privacyApi.ropa(0, 100),     ROPA);
 
+  // DD-71: merge intake-promoted rows into DSRs and Breaches.
+  const promotedDsrs     = usePromoted('DSR').map(toDsrDto);
+  const promotedBreaches = usePromoted('BREACH').map(toBreachDto);
+  const allDsrs     = useMemo(() => [...promotedDsrs, ...dsrs.data], [promotedDsrs, dsrs.data]);
+  const allBreaches = useMemo(() => [...promotedBreaches, ...breaches.data], [promotedBreaches, breaches.data]);
+  const dsrProv    = usePromotedProvenance('DSR');
+  const breachProv = usePromotedProvenance('BREACH');
+
   // ── DD-47: filter modal — applies tab-specific filters ─────────────
   const [filterOpen, setFilterOpen] = useState(false);
   const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
-  const filteredDsrs = useMemo(() => dsrs.data.filter(d => {
+  const filteredDsrs = useMemo(() => allDsrs.filter(d => {
     if (advFilters.status      && d.status !== advFilters.status) return false;
     if (advFilters.requestType && d.requestType !== advFilters.requestType) return false;
     return true;
-  }), [dsrs.data, advFilters]);
-  const filteredBreaches = useMemo(() => breaches.data.filter(b => {
+  }), [allDsrs, advFilters]);
+  const filteredBreaches = useMemo(() => allBreaches.filter(b => {
     if (advFilters.severity && b.severity !== advFilters.severity) return false;
     if (advFilters.status   && b.status !== advFilters.status) return false;
     return true;
-  }), [breaches.data, advFilters]);
+  }), [allBreaches, advFilters]);
   const privacyFilterFields: FilterField[] = (() => {
     if (tab === 'breaches') return [
       { key: 'severity', label: t('filterFieldSeverity'), kind: 'select',
@@ -115,7 +130,7 @@ export function PrivacyPage() {
   ];
 
   const dsrCols: Column<PrivacyDsrDto>[] = [
-    { header: t('privacyDsrSubject'),  cell: r => <div><div style={{ fontWeight: 600 }}>{r.requesterName}</div><div className="mono" style={{ fontSize: 11 }}>{r.requesterEmail}</div></div> },
+    { header: t('privacyDsrSubject'),  cell: r => <div><div style={{ fontWeight: 600 }}>{r.requesterName}{dsrProv.has(r.id) && <PromotedBadge sourceReferenceCode={dsrProv.get(r.id)!} />}</div><div className="mono" style={{ fontSize: 11 }}>{r.requesterEmail}</div></div> },
     { header: t('privacyDsrType'),     cell: r => <Badge tone="info">{r.requestType}</Badge> },
     { header: t('privacyDsrReceived'), cell: r => fmtDate(r.receivedAt), mono: true },
     { header: t('privacyDsrDue'),      cell: r => fmtDate(r.dueDate), mono: true },
@@ -143,7 +158,7 @@ export function PrivacyPage() {
   ];
 
   const breachCols: Column<PrivacyBreachDto>[] = [
-    { header: t('colTitle'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(r.descriptionEn ?? '').slice(0, 80)}</div></div> },
+    { header: t('colTitle'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}{breachProv.has(r.id) && <PromotedBadge sourceReferenceCode={breachProv.get(r.id)!} />}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(r.descriptionEn ?? '').slice(0, 80)}</div></div> },
     { header: t('colType'),     cell: r => <Badge tone="info">{r.breachType ?? '—'}</Badge> },
     { header: t('colSeverity'), cell: r => <Badge tone={SEVERITY_TONE[r.severity ?? ''] ?? 'neutral'} dot>{severityLabel(t, r.severity ?? '—')}</Badge> },
     { header: t('colRecords'),  cell: r => r.affectedRecords?.toLocaleString() ?? '—', mono: true },
@@ -254,7 +269,15 @@ export function PrivacyPage() {
   }
 
   const isDemo = dsrs.isDemo;
-  const openDsrs = dsrs.data.filter(d => d.status === 'PENDING' || d.status === 'IN_PROGRESS').length;
+  const openDsrs = allDsrs.filter(d => d.status === 'PENDING' || d.status === 'IN_PROGRESS' || d.status === 'NEW').length;
+
+  // Sprint 4 §2.7 — live privacy dashboard (DSR SLA, breach lifecycle)
+  const { pulse } = useLiveRefresh({
+    kinds: ['changed.dsr_case', 'changed.data_breach', 'changed.processing_activity'],
+    onRefresh: () => { dsrs.reload(); breaches.reload(); ropa.reload(); },
+    waitMs: 600,
+    enabled: !isDemo,
+  });
 
   return (
     <Shell title={t('modPdpl')} sub="Saudi PDPL · ISO 27701">
@@ -263,6 +286,7 @@ export function PrivacyPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>
@@ -277,7 +301,16 @@ export function PrivacyPage() {
               downloadCsv(cur.rows, stampFilename(cur.name, 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
-            <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
+            {/* DD-76: route DSR / breach / DPIA creation through Services Center.
+                For tabs without a registered intake (RoPA, consent), fall back to inline modal. */}
+            <Button variant="primary"   Icon={Plus} onClick={() => {
+              const kindByTab: Partial<Record<TabId, string>> = {
+                dsr: 'dsr_request', breaches: 'privacy_breach', dpia: 'dpia_initiation',
+              };
+              const kind = kindByTab[tab];
+              if (kind) navigate(`/intake/${kind}`);
+              else { setEditing(null); setOpen(true); }
+            }}>{t('actionNew')}</Button>
           </>
         }
       />
@@ -285,7 +318,7 @@ export function PrivacyPage() {
         <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length || 142} tone="primary" />
         <Kpi Icon={Inbox}       label={t('privacyKpiDsr')}        value={openDsrs} tone="warning" />
         <Kpi Icon={Users}       label={t('privacyKpiConsent')}    value="98%" tone="success" />
-        <Kpi Icon={ShieldAlert} label={t('privacyKpiBreaches')}   value={breaches.data.filter(b => b.status !== 'CLOSED').length} tone="danger" />
+        <Kpi Icon={ShieldAlert} label={t('privacyKpiBreaches')}   value={allBreaches.filter(b => b.status !== 'CLOSED').length} tone="danger" />
       </div>
 
       <OverviewStrip
@@ -326,9 +359,17 @@ export function PrivacyPage() {
         </Card>
       )}
       {tab === 'breaches' && (
-        <Card padded={false}>
-          {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={filteredBreaches} empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}
-        </Card>
+        <>
+          {/* Sprint 4 — PDPL 72-hour response console. Picks the most
+              time-sensitive open breach automatically and surfaces the
+              auto-generated SDAIA notification packet (PDPL Art. 25). */}
+          <div style={{ marginBottom: 12 }}>
+            <PdplBreachConsole breaches={allBreaches} />
+          </div>
+          <Card padded={false}>
+            {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={filteredBreaches} empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}
+          </Card>
+        </>
       )}
       {tab === 'ropa' && (
         <Card padded={false}>
@@ -397,8 +438,11 @@ const DPIA_RISK_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success' |
  * lifecycle workflow (submit-for-review / approve / reject / expire).
  */
 function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnType<typeof useI18n>['t'] }) {
-  const [items, setItems] = useState<DpiaDto[]>([]);
+  const [apiItems, setItems] = useState<DpiaDto[]>([]);
   const [loading, setLoading] = useState(false);
+  // DD-75: merge intake-promoted DPIAs into the visible register.
+  const promoted = usePromoted('DPIA').map(toDpiaDto);
+  const items = [...promoted, ...apiItems];
 
   function reload() {
     if (!isAuthenticated()) { setItems(DPIAS); return; }

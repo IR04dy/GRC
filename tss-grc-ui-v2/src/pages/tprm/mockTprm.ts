@@ -3,6 +3,7 @@
 // expiring-contracts panel and per-vendor detail page render with
 // realistic data offline. No fields left blank.
 import type { TprmVendorDto } from '../../lib/api';
+import type { VendorTier, OnboardingStage } from '../../lib/vendorOnboarding';
 
 // ── Per-vendor detail-tab mocks ────────────────────────────────────────
 export interface VendorAssessmentRow {
@@ -147,4 +148,78 @@ export const VENDORS: TprmVendorDto[] = [
     riskRating:    'HIGH',     status: 'ACTIVE',
     contractEndDate: '2027-06-30',
     description:   'Privileged session recording + vault for production infrastructure. Quarterly recertification log anchors NCA ECC AC-2 evidence (EV-1077).' },
+
+  // ── DD-74: in-pipeline vendors (still onboarding). One per stage so
+  //          the new Onboarding Pipeline panel has content in each lane.
+  { id: 13,
+    vendorName:    'Snowflake KSA',
+    vendorNameAr:  'سنوفليك السعودية',
+    vendorType:    'Cloud Data Warehouse',
+    country:       'Saudi Arabia',
+    riskRating:    'HIGH',     status: 'ONBOARDING',
+    contractEndDate: '',
+    description:   'Sovereign-region data-warehouse for analytics workloads. Just submitted by Data Office — pending tier classification.' },
+  { id: 14,
+    vendorName:    'Datadog',
+    vendorNameAr:  'داتا دوغ',
+    vendorType:    'Observability / APM',
+    country:       'United States',
+    riskRating:    'MEDIUM',   status: 'ONBOARDING',
+    contractEndDate: '',
+    description:   'SaaS observability for the production estate. TPRM analyst classifying into tier — cross-border log shipping under review.' },
+  { id: 15,
+    vendorName:    'Lookout Mobile Security',
+    vendorNameAr:  'لوك أوت لأمن الأجهزة الجوّالة',
+    vendorType:    'Mobile Threat Defense',
+    country:       'United States',
+    riskRating:    'MEDIUM',   status: 'ONBOARDING',
+    contractEndDate: '',
+    description:   'Mobile-device threat detection + EDR. Sanctions screen and ZATCA tax compliance in progress.' },
+  { id: 16,
+    vendorName:    'Cloudflare ME',
+    vendorNameAr:  'كلاودفلير الشرق الأوسط',
+    vendorType:    'WAF + CDN',
+    country:       'Bahrain',
+    riskRating:    'HIGH',     status: 'ONBOARDING',
+    contractEndDate: '',
+    description:   'Edge WAF + DDoS protection for customer-facing properties. Awaiting CISO Office sign-off on SOC 2 + DPA review.' },
 ];
+
+// ── DD-74: TPRM metadata layer ─────────────────────────────────────────
+// Frontend-only augmentation of the vendor record with the data the
+// onboarding pipeline + reassessment cadence engine needs:
+//   - tier            → drives reassessment cadence (T1 annual …)
+//   - onboardingStage → drives the kanban pipeline lane
+//   - lastAssessedAt  → drives the next-review-due computation
+//
+// Backend wiring will land in a follow-up; for demo mode this map is the
+// source of truth. Today's date for the seed math = 2026-05-05.
+
+export interface VendorTprmMeta {
+  tier: VendorTier;
+  onboardingStage: OnboardingStage;
+  /** ISO date string. */
+  lastAssessedAt: string;
+}
+
+export const VENDOR_TPRM_META: Record<number, VendorTprmMeta> = {
+  // ── Active (already through onboarding) ─────────────
+  1:  { tier: 'TIER_1', onboardingStage: 'ACTIVE', lastAssessedAt: '2025-03-15' }, // 14 mo → OVERDUE for T1
+  2:  { tier: 'TIER_1', onboardingStage: 'ACTIVE', lastAssessedAt: '2025-04-12' }, // 13 mo → OVERDUE
+  3:  { tier: 'TIER_2', onboardingStage: 'ACTIVE', lastAssessedAt: '2026-04-21' }, // just reassessed → ON_TRACK
+  4:  { tier: 'TIER_1', onboardingStage: 'ACTIVE', lastAssessedAt: '2025-09-05' }, // 8 mo → ON_TRACK
+  5:  { tier: 'TIER_2', onboardingStage: 'ACTIVE', lastAssessedAt: '2024-04-05' }, // 25 mo → OVERDUE for T2
+  6:  { tier: 'TIER_2', onboardingStage: 'ACTIVE', lastAssessedAt: '2024-11-05' }, // 18 mo → ON_TRACK
+  7:  { tier: 'TIER_3', onboardingStage: 'ACTIVE', lastAssessedAt: '2023-11-05' }, // 30 mo → DUE_SOON for T3
+  8:  { tier: 'TIER_3', onboardingStage: 'CONTRACT',       lastAssessedAt: '2026-04-20' }, // mid-contract
+  9:  { tier: 'TIER_1', onboardingStage: 'ACTIVE', lastAssessedAt: '2026-02-05' }, // 3 mo → ON_TRACK
+  10: { tier: 'TIER_1', onboardingStage: 'ACTIVE', lastAssessedAt: '2025-06-05' }, // 11 mo → DUE_SOON
+  11: { tier: 'TIER_3', onboardingStage: 'ACTIVE', lastAssessedAt: '2023-05-05' }, // 36 mo → OVERDUE
+  12: { tier: 'TIER_2', onboardingStage: 'ACTIVE', lastAssessedAt: '2024-06-05' }, // 23 mo → DUE_SOON
+
+  // ── In-pipeline (DD-74 onboarding stages) ────────────
+  13: { tier: 'TIER_2', onboardingStage: 'INTAKE',          lastAssessedAt: '2026-05-01' },
+  14: { tier: 'TIER_3', onboardingStage: 'TIER_ASSESSMENT', lastAssessedAt: '2026-04-25' },
+  15: { tier: 'TIER_3', onboardingStage: 'DUE_DILIGENCE',   lastAssessedAt: '2026-04-15' },
+  16: { tier: 'TIER_1', onboardingStage: 'SECURITY_REVIEW', lastAssessedAt: '2026-04-10' },
+};

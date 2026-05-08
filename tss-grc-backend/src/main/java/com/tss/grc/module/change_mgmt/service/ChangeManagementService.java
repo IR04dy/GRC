@@ -3,8 +3,10 @@ package com.tss.grc.module.change_mgmt.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,22 +28,23 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ChangeManagementService {
 
-    /** Forward transitions allowed from a given status (NORMAL/STANDARD path). */
-    private static final Map<String, Set<String>> NORMAL_TRANSITIONS = Map.of(
-        "DRAFT",            Set.of("SUBMITTED", "EMERGENCY_APPROVED", "CANCELLED"),
-        "SUBMITTED",        Set.of("IMPACT_ASSESSED", "CANCELLED"),
-        "IMPACT_ASSESSED",  Set.of("CAB_PENDING", "CANCELLED"),
-        "CAB_PENDING",      Set.of("CAB_APPROVED", "CAB_REJECTED"),
-        "CAB_APPROVED",     Set.of("SCHEDULED", "CANCELLED"),
-        "SCHEDULED",        Set.of("IMPLEMENTING", "CANCELLED"),
-        "EMERGENCY_APPROVED", Set.of("IMPLEMENTING", "CANCELLED"),
-        "IMPLEMENTING",     Set.of("IMPLEMENTED", "ROLLED_BACK"),
-        "IMPLEMENTED",      Set.of("POST_REVIEW"),
-        "POST_REVIEW",      Set.of("CLOSED"),
-        "ROLLED_BACK",      Set.of("POST_REVIEW", "CLOSED"),
-        "CAB_REJECTED",     Set.of("DRAFT"),    // can be reworked
-        "CANCELLED",        Set.of(),
-        "CLOSED",           Set.of()
+    /** Forward transitions allowed from a given status (NORMAL/STANDARD path).
+     *  Map.of caps at 10 entries — use Map.ofEntries for 13. */
+    private static final Map<String, Set<String>> NORMAL_TRANSITIONS = Map.ofEntries(
+        Map.entry("DRAFT",              Set.of("SUBMITTED", "EMERGENCY_APPROVED", "CANCELLED")),
+        Map.entry("SUBMITTED",          Set.of("IMPACT_ASSESSED", "CANCELLED")),
+        Map.entry("IMPACT_ASSESSED",    Set.of("CAB_PENDING", "CANCELLED")),
+        Map.entry("CAB_PENDING",        Set.of("CAB_APPROVED", "CAB_REJECTED")),
+        Map.entry("CAB_APPROVED",       Set.of("SCHEDULED", "CANCELLED")),
+        Map.entry("SCHEDULED",          Set.of("IMPLEMENTING", "CANCELLED")),
+        Map.entry("EMERGENCY_APPROVED", Set.of("IMPLEMENTING", "CANCELLED")),
+        Map.entry("IMPLEMENTING",       Set.of("IMPLEMENTED", "ROLLED_BACK")),
+        Map.entry("IMPLEMENTED",        Set.of("POST_REVIEW")),
+        Map.entry("POST_REVIEW",        Set.of("CLOSED")),
+        Map.entry("ROLLED_BACK",        Set.of("POST_REVIEW", "CLOSED")),
+        Map.entry("CAB_REJECTED",       Set.of("DRAFT")),    // can be reworked
+        Map.entry("CANCELLED",          Set.<String>of()),
+        Map.entry("CLOSED",             Set.<String>of())
     );
 
     private final ChangeRequestRepository changeRepo;
@@ -49,6 +52,12 @@ public class ChangeManagementService {
     private final ChangeTaskRepository taskRepo;
     private final ChangeLinkRepository linkRepo;
     private final ChangeCommentRepository commentRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
+    private void emitChange(ChangeRequest cr) {
+        if (bcast != null) bcast.entity(cr.getOrganisationId(), "change_request", cr.getId(), cr);
+    }
 
     // ── Listing + CRUD ──────────────────────────────────────────────────────
 
@@ -71,14 +80,18 @@ public class ChangeManagementService {
         if (c.getStatus() == null) c.setStatus("DRAFT");
         if (c.getChangeType() == null) c.setChangeType("NORMAL");
         if (c.getRequestedDate() == null) c.setRequestedDate(LocalDate.now());
-        return changeRepo.save(c);
+        ChangeRequest saved = changeRepo.save(c);
+        emitChange(saved);
+        return saved;
     }
 
     @Transactional
     public ChangeRequest update(Long id, ChangeRequest req) {
         ChangeRequest c = require(id);
         apply(c, req);
-        return changeRepo.save(c);
+        ChangeRequest saved = changeRepo.save(c);
+        emitChange(saved);
+        return saved;
     }
 
     @Transactional
@@ -86,6 +99,7 @@ public class ChangeManagementService {
         ChangeRequest c = require(id);
         c.setIsDeleted(true);
         changeRepo.save(c);
+        emitChange(c);
     }
 
     // ── Lifecycle transitions ───────────────────────────────────────────────
@@ -130,7 +144,9 @@ public class ChangeManagementService {
             default -> { /* no extra side-effects */ }
         }
         c.setStatus(target);
-        return changeRepo.save(c);
+        ChangeRequest saved = changeRepo.save(c);
+        emitChange(saved);
+        return saved;
     }
 
     // ── Approvals ───────────────────────────────────────────────────────────

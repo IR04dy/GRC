@@ -22,6 +22,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { LivePulse } from '../../components/ui/LivePulse';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
@@ -424,6 +426,22 @@ export function CyberPage() {
   const actionPlans    = useApiList<CyberActionPlanDto>(() => cyberApi.actionPlans(0, 200), ACTION_PLANS);
 
   const isDemo = controls.isDemo || vulns.isDemo;
+
+  // Sprint 4 §2.7 — keep this dashboard's lists live. When any cyber-domain
+  // entity changes (vulnerability transition, incident response advance, etc.)
+  // the relevant useApiList reloads. Debounced 600ms so a CAPA cascade
+  // collapses into one refetch.
+  const { pulse } = useLiveRefresh({
+    kinds: ['changed.vulnerability', 'changed.cyber_incident', 'changed.cyber_control', 'changed.cyber_action_plan'],
+    onRefresh: () => {
+      vulns.reload();
+      cyberIncidents.reload();
+      controls.reload();
+      actionPlans.reload();
+    },
+    waitMs: 600,
+    enabled: !isDemo,
+  });
 
   // Data-driven dropdowns — built per render so they reflect the latest list
   const controlOptions = [
@@ -952,6 +970,7 @@ export function CyberPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>
@@ -969,10 +988,10 @@ export function CyberPage() {
 
       <OverviewStrip
         storageKey="overview.cyber"
-        processBarTitle="Cybersecurity — Processes & Lifecycles"
-        processBarSubtitle="NIST CSF 2.0 + NIST SP 800-61 + ISO 27001:2022 + NCA ECC — every named process active in this domain."
+        processBarTitle={t('cyberProcessBarTitle')}
+        processBarSubtitle={t('cyberProcessBarSubtitle')}
         lifecycles={CYBER_LIFECYCLES}
-        postureTitle="Regulator Posture · Cybersecurity"
+        postureTitle={t('cyberPostureTitle')}
         anchors={CYBER_ANCHORS}
         />
 

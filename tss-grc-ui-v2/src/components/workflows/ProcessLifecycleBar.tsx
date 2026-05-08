@@ -5,6 +5,7 @@ import { Workflow, Play } from 'lucide-react';
 import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Card } from '../ui/Card';
 import { ProcessDetailModal } from './ProcessDetailModal';
+import type { IntakeKind } from '../../lib/intake';
 
 /**
  * ProcessAction — a single click target on a process tile.
@@ -59,6 +60,16 @@ export interface ProcessLifecycle {
 
   // Catalogue compatibility (not rendered).
   stages?: string[];
+
+  /**
+   * DD-66: Intake-kind that this process kicks off when the user clicks
+   * "Start" on the Process Detail modal. When set, the modal navigates
+   * to /intake/<kind-lowercase> instead of just routing to the register.
+   * Maps each named process to the front-door form that originates new
+   * work — closes the loop between "what is this process?" and "let me
+   * start one now."
+   */
+  intakeKind?: IntakeKind;
 }
 
 /**

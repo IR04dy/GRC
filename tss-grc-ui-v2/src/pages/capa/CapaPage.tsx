@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ListChecks, Hourglass, BarChart3, Network, Workflow, Zap,
   Plus, Search, Send, CheckCheck, Repeat, AlertTriangle,
@@ -27,6 +28,8 @@ import {
 import { scanPaTriggers, type PaTrigger } from '../../lib/paTriggers';
 import { deriveCapaNotifs, audCommitteeDigest, type CapaNotif } from '../../lib/capaNotifications';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toCapaFromObservation } from '../../lib/promotedAdapters';
 
 type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers' | 'committee';
 
@@ -44,7 +47,13 @@ const ROOT_CAUSE_CATS: { id: RootCauseCategory; en: string; ar: string }[] = [
 export function CapaPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { items, advance, create, update } = useCapas();
+  const navigate = useNavigate();
+  const { items: apiItems, advance, create, update } = useCapas();
+  // DD-75: surface CAPAs that originated from a promoted CONTROL_OBSERVATION
+  // intake. Promoted CAPAs are display-only — the lifecycle still operates
+  // on the underlying source intake until a real backend lands.
+  const promotedCapas = usePromoted('CAPA').map(toCapaFromObservation);
+  const items = useMemo(() => [...promotedCapas, ...apiItems], [promotedCapas, apiItems]);
   const [tab, setTab] = useState<TabId>('register');
   const [q, setQ] = useState('');
   const [filterStatus, setFilterStatus] = useState<CapaStatus | 'ALL'>('ALL');
@@ -165,7 +174,10 @@ export function CapaPage() {
             downloadCsv(rows, stampFilename('capa-register', 'csv'));
             toast.success(t('capaExportDone'));
           }}>{t('actionExport')}</Button>
-          <Button variant="primary" Icon={Plus} onClick={() => toast.info(t('capaNewHint'))}>{t('capaNew')}</Button>
+          {/* DD-76: CAPAs originate from control failures / observations.
+              Front door is the CONTROL_OBSERVATION intake which gets triaged
+              into a finding, which then becomes a CAPA. */}
+          <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/control_observation')}>{t('capaNew')}</Button>
         </>}
       />
 

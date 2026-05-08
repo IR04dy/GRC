@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useI18n } from '../../lib/i18n';
@@ -19,14 +19,26 @@ import {
  * privacy-breach, risk-issue, control-observation, policy-exception)
  * so the visual + UX is identical across all five.
  */
-export function IntakeFormRenderer({ fields, submitLabel, onSubmit }: {
+export function IntakeFormRenderer({ fields, submitLabel, onSubmit, onChange }: {
   fields: IntakeFieldDef[];
   submitLabel: string;
   onSubmit: (payload: Record<string, string>) => void;
+  /** DD-73: optional callback fired on every keystroke so parent pages
+   *  can render a live preview (e.g. the change-risk panel that
+   *  recomputes as the user picks values). */
+  onChange?: (values: Record<string, string>) => void;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
+
+  // DD-73: broadcast values to the parent via effect rather than from
+  // inside the setState updater — calling the parent's setState during a
+  // child's setState updater triggers a "Cannot update a component while
+  // rendering a different component" warning in React 18.
+  useEffect(() => {
+    if (onChange) onChange(values);
+  }, [values, onChange]);
 
   function set(key: string, v: string) {
     setValues(prev => ({ ...prev, [key]: v }));

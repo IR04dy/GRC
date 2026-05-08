@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Inbox, ListChecks, AlertTriangle, Send,
   CheckCheck, X as XIcon, Lock,
@@ -19,6 +20,8 @@ import {
   hoursUntilSla,
   type IntakeRecord, type IntakeKind,
 } from '../../lib/intake';
+import { computeChangeRisk } from '../../lib/changeRisk';
+import { ChangeRiskPanel } from '../../components/intake/ChangeRiskPanel';
 
 /**
  * Triager inbox — DD-58.
@@ -127,8 +130,12 @@ export function IntakeInboxPage() {
           rec={triageTarget}
           onClose={() => setTriageTarget(null)}
           onDecide={(decision, extra) => {
-            triage(triageTarget.id, decision, 'demo.triager@tss.sa', extra);
-            toast.success(t(decision === 'PROMOTE' ? 'inboxToastPromoted' : decision === 'REJECT' ? 'inboxToastRejected' : 'inboxToastClosed'));
+            const result = triage(triageTarget.id, decision, 'demo.triager@tss.sa', extra);
+            if (decision === 'PROMOTE' && result) {
+              toast.success(`${t('inboxToastPromoted')} → ${result.entityType} #${result.recordId}`);
+            } else {
+              toast.success(t(decision === 'REJECT' ? 'inboxToastRejected' : decision === 'CLOSE' ? 'inboxToastClosed' : 'inboxToastPromoted'));
+            }
             setTriageTarget(null);
           }}
         />
@@ -204,8 +211,47 @@ function InboxRow({ rec, onTriage, t, lang }: {
         {(rec.status === 'SUBMITTED' || rec.status === 'TRIAGING') && (
           <Button variant="primary" size="sm" Icon={Send} onClick={onTriage}>{t('inboxTriage')}</Button>
         )}
+        {rec.status === 'PROMOTED' && rec.promotedTo && (
+          <PromotedDeeplink target={rec.promotedTo} />
+        )}
       </div>
     </div>
+  );
+}
+
+function PromotedDeeplink({ target }: { target: NonNullable<IntakeRecord['promotedTo']> }) {
+  const { t } = useI18n();
+  // Map RegisterTarget → user-facing route
+  const route: Partial<Record<typeof target.entityType, string>> = {
+    INCIDENT:    '/incidents',
+    DSR:         '/privacy?tab=dsr',
+    BREACH:      '/privacy?tab=breaches',
+    RISK:        '/risk',
+    VENDOR:      '/tprm',
+    CAPA:        '/capa',
+    DPIA:        '/privacy?tab=dpia',
+    BIA:         '/bcm?tab=bia',
+    ENGAGEMENT:  '/audit-workspace',
+    CHANGE:      '/changes',
+    EXCEPTION:   '/compliance',
+    POLICY:      '/compliance?tab=policies',
+    FINDING:     '/compliance?tab=findings',
+    ETHICS_CASE: '/ethics',
+    CONTROL_TEST: '/compliance?tab=controls',
+  };
+  const href = route[target.entityType];
+  if (!href) return <Badge tone="success">#{target.recordId}</Badge>;
+  return (
+    <Link to={href}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '4px 10px', fontSize: 12, fontWeight: 600,
+        color: 'var(--success-fg)', background: 'var(--success-bg)',
+        borderRadius: 'var(--r-sm)', textDecoration: 'none',
+      }}
+      title={t('inboxPromotedDeeplinkTitle')}>
+      #{target.recordId} →
+    </Link>
   );
 }
 
@@ -217,6 +263,13 @@ function TriageModal({ rec, onClose, onDecide }: {
   const { t, lang } = useI18n();
   const [reason, setReason] = useState('');
   const catalog = INTAKE_CATALOG[rec.kind];
+
+  // DD-72: when triaging a CHANGE_REQUEST, surface the same auto-computed
+  // risk score / classification / CAB gate the submitter saw on the ack
+  // screen — keeps the audit narrative consistent end-to-end.
+  const changeRisk = rec.kind === 'CHANGE_REQUEST'
+    ? computeChangeRisk(rec.payload as Record<string, unknown>)
+    : null;
 
   return (
     <Modal open onClose={onClose} size="lg" title={`${rec.referenceCode} — ${lang === 'ar' ? catalog.titleAr : catalog.titleEn}`}
@@ -231,6 +284,8 @@ function TriageModal({ rec, onClose, onDecide }: {
           <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('inboxTriageReference')}</div>
           <div style={{ marginTop: 4 }}>{catalog.reference}</div>
         </div>
+
+        {changeRisk && <ChangeRiskPanel risk={changeRisk} t={t} lang={lang} />}
 
         <div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('inboxTriagePayload')}</div>

@@ -5,8 +5,10 @@ import com.tss.grc.module.tprm.entity.Vendor;
 import com.tss.grc.module.tprm.entity.VendorAssessment;
 import com.tss.grc.module.tprm.repository.VendorAssessmentRepository;
 import com.tss.grc.module.tprm.repository.VendorRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,9 @@ public class TprmService {
 
     private final VendorRepository vendorRepo;
     private final VendorAssessmentRepository assessmentRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
 
     // ── Vendors ───────────────────────────────────────────────────────────────
 
@@ -40,7 +45,9 @@ public class TprmService {
     @Transactional
     public Vendor createVendor(Vendor req) {
         req.setOrganisationId(TenantContext.getCurrentTenant());
-        return vendorRepo.save(req);
+        Vendor saved = vendorRepo.save(req);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "vendor", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -58,7 +65,9 @@ public class TprmService {
         existing.setContractEndDate(req.getContractEndDate());
         existing.setDescription(req.getDescription());
         existing.setUpdatedAt(LocalDateTime.now());
-        return vendorRepo.save(existing);
+        Vendor saved = vendorRepo.save(existing);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "vendor", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -66,6 +75,7 @@ public class TprmService {
         Vendor v = getVendor(id);
         v.setIsDeleted(true);
         vendorRepo.save(v);
+        if (bcast != null) bcast.entity(v.getOrganisationId(), "vendor", v.getId(), java.util.Map.of("id", v.getId(), "deleted", true));
     }
 
     // ── Assessments ───────────────────────────────────────────────────────────

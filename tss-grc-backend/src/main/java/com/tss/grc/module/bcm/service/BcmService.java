@@ -9,8 +9,10 @@ import com.tss.grc.module.bcm.repository.BcmExerciseRepository;
 import com.tss.grc.module.bcm.repository.BcmPlanRepository;
 import com.tss.grc.module.bcm.repository.BiaRecordRepository;
 import com.tss.grc.module.bcm.repository.CriticalProcessRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,9 @@ public class BcmService {
     private final CriticalProcessRepository processRepo;
     private final BiaRecordRepository biaRepo;
     private final BcmExerciseRepository exerciseRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
 
     // ── BCM Plans ─────────────────────────────────────────────────────────────
 
@@ -80,7 +85,9 @@ public class BcmService {
             throw new IllegalArgumentException("Plan must be DRAFT to submit for review (was " + p.getStatus() + ")");
         }
         p.setStatus("UNDER_REVIEW");
-        return planRepo.save(p);
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -90,7 +97,9 @@ public class BcmService {
             throw new IllegalArgumentException("Plan must be DRAFT or UNDER_REVIEW to approve (was " + p.getStatus() + ")");
         }
         p.setStatus("APPROVED");
-        return planRepo.save(p);
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -100,7 +109,9 @@ public class BcmService {
             throw new IllegalArgumentException("Plan must be APPROVED to invoke (was " + p.getStatus() + ")");
         }
         p.setStatus("INVOKED");
-        return planRepo.save(p);
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -110,7 +121,9 @@ public class BcmService {
             throw new IllegalArgumentException("Plan must be INVOKED to restore (was " + p.getStatus() + ")");
         }
         p.setStatus("APPROVED");
-        return planRepo.save(p);
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
     }
 
     // ── Critical Processes ────────────────────────────────────────────────────
@@ -241,7 +254,9 @@ public class BcmService {
         if (score != null) e.setScore(score);
         if (findings != null) e.setFindings(findings);
         e.setUpdatedAt(java.time.LocalDateTime.now());
-        return exerciseRepo.save(e);
+        BcmExercise saved = exerciseRepo.save(e);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_exercise", saved.getId(), saved);
+        return saved;
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────────

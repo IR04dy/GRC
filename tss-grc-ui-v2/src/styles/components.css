@@ -109,6 +109,27 @@ textarea.input { resize: vertical; min-height: 80px; }
   transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
 }
 .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+
+/* Flash-on-change — Sprint 4 §2.7 live dashboard. Briefly highlights a KPI
+   tile when its value updates from a realtime event so users notice the change. */
+.kpi-flash-up,
+.kpi-flash-down {
+  animation: kpi-flash 1.4s ease-out;
+}
+@keyframes kpi-flash {
+  0%   { box-shadow: var(--shadow-1), 0 0 0 0 currentColor; }
+  10%  { box-shadow: var(--shadow-1), 0 0 0 4px rgba(22, 163, 74, 0.45); }
+  100% { box-shadow: var(--shadow-1), 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+.kpi-flash-down {
+  animation-name: kpi-flash-down;
+}
+@keyframes kpi-flash-down {
+  0%   { box-shadow: var(--shadow-1), 0 0 0 0 currentColor; }
+  10%  { box-shadow: var(--shadow-1), 0 0 0 4px rgba(220, 38, 38, 0.40); }
+  100% { box-shadow: var(--shadow-1), 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
 .kpi-clickable { cursor: pointer; }
 .kpi-clickable:hover { border-color: var(--primary-300); box-shadow: var(--shadow-2); }
 .kpi-clickable:hover .kpi-arrow { color: var(--primary); transform: translateX(2px); }

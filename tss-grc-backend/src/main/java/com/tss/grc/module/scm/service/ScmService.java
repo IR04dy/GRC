@@ -4,9 +4,11 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.scm.dto.*;
 import com.tss.grc.module.scm.entity.*;
 import com.tss.grc.module.scm.repository.*;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,9 @@ public class ScmService {
     private final SupplierIncidentRepository incidentRepo;
     private final ContractRepository contractRepo;
     private final SlaRepository slaRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
 
     private Long orgId() {
         Long id = TenantContext.getCurrentTenant();
@@ -122,6 +127,7 @@ public class ScmService {
         o = onboardingRepo.save(o);
         // Update parent vendor onboarding_status
         vendorRepo.findById(req.getVendorId()).ifPresent(v -> { v.setOnboardingStatus("IN_PROGRESS"); vendorRepo.save(v); });
+        if (bcast != null) bcast.entity(o.getOrganisationId(), "vendor_onboarding", o.getId(), o);
         return toOnboardingResponse(o, vendorIndex());
     }
 
@@ -142,7 +148,9 @@ public class ScmService {
             o.setCurrentStage(stages[idx + 1]);
         }
         o.setUpdatedAt(LocalDateTime.now());
-        return toOnboardingResponse(onboardingRepo.save(o), vendorIndex());
+        VendorOnboarding savedOnb = onboardingRepo.save(o);
+        if (bcast != null) bcast.entity(savedOnb.getOrganisationId(), "vendor_onboarding", savedOnb.getId(), savedOnb);
+        return toOnboardingResponse(savedOnb, vendorIndex());
     }
 
     public OnboardingDtos.Response approveOnboarding(Long id) {
@@ -309,7 +317,9 @@ public class ScmService {
                 .orElseThrow(() -> new EntityNotFoundException("Incident not found: " + id));
         i.setBackupPlanActivated(true);
         i.setUpdatedAt(LocalDateTime.now());
-        return toIncidentResponse(incidentRepo.save(i), vendorIndex());
+        SupplierIncident saved = incidentRepo.save(i);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "supplier_incident", saved.getId(), saved);
+        return toIncidentResponse(saved, vendorIndex());
     }
 
     public IncidentDtos.Response createCapa(Long id) {
@@ -317,7 +327,9 @@ public class ScmService {
                 .orElseThrow(() -> new EntityNotFoundException("Incident not found: " + id));
         i.setCapaCreated(true);
         i.setUpdatedAt(LocalDateTime.now());
-        return toIncidentResponse(incidentRepo.save(i), vendorIndex());
+        SupplierIncident saved = incidentRepo.save(i);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "supplier_incident", saved.getId(), saved);
+        return toIncidentResponse(saved, vendorIndex());
     }
 
     public IncidentDtos.Response escalateIncident(Long id) {
@@ -325,7 +337,9 @@ public class ScmService {
                 .orElseThrow(() -> new EntityNotFoundException("Incident not found: " + id));
         i.setEscalatedToManagement(true);
         i.setUpdatedAt(LocalDateTime.now());
-        return toIncidentResponse(incidentRepo.save(i), vendorIndex());
+        SupplierIncident saved = incidentRepo.save(i);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "supplier_incident", saved.getId(), saved);
+        return toIncidentResponse(saved, vendorIndex());
     }
 
     public IncidentDtos.Response resolveIncident(Long id, String notes) {
@@ -335,7 +349,9 @@ public class ScmService {
         i.setResolvedAt(LocalDateTime.now());
         i.setResolutionNotes(notes);
         i.setUpdatedAt(LocalDateTime.now());
-        return toIncidentResponse(incidentRepo.save(i), vendorIndex());
+        SupplierIncident saved = incidentRepo.save(i);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "supplier_incident", saved.getId(), saved);
+        return toIncidentResponse(saved, vendorIndex());
     }
 
     private IncidentDtos.Response toIncidentResponse(SupplierIncident i, Map<Long, Vendor> vMap) {

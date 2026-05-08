@@ -7,8 +7,10 @@ import com.tss.grc.module.ethics.entity.EthicsCase;
 import com.tss.grc.module.ethics.repository.CaseActionRepository;
 import com.tss.grc.module.ethics.repository.CaseLinkRepository;
 import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -51,6 +53,12 @@ public class EthicsCaseService {
     private final CaseActionRepository actionRepo;
     private final CaseLinkRepository linkRepo;
 
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
+    private void emit(EthicsCase c) {
+        if (bcast != null) bcast.entity(c.getOrganisationId(), "ethics_case", c.getId(), c);
+    }
+
     @Transactional(readOnly = true)
     public Page<EthicsCase> list(String status, String category, String severity, Pageable pageable) {
         return caseRepo.findWithFilters(
@@ -69,14 +77,18 @@ public class EthicsCaseService {
         if (c.getStatus()        == null) c.setStatus("INTAKE");
         if (c.getSeverity()      == null) c.setSeverity("MEDIUM");
         if (c.getIntakeChannel() == null) c.setIntakeChannel("HOTLINE");
-        return caseRepo.save(c);
+        EthicsCase saved = caseRepo.save(c);
+        emit(saved);
+        return saved;
     }
 
     @Transactional
     public EthicsCase update(Long id, EthicsCase req) {
         EthicsCase c = require(id);
         apply(c, req);
-        return caseRepo.save(c);
+        EthicsCase saved = caseRepo.save(c);
+        emit(saved);
+        return saved;
     }
 
     @Transactional
@@ -84,6 +96,7 @@ public class EthicsCaseService {
         EthicsCase c = require(id);
         c.setIsDeleted(true);
         caseRepo.save(c);
+        emit(c);
     }
 
     @Transactional
@@ -125,7 +138,9 @@ public class EthicsCaseService {
             default -> { /* no-op */ }
         }
         c.setStatus(target);
-        return caseRepo.save(c);
+        EthicsCase saved = caseRepo.save(c);
+        emit(saved);
+        return saved;
     }
 
     @Transactional

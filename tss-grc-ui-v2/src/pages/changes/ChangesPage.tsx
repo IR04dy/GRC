@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   GitBranch, Filter, Plus, BarChart3, ListChecks, KanbanSquare, Activity,
   CheckCheck, X as XIcon, ArrowRight, AlertTriangle, ShieldCheck, Clock, Send,
@@ -31,6 +32,9 @@ import { CHANGE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CHANGE_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toChangeRequestDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { PromotedBadge } from '../../components/intake/PromotedBadge';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations' | 'comms';
 
@@ -87,10 +91,15 @@ const EMPTY: Partial<ChangeRequestDto> = {
 export function ChangesPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const demoMode = !isAuthenticated();
 
   const [tab, setTab] = useState<TabId>('register');
-  const [items, setItems] = useState<ChangeRequestDto[]>([]);
+  const [apiItems, setItems] = useState<ChangeRequestDto[]>([]);
+  // DD-71: include intake-promoted change requests in the visible register.
+  const promotedChanges = usePromoted('CHANGE').map(toChangeRequestDto);
+  const items = useMemo(() => [...promotedChanges, ...apiItems], [promotedChanges, apiItems]);
+  const changeProv = usePromotedProvenance('CHANGE');
   const [loading, setLoading] = useState(false);
   const [analytics, setAnalytics] = useState<ChangeAnalyticsDto | null>(null);
 
@@ -183,7 +192,7 @@ export function ChangesPage() {
   // Columns for register
   const cols: Column<ChangeRequestDto>[] = [
     { header: t('changeFldCode'),   cell: c => <span className="mono" style={{ fontWeight: 600 }}>{c.changeCode ?? '—'}</span>, width: '130px' },
-    { header: t('colTitle'),        cell: c => <div style={{ fontWeight: 600 }}>{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}</div> },
+    { header: t('colTitle'),        cell: c => <div style={{ fontWeight: 600 }}>{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{changeProv.has(c.id) && <PromotedBadge sourceReferenceCode={changeProv.get(c.id)!} />}</div> },
     { header: t('changeFldType'),   cell: c => <Badge tone={TYPE_TONE[c.changeType] ?? 'neutral'}>{c.changeType}</Badge>, width: '120px' },
     { header: t('changeFldRisk'),   cell: c => c.riskLevel ? <Badge tone={RISK_TONE[c.riskLevel] ?? 'neutral'} dot>{c.riskLevel}</Badge> : '—', width: '110px' },
     { header: t('colStatus'),       cell: c => <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>, width: '170px' },
@@ -212,7 +221,9 @@ export function ChangesPage() {
               onPdf={() => reportingApi.riskRegisterPdf(lang)}
               onXlsx={() => reportingApi.riskRegisterXlsx()}
             />
-            <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('changeNew')}</Button>
+            {/* DD-76: route new change requests through Services Center so the
+                risk-assessment fields (DD-70) get filled and a CAB gate is computed. */}
+            <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/change_request')}>{t('changeNew')}</Button>
           </>
         }
       />

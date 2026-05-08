@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertOctagon, Flame, Timer, CheckCircle2, Filter, Download, Plus, BarChart3, Lightbulb,
   Activity, FileText, AlertTriangle, ShieldCheck, RefreshCw, ArrowRight, Send, Archive, Scroll,
@@ -20,12 +21,17 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, SEVERITY_TONE, statusLabel, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { LivePulse } from '../../components/ui/LivePulse';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type RegulatoryTemplate, type SaudiRegulator } from '../../lib/api';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toIncidentDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { INCIDENT_ANCHORS } from '../../lib/moduleAnchors';
@@ -65,6 +71,7 @@ function incToReq(i: IncidentDto): IncidentRequest {
 export function IncidentsPage() {
   const { t } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>('overview');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<IncidentDto | null>(null);
@@ -75,10 +82,18 @@ export function IncidentsPage() {
 
   const incidents = useApiList<IncidentDto>(() => incidentApi.list(0, 100), INCIDENTS);
 
+  // DD-71: merge intake-promoted rows into the visible register so a
+  // triager who hits "Promote" on a security-event intake actually sees
+  // their new incident appear here. Promoted rows are display-only —
+  // edit / delete still operate on incidents.data.
+  const promotedRows = usePromoted('INCIDENT').map(toIncidentDto);
+  const allIncidents = useMemo(() => [...promotedRows, ...incidents.data], [promotedRows, incidents.data]);
+  const provenance = usePromotedProvenance('INCIDENT');
+
   // ── DD-47: filter modal state + predicate ─────────────────────────
   const [filterOpen, setFilterOpen] = useState(false);
   const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
-  const filteredIncidents = useMemo(() => incidents.data.filter(i => {
+  const filteredIncidents = useMemo(() => allIncidents.filter(i => {
     if (advFilters.severity && i.severity !== advFilters.severity) return false;
     if (advFilters.status   && i.status !== advFilters.status) return false;
     if (advFilters.category && i.category !== advFilters.category) return false;
@@ -86,7 +101,7 @@ export function IncidentsPage() {
     if (advFilters.discoveredAfter  && (i.discoveryDate ?? '') < advFilters.discoveredAfter) return false;
     if (advFilters.discoveredBefore && (i.discoveryDate ?? '') > advFilters.discoveredBefore) return false;
     return true;
-  }), [incidents.data, advFilters]);
+  }), [allIncidents, advFilters]);
   const incidentFilterFields: FilterField[] = [
     { key: 'severity', label: t('filterFieldSeverity'), kind: 'select',
       options: [{value:'LOW',label:'LOW'},{value:'MEDIUM',label:'MEDIUM'},{value:'HIGH',label:'HIGH'},{value:'CRITICAL',label:'CRITICAL'}] },
@@ -112,6 +127,31 @@ export function IncidentsPage() {
       setTemplatesOpen({ incident: r, templates });
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Could not load templates'); }
   }
+
+  // Sprint 4 follow-up — deep-link from the module-lifecycle dashboard CTA
+  // ("قوالب الجهات السعودية" / "Saudi templates") opens the templates modal
+  // automatically for the most-critical OPEN incident. Falls back gracefully
+  // when no candidate exists.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get('regulator') !== '1') return;
+    if (incidents.loading || allIncidents.length === 0) return;
+    const SEV_RANK: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+    const candidate = [...allIncidents]
+      .filter(i => i.status !== 'CLOSED' && i.status !== 'RESOLVED')
+      .sort((a, b) => (SEV_RANK[b.severity ?? ''] ?? 0) - (SEV_RANK[a.severity ?? ''] ?? 0))
+      [0];
+    if (!candidate) {
+      toast.info(t('incidentsRegulatorNoOpen'));
+    } else {
+      openTemplates(candidate);
+    }
+    // Strip the param so reloading doesn't re-trigger.
+    const next = new URLSearchParams(params);
+    next.delete('regulator');
+    setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, incidents.loading, allIncidents.length]);
   async function notifyRegulator(incidentId: number, regulator: SaudiRegulator) {
     try {
       await incidentApi.notifyRegulator(incidentId, regulator);
@@ -143,7 +183,7 @@ export function IncidentsPage() {
   ];
 
   const cols: Column<IncidentDto>[] = [
-    { header: t('incidentsTitleCol'),    cell: r => <span style={{ fontWeight: 600 }}>{r.title}</span> },
+    { header: t('incidentsTitleCol'),    cell: r => <span style={{ fontWeight: 600 }}>{r.title}{provenance.has(r.id) && <PromotedBadge sourceReferenceCode={provenance.get(r.id)!} />}</span> },
     { header: t('incidentsCategoryCol'), cell: r => <Badge tone="info">{r.category ?? '—'}</Badge> },
     { header: t('incidentsSeverityCol'), cell: r => <Badge tone={SEVERITY_TONE[r.severity] ?? 'neutral'} dot>{severityLabel(t, r.severity)}</Badge> },
     // NIST 800-61 phase column
@@ -184,9 +224,9 @@ export function IncidentsPage() {
     });
   }, [incidents.data, t]);
 
-  const open_count = incidents.data.filter(i => i.status !== 'CLOSED' && i.status !== 'RECOVERED').length;
-  const critical = incidents.data.filter(i => i.severity === 'CRITICAL' && i.status !== 'CLOSED').length;
-  const closed = incidents.data.filter(i => i.status === 'CLOSED').length;
+  const open_count = allIncidents.filter(i => i.status !== 'CLOSED' && i.status !== 'RECOVERED').length;
+  const critical = allIncidents.filter(i => i.severity === 'CRITICAL' && i.status !== 'CLOSED').length;
+  const closed = allIncidents.filter(i => i.status === 'CLOSED').length;
 
   async function onSubmit(values: IncidentRequest) {
     try {
@@ -219,6 +259,14 @@ export function IncidentsPage() {
 
   const isDemo = incidents.isDemo;
 
+  // Sprint 4 §2.7 — live incidents (NIST 800-61r2 phase machine + regulator notify)
+  const { pulse } = useLiveRefresh({
+    kinds: ['changed.incident', 'changed.cyber_incident'],
+    onRefresh: () => { incidents.reload(); },
+    waitMs: 600,
+    enabled: !isDemo,
+  });
+
   return (
     <Shell title={t('incidentsTitleHeader')} sub={t('incidentsSub')}>
       <PageHeader
@@ -226,6 +274,7 @@ export function IncidentsPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>
@@ -233,7 +282,9 @@ export function IncidentsPage() {
               downloadCsv(filteredIncidents as unknown as ExportRow[], stampFilename('incidents-register', 'csv'));
               toast.success(t('exportCsvDone'));
             }}>{t('actionExport')}</Button>
-            <Button variant="primary"   Icon={Plus} onClick={() => { setEditing(null); setOpen(true); }}>{t('actionNew')}</Button>
+            {/* DD-76: route every new submission through the Services Center intake form
+                so it gets a reference code, SLA, audit trail, and triage routing. */}
+            <Button variant="primary"   Icon={Plus} onClick={() => navigate('/intake/security_incident')}>{t('actionNew')}</Button>
           </>
         }
       />

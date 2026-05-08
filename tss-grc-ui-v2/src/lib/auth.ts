@@ -44,3 +44,22 @@ export function clearSession(): void {
 export function isAuthenticated(): boolean {
   return !!getAccessToken();
 }
+
+/**
+ * Role check used by UI gating. Matches Spring Security's `hasAnyRole(...)`
+ * semantics: the user has at least one of the roles in the supplied list.
+ *
+ * Spring Security and the auth backend embed the `ROLE_` prefix on
+ * persisted roles (e.g. `ROLE_PLATFORM_ADMIN`) and authority-style
+ * permissions without the prefix (e.g. `KB_WRITE`). To keep call-sites
+ * clean (`hasAnyRole('PLATFORM_ADMIN', 'KB_WRITE')`), we normalise both
+ * sides — strip the prefix from stored roles and from the supplied list,
+ * then compare the bare names.
+ */
+export function hasAnyRole(...roles: string[]): boolean {
+  const user = getUser();
+  if (!user || !Array.isArray(user.roles)) return false;
+  const strip = (s: string) => s.startsWith('ROLE_') ? s.slice(5) : s;
+  const wanted = roles.map(strip);
+  return user.roles.some(r => wanted.includes(strip(r)));
+}

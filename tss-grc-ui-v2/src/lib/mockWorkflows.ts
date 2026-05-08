@@ -2,6 +2,12 @@
 // Each module's Workflows tab feeds from a slice of this list — the stages
 // + escalation tiers + owner all reflect realistic GRC operational states.
 import type { WorkflowInstance } from './workflows';
+import { synthesiseAllBreaches } from './appetiteBreach';
+import { SAUDI_APPETITES } from './riskAppetiteSaudi';
+import { synthesiseAllEngagementWorkflows } from './auditEngagement';
+import { AUDIT_ENGAGEMENTS } from '../pages/compliance/mockCompliance';
+import { synthesiseStaleEvidenceWorkflows } from './ccm';
+import { synthesiseApprovalWorkflows } from './approvals';
 
 // ─── Risk Lifecycle (ISO 31000 / COSO ERM) ──────────────────────────────────
 const RISK_STAGES = ['IDENTIFIED', 'ASSESSED', 'TREATMENT_PLANNED', 'IMPLEMENTING', 'MONITORING', 'CLOSED'];
@@ -321,4 +327,46 @@ export const EVIDENCE_WORKFLOWS: WorkflowInstance[] = [
     dueDate: '2026-04-30', ageDays: 4, slaDays: 30, escalation: 'OVERDUE',
     reason: 'Certificate expired 4 days ago',
     nextStep: 'Re-attestation required' },
+];
+
+// Sprint 4 — synthesise WorkflowInstances from any Saudi appetite statement
+// currently outside its tolerance band. Lets the SLA engine treat appetite
+// breaches as first-class workflow citizens (countdown, escalation, Hijri).
+export const APPETITE_BREACH_WORKFLOWS: WorkflowInstance[] =
+  synthesiseAllBreaches(SAUDI_APPETITES).map(b => b.workflow);
+
+// Sprint 4 — synthesise WorkflowInstances from each open audit engagement's
+// current milestone (opening / fieldwork-end / closure) so audit deadlines
+// surface in the same SLA pulse as risk and privacy.
+export const AUDIT_ENGAGEMENT_WORKFLOWS: WorkflowInstance[] =
+  synthesiseAllEngagementWorkflows(AUDIT_ENGAGEMENTS);
+
+// Sprint 4 — CCM stale-evidence workflows. Every connector check whose
+// evidence has crossed the freshness window becomes a live workflow row.
+export const CCM_EVIDENCE_WORKFLOWS: WorkflowInstance[] =
+  synthesiseStaleEvidenceWorkflows();
+
+// Sprint 5 — every pending cross-module approval becomes a SLA-tracked
+// workflow row so the cross-module pulse sees them alongside everything
+// else and an approver who's running late surfaces in the escalation tier.
+export const APPROVAL_WORKFLOWS: WorkflowInstance[] =
+  synthesiseApprovalWorkflows();
+
+// ─── Cross-module aggregator ────────────────────────────────────────────────
+// Sprint 4 SLA-engine consumers (LiveSlaPulse, escalation-runtime telemetry)
+// iterate over every active instance regardless of source module.
+export const ALL_WORKFLOWS: WorkflowInstance[] = [
+  ...RISK_WORKFLOWS,
+  ...COMPLIANCE_WORKFLOWS,
+  ...CYBER_WORKFLOWS,
+  ...PRIVACY_WORKFLOWS,
+  ...BCM_WORKFLOWS,
+  ...TPRM_WORKFLOWS,
+  ...SCM_WORKFLOWS,
+  ...ETHICS_WORKFLOWS,
+  ...EVIDENCE_WORKFLOWS,
+  ...APPETITE_BREACH_WORKFLOWS,
+  ...AUDIT_ENGAGEMENT_WORKFLOWS,
+  ...CCM_EVIDENCE_WORKFLOWS,
+  ...APPROVAL_WORKFLOWS,
 ];

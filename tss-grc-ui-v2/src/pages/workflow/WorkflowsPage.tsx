@@ -13,6 +13,11 @@ import { isAuthenticated } from '../../lib/auth';
 import { WORKFLOW_DEFINITIONS, WORKFLOW_GRAPHS_BY_ID } from './mockWorkflowDefs';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
+import { LiveSlaPulse } from '../../components/workflows/LiveSlaPulse';
+import { ALL_WORKFLOWS } from '../../lib/mockWorkflows';
+import { ChainCatalog } from '../../components/workflows/ChainCatalog';
+import { WorkflowDesigner } from '../../components/workflows/WorkflowDesigner';
+import { Pencil, Eye } from 'lucide-react';
 
 /**
  * Workflows admin page — assessment §6.1 strategic flagship.
@@ -29,6 +34,7 @@ export function WorkflowsPage() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [graph, setGraph] = useState<WorkflowDefinitionGraph | null>(null);
   const [graphLoading, setGraphLoading] = useState(false);
+  const [designerMode, setDesignerMode] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -100,6 +106,13 @@ export function WorkflowsPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">Demo</Badge>}
+            {graph && (
+              <Button variant={designerMode ? 'primary' : 'secondary'}
+                Icon={designerMode ? Eye : Pencil}
+                onClick={() => setDesignerMode(m => !m)}>
+                {designerMode ? t('designerExitMode') : t('designerEnterMode')}
+              </Button>
+            )}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>
@@ -110,6 +123,19 @@ export function WorkflowsPage() {
           </>
         }
       />
+
+      {/* SLA runtime — Sprint 4. Re-derives every minute from real dueDate
+          across all modules. Saudi business calendar, Hijri tooltips. */}
+      <div style={{ marginBottom: 16 }}>
+        <LiveSlaPulse instances={ALL_WORKFLOWS} />
+      </div>
+
+      {/* Cross-module chain orchestration — Sprint 5. Declarative rules
+          fire downstream workflows / approvals / re-tests when a source
+          event happens (approval, breach, finding closure, etc.). */}
+      <div style={{ marginBottom: 16 }}>
+        <ChainCatalog />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16 }}>
         {/* Definition list */}
@@ -141,8 +167,10 @@ export function WorkflowsPage() {
               ))}
         </Card>
 
-        {/* Graph view */}
-        <Card padded>
+        {/* Graph view OR Designer (Sprint 5 visual editor) */}
+        {graph && designerMode
+          ? <WorkflowDesigner graph={graph} onClose={() => setDesignerMode(false)} />
+          : <Card padded>
           {graphLoading
             ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>Loading state machine…</div>
             : !graph
@@ -223,7 +251,7 @@ export function WorkflowsPage() {
                   </div>
                 </>
               )}
-        </Card>
+        </Card>}
       </div>
       <FilterModal open={filterOpen} fields={wfFilterFields} value={advFilters}
         onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}

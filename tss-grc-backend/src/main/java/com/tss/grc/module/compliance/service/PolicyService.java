@@ -3,8 +3,10 @@ package com.tss.grc.module.compliance.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.Policy;
 import com.tss.grc.module.compliance.repository.PolicyRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,12 @@ public class PolicyService {
 
     private final PolicyRepository repo;
 
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
+    private void emit(Policy p) {
+        if (bcast != null) bcast.entity(p.getOrganisationId(), "policy", p.getId(), p);
+    }
+
     @Transactional(readOnly = true)
     public Page<Policy> list(Pageable pageable) {
         return repo.findByOrganisationId(TenantContext.getCurrentTenant(), pageable);
@@ -40,7 +48,9 @@ public class PolicyService {
     @Transactional
     public Policy create(Policy req) {
         req.setOrganisationId(TenantContext.getCurrentTenant());
-        return repo.save(req);
+        Policy saved = repo.save(req);
+        emit(saved);
+        return saved;
     }
 
     @Transactional
@@ -55,7 +65,9 @@ public class PolicyService {
         p.setContentAr(req.getContentAr());
         p.setEffectiveFrom(req.getEffectiveFrom());
         p.setNextReviewDate(req.getNextReviewDate());
-        return repo.save(p);
+        Policy saved = repo.save(p);
+        emit(saved);
+        return saved;
     }
 
     @Transactional
@@ -63,6 +75,7 @@ public class PolicyService {
         Policy p = get(id);
         p.softDelete(null);
         repo.save(p);
+        emit(p);
     }
 
     // ── Lifecycle workflow actions ────────────────────────────────────────────
@@ -72,7 +85,9 @@ public class PolicyService {
         Policy p = get(id);
         require(p, "DRAFT", "REJECTED");
         p.setStatus("LEGAL_REVIEW");
-        return repo.save(p);
+        Policy saved = repo.save(p);
+        emit(saved);
+        return saved;
     }
 
     @Transactional
@@ -81,7 +96,9 @@ public class PolicyService {
         require(p, "LEGAL_REVIEW");
         p.setStatus("EXEC_APPROVAL");
         p.setLegalReviewedAt(LocalDateTime.now());
-        return repo.save(p);
+        Policy saved = repo.save(p);
+        emit(saved);
+        return saved;
     }
 
     /** EXEC_APPROVAL → PUBLISHED, sets publishedAt = now and effectiveFrom = today if blank, and a default 12-month review date. */
@@ -94,7 +111,9 @@ public class PolicyService {
         p.setPublishedAt(LocalDateTime.now());
         if (p.getEffectiveFrom() == null) p.setEffectiveFrom(LocalDate.now());
         if (p.getNextReviewDate() == null) p.setNextReviewDate(LocalDate.now().plusYears(1));
-        return repo.save(p);
+        Policy saved = repo.save(p);
+        emit(saved);
+        return saved;
     }
 
     /** Operator can manually mark a published policy review-due (typically a scheduler does this when nextReviewDate passes). */
@@ -103,7 +122,9 @@ public class PolicyService {
         Policy p = get(id);
         require(p, "PUBLISHED");
         p.setStatus("REVIEW_DUE");
-        return repo.save(p);
+        Policy saved = repo.save(p);
+        emit(saved);
+        return saved;
     }
 
     @Transactional
@@ -112,7 +133,9 @@ public class PolicyService {
         require(p, "PUBLISHED", "REVIEW_DUE");
         p.setStatus("RETIRED");
         p.setRetiredAt(LocalDateTime.now());
-        return repo.save(p);
+        Policy saved = repo.save(p);
+        emit(saved);
+        return saved;
     }
 
     @Transactional
@@ -122,7 +145,9 @@ public class PolicyService {
         p.setStatus("REJECTED");
         Object reason = body.get("reason");
         if (reason instanceof String s) p.setRejectionReason(s);
-        return repo.save(p);
+        Policy saved = repo.save(p);
+        emit(saved);
+        return saved;
     }
 
     private void require(Policy p, String... allowed) {

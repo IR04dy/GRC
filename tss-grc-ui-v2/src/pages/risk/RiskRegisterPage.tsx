@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,9 +17,14 @@ import { ExportMenu } from '../../components/ui/ExportMenu';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type KriBreachEventDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toRiskResponse, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { LivePulse } from '../../components/ui/LivePulse';
 import { NewRiskModal } from './NewRiskModal';
 import {
   MOCK_RISKS, KRIS, KRI_LATEST_BANDS, KRI_BREACHES, KRI_DASHBOARD_STATS,
@@ -29,6 +34,8 @@ import {
 import { TimeSeries } from '../../components/viz/TimeSeries';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
 import { RISK_WORKFLOWS } from '../../lib/mockWorkflows';
+import { AppetiteBreachFeed } from '../../components/risk/AppetiteBreachFeed';
+import { SAUDI_APPETITES } from '../../lib/riskAppetiteSaudi';
 import { RISK_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { RISK_ANCHORS } from '../../lib/moduleAnchors';
@@ -99,6 +106,7 @@ function ScorePill({ score }: { score: number }) {
 export function RiskRegisterPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as TabId | null) ?? 'register';
   const [tab, setTabState] = useState<TabId>(initialTab === 'register' || initialTab === 'heatmap' || initialTab === 'kri' || initialTab === 'appetite' ? initialTab : 'register');
@@ -114,7 +122,11 @@ export function RiskRegisterPage() {
       return next;
     });
   }
-  const [risks, setRisks] = useState<RiskResponse[]>([]);
+  const [apiRisks, setRisks] = useState<RiskResponse[]>([]);
+  // DD-71: include intake-promoted risks in the visible register.
+  const promotedRisks = usePromoted('RISK').map(toRiskResponse);
+  const risks = useMemo(() => [...promotedRisks, ...apiRisks], [promotedRisks, apiRisks]);
+  const provenance = usePromotedProvenance('RISK');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -152,9 +164,21 @@ export function RiskRegisterPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
+  // Sprint 4 §2.7 — live risk register. Subscribes to risk + treatment_plan
+  // transitions; bumps stats / heatmap / register through a single debounced
+  // reload.
+  const { pulse } = useLiveRefresh({
+    kinds: ['changed.risk', 'changed.treatment_plan', 'changed.kri_breach'],
+    onRefresh: () => { load(); },
+    waitMs: 600,
+    enabled: !demoMode,
+  });
+
   function startCreate() {
-    setEditingRisk(null);
-    setModalOpen(true);
+    // DD-76: route new risks through the Services Center intake form so
+    // they get a reference code, SLA, and triage routing instead of being
+    // created in-place on the register.
+    navigate('/intake/risk_issue');
   }
   function startEdit(risk: RiskResponse) {
     setEditingRisk(risk);
@@ -261,7 +285,7 @@ export function RiskRegisterPage() {
   // Columns for the Register table — DataTable, with Inherent → Residual + actions
   const cols: Column<RiskResponse>[] = [
     { header: t('riskColId'),    cell: r => r.riskCode, mono: true, width: '110px' },
-    { header: t('riskColName'),  cell: r => <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>{lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}</div> },
+    { header: t('riskColName'),  cell: r => <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>{lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}{provenance.has(r.id) && <PromotedBadge sourceReferenceCode={provenance.get(r.id)!} />}</div> },
     { header: t('riskColCategory'), cell: r => <Badge tone="info">{(lang === 'ar' && r.categoryNameAr) ? r.categoryNameAr : (r.categoryNameEn ?? r.categoryName ?? '—')}</Badge> },
     { header: t('riskColOwner'), cell: r => <span style={{ color: 'var(--ink-2)' }}>{r.ownerFullNameEn ?? r.ownerName ?? '—'}</span> },
     { header: t('riskColInherent'), cell: r => <ScorePill score={r.inherentScore} />, align: 'center', width: '90px' },
@@ -297,6 +321,7 @@ export function RiskRegisterPage() {
         actions={
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!demoMode && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('riskFilter')}{Object.values(riskFilterValues).filter(Boolean).length > 0 ? ` · ${Object.values(riskFilterValues).filter(Boolean).length}` : ''}
             </Button>
@@ -562,7 +587,23 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
   const toast = useToast();
 
   function applyMock() {
-    setItems(APPETITES); setBreaches(APPETITE_BREACHES); setStats(APPETITE_DASHBOARD_STATS);
+    // Sprint 4: extend demo with Saudi-aligned appetite library so the
+    // Appetite tab reflects the regulator-cited statements that listed/
+    // SAMA-supervised entities are expected to carry at board level.
+    const merged = [...APPETITES, ...SAUDI_APPETITES];
+    setItems(merged);
+    setBreaches(APPETITE_BREACHES);
+    // Recompute stats from the merged list so KPIs match what's rendered.
+    let withinTolerance = 0, exceeded = 0, critical = 0, noExposure = 0;
+    for (const s of merged) {
+      const v = s.currentExposure;
+      const upper = s.toleranceUpper;
+      if (v == null || upper == null) { noExposure++; continue; }
+      if (v <= upper) { withinTolerance++; continue; }
+      const pct = upper === 0 ? 100 : ((v - upper) / Math.max(1, upper)) * 100;
+      if (pct >= 25) critical++; else exceeded++;
+    }
+    setStats({ total: merged.length, withinTolerance, exceeded, critical, noExposure });
   }
 
   async function loadAll() {
@@ -622,6 +663,12 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
           Demo mode · sample appetite statements shown. Sign in for live exposure tracking.
         </div>
       )}
+      {/* Sprint 4 — Saudi-aligned breach feed driven by the SLA engine.
+          Surfaces every appetite statement currently outside its tolerance
+          band with regulator citation and a live SLA countdown. */}
+      <div style={{ marginBottom: 12 }}>
+        <AppetiteBreachFeed />
+      </div>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
         <Kpi Icon={Target}        label="Statements"        value={stats?.total ?? 0} tone="primary" />
         <Kpi Icon={ShieldCheck}   label="Within tolerance"  value={stats?.withinTolerance ?? 0} tone="success" />

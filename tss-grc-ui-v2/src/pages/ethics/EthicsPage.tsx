@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, AlertTriangle, Filter, Plus, RefreshCw, BarChart3, ListChecks,
   CheckCheck, X as XIcon, Send, Activity, EyeOff, Stamp, Flame,
@@ -35,6 +36,9 @@ import {
 import { ETHICS_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { ETHICS_ANCHORS as ETHICS_REG_ANCHORS } from '../../lib/moduleAnchors';
+import { usePromoted } from '../../lib/promotedRecords';
+import { toEthicsCaseDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { PromotedBadge } from '../../components/intake/PromotedBadge';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'aml' | 'analytics' | 'integrations';
 
@@ -86,10 +90,15 @@ const EMPTY: Partial<EthicsCaseDto> = {
 export function EthicsPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const demoMode = !isAuthenticated();
 
   const [tab, setTab] = useState<TabId>('register');
-  const [items, setItems] = useState<EthicsCaseDto[]>([]);
+  const [apiItems, setItems] = useState<EthicsCaseDto[]>([]);
+  // DD-71: include intake-promoted speakup / ethics-disclosure cases.
+  const promotedCases = usePromoted('ETHICS_CASE').map(toEthicsCaseDto);
+  const items = useMemo(() => [...promotedCases, ...apiItems], [promotedCases, apiItems]);
+  const ethicsProv = usePromotedProvenance('ETHICS_CASE');
   const [analytics, setAnalytics] = useState<EthicsAnalyticsDto | null>(null);
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -196,7 +205,7 @@ export function EthicsPage() {
     { header: t('ethicsFldCode'),     cell: c => <span className="mono" style={{ fontWeight: 600 }}>{c.caseCode ?? '—'}</span>, width: '130px' },
     { header: t('colTitle'),          cell: c => (
       <div>
-        <div style={{ fontWeight: 600 }}>{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}</div>
+        <div style={{ fontWeight: 600 }}>{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{ethicsProv.has(c.id) && <PromotedBadge sourceReferenceCode={ethicsProv.get(c.id)!} />}</div>
         {c.isAnonymous && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--ink-3)' }}><EyeOff size={10} /> {t('ethicsAnonymous')}</span>}
       </div>
     ) },
@@ -214,7 +223,7 @@ export function EthicsPage() {
   ];
 
   return (
-    <Shell title={t('modEthics')} sub="Anti-bribery · AML · Code of Conduct">
+    <Shell title={t('modEthics')} sub={t('ethicsShellSub')}>
       <PageHeader
         eyebrow={t('ethicsEyebrow')}
         title={t('ethicsTitle')}
@@ -224,7 +233,9 @@ export function EthicsPage() {
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={RefreshCw} onClick={load} disabled={loading}>{t('dashRefresh')}</Button>
             <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
-            <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('ethicsNew')}</Button>
+            {/* DD-76: route new ethics-case creation through Services Center
+                (employee-facing path) — anonymous reports go via /portal/speakup. */}
+            <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/ethics_disclosure')}>{t('ethicsNew')}</Button>
           </>
         }
       />
@@ -238,10 +249,10 @@ export function EthicsPage() {
 
       <OverviewStrip
         storageKey="overview.ethics"
-        processBarTitle="Ethics & Financial Crime — Processes & Lifecycles"
-        processBarSubtitle="ISO 37001 / ISO 37002 + Saudi Anti-Corruption Law + SAMA AML + FATF — every named process active in this domain."
+        processBarTitle={t('ethicsProcessBarTitle')}
+        processBarSubtitle={t('ethicsProcessBarSubtitle')}
         lifecycles={ETHICS_LIFECYCLES}
-        postureTitle="Regulator Posture · Ethics & Financial Crime"
+        postureTitle={t('ethicsPostureTitle')}
         anchors={ETHICS_REG_ANCHORS}
         lang={lang} />
 
@@ -283,7 +294,7 @@ export function EthicsPage() {
 
       <FormModal<Partial<EthicsCaseDto>>
         open={modalOpen}
-        title={editing ? `${t('editPrefix')} · ${editing.caseCode ?? editing.titleEn}` : t('ethicsNew')}
+        title={editing ? `${t('editPrefix')} · ${editing.caseCode ?? (lang === 'ar' && editing.titleAr ? editing.titleAr : editing.titleEn)}` : t('ethicsNew')}
         fields={FIELDS}
         initial={editing ? reqFromDto(editing) : EMPTY}
         onClose={() => { setModalOpen(false); setEditing(null); }}
@@ -293,7 +304,7 @@ export function EthicsPage() {
       <ConfirmDialog
         open={!!confirmDel} destructive busy={busy}
         title={t('ethicsConfirmDelete')}
-        message={confirmDel ? `${confirmDel.titleEn} ${t('confirmDeleteSuffix')}` : ''}
+        message={confirmDel ? `${(lang === 'ar' && confirmDel.titleAr ? confirmDel.titleAr : confirmDel.titleEn)} ${t('confirmDeleteSuffix')}` : ''}
         confirmLabel={t('deleteBtn')}
         onCancel={() => setConfirmDel(null)}
         onConfirm={executeDelete}
@@ -770,7 +781,7 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
 
       <FormModal<Partial<AmlAlertDto>>
         open={modalOpen}
-        title={editing ? `${t('editPrefix')} · ${editing.alertCode ?? editing.titleEn}` : t('amlNew')}
+        title={editing ? `${t('editPrefix')} · ${editing.alertCode ?? (lang === 'ar' && editing.titleAr ? editing.titleAr : editing.titleEn)}` : t('amlNew')}
         fields={FIELDS}
         initial={editing ? reqFromDto(editing) : AML_EMPTY}
         onClose={() => { setModalOpen(false); setEditing(null); }}
@@ -780,7 +791,7 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
       <ConfirmDialog
         open={!!confirmDel} destructive busy={busy}
         title={t('amlConfirmDelete')}
-        message={confirmDel ? `${confirmDel.titleEn} ${t('confirmDeleteSuffix')}` : ''}
+        message={confirmDel ? `${(lang === 'ar' && confirmDel.titleAr ? confirmDel.titleAr : confirmDel.titleEn)} ${t('confirmDeleteSuffix')}` : ''}
         confirmLabel={t('deleteBtn')}
         onCancel={() => setConfirmDel(null)}
         onConfirm={executeDelete}
@@ -1045,6 +1056,7 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   demoMode: boolean;
   ethicsFwOptions: { value: string; label: string }[];
 }) {
+  const navigate = useNavigate();
   const [items, setItems] = useState<DisclosureDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -1143,7 +1155,9 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
           {t('discDescription')}
         </div>
-        <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('discNew')}</Button>
+        {/* DD-79: route new disclosures through Services Center so they get
+            a reference code, SLA + Ethics-Cte triage like every other intake. */}
+        <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/ethics_disclosure')}>{t('discNew')}</Button>
       </div>
       <Card padded={false}>
         {loading ? <Loading /> :
@@ -1154,7 +1168,7 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
 
       <FormModal<Partial<DisclosureDto>>
         open={modalOpen}
-        title={editing ? `${t('editPrefix')} · ${editing.disclosureCode ?? editing.titleEn}` : t('discNew')}
+        title={editing ? `${t('editPrefix')} · ${editing.disclosureCode ?? (lang === 'ar' && editing.titleAr ? editing.titleAr : editing.titleEn)}` : t('discNew')}
         fields={FIELDS}
         initial={editing ? reqFromDto(editing) : DISCLOSURE_EMPTY}
         onClose={() => { setModalOpen(false); setEditing(null); }}
@@ -1164,7 +1178,7 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
       <ConfirmDialog
         open={!!confirmDel} destructive busy={busy}
         title={t('discConfirmDelete')}
-        message={confirmDel ? `${confirmDel.titleEn} ${t('confirmDeleteSuffix')}` : ''}
+        message={confirmDel ? `${(lang === 'ar' && confirmDel.titleAr ? confirmDel.titleAr : confirmDel.titleEn)} ${t('confirmDeleteSuffix')}` : ''}
         confirmLabel={t('deleteBtn')}
         onCancel={() => setConfirmDel(null)}
         onConfirm={executeDelete}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, Layers, RotateCcw, GripVertical, X as XIcon, Plus, Maximize2, Minimize2, FileText, Presentation } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import { Shell } from '../components/layout/Shell';
@@ -7,12 +7,28 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { ExportMenu } from '../components/ui/ExportMenu';
+import { LivePulse } from '../components/ui/LivePulse';
 import { type HeatCell } from '../components/viz/HeatMap';
 import { dashboardApi, reportingApi, ApiError, type DashboardStats } from '../lib/api';
 import { isAuthenticated } from '../lib/auth';
 import { useToast } from '../lib/toast';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 import { WIDGETS, WIDGETS_BY_ID, type WidgetSize } from './dashboard/widgets';
 import { useDashboardLayout } from './dashboard/useDashboardLayout';
+
+// All entity-change topics broadcast by lifecycle services that move values
+// inside the dashboard's stats response. Subscribing to all of them keeps
+// the KPIs and charts current. New lifecycle services should append here.
+const DASHBOARD_LIVE_TOPICS = [
+  'changed.risk',
+  'changed.treatment_plan',
+  'changed.incident',
+  'changed.vulnerability',
+  'changed.audit_finding',
+  'changed.dsr_case',
+  'changed.bcm_invocation',
+  'changed.compliance_assessment',
+];
 
 const FALLBACK_STATS: DashboardStats = {
   totalRisks: 42, criticalRisks: 7, highRisks: 12, mediumRisks: 18, lowRisks: 5,
@@ -36,7 +52,10 @@ export function DashboardPage() {
   const [customising, setCustomising] = useState(false);
   const layout = useDashboardLayout();
 
-  async function load() {
+  // Hold load() in a ref so the realtime subscription doesn't tear down on
+  // every render (load is recreated each render; the ref keeps it stable).
+  const loadRef = useRef<() => Promise<void>>(async () => {});
+  loadRef.current = async function load() {
     if (!isAuthenticated()) { setIsDemo(true); setLoading(false); return; }
     setLoading(true);
     try {
@@ -47,8 +66,20 @@ export function DashboardPage() {
       if (s) { setStats(s); setIsDemo(false); }
       if (Array.isArray(h)) setHeat(h as HeatCell[]);
     } finally { setLoading(false); }
-  }
+  };
+  async function load() { return loadRef.current(); }
+
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  // Sprint 4 §2.7 — keep dashboard data live. Whenever any lifecycle service
+  // broadcasts an entity change, we re-fetch stats. The 600ms debounce lets a
+  // bursty CAPA cascade or bulk import collapse into a single round-trip.
+  const { pulse, refreshing } = useLiveRefresh({
+    kinds: DASHBOARD_LIVE_TOPICS,
+    onRefresh: () => loadRef.current(),
+    waitMs: 600,
+    enabled: !isDemo,
+  });
 
   // Items currently in the layout, plus a list of widgets that can be added back
   const currentIds = new Set(layout.items.map(it => it.id));
@@ -63,8 +94,9 @@ export function DashboardPage() {
         actions={
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+            {!isDemo && <LivePulse pulse={pulse} enabled={!isDemo} />}
             {customising && <Badge tone="accent" dot>{t('dashCustomising')}</Badge>}
-            <Button variant="secondary" Icon={RefreshCw} onClick={load} disabled={loading}>{t('dashRefresh')}</Button>
+            <Button variant="secondary" Icon={RefreshCw} onClick={load} disabled={loading || refreshing}>{t('dashRefresh')}</Button>
             <Button variant={customising ? 'primary' : 'secondary'} Icon={Layers} onClick={() => setCustomising(c => !c)}>
               {customising ? t('dashDoneCustomising') : t('dashCustomise')}
             </Button>
