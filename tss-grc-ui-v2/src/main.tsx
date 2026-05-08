@@ -13,11 +13,16 @@ import './components/ui/sprint4-extras.css';
 
 import { App } from './App';
 import { applyToDom as applyWhiteLabel } from './lib/whiteLabel';
+import { bootOrgTheme } from './lib/orgTheme';
 
 // Apply white-label CSS variables before first paint so the topbar / buttons
 // render with the tenant's colours from the very first frame, not after a
 // flash of indigo. Idempotent — the WhiteLabelPage re-applies on save.
 applyWhiteLabel();
+// Then apply the active organisation's brand colour on top — overrides
+// the white-label defaults. Pulls last-applied theme from sessionStorage
+// so the colour survives reload during an org switch.
+bootOrgTheme();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element in index.html');

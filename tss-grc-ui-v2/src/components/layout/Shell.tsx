@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { CommandPalette } from '../search/CommandPalette';
+import { getOrgTheme } from '../../lib/orgTheme';
 
 export function Shell({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -29,8 +30,26 @@ export function Shell({ title, sub, children }: { title: string; sub?: string; c
   // Auto-close drawer on route change (mobile UX)
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
+  // Multi-tenant visual cue: a 3-px coloured stripe at the very top of the
+  // page, painted in the active organisation's primaryColor. Makes a tenant
+  // switch impossible to miss — TSS = navy, Aramco = teal, STC = green, etc.
+  const orgTheme = getOrgTheme();
   return (
     <div className="grc-shell">
+      {orgTheme?.primaryColor && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0,
+            height: 3,
+            background: orgTheme.primaryColor,
+            zIndex: 1200,
+            pointerEvents: 'none',
+          }}
+          aria-hidden="true"
+          title={orgTheme.organisationNameEn}
+        />
+      )}
       <Sidebar open={sidebarOpen} />
       {sidebarOpen && (
         <div className="sb-backdrop" onClick={() => setSidebarOpen(false)} />

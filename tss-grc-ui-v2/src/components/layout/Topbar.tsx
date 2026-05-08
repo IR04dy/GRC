@@ -3,6 +3,7 @@ import { Search, Bell, Languages, LogOut, Sun, Moon, Monitor, Building2, Check, 
 import { useI18n } from '../../lib/i18n';
 import { getUser, clearSession, updateAccessTokenAndOrg } from '../../lib/auth';
 import { logout, platformApi, ApiError, type OrganisationView } from '../../lib/api';
+import { setOrgTheme, getOrgTheme, clearOrgTheme } from '../../lib/orgTheme';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { useTheme, type ThemeMode } from '../../lib/theme';
@@ -21,6 +22,7 @@ export function Topbar({ title, sub, onOpenPalette, onToggleSidebar }: { title: 
 
   async function handleLogout() {
     await logout().catch(() => clearSession());
+    clearOrgTheme();
     navigate('/login', { replace: true });
   }
 
@@ -179,8 +181,25 @@ function OrgSwitcher() {
     if (!user) return;
     (async () => {
       setLoading(true);
-      try { setOrgs(await platformApi.accessibleOrgs()); }
-      catch { /* not signed in or backend down — silent */ }
+      try {
+        const list = await platformApi.accessibleOrgs();
+        setOrgs(list);
+        // Persist theme for the currently-active org so the next reload
+        // (and bootOrgTheme on cold start) picks up the right brand colour.
+        // Skip if already cached for the same org — avoids redundant CSS
+        // var writes on every render.
+        const cur = list.find(o => o.isCurrent);
+        const cached = getOrgTheme();
+        if (cur?.primaryColor && cur.id !== cached?.organisationId) {
+          setOrgTheme({
+            primaryColor: cur.primaryColor,
+            organisationId: cur.id,
+            organisationNameEn: cur.nameEn,
+            organisationNameAr: cur.nameAr,
+            shortCode: cur.shortCode,
+          });
+        }
+      } catch { /* not signed in or backend down — silent */ }
       finally { setLoading(false); }
     })();
   }, [user?.organisationId]);
@@ -205,6 +224,18 @@ function OrgSwitcher() {
     try {
       const r = await platformApi.switchOrg(o.id);
       updateAccessTokenAndOrg(r.accessToken, r.organisationId);
+      // Apply the new tenant's theme BEFORE reload so the colour shift is
+      // visible during the page transition (no flash of old colours).
+      // Falls back to the old palette if the org has no primaryColor set.
+      if (o.primaryColor) {
+        setOrgTheme({
+          primaryColor: o.primaryColor,
+          organisationId: o.id,
+          organisationNameEn: o.nameEn,
+          organisationNameAr: o.nameAr,
+          shortCode: o.shortCode,
+        });
+      }
       toast.success(`${t('orgSwitched')} → ${lang === 'ar' && o.nameAr ? o.nameAr : o.nameEn}`);
       // Hard reload so all data fetched on mount re-runs against the new tenant
       window.location.reload();
@@ -217,6 +248,11 @@ function OrgSwitcher() {
     ? (lang === 'ar' && current.nameAr ? current.nameAr : current.shortCode)
     : (loading ? '…' : '—');
 
+  // Visual cue for the active tenant — a small filled swatch in the org's
+  // primaryColor so users notice they're in the right tenant at a glance.
+  // This is the secondary signal next to the global tenant stripe rendered
+  // by Shell.tsx.
+  const swatchColor = current?.primaryColor;
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
@@ -226,9 +262,21 @@ function OrgSwitcher() {
         title={t('orgSwitcher')}
         aria-haspopup="menu"
         aria-expanded={open}
-        style={{ cursor: canSwitch ? 'pointer' : 'default', opacity: canSwitch ? 1 : 0.7 }}
+        style={{
+          cursor: canSwitch ? 'pointer' : 'default',
+          opacity: canSwitch ? 1 : 0.7,
+          // Tint the border so the active tenant's colour is visible
+          // even when the dropdown is closed.
+          borderColor: swatchColor ?? undefined,
+        }}
       >
-        <Building2 size={14} />
+        {swatchColor
+          ? <span style={{
+              width: 12, height: 12, borderRadius: '50%',
+              background: swatchColor, display: 'inline-block', flexShrink: 0,
+              boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+            }} aria-hidden="true" />
+          : <Building2 size={14} />}
         <span style={{ fontWeight: 600 }}>{label}</span>
         {canSwitch && <ChevronDown size={12} />}
       </button>
@@ -258,7 +306,13 @@ function OrgSwitcher() {
                   borderRadius: 'var(--r-sm)',
                   color: 'var(--ink-1)', textAlign: lang === 'ar' ? 'right' : 'left',
                 }}>
-                <Building2 size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
+                {o.primaryColor
+                  ? <span style={{
+                      width: 14, height: 14, borderRadius: '50%',
+                      background: o.primaryColor, flexShrink: 0,
+                      boxShadow: '0 0 0 1px rgba(0,0,0,0.08)',
+                    }} aria-hidden="true" />
+                  : <Building2 size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />}
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>{name}</span>
                   <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)' }} className="mono">
