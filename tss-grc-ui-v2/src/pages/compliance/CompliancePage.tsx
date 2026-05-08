@@ -954,7 +954,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
   const fullPct = total > 0 ? Math.round(((activeCov?.full ?? 0) / total) * 100) : 0;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+    <div className="rail-layout">
       {/* Left rail — frameworks grouped by family */}
       <Card title={t('complianceTabFrameworks')} Icon={BookOpenCheck} padded={false}>
         <div style={{ maxHeight: 540, overflowY: 'auto' }}>

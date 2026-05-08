@@ -78,6 +78,36 @@
   }
 }
 
+/* ─── KPI grids: force auto-fit on mobile, override inline `repeat(N, …)` ─
+ *
+ * Many pages set inline `style={{ gridTemplateColumns: 'repeat(5, …)' }}`
+ * which overflows below 700px. CSS !important wins over inline styles
+ * (which don't carry !important themselves), so this single rule un-breaks
+ * every page that uses .kpi-grid without per-file edits.
+ */
+@media (max-width: 767px) {
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+  }
+}
+@media (max-width: 479px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* ─── Rail layouts (left list + main panel) stack on mobile ───────── */
+.rail-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+}
+@media (max-width: 767px) {
+  .rail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ─── Tap targets ≥ 44×44 on touch devices ─────────────────────────── */
 @media (pointer: coarse) {
   button, .btn, [role="button"] {

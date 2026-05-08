@@ -402,7 +402,7 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
   const next = nextStatus(c);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+    <div className="rail-layout">
       <Card title={t('ethicsCaseList')} Icon={ListChecks} padded={false}>
         <div style={{ maxHeight: 460, overflowY: 'auto' }}>
           {items.map(it => (
