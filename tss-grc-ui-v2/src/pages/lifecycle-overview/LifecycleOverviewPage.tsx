@@ -26,7 +26,7 @@ import { loadVulns, loadAssets, subscribeCyber, aggregateCyber } from '../../lib
  * read-only at this level (with click-through to the workspace).
  */
 export function LifecycleOverviewPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   // Aggregate everything reactively.
   const [_t, setTick] = useState(0);

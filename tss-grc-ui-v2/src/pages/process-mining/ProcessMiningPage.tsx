@@ -25,7 +25,7 @@ import { ESCALATION_TONE } from '../../lib/workflows';
  *   4. Top stuck instances — actionable list
  */
 export function ProcessMiningPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   const kpis = useMemo(() => aggregateProcessKpis(), []);
   const leaderboard = useMemo(() => workflowLeaderboard(), []);

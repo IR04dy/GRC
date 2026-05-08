@@ -23,7 +23,7 @@ import { getUser } from '../../lib/auth';
  * page will embed — Evidence, DSR, breach attachments, vendor SOC 2.
  */
 export function FileUploadDemoPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const user = getUser();
   const userRef = user?.username ?? 'demo@tss.sa';
   const [stats, setStats] = useState(() => aggregateFiles());

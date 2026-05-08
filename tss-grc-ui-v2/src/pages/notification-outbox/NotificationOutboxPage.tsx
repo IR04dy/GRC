@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Send, Mail, MessageSquare, AlertOctagon, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertOctagon, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -13,7 +13,7 @@ import {
   loadNotifs, subscribeNotifs, aggregateNotifs,
   markSent, markFailed, cancelNotification,
   CHANNEL_LABEL, STATUS_LABEL, STATUS_TONE,
-  type NotificationItem, type NotifStatus,
+  type NotificationItem,
 } from '../../lib/notificationOutbox';
 import { getUser } from '../../lib/userDirectory';
 
@@ -102,7 +102,7 @@ export function NotificationOutboxPage() {
   );
 }
 
-function NotifRow({ n, lang, t, onSend, onFail, onCancel }: {
+function NotifRow({ n, lang, t, onSend, onFail: _onFail, onCancel }: {
   n: NotificationItem;
   lang: 'en' | 'ar';
   t: (k: string) => string;

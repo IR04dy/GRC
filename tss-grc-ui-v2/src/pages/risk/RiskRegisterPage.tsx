@@ -29,7 +29,7 @@ import { NewRiskModal } from './NewRiskModal';
 import {
   MOCK_RISKS, KRIS, KRI_LATEST_BANDS, KRI_BREACHES, KRI_DASHBOARD_STATS,
   KRI_TRENDS_BY_ID,
-  APPETITES, APPETITE_BREACHES, APPETITE_DASHBOARD_STATS,
+  APPETITES, APPETITE_BREACHES,
 } from './mockRisks';
 import { TimeSeries } from '../../components/viz/TimeSeries';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';

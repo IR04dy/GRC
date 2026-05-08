@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import {
-  Database, Cloud, Calendar, ShieldCheck, AlertOctagon, RefreshCw, Clock, Lock,
+  Database, Cloud, Calendar, ShieldCheck, Clock, Lock,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';

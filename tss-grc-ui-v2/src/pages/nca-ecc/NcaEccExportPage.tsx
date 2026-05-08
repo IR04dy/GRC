@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Shield, Printer, Download, ChevronDown, ChevronRight, Landmark, FileText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';

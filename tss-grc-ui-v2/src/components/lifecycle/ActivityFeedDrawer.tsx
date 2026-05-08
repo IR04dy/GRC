@@ -79,7 +79,7 @@ export function ActivityFeedDrawer({ open, onClose, entityType, entityId }: {
   );
 }
 
-function FeedRow({ event, isFirst, isLast, t, lang }: {
+function FeedRow({ event, isFirst: _isFirst, isLast, t, lang }: {
   event: ActivityEvent;
   isFirst: boolean;
   isLast: boolean;

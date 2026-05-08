@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Stamp, Calendar, FileText, ClipboardCheck, AlertTriangle,
   CheckCircle2, Download, ThumbsUp, Send, Eye, BookOpen,
-  Layers, Wrench, Activity, AlertOctagon, Clock,
+  Wrench, Activity, AlertOctagon,
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
 import { printPacket, textToSection } from '../../lib/packetPrint';
@@ -16,9 +16,9 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   loadAnnualPlan, transitionPlan,
-  loadWorkingPapers, workingPapersForEngagement, transitionWorkingPaper,
+  workingPapersForEngagement, transitionWorkingPaper,
   loadFindings, findingsForEngagement, transitionFinding,
-  loadCapas, capasForFinding, transitionCapa,
+  loadCapas, transitionCapa,
   subscribeAuditLifecycle, aggregateAuditLifecycle,
   buildAcPacket,
   pickEngagementByCode,
@@ -585,7 +585,7 @@ function CapaTab({ findings, allCapas, onTransition }: {
 
 // ─── AC packet tab ─────────────────────────────────────────────────────────
 
-function PacketTab({ plan, findings, capas, stats }: { plan: AnnualPlan; findings: Finding[]; capas: CapaTask[]; stats: ReturnType<typeof aggregateAuditLifecycle> }) {
+function PacketTab({ plan, findings, capas: _capas, stats }: { plan: AnnualPlan; findings: Finding[]; capas: CapaTask[]; stats: ReturnType<typeof aggregateAuditLifecycle> }) {
   const { t, lang } = useI18n();
   const sevCounts = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'OBSERVATION'].map(s => ({
     sev: s,

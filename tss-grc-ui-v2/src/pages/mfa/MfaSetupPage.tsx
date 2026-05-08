@@ -33,7 +33,7 @@ import { getUser } from '../../lib/auth';
  * Already-enrolled users see status + can re-set or unenrol.
  */
 export function MfaSetupPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const user = getUser();
   const userRef = user?.username ?? 'demo@tss.sa';

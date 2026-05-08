@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ShieldCheck, AlertTriangle, Activity, Server, Bug, Radio,
   Download, Send, ThumbsUp, CheckCircle2, ArrowUpRight, Clock,
-  AlertOctagon, FileText, Wrench,
+  AlertOctagon, Wrench,
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
 import { printPacket, textToSection } from '../../lib/packetPrint';

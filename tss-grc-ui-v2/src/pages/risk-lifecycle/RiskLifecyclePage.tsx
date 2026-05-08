@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ShieldCheck, TrendingUp, Calculator, GitBranch,
-  CheckCircle2, AlertOctagon, Activity, FileText, ArrowUpRight,
+  CheckCircle2, AlertOctagon, Activity, ArrowUpRight,
   Send, ThumbsUp, ThumbsDown, RefreshCw, Sigma,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -16,21 +16,21 @@ import { useToast } from '../../lib/toast';
 import { MOCK_RISKS } from '../risk/mockRisks';
 import {
   loadTreatmentPlans, plansForRisk, saveTreatmentPlan, transitionPlan, updateActionStatus,
-  loadBreachEvents, breachesForRisk, fireBreach, escalateBreach, resolveBreach,
-  loadAcceptances, acceptancesForRisk, saveAcceptance, transitionAcceptance,
+  breachesForRisk, fireBreach, escalateBreach, resolveBreach,
+  acceptancesForRisk, saveAcceptance, transitionAcceptance,
   controlsForRisk, runMonteCarlo, aggregateRiskLifecycle,
-  subscribeRiskLifecycle, createTreatmentPlan, addPlanAction,
+  subscribeRiskLifecycle,
   TREATMENT_STATUS_LABEL, TREATMENT_STATUS_TONE, STRATEGY_LABEL,
   ACCEPTANCE_STATUS_LABEL, ACCEPTANCE_STATUS_TONE,
   BREACH_STATUS_LABEL, BREACH_STATUS_TONE,
   type TreatmentPlan, type AcceptanceRequest, type KriBreachEvent,
-  type MonteCarloResult, type TreatmentStrategy, type TreatmentStatus,
+  type MonteCarloResult, type TreatmentStatus,
 } from '../../lib/riskLifecycle';
 import { formatHijri } from '../../lib/sla';
-import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
+import { LifecyclePipeline, type PipelineStage, type PipelineCard } from '../../components/lifecycle/LifecyclePipeline';
 import { Activity as ActivityIcon, Send as SendIcon, ThumbsUp as ThumbsUpIcon, Play, CheckCircle2 as CheckCircle2Icon, ThumbsDown as ThumbsDownIcon, FileText as FileTextIcon } from 'lucide-react';
 import { ActivityFeedDrawer } from '../../components/lifecycle/ActivityFeedDrawer';
-import { logTransition, logCreated } from '../../lib/activityLog';
+import { logTransition } from '../../lib/activityLog';
 import { notify } from '../../lib/notificationOutbox';
 import { lookupUserByName } from '../../lib/userDirectory';
 
@@ -286,7 +286,7 @@ export function RiskLifecyclePage() {
 // ─── Monte Carlo card ───────────────────────────────────────────────────────
 
 function MonteCarloCard({ riskId, risk }: { riskId: number; risk: any }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   // Default distribution — derived from inherent likelihood + impact (mocking SAR scale).
   const baseLikelihood = (risk.inherentLikelihood ?? 3) / 5;
   const baseImpact = (risk.inherentImpact ?? 3) * 1_000_000; // SAR scale
@@ -585,7 +585,7 @@ function TreatmentCard({ riskId: _riskId, plans, onCreate, onSubmit, onApprove, 
 
 // ─── Acceptance card ────────────────────────────────────────────────────────
 
-function AcceptanceCard({ riskId: _riskId, risk, accepts, onCreate, onSubmitToCro, onPromoteToBoard, onApprove }: {
+function AcceptanceCard({ riskId: _riskId, risk: _risk, accepts, onCreate, onSubmitToCro, onPromoteToBoard, onApprove }: {
   riskId: number;
   risk: any;
   accepts: AcceptanceRequest[];

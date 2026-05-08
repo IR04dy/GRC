@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import {
-  Link2, Filter, Globe, Landmark, FileText, Layers, ChevronRight, BookCopy,
+  Link2, Filter, Globe, Landmark, Layers, ChevronRight, BookCopy,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';

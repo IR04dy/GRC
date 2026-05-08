@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Fingerprint, Files, ShieldAlert, Globe, UserCheck, Clock,
+  Files, ShieldAlert, Globe, UserCheck, Clock,
   AlertTriangle, CheckCircle2, FileText, Activity,
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';

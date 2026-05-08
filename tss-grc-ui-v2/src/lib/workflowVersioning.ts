@@ -13,7 +13,6 @@
 
 import { WORKFLOW_DEFINITIONS } from '../pages/workflow/mockWorkflowDefs';
 import { ALL_WORKFLOWS } from './mockWorkflows';
-import type { WorkflowInstance } from './workflows';
 import type { WorkflowDefinitionDto } from './api';
 
 export type VersionStatus = 'DRAFT' | 'PUBLISHED' | 'DEPRECATED' | 'ARCHIVED';

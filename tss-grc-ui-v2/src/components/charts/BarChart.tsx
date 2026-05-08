@@ -24,8 +24,10 @@ export interface BarChartProps<T> {
   formatY?: (v: number) => string;
   /** Show legend. */
   legend?: boolean;
-  /** Click handler — fires with the data point + series key. */
-  onPointClick?: (datum: T, seriesKey: string) => void;
+  /** Click handler — fires with the data point + series key. seriesKey
+   *  matches the underlying _recharts-bundle contract, where some chart
+   *  variants (e.g. plain line, no series) fire without a key. */
+  onPointClick?: (datum: T, seriesKey?: string) => void;
   height?: number;
   style?: CSSProperties;
   /** Empty-state placeholder. */

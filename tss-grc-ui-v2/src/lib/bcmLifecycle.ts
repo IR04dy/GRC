@@ -26,7 +26,7 @@
 //      reporting packet with tier coverage, RTO compliance %, drill
 //      cadence and outstanding remediation.
 
-import { BCM_PLANS, BCM_PROCESSES, BCM_BIA, BCM_EXERCISES } from '../pages/bcm/mockBcm';
+import { BCM_PLANS, BCM_PROCESSES } from '../pages/bcm/mockBcm';
 import type { BcmPlanDto, BcmProcessDto, BcmBiaDto } from './api';
 import {
   BCM_INVOCATION_ADAPTER,

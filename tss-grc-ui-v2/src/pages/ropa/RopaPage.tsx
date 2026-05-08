@@ -95,7 +95,6 @@ export function RopaPage() {
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {CONSENT_SUMMARIES.map(c => {
                   const ropa = ROPA_ENTRIES.find(r => r.code === c.ropaCode);
-                  const total = c.active + c.withdrawn + c.expired;
                   return (
                     <div key={c.ropaCode} style={{
                       padding: '12px 0', borderBottom: '1px dashed var(--border)',

@@ -17,7 +17,7 @@ export interface LineChartProps<T> {
   xKey: keyof T & string;
   formatY?: (v: number) => string;
   legend?: boolean;
-  onPointClick?: (datum: T, seriesKey: string) => void;
+  onPointClick?: (datum: T, seriesKey?: string) => void;
   height?: number;
   style?: CSSProperties;
   emptyState?: React.ReactNode;

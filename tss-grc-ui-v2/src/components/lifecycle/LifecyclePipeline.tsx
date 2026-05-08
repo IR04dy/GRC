@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRight, Clock, AlertTriangle, Search, type LucideIcon } from 'lucide-react';
 import { Badge, type BadgeTone } from '../ui/Badge';
 import { useI18n } from '../../lib/i18n';

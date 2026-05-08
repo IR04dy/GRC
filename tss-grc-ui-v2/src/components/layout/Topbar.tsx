@@ -14,7 +14,6 @@ import { getUser as getDirUser } from '../../lib/userDirectory';
 export function Topbar({ title, sub, onOpenPalette, onToggleSidebar }: { title: string; sub?: string; onOpenPalette?: () => void; onToggleSidebar?: () => void }) {
   const { t, lang, toggleLang } = useI18n();
   const navigate = useNavigate();
-  const toast = useToast();
   const user = getUser();
   const initials = user?.username
     ? user.username.slice(0, 2).toUpperCase()

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Inbox, ShieldCheck, Clock, AlertTriangle, AlertOctagon, Flame, Landmark,
+  Inbox, ShieldCheck, Clock, AlertTriangle, Flame, Landmark,
   Check, X as XIcon, UserPlus, ArrowRight,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';

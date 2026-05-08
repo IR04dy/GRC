@@ -39,7 +39,7 @@ type EsgTab = 'overview' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'survey';
  *   • Survey     — Vendor ESG survey for Scope 3 supplier engagement
  */
 export function EsgPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const [tab, setTab] = useState<EsgTab>('overview');
 
@@ -147,7 +147,7 @@ export function EsgPage() {
 // ─── Overview tab ──────────────────────────────────────────────────────────
 
 function OverviewTab() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const maxTotal = Math.max(...EMISSIONS_TIMESERIES.map(r => r.scope1 + r.scope2 + r.scope3));
 
   return (

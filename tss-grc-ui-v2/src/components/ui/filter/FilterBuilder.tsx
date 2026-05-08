@@ -32,7 +32,7 @@ const newId = () => `f-${++nextId}`;
  * controlled externally (URL sync, reset to default, etc.).
  */
 export function FilterBuilder({ fields, group, onChange }: FilterBuilderProps) {
-  const { t, lang } = useI18n();
+  const { lang } = useI18n();
 
   const addCondition = (parent: FilterGroup) => {
     const f = fields[0];

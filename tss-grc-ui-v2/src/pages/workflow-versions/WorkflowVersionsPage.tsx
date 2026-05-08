@@ -184,7 +184,7 @@ function FamilyDetail({ family, t, lang }: { family: WorkflowFamily; t: (k: stri
   );
 }
 
-function ChangeRow({ change, lang, t }: { change: VersionChange; lang: 'en' | 'ar'; t: (k: string) => string }) {
+function ChangeRow({ change, lang, t: _t }: { change: VersionChange; lang: 'en' | 'ar'; t: (k: string) => string }) {
   const tone = change.kind === 'SLA_TIGHTENED' ? 'warning'
     : change.kind === 'SLA_RELAXED' ? 'info'
     : change.kind === 'STATE_REMOVED' || change.kind === 'TRANSITION_REMOVED' ? 'danger'
