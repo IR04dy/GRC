@@ -31,8 +31,32 @@ export interface WhiteLabelConfig {
   updatedAt?: string;
 }
 
-const KEY = 'grc.whitelabel.v1';
+// White-label config is scoped per organisation so an admin customising
+// Aramco's branding doesn't change what STC Bank sees. The storage key
+// is `grc.whitelabel.v2.org<id>` for the active tenant; pre-login or
+// when no org is selected, falls through to "global" (the login page,
+// which has no tenant context yet).
+//
+// `grc.whitelabel.v1` was the legacy global key — when present we migrate
+// it once to the current org's slot so an admin who previously customised
+// (back when whitelabel was global) doesn't lose their settings.
+const LEGACY_KEY = 'grc.whitelabel.v1';
+const KEY_PREFIX = 'grc.whitelabel.v2.org';
 const EVENT = 'grc.whitelabel.changed';
+
+function currentOrgId(): string {
+  if (typeof window === 'undefined') return 'global';
+  try {
+    const raw = window.sessionStorage.getItem('grc.user');
+    if (!raw) return 'global';
+    const u = JSON.parse(raw);
+    return u?.organisationId != null ? String(u.organisationId) : 'global';
+  } catch { return 'global'; }
+}
+
+function storageKey(): string {
+  return `${KEY_PREFIX}${currentOrgId()}`;
+}
 
 const DEFAULT_CONFIG: WhiteLabelConfig = {
   organisationNameEn: 'TSS GRC Platform',
@@ -45,8 +69,20 @@ const DEFAULT_CONFIG: WhiteLabelConfig = {
 
 export function loadWhiteLabel(): WhiteLabelConfig {
   if (typeof window === 'undefined') return DEFAULT_CONFIG;
+  const key = storageKey();
   try {
-    const raw = window.localStorage.getItem(KEY);
+    let raw = window.localStorage.getItem(key);
+    // One-shot migration from the legacy global key. We only do this for
+    // the first authenticated tenant that asks; the second tenant gets a
+    // clean default config.
+    if (!raw) {
+      const legacy = window.localStorage.getItem(LEGACY_KEY);
+      if (legacy && currentOrgId() !== 'global') {
+        window.localStorage.setItem(key, legacy);
+        window.localStorage.removeItem(LEGACY_KEY);
+        raw = legacy;
+      }
+    }
     if (!raw) return DEFAULT_CONFIG;
     const parsed = JSON.parse(raw);
     return { ...DEFAULT_CONFIG, ...parsed };
@@ -59,14 +95,14 @@ export function saveWhiteLabel(config: Partial<WhiteLabelConfig>): WhiteLabelCon
     ...current, ...config,
     updatedAt: new Date().toISOString(),
   };
-  try { window.localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  try { window.localStorage.setItem(storageKey(), JSON.stringify(next)); } catch { /* ignore */ }
   applyToDom(next);
   window.dispatchEvent(new CustomEvent(EVENT));
   return next;
 }
 
 export function resetWhiteLabel(): void {
-  try { window.localStorage.removeItem(KEY); } catch { /* ignore */ }
+  try { window.localStorage.removeItem(storageKey()); } catch { /* ignore */ }
   applyToDom(DEFAULT_CONFIG);
   window.dispatchEvent(new CustomEvent(EVENT));
 }
@@ -74,7 +110,12 @@ export function resetWhiteLabel(): void {
 export function subscribeWhiteLabel(cb: () => void): () => void {
   const handler = () => cb();
   window.addEventListener(EVENT, handler);
-  const storageHandler = (e: StorageEvent) => { if (e.key === KEY) cb(); };
+  // localStorage event fires across tabs; only react to changes for the
+  // active tenant (and the legacy key during the migration window).
+  const storageHandler = (e: StorageEvent) => {
+    const key = storageKey();
+    if (e.key === key || e.key === LEGACY_KEY) cb();
+  };
   window.addEventListener('storage', storageHandler);
   return () => {
     window.removeEventListener(EVENT, handler);

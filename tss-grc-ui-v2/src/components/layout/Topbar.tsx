@@ -6,6 +6,7 @@ import { logout, platformApi, ApiError, type OrganisationView } from '../../lib/
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { useTheme, type ThemeMode } from '../../lib/theme';
+import { applyToDom as applyWhiteLabel } from '../../lib/whiteLabel';
 import { useToast } from '../../lib/toast';
 import { currentMode, MODE_LABEL, MODE_TONE, subscribeMode, type Mode } from '../../lib/productionMode';
 import { unreadInApp, subscribeNotifs, markRead } from '../../lib/notificationOutbox';
@@ -21,6 +22,11 @@ export function Topbar({ title, sub, onOpenPalette, onToggleSidebar }: { title: 
 
   async function handleLogout() {
     await logout().catch(() => clearSession());
+    // Re-apply white-label after the session is cleared. With no user
+    // in sessionStorage the storage key resolves to "global" → empty →
+    // DEFAULT_CONFIG → CSS variables snap back to the unbranded palette
+    // for the login page.
+    applyWhiteLabel();
     navigate('/login', { replace: true });
   }
 

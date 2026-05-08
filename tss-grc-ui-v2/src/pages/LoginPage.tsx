@@ -5,6 +5,7 @@ import { useI18n } from '../lib/i18n';
 import { login as apiLogin, ApiError } from '../lib/api';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { applyToDom as applyWhiteLabel } from '../lib/whiteLabel';
 
 const FRAMEWORKS = ['NCA ECC', 'SDAIA', 'PDPL', 'SAMA', 'ISO 27001', 'ISO 22301', 'ISO 31000', 'COSO ERM'];
 
@@ -22,6 +23,11 @@ export function LoginPage() {
     setError(null);
     try {
       await apiLogin(username.trim(), password);
+      // Re-apply white-label now that the user (and therefore the tenant
+      // scope key) is set in sessionStorage. Without this, the app
+      // navigates to /risk still wearing the default palette because
+      // applyWhiteLabel() at boot ran with no tenant context.
+      applyWhiteLabel();
       navigate('/risk', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
