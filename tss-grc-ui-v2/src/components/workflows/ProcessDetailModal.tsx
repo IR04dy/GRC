@@ -1,4 +1,4 @@
-import { Workflow, Play, ArrowRight, BookOpen, User, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Workflow, Plus, ArrowRight, BookOpen, User, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -38,23 +38,24 @@ export function ProcessDetailModal({ lc, onClose }: {
     ? (lang === 'ar' && lc.secondary.labelAr ? lc.secondary.labelAr : lc.secondary.label)
     : undefined;
 
+  /**
+   * Primary button — does what its LABEL says.
+   *
+   * `lc.primary.label` is always a navigation verb (e.g. "Open register",
+   * "KRI dashboard", "Pending approvals"), so the button needs to honour
+   * that. Earlier the priority order put intakeKind first which routed
+   * every pill to the same /intake/<kind> form regardless of the visible
+   * label — e.g. clicking "Lessons-Learned Capture" → SECURITY_INCIDENT
+   * intake form, which doesn't capture lessons at all. Fixed by checking
+   * primary.href first.
+   *
+   *   1) primary.onClick — host-wired legacy callback wins (rare)
+   *   2) primary.href    — deep-link to the right tab/view
+   *   3) intakeKind      — fallback if no href; spawn intake form
+   *   4) secondary.href  — last fallback
+   *   5) toast hint
+   */
   function startWorkflow() {
-    // Priority order:
-    //   1) Process has a registered intake-form kind → open the live form
-    //      at /intake/<kind-lowercase>. This is the canonical "Start" path:
-    //      the user lands on a fillable form that captures the new instance
-    //      and routes it through the intake substrate (DD-54..DD-58).
-    //   2) Host page wired its own onClick (legacy modal openers).
-    //   3) Process has a register href → navigate there. Most registers
-    //      have an in-page "New" button so this is a working path even
-    //      without a dedicated intake form.
-    //   4) Toast hint — process is genuinely catalog-only (no form, no
-    //      onClick, no href). Should be unreachable in practice.
-    if (lc.intakeKind) {
-      navigate(`/intake/${lc.intakeKind.toLowerCase()}`);
-      onClose();
-      return;
-    }
     if (lc.primary.onClick) {
       lc.primary.onClick();
       onClose();
@@ -62,6 +63,11 @@ export function ProcessDetailModal({ lc, onClose }: {
     }
     if (lc.primary.href) {
       navigate(lc.primary.href);
+      onClose();
+      return;
+    }
+    if (lc.intakeKind) {
+      navigate(`/intake/${lc.intakeKind.toLowerCase()}`);
       onClose();
       return;
     }
@@ -73,10 +79,16 @@ export function ProcessDetailModal({ lc, onClose }: {
     toast.info(t('processDetailStartHint').replace('{name}', name));
   }
 
-  function openRegister() {
-    if (lc.primary.href) {
-      navigate(lc.primary.href);
-    } else if (lc.secondary?.href) {
+  /** Optional second action — spawn a new instance via the intake form. */
+  function submitNew() {
+    if (lc.intakeKind) {
+      navigate(`/intake/${lc.intakeKind.toLowerCase()}`);
+      onClose();
+    }
+  }
+
+  function openSecondary() {
+    if (lc.secondary?.href) {
       navigate(lc.secondary.href);
     }
     onClose();
@@ -87,12 +99,23 @@ export function ProcessDetailModal({ lc, onClose }: {
       footer={<>
         <div style={{ flex: 1 }} />
         <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
-        {(lc.primary.href || lc.secondary?.href) && (
-          <Button variant="ghost" Icon={ArrowRight} onClick={openRegister}>
-            {t('processDetailOpenRegister')}
+        {/* Optional secondary navigation — only shown when distinct from primary */}
+        {lc.secondary?.href && lc.secondary.href !== lc.primary.href && (
+          <Button variant="ghost" onClick={openSecondary}>
+            {secondaryLabel}
           </Button>
         )}
-        <Button variant="primary" Icon={Play} onClick={startWorkflow}>
+        {/* Submit-new is offered only when an intake form exists AND the
+         *  primary button isn't already pointing at it. Lifecycles whose
+         *  primary action is "open this view" (most of them) get a Plus
+         *  button so the user still has a one-click path to file a new
+         *  instance via the catalog. */}
+        {lc.intakeKind && lc.primary.href && (
+          <Button variant="ghost" Icon={Plus} onClick={submitNew}>
+            {t('processDetailSubmitNew')}
+          </Button>
+        )}
+        <Button variant="primary" Icon={ArrowRight} onClick={startWorkflow}>
           {primaryLabel}
         </Button>
       </>}>

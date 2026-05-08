@@ -3960,6 +3960,7 @@ export const ar = {
   processDetailActive:         'قيد التنفيذ',
   processDetailOverdue:        'متأخر / مخالف للموعد',
   processDetailOpenRegister:   'فتح السجل',
+  processDetailSubmitNew:      'تقديم جديد',
   processDetailHowToUse:       'كيفية استخدام هذه العملية',
   processDetailStartExplain:   'يفتح نموذج استلام "{name}" لتقديم نسخة جديدة — يُعتمد بكود مرجعي ويُحال إلى الجهة المسؤولة عن الفرز وفق المراحل المُبيّنة أعلاه.',
   processDetailRegisterExplain:'ينقلك إلى السجل المُصفّى لترى كل سجل يتحرّك حالياً عبر هذه العملية.',

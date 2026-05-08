@@ -694,7 +694,8 @@ export const INCIDENT_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Saudi templates', labelAr: 'قوالب الجهات السعودية', href: '/incidents?regulator=1' },
     steward:  'CSIRT + Legal',
     sla:      'Regulator-specific',
-    intakeKind: 'SECURITY_INCIDENT',
+    // No intakeKind: notifications operate on existing incidents — the
+    // ?regulator=1 param auto-opens the Saudi templates picker.
   },
   {
     name: 'Lessons-Learned Capture',
@@ -703,8 +704,9 @@ export const INCIDENT_LIFECYCLES: ProcessLifecycle[] = [
     Icon: ClipboardCheck,
     stages: ['Closed incident', 'Review', 'Lessons documented', 'Distributed'],
     activeCount: 0, overdueCount: 0,
-    primary:  { label: 'Lessons archive', labelAr: 'أرشيف الدروس المستفادة', href: '/incidents' },
+    primary:  { label: 'Lessons archive', labelAr: 'أرشيف الدروس المستفادة', href: '/incidents?tab=lessons' },
     steward:  'CSIRT Lead',
-    intakeKind: 'SECURITY_INCIDENT',
+    // No intakeKind: lessons are captured *from* a closed incident, not via a
+    // new submission. The pill should land users on the Lessons archive tab.
   },
 ];

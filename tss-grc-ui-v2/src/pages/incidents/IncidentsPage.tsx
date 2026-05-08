@@ -72,7 +72,20 @@ export function IncidentsPage() {
   const { t } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TabId>('overview');
+  const [params, setParams] = useSearchParams();
+
+  // Tab is URL-driven so deep-links like /incidents?tab=lessons land on the
+  // right tab and stay shareable. Manual tab clicks update the URL via
+  // setTab() below.
+  const VALID_TABS: TabId[] = ['overview', 'register', 'timeline', 'lessons', 'comms'];
+  const urlTab = params.get('tab') as TabId | null;
+  const tab: TabId = (urlTab && VALID_TABS.includes(urlTab)) ? urlTab : 'overview';
+  function setTab(next: TabId) {
+    const updated = new URLSearchParams(params);
+    if (next === 'overview') updated.delete('tab');
+    else updated.set('tab', next);
+    setParams(updated, { replace: true });
+  }
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<IncidentDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<IncidentDto | null>(null);
@@ -132,7 +145,6 @@ export function IncidentsPage() {
   // ("قوالب الجهات السعودية" / "Saudi templates") opens the templates modal
   // automatically for the most-critical OPEN incident. Falls back gracefully
   // when no candidate exists.
-  const [params, setParams] = useSearchParams();
   useEffect(() => {
     if (params.get('regulator') !== '1') return;
     if (incidents.loading || allIncidents.length === 0) return;

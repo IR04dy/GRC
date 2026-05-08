@@ -4089,6 +4089,7 @@ export const en = {
   processDetailActive:         'In flight',
   processDetailOverdue:        'Overdue / SLA-breached',
   processDetailOpenRegister:   'Open register',
+  processDetailSubmitNew:      'Submit new',
   processDetailHowToUse:       'How to use this process',
   processDetailStartExplain:   'Opens the "{name}" intake form so you can submit a new instance — it will be acknowledged with a reference code and routed to the right triager per the canonical stages above.',
   processDetailRegisterExplain:'Jumps to the filtered register so you can see every record currently moving through this process.',
