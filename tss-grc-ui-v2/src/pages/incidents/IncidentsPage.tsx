@@ -186,6 +186,40 @@ export function IncidentsPage() {
     { kind: 'textarea', key: 'description', label: t('fldDescriptionLbl'), rows: 3, span: 12 },
   ];
 
+  // Form for "Add lesson learned" — picks an incident, captures lesson text,
+  // optional CAPA reference. Lessons are not their own entity; they live as a
+  // satellite annotation on closed incidents.
+  const lessonIncidentOptions = [
+    { value: '', label: t('selectPlaceholder') },
+    ...allIncidents
+      .filter(i => i.status === 'CLOSED' || i.status === 'RECOVERED')
+      .map(i => ({ value: String(i.id), label: i.title })),
+  ];
+  const LESSON_FIELDS: FieldDef[] = [
+    { kind: 'select', key: 'incidentId', label: t('incidentsLessonFldIncident') + ' *', required: true, options: lessonIncidentOptions, span: 12 },
+    { kind: 'textarea', key: 'lesson', label: t('incidentsLessonFldLesson') + ' *', rows: 3, span: 12 },
+    { kind: 'text', key: 'capa', label: t('incidentsLessonFldCapa'), placeholder: 'CAPA-1234', span: 12 },
+  ];
+  function onAddLesson(values: Record<string, string>) {
+    const incidentId = values.incidentId;
+    const lessonText = String(values.lesson ?? '').trim();
+    const incident = allIncidents.find(i => String(i.id) === incidentId);
+    if (!incident || !lessonText) {
+      toast.danger(t('toastValidationFailed') ?? 'Required fields missing');
+      return;
+    }
+    const newRow: LessonRow = {
+      id: `user-${Date.now()}`,
+      incident: incident.title,
+      lesson: lessonText,
+      capa: String(values.capa ?? '').trim() || `CAPA-${1000 + incident.id}`,
+      userAdded: true,
+    };
+    persistUserLessons([newRow, ...userLessons]);
+    setAddLessonOpen(false);
+    toast.success(t('incidentsLessonAddedToast'));
+  }
+
   const tabs: TabItem<TabId>[] = [
     { id: 'overview', label: t('tabOverview') },
     { id: 'register', label: t('incidentsTabRegister') },
@@ -258,7 +292,24 @@ export function IncidentsPage() {
     finally { setBusy(false); setConfirmDel(null); }
   }
 
-  const lessons = incidents.data
+  // ── Lessons learned ─────────────────────────────────────────────────
+  // Two sources: (a) auto-derived from closed/recovered incidents (the
+  // historical demo shape), (b) user-authored entries persisted to
+  // localStorage. The "Add lesson" CTA on the Lessons tab opens a
+  // FormModal that writes into (b); both are rendered together.
+  type LessonRow = { id: string | number; incident: string; lesson: string; capa: string; userAdded?: boolean };
+  const LESSON_STORE_KEY = 'tss.incidents.lessonsLearned';
+  const [userLessons, setUserLessons] = useState<LessonRow[]>(() => {
+    try { return JSON.parse(localStorage.getItem(LESSON_STORE_KEY) ?? '[]') as LessonRow[]; }
+    catch { return []; }
+  });
+  function persistUserLessons(next: LessonRow[]) {
+    setUserLessons(next);
+    try { localStorage.setItem(LESSON_STORE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }
+  const [addLessonOpen, setAddLessonOpen] = useState(false);
+
+  const derivedLessons = incidents.data
     .filter(i => i.status === 'CLOSED' || i.status === 'RECOVERED')
     .slice(0, 5)
     .map(i => ({
@@ -268,6 +319,7 @@ export function IncidentsPage() {
             : 'Tighten alerting thresholds',
       capa: `CAPA-${1000 + i.id}`,
     }));
+  const lessons: LessonRow[] = [...userLessons, ...derivedLessons];
 
   const isDemo = incidents.isDemo;
 
@@ -352,14 +404,25 @@ export function IncidentsPage() {
       )}
       {tab === 'lessons' && (
         <div className="dash-grid">
-          <Card title={t('incidentsCardLessons')} Icon={Lightbulb} action={<Badge tone="primary">{lessons.length} {t('incidentsLessonsClosed')}</Badge>}>
+          <Card title={t('incidentsCardLessons')} Icon={Lightbulb}
+            action={
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Badge tone="primary">{lessons.length} {t('incidentsLessonsClosed')}</Badge>
+                <Button size="sm" variant="primary" Icon={Plus} onClick={() => setAddLessonOpen(true)}>
+                  {t('incidentsLessonAddBtn')}
+                </Button>
+              </div>
+            }>
             {lessons.length === 0
               ? <EmptyState Icon={Lightbulb} title={t('incidentsLessonsEmpty')} sub={t('incidentsLessonsEmptySub')} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {lessons.map(l => (
                     <div key={l.id} style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{l.incident}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>
+                          {l.incident}
+                          {l.userAdded && <span style={{ marginInlineStart: 6 }}><Badge tone="success">{t('incidentsLessonUserBadge')}</Badge></span>}
+                        </div>
                         <Badge tone="primary">{l.capa}</Badge>
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>→ {l.lesson}</div>
@@ -394,6 +457,14 @@ export function IncidentsPage() {
         initial={editing ? incToReq(editing) : EMPTY}
         onClose={() => { setOpen(false); setEditing(null); }}
         onSubmit={onSubmit}
+      />
+      <FormModal<Record<string, string>>
+        open={addLessonOpen}
+        title={t('incidentsLessonAddTitle')}
+        fields={LESSON_FIELDS}
+        initial={{ incidentId: '', lesson: '', capa: '' }}
+        onClose={() => setAddLessonOpen(false)}
+        onSubmit={onAddLesson}
       />
       <ConfirmDialog
         open={!!confirmDel} destructive busy={busy}

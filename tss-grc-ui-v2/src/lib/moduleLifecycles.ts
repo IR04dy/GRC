@@ -694,8 +694,10 @@ export const INCIDENT_LIFECYCLES: ProcessLifecycle[] = [
     primary:  { label: 'Saudi templates', labelAr: 'قوالب الجهات السعودية', href: '/incidents?regulator=1' },
     steward:  'CSIRT + Legal',
     sla:      'Regulator-specific',
-    // No intakeKind: notifications operate on existing incidents — the
-    // ?regulator=1 param auto-opens the Saudi templates picker.
+    // intakeKind kept so the pill modal also surfaces a "Submit new"
+    // ghost button — regulator filings always need an incident, so the
+    // shortcut path is "create a security incident now and notify later".
+    intakeKind: 'SECURITY_INCIDENT',
   },
   {
     name: 'Lessons-Learned Capture',
