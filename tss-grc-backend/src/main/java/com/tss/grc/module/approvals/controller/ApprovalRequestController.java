@@ -1,0 +1,50 @@
+package com.tss.grc.module.approvals.controller;
+
+import com.tss.grc.module.approvals.dto.ApprovalRequestDto;
+import com.tss.grc.module.approvals.service.ApprovalRequestService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/approvals/requests")
+@RequiredArgsConstructor
+public class ApprovalRequestController {
+
+    private final ApprovalRequestService service;
+
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public List<ApprovalRequestDto> list(@RequestParam(defaultValue = "false") boolean myInbox,
+                                         Authentication auth) {
+        return myInbox ? service.myInbox(auth.getName()) : service.listForOrg();
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ApprovalRequestDto get(@PathVariable String id) { return service.get(id); }
+
+    @PostMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApprovalRequestDto> create(@RequestBody @Valid ApprovalRequestDto req) {
+        return ResponseEntity.ok(service.create(req));
+    }
+
+    @PostMapping("/{id}/transition")
+    @PreAuthorize("isAuthenticated()")
+    public ApprovalRequestDto transition(@PathVariable String id,
+                                         @RequestBody @Valid ApprovalRequestDto.TransitionRequest req) {
+        return service.transition(id, req);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable String id) {
+        service.softDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+}

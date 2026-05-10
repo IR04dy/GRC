@@ -1,0 +1,111 @@
+/* FilterBuilder — minimal cohesive styling using existing tokens. */
+
+.filter-root {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px;
+}
+
+.filter-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 8px;
+}
+
+.filter-subgroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.filter-combinator-row {
+  display: flex;
+  margin-block: 2px;
+}
+
+.filter-combinator {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--surface-2);
+  color: var(--primary);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+}
+
+.filter-combinator:hover {
+  background: var(--primary-50, rgba(12,84,96,0.08));
+}
+
+.filter-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.filter-row select,
+.filter-row input {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  font-size: 12px;
+  min-width: 100px;
+}
+
+.filter-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--ink-3);
+  border-radius: var(--r-sm);
+}
+
+.filter-remove:hover {
+  background: var(--danger-50, rgba(220,38,38,0.08));
+  color: var(--danger, #dc2626);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.filter-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.filter-action-btn:hover {
+  border-style: solid;
+  background: var(--surface-2);
+  color: var(--primary);
+}

@@ -1,24 +1,17 @@
 /**
- * Data Governance module.
+ * Data Governance module — <strong>RESERVED FOR v2</strong>.
  *
- * <p>Establishes data ownership, quality standards, and lifecycle policies
- * across the organisation. Aligned with Saudi NCA data classification requirements
- * and ISO 27001 Annex A.8 (Asset Management).</p>
+ * <p>This package is currently a placeholder. No controllers, services, or
+ * entities are implemented here. Data governance (asset register, classification,
+ * stewardship, quality rules, lineage) is intentionally deferred to v2 — it
+ * has substantial scope and competes with specialised products (Collibra,
+ * Alation) that customers may already own.</p>
  *
- * <h3>Key entities</h3>
+ * <p>Adjacent capabilities that <em>are</em> live today:</p>
  * <ul>
- *   <li>{@code DataAsset} — logical data asset register (databases, files, APIs, reports)</li>
- *   <li>{@code DataClassification} — classification scheme (Public / Internal / Confidential / Restricted)</li>
- *   <li>{@code DataStewardship} — steward and custodian assignments per data asset</li>
- *   <li>{@code DataQualityRule} — data quality rules with automated check scheduling</li>
- *   <li>{@code DataLineage} — upstream / downstream data lineage records</li>
- * </ul>
- *
- * <h3>Cross-module integration</h3>
- * <ul>
- *   <li>Privacy module ← data assets link to RoPA processing activities</li>
- *   <li>Risk module ← critical data assets generate default risk entries</li>
- *   <li>Compliance module ← data classification evidence for NCA ECC / ISO 27001</li>
+ *   <li>Privacy data-mapping — see {@code module.privacy} (ROPA/DPIA)</li>
+ *   <li>Asset register (cyber) — see {@code module.cyber} (cyber_assets)</li>
+ *   <li>Evidence-to-control mapping — see {@code module.evidence}</li>
  * </ul>
  */
 package com.tss.grc.module.datagov;

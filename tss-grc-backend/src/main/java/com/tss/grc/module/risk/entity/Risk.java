@@ -74,4 +74,18 @@ public class Risk extends BaseEntity {
 
     @Column(name = "workflow_instance_id")
     private Long workflowInstanceId;
+
+    /** Risk-management taxonomy framework (ISO 31000, COSO ERM, NIST RMF) — IA-5. */
+    @Column(name = "risk_framework_id")
+    private Long riskFrameworkId;
+
+    @Column(name = "risk_framework_clause", length = 100)
+    private String riskFrameworkClause;
+
+    /** Compliance framework this risk threatens (NCA ECC, SAMA CSF, PDPL …) — IA-5. */
+    @Column(name = "compliance_framework_id")
+    private Long complianceFrameworkId;
+
+    @Column(name = "compliance_framework_clause", length = 100)
+    private String complianceFrameworkClause;
 }

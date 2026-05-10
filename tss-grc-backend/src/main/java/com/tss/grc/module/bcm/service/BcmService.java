@@ -1,14 +1,18 @@
 package com.tss.grc.module.bcm.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.bcm.entity.BcmExercise;
 import com.tss.grc.module.bcm.entity.BcmPlan;
 import com.tss.grc.module.bcm.entity.BiaRecord;
 import com.tss.grc.module.bcm.entity.CriticalProcess;
+import com.tss.grc.module.bcm.repository.BcmExerciseRepository;
 import com.tss.grc.module.bcm.repository.BcmPlanRepository;
 import com.tss.grc.module.bcm.repository.BiaRecordRepository;
 import com.tss.grc.module.bcm.repository.CriticalProcessRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,6 +28,10 @@ public class BcmService {
     private final BcmPlanRepository planRepo;
     private final CriticalProcessRepository processRepo;
     private final BiaRecordRepository biaRepo;
+    private final BcmExerciseRepository exerciseRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
 
     // ── BCM Plans ─────────────────────────────────────────────────────────────
 
@@ -62,6 +70,60 @@ public class BcmService {
         BcmPlan p = getPlan(id);
         p.setIsDeleted(true);
         planRepo.save(p);
+    }
+
+    // ── Plan workflow actions (ISO 22301 lifecycle) ───────────────────────────
+    //
+    // Status transitions:
+    //   DRAFT → UNDER_REVIEW → APPROVED → INVOKED → APPROVED (after restoration)
+    // Each transition is enforced; calling out-of-order transitions throws.
+
+    @Transactional
+    public BcmPlan submitForReview(Long id) {
+        BcmPlan p = getPlan(id);
+        if (!"DRAFT".equals(p.getStatus())) {
+            throw new IllegalArgumentException("Plan must be DRAFT to submit for review (was " + p.getStatus() + ")");
+        }
+        p.setStatus("UNDER_REVIEW");
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
+    }
+
+    @Transactional
+    public BcmPlan approvePlan(Long id) {
+        BcmPlan p = getPlan(id);
+        if (!"DRAFT".equals(p.getStatus()) && !"UNDER_REVIEW".equals(p.getStatus())) {
+            throw new IllegalArgumentException("Plan must be DRAFT or UNDER_REVIEW to approve (was " + p.getStatus() + ")");
+        }
+        p.setStatus("APPROVED");
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
+    }
+
+    @Transactional
+    public BcmPlan invokePlan(Long id) {
+        BcmPlan p = getPlan(id);
+        if (!"APPROVED".equals(p.getStatus())) {
+            throw new IllegalArgumentException("Plan must be APPROVED to invoke (was " + p.getStatus() + ")");
+        }
+        p.setStatus("INVOKED");
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
+    }
+
+    @Transactional
+    public BcmPlan restorePlan(Long id) {
+        BcmPlan p = getPlan(id);
+        if (!"INVOKED".equals(p.getStatus())) {
+            throw new IllegalArgumentException("Plan must be INVOKED to restore (was " + p.getStatus() + ")");
+        }
+        p.setStatus("APPROVED");
+        BcmPlan saved = planRepo.save(p);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_plan", saved.getId(), saved);
+        return saved;
     }
 
     // ── Critical Processes ────────────────────────────────────────────────────
@@ -136,6 +198,67 @@ public class BcmService {
         biaRepo.deleteById(id);
     }
 
+    // ── Exercises (ISO 22301 §8.5 — exercise programme) ───────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<BcmExercise> listExercises(Pageable pageable) {
+        return exerciseRepo.findByOrganisationId(TenantContext.getCurrentTenant(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public BcmExercise getExercise(Long id) {
+        return exerciseRepo.findById(id)
+            .filter(e -> e.getOrganisationId().equals(TenantContext.getCurrentTenant()))
+            .orElseThrow(() -> new EntityNotFoundException("Exercise not found: " + id));
+    }
+
+    @Transactional
+    public BcmExercise createExercise(BcmExercise req) {
+        req.setOrganisationId(TenantContext.getCurrentTenant());
+        return exerciseRepo.save(req);
+    }
+
+    @Transactional
+    public BcmExercise updateExercise(Long id, BcmExercise req) {
+        BcmExercise e = getExercise(id);
+        e.setPlanId(req.getPlanId());
+        e.setExerciseNameEn(req.getExerciseNameEn());
+        e.setExerciseNameAr(req.getExerciseNameAr());
+        e.setExerciseType(req.getExerciseType());
+        e.setScenario(req.getScenario());
+        e.setScheduledDate(req.getScheduledDate());
+        e.setExecutedDate(req.getExecutedDate());
+        e.setScore(req.getScore());
+        e.setStatus(req.getStatus());
+        e.setFindings(req.getFindings());
+        e.setCapaCount(req.getCapaCount() != null ? req.getCapaCount() : 0);
+        e.setFacilitator(req.getFacilitator());
+        e.setUpdatedAt(java.time.LocalDateTime.now());
+        return exerciseRepo.save(e);
+    }
+
+    @Transactional
+    public void deleteExercise(Long id) {
+        BcmExercise e = getExercise(id);
+        e.setIsDeleted(true);
+        e.setUpdatedAt(java.time.LocalDateTime.now());
+        exerciseRepo.save(e);
+    }
+
+    /** Lifecycle helper: mark an exercise complete and persist its score & findings. */
+    @Transactional
+    public BcmExercise completeExercise(Long id, Integer score, String findings) {
+        BcmExercise e = getExercise(id);
+        e.setStatus("COMPLETED");
+        e.setExecutedDate(java.time.LocalDate.now());
+        if (score != null) e.setScore(score);
+        if (findings != null) e.setFindings(findings);
+        e.setUpdatedAt(java.time.LocalDateTime.now());
+        BcmExercise saved = exerciseRepo.save(e);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "bcm_exercise", saved.getId(), saved);
+        return saved;
+    }
+
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -146,6 +269,12 @@ public class BcmService {
         List<Long> processIds = processRepo.findByOrganisationId(orgId, Pageable.unpaged())
             .map(CriticalProcess::getId).getContent();
         long totalBia = biaRepo.findByProcessIdIn(processIds).size();
-        return Map.of("totalPlans", totalPlans, "totalProcesses", totalProcesses, "totalBia", totalBia);
+        long totalExercises = exerciseRepo.findByOrganisationId(orgId, Pageable.unpaged()).getTotalElements();
+        return Map.of(
+            "totalPlans",     totalPlans,
+            "totalProcesses", totalProcesses,
+            "totalBia",       totalBia,
+            "totalExercises", totalExercises
+        );
     }
 }

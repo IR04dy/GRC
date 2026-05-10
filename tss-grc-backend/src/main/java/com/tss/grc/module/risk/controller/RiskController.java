@@ -59,4 +59,42 @@ public class RiskController {
     public void delete(@PathVariable Long id) {
         riskService.delete(id);
     }
+
+    // ── Risk lifecycle workflow (ISO 31000 / COSO ERM) ────────────────────────
+    @PostMapping("/{id}/submit-for-review")
+    @PreAuthorize("hasPermission('RISK', 'WRITE')")
+    public RiskResponse submitForReview(@PathVariable Long id) {
+        return riskService.submitForReview(id);
+    }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasPermission('RISK', 'WRITE')")
+    public RiskResponse approve(@PathVariable Long id) {
+        return riskService.approve(id);
+    }
+
+    @PostMapping("/{id}/accept")
+    @PreAuthorize("hasPermission('RISK', 'WRITE')")
+    public RiskResponse accept(@PathVariable Long id) {
+        return riskService.accept(id);
+    }
+
+    @PostMapping("/{id}/close")
+    @PreAuthorize("hasPermission('RISK', 'WRITE')")
+    public RiskResponse close(@PathVariable Long id) {
+        return riskService.close(id);
+    }
+
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasPermission('RISK', 'WRITE')")
+    public RiskResponse reopen(@PathVariable Long id) {
+        return riskService.reopen(id);
+    }
+
+    @PostMapping("/{id}/incident-bump")
+    @PreAuthorize("hasPermission('RISK', 'WRITE')")
+    @Operation(summary = "Risk-incident retrospective: bump residual likelihood by 1 (capped at 5) when an incident is realised for this risk")
+    public RiskResponse incidentBump(@PathVariable Long id) {
+        return riskService.bumpLikelihoodFromIncident(id);
+    }
 }

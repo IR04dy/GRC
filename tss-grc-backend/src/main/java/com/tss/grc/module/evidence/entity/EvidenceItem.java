@@ -69,4 +69,47 @@ public class EvidenceItem extends BaseEntity {
 
     @Column(name = "mime_type", length = 200)
     private String mimeType;
+
+    // ── Chain-of-custody (assessment §5.9 #3) ──
+    /** MANUAL | AGENT | API_PULL | SIEM | SCANNER | NAFATH_SIGNED */
+    @Column(name = "collection_method", length = 50)
+    private String collectionMethod;
+
+    @Column(name = "collector_name", length = 255)
+    private String collectorName;
+
+    @Column(name = "collector_id")
+    private Long collectorId;
+
+    @Column(name = "witness_id")
+    private Long witnessId;
+
+    @Column(name = "tool_version", length = 100)
+    private String toolVersion;
+
+    /** SHA-256 hex of the evidence payload at collection time. */
+    @Column(name = "evidence_hash", length = 128)
+    private String evidenceHash;
+
+    /** Hash of the previous version of this evidence — forms a per-evidence WORM chain. */
+    @Column(name = "previous_hash", length = 128)
+    private String previousHash;
+
+    /** Optional external timestamp authority anchor (e.g. RFC 3161 token) — for forensic-grade WORM. */
+    @Column(name = "merkle_anchor", length = 255)
+    private String merkleAnchor;
+
+    @Column(name = "collected_at")
+    private java.time.LocalDateTime collectedAt;
+
+    /** Periodic re-review trigger date (for evidence freshness — §5.9 #5). */
+    @Column(name = "review_due_date")
+    private java.time.LocalDate reviewDueDate;
+
+    /** If this evidence was produced by a connector — the connector code. */
+    @Column(name = "connector_code", length = 50)
+    private String connectorCode;
+
+    @Column(name = "current_version_no", nullable = false)
+    private Integer currentVersionNo = 1;
 }

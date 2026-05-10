@@ -16,6 +16,38 @@ public class Incident extends BaseEntity {
     @Column(name = "organisation_id", nullable = false)
     private Long organisationId;
 
+    /**
+     * NIST 800-61r2 phase. State machine:
+     *   IDENTIFICATION → ANALYSIS → CONTAINMENT → ERADICATION → RECOVERY → POST_INCIDENT
+     * The existing `status` column tracks high-level state (OPEN | INVESTIGATING |
+     * RESOLVED | CLOSED) and is auto-mapped from `nistPhase` by the service layer.
+     */
+    @Column(name = "nist_phase", nullable = false, length = 30)
+    private String nistPhase = "IDENTIFICATION";
+
+    /** NCA HEY 24-hour cyber-incident notification (NCA mandate). */
+    @Column(name = "nca_hey_notified_at")
+    private java.time.LocalDateTime ncaHeyNotifiedAt;
+    /** Saudi Data Office 72-hour PDPL Article 20 notification. */
+    @Column(name = "data_office_notified_at")
+    private java.time.LocalDateTime dataOfficeNotifiedAt;
+    /** CITC 24-hour notification (telco / cloud providers). */
+    @Column(name = "citc_notified_at")
+    private java.time.LocalDateTime citcNotifiedAt;
+    /** SAMA Cyber Threat Intelligence Sharing (banks). */
+    @Column(name = "sama_notified_at")
+    private java.time.LocalDateTime samaNotifiedAt;
+    /** HRSD breach affecting employee data. */
+    @Column(name = "hrsd_notified_at")
+    private java.time.LocalDateTime hrsdNotifiedAt;
+
+    /** MITRE ATT&CK tactics — comma-separated tactic IDs, e.g. "TA0001,TA0002". */
+    @Column(name = "mitre_tactics", length = 500)
+    private String mitreTactics;
+    /** MITRE ATT&CK techniques — comma-separated technique IDs, e.g. "T1078,T1133". */
+    @Column(name = "mitre_techniques", length = 500)
+    private String mitreTechniques;
+
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 

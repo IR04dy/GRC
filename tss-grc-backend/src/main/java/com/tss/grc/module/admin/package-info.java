@@ -1,23 +1,19 @@
 /**
- * Administration &amp; Configuration module.
+ * Administration &amp; Configuration module — <strong>RESERVED</strong>.
  *
- * <p>Platform-level and organisation-level administration: user and role management,
- * module activation per organisation, branding configuration, lookup table management,
- * licensing, system health monitoring, and audit log viewer.</p>
+ * <p>This package is currently a placeholder. No controllers, services, or
+ * entities are implemented here. Tenant-admin features (user management, role
+ * assignment, branding, feature flags, audit-log viewer, etc.) are scheduled
+ * for a future sprint; the working implementations of those concerns live in:</p>
  *
- * <h3>Key capabilities</h3>
  * <ul>
- *   <li>User CRUD with role assignment and forced password reset</li>
- *   <li>Role and permission management (RBAC)</li>
- *   <li>Organisation module activation (feature flags per tenant)</li>
- *   <li>Branding: logo, primary colour, organisation name in Arabic / English</li>
- *   <li>Lookup table management (risk categories, asset types, etc.)</li>
- *   <li>License management and subscription tier controls</li>
- *   <li>System audit log viewer with export</li>
+ *   <li>User &amp; role CRUD — {@code module.iam}</li>
+ *   <li>Branding (white-label) — handled in the frontend (deferred per
+ *       Sprint 4 §3.3)</li>
+ *   <li>Audit-log viewer — see {@code module.platform.audit}</li>
  * </ul>
  *
- * <h3>Access control</h3>
- * <p>All controllers in this package require {@code ROLE_PLATFORM_ADMIN} or
- * {@code ROLE_ORG_ADMIN} — enforced via Spring Security {@code @PreAuthorize}.</p>
+ * <p>If you find yourself wanting to add code here, first confirm it doesn't
+ * belong in {@code iam} or {@code platform}.</p>
  */
 package com.tss.grc.module.admin;

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0E5E5E" />
+    <title>TSS GRC Platform</title>
+    <!--
+      Sprint 4 §2.7 — sockjs-client (used by @stomp/stompjs) is a CommonJS
+      module that references `global`, which exists in Node.js but not in
+      browsers. Polyfill it here so it's defined BEFORE any ES modules load.
+      vite.config.ts also has `define: { global: 'globalThis' }` for prod build.
+    -->
+    <script>
+      if (typeof window.global === 'undefined') window.global = window;
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

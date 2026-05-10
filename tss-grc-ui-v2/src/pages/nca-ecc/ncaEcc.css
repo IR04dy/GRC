@@ -1,0 +1,220 @@
+/* NCA ECC self-assessment template — print-friendly */
+
+.nca-document {
+  max-width: 980px;
+  margin: 0 auto;
+  background: var(--surface-1);
+  color: var(--ink-1);
+  font-family: var(--font-sans, system-ui);
+}
+
+.nca-cover {
+  padding: 40px;
+  text-align: center;
+  background: linear-gradient(135deg, var(--primary-50, #eef2ff) 0%, var(--surface-2, #f9fafb) 100%);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  page-break-after: always;
+}
+.nca-cover-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--primary, #4f46e5);
+  color: white;
+  margin: 0 auto 18px;
+}
+.nca-cover-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.nca-cover-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ink-1);
+  margin: 0 0 24px;
+  line-height: 1.3;
+}
+.nca-cover-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 36px;
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: start;
+}
+.nca-cover-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nca-meta-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.nca-meta-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nca-section {
+  margin-bottom: 24px;
+}
+.nca-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--primary);
+  color: var(--ink-1);
+}
+
+.nca-domain {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  page-break-inside: avoid;
+}
+.nca-domain-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--primary-50, #eef2ff);
+  border: none;
+  cursor: pointer;
+  text-align: start;
+  border-radius: 8px 8px 0 0;
+}
+.nca-domain-code {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--primary);
+}
+.nca-domain-title {
+  font-size: 14px;
+  font-weight: 700;
+  flex: 1;
+}
+.nca-domain-meta {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.nca-subdomain {
+  border-top: 1px solid var(--border);
+  padding: 14px 18px;
+}
+.nca-subdomain-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.nca-subdomain-code {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.nca-subdomain-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nca-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.nca-table th {
+  text-align: start;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  padding: 8px;
+  background: var(--surface-2);
+  border-bottom: 2px solid var(--ink-3);
+}
+.nca-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.5;
+}
+.nca-control-desc {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.nca-remarks {
+  font-size: 11px;
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.nca-signoff {
+  margin-top: 32px;
+  padding: 24px 0;
+  border-top: 2px solid var(--border);
+}
+.nca-signoff-narrative {
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+.nca-signoff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 48px;
+}
+.nca-signoff-cell {
+  text-align: center;
+}
+.nca-signoff-line {
+  border-bottom: 1px solid var(--ink-3);
+  height: 28px;
+  margin-bottom: 6px;
+}
+.nca-signoff-label {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media print {
+  body * { visibility: hidden; }
+  .nca-document, .nca-document * { visibility: visible; }
+  .nca-document {
+    position: absolute;
+    left: 0; top: 0;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+  }
+  .nca-actions { display: none !important; }
+  .nca-domain { page-break-inside: avoid; }
+  .nca-cover {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}

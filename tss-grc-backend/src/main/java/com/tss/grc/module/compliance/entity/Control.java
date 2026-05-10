@@ -26,6 +26,10 @@ public class Control extends BaseEntity {
     @Column(name = "framework", nullable = false, length = 100)
     private String framework;
 
+    /** Typed FK to {@code compliance.frameworks} — populated by IA-3 backfill. */
+    @Column(name = "framework_id")
+    private Long frameworkId;
+
     @Column(name = "domain", length = 100)
     private String domain;
 

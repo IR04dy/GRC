@@ -78,6 +78,29 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    /** Lifecycle state-machine rejection — 409 with from/to/allowed for the client. */
+    @ExceptionHandler(IllegalTransitionException.class)
+    public ProblemDetail handleIllegalTransition(IllegalTransitionException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Illegal State Transition");
+        pd.setType(URI.create("https://grc.tss.com/errors/illegal-transition"));
+        pd.setProperty("from", ex.getFrom());
+        pd.setProperty("to", ex.getTo());
+        pd.setProperty("allowed", ex.getAllowed());
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /** Catch-all for IllegalStateException not caught by a more specific handler. */
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalState(IllegalStateException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Conflict");
+        pd.setType(URI.create("https://grc.tss.com/errors/conflict"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneral(Exception ex) {
         log.error("Unhandled exception [{}]: {}", ex.getClass().getName(), ex.getMessage(), ex);

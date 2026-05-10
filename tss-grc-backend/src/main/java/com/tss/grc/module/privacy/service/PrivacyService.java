@@ -7,8 +7,10 @@ import com.tss.grc.module.privacy.entity.ProcessingActivity;
 import com.tss.grc.module.privacy.repository.DataBreachRepository;
 import com.tss.grc.module.privacy.repository.DataSubjectRequestRepository;
 import com.tss.grc.module.privacy.repository.ProcessingActivityRepository;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,18 @@ public class PrivacyService {
     private final DataBreachRepository breachRepo;
     private final DataSubjectRequestRepository dsrRepo;
     private final ProcessingActivityRepository ropaRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
+    private void emitBreach(DataBreach b) {
+        if (bcast != null) bcast.entity(b.getOrganisationId(), "data_breach", b.getId(), b);
+    }
+    private void emitDsr(DataSubjectRequest r) {
+        if (bcast != null) bcast.entity(r.getOrganisationId(), "dsr_case", r.getId(), r);
+    }
+    private void emitRopa(ProcessingActivity a) {
+        if (bcast != null) bcast.entity(a.getOrganisationId(), "processing_activity", a.getId(), a);
+    }
 
     // ── Data Breaches ─────────────────────────────────────────────────────────
 
@@ -65,6 +79,47 @@ public class PrivacyService {
         breachRepo.save(b);
     }
 
+    // ── Breach workflow (PDPL Article 20 — 72-hour notification) ──────────────
+
+    @Transactional
+    public DataBreach containBreach(Long id) {
+        DataBreach b = getBreach(id);
+        if (!"OPEN".equals(b.getStatus())) {
+            throw new IllegalArgumentException("Breach must be OPEN to contain (was " + b.getStatus() + ")");
+        }
+        b.setStatus("INVESTIGATING");
+        DataBreach saved = breachRepo.save(b);
+        emitBreach(saved);
+        return saved;
+    }
+
+    /**
+     * Mark the Saudi Data Office as notified for this breach. Records the
+     * notification timestamp; the consumer should subsequently attach the
+     * submission package as evidence.
+     */
+    @Transactional
+    public DataBreach notifyDataOffice(Long id) {
+        DataBreach b = getBreach(id);
+        b.setPdpcNotificationRequired(true);
+        b.setPdpcNotifiedAt(java.time.LocalDateTime.now());
+        DataBreach saved = breachRepo.save(b);
+        emitBreach(saved);
+        return saved;
+    }
+
+    @Transactional
+    public DataBreach closeBreach(Long id) {
+        DataBreach b = getBreach(id);
+        if (!"INVESTIGATING".equals(b.getStatus()) && !"OPEN".equals(b.getStatus())) {
+            throw new IllegalArgumentException("Breach must be OPEN or INVESTIGATING to close (was " + b.getStatus() + ")");
+        }
+        b.setStatus("CLOSED");
+        DataBreach saved = breachRepo.save(b);
+        emitBreach(saved);
+        return saved;
+    }
+
     // ── Data Subject Requests ─────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -103,6 +158,70 @@ public class PrivacyService {
         DataSubjectRequest r = getDsr(id);
         r.setIsDeleted(true);
         dsrRepo.save(r);
+    }
+
+    // ── DSR workflow (PDPL — 30-day fulfilment SLA) ───────────────────────────
+
+    /**
+     * Start fulfilling a DSR. Transitions OPEN → IN_PROGRESS and, if no
+     * due_date was set, defaults it to received_at + 30 days per PDPL.
+     */
+    @Transactional
+    public DataSubjectRequest startDsr(Long id) {
+        DataSubjectRequest r = getDsr(id);
+        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+            throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
+        }
+        r.setStatus("IN_PROGRESS");
+        if (r.getDueDate() == null) {
+            java.time.LocalDateTime base = r.getReceivedAt() != null ? r.getReceivedAt() : java.time.LocalDateTime.now();
+            r.setDueDate(base.toLocalDate().plusDays(30));
+        }
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
+    }
+
+    @Transactional
+    public DataSubjectRequest fulfilDsr(Long id) {
+        DataSubjectRequest r = getDsr(id);
+        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+            throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
+        }
+        r.setStatus("FULFILLED");
+        r.setCompletedAt(java.time.LocalDateTime.now());
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
+    }
+
+    /**
+     * Extend the DSR due date by N days. PDPL Implementing Regulations allow
+     * the controller to extend the response window once, with notification to
+     * the data subject. Default extension is 30 days.
+     */
+    @Transactional
+    public DataSubjectRequest extendDsr(Long id, Integer days) {
+        DataSubjectRequest r = getDsr(id);
+        int n = (days == null || days <= 0) ? 30 : days;
+        java.time.LocalDate base = r.getDueDate() != null ? r.getDueDate() : java.time.LocalDate.now();
+        r.setDueDate(base.plusDays(n));
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
+    }
+
+    @Transactional
+    public DataSubjectRequest rejectDsr(Long id) {
+        DataSubjectRequest r = getDsr(id);
+        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+            throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
+        }
+        r.setStatus("REJECTED");
+        r.setCompletedAt(java.time.LocalDateTime.now());
+        DataSubjectRequest saved = dsrRepo.save(r);
+        emitDsr(saved);
+        return saved;
     }
 
     // ── Processing Activities (ROPA) ──────────────────────────────────────────

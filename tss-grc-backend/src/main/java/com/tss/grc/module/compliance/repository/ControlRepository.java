@@ -28,4 +28,6 @@ public interface ControlRepository extends JpaRepository<Control, Long> {
 
     long countByOrganisationIdAndStatus(Long organisationId, String status);
     long countByOrganisationId(Long organisationId);
+
+    java.util.List<Control> findByOrganisationIdAndFrameworkId(Long organisationId, Long frameworkId);
 }

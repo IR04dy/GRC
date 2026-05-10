@@ -16,6 +16,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Dashboard read endpoints. Each method requires the underlying module's READ
+ * permission so dashboard widgets respect the same RBAC as the source data.
+ * The aggregate {@code /stats} and {@code /heatmap} endpoints accept any of
+ * the relevant module READs (defense-in-depth; the underlying service still
+ * filters by what the user can see).
+ *
+ * Data is always tenant-scoped via {@link TenantContext} regardless of role.
+ */
 @RestController
 @RequestMapping("/api/v1/dashboard")
 @RequiredArgsConstructor
@@ -26,44 +35,44 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('RISK_READ','INCIDENT_READ','COMPLIANCE_READ','CYBER_READ')")
     public DashboardStats stats() {
-        return dashboardService.getStats(TenantContext.getCurrentTenant());
+        return dashboardService.getStats(TenantContext.requireOrganisationId());
     }
 
     @GetMapping("/heatmap")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     public HeatmapData heatmap() {
-        return dashboardService.getHeatmap(TenantContext.getCurrentTenant());
+        return dashboardService.getHeatmap(TenantContext.requireOrganisationId());
     }
 
     @GetMapping("/risk-by-category")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     public ChartData riskByCategory() {
-        return dashboardService.getRiskByCategory(TenantContext.getCurrentTenant());
+        return dashboardService.getRiskByCategory(TenantContext.requireOrganisationId());
     }
 
     @GetMapping("/recent-risks")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     public List<RiskResponse> recentRisks() {
-        return dashboardService.getRecentRisks(TenantContext.getCurrentTenant());
+        return dashboardService.getRecentRisks(TenantContext.requireOrganisationId());
     }
 
     /** Stub — Incident module is Sprint 2. Returns empty list. */
     @GetMapping("/recent-incidents")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('INCIDENT','READ')")
     public List<IncidentSummary> recentIncidents() {
         return List.of();
     }
 
     /** Stub — Compliance module is Sprint 2. Returns empty chart data. */
     @GetMapping("/compliance-by-framework")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public ChartData complianceByFramework() {
         return new ChartData(List.of(), List.of());
     }
 
-    /** Stub — Workflow/Task module is Sprint 2. Returns empty list. */
+    /** Personal task list — every authenticated user has tasks regardless of module RBAC. */
     @GetMapping("/my-tasks")
     @PreAuthorize("isAuthenticated()")
     public List<TaskSummary> myTasks() {

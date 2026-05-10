@@ -45,12 +45,45 @@ public class JwtTokenProvider {
     private final long refreshTokenExpiryMs;
 
     public JwtTokenProvider(
-            @Value("${grc.jwt.secret}") String secret,
+            @Value("${grc.jwt.secret:}") String secret,
             @Value("${grc.jwt.access-token-expiry-ms:900000}") long accessTokenExpiryMs,
             @Value("${grc.jwt.refresh-token-expiry-ms:604800000}") long refreshTokenExpiryMs) {
+        validateSecret(secret);
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
         this.accessTokenExpiryMs = accessTokenExpiryMs;
         this.refreshTokenExpiryMs = refreshTokenExpiryMs;
+        log.info("JwtTokenProvider initialised: access={}ms refresh={}ms keyBytes={}",
+                accessTokenExpiryMs, refreshTokenExpiryMs, secret.getBytes().length);
+    }
+
+    /**
+     * Fail-fast validation of the JWT secret.
+     *
+     * <p>Refuses to start the application if the secret is missing, too short, or matches
+     * one of the known placeholder strings. This prevents the historic bug where a missing
+     * {@code JWT_SECRET} env var caused the app to silently fall back to a known-bad
+     * default, producing a deployment that signs all tokens with a public-knowledge key.
+     *
+     * <p>Required: ≥ 32 ASCII characters (256 bits, the minimum HS256/HS384 strength).
+     */
+    static void validateSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                "JWT_SECRET environment variable is not set. Refusing to start the application. " +
+                "Generate a secret with: openssl rand -base64 48");
+        }
+        if (secret.length() < 32) {
+            throw new IllegalStateException(
+                "JWT_SECRET must be at least 32 characters (256 bits). Current length: " + secret.length());
+        }
+        // Reject the historical placeholder strings that previously lived in application*.yml
+        String lower = secret.toLowerCase();
+        if (lower.contains("change-this") || lower.contains("change_me") ||
+            lower.contains("placeholder") || lower.contains("provide_jwt_secret")) {
+            throw new IllegalStateException(
+                "JWT_SECRET appears to be a placeholder value. Provide a real secret via the " +
+                "JWT_SECRET environment variable.");
+        }
     }
 
     public String generateAccessToken(Authentication authentication) {

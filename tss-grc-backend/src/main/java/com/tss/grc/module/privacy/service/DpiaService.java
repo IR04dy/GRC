@@ -1,0 +1,174 @@
+package com.tss.grc.module.privacy.service;
+
+import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.privacy.entity.Dpia;
+import com.tss.grc.module.privacy.entity.DpiaMitigation;
+import com.tss.grc.module.privacy.entity.DpiaQuestion;
+import com.tss.grc.module.privacy.entity.DpiaReview;
+import com.tss.grc.module.privacy.repository.DpiaMitigationRepository;
+import com.tss.grc.module.privacy.repository.DpiaQuestionRepository;
+import com.tss.grc.module.privacy.repository.DpiaRepository;
+import com.tss.grc.module.privacy.repository.DpiaReviewRepository;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * DPIA workflow service — assessment §5.4 critical recommendation #3.
+ * State machine:
+ *   DRAFT → IN_REVIEW → APPROVED   (next_review_date drives EXPIRED)
+ *   IN_REVIEW → REJECTED (with reason)
+ *   APPROVED → EXPIRED (when next_review_date passes — handled by scheduler follow-up)
+ */
+@Service
+@RequiredArgsConstructor
+public class DpiaService {
+
+    private final DpiaRepository           dpiaRepo;
+    private final DpiaQuestionRepository   questionRepo;
+    private final DpiaMitigationRepository mitigationRepo;
+    private final DpiaReviewRepository     reviewRepo;
+
+    // ── DPIA CRUD ────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<Dpia> list(Pageable pageable) {
+        return dpiaRepo.findByOrganisationId(TenantContext.getCurrentTenant(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getWithChildren(Long id) {
+        Dpia d = mustGet(id);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("dpia",        d);
+        out.put("questions",   questionRepo.findByDpiaIdOrderBySortOrder(id));
+        out.put("mitigations", mitigationRepo.findByDpiaIdOrderBySortOrder(id));
+        out.put("reviews",     reviewRepo.findByDpiaIdOrderByDecidedAtDesc(id));
+        return out;
+    }
+
+    @Transactional
+    public Dpia create(Dpia req) {
+        req.setOrganisationId(TenantContext.getCurrentTenant());
+        return dpiaRepo.save(req);
+    }
+
+    @Transactional
+    public Dpia update(Long id, Dpia req) {
+        Dpia d = mustGet(id);
+        d.setProcessingActivityId(req.getProcessingActivityId());
+        d.setTitleEn(req.getTitleEn());
+        d.setTitleAr(req.getTitleAr());
+        d.setTriggerReason(req.getTriggerReason());
+        d.setOverallResidualRisk(req.getOverallResidualRisk());
+        d.setDpoId(req.getDpoId());
+        d.setAssessorId(req.getAssessorId());
+        d.setAssessmentDate(req.getAssessmentDate());
+        d.setNextReviewDate(req.getNextReviewDate());
+        d.setConclusion(req.getConclusion());
+        d.setUpdatedAt(LocalDateTime.now());
+        return dpiaRepo.save(d);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Dpia d = mustGet(id);
+        d.setIsDeleted(true);
+        dpiaRepo.save(d);
+    }
+
+    // ── Workflow transitions ────────────────────────────────────────────────
+
+    @Transactional
+    public Dpia submitForReview(Long id) {
+        Dpia d = mustGet(id);
+        require(d, "DRAFT");
+        d.setStatus("IN_REVIEW");
+        return dpiaRepo.save(d);
+    }
+
+    @Transactional
+    public Dpia approve(Long id, Map<String, Object> body) {
+        Dpia d = mustGet(id);
+        require(d, "IN_REVIEW");
+        d.setStatus("APPROVED");
+        d.setApprovedAt(LocalDateTime.now());
+        if (body.get("conclusion") instanceof String s) d.setConclusion(s);
+        if (d.getNextReviewDate() == null) d.setNextReviewDate(java.time.LocalDate.now().plusYears(1));
+        return dpiaRepo.save(d);
+    }
+
+    @Transactional
+    public Dpia reject(Long id, Map<String, Object> body) {
+        Dpia d = mustGet(id);
+        require(d, "IN_REVIEW", "DRAFT");
+        d.setStatus("REJECTED");
+        d.setRejectedAt(LocalDateTime.now());
+        if (body.get("reason") instanceof String s) d.setRejectionReason(s);
+        return dpiaRepo.save(d);
+    }
+
+    @Transactional
+    public Dpia expire(Long id) {
+        Dpia d = mustGet(id);
+        require(d, "APPROVED");
+        d.setStatus("EXPIRED");
+        return dpiaRepo.save(d);
+    }
+
+    // ── Children: questions + mitigations + reviews ─────────────────────────
+
+    @Transactional
+    public DpiaQuestion addQuestion(Long dpiaId, DpiaQuestion req) {
+        mustGet(dpiaId);
+        req.setDpiaId(dpiaId);
+        return questionRepo.save(req);
+    }
+
+    @Transactional
+    public DpiaMitigation addMitigation(Long dpiaId, DpiaMitigation req) {
+        mustGet(dpiaId);
+        req.setDpiaId(dpiaId);
+        return mitigationRepo.save(req);
+    }
+
+    @Transactional
+    public DpiaReview addReview(Long dpiaId, DpiaReview req) {
+        mustGet(dpiaId);
+        req.setDpiaId(dpiaId);
+        return reviewRepo.save(req);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> stats() {
+        Long org = TenantContext.getCurrentTenant();
+        return Map.of(
+            "draftCount",     dpiaRepo.countByOrganisationIdAndStatus(org, "DRAFT"),
+            "inReviewCount",  dpiaRepo.countByOrganisationIdAndStatus(org, "IN_REVIEW"),
+            "approvedCount",  dpiaRepo.countByOrganisationIdAndStatus(org, "APPROVED"),
+            "rejectedCount",  dpiaRepo.countByOrganisationIdAndStatus(org, "REJECTED"),
+            "expiredCount",   dpiaRepo.countByOrganisationIdAndStatus(org, "EXPIRED")
+        );
+    }
+
+    private Dpia mustGet(Long id) {
+        return dpiaRepo.findById(id)
+            .filter(x -> x.getOrganisationId().equals(TenantContext.getCurrentTenant()))
+            .orElseThrow(() -> new EntityNotFoundException("DPIA not found: " + id));
+    }
+
+    private void require(Dpia d, String... allowed) {
+        for (String s : allowed) if (s.equals(d.getStatus())) return;
+        throw new IllegalArgumentException("DPIA must be in " + java.util.Arrays.toString(allowed) + " (was " + d.getStatus() + ")");
+    }
+
+    @SuppressWarnings("unused")
+    private List<DpiaQuestion> _q;  // keep imports tidy
+}

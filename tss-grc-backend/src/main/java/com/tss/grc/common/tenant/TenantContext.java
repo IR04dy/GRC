@@ -30,6 +30,23 @@ public final class TenantContext {
         return CURRENT_TENANT.get();
     }
 
+    /**
+     * Returns the current tenant or throws — use in service-layer code where
+     * an unauthenticated/missing tenant is a programmer error, not a recoverable
+     * condition. Lifecycle modules (risk_lc, audit_lc, privacy_lc, bcm_lc, cyber_lc)
+     * call this to fail-fast rather than silently leaking across tenants.
+     */
+    public static Long requireOrganisationId() {
+        Long tenant = CURRENT_TENANT.get();
+        if (tenant == null) {
+            throw new IllegalStateException(
+                "No tenant in TenantContext — JwtAuthenticationFilter did not run, " +
+                "or the request is unauthenticated. Refusing to query without tenant scope."
+            );
+        }
+        return tenant;
+    }
+
     public static void clear() {
         CURRENT_TENANT.remove();
     }

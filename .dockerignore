@@ -1,0 +1,65 @@
+# Files NOT copied into the Docker build context. Keeps image lean and prevents
+# secrets / IDE state from leaking in.
+
+# Git
+.git
+.github
+.gitignore
+.gitattributes
+
+# Build output
+**/target
+**/build
+**/dist
+**/.gradle
+**/node_modules
+
+# IDE / editor
+.idea
+.vscode
+*.iml
+.project
+.classpath
+.settings
+
+# Local tooling we ship in the worktree but don't want in the image
+.tools
+.claude
+
+# Logs
+**/*.log
+**/logs
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Frontend (built separately)
+tss-grc-ui-v2/node_modules
+tss-grc-ui-v2/dist
+tss-grc-ui-v2/.vite
+tss-grc-ui
+
+# Sprint scratch / docs (not needed in image)
+sprints
+docs/diagrams
+*.md
+!README.md
+
+# Python bootstrap (dev-only — prod uses Flyway)
+setup_*.py
+fix_*.py
+db/sqlserver
+
+# Test data / fixtures
+**/test-output
+**/coverage
+
+# Secrets — never copy these
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+*.jks

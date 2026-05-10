@@ -11,9 +11,13 @@ spring:
       - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
 
   datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=TSS_GRC;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true
-    username: sa
-    password: "tss.123"
+    # Secrets are sourced from environment variables. For day-one local dev
+    # the variables fall back to documented defaults — see
+    # docs/diagrams/16-secrets-management.md for the recommended setup
+    # (Vault / Azure Key Vault / AWS Secrets Manager for non-dev environments).
+    url:      ${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=TSS_GRC;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:CHANGE_ME_IN_ENV}
     hikari:
       minimum-idle: 2
       maximum-pool-size: 10
@@ -45,11 +49,15 @@ server:
 
 grc:
   jwt:
-    secret: "tss-dev-secret-key-at-least-32-chars-padding-ok"
+    # JWT secret must be sourced from JWT_SECRET env var. The literal default
+    # is intentionally a recognisably-broken placeholder so an unconfigured
+    # deployment fails loudly at first authentication rather than silently
+    # using a known-bad secret.
+    secret: ${JWT_SECRET:CHANGE_ME_PROVIDE_JWT_SECRET_VIA_ENVIRONMENT_VARIABLE_AT_LEAST_32_CHARS}
     access-token-expiry-ms: 3600000       # 1 hour in dev
     refresh-token-expiry-ms: 604800000
   cors:
-    allowed-origins: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8086,http://127.0.0.1:8086,http://localhost:8087,http://127.0.0.1:8087"
+    allowed-origins: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8086,http://127.0.0.1:8086,http://localhost:8087,http://127.0.0.1:8087"
   security:
     max-failed-login-attempts: 99
     lockout-duration-minutes: 1

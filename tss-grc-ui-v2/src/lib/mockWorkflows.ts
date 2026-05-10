@@ -1,0 +1,372 @@
+// Cross-module catalogue of "what's currently in flight" workflow instances.
+// Each module's Workflows tab feeds from a slice of this list — the stages
+// + escalation tiers + owner all reflect realistic GRC operational states.
+import type { WorkflowInstance } from './workflows';
+import { synthesiseAllBreaches } from './appetiteBreach';
+import { SAUDI_APPETITES } from './riskAppetiteSaudi';
+import { synthesiseAllEngagementWorkflows } from './auditEngagement';
+import { AUDIT_ENGAGEMENTS } from '../pages/compliance/mockCompliance';
+import { synthesiseStaleEvidenceWorkflows } from './ccm';
+import { synthesiseApprovalWorkflows } from './approvals';
+
+// ─── Risk Lifecycle (ISO 31000 / COSO ERM) ──────────────────────────────────
+const RISK_STAGES = ['IDENTIFIED', 'ASSESSED', 'TREATMENT_PLANNED', 'IMPLEMENTING', 'MONITORING', 'CLOSED'];
+
+export const RISK_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'RWF-101', module: 'Risk', workflow: 'Risk Lifecycle', entityType: 'Risk', entityRef: 'R-0042',
+    title: 'Sensitive Data Breach', stages: RISK_STAGES, currentStage: 'TREATMENT_PLANNED', progress: 50,
+    owner: 'Ahmed Al-Qahtani', ownerRole: 'CISO Office',
+    dueDate: '2026-05-12', ageDays: 18, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'Approve treatment plan', href: '/risk/1' },
+  { id: 'RWF-102', module: 'Risk', workflow: 'Risk Lifecycle', entityType: 'Risk', entityRef: 'R-0036',
+    title: 'AML Transaction Screening Gap', stages: RISK_STAGES, currentStage: 'ASSESSED', progress: 30,
+    owner: 'Faisal Al-Maliki', ownerRole: 'AML Lead',
+    dueDate: '2026-05-08', ageDays: 24, slaDays: 30, escalation: 'OVERDUE',
+    nextStep: 'Submit treatment plan', reason: 'SLA breach — exceeded by 4 days',
+    href: '/risk/7' },
+  { id: 'RWF-103', module: 'Risk', workflow: 'Risk Lifecycle', entityType: 'Risk', entityRef: 'R-0033',
+    title: 'Cross-Border Data Transfer Compliance', stages: RISK_STAGES, currentStage: 'IMPLEMENTING', progress: 65,
+    owner: 'Mona Al-Bishi', ownerRole: 'DPO',
+    dueDate: '2026-06-20', ageDays: 33, slaDays: 60, escalation: 'ON_TRACK',
+    nextStep: 'Complete SCC adoption', href: '/risk/10' },
+  { id: 'RWF-104', module: 'Risk', workflow: 'Risk Lifecycle', entityType: 'Risk', entityRef: 'R-0034',
+    title: 'Vendor BCP Inadequacy', stages: RISK_STAGES, currentStage: 'IDENTIFIED', progress: 12,
+    owner: 'Sami Al-Qahtani', ownerRole: 'TPRM Lead',
+    dueDate: '2026-05-25', ageDays: 8, slaDays: 14, escalation: 'AT_RISK',
+    nextStep: 'Complete inherent assessment', href: '/risk/9' },
+  { id: 'RWF-105', module: 'Risk', workflow: 'KRI Breach Response', entityType: 'KRI', entityRef: 'KRI-TPRM-01',
+    title: 'Critical vendors without backup — RED band', stages: ['BREACH_DETECTED', 'TRIAGED', 'ACTION_PLAN', 'REMEDIATED', 'CLOSED'],
+    currentStage: 'TRIAGED', progress: 35,
+    owner: 'TPRM Committee', ownerRole: 'TPRM Lead',
+    dueDate: '2026-05-09', ageDays: 11, slaDays: 14, escalation: 'MANAGER_ESC',
+    reason: '4 critical vendors with no alternative — exceeds threshold of 3',
+    nextStep: 'Approve remediation plan' },
+  { id: 'RWF-106', module: 'Risk', workflow: 'Appetite Breach Response', entityType: 'Appetite', entityRef: 'AS-5104',
+    title: 'Vendor concentration — exceeded 25% threshold', stages: ['DETECTED', 'INVESTIGATED', 'TREATMENT', 'WITHIN_TOLERANCE'],
+    currentStage: 'INVESTIGATED', progress: 50,
+    owner: 'CFO',
+    dueDate: '2026-05-28', ageDays: 15, slaDays: 30, escalation: 'DIRECTOR_ESC',
+    reason: 'AWS spend share at 32% (tolerance 25%)',
+    nextStep: 'Present de-concentration plan to CFO' },
+];
+
+// ─── CAPA Closure (Compliance / Audit) ──────────────────────────────────────
+const CAPA_STAGES = ['IDENTIFIED', 'IMPLEMENTING', 'OWNER_TESTED', 'INDEPENDENT_TESTED', 'AUDIT_SIGNED_OFF', 'CLOSED'];
+
+export const COMPLIANCE_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'CWF-201', module: 'Compliance', workflow: 'CAPA Closure', entityType: 'Finding', entityRef: 'AUD-F-031',
+    title: 'Cross-border data transfer mechanism not formalised', stages: CAPA_STAGES, currentStage: 'IMPLEMENTING', progress: 35,
+    owner: 'Mona Al-Bishi', ownerRole: 'DPO',
+    dueDate: '2026-06-30', ageDays: 19, slaDays: 60, escalation: 'ON_TRACK',
+    nextStep: 'Complete owner testing', href: '/findings/31' },
+  { id: 'CWF-202', module: 'Compliance', workflow: 'CAPA Closure', entityType: 'Finding', entityRef: 'AUD-F-032',
+    title: 'Privileged session recording not extended to DBA bastion', stages: CAPA_STAGES, currentStage: 'OWNER_TESTED', progress: 55,
+    owner: 'PAM Team', ownerRole: 'IAM Lead',
+    dueDate: '2026-05-31', ageDays: 26, slaDays: 45, escalation: 'AT_RISK',
+    nextStep: 'Schedule independent test', href: '/findings/32' },
+  { id: 'CWF-203', module: 'Compliance', workflow: 'CAPA Closure', entityType: 'Finding', entityRef: 'AUD-F-033',
+    title: 'SIEM tuning false-positive rate above threshold', stages: CAPA_STAGES, currentStage: 'OWNER_TESTED', progress: 55,
+    owner: 'SOC Lead', ownerRole: 'SOC Manager',
+    dueDate: '2026-06-30', ageDays: 33, slaDays: 60, escalation: 'ON_TRACK',
+    nextStep: 'Schedule independent test', href: '/findings/33' },
+  { id: 'CWF-204', module: 'Compliance', workflow: 'CAPA Closure', entityType: 'Finding', entityRef: 'AUD-F-034',
+    title: 'Cryptographic key rotation policy needs annual cadence', stages: CAPA_STAGES, currentStage: 'INDEPENDENT_TESTED', progress: 75,
+    owner: 'PKI Team', ownerRole: 'Crypto Lead',
+    dueDate: '2026-05-15', ageDays: 41, slaDays: 60, escalation: 'AT_RISK',
+    nextStep: 'Audit sign-off', href: '/findings/34' },
+  { id: 'CWF-205', module: 'Compliance', workflow: 'CAPA Closure', entityType: 'Finding', entityRef: 'AUD-F-036',
+    title: 'External vendor SOC 2 attestation overdue', stages: CAPA_STAGES, currentStage: 'IDENTIFIED', progress: 8,
+    owner: 'TPRM Lead',
+    dueDate: '2026-05-30', ageDays: 5, slaDays: 30, escalation: 'ON_TRACK',
+    nextStep: 'Plan remediation', href: '/findings/36' },
+  { id: 'CWF-206', module: 'Compliance', workflow: 'CAPA Closure', entityType: 'Finding', entityRef: 'AUD-F-038',
+    title: 'CCTV retention exceeds policy at three branches', stages: CAPA_STAGES, currentStage: 'AUDIT_SIGNED_OFF', progress: 85,
+    owner: 'DPO Office',
+    dueDate: '2026-05-20', ageDays: 49, slaDays: 60, escalation: 'AT_RISK',
+    nextStep: 'Close finding', href: '/findings/38' },
+  { id: 'CWF-207', module: 'Compliance', workflow: 'Regulatory Change Implementation', entityType: 'Change', entityRef: 'REG-2026-001',
+    title: 'PDPL Implementing Regulations — 2026 amendments',
+    stages: ['NEW', 'APPLICABILITY_ASSESSED', 'IMPACT_ASSESSED', 'CONTROLS_UPDATED', 'CLOSED'],
+    currentStage: 'IMPACT_ASSESSED', progress: 50,
+    owner: 'DPO + Legal', ownerRole: 'Compliance Office',
+    dueDate: '2026-08-15', ageDays: 75, slaDays: 180, escalation: 'ON_TRACK',
+    nextStep: 'Update affected controls (12)' },
+  { id: 'CWF-208', module: 'Compliance', workflow: 'Policy Approval', entityType: 'Policy', entityRef: 'POL-AI-001',
+    title: 'Acceptable AI Use Policy', stages: ['DRAFT', 'LEGAL_REVIEW', 'EXEC_APPROVAL', 'PUBLISHED', 'REVIEW_DUE', 'RETIRED'],
+    currentStage: 'LEGAL_REVIEW', progress: 35,
+    owner: 'CISO + Legal', ownerRole: 'Legal Counsel',
+    dueDate: '2026-06-01', ageDays: 22, slaDays: 60, escalation: 'ON_TRACK',
+    nextStep: 'Legal sign-off', href: '/policies/55' },
+  { id: 'CWF-209', module: 'Compliance', workflow: 'Audit Engagement', entityType: 'Engagement', entityRef: 'AUD-2026-003',
+    title: 'SAMA CSF External Audit — fieldwork in progress',
+    stages: ['PLANNED', 'OPENING', 'FIELDWORK', 'REPORT_ISSUED', 'CLOSED'],
+    currentStage: 'FIELDWORK', progress: 60,
+    owner: 'EY MENA', ownerRole: 'External Auditor',
+    dueDate: '2026-05-31', ageDays: 12, slaDays: 45, escalation: 'ON_TRACK',
+    nextStep: 'Complete fieldwork; deliver report' },
+];
+
+// ─── Cyber workflows ────────────────────────────────────────────────────────
+const CYBER_INC_STAGES = ['DETECTION', 'TRIAGE', 'CONTAINMENT', 'INVESTIGATION', 'ERADICATION', 'RECOVERY', 'CLOSURE'];
+const VULN_STAGES      = ['REGISTERED', 'CLASSIFICATION', 'OWNER_ASSIGNMENT', 'REMEDIATION', 'VERIFICATION', 'CLOSED'];
+
+export const CYBER_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'CYW-301', module: 'Cyber', workflow: 'Incident Response (NIST 800-61)', entityType: 'Incident', entityRef: 'CYB-INC-2026-019',
+    title: 'Phishing campaign targeting finance team', stages: CYBER_INC_STAGES, currentStage: 'INVESTIGATION', progress: 50,
+    owner: 'CSIRT Lead', ownerRole: 'Cyber CSIRT',
+    dueDate: '2026-05-04', ageDays: 7, slaDays: 14, escalation: 'AT_RISK',
+    nextStep: 'Complete forensic root-cause' },
+  { id: 'CYW-302', module: 'Cyber', workflow: 'Incident Response (NIST 800-61)', entityType: 'Incident', entityRef: 'CYB-INC-2026-018',
+    title: 'Ransomware attempt on file share', stages: CYBER_INC_STAGES, currentStage: 'CONTAINMENT', progress: 30,
+    owner: 'CSIRT Lead', ownerRole: 'Cyber CSIRT',
+    dueDate: '2026-04-29', ageDays: 10, slaDays: 7, escalation: 'EXEC_ESC',
+    reason: 'Critical severity — exec committee notified, BCM handoff active',
+    nextStep: 'Complete containment, begin eradication' },
+  { id: 'CYW-303', module: 'Cyber', workflow: 'Vulnerability Remediation', entityType: 'Vulnerability', entityRef: 'CVE-2025-3041',
+    title: 'RCE in web frontend (Spring Web)', stages: VULN_STAGES, currentStage: 'REMEDIATION', progress: 60,
+    owner: 'Eng Team', ownerRole: 'AppSec Lead',
+    dueDate: '2026-04-29', ageDays: 7, slaDays: 7, escalation: 'OVERDUE',
+    reason: 'Critical SLA breach by 1 day',
+    nextStep: 'Apply production patch tonight' },
+  { id: 'CYW-304', module: 'Cyber', workflow: 'Vulnerability Remediation', entityType: 'Vulnerability', entityRef: 'CVE-2025-2918',
+    title: 'SSRF in API gateway plugin', stages: VULN_STAGES, currentStage: 'OWNER_ASSIGNMENT', progress: 30,
+    owner: 'Platform Lead',
+    dueDate: '2026-05-03', ageDays: 10, slaDays: 14, escalation: 'AT_RISK',
+    nextStep: 'Begin remediation' },
+  { id: 'CYW-305', module: 'Cyber', workflow: 'Control Assessment', entityType: 'Control', entityRef: 'AC-2.1.2',
+    title: 'Privileged access review', stages: ['PLANNED', 'EVIDENCE_COLLECTION', 'TESTING', 'REVIEW', 'COMPLETED'],
+    currentStage: 'EVIDENCE_COLLECTION', progress: 40,
+    owner: 'PAM Team', ownerRole: 'IAM Lead',
+    dueDate: '2026-05-15', ageDays: 11, slaDays: 30, escalation: 'ON_TRACK',
+    nextStep: 'Complete sample testing' },
+  { id: 'CYW-306', module: 'Cyber', workflow: 'Vulnerability Exception', entityType: 'Exception', entityRef: 'EXC-402',
+    title: 'Jenkins auth bypass — segmented network', stages: ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXPIRED'],
+    currentStage: 'PENDING_APPROVAL', progress: 50,
+    owner: 'DevOps Lead',
+    dueDate: '2026-05-09', ageDays: 4, slaDays: 14, escalation: 'ON_TRACK',
+    nextStep: 'CISO approval' },
+];
+
+// ─── Privacy workflows ──────────────────────────────────────────────────────
+const DSR_STAGES   = ['RECEIVED', 'IDENTITY_VERIFIED', 'IN_PROGRESS', 'FULFILLED', 'CLOSED'];
+const BREACH_STAGES = ['DETECTED', 'TRIAGE', 'CONTAINMENT', 'NOTIFIED_DPA', 'NOTIFIED_DATA_SUBJECTS', 'CLOSED'];
+const DPIA_STAGES  = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'EXPIRED'];
+
+export const PRIVACY_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'PWF-401', module: 'Privacy', workflow: 'DSR Fulfilment (PDPL 30-day)', entityType: 'DSR', entityRef: 'DSR-2026-013',
+    title: 'Erasure request — Layla Al-Saud', stages: DSR_STAGES, currentStage: 'IDENTITY_VERIFIED', progress: 35,
+    owner: 'DPO',
+    dueDate: '2026-04-29', ageDays: 12, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'Process erasure across all systems' },
+  { id: 'PWF-402', module: 'Privacy', workflow: 'DSR Fulfilment (PDPL 30-day)', entityType: 'DSR', entityRef: 'DSR-2026-014',
+    title: 'Access request — Ahmed Al-Mutairi', stages: DSR_STAGES, currentStage: 'IN_PROGRESS', progress: 50,
+    owner: 'DPO',
+    dueDate: '2026-05-25', ageDays: 9, slaDays: 30, escalation: 'ON_TRACK',
+    nextStep: 'Compile data inventory + dispatch' },
+  { id: 'PWF-403', module: 'Privacy', workflow: 'Breach Notification (PDPL 72-hour)', entityType: 'Breach', entityRef: 'BR-13',
+    title: 'Vendor system mis-configuration exposed customer records', stages: BREACH_STAGES, currentStage: 'NOTIFIED_DPA', progress: 70,
+    owner: 'DPO + Legal',
+    dueDate: '2026-04-05', ageDays: 32, slaDays: 30, escalation: 'OVERDUE',
+    reason: '72-hour data-subject notification deadline approaching',
+    nextStep: 'Notify affected data subjects (18,440)' },
+  { id: 'PWF-404', module: 'Privacy', workflow: 'DPIA Review', entityType: 'DPIA', entityRef: 'DPIA-42',
+    title: 'Cross-border payroll vendor', stages: DPIA_STAGES, currentStage: 'IN_REVIEW', progress: 50,
+    owner: 'DPO + Legal',
+    dueDate: '2026-05-12', ageDays: 21, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'Approve / reject', href: '/dpias/42' },
+  { id: 'PWF-405', module: 'Privacy', workflow: 'DPIA Review', entityType: 'DPIA', entityRef: 'DPIA-45',
+    title: 'Employee wellness programme', stages: DPIA_STAGES, currentStage: 'DRAFT', progress: 15,
+    owner: 'HR + DPO',
+    dueDate: '2026-06-15', ageDays: 7, slaDays: 60, escalation: 'ON_TRACK',
+    nextStep: 'Submit for review', href: '/dpias/45' },
+  { id: 'PWF-406', module: 'Privacy', workflow: 'DPIA Review', entityType: 'DPIA', entityRef: 'DPIA-46',
+    title: 'Customer-service transcript analytics — re-assessment', stages: DPIA_STAGES, currentStage: 'EXPIRED', progress: 95,
+    owner: 'DPO',
+    dueDate: '2025-09-10', ageDays: 235, slaDays: 365, escalation: 'EXEC_ESC',
+    reason: 'Original assessment expired 7+ months ago — exec escalation',
+    nextStep: 'Re-assess immediately', href: '/dpias/46' },
+];
+
+// ─── BCM workflows ──────────────────────────────────────────────────────────
+const PLAN_STAGES = ['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'INVOKED', 'RESTORED'];
+const EXERCISE_STAGES = ['PLANNED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'SCORED'];
+
+export const BCM_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'BWF-501', module: 'BCM', workflow: 'BCP Plan Approval', entityType: 'Plan', entityRef: 'BCP-004',
+    title: 'Branch Network Continuity', stages: PLAN_STAGES, currentStage: 'UNDER_REVIEW', progress: 35,
+    owner: 'Sara Al-Dosari', ownerRole: 'BCM Coordinator',
+    dueDate: '2026-05-10', ageDays: 19, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'BCM committee approval' },
+  { id: 'BWF-502', module: 'BCM', workflow: 'BCP Plan Approval', entityType: 'Plan', entityRef: 'BCP-005',
+    title: 'Workforce Remote Operations', stages: PLAN_STAGES, currentStage: 'DRAFT', progress: 12,
+    owner: 'Noura Al-Harbi', ownerRole: 'HR Operations',
+    dueDate: '2026-06-30', ageDays: 5, slaDays: 60, escalation: 'ON_TRACK',
+    nextStep: 'Submit for review' },
+  { id: 'BWF-503', module: 'BCM', workflow: 'Exercise Execution', entityType: 'Exercise', entityRef: 'EX-56',
+    title: 'Branch Network Failover (5 sites)', stages: EXERCISE_STAGES, currentStage: 'SCHEDULED', progress: 35,
+    owner: 'Sara Al-Dosari',
+    dueDate: '2026-05-12', ageDays: 14, slaDays: 30, escalation: 'ON_TRACK',
+    nextStep: 'Run failover scenario' },
+  { id: 'BWF-504', module: 'BCM', workflow: 'Crisis Activation', entityType: 'Plan', entityRef: 'CMP-001',
+    title: 'Crisis Management Plan — quarterly readiness check',
+    stages: ['STANDBY', 'PRE-ACTIVATION', 'ACTIVATED', 'STAND_DOWN'],
+    currentStage: 'STANDBY', progress: 25,
+    owner: 'Faisal Al-Maliki', ownerRole: 'Crisis Manager',
+    dueDate: '2026-06-30', ageDays: 12, slaDays: 90, escalation: 'ON_TRACK',
+    nextStep: 'Quarterly readiness review' },
+];
+
+// ─── TPRM workflows ─────────────────────────────────────────────────────────
+const TPRM_STAGES = ['REGISTERED', 'DUE_DILIGENCE', 'CONTRACT_NEGOTIATION', 'ACTIVE', 'REVIEW_DUE', 'EXIT'];
+
+export const TPRM_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'TWF-601', module: 'TPRM', workflow: 'Vendor Onboarding', entityType: 'Vendor', entityRef: 'V-204',
+    title: 'NEOM Tech Services — onboarding', stages: TPRM_STAGES, currentStage: 'DUE_DILIGENCE', progress: 25,
+    owner: 'TPRM Analyst',
+    dueDate: '2026-05-25', ageDays: 12, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'Complete security questionnaire' },
+  { id: 'TWF-602', module: 'TPRM', workflow: 'Vendor Re-assessment', entityType: 'Vendor', entityRef: 'V-104',
+    title: 'Tabuk Logistics Group — annual review', stages: TPRM_STAGES, currentStage: 'REVIEW_DUE', progress: 70,
+    owner: 'TPRM Lead',
+    dueDate: '2026-04-29', ageDays: 21, slaDays: 14, escalation: 'OVERDUE',
+    reason: 'Annual review SLA breached (Q1 SLA)',
+    nextStep: 'Complete re-assessment' },
+  { id: 'TWF-603', module: 'TPRM', workflow: 'Contract Renewal', entityType: 'Contract', entityRef: 'STC-MSP-2024-077',
+    title: 'STC Cloud — sovereign hosting renewal', stages: ['RENEWAL_DUE', 'RFP', 'NEGOTIATION', 'SIGNED'],
+    currentStage: 'RFP', progress: 30,
+    owner: 'Procurement + CIO',
+    dueDate: '2026-06-30', ageDays: 30, slaDays: 90, escalation: 'ON_TRACK',
+    nextStep: 'Issue RFP' },
+];
+
+// ─── SCM workflows ──────────────────────────────────────────────────────────
+const SCM_ONB_STAGES = ['REGISTRATION', 'CRITICALITY_CLASSIFICATION', 'SECURITY_REVIEW', 'OPERATIONAL_REVIEW', 'LEGAL_REVIEW', 'APPROVAL'];
+
+export const SCM_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'SWF-701', module: 'SCM', workflow: 'Supplier Onboarding (6-stage)', entityType: 'Supplier', entityRef: 'V-4',
+    title: 'Tabuk Logistics Group', stages: SCM_ONB_STAGES, currentStage: 'OPERATIONAL_REVIEW', progress: 60,
+    owner: 'Procurement Lead',
+    dueDate: '2026-05-20', ageDays: 18, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'Confirm Tabuk + Hail coverage' },
+  { id: 'SWF-702', module: 'SCM', workflow: 'Supplier Onboarding (6-stage)', entityType: 'Supplier', entityRef: 'V-13',
+    title: 'Almarai Foodservice', stages: SCM_ONB_STAGES, currentStage: 'LEGAL_REVIEW', progress: 75,
+    owner: 'Legal Counsel',
+    dueDate: '2026-05-08', ageDays: 25, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'Cold-chain SLA addendum' },
+  { id: 'SWF-703', module: 'SCM', workflow: 'Supplier Onboarding (6-stage)', entityType: 'Supplier', entityRef: 'V-15',
+    title: 'PwC Saudi Tax Bureau', stages: SCM_ONB_STAGES, currentStage: 'APPROVAL', progress: 95,
+    owner: 'CFO Office',
+    dueDate: '2026-05-04', ageDays: 28, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'CFO sign-off' },
+  { id: 'SWF-704', module: 'SCM', workflow: 'Disruption Response', entityType: 'Incident', entityRef: 'SC-INC-2026-014',
+    title: 'Mobily — 6h MPLS outage on HQ-DR circuit',
+    stages: ['REPORT', 'CONTAIN', 'RECOVER', 'CAPA', 'CLOSE'],
+    currentStage: 'CAPA', progress: 70,
+    owner: 'Network Lead',
+    dueDate: '2026-05-19', ageDays: 11, slaDays: 30, escalation: 'MANAGER_ESC',
+    reason: 'SLA breach + critical path',
+    nextStep: 'Implement SD-WAN diversification' },
+  { id: 'SWF-705', module: 'SCM', workflow: 'Disruption Response', entityType: 'Incident', entityRef: 'SC-INC-2026-013',
+    title: 'Tabuk Logistics — 3 missed delivery SLAs in Q1',
+    stages: ['REPORT', 'CONTAIN', 'RECOVER', 'CAPA', 'CLOSE'],
+    currentStage: 'CAPA', progress: 60,
+    owner: 'TPRM Lead',
+    dueDate: '2026-05-08', ageDays: 22, slaDays: 30, escalation: 'AT_RISK',
+    nextStep: 'Onboard backup carrier' },
+];
+
+// ─── Ethics & Compliance ────────────────────────────────────────────────────
+const ETHICS_CASE_STAGES = ['INTAKE', 'TRIAGE', 'INVESTIGATION', 'OUTCOME', 'CLOSED'];
+
+export const ETHICS_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'EWF-801', module: 'Ethics', workflow: 'Whistleblower Investigation', entityType: 'Case', entityRef: 'ETH-2026-019',
+    title: 'Alleged kickback from regional supplier', stages: ETHICS_CASE_STAGES, currentStage: 'INVESTIGATION', progress: 50,
+    owner: 'Investigator + Legal',
+    dueDate: '2026-05-30', ageDays: 18, slaDays: 60, escalation: 'ON_TRACK',
+    nextStep: 'Complete witness interviews' },
+  { id: 'EWF-802', module: 'Ethics', workflow: 'AML Alert Triage', entityType: 'AML Alert', entityRef: 'AML-2026-441',
+    title: 'Structuring pattern — high-risk geo (Lebanon)', stages: ['NEW', 'ASSIGNED', 'INVESTIGATION', 'CLEARED_OR_STR', 'CLOSED'],
+    currentStage: 'INVESTIGATION', progress: 60,
+    owner: 'AML Analyst', ownerRole: 'AML Team',
+    dueDate: '2026-04-30', ageDays: 8, slaDays: 5, escalation: 'OVERDUE',
+    reason: 'Critical alert SLA breach (5d)',
+    nextStep: 'File STR with SAFIU or clear' },
+  { id: 'EWF-803', module: 'Ethics', workflow: 'Disclosure Decision', entityType: 'Disclosure', entityRef: 'DIS-2026-088',
+    title: 'Conflict of interest — board director', stages: ['SUBMITTED', 'COMMITTEE_REVIEW', 'DECIDED', 'RECUSED'],
+    currentStage: 'COMMITTEE_REVIEW', progress: 50,
+    owner: 'Board Secretary',
+    dueDate: '2026-05-15', ageDays: 10, slaDays: 30, escalation: 'ON_TRACK',
+    nextStep: 'Committee decision' },
+  { id: 'EWF-804', module: 'Ethics', workflow: 'KYC Onboarding', entityType: 'Subject', entityRef: 'KYC-2026-2204',
+    title: 'New PEP customer — enhanced due diligence', stages: ['CDD', 'EDD', 'SCREENING', 'APPROVED', 'PERIODIC_REVIEW'],
+    currentStage: 'EDD', progress: 50,
+    owner: 'KYC Analyst',
+    dueDate: '2026-05-10', ageDays: 6, slaDays: 14, escalation: 'ON_TRACK',
+    nextStep: 'Run sanctions / PEP screening' },
+];
+
+// ─── Evidence Management ────────────────────────────────────────────────────
+const EVIDENCE_STAGES = ['REQUESTED', 'COLLECTED', 'PENDING_REVIEW', 'APPROVED', 'EXPIRED'];
+
+export const EVIDENCE_WORKFLOWS: WorkflowInstance[] = [
+  { id: 'EVW-901', module: 'Evidence', workflow: 'Evidence Review', entityType: 'Evidence', entityRef: 'EV-1081',
+    title: 'Firewall Rules Configuration Snapshot', stages: EVIDENCE_STAGES, currentStage: 'PENDING_REVIEW', progress: 50,
+    owner: 'Network Reviewer',
+    dueDate: '2026-05-06', ageDays: 12, slaDays: 14, escalation: 'AT_RISK',
+    nextStep: 'Approve or request changes' },
+  { id: 'EVW-902', module: 'Evidence', workflow: 'Evidence Request', entityType: 'Request', entityRef: 'REQ-2026-039',
+    title: 'PDPL data-inventory refresh', stages: ['OPEN', 'IN_PROGRESS', 'COMPLETED', 'OVERDUE'],
+    currentStage: 'OVERDUE', progress: 50,
+    owner: 'DPO',
+    dueDate: '2026-04-15', ageDays: 47, slaDays: 30, escalation: 'DIRECTOR_ESC',
+    reason: 'Overdue 18 days — director escalation',
+    nextStep: 'Provide refreshed inventory' },
+  { id: 'EVW-903', module: 'Evidence', workflow: 'Evidence Renewal', entityType: 'Evidence', entityRef: 'EV-1078',
+    title: 'SAMA CSF Attestation Certificate 2025', stages: EVIDENCE_STAGES, currentStage: 'EXPIRED', progress: 100,
+    owner: 'Compliance Lead',
+    dueDate: '2026-04-30', ageDays: 4, slaDays: 30, escalation: 'OVERDUE',
+    reason: 'Certificate expired 4 days ago',
+    nextStep: 'Re-attestation required' },
+];
+
+// Sprint 4 — synthesise WorkflowInstances from any Saudi appetite statement
+// currently outside its tolerance band. Lets the SLA engine treat appetite
+// breaches as first-class workflow citizens (countdown, escalation, Hijri).
+export const APPETITE_BREACH_WORKFLOWS: WorkflowInstance[] =
+  synthesiseAllBreaches(SAUDI_APPETITES).map(b => b.workflow);
+
+// Sprint 4 — synthesise WorkflowInstances from each open audit engagement's
+// current milestone (opening / fieldwork-end / closure) so audit deadlines
+// surface in the same SLA pulse as risk and privacy.
+export const AUDIT_ENGAGEMENT_WORKFLOWS: WorkflowInstance[] =
+  synthesiseAllEngagementWorkflows(AUDIT_ENGAGEMENTS);
+
+// Sprint 4 — CCM stale-evidence workflows. Every connector check whose
+// evidence has crossed the freshness window becomes a live workflow row.
+export const CCM_EVIDENCE_WORKFLOWS: WorkflowInstance[] =
+  synthesiseStaleEvidenceWorkflows();
+
+// Sprint 5 — every pending cross-module approval becomes a SLA-tracked
+// workflow row so the cross-module pulse sees them alongside everything
+// else and an approver who's running late surfaces in the escalation tier.
+export const APPROVAL_WORKFLOWS: WorkflowInstance[] =
+  synthesiseApprovalWorkflows();
+
+// ─── Cross-module aggregator ────────────────────────────────────────────────
+// Sprint 4 SLA-engine consumers (LiveSlaPulse, escalation-runtime telemetry)
+// iterate over every active instance regardless of source module.
+export const ALL_WORKFLOWS: WorkflowInstance[] = [
+  ...RISK_WORKFLOWS,
+  ...COMPLIANCE_WORKFLOWS,
+  ...CYBER_WORKFLOWS,
+  ...PRIVACY_WORKFLOWS,
+  ...BCM_WORKFLOWS,
+  ...TPRM_WORKFLOWS,
+  ...SCM_WORKFLOWS,
+  ...ETHICS_WORKFLOWS,
+  ...EVIDENCE_WORKFLOWS,
+  ...APPETITE_BREACH_WORKFLOWS,
+  ...AUDIT_ENGAGEMENT_WORKFLOWS,
+  ...CCM_EVIDENCE_WORKFLOWS,
+  ...APPROVAL_WORKFLOWS,
+];

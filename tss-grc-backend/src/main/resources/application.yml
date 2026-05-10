@@ -123,7 +123,9 @@ springdoc:
 grc:
   # JWT authentication
   jwt:
-    secret: ${JWT_SECRET:change-this-to-a-256-bit-secret-key-in-production}
+    # No default — JwtTokenProvider.@PostConstruct fails fast if missing/weak.
+    # Provide via JWT_SECRET env var; minimum 32 chars; must not start with placeholder text.
+    secret: ${JWT_SECRET:}
     access-token-expiry-ms: ${JWT_ACCESS_EXPIRY_MS:900000}        # 15 minutes
     refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY_MS:604800000}   # 7 days
 

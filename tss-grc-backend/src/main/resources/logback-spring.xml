@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TSS GRC Platform — Logback configuration.
+
+  - dev profile: human-readable console output (default Spring Boot pattern).
+  - prod profile: JSON structured logs (Logstash encoder) → easy to ship into
+    Loki / ELK / CloudWatch. Plus rolling file appender to /var/log/tss-grc/.
+-->
+<configuration>
+
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <!-- ─── Dev / default — pretty console ─────────────────────────────── -->
+  <springProfile name="!prod">
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder>
+        <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+        <charset>UTF-8</charset>
+      </encoder>
+    </appender>
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+
+  <!-- ─── Prod — JSON to stdout + rolling file ───────────────────────── -->
+  <springProfile name="prod">
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+        <providers>
+          <timestamp>
+            <fieldName>@timestamp</fieldName>
+          </timestamp>
+          <version>
+            <fieldName>@version</fieldName>
+          </version>
+          <pattern>
+            <pattern>
+              {
+                "service":"tss-grc-platform",
+                "env":"${SPRING_PROFILES_ACTIVE:-prod}",
+                "host":"${HOSTNAME:-unknown}"
+              }
+            </pattern>
+          </pattern>
+          <mdc/>
+          <logLevel/>
+          <loggerName/>
+          <threadName/>
+          <message/>
+          <stackTrace/>
+        </providers>
+      </encoder>
+    </appender>
+
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>/var/log/tss-grc/application.json</file>
+      <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>/var/log/tss-grc/application.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+        <maxFileSize>50MB</maxFileSize>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>1GB</totalSizeCap>
+      </rollingPolicy>
+      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+        <providers>
+          <timestamp><fieldName>@timestamp</fieldName></timestamp>
+          <version><fieldName>@version</fieldName></version>
+          <pattern>
+            <pattern>{"service":"tss-grc-platform","env":"prod"}</pattern>
+          </pattern>
+          <mdc/>
+          <logLevel/>
+          <loggerName/>
+          <threadName/>
+          <message/>
+          <stackTrace/>
+        </providers>
+      </encoder>
+    </appender>
+
+    <root level="INFO">
+      <appender-ref ref="JSON_CONSOLE"/>
+      <appender-ref ref="JSON_FILE"/>
+    </root>
+  </springProfile>
+
+</configuration>

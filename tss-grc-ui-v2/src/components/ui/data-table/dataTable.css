@@ -1,0 +1,151 @@
+/*
+ * DataTable v2 — TanStack Table styles.
+ * Imported by DataTableV2.tsx via the index.ts barrel (in App.tsx).
+ * Uses the same design tokens as the rest of the UI (--surface-1, --ink-1, etc.).
+ */
+
+.dt2-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dt2-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.dt2-scroll {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+
+.dt2 {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dt2-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.dt2-head th {
+  text-align: start;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.dt2-sortable {
+  cursor: pointer;
+}
+
+.dt2-sortable:hover {
+  background: var(--surface-3, rgba(0,0,0,0.03));
+}
+
+.dt2-row td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-1);
+  vertical-align: middle;
+}
+
+.dt2-row-clickable {
+  cursor: pointer;
+}
+
+.dt2-row-clickable:hover {
+  background: var(--surface-2);
+}
+
+/* Density variants */
+.dt2-density-compact     .dt2-row td { padding: 4px 12px; }
+.dt2-density-comfortable .dt2-row td { padding: 14px 12px; }
+
+/* Skeleton */
+.dt2-skel td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.dt2-skel-bar {
+  display: block;
+  height: 12px;
+  width: 80%;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3, rgba(0,0,0,0.06)) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  border-radius: 2px;
+  animation: dt2-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes dt2-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Empty */
+.dt2-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--ink-3);
+}
+
+/* Footer / pagination */
+.dt2-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.dt2-page-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.dt2-page-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.dt2-page-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.dt2-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* RTL — reverse pagination icons */
+[dir="rtl"] .dt2 {
+  /* No specific reversal needed for the icons (chevrons are direction-agnostic
+     in our tokens), but text alignment naturally flips via the start keyword. */
+}

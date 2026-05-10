@@ -10,5 +10,8 @@ public record FindingRequest(
     @Size(max = 255)           String owner,
     String                     capa,
     LocalDate                  dueDate,
-    @Size(max = 50)            String status
+    @Size(max = 50)            String status,
+    // Framework anchor (IA-2)
+    Long                       frameworkId,
+    @Size(max = 100)           String clauseRef
 ) {}

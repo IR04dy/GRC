@@ -8,7 +8,9 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.0</version>
+        <!-- Sprint 4 §4.3: bumped from 3.5.0 to 3.5.6 for CVE patches in
+             3.5.1..3.5.6 (CVE-2025-XXXX series in spring-security + Tomcat). -->
+        <version>3.5.6</version>
         <relativePath/>
     </parent>
 
@@ -25,13 +27,14 @@
     <properties>
         <java.version>17</java.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <lombok.version>1.18.30</lombok.version>
-        <mssql.version>12.6.1.jre11</mssql.version>
+        <!-- Sprint 4 §4.3 — patch-level bumps for CVE coverage. Major versions held. -->
+        <lombok.version>1.18.34</lombok.version>      <!-- was 1.18.30 -->
+        <mssql.version>12.8.1.jre11</mssql.version>   <!-- was 12.6.1.jre11 -->
         <flyway.version>10.15.0</flyway.version>
         <poi.version>5.2.5</poi.version>
         <openpdf.version>1.3.34</openpdf.version>
         <springdoc.version>2.8.6</springdoc.version>
-        <caffeine.version>3.1.8</caffeine.version>
+        <caffeine.version>3.2.0</caffeine.version>    <!-- was 3.1.8 -->
         <jjwt.version>0.12.6</jjwt.version>
     </properties>
 
@@ -162,6 +165,36 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-ldap</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- ── WebSocket / STOMP (Sprint 4 §2.7) ─────────────────────── -->
+        <!-- Real-time push for notifications, lifecycle transitions, SLA pulses.
+             Topics namespaced by org.{orgId}.* for tenant isolation. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
+        <!-- ── Telemetry (Sprint 4 §4.4) ─────────────────────────────── -->
+        <!-- Prometheus scrape endpoint at /actuator/prometheus on the
+             management port (8090 in prod). Enables Grafana dashboards. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!-- JSON-encoded log output for prod (parses cleanly in Loki/ELK). -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>8.0</version>
+        </dependency>
+
+        <!-- Sentry — error tracking. No-op until SENTRY_DSN env var is set
+             in application-prod.yml (free tier covers small deployments). -->
+        <dependency>
+            <groupId>io.sentry</groupId>
+            <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+            <version>7.18.0</version>
         </dependency>
 
         <!-- ── Testing ─────────────────────────────────────────────────── -->

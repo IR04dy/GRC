@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.controller;
 
+import com.tss.grc.module.bcm.entity.BcmExercise;
 import com.tss.grc.module.bcm.entity.BcmPlan;
 import com.tss.grc.module.bcm.entity.BiaRecord;
 import com.tss.grc.module.bcm.entity.CriticalProcess;
@@ -58,6 +59,31 @@ public class BcmController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePlan(@PathVariable Long id) {
         bcmService.deletePlan(id);
+    }
+
+    // ── Plan workflow actions (ISO 22301 lifecycle) ──────────────────────────
+    @PostMapping("/plans/{id}/submit-for-review")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
+    public BcmPlan submitPlanForReview(@PathVariable Long id) {
+        return bcmService.submitForReview(id);
+    }
+
+    @PostMapping("/plans/{id}/approve")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
+    public BcmPlan approvePlan(@PathVariable Long id) {
+        return bcmService.approvePlan(id);
+    }
+
+    @PostMapping("/plans/{id}/invoke")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
+    public BcmPlan invokePlan(@PathVariable Long id) {
+        return bcmService.invokePlan(id);
+    }
+
+    @PostMapping("/plans/{id}/restore")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
+    public BcmPlan restorePlan(@PathVariable Long id) {
+        return bcmService.restorePlan(id);
     }
 
     // ── Critical Processes ────────────────────────────────────────────────────
@@ -120,6 +146,48 @@ public class BcmController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBia(@PathVariable Long id) {
         bcmService.deleteBia(id);
+    }
+
+    // ── Exercises ────────────────────────────────────────────────────────────
+
+    @GetMapping("/exercises")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
+    public Page<BcmExercise> listExercises(@PageableDefault(size = 50) Pageable pageable) {
+        return bcmService.listExercises(pageable);
+    }
+
+    @GetMapping("/exercises/{id}")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
+    public BcmExercise getExercise(@PathVariable Long id) {
+        return bcmService.getExercise(id);
+    }
+
+    @PostMapping("/exercises")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public BcmExercise createExercise(@RequestBody BcmExercise req) {
+        return bcmService.createExercise(req);
+    }
+
+    @PutMapping("/exercises/{id}")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
+    public BcmExercise updateExercise(@PathVariable Long id, @RequestBody BcmExercise req) {
+        return bcmService.updateExercise(id, req);
+    }
+
+    @DeleteMapping("/exercises/{id}")
+    @PreAuthorize("hasPermission('BCM', 'DELETE')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteExercise(@PathVariable Long id) {
+        bcmService.deleteExercise(id);
+    }
+
+    @PostMapping("/exercises/{id}/complete")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
+    public BcmExercise completeExercise(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Integer score = body.get("score") instanceof Number n ? n.intValue() : null;
+        String findings = body.get("findings") instanceof String s ? s : null;
+        return bcmService.completeExercise(id, score, findings);
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────────

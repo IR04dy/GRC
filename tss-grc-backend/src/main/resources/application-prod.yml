@@ -24,7 +24,16 @@ spring:
         format_sql: false
 
   flyway:
-    baseline-on-migrate: false             # Never baseline in production
+    enabled: true
+    locations: classpath:db/migration/sqlserver
+    # baseline-on-migrate: a fresh empty DB is migrated from V1 onwards.
+    # If you're upgrading an EXISTING DB that was bootstrapped pre-V1
+    # (i.e. via the old Python scripts) set FLYWAY_BASELINE_VERSION=2 via env
+    # var so Flyway treats V1+V2 as already applied and only runs V3 onwards.
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
+    baseline-version: ${FLYWAY_BASELINE_VERSION:0}
+    clean-disabled: true                   # NEVER run flyway:clean in production
+    validate-on-migrate: true
 
   thymeleaf:
     cache: true                            # Enable template caching
@@ -85,6 +94,15 @@ server:
   http2:
     enabled: true
 
+sentry:
+  # Sprint 4 §4.4 — error tracking. Auto-disabled when SENTRY_DSN is missing.
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENV:prod}
+  release: ${SENTRY_RELEASE:tss-grc-platform@0.1.0-SNAPSHOT}
+  traces-sample-rate: 0.1                  # 10% of requests for performance tracing
+  send-default-pii: false                  # Never send raw user identifiers
+  in-app-includes: com.tss.grc
+
 grc:
   security:
     session-timeout-minutes: 30
@@ -106,10 +124,22 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics       # Restrict actuator endpoints in production
+        # Sprint 4 §4.4 — added prometheus for scraping by Grafana / VictoriaMetrics.
+        # Management port is 8090 (separate from app port 8443); only expose to
+        # the metrics-collector network, never to the public internet.
+        include: health,info,metrics,prometheus
       base-path: /actuator
   endpoint:
     health:
       show-details: never
+    prometheus:
+      access: read_only
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true       # Enable percentile histograms for HTTP latency
+    tags:
+      application: tss-grc-platform
+      environment: prod
   server:
     port: 8090                             # Actuator on separate port, not exposed publicly

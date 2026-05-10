@@ -4,8 +4,10 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.cyber.dto.CyberDashboardDto;
 import com.tss.grc.module.cyber.entity.*;
 import com.tss.grc.module.cyber.repository.*;
+import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +32,9 @@ public class CyberService {
     private final CyberIncidentRepository incidentRepo;
     private final CyberEvidenceRepository evidenceRepo;
     private final CyberActionPlanRepository actionPlanRepo;
+
+    @Autowired(required = false)
+    private BroadcastHelper bcast;
 
     // ── Vulnerability escalation workflow ────────────────────────────────────
     private static final List<String> VULN_WORKFLOW = List.of(
@@ -239,7 +244,9 @@ public class CyberService {
     public ControlAssessment approveAssessment(Long id) {
         ControlAssessment a = getAssessment(id);
         a.setStatus("APPROVED");
-        return assessmentRepo.save(a);
+        ControlAssessment saved = assessmentRepo.save(a);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "cyber_assessment", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -258,6 +265,10 @@ public class CyberService {
         CyberActionPlan saved = actionPlanRepo.save(ap);
         assessment.setCapaId(saved.getId());
         assessmentRepo.save(assessment);
+        if (bcast != null) {
+            bcast.entity(saved.getOrganisationId(), "cyber_action_plan", saved.getId(), saved);
+            bcast.entity(assessment.getOrganisationId(), "cyber_assessment", assessment.getId(), assessment);
+        }
         return saved;
     }
 
@@ -308,7 +319,9 @@ public class CyberService {
         if (idx >= 0 && idx < VULN_WORKFLOW.size() - 1) {
             v.setWorkflowStatus(VULN_WORKFLOW.get(idx + 1));
         }
-        return vulnerabilityRepo.save(v);
+        Vulnerability saved = vulnerabilityRepo.save(v);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "vulnerability", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -340,7 +353,9 @@ public class CyberService {
                 .orElseThrow(() -> new EntityNotFoundException("VulnException not found: " + id));
         e.setWorkflowStatus("APPROVED");
         e.setApprovedAt(LocalDate.now());
-        return exceptionRepo.save(e);
+        VulnException saved = exceptionRepo.save(e);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "vuln_exception", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -403,7 +418,9 @@ public class CyberService {
         if (idx >= 0 && idx < INCIDENT_WORKFLOW.size() - 1) {
             inc.setWorkflowStatus(INCIDENT_WORKFLOW.get(idx + 1));
         }
-        return incidentRepo.save(inc);
+        CyberIncident saved = incidentRepo.save(inc);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "cyber_incident", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -529,7 +546,9 @@ public class CyberService {
         ap.setWorkflowStatus("COMPLETED");
         ap.setCompletedAt(LocalDate.now());
         ap.setProgressPct(100);
-        return actionPlanRepo.save(ap);
+        CyberActionPlan saved = actionPlanRepo.save(ap);
+        if (bcast != null) bcast.entity(saved.getOrganisationId(), "cyber_action_plan", saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
