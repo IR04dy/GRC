@@ -45,6 +45,7 @@ import { IntakeCatalogPage } from './pages/intake/IntakeCatalogPage';
 import { IntakeFormPage } from './pages/intake/IntakeFormPage';
 import { ConnectorsPage } from './pages/intake/ConnectorsPage';
 import { ApprovalInboxPage } from './pages/approvals/ApprovalInboxPage';
+import { SignaturesPage } from './pages/signatures/SignaturesPage';
 import { AssetRegisterPage } from './pages/assets/AssetRegisterPage';
 import { BoardPackPage } from './pages/board-pack/BoardPackPage';
 import { RegulatoryChangePage } from './pages/regulatory-change/RegulatoryChangePage';
@@ -225,6 +226,7 @@ export function App() {
 
               {/* Cross-module approval inbox (Sprint 5) */}
               <Route path="/approvals"          element={<ApprovalInboxPage />} />
+              <Route path="/signatures"         element={<SignaturesPage />} />
 
               {/* Unified asset register / CMDB-lite (Sprint 5) */}
               <Route path="/assets"             element={<AssetRegisterPage />} />
