@@ -4,6 +4,7 @@ import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, Refresh
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
          Newspaper, Briefcase, Activity, Leaf, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
+         Network, Share2, Bug,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -113,6 +114,8 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'ropa',       to: '/ropa',              Icon: Files,       labelKey: 'ropaSidebar' },
       { id: 'data-lc',    to: '/data-lifecycle',    Icon: Compass,     labelKey: 'pdplExtSidebar' },
       { id: 'cyb-pdpl',   to: '/cyber-pdpl-bridge', Icon: Workflow,    labelKey: 'cpbSidebar' },
+      { id: 'dsa',        to: '/data-sharing',         Icon: Share2,         labelKey: 'dsaSidebar' },
+      { id: 'proc-dd',    to: '/processor-assessments', Icon: ClipboardCheck, labelKey: 'procSidebar' },
     ],
   },
 
@@ -154,6 +157,9 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'scm',           to: '/scm',                   Icon: Truck,       labelKey: 'scmEyebrow' },
       { id: 'srp',           to: '/supplier-resilience',   Icon: ShieldCheck, labelKey: 'srpSidebar' },
       { id: 'clauses',       to: '/contract-clauses',      Icon: Stamp,       labelKey: 'cclSidebar' },
+      { id: 'fourth-party',  to: '/fourth-party',          Icon: Network,     labelKey: 'fpSidebar' },
+      { id: 'tpc',           to: '/third-party-cyber',     Icon: Bug,         labelKey: 'tpcSidebar' },
+      { id: 'res-tests',     to: '/resilience-tests',      Icon: Activity,    labelKey: 'srtSidebar' },
     ],
   },
 

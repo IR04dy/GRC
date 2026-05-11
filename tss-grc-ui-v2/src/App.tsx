@@ -88,6 +88,11 @@ import { FrameworkControlsPage } from './pages/framework-controls/FrameworkContr
 import { ContractClausesPage } from './pages/contract-clauses/ContractClausesPage';
 import { CyberPdplBridgePage } from './pages/cyber-pdpl-bridge/CyberPdplBridgePage';
 import { EvidenceChainPage } from './pages/evidence-chain/EvidenceChainPage';
+import { FourthPartyPage } from './pages/fourth-party/FourthPartyPage';
+import { DataSharingPage } from './pages/data-sharing/DataSharingPage';
+import { ProcessorAssessmentsPage } from './pages/processor-assessments/ProcessorAssessmentsPage';
+import { ThirdPartyCyberPage } from './pages/third-party-cyber/ThirdPartyCyberPage';
+import { ResilienceTestsPage } from './pages/resilience-tests/ResilienceTestsPage';
 
 export function App() {
   return (
@@ -129,6 +134,11 @@ export function App() {
               <Route path="/contract-clauses"   element={<ContractClausesPage />} />
               <Route path="/cyber-pdpl-bridge"  element={<CyberPdplBridgePage />} />
               <Route path="/evidence-chain"     element={<EvidenceChainPage />} />
+              <Route path="/fourth-party"           element={<FourthPartyPage />} />
+              <Route path="/data-sharing"           element={<DataSharingPage />} />
+              <Route path="/processor-assessments"  element={<ProcessorAssessmentsPage />} />
+              <Route path="/third-party-cyber"      element={<ThirdPartyCyberPage />} />
+              <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />

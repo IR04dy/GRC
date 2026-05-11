@@ -1,8 +1,8 @@
 # Saudi GRC Platform — Gap Analysis vs Implementation Prompt
 
-**Date:** 2026-05-11 (last refresh — late session, after V48/V49 polish)
+**Date:** 2026-05-11 (last refresh — final session, after V50-V54 close the 5 remaining ⚠ items)
 **Reference:** `Saudi_GRC_Platform_Claude_Code_Implementation_Prompt.md`
-**Branch surveyed:** `feat/pdpl-extensions` (HEAD `26ca75e`)
+**Branch surveyed:** `feat/pdpl-extensions`
 
 This document maps the prompt's 40+ required capabilities against the
 current platform and flags concrete gaps. It is the input to subsequent
@@ -196,21 +196,42 @@ in the day is now closed.
 
 ## What still remains in the gap (single source of truth)
 
-After today's polish, the **only** items the gap analysis still flags
-are 5 ⚠ entries — none of them are missing capability, all are
-documented design decisions:
+**Nothing.** As of this final session, every ⚠ item from the prior
+table has been closed with a dedicated entity + REST surface + bilingual
+page + seeded demo data. See "Final round" below.
 
-| # | Item | Why ⚠ |
+| # | Item | Status |
 |---|---|---|
-| 1 | Fourth-party exposure (SCM sub-tier vendor depth) | Needs a design call — questionnaire-driven vs API-driven sub-tier discovery. Sprint 6 candidate. |
-| 2 | Data sharing agreements (PDPL) | DSAs are CLM territory, not GRC. Out-of-scope by decision. |
-| 3 | Processor due diligence (PDPL) | Subsumed by `VendorAssessment` + the new TPRM cyber check. No separate `ProcessorAssessment` lifecycle. |
-| 4 | Third-party cyber risk | Reachable via SCM vendor risk + TPRM cyber assessment. No dedicated `ThirdPartyCyberRisk` entity. |
-| 5 | Resilience testing (SCM-specific) | Generic `BcmExercise` + the new `ExitPlan.recordTest()` cover this. No supplier-specific exercise type. |
+| 1 | Fourth-party exposure (SCM sub-tier vendor depth) | ✓ Closed — V50 + `module/scm/fourthparty/` |
+| 2 | Data sharing agreements (PDPL) | ✓ Closed — V51 + `module/privacy/dsa/` |
+| 3 | Processor due diligence (PDPL Art. 28) | ✓ Closed — V52 + `module/privacy/processor/` |
+| 4 | Third-party cyber risk (dedicated) | ✓ Closed — V53 + `module/tprm/cyber/` |
+| 5 | Resilience testing (SCM-specific) | ✓ Closed — V54 + `module/scm/resilience/SupplierResilienceTest` |
 
-**Nothing on this list blocks a regulatory submission or a customer launch.**
-Items 2-5 are subsumption / scope decisions; only #1 is a real "to-do"
-and it depends on a design choice the team has deferred.
+---
+
+## Final round — 2026-05-11 (V50-V54 close all five remaining ⚠ items)
+
+Every previously-flagged ⚠ item now has a working module with a seeded
+demo. Summary:
+
+| # | Migration | Module | Page | Seed rows |
+|---|---|---|---|---|
+| 1 | V50 | `scm/fourthparty` — `FourthPartyExposure` with DISCOVERED→VALIDATED→MITIGATED→RETIRED state machine and derived concentration-risk tier | `/fourth-party` | 7 (incl. Cloudflare-behind-STC, NVIDIA-behind-AWS, AWS-behind-Workday concentration) |
+| 2 | V51 | `privacy/dsa` — `DataSharingAgreement` with DRAFT→IN_REVIEW→ACTIVE→EXPIRED\|TERMINATED state machine | `/data-sharing` | 8 (SIMAH, Yakeen, group HR, NCA notification, HubSpot joint-controller, KFUPM research, MoCI legacy, group cyber-intel) |
+| 3 | V52 | `privacy/processor` — `ProcessorAssessment` with eight PDPL Art. 28 controls scored individually, derived overall outcome + risk score | `/processor-assessments` | 8 (AWS, Workday, TCS BPO, OpenAI rejected, Stripe, HubSpot, M365, Sentry new) |
+| 4 | V53 | `tprm/cyber` — `ThirdPartyCyberAssessment` with external posture score, questionnaire score, certification stack, breach history, derived 5-tier residual risk | `/third-party-cyber` | 8 (STC, AWS, OpenAI elevated, TCS, HubSpot, Sentry new, legacy tape vendor, Stripe) |
+| 5 | V54 | `scm/resilience` — `SupplierResilienceTest` with SCHEDULED→IN_PROGRESS→COMPLETED→APPROVED\|CANCELLED state machine and tabletop / failover / exit-rehearsal / SLA / joint-crisis test types | `/resilience-tests` | 8 (AWS region tabletop, STC Mobily failover drill, TCS exit rehearsal, Workday RPO test, Stripe outage tabletop, OpenAI joint-crisis sim failure, cancelled HubSpot, joint SOC-MSSP) |
+
+Wiring:
+- 5 new routes in `App.tsx`
+- 5 new sidebar entries (3 under "Third-Party Risk", 2 under "Privacy")
+- ~150 EN + ~150 AR translation keys
+- All seeds idempotent (NOT EXISTS guards)
+
+**Gap analysis verdict: 40/40 capabilities ✓ DONE, 0 ⚠, 0 ✗.**
+The platform fully covers the Saudi GRC Implementation Prompt as
+written.
 
 ---
 
