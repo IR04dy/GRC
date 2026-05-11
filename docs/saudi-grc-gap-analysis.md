@@ -237,8 +237,12 @@ written.
 
 ## What the prompt asks for vs reality
 
-The prompt expects 16 documentation deliverables under `/Saudi-GRC-Platform-Integration/`.
-Most are derivable from existing code:
+The prompt expects 16 documentation deliverables under
+`/Saudi-GRC-Platform-Integration/`. **All 16 are now shipped** — see
+`Saudi-GRC-Platform-Integration/README.md` for the full index. Each
+output is a structured markdown file anchored to the running platform
+(controllers, entities, migrations, pages). Original "derivable from"
+mapping kept below for traceability:
 
 | Prompt deliverable | Today's equivalent |
 |---|---|
