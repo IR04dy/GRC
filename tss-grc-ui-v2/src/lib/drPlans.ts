@@ -1,7 +1,9 @@
-// DR plan API client. Backend: /api/bcm/dr-plans
+// DR plan API client — uses shared api.ts.
 
-export type DrStatus     = 'DRAFT' | 'APPROVED' | 'ACTIVATED' | 'ARCHIVED' | 'REJECTED';
-export type DrSiteType   = 'HOT' | 'WARM' | 'COLD' | 'ACTIVE_ACTIVE' | 'CLOUD_DR';
+import { api } from './api';
+
+export type DrStatus      = 'DRAFT' | 'APPROVED' | 'ACTIVATED' | 'ARCHIVED' | 'REJECTED';
+export type DrSiteType    = 'HOT' | 'WARM' | 'COLD' | 'ACTIVE_ACTIVE' | 'CLOUD_DR';
 export type DrTestOutcome = 'NOT_TESTED' | 'PASSED' | 'GAP' | 'FAILED';
 
 export interface DrPlan {
@@ -41,77 +43,42 @@ export interface DrCreateRequest {
 
 const BASE = '/api/bcm/dr-plans';
 
-function authHeaders(extra?: Record<string,string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return { ...(extra ?? {}), ...(tok ? { Authorization: `Bearer ${tok}` } : {}) };
-}
-
-export async function listDrPlans(status?: DrStatus, page = 0, size = 200):
+export function listDrPlans(status?: DrStatus, page = 0, size = 200):
     Promise<{ content: DrPlan[]; totalElements: number }> {
   const qs = status ? `&status=${status}` : '';
-  const res = await fetch(`${BASE}?page=${page}&size=${size}${qs}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listDrPlans HTTP ${res.status}`);
-  return res.json();
+  return api.get(`${BASE}?page=${page}&size=${size}${qs}`);
 }
 
-export async function createDrPlan(body: DrCreateRequest): Promise<DrPlan> {
-  const res = await fetch(BASE, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`createDrPlan HTTP ${res.status}`);
-  return res.json();
+export function createDrPlan(body: DrCreateRequest): Promise<DrPlan> {
+  return api.post(BASE, body);
 }
 
-export async function approveDrPlan(id: number): Promise<DrPlan> {
-  const res = await fetch(`${BASE}/${id}/approve`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`approveDrPlan HTTP ${res.status}`);
-  return res.json();
+export function approveDrPlan(id: number): Promise<DrPlan> {
+  return api.post(`${BASE}/${id}/approve`);
 }
 
-export async function rejectDrPlan(id: number, reason: string): Promise<DrPlan> {
-  const res = await fetch(`${BASE}/${id}/reject`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`rejectDrPlan HTTP ${res.status}`);
-  return res.json();
+export function rejectDrPlan(id: number, reason: string): Promise<DrPlan> {
+  return api.post(`${BASE}/${id}/reject`, { reason });
 }
 
-export async function activateDrPlan(id: number, reason: string): Promise<DrPlan> {
-  const res = await fetch(`${BASE}/${id}/activate`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`activateDrPlan HTTP ${res.status}`);
-  return res.json();
+export function activateDrPlan(id: number, reason: string): Promise<DrPlan> {
+  return api.post(`${BASE}/${id}/activate`, { reason });
 }
 
-export async function archiveDrPlan(id: number, reason: string): Promise<DrPlan> {
-  const res = await fetch(`${BASE}/${id}/archive`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`archiveDrPlan HTTP ${res.status}`);
-  return res.json();
+export function archiveDrPlan(id: number, reason: string): Promise<DrPlan> {
+  return api.post(`${BASE}/${id}/archive`, { reason });
 }
 
-export async function recordDrTest(id: number, outcome: 'PASSED'|'GAP'|'FAILED', notesEn?: string, nextTestDue?: string): Promise<DrPlan> {
-  const res = await fetch(`${BASE}/${id}/record-test`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ outcome, notesEn, nextTestDue }),
-  });
-  if (!res.ok) throw new Error(`recordDrTest HTTP ${res.status}`);
-  return res.json();
+export function recordDrTest(id: number, outcome: 'PASSED'|'GAP'|'FAILED',
+                             notesEn?: string, nextTestDue?: string): Promise<DrPlan> {
+  return api.post(`${BASE}/${id}/record-test`, { outcome, notesEn, nextTestDue });
 }
 
 export function parseDrSteps(json?: string): DrStep[] {
-  if (!json) return [];
-  try { const a = JSON.parse(json); return Array.isArray(a) ? a : []; } catch { return []; }
+  if (!json) return []; try { const a = JSON.parse(json); return Array.isArray(a) ? a : []; } catch { return []; }
 }
 export function parseDrDependencies(json?: string): DrDependency[] {
-  if (!json) return [];
-  try { const a = JSON.parse(json); return Array.isArray(a) ? a : []; } catch { return []; }
+  if (!json) return []; try { const a = JSON.parse(json); return Array.isArray(a) ? a : []; } catch { return []; }
 }
 
 export const DR_STATUS_TONE: Record<DrStatus, 'primary'|'success'|'danger'|'warning'|'info'> = {

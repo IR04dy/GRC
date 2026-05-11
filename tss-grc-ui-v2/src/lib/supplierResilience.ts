@@ -1,9 +1,6 @@
-// Supplier resilience API client — alternate suppliers + exit plans.
-//
-// Backend: /api/scm/resilience/{alternates,exit-plans}.
-// AlternateSupplier:  DRAFT → APPROVED → ARCHIVED.
-// ExitPlan:           DRAFT → APPROVED → ACTIVATED → ARCHIVED
-//                     DRAFT → REJECTED (terminal).
+// Supplier resilience API client — uses shared api.ts.
+
+import { api } from './api';
 
 export type AltStatus       = 'DRAFT' | 'APPROVED' | 'ARCHIVED';
 export type AltRole         = 'BACKUP_PRIMARY' | 'BACKUP_SECONDARY' | 'TERTIARY';
@@ -15,198 +12,128 @@ export type PlanSeverity    = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type PlanTestOutcome = 'NOT_TESTED' | 'PASSED' | 'GAP_IDENTIFIED' | 'FAILED';
 
 export interface AlternateSupplier {
-  id: number;                          externalId?: string;
-  primaryVendorId?: number;            primaryVendorName: string;
+  id: number; externalId?: string;
+  primaryVendorId?: number; primaryVendorName: string;
   alternateVendorName: string;
-  alternateVendorCountry?: string;     alternateVendorRole: AltRole;
-  serviceScopeEn: string;              serviceScopeAr?: string;
-  estimatedOnboardingDays?: number;    estimatedCostSar?: number;
-  lastAssessedAt?: string;             lastAssessedOutcome?: AltOutcome;
+  alternateVendorCountry?: string; alternateVendorRole: AltRole;
+  serviceScopeEn: string; serviceScopeAr?: string;
+  estimatedOnboardingDays?: number; estimatedCostSar?: number;
+  lastAssessedAt?: string; lastAssessedOutcome?: AltOutcome;
   contractualStatus: AltContractual;
-  notesEn?: string;                    notesAr?: string;
+  notesEn?: string; notesAr?: string;
   status: AltStatus;
-  approvedAt?: string;                 approverName?: string;
-  archivedAt?: string;                 archiveReason?: string;
-  createdAt: string;                   updatedAt: string;
+  approvedAt?: string; approverName?: string;
+  archivedAt?: string; archiveReason?: string;
+  createdAt: string; updatedAt: string;
 }
 
 export interface AltCreateRequest {
-  primaryVendorId?: number;            primaryVendorName: string;
+  primaryVendorId?: number; primaryVendorName: string;
   alternateVendorName: string;
-  alternateVendorCountry?: string;     alternateVendorRole: AltRole;
-  serviceScopeEn: string;              serviceScopeAr?: string;
-  estimatedOnboardingDays?: number;    estimatedCostSar?: number;
+  alternateVendorCountry?: string; alternateVendorRole: AltRole;
+  serviceScopeEn: string; serviceScopeAr?: string;
+  estimatedOnboardingDays?: number; estimatedCostSar?: number;
   lastAssessedOutcome?: AltOutcome;
   contractualStatus?: AltContractual;
-  notesEn?: string;                    notesAr?: string;
+  notesEn?: string; notesAr?: string;
 }
 
-/** One step in the exit-plan playbook (parsed from steps_json). */
 export interface ExitPlanStep {
-  seq:               number;
-  actionEn:          string;
-  actionAr?:         string;
-  owner:             string;
-  days:              number;
-  evidenceRequired?: boolean;
-  doneAt?:           string | null;
-  doneBy?:           number | null;
+  seq: number; actionEn: string; actionAr?: string;
+  owner: string; days: number;
+  evidenceRequired?: boolean; doneAt?: string | null; doneBy?: number | null;
 }
 
 export interface ExitPlan {
-  id: number;                          externalId?: string;
+  id: number; externalId?: string;
   planCode: string;
-  vendorId?: number;                   vendorName: string;
-  contractCode?: string;
-  titleEn: string;                     titleAr?: string;
-  triggerConditions?: string;          severityThreshold?: PlanSeverity;
+  vendorId?: number; vendorName: string; contractCode?: string;
+  titleEn: string; titleAr?: string;
+  triggerConditions?: string; severityThreshold?: PlanSeverity;
   targetDisengagementDays: number;
   stepsJson: string;
-  dataMigrationPlanEn?: string;        dataMigrationPlanAr?: string;
-  knowledgeTransferPlanEn?: string;    knowledgeTransferPlanAr?: string;
-  lastTestedAt?: string;               lastTestedOutcome?: PlanTestOutcome;
+  dataMigrationPlanEn?: string; dataMigrationPlanAr?: string;
+  knowledgeTransferPlanEn?: string; knowledgeTransferPlanAr?: string;
+  lastTestedAt?: string; lastTestedOutcome?: PlanTestOutcome;
   nextTestDue?: string;
   status: PlanStatus;
-  approvedAt?: string;                 approverName?: string;
-  activatedAt?: string;                activationReason?: string;
-  archivedAt?: string;                 archiveReason?: string;
+  approvedAt?: string; approverName?: string;
+  activatedAt?: string; activationReason?: string;
+  archivedAt?: string; archiveReason?: string;
   rejectionReason?: string;
-  createdAt: string;                   updatedAt: string;
+  createdAt: string; updatedAt: string;
 }
 
 export interface PlanCreateRequest {
-  vendorId?: number;                   vendorName: string;
-  contractCode?: string;
-  titleEn: string;                     titleAr?: string;
-  triggerConditions?: string;          severityThreshold?: PlanSeverity;
+  vendorId?: number; vendorName: string; contractCode?: string;
+  titleEn: string; titleAr?: string;
+  triggerConditions?: string; severityThreshold?: PlanSeverity;
   targetDisengagementDays?: number;
   stepsJson: string;
-  dataMigrationPlanEn?: string;        dataMigrationPlanAr?: string;
-  knowledgeTransferPlanEn?: string;    knowledgeTransferPlanAr?: string;
+  dataMigrationPlanEn?: string; dataMigrationPlanAr?: string;
+  knowledgeTransferPlanEn?: string; knowledgeTransferPlanAr?: string;
 }
 
 const ALT_BASE  = '/api/scm/resilience/alternates';
 const PLAN_BASE = '/api/scm/resilience/exit-plans';
 
-function authHeaders(extra?: Record<string, string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return { ...(extra ?? {}), ...(tok ? { Authorization: `Bearer ${tok}` } : {}) };
-}
-
-// ─── Alternate suppliers ───────────────────────────────────────────────
-export async function listAlternates(status?: AltStatus, page = 0, size = 100):
+export function listAlternates(status?: AltStatus, page = 0, size = 100):
     Promise<{ content: AlternateSupplier[]; totalElements: number }> {
   const qs = status ? `&status=${status}` : '';
-  const res = await fetch(`${ALT_BASE}?page=${page}&size=${size}${qs}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listAlternates HTTP ${res.status}`);
-  return res.json();
+  return api.get(`${ALT_BASE}?page=${page}&size=${size}${qs}`);
 }
 
-export async function alternatesForPrimary(vendorId: number): Promise<AlternateSupplier[]> {
-  const res = await fetch(`${ALT_BASE}/by-primary/${vendorId}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`alternatesForPrimary HTTP ${res.status}`);
-  return res.json();
+export function alternatesForPrimary(vendorId: number): Promise<AlternateSupplier[]> {
+  return api.get(`${ALT_BASE}/by-primary/${vendorId}`);
 }
 
-export async function createAlternate(body: AltCreateRequest): Promise<AlternateSupplier> {
-  const res = await fetch(ALT_BASE, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`createAlternate HTTP ${res.status}`);
-  return res.json();
+export function createAlternate(body: AltCreateRequest): Promise<AlternateSupplier> {
+  return api.post(ALT_BASE, body);
 }
 
-export async function approveAlternate(id: number): Promise<AlternateSupplier> {
-  const res = await fetch(`${ALT_BASE}/${id}/approve`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`approveAlternate HTTP ${res.status}`);
-  return res.json();
+export function approveAlternate(id: number): Promise<AlternateSupplier> {
+  return api.post(`${ALT_BASE}/${id}/approve`);
 }
 
-export async function archiveAlternate(id: number, reason: string): Promise<AlternateSupplier> {
-  const res = await fetch(`${ALT_BASE}/${id}/archive`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`archiveAlternate HTTP ${res.status}`);
-  return res.json();
+export function archiveAlternate(id: number, reason: string): Promise<AlternateSupplier> {
+  return api.post(`${ALT_BASE}/${id}/archive`, { reason });
 }
 
-// ─── Exit plans ────────────────────────────────────────────────────────
-export async function listExitPlans(status?: PlanStatus, page = 0, size = 100):
+export function listExitPlans(status?: PlanStatus, page = 0, size = 100):
     Promise<{ content: ExitPlan[]; totalElements: number }> {
   const qs = status ? `&status=${status}` : '';
-  const res = await fetch(`${PLAN_BASE}?page=${page}&size=${size}${qs}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listExitPlans HTTP ${res.status}`);
-  return res.json();
+  return api.get(`${PLAN_BASE}?page=${page}&size=${size}${qs}`);
 }
 
-export async function plansForVendor(vendorId: number): Promise<ExitPlan[]> {
-  const res = await fetch(`${PLAN_BASE}/by-vendor/${vendorId}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`plansForVendor HTTP ${res.status}`);
-  return res.json();
+export function plansForVendor(vendorId: number): Promise<ExitPlan[]> {
+  return api.get(`${PLAN_BASE}/by-vendor/${vendorId}`);
 }
 
-export async function createExitPlan(body: PlanCreateRequest): Promise<ExitPlan> {
-  const res = await fetch(PLAN_BASE, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`createExitPlan HTTP ${res.status}`);
-  return res.json();
+export function createExitPlan(body: PlanCreateRequest): Promise<ExitPlan> {
+  return api.post(PLAN_BASE, body);
 }
 
-export async function approvePlan(id: number): Promise<ExitPlan> {
-  const res = await fetch(`${PLAN_BASE}/${id}/approve`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`approvePlan HTTP ${res.status}`);
-  return res.json();
+export function approvePlan(id: number): Promise<ExitPlan> {
+  return api.post(`${PLAN_BASE}/${id}/approve`);
 }
 
-export async function rejectPlan(id: number, reason: string): Promise<ExitPlan> {
-  const res = await fetch(`${PLAN_BASE}/${id}/reject`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`rejectPlan HTTP ${res.status}`);
-  return res.json();
+export function rejectPlan(id: number, reason: string): Promise<ExitPlan> {
+  return api.post(`${PLAN_BASE}/${id}/reject`, { reason });
 }
 
-export async function activatePlan(id: number, reason: string): Promise<ExitPlan> {
-  const res = await fetch(`${PLAN_BASE}/${id}/activate`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`activatePlan HTTP ${res.status}`);
-  return res.json();
+export function activatePlan(id: number, reason: string): Promise<ExitPlan> {
+  return api.post(`${PLAN_BASE}/${id}/activate`, { reason });
 }
 
-export async function archivePlan(id: number, reason: string): Promise<ExitPlan> {
-  const res = await fetch(`${PLAN_BASE}/${id}/archive`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`archivePlan HTTP ${res.status}`);
-  return res.json();
+export function archivePlan(id: number, reason: string): Promise<ExitPlan> {
+  return api.post(`${PLAN_BASE}/${id}/archive`, { reason });
 }
 
-export async function recordPlanTest(id: number, outcome: 'PASSED' | 'GAP_IDENTIFIED' | 'FAILED',
-                                     nextTestDue?: string): Promise<ExitPlan> {
-  const res = await fetch(`${PLAN_BASE}/${id}/record-test`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ outcome, nextTestDue }),
-  });
-  if (!res.ok) throw new Error(`recordPlanTest HTTP ${res.status}`);
-  return res.json();
+export function recordPlanTest(id: number, outcome: 'PASSED'|'GAP_IDENTIFIED'|'FAILED',
+                               nextTestDue?: string): Promise<ExitPlan> {
+  return api.post(`${PLAN_BASE}/${id}/record-test`, { outcome, nextTestDue });
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────
 export function parseExitPlanSteps(json?: string): ExitPlanStep[] {
   if (!json) return [];
   try {
@@ -217,30 +144,19 @@ export function parseExitPlanSteps(json?: string): ExitPlanStep[] {
   } catch { return []; }
 }
 
-export const ALT_STATUS_TONE: Record<AltStatus, 'primary' | 'success' | 'danger' | 'warning' | 'info'> = {
-  DRAFT:    'warning',
-  APPROVED: 'success',
-  ARCHIVED: 'info',
+export const ALT_STATUS_TONE: Record<AltStatus, 'primary'|'success'|'danger'|'warning'|'info'> = {
+  DRAFT: 'warning', APPROVED: 'success', ARCHIVED: 'info',
 };
-export const ALT_OUTCOME_TONE: Record<AltOutcome, 'success' | 'warning' | 'danger' | 'info'> = {
-  READY:       'success',
-  CONDITIONAL: 'warning',
-  GAP:         'warning',
-  NOT_VIABLE:  'danger',
+export const ALT_OUTCOME_TONE: Record<AltOutcome, 'success'|'warning'|'danger'|'info'> = {
+  READY: 'success', CONDITIONAL: 'warning', GAP: 'warning', NOT_VIABLE: 'danger',
 };
 
-export const PLAN_STATUS_TONE: Record<PlanStatus, 'primary' | 'success' | 'danger' | 'warning' | 'info'> = {
-  DRAFT:     'warning',
-  APPROVED:  'success',
-  ACTIVATED: 'primary',
-  REJECTED:  'danger',
-  ARCHIVED:  'info',
+export const PLAN_STATUS_TONE: Record<PlanStatus, 'primary'|'success'|'danger'|'warning'|'info'> = {
+  DRAFT: 'warning', APPROVED: 'success', ACTIVATED: 'primary',
+  REJECTED: 'danger', ARCHIVED: 'info',
 };
-export const PLAN_TEST_TONE: Record<PlanTestOutcome, 'success' | 'warning' | 'danger' | 'info'> = {
-  NOT_TESTED:     'info',
-  PASSED:         'success',
-  GAP_IDENTIFIED: 'warning',
-  FAILED:         'danger',
+export const PLAN_TEST_TONE: Record<PlanTestOutcome, 'success'|'warning'|'danger'|'info'> = {
+  NOT_TESTED: 'info', PASSED: 'success', GAP_IDENTIFIED: 'warning', FAILED: 'danger',
 };
 
 export function fmtSar(amount?: number): string {

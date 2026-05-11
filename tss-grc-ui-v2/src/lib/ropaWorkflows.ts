@@ -7,15 +7,8 @@
 // buttons that deep-link into /data-lifecycle with the right tab +
 // pre-filled ROPA code.
 
+import { api } from './api';
 import type { CrossBorderTransfer, DisposalCertificate, PrivacyNotice } from './pdplExtensions';
-
-function authHeaders(extra?: Record<string, string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return {
-    ...(extra ?? {}),
-    ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
-  };
-}
 
 export interface RopaCounts {
   notices: number;
@@ -32,15 +25,17 @@ export interface RopaBundle {
 }
 
 export async function ropaWorkflowsCounts(ropaCode: string): Promise<RopaCounts> {
-  const res = await fetch(`/api/privacy/ropa-workflows/${encodeURIComponent(ropaCode)}/counts`, { headers: authHeaders() });
-  if (!res.ok) return { notices: 0, crossBorder: 0, disposal: 0 };
-  return res.json();
+  try {
+    return await api.get<RopaCounts>(
+      `/api/privacy/ropa-workflows/${encodeURIComponent(ropaCode)}/counts`);
+  } catch { return { notices: 0, crossBorder: 0, disposal: 0 }; }
 }
 
 export async function ropaWorkflowsBundle(ropaCode: string): Promise<RopaBundle | null> {
-  const res = await fetch(`/api/privacy/ropa-workflows/${encodeURIComponent(ropaCode)}`, { headers: authHeaders() });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    return await api.get<RopaBundle>(
+      `/api/privacy/ropa-workflows/${encodeURIComponent(ropaCode)}`);
+  } catch { return null; }
 }
 
 /**

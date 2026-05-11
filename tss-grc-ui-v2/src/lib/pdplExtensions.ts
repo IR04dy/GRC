@@ -8,13 +8,7 @@
 // All are per-tenant, status-driven, and share the page surface at
 // /pdpl-extensions with one tab per capability.
 
-function authHeaders(extra?: Record<string, string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return {
-    ...(extra ?? {}),
-    ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
-  };
-}
+import { api } from './api';
 
 // ─── Cross-border transfer ───────────────────────────────────────────
 
@@ -47,39 +41,23 @@ export interface CrossBorderTransfer {
   updatedAt: string;
 }
 
-export async function listCrossBorderTransfers(page = 0, size = 50) {
-  const r = await fetch(`/api/privacy/cross-border-transfers?page=${page}&size=${size}`, { headers: authHeaders() });
-  if (!r.ok) throw new Error(`listCbt HTTP ${r.status}`);
-  return r.json() as Promise<{ content: CrossBorderTransfer[]; totalElements: number }>;
+export function listCrossBorderTransfers(page = 0, size = 50) {
+  return api.get<{ content: CrossBorderTransfer[]; totalElements: number }>(
+    `/api/privacy/cross-border-transfers?page=${page}&size=${size}`);
 }
-export async function createCrossBorderTransfer(body: Partial<CrossBorderTransfer>) {
-  const r = await fetch('/api/privacy/cross-border-transfers', {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(`createCbt HTTP ${r.status}`);
-  return r.json() as Promise<CrossBorderTransfer>;
+export function createCrossBorderTransfer(body: Partial<CrossBorderTransfer>) {
+  return api.post<CrossBorderTransfer>('/api/privacy/cross-border-transfers', body);
 }
-export async function cbtAssess(id: number, residencyCheckBy: string, outcome: 'PASS' | 'PASS_WITH_CONDITIONS' | 'FAIL') {
-  const r = await fetch(`/api/privacy/cross-border-transfers/${id}/assess`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ residencyCheckBy, residencyCheckOutcome: outcome }),
-  });
-  if (!r.ok) throw new Error(`cbtAssess HTTP ${r.status}`);
-  return r.json() as Promise<CrossBorderTransfer>;
+export function cbtAssess(id: number, residencyCheckBy: string, outcome: 'PASS' | 'PASS_WITH_CONDITIONS' | 'FAIL') {
+  return api.post<CrossBorderTransfer>(`/api/privacy/cross-border-transfers/${id}/assess`,
+    { residencyCheckBy, residencyCheckOutcome: outcome });
 }
-export async function cbtApprove(id: number) {
-  const r = await fetch(`/api/privacy/cross-border-transfers/${id}/approve`, { method: 'POST', headers: authHeaders() });
-  if (!r.ok) throw new Error(`cbtApprove HTTP ${r.status}`);
-  return r.json() as Promise<CrossBorderTransfer>;
+export function cbtApprove(id: number) {
+  return api.post<CrossBorderTransfer>(`/api/privacy/cross-border-transfers/${id}/approve`);
 }
-export async function cbtReject(id: number, rejectionReason: string) {
-  const r = await fetch(`/api/privacy/cross-border-transfers/${id}/reject`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ rejectionReason }),
-  });
-  if (!r.ok) throw new Error(`cbtReject HTTP ${r.status}`);
-  return r.json() as Promise<CrossBorderTransfer>;
+export function cbtReject(id: number, rejectionReason: string) {
+  return api.post<CrossBorderTransfer>(`/api/privacy/cross-border-transfers/${id}/reject`,
+    { rejectionReason });
 }
 
 export const CBT_STATUS_TONE: Record<CbtStatus, 'primary' | 'success' | 'danger' | 'warning' | 'info'> = {
@@ -114,39 +92,23 @@ export interface DisposalCertificate {
   updatedAt: string;
 }
 
-export async function listDisposals(page = 0, size = 50) {
-  const r = await fetch(`/api/privacy/disposal-certificates?page=${page}&size=${size}`, { headers: authHeaders() });
-  if (!r.ok) throw new Error(`listDisposals HTTP ${r.status}`);
-  return r.json() as Promise<{ content: DisposalCertificate[]; totalElements: number }>;
+export function listDisposals(page = 0, size = 50) {
+  return api.get<{ content: DisposalCertificate[]; totalElements: number }>(
+    `/api/privacy/disposal-certificates?page=${page}&size=${size}`);
 }
-export async function createDisposal(body: Partial<DisposalCertificate>) {
-  const r = await fetch('/api/privacy/disposal-certificates', {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(`createDisposal HTTP ${r.status}`);
-  return r.json() as Promise<DisposalCertificate>;
+export function createDisposal(body: Partial<DisposalCertificate>) {
+  return api.post<DisposalCertificate>('/api/privacy/disposal-certificates', body);
 }
-export async function disposalStart(id: number) {
-  const r = await fetch(`/api/privacy/disposal-certificates/${id}/start`, { method: 'POST', headers: authHeaders() });
-  if (!r.ok) throw new Error(`disposalStart HTTP ${r.status}`);
-  return r.json() as Promise<DisposalCertificate>;
+export function disposalStart(id: number) {
+  return api.post<DisposalCertificate>(`/api/privacy/disposal-certificates/${id}/start`);
 }
-export async function disposalComplete(id: number, executorName?: string, evidenceRef?: string) {
-  const r = await fetch(`/api/privacy/disposal-certificates/${id}/complete`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ executorName, evidenceRef }),
-  });
-  if (!r.ok) throw new Error(`disposalComplete HTTP ${r.status}`);
-  return r.json() as Promise<DisposalCertificate>;
+export function disposalComplete(id: number, executorName?: string, evidenceRef?: string) {
+  return api.post<DisposalCertificate>(`/api/privacy/disposal-certificates/${id}/complete`,
+    { executorName, evidenceRef });
 }
-export async function disposalVerify(id: number, verifierName?: string, signatureTxId?: number) {
-  const r = await fetch(`/api/privacy/disposal-certificates/${id}/verify`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ verifierName, signatureTxId }),
-  });
-  if (!r.ok) throw new Error(`disposalVerify HTTP ${r.status}`);
-  return r.json() as Promise<DisposalCertificate>;
+export function disposalVerify(id: number, verifierName?: string, signatureTxId?: number) {
+  return api.post<DisposalCertificate>(`/api/privacy/disposal-certificates/${id}/verify`,
+    { verifierName, signatureTxId });
 }
 
 export const DISPOSAL_STATUS_TONE: Record<DisposalStatus, 'primary' | 'success' | 'danger' | 'warning' | 'info'> = {
@@ -183,36 +145,21 @@ export interface PrivacyNotice {
   updatedAt: string;
 }
 
-export async function listNotices(page = 0, size = 50) {
-  const r = await fetch(`/api/privacy/notices?page=${page}&size=${size}`, { headers: authHeaders() });
-  if (!r.ok) throw new Error(`listNotices HTTP ${r.status}`);
-  return r.json() as Promise<{ content: PrivacyNotice[]; totalElements: number }>;
+export function listNotices(page = 0, size = 50) {
+  return api.get<{ content: PrivacyNotice[]; totalElements: number }>(
+    `/api/privacy/notices?page=${page}&size=${size}`);
 }
-export async function createNotice(body: Partial<PrivacyNotice>) {
-  const r = await fetch('/api/privacy/notices', {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(`createNotice HTTP ${r.status}`);
-  return r.json() as Promise<PrivacyNotice>;
+export function createNotice(body: Partial<PrivacyNotice>) {
+  return api.post<PrivacyNotice>('/api/privacy/notices', body);
 }
-export async function publishNotice(id: number) {
-  const r = await fetch(`/api/privacy/notices/${id}/publish`, { method: 'POST', headers: authHeaders() });
-  if (!r.ok) throw new Error(`publishNotice HTTP ${r.status}`);
-  return r.json() as Promise<PrivacyNotice>;
+export function publishNotice(id: number) {
+  return api.post<PrivacyNotice>(`/api/privacy/notices/${id}/publish`);
 }
-export async function archiveNotice(id: number, archiveReasonEn?: string) {
-  const r = await fetch(`/api/privacy/notices/${id}/archive`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ archiveReasonEn }),
-  });
-  if (!r.ok) throw new Error(`archiveNotice HTTP ${r.status}`);
-  return r.json() as Promise<PrivacyNotice>;
+export function archiveNotice(id: number, archiveReasonEn?: string) {
+  return api.post<PrivacyNotice>(`/api/privacy/notices/${id}/archive`, { archiveReasonEn });
 }
-export async function supersedeNotice(id: number) {
-  const r = await fetch(`/api/privacy/notices/${id}/supersede`, { method: 'POST', headers: authHeaders() });
-  if (!r.ok) throw new Error(`supersedeNotice HTTP ${r.status}`);
-  return r.json() as Promise<PrivacyNotice>;
+export function supersedeNotice(id: number) {
+  return api.post<PrivacyNotice>(`/api/privacy/notices/${id}/supersede`);
 }
 
 export const NOTICE_STATUS_TONE: Record<NoticeStatus, 'primary' | 'success' | 'danger' | 'warning' | 'info'> = {

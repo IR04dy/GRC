@@ -75,74 +75,41 @@ export interface RcaUpdateRequest {
   capaRefs?: string;
 }
 
+import { api } from './api';
+
 const BASE = '/api/incident/rca';
 
-function authHeaders(extra?: Record<string, string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return {
-    ...(extra ?? {}),
-    ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
-  };
+export function listRcas(page = 0, size = 50):
+    Promise<{ content: RootCauseAnalysis[]; totalElements: number }> {
+  return api.get(`${BASE}?page=${page}&size=${size}`);
 }
 
-export async function listRcas(page = 0, size = 50): Promise<{ content: RootCauseAnalysis[]; totalElements: number }> {
-  const res = await fetch(`${BASE}?page=${page}&size=${size}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listRcas HTTP ${res.status}`);
-  return res.json();
+export function rcasForEntity(entityType: string, entityId: number): Promise<RootCauseAnalysis[]> {
+  return api.get(`${BASE}/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`);
 }
 
-export async function rcasForEntity(entityType: string, entityId: number): Promise<RootCauseAnalysis[]> {
-  const res = await fetch(`${BASE}/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`rcasForEntity HTTP ${res.status}`);
-  return res.json();
+export function getRca(id: number): Promise<RootCauseAnalysis> {
+  return api.get(`${BASE}/${id}`);
 }
 
-export async function getRca(id: number): Promise<RootCauseAnalysis> {
-  const res = await fetch(`${BASE}/${id}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`getRca HTTP ${res.status}`);
-  return res.json();
+export function createRca(body: RcaCreateRequest): Promise<RootCauseAnalysis> {
+  return api.post(BASE, body);
 }
 
-export async function createRca(body: RcaCreateRequest): Promise<RootCauseAnalysis> {
-  const res = await fetch(BASE, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`createRca HTTP ${res.status}`);
-  return res.json();
+export function updateRca(id: number, body: RcaUpdateRequest): Promise<RootCauseAnalysis> {
+  return api.put(`${BASE}/${id}`, body);
 }
 
-export async function updateRca(id: number, body: RcaUpdateRequest): Promise<RootCauseAnalysis> {
-  const res = await fetch(`${BASE}/${id}`, {
-    method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`updateRca HTTP ${res.status}`);
-  return res.json();
+export function submitRca(id: number): Promise<RootCauseAnalysis> {
+  return api.post(`${BASE}/${id}/submit`);
 }
 
-export async function submitRca(id: number): Promise<RootCauseAnalysis> {
-  const res = await fetch(`${BASE}/${id}/submit`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`submitRca HTTP ${res.status}`);
-  return res.json();
+export function approveRca(id: number): Promise<RootCauseAnalysis> {
+  return api.post(`${BASE}/${id}/approve`);
 }
 
-export async function approveRca(id: number): Promise<RootCauseAnalysis> {
-  const res = await fetch(`${BASE}/${id}/approve`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`approveRca HTTP ${res.status}`);
-  return res.json();
-}
-
-export async function rejectRca(id: number, rejectionReason: string): Promise<RootCauseAnalysis> {
-  const res = await fetch(`${BASE}/${id}/reject`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ rejectionReason }),
-  });
-  if (!res.ok) throw new Error(`rejectRca HTTP ${res.status}`);
-  return res.json();
+export function rejectRca(id: number, rejectionReason: string): Promise<RootCauseAnalysis> {
+  return api.post(`${BASE}/${id}/reject`, { rejectionReason });
 }
 
 /**
@@ -164,11 +131,9 @@ export interface GeneratedCapa {
   owner: string;
   targetDate: string;
 }
-export async function generateCapasFromRca(id: number, owner?: string): Promise<GeneratedCapa[]> {
+export function generateCapasFromRca(id: number, owner?: string): Promise<GeneratedCapa[]> {
   const qs = owner ? `?owner=${encodeURIComponent(owner)}` : '';
-  const res = await fetch(`${BASE}/${id}/generate-capas${qs}`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`generateCapasFromRca HTTP ${res.status}`);
-  return res.json();
+  return api.post(`${BASE}/${id}/generate-capas${qs}`);
 }
 
 /** Safely parse 5-Whys JSON blob, falling back to []. */

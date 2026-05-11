@@ -1,5 +1,6 @@
-// Emerging risk API client. Backend: /api/risk/emerging
-// State: HORIZON → MONITORING → (ESCALATED | MATURED | DISMISSED)
+// Emerging risk API client — uses shared api.ts.
+
+import { api } from './api';
 
 export type EmRiskStatus   = 'HORIZON' | 'MONITORING' | 'ESCALATED' | 'MATURED' | 'DISMISSED';
 export type EmRiskCategory = 'REGULATORY' | 'GEOPOLITICAL' | 'TECHNOLOGY' | 'ENVIRONMENTAL' | 'ECONOMIC' | 'SOCIAL' | 'OTHER';
@@ -40,72 +41,36 @@ export interface EmCreateRequest {
 
 const BASE = '/api/risk/emerging';
 
-function authHeaders(extra?: Record<string,string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return { ...(extra ?? {}), ...(tok ? { Authorization: `Bearer ${tok}` } : {}) };
-}
-
-export async function listEmergingRisks(status?: EmRiskStatus, page = 0, size = 200):
+export function listEmergingRisks(status?: EmRiskStatus, page = 0, size = 200):
     Promise<{ content: EmergingRisk[]; totalElements: number }> {
   const qs = status ? `&status=${status}` : '';
-  const res = await fetch(`${BASE}?page=${page}&size=${size}${qs}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listEmergingRisks HTTP ${res.status}`);
-  return res.json();
+  return api.get(`${BASE}?page=${page}&size=${size}${qs}`);
 }
 
-export async function createEmergingRisk(body: EmCreateRequest): Promise<EmergingRisk> {
-  const res = await fetch(BASE, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`createEmergingRisk HTTP ${res.status}`);
-  return res.json();
+export function createEmergingRisk(body: EmCreateRequest): Promise<EmergingRisk> {
+  return api.post(BASE, body);
 }
 
-export async function reviewEmergingRisk(id: number, notes: string, nextReviewDue?: string): Promise<EmergingRisk> {
-  const res = await fetch(`${BASE}/${id}/review`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ notes, nextReviewDue }),
-  });
-  if (!res.ok) throw new Error(`reviewEmergingRisk HTTP ${res.status}`);
-  return res.json();
+export function reviewEmergingRisk(id: number, notes: string, nextReviewDue?: string): Promise<EmergingRisk> {
+  return api.post(`${BASE}/${id}/review`, { notes, nextReviewDue });
 }
 
-export async function escalateEmergingRisk(id: number, linkedRiskCode: string): Promise<EmergingRisk> {
-  const res = await fetch(`${BASE}/${id}/escalate`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ linkedRiskCode }),
-  });
-  if (!res.ok) throw new Error(`escalateEmergingRisk HTTP ${res.status}`);
-  return res.json();
+export function escalateEmergingRisk(id: number, linkedRiskCode: string): Promise<EmergingRisk> {
+  return api.post(`${BASE}/${id}/escalate`, { linkedRiskCode });
 }
 
-export async function matureEmergingRisk(id: number): Promise<EmergingRisk> {
-  const res = await fetch(`${BASE}/${id}/mature`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`matureEmergingRisk HTTP ${res.status}`);
-  return res.json();
+export function matureEmergingRisk(id: number): Promise<EmergingRisk> {
+  return api.post(`${BASE}/${id}/mature`);
 }
 
-export async function dismissEmergingRisk(id: number, reason: string): Promise<EmergingRisk> {
-  const res = await fetch(`${BASE}/${id}/dismiss`, {
-    method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) throw new Error(`dismissEmergingRisk HTTP ${res.status}`);
-  return res.json();
+export function dismissEmergingRisk(id: number, reason: string): Promise<EmergingRisk> {
+  return api.post(`${BASE}/${id}/dismiss`, { reason });
 }
 
 export const EM_STATUS_TONE: Record<EmRiskStatus, 'primary'|'success'|'danger'|'warning'|'info'> = {
-  HORIZON:    'info',
-  MONITORING: 'primary',
-  ESCALATED:  'warning',
-  MATURED:    'success',
-  DISMISSED:  'danger',
+  HORIZON: 'info', MONITORING: 'primary', ESCALATED: 'warning', MATURED: 'success', DISMISSED: 'danger',
 };
 
 export const EM_SIGNAL_TONE: Record<EmRiskSignal, 'success'|'danger'|'warning'|'info'> = {
-  WEAK:      'info',
-  MODERATE:  'warning',
-  STRONG:    'warning',
-  CONFIRMED: 'danger',
+  WEAK: 'info', MODERATE: 'warning', STRONG: 'warning', CONFIRMED: 'danger',
 };

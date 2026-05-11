@@ -48,63 +48,34 @@ export interface DigitalSignatureCreateRequest {
   expiryDate?: string;
 }
 
+import { api } from './api';
+
 const BASE = '/api/signature/transactions';
 
-function authHeaders(extra?: Record<string, string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return {
-    ...(extra ?? {}),
-    ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
-  };
+export function listSignatures(page = 0, size = 50):
+    Promise<{ content: DigitalSignatureTransaction[]; totalElements: number }> {
+  return api.get(`${BASE}?page=${page}&size=${size}`);
 }
 
-export async function listSignatures(page = 0, size = 50): Promise<{ content: DigitalSignatureTransaction[]; totalElements: number }> {
-  const res = await fetch(`${BASE}?page=${page}&size=${size}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listSignatures HTTP ${res.status}`);
-  return res.json();
+export function listMyInbox(): Promise<DigitalSignatureTransaction[]> {
+  return api.get(`${BASE}/inbox`);
 }
 
-export async function listMyInbox(): Promise<DigitalSignatureTransaction[]> {
-  const res = await fetch(`${BASE}/inbox`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listMyInbox HTTP ${res.status}`);
-  return res.json();
+export function listForEntity(entityType: string, entityId: number): Promise<DigitalSignatureTransaction[]> {
+  return api.get(`${BASE}/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`);
 }
 
-export async function listForEntity(entityType: string, entityId: number): Promise<DigitalSignatureTransaction[]> {
-  const url = `${BASE}/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`;
-  const res = await fetch(url, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listForEntity HTTP ${res.status}`);
-  return res.json();
+export function createSignature(body: DigitalSignatureCreateRequest): Promise<DigitalSignatureTransaction> {
+  return api.post(BASE, body);
 }
 
-export async function createSignature(body: DigitalSignatureCreateRequest): Promise<DigitalSignatureTransaction> {
-  const res = await fetch(BASE, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`createSignature HTTP ${res.status}`);
-  return res.json();
+export function signTransaction(id: number, signedDocumentHash: string,
+                                certificateReference?: string): Promise<DigitalSignatureTransaction> {
+  return api.post(`${BASE}/${id}/sign`, { signedDocumentHash, certificateReference });
 }
 
-export async function signTransaction(id: number, signedDocumentHash: string, certificateReference?: string): Promise<DigitalSignatureTransaction> {
-  const res = await fetch(`${BASE}/${id}/sign`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ signedDocumentHash, certificateReference }),
-  });
-  if (!res.ok) throw new Error(`signTransaction HTTP ${res.status}`);
-  return res.json();
-}
-
-export async function rejectTransaction(id: number, rejectionReason: string): Promise<DigitalSignatureTransaction> {
-  const res = await fetch(`${BASE}/${id}/reject`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ rejectionReason }),
-  });
-  if (!res.ok) throw new Error(`rejectTransaction HTTP ${res.status}`);
-  return res.json();
+export function rejectTransaction(id: number, rejectionReason: string): Promise<DigitalSignatureTransaction> {
+  return api.post(`${BASE}/${id}/reject`, { rejectionReason });
 }
 
 /**

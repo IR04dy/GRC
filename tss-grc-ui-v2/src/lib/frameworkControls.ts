@@ -1,5 +1,6 @@
-// Framework controls API client — reads from existing cyber controls endpoints.
-// Backend: /api/v1/cyber/frameworks + /api/v1/cyber/controls/all
+// Framework controls API client — uses shared api.ts.
+
+import { api } from './api';
 
 export interface CyberFramework {
   id: number; name: string; nameAr?: string;
@@ -27,31 +28,18 @@ export interface CyberControl {
   status?: string;
 }
 
-function authHeaders(): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return tok ? { Authorization: `Bearer ${tok}` } : {};
+export function listFrameworks(): Promise<CyberFramework[]> {
+  return api.get('/api/v1/cyber/frameworks');
 }
 
-export async function listFrameworks(): Promise<CyberFramework[]> {
-  const res = await fetch('/api/v1/cyber/frameworks', { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listFrameworks HTTP ${res.status}`);
-  return res.json();
+export function listAllControls(): Promise<CyberControl[]> {
+  return api.get('/api/v1/cyber/controls/all');
 }
 
-export async function listAllControls(): Promise<CyberControl[]> {
-  const res = await fetch('/api/v1/cyber/controls/all', { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listAllControls HTTP ${res.status}`);
-  return res.json();
-}
-
-export const CTRL_IMPL_TONE: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
-  IMPLEMENTED: 'success',
-  PARTIAL:     'warning',
-  PLANNED:     'info',
-  NOT_APPLICABLE: 'info',
-  NOT_IMPLEMENTED: 'danger',
+export const CTRL_IMPL_TONE: Record<string, 'success'|'warning'|'danger'|'info'> = {
+  IMPLEMENTED: 'success', PARTIAL: 'warning', PLANNED: 'info',
+  NOT_APPLICABLE: 'info', NOT_IMPLEMENTED: 'danger',
 };
-export const CTRL_MATURITY_TONE: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
-  L1: 'danger',  L2: 'warning', L3: 'info',
-  L4: 'success', L5: 'success',
+export const CTRL_MATURITY_TONE: Record<string, 'success'|'warning'|'danger'|'info'> = {
+  L1: 'danger', L2: 'warning', L3: 'info', L4: 'success', L5: 'success',
 };

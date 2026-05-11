@@ -1,4 +1,6 @@
-// Evidence chain-of-custody API client. Backend: /api/evidence/chain
+// Evidence chain-of-custody API client — uses shared api.ts.
+
+import { api } from './api';
 
 export type ChainStatus = 'VALID' | 'BROKEN' | 'UNVERIFIED';
 
@@ -43,37 +45,23 @@ export interface ChainReport {
 
 const BASE = '/api/evidence/chain';
 
-function authHeaders(): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return tok ? { Authorization: `Bearer ${tok}` } : {};
-}
-
-export async function listChainItems(status?: ChainStatus): Promise<ChainItemSummary[]> {
+export function listChainItems(status?: ChainStatus): Promise<ChainItemSummary[]> {
   const qs = status ? `?status=${status}` : '';
-  const res = await fetch(`${BASE}${qs}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`listChainItems HTTP ${res.status}`);
-  return res.json();
+  return api.get(`${BASE}${qs}`);
 }
 
-export async function getChainReport(evidenceId: number): Promise<ChainReport> {
-  const res = await fetch(`${BASE}/${evidenceId}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`getChainReport HTTP ${res.status}`);
-  return res.json();
+export function getChainReport(evidenceId: number): Promise<ChainReport> {
+  return api.get(`${BASE}/${evidenceId}`);
 }
 
-export async function verifyChain(evidenceId: number): Promise<ChainReport> {
-  const res = await fetch(`${BASE}/${evidenceId}/verify`, { method: 'POST', headers: authHeaders() });
-  if (!res.ok) throw new Error(`verifyChain HTTP ${res.status}`);
-  return res.json();
+export function verifyChain(evidenceId: number): Promise<ChainReport> {
+  return api.post(`${BASE}/${evidenceId}/verify`);
 }
 
 export const CHAIN_STATUS_TONE: Record<ChainStatus, 'primary'|'success'|'danger'|'warning'|'info'> = {
-  VALID:      'success',
-  BROKEN:     'danger',
-  UNVERIFIED: 'warning',
+  VALID: 'success', BROKEN: 'danger', UNVERIFIED: 'warning',
 };
 
-/** Format a 64-char SHA-256 hex string as "abcd1234…ef12" for tight display. */
 export function shortHash(h?: string): string {
   if (!h) return '—';
   if (h.length < 12) return h;
