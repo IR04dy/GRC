@@ -79,6 +79,7 @@ import { LifecycleOverviewPage } from './pages/lifecycle-overview/LifecycleOverv
 import { NotificationOutboxPage } from './pages/notification-outbox/NotificationOutboxPage';
 import { PdplExtensionsPage } from './pages/pdpl-extensions/PdplExtensionsPage';
 import { RcaPage } from './pages/rca/RcaPage';
+import { RiskScenariosPage } from './pages/risk-scenarios/RiskScenariosPage';
 
 export function App() {
   return (
@@ -112,6 +113,7 @@ export function App() {
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/rca"        element={<RcaPage />} />
+              <Route path="/risk-scenarios" element={<RiskScenariosPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />
