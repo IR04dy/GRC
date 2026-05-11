@@ -105,6 +105,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'privacy',    to: '/privacy',           Icon: Fingerprint, labelKey: 'modPdpl' },
       { id: 'privacy-lc', to: '/privacy-lifecycle', Icon: UserCog,     labelKey: 'prcSidebar' },
       { id: 'ropa',       to: '/ropa',              Icon: Files,       labelKey: 'ropaSidebar' },
+      { id: 'pdpl-ext',   to: '/pdpl-extensions',   Icon: Compass,     labelKey: 'pdplExtSidebar' },
     ],
   },
 

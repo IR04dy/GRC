@@ -76,6 +76,7 @@ import { BcmLifecyclePage } from './pages/bcm-lifecycle/BcmLifecyclePage';
 import { CyberLifecyclePage } from './pages/cyber-lifecycle/CyberLifecyclePage';
 import { LifecycleOverviewPage } from './pages/lifecycle-overview/LifecycleOverviewPage';
 import { NotificationOutboxPage } from './pages/notification-outbox/NotificationOutboxPage';
+import { PdplExtensionsPage } from './pages/pdpl-extensions/PdplExtensionsPage';
 
 export function App() {
   return (
@@ -102,6 +103,7 @@ export function App() {
               <Route path="/bcm"        element={<BcmPage />} />
               <Route path="/privacy"    element={<PrivacyPage />} />
               <Route path="/pdpl"       element={<Navigate to="/privacy" replace />} />
+              <Route path="/pdpl-extensions" element={<PdplExtensionsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
