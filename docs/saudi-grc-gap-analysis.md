@@ -1,8 +1,8 @@
 # Saudi GRC Platform — Gap Analysis vs Implementation Prompt
 
-**Date:** 2026-05-11 (last refresh)
+**Date:** 2026-05-11 (last refresh — late session, after V48/V49 polish)
 **Reference:** `Saudi_GRC_Platform_Claude_Code_Implementation_Prompt.md`
-**Branch surveyed:** `feat/pdpl-extensions` (HEAD after item-5 commit `fce23bf`)
+**Branch surveyed:** `feat/pdpl-extensions` (HEAD `26ca75e`)
 
 This document maps the prompt's 40+ required capabilities against the
 current platform and flags concrete gaps. It is the input to subsequent
@@ -167,6 +167,50 @@ the next candidates for implementation.
 | OT / ICS control library | ✓ | OTCC framework + 27 controls in V37+V44; `FrameworkControlsPage` filters to OTCC |
 | Third-party cyber risk | ⚠ | Reachable via SCM vendor risk + new TPRM cyber assessment |
 | Resilience testing (SCM) | ⚠ | Generic BCM exercise + new ExitPlan `recordTest()` now cover this |
+
+---
+
+## Today's polish — 2026-05-11 late session (V48 + V49)
+
+Browser-driven sweep of every today's page and every sub-tab uncovered
+a handful of data-quality issues (not new capability gaps). All fixed
+in this session:
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| ROPA detail panel "Privacy notices / Cross-border / Disposal" chips all 0 on every ROPA | Workflow records seeded with `ROPA-2026-NNN` codes, RopaPage demo register uses `ROPA-NNN`. Bundle endpoint matched nothing. | `V48` — rewrite prefix in `cross_border_transfers.ropa_code`, `disposal_certificates.related_entity_id` (where `relatedEntityType='ropa'`), `privacy_notices.linked_ropa_codes`. ROPA-001 now shows 3 / 2 / 3. |
+| `/framework-controls` → SAMA (0), ISO 22301 (0), PCI DSS (0) tabs empty | V37 seeded the framework rows + KPI counts but no control catalogue | `V49` — 8 bilingual controls per framework (24 total) with realistic procedure text, maturity and implementation status |
+| `/cyber-pdpl-bridge` → Linked (0) tab empty | V46a only seeded CREATED + SKIPPED outcomes | `V49` — one `BREACH_LINKED` demo (cyber incident matched to an existing breach, no duplicate created) |
+| `/evidence-chain` → Unverified (0) tab empty | V47/V47a left every chain in VALID or BROKEN | `V49` — flip one VALID chain to UNVERIFIED so the filter has at least one item |
+
+Both migrations are idempotent. Headline counts after V49:
+
+- `/framework-controls`: 145 controls across 8 frameworks (ECC 30, CSCC 32, CCC 30, OTCC 27, **SAMA 8**, ISO 27001 2, **ISO 22301 8**, **PCI DSS 8**)
+- `/cyber-pdpl-bridge`: All 6 (Created 4, **Linked 1**, Skipped 1, Errors 0 — Errors=0 is the happy path)
+- `/evidence-chain`: All 58 (Valid 56, Broken 1, **Unverified 1**)
+
+The "failed to load" / empty-tab class of issue the user flagged earlier
+in the day is now closed.
+
+---
+
+## What still remains in the gap (single source of truth)
+
+After today's polish, the **only** items the gap analysis still flags
+are 5 ⚠ entries — none of them are missing capability, all are
+documented design decisions:
+
+| # | Item | Why ⚠ |
+|---|---|---|
+| 1 | Fourth-party exposure (SCM sub-tier vendor depth) | Needs a design call — questionnaire-driven vs API-driven sub-tier discovery. Sprint 6 candidate. |
+| 2 | Data sharing agreements (PDPL) | DSAs are CLM territory, not GRC. Out-of-scope by decision. |
+| 3 | Processor due diligence (PDPL) | Subsumed by `VendorAssessment` + the new TPRM cyber check. No separate `ProcessorAssessment` lifecycle. |
+| 4 | Third-party cyber risk | Reachable via SCM vendor risk + TPRM cyber assessment. No dedicated `ThirdPartyCyberRisk` entity. |
+| 5 | Resilience testing (SCM-specific) | Generic `BcmExercise` + the new `ExitPlan.recordTest()` cover this. No supplier-specific exercise type. |
+
+**Nothing on this list blocks a regulatory submission or a customer launch.**
+Items 2-5 are subsumption / scope decisions; only #1 is a real "to-do"
+and it depends on a design choice the team has deferred.
 
 ---
 
