@@ -145,6 +145,32 @@ export async function rejectRca(id: number, rejectionReason: string): Promise<Ro
   return res.json();
 }
 
+/**
+ * Cross-module: turn the RCA's approved recommendations into actual
+ * CAPA tasks. Server-side parses the numbered list, spawns one CAPA
+ * per item with originType="rca", originId=<RCA external id>, and
+ * appends the new CAPA ids to the RCA's capa_refs field.
+ *
+ * APPROVED only — call results in HTTP 409 IllegalTransition otherwise.
+ * Returns the list of newly-created CAPA DTOs so the UI can offer a
+ * "Jump to CAPA" link per result.
+ */
+export interface GeneratedCapa {
+  id: string;        // CAPA external id (e.g. "CAPA-202612-0011")
+  originType: string;
+  originId: string;
+  titleEn: string;
+  status: string;
+  owner: string;
+  targetDate: string;
+}
+export async function generateCapasFromRca(id: number, owner?: string): Promise<GeneratedCapa[]> {
+  const qs = owner ? `?owner=${encodeURIComponent(owner)}` : '';
+  const res = await fetch(`${BASE}/${id}/generate-capas${qs}`, { method: 'POST', headers: authHeaders() });
+  if (!res.ok) throw new Error(`generateCapasFromRca HTTP ${res.status}`);
+  return res.json();
+}
+
 /** Safely parse 5-Whys JSON blob, falling back to []. */
 export function parseFiveWhys(json?: string): FiveWhysEntry[] {
   if (!json) return [];

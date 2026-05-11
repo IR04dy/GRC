@@ -1,5 +1,6 @@
 package com.tss.grc.module.incident.rca.controller;
 
+import com.tss.grc.module.capa.dto.CapaTaskDto;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.CreateRequest;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.RejectRequest;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.Response;
@@ -81,6 +82,15 @@ public class RootCauseAnalysisController {
     @Operation(summary = "Reject an IN_REVIEW RCA. Reason is mandatory.")
     public Response reject(@PathVariable Long id, @RequestBody @Valid RejectRequest body) {
         return Response.from(service.reject(id, body));
+    }
+
+    @PostMapping("/{id}/generate-capas")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Spawn one CAPA per numbered recommendation in the RCA. APPROVED only. "
+                       + "Optional ?owner=<name> overrides the default (the RCA facilitator).")
+    public List<CapaTaskDto> generateCapas(@PathVariable Long id,
+                                           @RequestParam(name = "owner", required = false) String owner) {
+        return service.generateCapasFromRecommendations(id, owner);
     }
 
     @DeleteMapping("/{id}")

@@ -2,6 +2,8 @@ package com.tss.grc.module.incident.rca;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.capa.dto.CapaTaskDto;
+import com.tss.grc.module.capa.service.CapaTaskService;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.CreateRequest;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.RejectRequest;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.UpdateRequest;
@@ -16,6 +18,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -42,6 +46,7 @@ class RootCauseAnalysisServiceTest {
     private static final Long RCA_ID = 42L;
 
     @Mock private RootCauseAnalysisRepository repo;
+    @Mock private CapaTaskService capaService;
     @InjectMocks private RootCauseAnalysisService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -189,5 +194,73 @@ class RootCauseAnalysisServiceTest {
 
         assertThatThrownBy(() -> service.get(RCA_ID))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // ─── Cross-module: spawn CAPAs from RCA recommendations ───────────
+
+    @Test void generateCapas_refuses_when_not_APPROVED() {
+        when(repo.findByIdAndOrganisationId(RCA_ID, ORG_ID)).thenReturn(Optional.of(rca("DRAFT")));
+        assertThatThrownBy(() -> service.generateCapasFromRecommendations(RCA_ID, null))
+                .isInstanceOf(IllegalTransitionException.class);
+    }
+
+    @Test void generateCapas_returns_empty_when_no_recommendations() {
+        RootCauseAnalysis r = rca("APPROVED");
+        r.setRecommendationsEn(null);
+        when(repo.findByIdAndOrganisationId(RCA_ID, ORG_ID)).thenReturn(Optional.of(r));
+
+        List<CapaTaskDto> out = service.generateCapasFromRecommendations(RCA_ID, null);
+        assertThat(out).isEmpty();
+    }
+
+    @Test void generateCapas_parses_numbered_list_and_creates_one_per_item() {
+        RootCauseAnalysis r = rca("APPROVED");
+        r.setExternalId("RCA-A1B2C3D4");
+        r.setRecommendationsEn(
+                "1) Tighten USB exception to a VID/PID allow-list for the biometric thumb-drive only. " +
+                "2) Accelerate the YubiKey rollout once SAMA approves. " +
+                "3) Add a CrowdStrike custom IOA for the specific ransomware family detected.");
+        when(repo.findByIdAndOrganisationId(RCA_ID, ORG_ID)).thenReturn(Optional.of(r));
+        when(repo.save(any(RootCauseAnalysis.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(capaService.create(any(CapaTaskDto.class))).thenAnswer(inv -> {
+            CapaTaskDto dto = inv.getArgument(0);
+            dto.setId("CAPA-" + System.nanoTime());
+            return dto;
+        });
+
+        List<CapaTaskDto> out = service.generateCapasFromRecommendations(RCA_ID, "CISO Office");
+
+        assertThat(out).hasSize(3);
+        // Each CAPA carries the RCA's external id as origin.
+        assertThat(out).allMatch(d -> "rca".equals(d.getOriginType()));
+        assertThat(out).allMatch(d -> "RCA-A1B2C3D4".equals(d.getOriginId()));
+        // First item's title starts with the action verb (numeric prefix stripped).
+        assertThat(out.get(0).getTitleEn()).startsWith("Tighten USB exception");
+        // Owner override applied.
+        assertThat(out).allMatch(d -> "CISO Office".equals(d.getOwner()));
+        // RCA's capa_refs got the new ids appended.
+        assertThat(r.getCapaRefs()).isNotNull();
+        assertThat(r.getCapaRefs().split(",")).hasSize(3);
+    }
+
+    @Test void generateCapas_falls_back_to_newline_split_when_no_numbered_list() {
+        RootCauseAnalysis r = rca("APPROVED");
+        r.setExternalId("RCA-XYZ");
+        r.setRecommendationsEn(
+                "First action item is sufficiently long.\n" +
+                "Second action item is also reasonable.\n" +
+                "tiny\n" +
+                "Third long enough action item here.");
+        when(repo.findByIdAndOrganisationId(RCA_ID, ORG_ID)).thenReturn(Optional.of(r));
+        when(repo.save(any(RootCauseAnalysis.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(capaService.create(any(CapaTaskDto.class))).thenAnswer(inv -> {
+            CapaTaskDto dto = inv.getArgument(0);
+            dto.setId("CAPA-" + System.nanoTime());
+            return dto;
+        });
+
+        List<CapaTaskDto> out = service.generateCapasFromRecommendations(RCA_ID, null);
+        // 3 long items survive; "tiny" is filtered out.
+        assertThat(out).hasSize(3);
     }
 }

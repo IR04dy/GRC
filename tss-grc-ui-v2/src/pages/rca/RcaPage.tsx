@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Microscope, Plus, Send, CheckCircle2, XCircle, FileText,
-  ChevronRight, ChevronDown, Clock,
+  ChevronRight, ChevronDown, Clock, Wrench,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -15,7 +15,7 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
-  listRcas, createRca, submitRca, approveRca, rejectRca,
+  listRcas, createRca, submitRca, approveRca, rejectRca, generateCapasFromRca,
   parseFiveWhys, RCA_STATUS_TONE,
   type RootCauseAnalysis, type RcaStatus, type RcaMethodology,
 } from '../../lib/rootCauseAnalysis';
@@ -129,6 +129,16 @@ export function RcaPage() {
     catch { toast.danger(t('rcaActionFailedToast')); }
     finally { setBusyId(null); }
   }
+  async function onGenerateCapas(row: RootCauseAnalysis) {
+    if (!window.confirm(t('rcaGenerateCapasConfirm'))) return;
+    setBusyId(row.id);
+    try {
+      const created = await generateCapasFromRca(row.id);
+      toast.success(`${t('rcaGenerateCapasToast')} (${created.length})`);
+      await reload();
+    } catch { toast.danger(t('rcaActionFailedToast')); }
+    finally { setBusyId(null); }
+  }
 
   function toggleExpanded(id: number) {
     const next = new Set(expanded);
@@ -176,7 +186,8 @@ export function RcaPage() {
                   <RcaRow key={row.id} row={row} lang={lang} t={t} busyId={busyId}
                           isExpanded={expanded.has(row.id)}
                           onToggle={() => toggleExpanded(row.id)}
-                          onSubmit={onSubmit} onApprove={onApprove} onReject={onReject} />
+                          onSubmit={onSubmit} onApprove={onApprove} onReject={onReject}
+                          onGenerateCapas={onGenerateCapas} />
                 ))}
               </div>}
       </Card>
@@ -193,7 +204,7 @@ export function RcaPage() {
   );
 }
 
-function RcaRow({ row, lang, t, busyId, isExpanded, onToggle, onSubmit, onApprove, onReject }: {
+function RcaRow({ row, lang, t, busyId, isExpanded, onToggle, onSubmit, onApprove, onReject, onGenerateCapas }: {
   row: RootCauseAnalysis;
   lang: 'en' | 'ar';
   t: (k: string) => string;
@@ -203,6 +214,7 @@ function RcaRow({ row, lang, t, busyId, isExpanded, onToggle, onSubmit, onApprov
   onSubmit: (r: RootCauseAnalysis) => Promise<void>;
   onApprove: (r: RootCauseAnalysis) => Promise<void>;
   onReject: (r: RootCauseAnalysis) => Promise<void>;
+  onGenerateCapas: (r: RootCauseAnalysis) => Promise<void>;
 }) {
   const problem = lang === 'ar' && row.problemStatementAr ? row.problemStatementAr : row.problemStatementEn;
   const rootCause = lang === 'ar' && row.rootCauseAr ? row.rootCauseAr : row.rootCauseEn;
@@ -247,6 +259,13 @@ function RcaRow({ row, lang, t, busyId, isExpanded, onToggle, onSubmit, onApprov
               <Button size="sm" variant="ghost" Icon={XCircle} disabled={busyId === row.id}
                       onClick={() => onReject(row)}>{t('rcaActReject')}</Button>
             </>
+          )}
+          {row.status === 'APPROVED' && row.recommendationsEn && (
+            <Button size="sm" variant="ghost" Icon={Wrench} disabled={busyId === row.id}
+                    onClick={() => onGenerateCapas(row)}
+                    title={t('rcaGenerateCapasHint')}>
+              {t('rcaActGenerateCapas')}
+            </Button>
           )}
         </div>
       </div>
