@@ -29,6 +29,37 @@ public class CyberFramework {
     @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)")
     private String descriptionEn;
 
+    // ─── Bilingual + metadata columns (V37) ──────────────────────────
+    @Column(name = "name_ar", length = 255)
+    private String nameAr;
+
+    @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String descriptionAr;
+
+    /** NCA | SAMA | CITC | SDAIA | ISO | PCI. */
+    @Column(name = "regulator", length = 20)
+    private String regulator;
+
+    /** ECC | CSCC | CCC | OTCC | ISO27001 | ISO22301 | PCIDSS | SAMA_CYBER. */
+    @Column(name = "framework_code", length = 20)
+    private String frameworkCode;
+
+    @Column(name = "domain_count")
+    private Integer domainCount;
+
+    @Column(name = "control_count")
+    private Integer controlCount;
+
+    @Column(name = "effective_from")
+    private java.time.LocalDate effectiveFrom;
+
+    /** CSV of sectors / scopes — CRITICAL_INFRA,ENERGY,BANKING,etc. */
+    @Column(name = "mandatory_for", columnDefinition = "NVARCHAR(MAX)")
+    private String mandatoryFor;
+
+    @Column(name = "reference_url", length = 500)
+    private String referenceUrl;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 
