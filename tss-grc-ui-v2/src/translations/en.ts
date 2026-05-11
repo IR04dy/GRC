@@ -1234,11 +1234,17 @@ export const en = {
 
   // ROPA + consent — B2.
   ropaSidebar:             'ROPA',
-  // ─── PDPL extensions (gap-analysis items 6 / 7 / 8) ────────────────
-  pdplExtSidebar:               'PDPL extensions',
-  pdplExtTitle:                 'PDPL extensions',
-  pdplExtEyebrow:               'Data Protection',
-  pdplExtSub:                   'Cross-border transfers, disposal certificates, and versioned privacy notices — PDPL Art. 12, 18, 29.',
+  // ─── Personal-data lifecycle (gap-analysis items 6 / 7 / 8) ────────
+  // Renamed from the developer-internal "PDPL extensions". The three
+  // features under this page are the three PDPL articles that govern
+  // personal data at successive stages of its lifecycle:
+  //   • intake / notification — Art. 12 (privacy notices)
+  //   • outbound flow         — Art. 29 (cross-border transfers)
+  //   • end of life           — Art. 18 (disposal certificates)
+  pdplExtSidebar:               'Data lifecycle',
+  pdplExtTitle:                 'Personal data lifecycle',
+  pdplExtEyebrow:               'PDPL · Personal Data Protection Law',
+  pdplExtSub:                   'Privacy notices (Art. 12), cross-border transfers (Art. 29), and disposal certificates (Art. 18) — the three workflows that govern personal data from intake to erasure.',
   pdplExtCbtTab:                'Cross-border transfers',
   pdplExtDisposalTab:           'Disposal certificates',
   pdplExtNoticeTab:             'Privacy notices',

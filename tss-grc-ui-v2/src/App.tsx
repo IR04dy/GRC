@@ -103,7 +103,9 @@ export function App() {
               <Route path="/bcm"        element={<BcmPage />} />
               <Route path="/privacy"    element={<PrivacyPage />} />
               <Route path="/pdpl"       element={<Navigate to="/privacy" replace />} />
-              <Route path="/pdpl-extensions" element={<PdplExtensionsPage />} />
+              <Route path="/data-lifecycle"  element={<PdplExtensionsPage />} />
+              {/* Legacy route from when this page was called "PDPL extensions". */}
+              <Route path="/pdpl-extensions" element={<Navigate to="/data-lifecycle" replace />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
