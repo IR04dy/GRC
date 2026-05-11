@@ -13,15 +13,17 @@
 --   APPROVED  — locked; CAPAs spawned from recommendations
 --   REJECTED  — terminal; reason captured for audit
 --
--- Lives under schema `incident` because the dominant link is to incidents,
--- but `related_entity_type` allows other modules to attach RCAs too.
+-- Lives under schema `cyber` to match the parent incidents table
+-- (cyber.incidents) — the codebase uses `cyber` as the schema for all
+-- incident-domain rows. `related_entity_type` allows the table to
+-- service incident, data_breach, bcm_invocation, supplier_incident, etc.
 
 SET QUOTED_IDENTIFIER ON;
 GO
 
-IF OBJECT_ID(N'incident.root_cause_analyses', N'U') IS NULL
+IF OBJECT_ID(N'cyber.root_cause_analyses', N'U') IS NULL
 BEGIN
-    CREATE TABLE incident.root_cause_analyses (
+    CREATE TABLE cyber.root_cause_analyses (
         id                       BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         organisation_id          BIGINT NOT NULL,
 
@@ -92,7 +94,7 @@ BEGIN
         CONSTRAINT CK_rca_rejection_reason CHECK (status <> N'REJECTED' OR rejection_reason IS NOT NULL)
     );
 
-    CREATE INDEX IX_rca_org_status     ON incident.root_cause_analyses (organisation_id, status) WHERE is_deleted = 0;
-    CREATE INDEX IX_rca_related_entity ON incident.root_cause_analyses (organisation_id, related_entity_type, related_entity_id);
+    CREATE INDEX IX_rca_org_status     ON cyber.root_cause_analyses (organisation_id, status) WHERE is_deleted = 0;
+    CREATE INDEX IX_rca_related_entity ON cyber.root_cause_analyses (organisation_id, related_entity_type, related_entity_id);
 END;
 GO

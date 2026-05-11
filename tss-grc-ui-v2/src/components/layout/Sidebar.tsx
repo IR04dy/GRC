@@ -2,7 +2,7 @@ import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, Refresh
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
-         Newspaper, Briefcase, Activity, Leaf, Layers, Compass, BookOpen, PenLine,
+         Newspaper, Briefcase, Activity, Leaf, Layers, Compass, BookOpen, PenLine, Microscope,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -60,6 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'risk',      to: '/risk',           Icon: AlertTriangle, labelKey: 'modRisk' },
       { id: 'risk-lc',   to: '/risk-lifecycle', Icon: GitBranch,     labelKey: 'rlcSidebar' },
       { id: 'incidents', to: '/incidents',      Icon: AlertOctagon,  labelKey: 'incidentsTitle' },
+      { id: 'rca',       to: '/rca',            Icon: Microscope,    labelKey: 'rcaSidebar' },
       { id: 'changes',   to: '/changes',        Icon: GitBranch,     labelKey: 'modChanges' },
     ],
   },

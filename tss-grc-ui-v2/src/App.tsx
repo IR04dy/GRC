@@ -77,6 +77,7 @@ import { BcmLifecyclePage } from './pages/bcm-lifecycle/BcmLifecyclePage';
 import { CyberLifecyclePage } from './pages/cyber-lifecycle/CyberLifecyclePage';
 import { LifecycleOverviewPage } from './pages/lifecycle-overview/LifecycleOverviewPage';
 import { NotificationOutboxPage } from './pages/notification-outbox/NotificationOutboxPage';
+import { RcaPage } from './pages/rca/RcaPage';
 
 export function App() {
   return (
@@ -106,6 +107,7 @@ export function App() {
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
+              <Route path="/rca"        element={<RcaPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />

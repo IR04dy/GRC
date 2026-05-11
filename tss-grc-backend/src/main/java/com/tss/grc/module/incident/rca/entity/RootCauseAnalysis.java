@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * | REJECTED.
  */
 @Entity
-@Table(schema = "incident", name = "root_cause_analyses")
+@Table(schema = "cyber", name = "root_cause_analyses")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor
 public class RootCauseAnalysis {
