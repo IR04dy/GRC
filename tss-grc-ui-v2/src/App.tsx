@@ -45,6 +45,7 @@ import { IntakeCatalogPage } from './pages/intake/IntakeCatalogPage';
 import { IntakeFormPage } from './pages/intake/IntakeFormPage';
 import { ConnectorsPage } from './pages/intake/ConnectorsPage';
 import { ApprovalInboxPage } from './pages/approvals/ApprovalInboxPage';
+import { SignaturesPage } from './pages/signatures/SignaturesPage';
 import { AssetRegisterPage } from './pages/assets/AssetRegisterPage';
 import { BoardPackPage } from './pages/board-pack/BoardPackPage';
 import { RegulatoryChangePage } from './pages/regulatory-change/RegulatoryChangePage';
@@ -77,6 +78,7 @@ import { CyberLifecyclePage } from './pages/cyber-lifecycle/CyberLifecyclePage';
 import { LifecycleOverviewPage } from './pages/lifecycle-overview/LifecycleOverviewPage';
 import { NotificationOutboxPage } from './pages/notification-outbox/NotificationOutboxPage';
 import { PdplExtensionsPage } from './pages/pdpl-extensions/PdplExtensionsPage';
+import { RcaPage } from './pages/rca/RcaPage';
 
 export function App() {
   return (
@@ -109,6 +111,7 @@ export function App() {
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
+              <Route path="/rca"        element={<RcaPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />
@@ -229,6 +232,7 @@ export function App() {
 
               {/* Cross-module approval inbox (Sprint 5) */}
               <Route path="/approvals"          element={<ApprovalInboxPage />} />
+              <Route path="/signatures"         element={<SignaturesPage />} />
 
               {/* Unified asset register / CMDB-lite (Sprint 5) */}
               <Route path="/assets"             element={<AssetRegisterPage />} />
