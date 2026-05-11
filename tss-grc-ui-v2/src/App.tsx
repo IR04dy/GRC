@@ -80,6 +80,7 @@ import { NotificationOutboxPage } from './pages/notification-outbox/Notification
 import { PdplExtensionsPage } from './pages/pdpl-extensions/PdplExtensionsPage';
 import { RcaPage } from './pages/rca/RcaPage';
 import { RiskScenariosPage } from './pages/risk-scenarios/RiskScenariosPage';
+import { SupplierResiliencePage } from './pages/supplier-resilience/SupplierResiliencePage';
 
 export function App() {
   return (
@@ -117,6 +118,7 @@ export function App() {
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />
+              <Route path="/supplier-resilience" element={<SupplierResiliencePage />} />
               <Route path="/workflows"  element={<WorkflowsPage />} />
               <Route path="/changes"    element={<ChangesPage />} />
               <Route path="/ethics"     element={<EthicsPage />} />

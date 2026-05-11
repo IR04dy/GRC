@@ -144,9 +144,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'third-party', titleKey: 'navThirdParty',
     items: [
-      { id: 'tprm',          to: '/tprm',          Icon: Workflow,  labelKey: 'modThirdParty' },
-      { id: 'vendor-portal', to: '/portal/vendor', Icon: Briefcase, labelKey: 'vpSidebar' },
-      { id: 'scm',           to: '/scm',           Icon: Truck,     labelKey: 'scmEyebrow' },
+      { id: 'tprm',          to: '/tprm',                  Icon: Workflow,    labelKey: 'modThirdParty' },
+      { id: 'vendor-portal', to: '/portal/vendor',         Icon: Briefcase,   labelKey: 'vpSidebar' },
+      { id: 'scm',           to: '/scm',                   Icon: Truck,       labelKey: 'scmEyebrow' },
+      { id: 'srp',           to: '/supplier-resilience',   Icon: ShieldCheck, labelKey: 'srpSidebar' },
     ],
   },
 
