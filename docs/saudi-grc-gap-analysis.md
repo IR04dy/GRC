@@ -162,9 +162,9 @@ the next candidates for implementation.
 | IT DRP entity (BCM) | ✓ | Closed in this sprint — V41 + `module/bcm/drp/` |
 | Cyber → PDPL breach automation rule | ⚠ | Both modules exist; rule-engine wiring is a Sprint 6 candidate |
 | Processor due diligence (PDPL) | ⚠ | Subsumed by Vendor assessments + the new TPRM cyber check |
-| Contractual resilience clauses (SCM) | ⚠ | Covered by Contract + new ExitPlan; clause-library is a polish item |
-| Cloud cybersecurity assessment | ⚠ | CCC seed now in V37; controls library import is a separate task |
-| OT / ICS control library | ⚠ | OTCC seed now in V37; same — control rows import is separate |
+| Contractual resilience clauses (SCM) | ✓ | Closed — V45 + `module/scm/clauses/` (22 standard clause templates across 9 categories; `ContractClausesPage`) |
+| Cloud cybersecurity assessment | ✓ | CCC framework + 30 controls in V37+V43; `FrameworkControlsPage` filters to CCC |
+| OT / ICS control library | ✓ | OTCC framework + 27 controls in V37+V44; `FrameworkControlsPage` filters to OTCC |
 | Third-party cyber risk | ⚠ | Reachable via SCM vendor risk + new TPRM cyber assessment |
 | Resilience testing (SCM) | ⚠ | Generic BCM exercise + new ExitPlan `recordTest()` now cover this |
 

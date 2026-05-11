@@ -120,9 +120,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'cyber', titleKey: 'navCyber',
     items: [
-      { id: 'cyber',    to: '/cyber',           Icon: LockKeyhole, labelKey: 'modCyber' },
-      { id: 'cyber-lc', to: '/cyber-lifecycle', Icon: ShieldCheck, labelKey: 'cycSidebar' },
-      { id: 'assets',   to: '/assets',          Icon: Server,      labelKey: 'assetsSidebar' },
+      { id: 'cyber',    to: '/cyber',              Icon: LockKeyhole, labelKey: 'modCyber' },
+      { id: 'cyber-lc', to: '/cyber-lifecycle',    Icon: ShieldCheck, labelKey: 'cycSidebar' },
+      { id: 'fw-ctrls', to: '/framework-controls', Icon: BookOpen,    labelKey: 'fwcSidebar' },
+      { id: 'assets',   to: '/assets',             Icon: Server,      labelKey: 'assetsSidebar' },
     ],
   },
 
@@ -150,6 +151,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'vendor-portal', to: '/portal/vendor',         Icon: Briefcase,   labelKey: 'vpSidebar' },
       { id: 'scm',           to: '/scm',                   Icon: Truck,       labelKey: 'scmEyebrow' },
       { id: 'srp',           to: '/supplier-resilience',   Icon: ShieldCheck, labelKey: 'srpSidebar' },
+      { id: 'clauses',       to: '/contract-clauses',      Icon: Stamp,       labelKey: 'cclSidebar' },
     ],
   },
 

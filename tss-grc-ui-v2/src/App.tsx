@@ -84,6 +84,8 @@ import { SupplierResiliencePage } from './pages/supplier-resilience/SupplierResi
 import { EmergingRiskPage } from './pages/emerging-risk/EmergingRiskPage';
 import { CommitteesPage } from './pages/committees/CommitteesPage';
 import { DrPlansPage } from './pages/dr-plans/DrPlansPage';
+import { FrameworkControlsPage } from './pages/framework-controls/FrameworkControlsPage';
+import { ContractClausesPage } from './pages/contract-clauses/ContractClausesPage';
 
 export function App() {
   return (
@@ -121,6 +123,8 @@ export function App() {
               <Route path="/emerging-risk"    element={<EmergingRiskPage />} />
               <Route path="/committees"       element={<CommitteesPage />} />
               <Route path="/dr-plans"         element={<DrPlansPage />} />
+              <Route path="/framework-controls" element={<FrameworkControlsPage />} />
+              <Route path="/contract-clauses"   element={<ContractClausesPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />
