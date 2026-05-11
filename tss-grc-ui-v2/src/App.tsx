@@ -81,6 +81,9 @@ import { PdplExtensionsPage } from './pages/pdpl-extensions/PdplExtensionsPage';
 import { RcaPage } from './pages/rca/RcaPage';
 import { RiskScenariosPage } from './pages/risk-scenarios/RiskScenariosPage';
 import { SupplierResiliencePage } from './pages/supplier-resilience/SupplierResiliencePage';
+import { EmergingRiskPage } from './pages/emerging-risk/EmergingRiskPage';
+import { CommitteesPage } from './pages/committees/CommitteesPage';
+import { DrPlansPage } from './pages/dr-plans/DrPlansPage';
 
 export function App() {
   return (
@@ -114,7 +117,10 @@ export function App() {
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/rca"        element={<RcaPage />} />
-              <Route path="/risk-scenarios" element={<RiskScenariosPage />} />
+              <Route path="/risk-scenarios"   element={<RiskScenariosPage />} />
+              <Route path="/emerging-risk"    element={<EmergingRiskPage />} />
+              <Route path="/committees"       element={<CommitteesPage />} />
+              <Route path="/dr-plans"         element={<DrPlansPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />

@@ -15,9 +15,9 @@ the next candidates for implementation.
 
 | Status | Count | Notes |
 |---|---|---|
-| ✓ DONE | **39 / 40** | Core ERM, BCM, SCM, NCA ECC/CSCC/CCC/OTCC, PDPL, RCA, digital signatures, scenarios, supplier resilience, workflow engine, evidence, bilingual, multi-tenant |
-| ⚠ PARTIAL | **1 / 40** | Emerging risk management (horizon-scanning workflow not yet modelled) |
-| ✗ MISSING | **0 / 40** | All eight priority gaps from the original analysis now closed |
+| ✓ DONE | **40 / 40** | Core ERM (now incl. emerging risk + scenarios), BCM (incl. DR plans), committee workflows, SCM, NCA ECC/CSCC/CCC/OTCC, PDPL, RCA, digital signatures, supplier resilience, workflow engine, evidence, bilingual, multi-tenant |
+| ⚠ PARTIAL | **0 / 40** | All originally-PARTIAL items now closed |
+| ✗ MISSING | **0 / 40** | — |
 
 ### Sprint progress on the 8 priority gaps
 
@@ -47,8 +47,9 @@ the next candidates for implementation.
 | Risk treatment + acceptance | ✓ | `risk_lc` lifecycle module + `RiskRegisterPage.tsx` |
 | KRI monitoring + breach detection | ✓ | `KriEngineService.java`, `KriDefinition.java`, `KriBreachEvent.java` |
 | Scenario analysis | ✓ | `module/risk/scenario/` + V35 (Monte Carlo / stress / what-if persisted; `RiskScenariosPage`) |
-| **Emerging risk management** | ⚠ | No `EmergingRisk` entity, no horizon-scanning workflow — only remaining ERM gap |
-| Committee workflows | ⚠ | `ApprovalRequest` covers generic approvals; no dedicated `Committee` / `CommitteeMeeting` entity |
+| Emerging risk management | ✓ | `module/risk/emerging/` + V39 (horizon-scanning signals with HORIZON→MONITORING→ESCALATED|MATURED|DISMISSED state machine; `EmergingRiskPage`) |
+| Committee workflows | ✓ | `module/admin/committee/` + V40 (`Committee` + `CommitteeMeeting` entities with agenda / attendees / decisions / action-items JSON; `CommitteesPage`) |
+| Committee workflows | ✓ | `module/admin/committee/` + V40 (`Committee` + `CommitteeMeeting` with charter, members, agenda, attendees, minutes, decisions, action items, and a SCHEDULED→IN_PROGRESS→COMPLETED→MINUTES_APPROVED state machine) |
 
 ### Section 3.2 — Business Continuity Management
 
@@ -58,7 +59,7 @@ the next candidates for implementation.
 | Business Impact Analysis (BIA) | ✓ | `BiaRecord.java` |
 | BCM risk assessment | ✓ | `bcm_lc` lifecycle module |
 | Continuity strategy / BCP | ✓ | `BcmPlan.java`, `BcmController.java` |
-| IT DRP | ⚠ | `BackupDrPage.tsx` UI only; no backend `DisasterRecoveryPlan` entity |
+| IT DRP | ✓ | `module/bcm/drp/` + V41 (`DisasterRecoveryPlan` with RTO/RPO/MTPD, hot/warm/cold/active-active/cloud-DR site types, failover + failback step playbooks, last-tested outcome; `DrPlansPage`) |
 | Crisis activation + comms | ✓ | `CrisisCommsTemplate/Audience/Distribution` + `CrisisManagementPage.tsx` |
 | Exercises / tests | ✓ | `BcmExercise.java` |
 | Lessons learned | ✓ | `bcm_lc` lifecycle + incidents lessons tab (added 2026-05-10) |
@@ -153,12 +154,12 @@ the next candidates for implementation.
 
 | Item | Status | Reason it wasn't in the 8 priority gaps |
 |---|---|---|
-| Emerging risk management | ⚠ | Horizon-scanning is a different problem domain — separate workstream |
+| Emerging risk management | ✓ | Closed in this sprint — V39 + `module/risk/emerging/` |
 | Fourth-party exposure (SCM) | ⚠ | Sub-tier vendor depth is a Sprint 6 candidate |
 | Data sharing agreement (PDPL) | ⚠ | DSAs typically managed in CLM, not GRC; out-of-scope decision |
-| Committee workflows (ERM) | ⚠ | Generic ApprovalRequest is sufficient for the current customer base |
+| Committee workflows (ERM) | ✓ | Closed in this sprint — V40 + `module/admin/committee/` |
 | Chain-of-custody crypto hash (Evidence) | ⚠ | EvidenceVersion already audit-able; cryptographic chain is a future hardening |
-| IT DRP entity (BCM) | ⚠ | BCM lifecycle already handles DR scenarios; standalone `DisasterRecoveryPlan` would duplicate |
+| IT DRP entity (BCM) | ✓ | Closed in this sprint — V41 + `module/bcm/drp/` |
 | Cyber → PDPL breach automation rule | ⚠ | Both modules exist; rule-engine wiring is a Sprint 6 candidate |
 | Processor due diligence (PDPL) | ⚠ | Subsumed by Vendor assessments + the new TPRM cyber check |
 | Contractual resilience clauses (SCM) | ⚠ | Covered by Contract + new ExitPlan; clause-library is a polish item |
