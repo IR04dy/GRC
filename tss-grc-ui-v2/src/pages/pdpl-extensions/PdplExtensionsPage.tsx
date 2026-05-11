@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Globe2, Trash2, FileText, Plus, ShieldCheck, CheckCircle2, XCircle, Play, Send,
   AlertOctagon, Clock,
@@ -39,7 +40,16 @@ type TabId = 'cbt' | 'disposal' | 'notice';
 export function PdplExtensionsPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const [tab, setTab] = useState<TabId>('cbt');
+
+  // URL-driven state — ROPA pages deep-link here with ?tab=&ropaCode=&new=1
+  // so the right tab is open, the lists are filtered to that ROPA, and the
+  // create modal pre-fills the ROPA reference.
+  const [params, setParams] = useSearchParams();
+  const urlTab = (params.get('tab') ?? 'cbt') as TabId;
+  const initialTab: TabId = ['cbt', 'disposal', 'notice'].includes(urlTab) ? urlTab : 'cbt';
+  const [tab, setTab] = useState<TabId>(initialTab);
+  const ropaFilter = params.get('ropaCode') ?? '';
+  const wantNew = params.get('new') === '1';
 
   const [cbts, setCbts] = useState<CrossBorderTransfer[]>([]);
   const [disposals, setDisposals] = useState<DisposalCertificate[]>([]);
@@ -51,6 +61,45 @@ export function PdplExtensionsPage() {
   const [createNoticeOpen, setCreateNoticeOpen] = useState(false);
 
   useEffect(() => { void reloadAll(); }, []);
+
+  // Auto-open the create modal for the active tab when ?new=1 is present.
+  // Then strip the param so refreshing the page doesn't reopen the modal.
+  useEffect(() => {
+    if (!wantNew) return;
+    if (tab === 'cbt') setCreateCbtOpen(true);
+    else if (tab === 'disposal') setCreateDisposalOpen(true);
+    else if (tab === 'notice') setCreateNoticeOpen(true);
+    const next = new URLSearchParams(params);
+    next.delete('new');
+    setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantNew, tab]);
+
+  // Keep the URL in sync when the user clicks tabs so refresh keeps state.
+  function changeTab(next: TabId) {
+    setTab(next);
+    const p = new URLSearchParams(params);
+    p.set('tab', next);
+    setParams(p, { replace: true });
+  }
+
+  // Per-tab filtered views: when ropaCode is in the URL, narrow the list to
+  // the records that reference it. The three modules expose the link
+  // differently (transfers via ropaCode column, disposals via
+  // relatedEntityType=ropa+entityId, notices via comma-CSV linkedRopaCodes).
+  const filteredCbts = useMemo(() =>
+    ropaFilter ? cbts.filter(x => x.ropaCode === ropaFilter) : cbts,
+    [cbts, ropaFilter]);
+  const filteredDisposals = useMemo(() =>
+    ropaFilter ? disposals.filter(x => x.relatedEntityType === 'ropa' && x.relatedEntityId === ropaFilter) : disposals,
+    [disposals, ropaFilter]);
+  const filteredNotices = useMemo(() => {
+    if (!ropaFilter) return notices;
+    return notices.filter(n => {
+      const csv = (n.linkedRopaCodes ?? '').split(',').map(s => s.trim()).filter(Boolean);
+      return csv.includes(ropaFilter);
+    });
+  }, [notices, ropaFilter]);
 
   async function reloadAll() {
     const [a, b, c] = await Promise.all([
@@ -77,24 +126,50 @@ export function PdplExtensionsPage() {
         sub={t('pdplExtSub')}
       />
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      {ropaFilter && (
+        <div style={{
+          padding: '8px 12px', marginBottom: 12,
+          background: 'var(--primary-50)', border: '1px solid var(--primary-200)',
+          borderRadius: 'var(--r-sm)', fontSize: 12,
+          display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between',
+        }}>
+          <span>
+            {t('pdplExtRopaFilterLabel')}: <strong className="mono">{ropaFilter}</strong>
+          </span>
+          <button type="button" onClick={() => {
+            const p = new URLSearchParams(params);
+            p.delete('ropaCode');
+            setParams(p, { replace: true });
+          }} style={{
+            background: 'transparent', border: '1px solid var(--primary-200)',
+            borderRadius: 'var(--r-sm)', padding: '2px 8px', cursor: 'pointer',
+            fontSize: 11, color: 'var(--primary-700)',
+          }}>
+            {t('pdplExtRopaFilterClear')}
+          </button>
+        </div>
+      )}
+      <Tabs items={tabs} active={tab} onChange={changeTab} />
 
       {tab === 'cbt' && (
-        <CbtTab rows={cbts} busy={busy} setBusy={setBusy} t={t} toast={toast}
+        <CbtTab rows={filteredCbts} busy={busy} setBusy={setBusy} t={t} toast={toast}
                 onChanged={reloadAll}
-                createOpen={createCbtOpen} setCreateOpen={setCreateCbtOpen} />
+                createOpen={createCbtOpen} setCreateOpen={setCreateCbtOpen}
+                prefillRopaCode={ropaFilter} />
       )}
 
       {tab === 'disposal' && (
-        <DisposalTab rows={disposals} busy={busy} setBusy={setBusy} lang={lang} t={t} toast={toast}
+        <DisposalTab rows={filteredDisposals} busy={busy} setBusy={setBusy} lang={lang} t={t} toast={toast}
                      onChanged={reloadAll}
-                     createOpen={createDisposalOpen} setCreateOpen={setCreateDisposalOpen} />
+                     createOpen={createDisposalOpen} setCreateOpen={setCreateDisposalOpen}
+                     prefillRopaCode={ropaFilter} />
       )}
 
       {tab === 'notice' && (
-        <NoticeTab rows={notices} busy={busy} setBusy={setBusy} lang={lang} t={t} toast={toast}
+        <NoticeTab rows={filteredNotices} busy={busy} setBusy={setBusy} lang={lang} t={t} toast={toast}
                    onChanged={reloadAll}
-                   createOpen={createNoticeOpen} setCreateOpen={setCreateNoticeOpen} />
+                   createOpen={createNoticeOpen} setCreateOpen={setCreateNoticeOpen}
+                   prefillRopaCode={ropaFilter} />
       )}
     </Shell>
   );
@@ -102,7 +177,7 @@ export function PdplExtensionsPage() {
 
 // ─── Cross-border transfer tab ───────────────────────────────────────
 
-function CbtTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen }: any) {
+function CbtTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen, prefillRopaCode }: any) {
   const stats = countByStatus(rows, 'status');
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'ropaCode', label: 'ROPA code *', required: true, span: 6 },
@@ -232,7 +307,7 @@ function CbtTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreat
         open={createOpen}
         title={t('pdplExtCbtAddTitle')}
         fields={FIELDS}
-        initial={{}}
+        initial={prefillRopaCode ? { ropaCode: prefillRopaCode } : {}}
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
       />
@@ -242,7 +317,7 @@ function CbtTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreat
 
 // ─── Disposal certificate tab ────────────────────────────────────────
 
-function DisposalTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen }: any) {
+function DisposalTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen, prefillRopaCode }: any) {
   const stats = countByStatus(rows, 'status');
   const FIELDS: FieldDef[] = [
     { kind: 'select', key: 'relatedEntityType', label: t('pdplExtDspEntityType') + ' *', required: true,
@@ -354,7 +429,9 @@ function DisposalTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, set
         open={createOpen}
         title={t('pdplExtDspAddTitle')}
         fields={FIELDS}
-        initial={{ relatedEntityType: 'ropa', disposalMethod: 'ANONYMIZE' }}
+        initial={prefillRopaCode
+          ? { relatedEntityType: 'ropa', disposalMethod: 'ANONYMIZE', relatedEntityId: prefillRopaCode }
+          : { relatedEntityType: 'ropa', disposalMethod: 'ANONYMIZE' }}
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
       />
@@ -364,7 +441,7 @@ function DisposalTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, set
 
 // ─── Privacy notice tab ─────────────────────────────────────────────
 
-function NoticeTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen }: any) {
+function NoticeTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen, prefillRopaCode }: any) {
   const stats = countByStatus(rows, 'status');
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'noticeCode', label: t('pdplExtPnCode') + ' *', required: true, placeholder: 'PN-EMP', span: 6 },
@@ -471,7 +548,7 @@ function NoticeTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCr
         open={createOpen}
         title={t('pdplExtPnAddTitle')}
         fields={FIELDS}
-        initial={{}}
+        initial={prefillRopaCode ? { linkedRopaCodes: prefillRopaCode } : {}}
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
       />

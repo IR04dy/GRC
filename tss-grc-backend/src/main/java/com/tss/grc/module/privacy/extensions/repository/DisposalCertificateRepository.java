@@ -15,4 +15,11 @@ public interface DisposalCertificateRepository extends JpaRepository<DisposalCer
     Optional<DisposalCertificate> findByIdAndOrganisationId(Long id, Long orgId);
 
     List<DisposalCertificate> findByOrganisationIdAndStatusOrderByCreatedAtDesc(Long orgId, String status);
+
+    /** Disposal certs attached to a ROPA (related_entity_type = 'ropa'). */
+    List<DisposalCertificate> findByOrganisationIdAndRelatedEntityTypeAndRelatedEntityIdOrderByCreatedAtDesc(
+            Long orgId, String entityType, String entityId);
+
+    /** Counter for ROPA-attached disposal certificates. */
+    int countByOrganisationIdAndRelatedEntityTypeAndRelatedEntityId(Long orgId, String entityType, String entityId);
 }

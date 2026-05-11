@@ -17,4 +17,7 @@ public interface CrossBorderTransferRepository extends JpaRepository<CrossBorder
     List<CrossBorderTransfer> findByOrganisationIdAndStatusOrderByCreatedAtDesc(Long orgId, String status);
 
     List<CrossBorderTransfer> findByOrganisationIdAndRopaCodeOrderByCreatedAtDesc(Long orgId, String ropaCode);
+
+    /** Count active (non-deleted) transfers for a ROPA — drives the chip counter on ROPA detail. */
+    int countByOrganisationIdAndRopaCode(Long orgId, String ropaCode);
 }
