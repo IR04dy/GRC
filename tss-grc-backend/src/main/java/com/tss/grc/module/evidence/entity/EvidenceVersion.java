@@ -57,4 +57,27 @@ public class EvidenceVersion {
 
     @Column(name = "snapshotted_by")
     private Long snapshottedBy;
+
+    // ─── Chain-of-custody hash (V47 / gap-analysis item C) ────────────
+    @Column(name = "content_hash_sha256", length = 64)
+    private String contentHashSha256;
+
+    @Column(name = "chain_hash_sha256", length = 64)
+    private String chainHashSha256;
+
+    @Column(name = "chain_position")
+    private Integer chainPosition;
+
+    /** VALID | BROKEN | UNVERIFIED. */
+    @Column(name = "chain_status", length = 15)
+    private String chainStatus;
+
+    @Column(name = "chain_verified_at")
+    private LocalDateTime chainVerifiedAt;
+
+    @Column(name = "chain_verified_by")
+    private Long chainVerifiedBy;
+
+    @Column(name = "chain_break_reason", length = 500)
+    private String chainBreakReason;
 }

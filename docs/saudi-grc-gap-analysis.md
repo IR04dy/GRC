@@ -158,9 +158,9 @@ the next candidates for implementation.
 | Fourth-party exposure (SCM) | ⚠ | Sub-tier vendor depth is a Sprint 6 candidate |
 | Data sharing agreement (PDPL) | ⚠ | DSAs typically managed in CLM, not GRC; out-of-scope decision |
 | Committee workflows (ERM) | ✓ | Closed in this sprint — V40 + `module/admin/committee/` |
-| Chain-of-custody crypto hash (Evidence) | ⚠ | EvidenceVersion already audit-able; cryptographic chain is a future hardening |
+| Chain-of-custody crypto hash (Evidence) | ✓ | Closed — V47 + `module/evidence/chain/` (SHA-256 hash chain across evidence versions, on-demand verifier, parent-item rollup status, `EvidenceChainPage` with VALID/BROKEN/UNVERIFIED filters and a seeded broken-chain demo) |
 | IT DRP entity (BCM) | ✓ | Closed in this sprint — V41 + `module/bcm/drp/` |
-| Cyber → PDPL breach automation rule | ⚠ | Both modules exist; rule-engine wiring is a Sprint 6 candidate |
+| Cyber → PDPL breach automation rule | ✓ | Closed — V46 + `module/privacy/bridge/` (cross-link columns on cyber.incidents + privacy.data_breaches, `cyber_breach_bridge_log` audit table, `CyberPdplBridgeService.triggerForIncident()`, `CyberPdplBridgePage` audit log) |
 | Processor due diligence (PDPL) | ⚠ | Subsumed by Vendor assessments + the new TPRM cyber check |
 | Contractual resilience clauses (SCM) | ✓ | Closed — V45 + `module/scm/clauses/` (22 standard clause templates across 9 categories; `ContractClausesPage`) |
 | Cloud cybersecurity assessment | ✓ | CCC framework + 30 controls in V37+V43; `FrameworkControlsPage` filters to CCC |

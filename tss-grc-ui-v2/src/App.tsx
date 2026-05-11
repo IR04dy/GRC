@@ -86,6 +86,8 @@ import { CommitteesPage } from './pages/committees/CommitteesPage';
 import { DrPlansPage } from './pages/dr-plans/DrPlansPage';
 import { FrameworkControlsPage } from './pages/framework-controls/FrameworkControlsPage';
 import { ContractClausesPage } from './pages/contract-clauses/ContractClausesPage';
+import { CyberPdplBridgePage } from './pages/cyber-pdpl-bridge/CyberPdplBridgePage';
+import { EvidenceChainPage } from './pages/evidence-chain/EvidenceChainPage';
 
 export function App() {
   return (
@@ -125,6 +127,8 @@ export function App() {
               <Route path="/dr-plans"         element={<DrPlansPage />} />
               <Route path="/framework-controls" element={<FrameworkControlsPage />} />
               <Route path="/contract-clauses"   element={<ContractClausesPage />} />
+              <Route path="/cyber-pdpl-bridge"  element={<CyberPdplBridgePage />} />
+              <Route path="/evidence-chain"     element={<EvidenceChainPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />

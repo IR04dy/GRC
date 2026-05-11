@@ -97,6 +97,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'audit-ws',  to: '/audit-workspace',   Icon: Stamp,       labelKey: 'modAuditWorkspace' },
       { id: 'audit-lc',  to: '/audit-lifecycle',   Icon: BookOpen,    labelKey: 'alcSidebar' },
+      { id: 'ev-chain',  to: '/evidence-chain',    Icon: Fingerprint, labelKey: 'echSidebar' },
       { id: 'nca-ecc',   to: '/nca-ecc-export',    Icon: ShieldCheck, labelKey: 'ncaSidebar' },
     ],
   },
@@ -111,6 +112,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'privacy-lc', to: '/privacy-lifecycle', Icon: UserCog,     labelKey: 'prcSidebar' },
       { id: 'ropa',       to: '/ropa',              Icon: Files,       labelKey: 'ropaSidebar' },
       { id: 'data-lc',    to: '/data-lifecycle',    Icon: Compass,     labelKey: 'pdplExtSidebar' },
+      { id: 'cyb-pdpl',   to: '/cyber-pdpl-bridge', Icon: Workflow,    labelKey: 'cpbSidebar' },
     ],
   },
 
