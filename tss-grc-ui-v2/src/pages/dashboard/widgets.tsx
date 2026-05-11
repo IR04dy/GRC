@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { AlertTriangle, Flame, ClipboardCheck, ShieldCheck, Plus, Check, Activity, FileText, Grid3x3, BarChart3, CheckSquare, Award, Inbox, Clock, GitBranch } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { AlertTriangle, Flame, ClipboardCheck, ShieldCheck, Plus, Check, Activity, FileText, Grid3x3, BarChart3, CheckSquare, Award, Inbox, Clock, GitBranch, Truck, ArrowUpRight, Network, Bug, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
@@ -9,6 +9,11 @@ import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { BarChart3D } from '../../components/viz/BarChart3D';
 import type { DashboardStats } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { listFourthParty } from '../../lib/fourthParty';
+import { listTpc } from '../../lib/thirdPartyCyber';
+import { listSrt } from '../../lib/resilienceTests';
+import { listProcessorAssessments } from '../../lib/processorAssessments';
+import { listDsas } from '../../lib/dataSharing';
 import {
   loadNitaqatState, computeSaudization, classifyNitaqatBand, nitaqatMeta, NITAQAT_BANDS,
 } from '../../lib/nitaqat';
@@ -109,6 +114,16 @@ export const WIDGETS: DashboardWidget[] = [
     render: ({ t }) => <OverdueReassessmentsKpi t={t} /> },
   { id: 'kpi-cab-queue',              titleKey: 'dashKpiCabQueue',              defaultSize: 'sm', isKpi: true, category: 'kpi',
     render: ({ t }) => <CabQueueKpi t={t} /> },
+
+  // Enhancement C — TPRM consolidated snapshot widget surfacing the five
+  // new modules (fourth-party, third-party cyber, processor DD, SCM
+  // resilience tests, data sharing). One row in the layout that rolls them
+  // up and deep-links into /tprm overview tab for the full view.
+  { id: 'tprm-snapshot', titleKey: 'dashTprmSnapshotTitle', defaultSize: 'lg', category: 'progress',
+    render: ({ t }) =>
+      <Card title={t('dashTprmSnapshotTitle')} Icon={Truck} action={<Badge tone="primary">{t('dashTprmSnapshotBadge')}</Badge>}>
+        <TprmSnapshotWidget t={t} />
+      </Card> },
 ];
 
 export const WIDGETS_BY_ID: Record<string, DashboardWidget> = Object.fromEntries(WIDGETS.map(w => [w.id, w]));
@@ -123,6 +138,7 @@ export const DEFAULT_LAYOUT: Array<{ id: string; size: WidgetSize }> = [
   { id: 'kpi-overdue-reassessments',  size: 'sm' },
   { id: 'kpi-cab-queue',              size: 'sm' },
   { id: 'kpi-critical-risks',         size: 'sm' },
+  { id: 'tprm-snapshot',              size: 'lg' },
   // Existing tier-1 KPIs.
   { id: 'kpi-total-risks',    size: 'sm' },
   { id: 'kpi-compliance',     size: 'sm' },
@@ -321,6 +337,83 @@ function ActivityFeed() {
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>{it.time}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Dashboard TPRM snapshot — rolls up the five new modules (fourth-party,
+ * cyber assessment, processor DD, resilience tests, data sharing) into a
+ * single dashboard tile with deep-links into each.
+ */
+function TprmSnapshotWidget({ t }: { t: (k: string) => string }) {
+  const [c, setC] = useState({
+    fp: 0, fpHigh: 0, tpc: 0, tpcHigh: 0, proc: 0, procFail: 0,
+    srt: 0, srtFail: 0, srtScheduled: 0, dsa: 0, dsaCross: 0,
+    loading: true,
+  });
+  useEffect(() => {
+    (async () => {
+      try {
+        const [a, b, p, s, d] = await Promise.all([
+          listFourthParty(undefined, 0, 200).catch(() => ({ content: [] as any[], totalElements: 0 })),
+          listTpc(undefined, 0, 200).catch(() => ({ content: [] as any[], totalElements: 0 })),
+          listProcessorAssessments(undefined, 0, 200).catch(() => ({ content: [] as any[], totalElements: 0 })),
+          listSrt(undefined, 0, 200).catch(() => ({ content: [] as any[], totalElements: 0 })),
+          listDsas(undefined, 0, 200).catch(() => ({ content: [] as any[], totalElements: 0 })),
+        ]);
+        setC({
+          fp:           a.content.length,
+          fpHigh:       a.content.filter((r: any) => r.concentrationRisk === 'HIGH').length,
+          tpc:          b.content.length,
+          tpcHigh:      b.content.filter((r: any) => r.residualRiskTier === 'HIGH' || r.residualRiskTier === 'CRITICAL').length,
+          proc:         p.content.length,
+          procFail:     p.content.filter((r: any) => r.overallOutcome === 'FAIL').length,
+          srt:          s.content.length,
+          srtFail:      s.content.filter((r: any) => r.outcome === 'FAIL').length,
+          srtScheduled: s.content.filter((r: any) => r.status === 'SCHEDULED').length,
+          dsa:          d.content.length,
+          dsaCross:     d.content.filter((r: any) => r.crossBorderMechanism && r.crossBorderMechanism !== 'NONE').length,
+          loading: false,
+        });
+      } catch { setC(prev => ({ ...prev, loading: false })); }
+    })();
+  }, []);
+
+  const Tile = ({ to, Icon, label, value, sub, subTone }: { to: string; Icon: any; label: string; value: number | string; sub?: string; subTone?: 'danger' | 'warning' | 'info' | 'success' }) => (
+    <Link to={to} style={{
+      display: 'flex', flexDirection: 'column', gap: 4,
+      padding: '12px 14px', background: 'var(--surface-2)',
+      border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+      textDecoration: 'none', color: 'var(--ink-1)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+        <Icon size={13} /> {label} <ArrowUpRight size={11} style={{ marginInlineStart: 'auto' }} />
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.loading ? '…' : value}</div>
+      {sub && <Badge tone={subTone ?? 'info'}>{sub}</Badge>}
+    </Link>
+  );
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: 'var(--muted-foreground)', marginBottom: 10 }}>{t('dashTprmSnapshotSub')}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+        <Tile to="/fourth-party"          Icon={Network}        label={t('tpoLinkFp')}    value={c.fp}   sub={c.fpHigh    ? `${c.fpHigh} HIGH conc.`     : undefined} subTone="danger" />
+        <Tile to="/third-party-cyber"     Icon={Bug}            label={t('tpoLinkTpc')}   value={c.tpc}  sub={c.tpcHigh   ? `${c.tpcHigh} HIGH residual` : undefined} subTone="danger" />
+        <Tile to="/processor-assessments" Icon={ClipboardCheck} label={t('tpoLinkProc')}  value={c.proc} sub={c.procFail  ? `${c.procFail} FAILED`        : undefined} subTone="danger" />
+        <Tile to="/resilience-tests"      Icon={Activity}       label={t('tpoLinkSrt')}   value={c.srt}  sub={c.srtScheduled ? `${c.srtScheduled} scheduled` : undefined} subTone="warning" />
+        <Tile to="/data-sharing"          Icon={Share2}         label={t('tpoLinkDsa')}   value={c.dsa}  sub={c.dsaCross  ? `${c.dsaCross} cross-border`  : undefined} subTone="info" />
+        <Link to="/tprm" style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 4,
+          padding: '12px 14px', background: 'var(--primary-50)',
+          border: '1px solid var(--primary-200)', borderRadius: 'var(--r-md)',
+          color: 'var(--primary-700)', textDecoration: 'none', fontWeight: 600, fontSize: 13,
+        }}>
+          <Truck size={14} /> {t('dashTprmSnapshotCta')}
+          <ArrowUpRight size={12} />
+        </Link>
+      </div>
     </div>
   );
 }

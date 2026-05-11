@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Bug, ChevronRight, ChevronDown, Shield, AlertTriangle, CheckCircle2, Lock,
+  Bug, ChevronRight, ChevronDown, Shield, AlertTriangle, CheckCircle2, Lock, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +11,8 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -28,6 +31,7 @@ export function ThirdPartyCyberPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => { void reload(); }, []);
   async function reload() {
@@ -70,9 +74,47 @@ export function ThirdPartyCyberPage() {
   async function onApprove(id: number) { try { setBusyId(id); await approveTpc(id, 'admin'); toast.success(t('tpcApproved')); await reload(); } catch { toast.danger(t('tpcActionFailed')); } finally { setBusyId(null); } }
   async function onRetire(id: number)  { if(!window.confirm(t('tpcRetireConfirm'))) return; try { setBusyId(id); await retireTpc(id); toast.success(t('tpcRetired')); await reload(); } catch { toast.danger(t('tpcActionFailed')); } finally { setBusyId(null); } }
 
+  const CREATE_FIELDS: FieldDef[] = [
+    { kind: 'text', key: 'assessmentCode', label: t('tpcColCode'), span: 4, placeholder: 'TPC-2026-009' },
+    { kind: 'text', key: 'vendorName',     label: t('tpcColVendor') + ' *', required: true, span: 5 },
+    { kind: 'text', key: 'vendorCountry',  label: t('tpcColCountry'), maxLength: 3, span: 3, placeholder: 'SAU' },
+    { kind: 'select', key: 'inherentCyberRisk', label: t('tpcColInherent') + ' *', required: true, span: 12,
+      options: [ {value:'LOW',label:'Low'},{value:'MEDIUM',label:'Medium'},{value:'HIGH',label:'High'},{value:'CRITICAL',label:'Critical'} ] },
+    { kind: 'textarea', key: 'scopeDescriptionEn', label: t('tpcScopeEn') + ' *', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'scopeDescriptionAr', label: t('tpcScopeAr'), rows: 2, span: 12 },
+    { kind: 'text',     key: 'certifications', label: t('tpcCerts'), span: 12, placeholder: 'ISO27001,SOC2,PCI_DSS' },
+    { kind: 'number',   key: 'externalPostureScore', label: t('tpcExternalPosture'), min: 0, max: 100, span: 4 },
+    { kind: 'number',   key: 'questionnaireScore',   label: t('tpcQuestionnaireScore'),   min: 0, max: 100, span: 4 },
+    { kind: 'number',   key: 'criticalVulnsOpen',    label: t('tpcCriticalVulns'),  min: 0, span: 4 },
+    { kind: 'date',     key: 'nextReviewDue', label: t('tpcNextReview'), span: 6 },
+  ];
+
+  async function onCreate(values: Record<string, unknown>) {
+    try {
+      await api.post('/api/tprm/cyber-assessments', {
+        assessmentCode: String(values.assessmentCode ?? '').trim() || undefined,
+        vendorName: String(values.vendorName ?? '').trim(),
+        vendorCountry: String(values.vendorCountry ?? '').trim() || undefined,
+        inherentCyberRisk: values.inherentCyberRisk,
+        scopeDescriptionEn: String(values.scopeDescriptionEn ?? '').trim(),
+        scopeDescriptionAr: String(values.scopeDescriptionAr ?? '').trim() || undefined,
+        certifications: String(values.certifications ?? '').trim() || undefined,
+        externalPostureScore: values.externalPostureScore != null ? Number(values.externalPostureScore) : undefined,
+        questionnaireScore:   values.questionnaireScore   != null ? Number(values.questionnaireScore)   : undefined,
+        criticalVulnsOpen:    values.criticalVulnsOpen    != null ? Number(values.criticalVulnsOpen)    : undefined,
+        mfaEnforced: 1, penTestWithin12m: 0, breachHistory24m: 0,
+        nextReviewDue: values.nextReviewDue || undefined,
+      });
+      toast.success(t('tpcCreated'));
+      setCreateOpen(false);
+      await reload();
+    } catch { toast.danger(t('tpcActionFailed')); }
+  }
+
   return (
     <Shell title={t('tpcPageTitle')} sub={t('tpcPageSub')}>
-      <PageHeader eyebrow={t('navThirdParty')} title={t('tpcPageTitle')} sub={t('tpcPageSub')} />
+      <PageHeader eyebrow={t('navThirdParty')} title={t('tpcPageTitle')} sub={t('tpcPageSub')}
+        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('tpcNew')}</Button>} />
 
       <div className="kpi-grid">
         <Kpi Icon={CheckCircle2}   label={t('tpcKpiApproved')} value={stats.APPROVED} tone="success" />
@@ -158,6 +200,11 @@ export function ThirdPartyCyberPage() {
                               {r.treatmentPlanEn && (
                                 <p style={{marginTop:6}}><strong>{t('tpcTreatment')}:</strong> {lang === 'ar' && r.treatmentPlanAr ? r.treatmentPlanAr : r.treatmentPlanEn}</p>
                               )}
+                              <p style={{marginTop:8, fontSize:12}}>
+                                <Link to="/supplier-resilience" style={{ marginInlineEnd: 8, padding: '2px 8px', background: 'var(--primary-50)', border: '1px solid var(--primary-200)', borderRadius: 4, color: 'var(--primary-700)', textDecoration: 'none' }}>{t('tpcLinkResilience')} →</Link>
+                                <Link to="/processor-assessments" style={{ marginInlineEnd: 8, padding: '2px 8px', background: 'var(--primary-50)', border: '1px solid var(--primary-200)', borderRadius: 4, color: 'var(--primary-700)', textDecoration: 'none' }}>{t('tpcLinkProcessor')} →</Link>
+                                <Link to="/fourth-party" style={{ marginInlineEnd: 8, padding: '2px 8px', background: 'var(--primary-50)', border: '1px solid var(--primary-200)', borderRadius: 4, color: 'var(--primary-700)', textDecoration: 'none' }}>{t('tpcLinkFourthParty')} →</Link>
+                              </p>
                             </div>
                           </td></tr>
                         )}
@@ -169,6 +216,15 @@ export function ThirdPartyCyberPage() {
             )
         }
       </Card>
+
+      <FormModal
+        open={createOpen}
+        title={t('tpcNew')}
+        fields={CREATE_FIELDS}
+        initial={{ inherentCyberRisk: 'MEDIUM' }}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={onCreate}
+      />
     </Shell>
   );
 }

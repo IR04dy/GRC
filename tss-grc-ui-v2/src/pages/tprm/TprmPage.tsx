@@ -34,6 +34,7 @@ import { usePromoted } from '../../lib/promotedRecords';
 import { toVendorDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { TprmOnboardingPipeline, TprmReassessmentDashboard } from './TprmOnboardingPanel';
+import { TprmConsolidatedOverview } from '../../components/tprm/TprmConsolidatedOverview';
 
 type TabId = 'overview' | 'vendors' | 'onboarding' | 'reassessment' | 'assessments' | 'contracts' | 'workflows' | 'comms';
 
@@ -215,6 +216,8 @@ export function TprmPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
+        <>
+          <TprmConsolidatedOverview />
         <div className="dash-grid">
           <Card title={t('tprmCardByRisk')} Icon={BarChart3}>
             <BarChart3D items={[
@@ -233,6 +236,7 @@ export function TprmPage() {
             ]} />
           </Card>
         </div>
+        </>
       )}
       {tab === 'vendors' && (
         <Card padded={false}>

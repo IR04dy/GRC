@@ -3,8 +3,10 @@ package com.tss.grc.module.scm.resilience.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
 import com.tss.grc.module.scm.resilience.repository.SupplierResilienceTestRepository;
+import com.tss.grc.module.tprm.automation.TprmAutomationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ public class SupplierResilienceTestService {
     private static final Set<String> OUTCOMES = Set.of("PASS", "PASS_WITH_OBSERVATIONS", "FAIL", "NOT_RUN");
 
     private final SupplierResilienceTestRepository repo;
+    @Autowired(required = false) private TprmAutomationService automation;
 
     @Transactional(readOnly = true)
     public Page<SupplierResilienceTest> list(Pageable p) {
@@ -69,7 +72,12 @@ public class SupplierResilienceTestService {
         if (body.get("actionItemsEn") instanceof String s) a.setActionItemsEn(s);
         if (body.get("evidenceRefs") instanceof String s) a.setEvidenceRefs(s);
         a.setStatus("COMPLETED");
-        return repo.save(a);
+        SupplierResilienceTest saved = repo.save(a);
+        // Enhancement E: auto-CAPA on FAIL outcome.
+        if ("FAIL".equals(saved.getOutcome()) && automation != null) {
+            automation.onResilienceTestFailed(saved);
+        }
+        return saved;
     }
 
     @Transactional

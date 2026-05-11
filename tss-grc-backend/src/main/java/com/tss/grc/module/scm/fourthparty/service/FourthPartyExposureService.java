@@ -3,8 +3,10 @@ package com.tss.grc.module.scm.fourthparty.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.scm.fourthparty.entity.FourthPartyExposure;
 import com.tss.grc.module.scm.fourthparty.repository.FourthPartyExposureRepository;
+import com.tss.grc.module.tprm.automation.TprmAutomationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,7 @@ public class FourthPartyExposureService {
     private static final Set<String> STATUSES = Set.of("DISCOVERED", "VALIDATED", "MITIGATED", "RETIRED");
 
     private final FourthPartyExposureRepository repo;
+    @Autowired(required = false) private TprmAutomationService automation;
 
     @Transactional(readOnly = true)
     public Page<FourthPartyExposure> list(Pageable pageable) {
@@ -131,9 +134,15 @@ public class FourthPartyExposureService {
         for (FourthPartyExposure ex : all) {
             long n = counts.getOrDefault(ex.getFourthPartyName(), 1L);
             String tier = n >= 3 ? "HIGH" : n == 2 ? "MEDIUM" : "LOW";
-            if (!tier.equals(ex.getConcentrationRisk())) {
+            String previous = ex.getConcentrationRisk();
+            if (!tier.equals(previous)) {
                 ex.setConcentrationRisk(tier);
-                repo.save(ex);
+                FourthPartyExposure saved = repo.save(ex);
+                // Enhancement E: only fire the auto-CAPA on the rising edge —
+                // when concentration is newly elevated to HIGH.
+                if ("HIGH".equals(tier) && !"HIGH".equals(previous) && automation != null) {
+                    automation.onFourthPartyHighConcentration(saved);
+                }
             }
         }
     }

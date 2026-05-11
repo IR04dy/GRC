@@ -3,8 +3,10 @@ package com.tss.grc.module.privacy.processor.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.privacy.processor.entity.ProcessorAssessment;
 import com.tss.grc.module.privacy.processor.repository.ProcessorAssessmentRepository;
+import com.tss.grc.module.tprm.automation.TprmAutomationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,7 @@ public class ProcessorAssessmentService {
     private static final Set<String>  CONTROL_OUTCOMES = Set.of("PASS", "PASS_WITH_CONDITIONS", "FAIL", "NOT_APPLICABLE");
 
     private final ProcessorAssessmentRepository repo;
+    @Autowired(required = false) private TprmAutomationService automation;
 
     @Transactional(readOnly = true)
     public Page<ProcessorAssessment> list(Pageable p) {
@@ -90,7 +93,12 @@ public class ProcessorAssessmentService {
                 .setScale(1, java.math.RoundingMode.HALF_UP));
         a.setStatus("COMPLETED");
         a.setAssessedAt(LocalDateTime.now());
-        return repo.save(a);
+        ProcessorAssessment saved = repo.save(a);
+        // Enhancement E: auto-CAPA on FAIL outcome.
+        if ("FAIL".equals(saved.getOverallOutcome()) && automation != null) {
+            automation.onProcessorAssessmentFailed(saved);
+        }
+        return saved;
     }
 
     @Transactional

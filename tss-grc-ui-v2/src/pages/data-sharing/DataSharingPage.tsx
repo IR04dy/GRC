@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Share2, ChevronRight, ChevronDown, CheckCircle2, FileText, Globe, AlertOctagon,
+  Share2, ChevronRight, ChevronDown, CheckCircle2, FileText, Globe, AlertOctagon, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +11,8 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -27,6 +30,7 @@ export function DataSharingPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => { void reload(); }, []);
   async function reload() {
@@ -73,9 +77,59 @@ export function DataSharingPage() {
   async function onExpire(id: number)   { if(!window.confirm(t('dsaExpireConfirm'))) return; try { setBusyId(id); await expireDsa(id); toast.success(t('dsaExpired')); await reload(); } catch { toast.danger(t('dsaActionFailed')); } finally { setBusyId(null); } }
   async function onTerminate(id: number){ const reason = window.prompt(t('dsaTerminatePrompt'), ''); if(!reason||!reason.trim()) return; try { setBusyId(id); await terminateDsa(id, reason.trim()); toast.success(t('dsaTerminated')); await reload(); } catch { toast.danger(t('dsaActionFailed')); } finally { setBusyId(null); } }
 
+  const CREATE_FIELDS: FieldDef[] = [
+    { kind: 'text', key: 'agreementCode', label: t('dsaColCode'), span: 4, placeholder: 'DSA-2026-009' },
+    { kind: 'text', key: 'titleEn',  label: t('dsaColTitle') + ' (EN) *', required: true, span: 8 },
+    { kind: 'text', key: 'titleAr',  label: t('dsaColTitle') + ' (AR)', span: 12 },
+    { kind: 'text', key: 'recipientName', label: t('dsaColRecipient') + ' *', required: true, span: 8 },
+    { kind: 'text', key: 'recipientCountry', label: t('dsaColCountry'), maxLength: 3, span: 4, placeholder: 'SAU' },
+    { kind: 'select', key: 'recipientType', label: t('dsaColType') + ' *', required: true, span: 6,
+      options: [ {value:'REGULATOR',label:'Regulator'},{value:'CREDIT_BUREAU',label:'Credit bureau'},{value:'GROUP_AFFILIATE',label:'Group affiliate'},{value:'JOINT_VENTURE',label:'Joint venture'},{value:'PUBLIC_AUTHORITY',label:'Public authority'},{value:'RESEARCH',label:'Research'},{value:'COMMERCIAL_PARTNER',label:'Commercial partner'} ] },
+    { kind: 'select', key: 'recipientLegalRole', label: t('dsaRecipientRole') + ' *', required: true, span: 6,
+      options: [ {value:'CONTROLLER',label:'Controller'},{value:'JOINT_CONTROLLER',label:'Joint controller'},{value:'PROCESSOR',label:'Processor'} ] },
+    { kind: 'select', key: 'lawfulBasis', label: t('dsaColBasis') + ' *', required: true, span: 6,
+      options: [ {value:'CONSENT',label:'Consent'},{value:'LEGAL_OBLIGATION',label:'Legal obligation'},{value:'CONTRACT',label:'Contract'},{value:'VITAL_INTEREST',label:'Vital interest'},{value:'PUBLIC_INTEREST',label:'Public interest'},{value:'LEGITIMATE_INTEREST',label:'Legitimate interest'} ] },
+    { kind: 'select', key: 'crossBorderMechanism', label: t('dsaColCrossBorder'), span: 6,
+      options: [ {value:'NONE',label:'None (in-country)'},{value:'ADEQUACY',label:'Adequacy'},{value:'SCC',label:'SCC'},{value:'BCR',label:'BCR'},{value:'EXPLICIT_CONSENT',label:'Explicit consent'},{value:'CONTRACT_NECESSITY',label:'Contract necessity'},{value:'VITAL_INTEREST',label:'Vital interest'},{value:'PUBLIC_INTEREST',label:'Public interest'} ] },
+    { kind: 'text', key: 'dataCategories', label: t('dsaCategories') + ' *', required: true, span: 8, placeholder: 'IDENTITY,CONTACT,FINANCIAL' },
+    { kind: 'text', key: 'dataSubjects', label: t('dsaSubjects') + ' *', required: true, span: 4, placeholder: 'CUSTOMER' },
+    { kind: 'textarea', key: 'purposeEn', label: t('dsaPurposeEn') + ' *', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'purposeAr', label: t('dsaPurposeAr'), rows: 2, span: 12 },
+    { kind: 'date', key: 'effectiveFrom', label: t('dsaEffectiveFrom'), span: 6 },
+    { kind: 'date', key: 'effectiveTo',   label: t('dsaEffectiveTo'),   span: 6 },
+    { kind: 'text', key: 'linkedRopaCodes', label: t('dsaLinkedRopa'), span: 12, placeholder: 'ROPA-001,ROPA-004' },
+  ];
+
+  async function onCreate(values: Record<string, unknown>) {
+    try {
+      await api.post('/api/privacy/data-sharing', {
+        agreementCode: String(values.agreementCode ?? '').trim() || undefined,
+        titleEn: String(values.titleEn ?? '').trim(),
+        titleAr: String(values.titleAr ?? '').trim() || undefined,
+        recipientName: String(values.recipientName ?? '').trim(),
+        recipientCountry: String(values.recipientCountry ?? '').trim() || undefined,
+        recipientType: values.recipientType,
+        recipientLegalRole: values.recipientLegalRole,
+        lawfulBasis: values.lawfulBasis,
+        crossBorderMechanism: values.crossBorderMechanism || 'NONE',
+        dataCategories: String(values.dataCategories ?? '').trim(),
+        dataSubjects: String(values.dataSubjects ?? '').trim(),
+        purposeEn: String(values.purposeEn ?? '').trim(),
+        purposeAr: String(values.purposeAr ?? '').trim() || undefined,
+        effectiveFrom: values.effectiveFrom || undefined,
+        effectiveTo: values.effectiveTo || undefined,
+        linkedRopaCodes: String(values.linkedRopaCodes ?? '').trim() || undefined,
+      });
+      toast.success(t('dsaCreated'));
+      setCreateOpen(false);
+      await reload();
+    } catch { toast.danger(t('dsaActionFailed')); }
+  }
+
   return (
     <Shell title={t('dsaPageTitle')} sub={t('dsaPageSub')}>
-      <PageHeader eyebrow={t('navPrivacy')} title={t('dsaPageTitle')} sub={t('dsaPageSub')} />
+      <PageHeader eyebrow={t('navPrivacy')} title={t('dsaPageTitle')} sub={t('dsaPageSub')}
+        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('dsaNew')}</Button>} />
 
       <div className="kpi-grid">
         <Kpi Icon={Share2}      label={t('dsaKpiActive')}     value={stats.ACTIVE} tone="success" />
@@ -143,7 +197,15 @@ export function DataSharingPage() {
                                 <div>
                                   {r.effectiveFrom && <><strong>{t('dsaEffective')}:</strong> {r.effectiveFrom} → {r.effectiveTo ?? t('dsaIndefinite')}<br/></>}
                                   {r.signedAt && <><strong>{t('dsaSigned')}:</strong> {r.signedAt.slice(0,10)} ({r.signerName ?? '—'})<br/></>}
-                                  {r.linkedRopaCodes && <><strong>{t('dsaLinkedRopa')}:</strong> <span className="mono">{r.linkedRopaCodes}</span><br/></>}
+                                  {r.linkedRopaCodes && (
+                                    <><strong>{t('dsaLinkedRopa')}:</strong>{' '}
+                                      {r.linkedRopaCodes.split(',').map(c => c.trim()).filter(Boolean).map(code => (
+                                        <Link key={code} to={`/ropa`} state={{ ropaCode: code }}
+                                          style={{ marginInlineEnd: 6, padding: '1px 6px', background: 'var(--primary-50)', border: '1px solid var(--primary-200)', borderRadius: 4, fontSize: 11, color: 'var(--primary-700)', textDecoration: 'none' }} className="mono">{code}</Link>
+                                      ))}
+                                      <br/>
+                                    </>
+                                  )}
                                   <strong>{t('dsaSubjectNotified')}:</strong> {r.subjectNotified ? '✓' : '✗'}{' · '}
                                   <strong>{t('dsaSubAllowed')}:</strong> {r.subDisclosureAllowed ? '✓' : '✗'}
                                 </div>
@@ -162,6 +224,15 @@ export function DataSharingPage() {
             )
         }
       </Card>
+
+      <FormModal
+        open={createOpen}
+        title={t('dsaNew')}
+        fields={CREATE_FIELDS}
+        initial={{ recipientLegalRole: 'CONTROLLER', lawfulBasis: 'LEGAL_OBLIGATION', crossBorderMechanism: 'NONE' }}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={onCreate}
+      />
     </Shell>
   );
 }

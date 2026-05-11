@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import {
-  Network, ChevronRight, ChevronDown, AlertTriangle, CheckCircle2, Shield, Globe,
+  Network, ChevronRight, ChevronDown, AlertTriangle, CheckCircle2, Shield, Globe, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +10,8 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -35,6 +37,7 @@ export function FourthPartyPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => { void reload(); }, []);
 
@@ -101,9 +104,41 @@ export function FourthPartyPage() {
     finally { setBusyId(null); }
   }
 
+  const CREATE_FIELDS: FieldDef[] = [
+    { kind: 'text',   key: 'primaryVendorName',     label: t('fpColPrimary') + ' *', required: true, span: 6 },
+    { kind: 'text',   key: 'fourthPartyName',       label: t('fpColFourth')  + ' *', required: true, span: 6 },
+    { kind: 'text',   key: 'fourthPartyCountry',    label: t('fpColCountry'),        span: 3, maxLength: 3, placeholder: 'USA' },
+    { kind: 'select', key: 'dependencyType',        label: t('fpColType') + ' *', required: true, span: 4,
+      options: [ {value:'DATA_PROCESSING',label:'Data processing'},{value:'INFRASTRUCTURE',label:'Infrastructure'},{value:'SOFTWARE',label:'Software'},{value:'LOGISTICS',label:'Logistics'},{value:'FINANCIAL',label:'Financial'},{value:'SUPPORT',label:'Support'} ] },
+    { kind: 'select', key: 'downstreamCriticality', label: t('fpColCrit') + ' *', required: true, span: 5,
+      options: [ {value:'LOW',label:'Low'},{value:'MEDIUM',label:'Medium'},{value:'HIGH',label:'High'},{value:'CRITICAL',label:'Critical'} ] },
+    { kind: 'textarea', key: 'serviceDescriptionEn', label: t('fpServiceEn') + ' *', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'serviceDescriptionAr', label: t('fpServiceAr'),       rows: 2, span: 12 },
+    { kind: 'text',     key: 'dataCategoriesShared', label: t('fpColCategories'),    span: 12 },
+  ];
+
+  async function onCreate(values: Record<string, unknown>) {
+    try {
+      await api.post('/api/scm/fourth-party', {
+        primaryVendorName:     String(values.primaryVendorName ?? '').trim(),
+        fourthPartyName:       String(values.fourthPartyName ?? '').trim(),
+        fourthPartyCountry:    String(values.fourthPartyCountry ?? '').trim() || undefined,
+        dependencyType:        values.dependencyType,
+        downstreamCriticality: values.downstreamCriticality,
+        serviceDescriptionEn:  String(values.serviceDescriptionEn ?? '').trim(),
+        serviceDescriptionAr:  String(values.serviceDescriptionAr ?? '').trim() || undefined,
+        dataCategoriesShared:  String(values.dataCategoriesShared ?? '').trim() || undefined,
+      });
+      toast.success(t('fpCreated'));
+      setCreateOpen(false);
+      await reload();
+    } catch { toast.danger(t('fpActionFailed')); }
+  }
+
   return (
     <Shell title={t('fpPageTitle')} sub={t('fpPageSub')}>
-      <PageHeader eyebrow={t('navThirdParty')} title={t('fpPageTitle')} sub={t('fpPageSub')} />
+      <PageHeader eyebrow={t('navThirdParty')} title={t('fpPageTitle')} sub={t('fpPageSub')}
+        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('fpNew')}</Button>} />
 
       <div className="kpi-grid">
         <Kpi Icon={Network}       label={t('fpKpiTotal')}       value={rows.length} tone="primary" />
@@ -206,6 +241,15 @@ export function FourthPartyPage() {
             )
         }
       </Card>
+
+      <FormModal
+        open={createOpen}
+        title={t('fpNew')}
+        fields={CREATE_FIELDS}
+        initial={{ dependencyType: 'INFRASTRUCTURE', downstreamCriticality: 'MEDIUM' }}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={onCreate}
+      />
     </Shell>
   );
 }

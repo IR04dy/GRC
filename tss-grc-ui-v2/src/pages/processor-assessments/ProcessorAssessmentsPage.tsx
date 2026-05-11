@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import {
-  ClipboardCheck, ChevronRight, ChevronDown, CheckCircle2, XCircle, AlertTriangle, Shield,
+  ClipboardCheck, ChevronRight, ChevronDown, CheckCircle2, XCircle, AlertTriangle, Shield, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +10,8 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -28,6 +30,7 @@ export function ProcessorAssessmentsPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => { void reload(); }, []);
   async function reload() {
@@ -78,9 +81,40 @@ export function ProcessorAssessmentsPage() {
     finally { setBusyId(null); }
   }
 
+  const CREATE_FIELDS: FieldDef[] = [
+    { kind: 'text',   key: 'assessmentCode', label: t('procColCode'), span: 4, placeholder: 'PROC-2026-009' },
+    { kind: 'text',   key: 'processorName',  label: t('procColProcessor') + ' *', required: true, span: 5 },
+    { kind: 'text',   key: 'processorCountry', label: t('procColCountry'), maxLength: 3, span: 3, placeholder: 'SAU' },
+    { kind: 'select', key: 'assessmentType', label: t('procColType') + ' *', required: true, span: 12,
+      options: [ {value:'ONBOARDING',label:'Onboarding'},{value:'ANNUAL',label:'Annual'},{value:'RENEWAL',label:'Renewal'},{value:'AD_HOC',label:'Ad-hoc'},{value:'INCIDENT_TRIGGERED',label:'Incident-triggered'} ] },
+    { kind: 'textarea', key: 'processingScopeEn', label: t('procScopeEn') + ' *', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'processingScopeAr', label: t('procScopeAr'), rows: 2, span: 12 },
+    { kind: 'text',     key: 'evidenceRefs', label: t('procEvidenceRefs'), span: 12, placeholder: 'DPA-2026 · SOC2 · ISO27001' },
+    { kind: 'date',     key: 'nextAssessmentDue', label: t('procNextDue'), span: 6 },
+  ];
+
+  async function onCreate(values: Record<string, unknown>) {
+    try {
+      await api.post('/api/privacy/processor-assessments', {
+        assessmentCode: String(values.assessmentCode ?? '').trim() || undefined,
+        processorName: String(values.processorName ?? '').trim(),
+        processorCountry: String(values.processorCountry ?? '').trim() || undefined,
+        assessmentType: values.assessmentType,
+        processingScopeEn: String(values.processingScopeEn ?? '').trim(),
+        processingScopeAr: String(values.processingScopeAr ?? '').trim() || undefined,
+        evidenceRefs: String(values.evidenceRefs ?? '').trim() || undefined,
+        nextAssessmentDue: values.nextAssessmentDue || undefined,
+      });
+      toast.success(t('procCreated'));
+      setCreateOpen(false);
+      await reload();
+    } catch { toast.danger(t('procActionFailed')); }
+  }
+
   return (
     <Shell title={t('procPageTitle')} sub={t('procPageSub')}>
-      <PageHeader eyebrow={t('navPrivacy')} title={t('procPageTitle')} sub={t('procPageSub')} />
+      <PageHeader eyebrow={t('navPrivacy')} title={t('procPageTitle')} sub={t('procPageSub')}
+        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('procNew')}</Button>} />
 
       <div className="kpi-grid">
         <Kpi Icon={ClipboardCheck} label={t('procKpiApproved')} value={stats.APPROVED} tone="success" />
@@ -174,6 +208,15 @@ export function ProcessorAssessmentsPage() {
             )
         }
       </Card>
+
+      <FormModal
+        open={createOpen}
+        title={t('procNew')}
+        fields={CREATE_FIELDS}
+        initial={{ assessmentType: 'ONBOARDING' }}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={onCreate}
+      />
     </Shell>
   );
 }
