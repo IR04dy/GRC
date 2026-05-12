@@ -31,6 +31,9 @@ below).
 | 14 | `12-Developer-Handoff/` | `developer-handoff.md` | MD | Architecture, workflow engine, API, DB, audit, notifications, integration, signature, security, localisation, reporting, testing, migration requirements | Engineering | Onboarding |
 | 15 | `14-Test-Cases/` | `test-cases.md` | MD | UAT test cases: ID, scenario, preconditions, steps, expected, role, pass/fail | QA + UAT | Acceptance testing |
 | 16 | `15-Sample-Data/` | `sample-seed-data.md` | MD | Seed-data catalogue per migration; instructions for fresh-DB bootstrap | Engineering + Demo | Demo + UAT data |
+| 17 | `16-AI-Features/` | `ai-features.md` | MD | 15 LLM-assisted features (risk-description, BIA impact, RTO/RPO, supplier scoring, PIA + NCA gap, evidence quality, CAPA advisor, exec / board narratives, reg-change impact, RCA draft, lessons distiller, control mapping) — each with input / output / human review / approval / hallucination risk / guardrails / audit / privacy | Product + Backend + Security | AI roadmap + provider procurement |
+| 18 | `17-Frontend-Requirements/` | `frontend-requirements.md` | MD | Spec-level FE breakdown: nav, pages, components, table columns, form fields, buttons, filters, modals, wizards, dashboard widgets, empty states, validation, AR/EN labels, RTL behaviour, RBAC visibility, status badges, evidence upload, signature, report export | Frontend + UX | Rebuild / extend the UI |
+| 19 | `18-Excel-Workbook/` | `workbook-spec.md` + `tss-grc-implementation-package.xlsx` | MD + XLSX | 23-sheet workbook: Module Catalogue, Workflow Catalogue, Workflow Steps, Role Matrix, Approval Matrix, Data Objects, Entity Relationships, UI Screens, UI Fields, Evidence Library, Regulatory Mapping, Controls Library, Risk / BIA / Supplier / PDPL / NCA / Incident / Corrective-Action registers, Reports Catalogue, Automation Rules, Test Cases, Sample Data | BA / Config consultant / DBA / QA | Implementation config + seed import |
 
 ---
 
@@ -72,6 +75,9 @@ below).
 | OUTPUT 14 Developer Handoff | ✓ DONE | `12-Developer-Handoff/developer-handoff.md` |
 | OUTPUT 15 Test Cases | ✓ DONE | `14-Test-Cases/test-cases.md` |
 | OUTPUT 16 Sample Seed Data | ✓ DONE | `15-Sample-Data/sample-seed-data.md` |
+| OUTPUT 17 AI-Assisted Features | ✓ DONE | `16-AI-Features/ai-features.md` |
+| OUTPUT 18 Frontend Implementation Requirements | ✓ DONE | `17-Frontend-Requirements/frontend-requirements.md` |
+| OUTPUT 19 Excel Workbook (23 sheets + .xlsx) | ✓ DONE | `18-Excel-Workbook/workbook-spec.md` + `tss-grc-implementation-package.xlsx` |
 | API spec | ✓ live + summary | `13-API-Specification/api-specification.md` + `/v3/api-docs` |
 
 **All 16 outputs present.** Each is grounded in the actual platform
