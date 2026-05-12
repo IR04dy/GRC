@@ -46,7 +46,7 @@ export function FourthPartyPage() {
     try {
       const page = await listFourthParty(undefined, 0, 200);
       setRows(page.content);
-    } catch { toast.danger(t('fpLoadFailed')); }
+    } catch { toast.danger(t('f4pLoadFailed')); }
     finally { setLoading(false); }
   }
 
@@ -68,12 +68,12 @@ export function FourthPartyPage() {
   }, [tab, rows]);
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'all',           label: `${t('fpTabAll')} (${rows.length})` },
-    { id: 'DISCOVERED',    label: `${t('fpTabDiscovered')} (${stats.DISCOVERED})` },
-    { id: 'VALIDATED',     label: `${t('fpTabValidated')} (${stats.VALIDATED})` },
-    { id: 'MITIGATED',     label: `${t('fpTabMitigated')} (${stats.MITIGATED})` },
-    { id: 'RETIRED',       label: `${t('fpTabRetired')} (${stats.RETIRED})` },
-    { id: 'concentration', label: `${t('fpTabConcentration')} (${stats.highConc + rows.filter(r=>r.concentrationRisk==='MEDIUM').length})` },
+    { id: 'all',           label: `${t('f4pTabAll')} (${rows.length})` },
+    { id: 'DISCOVERED',    label: `${t('f4pTabDiscovered')} (${stats.DISCOVERED})` },
+    { id: 'VALIDATED',     label: `${t('f4pTabValidated')} (${stats.VALIDATED})` },
+    { id: 'MITIGATED',     label: `${t('f4pTabMitigated')} (${stats.MITIGATED})` },
+    { id: 'RETIRED',       label: `${t('f4pTabRetired')} (${stats.RETIRED})` },
+    { id: 'concentration', label: `${t('f4pTabConcentration')} (${stats.highConc + rows.filter(r=>r.concentrationRisk==='MEDIUM').length})` },
   ];
 
   function toggle(id: number) {
@@ -84,37 +84,37 @@ export function FourthPartyPage() {
 
   async function onValidate(id: number) {
     setBusyId(id);
-    try { await validateFourthParty(id, 'admin'); toast.success(t('fpValidated')); await reload(); }
-    catch { toast.danger(t('fpActionFailed')); }
+    try { await validateFourthParty(id, 'admin'); toast.success(t('f4pValidated')); await reload(); }
+    catch { toast.danger(t('f4pActionFailed')); }
     finally { setBusyId(null); }
   }
   async function onMitigate(id: number) {
-    const notes = window.prompt(t('fpMitigatePrompt'), '');
+    const notes = window.prompt(t('f4pMitigatePrompt'), '');
     if (!notes || !notes.trim()) return;
     setBusyId(id);
-    try { await mitigateFourthParty(id, notes.trim()); toast.success(t('fpMitigated')); await reload(); }
-    catch { toast.danger(t('fpActionFailed')); }
+    try { await mitigateFourthParty(id, notes.trim()); toast.success(t('f4pMitigated')); await reload(); }
+    catch { toast.danger(t('f4pActionFailed')); }
     finally { setBusyId(null); }
   }
   async function onRetire(id: number) {
-    if (!window.confirm(t('fpRetireConfirm'))) return;
+    if (!window.confirm(t('f4pRetireConfirm'))) return;
     setBusyId(id);
-    try { await retireFourthParty(id); toast.success(t('fpRetired')); await reload(); }
-    catch { toast.danger(t('fpActionFailed')); }
+    try { await retireFourthParty(id); toast.success(t('f4pRetired')); await reload(); }
+    catch { toast.danger(t('f4pActionFailed')); }
     finally { setBusyId(null); }
   }
 
   const CREATE_FIELDS: FieldDef[] = [
-    { kind: 'text',   key: 'primaryVendorName',     label: t('fpColPrimary') + ' *', required: true, span: 6 },
-    { kind: 'text',   key: 'fourthPartyName',       label: t('fpColFourth')  + ' *', required: true, span: 6 },
-    { kind: 'text',   key: 'fourthPartyCountry',    label: t('fpColCountry'),        span: 3, maxLength: 3, placeholder: 'USA' },
-    { kind: 'select', key: 'dependencyType',        label: t('fpColType') + ' *', required: true, span: 4,
+    { kind: 'text',   key: 'primaryVendorName',     label: t('f4pColPrimary') + ' *', required: true, span: 6 },
+    { kind: 'text',   key: 'fourthPartyName',       label: t('f4pColFourth')  + ' *', required: true, span: 6 },
+    { kind: 'text',   key: 'fourthPartyCountry',    label: t('f4pColCountry'),        span: 3, maxLength: 3, placeholder: 'USA' },
+    { kind: 'select', key: 'dependencyType',        label: t('f4pColType') + ' *', required: true, span: 4,
       options: [ {value:'DATA_PROCESSING',label:'Data processing'},{value:'INFRASTRUCTURE',label:'Infrastructure'},{value:'SOFTWARE',label:'Software'},{value:'LOGISTICS',label:'Logistics'},{value:'FINANCIAL',label:'Financial'},{value:'SUPPORT',label:'Support'} ] },
-    { kind: 'select', key: 'downstreamCriticality', label: t('fpColCrit') + ' *', required: true, span: 5,
+    { kind: 'select', key: 'downstreamCriticality', label: t('f4pColCrit') + ' *', required: true, span: 4,
       options: [ {value:'LOW',label:'Low'},{value:'MEDIUM',label:'Medium'},{value:'HIGH',label:'High'},{value:'CRITICAL',label:'Critical'} ] },
-    { kind: 'textarea', key: 'serviceDescriptionEn', label: t('fpServiceEn') + ' *', rows: 2, span: 12 },
-    { kind: 'textarea', key: 'serviceDescriptionAr', label: t('fpServiceAr'),       rows: 2, span: 12 },
-    { kind: 'text',     key: 'dataCategoriesShared', label: t('fpColCategories'),    span: 12 },
+    { kind: 'textarea', key: 'serviceDescriptionEn', label: t('f4pServiceEn') + ' *', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'serviceDescriptionAr', label: t('f4pServiceAr'),       rows: 2, span: 12 },
+    { kind: 'text',     key: 'dataCategoriesShared', label: t('f4pColCategories'),    span: 12 },
   ];
 
   async function onCreate(values: Record<string, unknown>) {
@@ -129,43 +129,43 @@ export function FourthPartyPage() {
         serviceDescriptionAr:  String(values.serviceDescriptionAr ?? '').trim() || undefined,
         dataCategoriesShared:  String(values.dataCategoriesShared ?? '').trim() || undefined,
       });
-      toast.success(t('fpCreated'));
+      toast.success(t('f4pCreated'));
       setCreateOpen(false);
       await reload();
-    } catch { toast.danger(t('fpActionFailed')); }
+    } catch { toast.danger(t('f4pActionFailed')); }
   }
 
   return (
-    <Shell title={t('fpPageTitle')} sub={t('fpPageSub')}>
-      <PageHeader eyebrow={t('navThirdParty')} title={t('fpPageTitle')} sub={t('fpPageSub')}
-        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('fpNew')}</Button>} />
+    <Shell title={t('f4pPageTitle')} sub={t('f4pPageSub')}>
+      <PageHeader eyebrow={t('navThirdParty')} title={t('f4pPageTitle')} sub={t('f4pPageSub')}
+        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('f4pNew')}</Button>} />
 
       <div className="kpi-grid">
-        <Kpi Icon={Network}       label={t('fpKpiTotal')}       value={rows.length} tone="primary" />
-        <Kpi Icon={CheckCircle2}  label={t('fpKpiValidated')}   value={stats.VALIDATED} tone="success" />
-        <Kpi Icon={AlertTriangle} label={t('fpKpiHighConc')}    value={stats.highConc} tone="danger" />
-        <Kpi Icon={Shield}        label={t('fpKpiCritical')}    value={stats.critical} tone="warning" />
+        <Kpi Icon={Network}       label={t('f4pKpiTotal')}       value={rows.length} tone="primary" />
+        <Kpi Icon={CheckCircle2}  label={t('f4pKpiValidated')}   value={stats.VALIDATED} tone="success" />
+        <Kpi Icon={AlertTriangle} label={t('f4pKpiHighConc')}    value={stats.highConc} tone="danger" />
+        <Kpi Icon={Shield}        label={t('f4pKpiCritical')}    value={stats.critical} tone="warning" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
-      <Card title={t('fpPageTitle')} Icon={Network}>
+      <Card title={t('f4pPageTitle')} Icon={Network}>
         {loading
           ? <EmptyState Icon={Network} title={t('loading')} />
           : filtered.length === 0
-            ? <EmptyState Icon={Network} title={t('fpEmpty')} sub={t('fpEmptyHint')} />
+            ? <EmptyState Icon={Network} title={t('f4pEmpty')} sub={t('f4pEmptyHint')} />
             : (
               <table className="grc-table">
                 <thead>
                   <tr>
                     <th style={{ width: 28 }} />
-                    <th>{t('fpColPrimary')}</th>
-                    <th>{t('fpColFourth')}</th>
+                    <th>{t('f4pColPrimary')}</th>
+                    <th>{t('f4pColFourth')}</th>
                     <th><Globe size={14}/></th>
-                    <th>{t('fpColType')}</th>
-                    <th>{t('fpColCrit')}</th>
-                    <th>{t('fpColConc')}</th>
-                    <th>{t('fpColStatus')}</th>
+                    <th>{t('f4pColType')}</th>
+                    <th>{t('f4pColCrit')}</th>
+                    <th>{t('f4pColConc')}</th>
+                    <th>{t('f4pColStatus')}</th>
                     <th style={{ textAlign: 'right' }}>{t('scnColActions')}</th>
                   </tr>
                 </thead>
@@ -191,17 +191,17 @@ export function FourthPartyPage() {
                           <td style={{ textAlign: 'right' }}>
                             {r.status === 'DISCOVERED' && (
                               <Button size="sm" variant="primary" disabled={busyId === r.id} onClick={() => onValidate(r.id)}>
-                                {t('fpValidate')}
+                                {t('f4pValidate')}
                               </Button>
                             )}
                             {r.status === 'VALIDATED' && (
                               <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => onMitigate(r.id)}>
-                                {t('fpMitigate')}
+                                {t('f4pMitigate')}
                               </Button>
                             )}
                             {(r.status === 'MITIGATED' || r.status === 'VALIDATED') && (
                               <>{' '}<Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => onRetire(r.id)}>
-                                {t('fpRetire')}
+                                {t('f4pRetire')}
                               </Button></>
                             )}
                           </td>
@@ -211,22 +211,22 @@ export function FourthPartyPage() {
                             <div style={{ padding: 12, fontSize: 13 }}>
                               <p>{lang === 'ar' && r.serviceDescriptionAr ? r.serviceDescriptionAr : r.serviceDescriptionEn}</p>
                               {r.dataCategoriesShared && (
-                                <p style={{ marginTop: 6 }}><strong>{t('fpColCategories')}:</strong> <span className="mono">{r.dataCategoriesShared}</span></p>
+                                <p style={{ marginTop: 6 }}><strong>{t('f4pColCategories')}:</strong> <span className="mono">{r.dataCategoriesShared}</span></p>
                               )}
                               <p style={{ marginTop: 6 }}>
-                                <strong>{t('fpSubcontracting')}:</strong>{' '}{r.subContractingAllowed ? '✓' : '✗'}
+                                <strong>{t('f4pSubcontracting')}:</strong>{' '}{r.subContractingAllowed ? '✓' : '✗'}
                                 {' · '}
-                                <strong>{t('fpFlowDown')}:</strong>{' '}{r.flowDownClausesPresent ? '✓' : '✗'}
+                                <strong>{t('f4pFlowDown')}:</strong>{' '}{r.flowDownClausesPresent ? '✓' : '✗'}
                               </p>
                               {r.lastValidatedAt && (
                                 <p style={{ marginTop: 6, fontSize: 12, color: 'var(--muted-foreground)' }}>
-                                  {t('fpLastValidated')}: {r.lastValidatedAt.slice(0, 10)} ({r.validatorName ?? '—'})
-                                  {r.nextValidationDue ? ` · ${t('fpNextDue')}: ${r.nextValidationDue}` : ''}
+                                  {t('f4pLastValidated')}: {r.lastValidatedAt.slice(0, 10)} ({r.validatorName ?? '—'})
+                                  {r.nextValidationDue ? ` · ${t('f4pNextDue')}: ${r.nextValidationDue}` : ''}
                                 </p>
                               )}
                               {r.mitigationNotesEn && (
                                 <p style={{ marginTop: 6 }}>
-                                  <strong>{t('fpMitigationNotes')}:</strong>{' '}
+                                  <strong>{t('f4pMitigationNotes')}:</strong>{' '}
                                   {lang === 'ar' && r.mitigationNotesAr ? r.mitigationNotesAr : r.mitigationNotesEn}
                                 </p>
                               )}
@@ -244,7 +244,7 @@ export function FourthPartyPage() {
 
       <FormModal
         open={createOpen}
-        title={t('fpNew')}
+        title={t('f4pNew')}
         fields={CREATE_FIELDS}
         initial={{ dependencyType: 'INFRASTRUCTURE', downstreamCriticality: 'MEDIUM' }}
         onClose={() => setCreateOpen(false)}

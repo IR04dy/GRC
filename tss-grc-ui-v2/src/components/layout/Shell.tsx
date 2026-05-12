@@ -11,7 +11,10 @@ export function Shell({ title, sub, children }: { title: string; sub?: string; c
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  // Global keyboard shortcut: Cmd/Ctrl+K opens the command palette.
+  // Global keyboard shortcut: Cmd/Ctrl+K opens the command palette. We
+  // also listen for a custom `grc:open-palette` window event so toolbar
+  // buttons (e.g. per-page Filter) can open the same surface without
+  // re-implementing search.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
@@ -22,8 +25,13 @@ export function Shell({ title, sub, children }: { title: string; sub?: string; c
       // Esc closes sidebar drawer on mobile
       if (e.key === 'Escape' && sidebarOpen) setSidebarOpen(false);
     }
+    function onOpenPalette() { setPaletteOpen(true); }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('grc:open-palette', onOpenPalette);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('grc:open-palette', onOpenPalette);
+    };
   }, [sidebarOpen]);
 
   // Auto-close drawer on route change (mobile UX)

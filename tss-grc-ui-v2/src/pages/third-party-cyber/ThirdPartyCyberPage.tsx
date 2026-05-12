@@ -76,8 +76,8 @@ export function ThirdPartyCyberPage() {
 
   const CREATE_FIELDS: FieldDef[] = [
     { kind: 'text', key: 'assessmentCode', label: t('tpcColCode'), span: 4, placeholder: 'TPC-2026-009' },
-    { kind: 'text', key: 'vendorName',     label: t('tpcColVendor') + ' *', required: true, span: 5 },
-    { kind: 'text', key: 'vendorCountry',  label: t('tpcColCountry'), maxLength: 3, span: 3, placeholder: 'SAU' },
+    { kind: 'text', key: 'vendorName',     label: t('tpcColVendor') + ' *', required: true, span: 4 },
+    { kind: 'text', key: 'vendorCountry',  label: t('tpcColCountry'), maxLength: 3, span: 4, placeholder: 'SAU' },
     { kind: 'select', key: 'inherentCyberRisk', label: t('tpcColInherent') + ' *', required: true, span: 12,
       options: [ {value:'LOW',label:'Low'},{value:'MEDIUM',label:'Medium'},{value:'HIGH',label:'High'},{value:'CRITICAL',label:'Critical'} ] },
     { kind: 'textarea', key: 'scopeDescriptionEn', label: t('tpcScopeEn') + ' *', rows: 2, span: 12 },

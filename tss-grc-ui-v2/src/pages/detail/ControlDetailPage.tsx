@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ClipboardCheck, FileCheck2, ListChecks, Link2, CheckCheck, AlertTriangle, ShieldOff, Calendar } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -29,6 +29,7 @@ export function ControlDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [item, setItem] = useState<ComplianceControlDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabId>('overview');
@@ -80,7 +81,10 @@ export function ControlDetailPage() {
           {item.status !== 'IMPLEMENTED' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionControl('IMPLEMENTED', 'controlActMarkImplemented')}>{t('controlActMarkImplemented')}</Button>}
           {item.status !== 'PARTIAL' && <Button variant="secondary" Icon={AlertTriangle} onClick={() => transitionControl('PARTIAL', 'controlActMarkPartial')}>{t('controlActMarkPartial')}</Button>}
           {item.status !== 'NOT_APPLICABLE' && <Button variant="ghost" Icon={ShieldOff} onClick={() => transitionControl('NOT_APPLICABLE', 'controlActMarkNA')}>{t('controlActMarkNA')}</Button>}
-          <Button variant="ghost" Icon={Calendar} onClick={() => toast.info(t('controlActScheduleTestHint'))}>{t('controlActScheduleTest')}</Button>
+          <Button variant="ghost" Icon={Calendar}
+            onClick={() => navigate(`/audit-workspace?tab=plan&controlId=${encodeURIComponent(String(item.id))}&action=schedule-test`)}>
+            {t('controlActScheduleTest')}
+          </Button>
         </>}
       />
 

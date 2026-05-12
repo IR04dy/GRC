@@ -670,7 +670,10 @@ export function CompliancePage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             {!isDemo && <LivePulse pulse={pulse} />}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter}
+              onClick={() => window.dispatchEvent(new CustomEvent('grc:open-palette'))}>
+              {t('actionFilter')}
+            </Button>
             <ExportMenu
               demoMode={isDemo} t={t} toast={toast}
               onPdf={() => reportingApi.findingsPdf((typeof navigator !== 'undefined' && navigator.language?.startsWith('ar')) ? 'ar' : 'en')}

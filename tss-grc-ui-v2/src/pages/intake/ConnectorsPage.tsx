@@ -32,7 +32,26 @@ export function ConnectorsPage() {
   const toast = useToast();
   const [filter, setFilter] = useState<'ALL' | ConnectorStatus>('ALL');
 
-  const connectors = CONNECTOR_REGISTRY;
+  // Connector statuses are mutable per-session so Pause / Activate produce
+  // a visible state change even though the backend connector module is not
+  // yet wired up. The overrides map keyed on connector id wins over the
+  // baked-in CONNECTOR_REGISTRY status.
+  const [overrides, setOverrides] = useState<Record<string, ConnectorStatus>>({});
+
+  function effectiveStatus(c: ConnectorDefinition): ConnectorStatus {
+    return overrides[c.id] ?? c.status;
+  }
+  function pause(c: ConnectorDefinition) {
+    setOverrides(prev => ({ ...prev, [c.id]: 'DISABLED' }));
+    toast.success((t('connectorsPausedToast') ?? 'Connector paused').replace('{name}', c.id));
+  }
+  function activate(c: ConnectorDefinition) {
+    setOverrides(prev => ({ ...prev, [c.id]: 'ACTIVE' }));
+    toast.success(t('connectorsActivated'));
+  }
+
+  const withEffective = CONNECTOR_REGISTRY.map(c => ({ ...c, status: effectiveStatus(c) }));
+  const connectors = withEffective;
   const active = connectors.filter(c => c.status === 'ACTIVE');
   const configured = connectors.filter(c => c.status === 'CONFIGURED');
   const intake30d = active.reduce((acc, c) => acc + (c.intake30d ?? 0), 0);
@@ -79,7 +98,8 @@ export function ConnectorsPage() {
         </p>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {visible.map(c => (
-            <ConnectorRow key={c.id} c={c} t={t} lang={lang} toast={toast} />
+            <ConnectorRow key={c.id} c={c} t={t} lang={lang} toast={toast}
+              onPause={() => pause(c)} onActivate={() => activate(c)} />
           ))}
         </div>
       </Card>
@@ -87,11 +107,13 @@ export function ConnectorsPage() {
   );
 }
 
-function ConnectorRow({ c, t, lang, toast }: {
+function ConnectorRow({ c, t, lang, onPause, onActivate }: {
   c: ConnectorDefinition;
   t: (k: string) => string;
   lang: 'en' | 'ar';
   toast: { info: (m: string) => void; success: (m: string) => void };
+  onPause: () => void;
+  onActivate: () => void;
 }) {
   const statusLabel = CONNECTOR_STATUS_LABEL[c.status][lang === 'ar' ? 'ar' : 'en'];
   const cadenceLabel = CADENCE_LABEL[c.cadence][lang === 'ar' ? 'ar' : 'en'];
@@ -150,12 +172,12 @@ function ConnectorRow({ c, t, lang, toast }: {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
         <Badge tone={CONNECTOR_STATUS_TONE[c.status]} dot>{statusLabel}</Badge>
         {c.status === 'ACTIVE' && (
-          <Button variant="ghost" size="sm" Icon={Pause} onClick={() => toast.info(t('connectorsPauseHint'))}>
+          <Button variant="ghost" size="sm" Icon={Pause} onClick={onPause}>
             {t('connectorsPause')}
           </Button>
         )}
         {(c.status === 'CONFIGURED' || c.status === 'AVAILABLE' || c.status === 'DISABLED') && (
-          <Button variant="primary" size="sm" Icon={Play} onClick={() => toast.success(t('connectorsActivated'))}>
+          <Button variant="primary" size="sm" Icon={Play} onClick={onActivate}>
             {t('connectorsActivate')}
           </Button>
         )}

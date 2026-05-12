@@ -215,7 +215,10 @@ export function ChangesPage() {
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={RefreshCw} onClick={load} disabled={loading}>{t('dashRefresh')}</Button>
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter}
+              onClick={() => window.dispatchEvent(new CustomEvent('grc:open-palette'))}>
+              {t('actionFilter')}
+            </Button>
             <ExportMenu
               demoMode={demoMode} t={t} toast={toast}
               onPdf={() => reportingApi.riskRegisterPdf(lang)}

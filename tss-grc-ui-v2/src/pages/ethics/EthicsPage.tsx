@@ -232,7 +232,10 @@ export function EthicsPage() {
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={RefreshCw} onClick={load} disabled={loading}>{t('dashRefresh')}</Button>
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter}
+              onClick={() => window.dispatchEvent(new CustomEvent('grc:open-palette'))}>
+              {t('actionFilter')}
+            </Button>
             {/* DD-76: route new ethics-case creation through Services Center
                 (employee-facing path) — anonymous reports go via /portal/speakup. */}
             <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/ethics_disclosure')}>{t('ethicsNew')}</Button>

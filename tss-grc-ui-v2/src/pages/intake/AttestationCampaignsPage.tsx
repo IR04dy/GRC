@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FileCheck2, Users, Clock, ListChecks,
   CheckCircle2, BookOpen, Send,
@@ -35,8 +36,17 @@ type TabId = 'in_flight' | 'closing' | 'completed' | 'draft' | 'all';
 export function AttestationCampaignsPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>('in_flight');
   const [activeId, setActiveId] = useState<string | null>(ATTESTATION_CAMPAIGNS[0]?.id ?? null);
+  // Per-session "reminded" stamps. Keyed `${campaignId}:${responder}` so we
+  // can show the row as just-reminded without a backend round-trip.
+  const [reminded, setReminded] = useState<Record<string, string>>({});
+
+  function sendReminder(campaignId: string, responder: string, name?: string) {
+    setReminded(prev => ({ ...prev, [`${campaignId}:${responder}`]: new Date().toISOString() }));
+    toast.success(t('campaignsRemindToast').replace('{r}', name ?? responder));
+  }
 
   const campaigns = ATTESTATION_CAMPAIGNS;
   const inFlight  = campaigns.filter(c => c.status === 'IN_FLIGHT');
@@ -68,7 +78,7 @@ export function AttestationCampaignsPage() {
         title={t('campaignsTitle')}
         sub={t('campaignsPageSub')}
         actions={<>
-          <Button variant="primary" onClick={() => toast.info(t('campaignsNewHint'))}>
+          <Button variant="primary" onClick={() => navigate('/admin?tab=compliance&action=campaign-new')}>
             {t('campaignsNew')}
           </Button>
         </>}
@@ -124,7 +134,7 @@ export function AttestationCampaignsPage() {
 
         {/* Right pane — selected campaign detail */}
         <div>
-          {active ? <CampaignDetail c={active} t={t} lang={lang} toast={toast} /> : (
+          {active ? <CampaignDetail c={active} t={t} lang={lang} reminded={reminded} onRemind={(responder, name) => sendReminder(active.id, responder, name)} /> : (
             <Card>
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>
                 {t('campaignsPickOne')}
@@ -137,11 +147,12 @@ export function AttestationCampaignsPage() {
   );
 }
 
-function CampaignDetail({ c, t, lang, toast }: {
+function CampaignDetail({ c, t, lang, reminded, onRemind }: {
   c: AttestationCampaign;
   t: (k: string) => string;
   lang: 'en' | 'ar';
-  toast: { info: (m: string) => void; success: (m: string) => void };
+  reminded: Record<string, string>;
+  onRemind: (responder: string, name?: string) => void;
 }) {
   const prog = campaignProgress(c);
 
@@ -203,12 +214,19 @@ function CampaignDetail({ c, t, lang, toast }: {
                     ? `seen ${r.lastSeenAt.slice(0, 10)}`
                     : '—'}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                 {r.status === 'PENDING' || r.status === 'OVERDUE' ? (
-                  <Button variant="primary" size="sm" Icon={Send}
-                    onClick={() => toast.success(t('campaignsRemindToast').replace('{r}', r.responderName ?? r.responder))}>
-                    {t('campaignsRemind')}
-                  </Button>
+                  <>
+                    <Button variant="primary" size="sm" Icon={Send}
+                      onClick={() => onRemind(r.responder, r.responderName)}>
+                      {t('campaignsRemind')}
+                    </Button>
+                    {reminded[`${c.id}:${r.responder}`] && (
+                      <span style={{ fontSize: 10, color: 'var(--success-fg)' }} className="mono">
+                        ✓ {reminded[`${c.id}:${r.responder}`].slice(11, 16)}
+                      </span>
+                    )}
+                  </>
                 ) : r.status === 'COMPLETED' && r.intakeRefCode ? (
                   <Badge tone="success">{r.intakeRefCode}</Badge>
                 ) : null}

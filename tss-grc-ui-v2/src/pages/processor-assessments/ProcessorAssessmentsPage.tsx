@@ -83,8 +83,8 @@ export function ProcessorAssessmentsPage() {
 
   const CREATE_FIELDS: FieldDef[] = [
     { kind: 'text',   key: 'assessmentCode', label: t('procColCode'), span: 4, placeholder: 'PROC-2026-009' },
-    { kind: 'text',   key: 'processorName',  label: t('procColProcessor') + ' *', required: true, span: 5 },
-    { kind: 'text',   key: 'processorCountry', label: t('procColCountry'), maxLength: 3, span: 3, placeholder: 'SAU' },
+    { kind: 'text',   key: 'processorName',  label: t('procColProcessor') + ' *', required: true, span: 4 },
+    { kind: 'text',   key: 'processorCountry', label: t('procColCountry'), maxLength: 3, span: 4, placeholder: 'SAU' },
     { kind: 'select', key: 'assessmentType', label: t('procColType') + ' *', required: true, span: 12,
       options: [ {value:'ONBOARDING',label:'Onboarding'},{value:'ANNUAL',label:'Annual'},{value:'RENEWAL',label:'Renewal'},{value:'AD_HOC',label:'Ad-hoc'},{value:'INCIDENT_TRIGGERED',label:'Incident-triggered'} ] },
     { kind: 'textarea', key: 'processingScopeEn', label: t('procScopeEn') + ' *', rows: 2, span: 12 },

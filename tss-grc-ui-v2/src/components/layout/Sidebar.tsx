@@ -157,7 +157,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'scm',           to: '/scm',                   Icon: Truck,       labelKey: 'scmEyebrow' },
       { id: 'srp',           to: '/supplier-resilience',   Icon: ShieldCheck, labelKey: 'srpSidebar' },
       { id: 'clauses',       to: '/contract-clauses',      Icon: Stamp,       labelKey: 'cclSidebar' },
-      { id: 'fourth-party',  to: '/fourth-party',          Icon: Network,     labelKey: 'fpSidebar' },
+      { id: 'fourth-party',  to: '/fourth-party',          Icon: Network,     labelKey: 'f4pSidebar' },
       { id: 'tpc',           to: '/third-party-cyber',     Icon: Bug,         labelKey: 'tpcSidebar' },
       { id: 'res-tests',     to: '/resilience-tests',      Icon: Activity,    labelKey: 'srtSidebar' },
     ],
