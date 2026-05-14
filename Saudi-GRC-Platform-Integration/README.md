@@ -8,6 +8,13 @@ of branch `feat/pdpl-extensions`.
 section is relevant to your role (see "Owner / development usage" column
 below).
 
+**PDF rendering:** every markdown file in this package is also published
+as a styled PDF alongside its source (same folder, `.pdf` extension).
+A single combined deliverable lives at the root:
+`Saudi-GRC-Platform-Integration.pdf` (146 pages, ~360 KB, bookmarked by
+section). Re-generate with `python build_pdfs.py` and `python
+build_master_pdf.py`.
+
 ---
 
 ## File output plan
