@@ -63,8 +63,12 @@ const DEFAULT_CONFIG: WhiteLabelConfig = {
   organisationNameAr: 'منصة الحوكمة والمخاطر والامتثال',
   taglineEn: 'Saudi-first GRC platform',
   taglineAr: 'منصة الحوكمة والمخاطر والامتثال — صناعة سعودية',
-  primaryHex: '#4f46e5',
-  accentHex: '#14b8a6',
+  // Brand palette from styles/tokens.css. Previously these were
+  // #4f46e5 (indigo) + #14b8a6 (emerald) which silently overwrote the
+  // CSS tokens at runtime → every primary-tinted chip / badge /
+  // hover-fill rendered as royal-indigo instead of TSS teal.
+  primaryHex: '#0E5E5E',
+  accentHex: '#C8932A',
 };
 
 export function loadWhiteLabel(): WhiteLabelConfig {
@@ -85,7 +89,22 @@ export function loadWhiteLabel(): WhiteLabelConfig {
     }
     if (!raw) return DEFAULT_CONFIG;
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_CONFIG, ...parsed };
+    // Migration: an earlier build seeded indigo/emerald defaults. Strip
+    // those exact values so the user picks up the canonical TSS teal +
+    // gold from DEFAULT_CONFIG instead of staying stuck on the old
+    // palette. Custom colours other than the legacy pair are preserved.
+    const LEGACY_PRIMARY = '#4f46e5';
+    const LEGACY_ACCENT  = '#14b8a6';
+    const migrated = { ...parsed };
+    if (typeof migrated.primaryHex === 'string'
+        && migrated.primaryHex.toLowerCase() === LEGACY_PRIMARY) {
+      delete migrated.primaryHex;
+    }
+    if (typeof migrated.accentHex === 'string'
+        && migrated.accentHex.toLowerCase() === LEGACY_ACCENT) {
+      delete migrated.accentHex;
+    }
+    return { ...DEFAULT_CONFIG, ...migrated };
   } catch { return DEFAULT_CONFIG; }
 }
 

@@ -66,9 +66,13 @@
   --danger:     #C0413A;
   --danger-bg:  #F8E5E2;
   --danger-fg:  #7E2A25;
-  --info:       #5A7A8C;
-  --info-bg:    #E5ECEF;
-  --info-fg:    #36505D;
+  /* Info — re-tuned: previously #5A7A8C slate-blue, which clashed with
+     the warm-cream + teal palette. Now a desaturated teal that sits
+     next to --primary in the same hue family so badges, KPIs and
+     widget chips no longer read as a different design system. */
+  --info:       #5F8A8A;
+  --info-bg:    #E8EFEF;
+  --info-fg:    #2E5252;
   --neutral-bg: #ECE7DB;
   --neutral-fg: #5C6A65;
 
@@ -83,7 +87,7 @@
   /* ─── Color · Categorical (charts) ────────────────── */
   --cat-1: #0E5E5E;
   --cat-2: #C8932A;
-  --cat-3: #5A7A8C;
+  --cat-3: #5F8A8A; /* was #5A7A8C slate-blue — re-tuned to match --info */
   --cat-4: #8E5A7A;
   --cat-5: #3F8C5C;
   --cat-6: #B5663C;
@@ -243,9 +247,10 @@
   --danger:     #E47B73;
   --danger-bg:  #2A1614;
   --danger-fg:  #F1A39C;
-  --info:       #7AA0B5;
-  --info-bg:    #16242C;
-  --info-fg:    #B8CFDC;
+  /* Info dark — re-tuned to teal-gray, matches light theme shift */
+  --info:       #7FB0B0;
+  --info-bg:    #16282A;
+  --info-fg:    #B8DCDC;
   --neutral-bg: #1F2A27;
   --neutral-fg: #93A19B;
 
