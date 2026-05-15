@@ -124,6 +124,37 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .input-hint.is-error { color: var(--danger-fg); font-weight: 600; }
 
+/* ─── SearchableSelect — popover items ─────────────────
+ * Rows inside the SearchableSelect dropdown. Highlight tone matches the
+ * `.tab:hover` palette so the keyboard cursor reads as the same vocabulary
+ * as other interactive surfaces in the app. */
+.ss-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: start;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: 500 13px var(--font-sans);
+  color: var(--ink-1);
+  transition: background var(--dur-fast);
+}
+.ss-item.is-highlight { background: var(--primary-50); }
+.ss-item.is-selected  { background: var(--primary-50); color: var(--primary-700); font-weight: 600; }
+.ss-item:disabled     { opacity: 0.5; cursor: not-allowed; }
+.ss-item-label { display: block; line-height: 1.3; }
+.ss-item-sub   { display: block; margin-top: 2px; font: 500 11px var(--font-sans); color: var(--ink-3); }
+
+/* Create-new row at the bottom of the list — visually distinct from
+ * regular options via a top border + primary tint on hover. */
+.ss-item-create {
+  border-top: 1px solid var(--border);
+  color: var(--primary-700);
+}
+.ss-item-create.is-highlight { background: var(--primary-50); }
+.ss-item-create .ss-item-label { color: var(--primary-700); font-weight: 600; }
+
 /* ─── Card ───────────────────────────────────────── */
 .card {
   background: var(--surface);

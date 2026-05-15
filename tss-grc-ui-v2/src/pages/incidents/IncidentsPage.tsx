@@ -69,7 +69,7 @@ function incToReq(i: IncidentDto): IncidentRequest {
 }
 
 export function IncidentsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -188,15 +188,55 @@ export function IncidentsPage() {
 
   // Form for "Add lesson learned" — picks an incident, captures lesson text,
   // optional CAPA reference. Lessons are not their own entity; they live as a
-  // satellite annotation on closed incidents.
-  const lessonIncidentOptions = [
-    { value: '', label: t('selectPlaceholder') },
-    ...allIncidents
-      .filter(i => i.status === 'CLOSED' || i.status === 'RECOVERED')
-      .map(i => ({ value: String(i.id), label: i.title })),
-  ];
+  // satellite annotation on incidents.
+  //
+  // Source-incident dropdown:
+  //   • Includes the full incident pool, not just CLOSED/RECOVERED — lessons
+  //     can legitimately be drafted while an incident is still in CONTAINED
+  //     or INVESTIGATING (post-mortem early notes). Each row carries a status
+  //     subtitle so the user knows what they're picking.
+  //   • Uses select-searchable so a typeahead works for long pools (>20).
+  //   • onCreate spawns a quick incident inline if the lesson refers to
+  //     something the platform doesn't track yet (e.g. near-miss noticed
+  //     during a tabletop). The created incident lands in DETECTED status
+  //     and the new id flows back into the field automatically.
+  const lessonIncidentOptions = allIncidents.map(i => ({
+    value: String(i.id),
+    label: i.title,
+    sub: `${i.id ? `INC-${String(i.id).padStart(4, '0')} · ` : ''}${statusLabel(t, i.status)} · ${severityLabel(t, i.severity)}`,
+  }));
+  async function quickCreateIncident(typedTitle: string): Promise<string | null> {
+    try {
+      const body: IncidentRequest = {
+        title: typedTitle,
+        severity: 'MEDIUM',
+        category: 'OPS',
+        status: 'DETECTED',
+        description: lang === 'ar'
+          ? 'تمّ إنشاء الحادثة من نموذج الدرس المستفاد. حدّث التفاصيل لاحقاً.'
+          : 'Created inline from the Lessons-Learned form. Update the details later.',
+      } as IncidentRequest;
+      const created = await incidentApi.create(body);
+      toast.success(lang === 'ar' ? 'تمّ إنشاء الحادثة وتم اختيارها' : 'Incident created and selected');
+      incidents.reload();
+      return String(created.id);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر الإنشاء' : 'Create failed'));
+      return null;
+    }
+  }
   const LESSON_FIELDS: FieldDef[] = [
-    { kind: 'select', key: 'incidentId', label: t('incidentsLessonFldIncident') + ' *', required: true, options: lessonIncidentOptions, span: 12 },
+    { kind: 'select-searchable', key: 'incidentId',
+      label: t('incidentsLessonFldIncident') + ' *',
+      required: true,
+      options: lessonIncidentOptions,
+      placeholder: lang === 'ar' ? 'ابحث عن حادثة أو أنشئ جديدة…' : 'Search incidents or create new…',
+      emptyHint: lang === 'ar'
+        ? 'لا توجد حوادث بعد — استخدم زرّ "إنشاء" أعلاه.'
+        : 'No incidents yet — use the Create option above.',
+      onCreate: quickCreateIncident,
+      createLabel: (typed) => lang === 'ar' ? `+ إنشاء حادثة جديدة: "${typed}"` : `+ Create new incident: "${typed}"`,
+      span: 12 },
     { kind: 'textarea', key: 'lesson', label: t('incidentsLessonFldLesson') + ' *', rows: 3, span: 12 },
     { kind: 'text', key: 'capa', label: t('incidentsLessonFldCapa'), placeholder: 'CAPA-1234', span: 12 },
   ];

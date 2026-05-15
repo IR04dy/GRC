@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Modal } from './Modal';
 import { Input, Textarea } from './Input';
 import { Select } from './Select';
+import { SearchableSelect, type SelectOption } from './SearchableSelect';
 import { Button } from './Button';
 import { useI18n } from '../../lib/i18n';
 
@@ -20,7 +21,25 @@ export type FieldDef =
   | (FieldCommon & { kind: 'textarea'; rows?: number })
   | (FieldCommon & { kind: 'number';   min?: number; max?: number; required?: boolean })
   | (FieldCommon & { kind: 'date' })
-  | (FieldCommon & { kind: 'select';   options: Array<{ value: string; label: string }>; required?: boolean });
+  | (FieldCommon & { kind: 'select';   options: Array<{ value: string; label: string }>; required?: boolean })
+  /**
+   * Searchable select with optional "create new" affordance. Use when:
+   *   - the option list is long (50+) and scanning is slow
+   *   - the user often needs an entity that doesn't yet exist
+   *
+   * `onCreate` fires when the user picks the inline "+ Create new" row.
+   * It should create the entity and return its new value/id so the field
+   * can auto-select it. Return null to abort (validation failed etc.).
+   */
+  | (FieldCommon & {
+      kind: 'select-searchable';
+      options: SelectOption[];
+      required?: boolean;
+      placeholder?: string;
+      onCreate?: (typedLabel: string) => Promise<string | null> | string | null;
+      createLabel?: (typedLabel: string) => string;
+      emptyHint?: string;
+    });
 
 interface FormModalProps<T> {
   open: boolean;
@@ -116,6 +135,17 @@ export function FormModal<T>({
                   required={f.required} options={f.options}
                   value={(v as string) ?? ''}
                   onChange={e => setV(e.currentTarget.value)} />
+              );
+            case 'select-searchable':
+              return wrap(
+                <SearchableSelect id={f.key} label={f.label}
+                  required={f.required} options={f.options}
+                  placeholder={f.placeholder}
+                  onCreate={f.onCreate}
+                  createLabel={f.createLabel}
+                  emptyHint={f.emptyHint}
+                  value={(v as string) ?? ''}
+                  onChange={(next) => setV(next)} />
               );
           }
         })}
