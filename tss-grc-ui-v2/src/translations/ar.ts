@@ -400,7 +400,7 @@ export const ar = {
 
   riskAxisImpact: 'الأثر',
   riskAxisLikelihood: 'الاحتمالية',
-  heatLevels: 'ضئيل,منخفض,متوسط,عالي,حرج',
+  heatLevels: 'ضئيل، منخفض، متوسط، عالي، حرج',
 
   // إجراءات دورة حياة المخاطرة (ISO 31000 / COSO ERM)
   riskActSubmitReview: 'إرسال للمراجعة',

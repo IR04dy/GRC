@@ -379,19 +379,22 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 
 /* ─── Toast ──────────────────────────────────────── */
+/* Toast stack docks in the bottom-end corner: bottom-right in LTR,
+ * bottom-left in RTL. `inset-inline-end` is the logical equivalent so
+ * we don't need a separate [dir="rtl"] override. */
 .toast-stack {
   position: fixed;
-  bottom: 24px; right: 24px;
+  bottom: 24px; inset-inline-end: 24px;
   display: flex; flex-direction: column; gap: 8px;
   z-index: 2000;
   pointer-events: none;
 }
-[dir="rtl"] .toast-stack { right: auto; left: 24px; }
 .toast {
   pointer-events: auto;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--primary);
+  /* Accent stripe on the LEADING edge of the toast — flips with direction. */
+  border-inline-start: 3px solid var(--primary);
   box-shadow: var(--shadow-3);
   padding: 11px 16px;
   border-radius: var(--r-md);
@@ -401,11 +404,8 @@ textarea.input { resize: vertical; min-height: 80px; }
   min-width: 240px;
   animation: slide-up var(--dur-normal) var(--ease-spring);
 }
-[dir="rtl"] .toast { border-left: 1px solid var(--border); border-right: 3px solid var(--primary); }
-.toast.success { border-left-color: var(--success); }
-.toast.danger  { border-left-color: var(--danger); }
-[dir="rtl"] .toast.success { border-right-color: var(--success); }
-[dir="rtl"] .toast.danger  { border-right-color: var(--danger); }
+.toast.success { border-inline-start-color: var(--success); }
+.toast.danger  { border-inline-start-color: var(--danger);  }
 
 /* ─── Login ──────────────────────────────────────── */
 .login-shell {
@@ -625,13 +625,12 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 .preset-sidebar-dot {
   position: absolute;
-  top: 50%; left: 6px;
+  top: 50%; inset-inline-start: 6px;
   transform: translateY(-50%);
   width: 6px; height: 6px;
   border-radius: 50%;
   box-shadow: 0 0 0 2px rgba(255,255,255,.12);
 }
-[dir="rtl"] .preset-sidebar-dot { left: auto; right: 6px; }
 
 /* ─── Stepper (workflow stages) ─────────────────── */
 .stepper {
@@ -667,15 +666,20 @@ textarea.input { resize: vertical; min-height: 80px; }
   max-width: 100px;
   line-height: 1.2;
 }
+/* Connector between two stepper dots. inset-inline-{start,end} are the
+ * direction-aware versions of left/right; in LTR start=left and the bar
+ * extends from the dot's centre to half-way into the next slot; in RTL
+ * the same logical sides map to right→start, which gives the same
+ * visual result on the mirrored row without any [dir="rtl"] override. */
 .step-bar {
   position: absolute;
   top: 14px;
-  left: 50%; right: -50%;
+  inset-inline-start: 50%;
+  inset-inline-end: -50%;
   height: 2px;
   background: var(--border-strong);
   z-index: 1;
 }
-[dir="rtl"] .step-bar { left: -50%; right: 50%; }
 
 .step-done .step-dot { background: var(--success); color: #fff; border-color: var(--success); }
 .step-done + .step .step-bar, .step-done .step-bar { background: var(--success); }
@@ -696,10 +700,9 @@ textarea.input { resize: vertical; min-height: 80px; }
 .timeline::before {
   content: '';
   position: absolute;
-  top: 16px; bottom: 16px; left: 13px;
+  top: 16px; bottom: 16px; inset-inline-start: 13px;
   width: 2px; background: var(--border-strong);
 }
-[dir="rtl"] .timeline::before { left: auto; right: 13px; }
 
 .timeline-row {
   display: flex; gap: 14px;

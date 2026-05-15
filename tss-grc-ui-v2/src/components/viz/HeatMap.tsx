@@ -19,7 +19,10 @@ export interface HeatMapProps {
 
 export function HeatMap({ data, onCellClick, selected }: HeatMapProps) {
   const { t } = useI18n();
-  const levels = t('heatLevels').split(',');
+  // Split on either Latin (,) or Arabic (،) comma so the source
+  // string can use the locale-native separator. The trim() handles
+  // the Arabic-prose convention of a space after the comma.
+  const levels = t('heatLevels').split(/[,،]/).map(s => s.trim());
   const rows = [5, 4, 3, 2, 1];
 
   return (
