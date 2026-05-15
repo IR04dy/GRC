@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Link } from 'react-router-dom';
 import {
   Database, Globe, Fingerprint, ShieldCheck, AlertTriangle, ChevronRight, Users,
@@ -97,7 +98,7 @@ export function RopaPage() {
             {t('ropaConsentSub')}
           </div>
           {CONSENT_SUMMARIES.length === 0
-            ? <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>{t('ropaConsentEmpty')}</div>
+            ? <InlineEmpty>{t('ropaConsentEmpty')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {CONSENT_SUMMARIES.map(c => {
                   const ropa = ROPA_ENTRIES.find(r => r.code === c.ropaCode);

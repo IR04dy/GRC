@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Stamp, Calendar, FileText, ClipboardCheck, AlertTriangle,
   CheckCircle2, Download, ThumbsUp, Send, Eye, BookOpen,
@@ -296,7 +297,7 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
           }}>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>{q.label} 2026</div>
             {q.codes.length === 0
-              ? <div style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', padding: 8 }}>—</div>
+              ? <InlineEmpty>—</InlineEmpty>
               : q.codes.map(code => {
                   const e = pickEngagementByCode(code);
                   if (!e) return null;
@@ -337,9 +338,7 @@ function WpTab({ wps, engagementCode: _ec, onPeerReview, onApprove, onReject, on
           {t('alcWpSub')}
         </div>
         {wps.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              {t('alcWpEmpty')}
-            </div>
+          ? <InlineEmpty>{t('alcWpEmpty')}</InlineEmpty>
           : wps.map(wp => (
               <div key={wp.id} style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 8 }}>
@@ -419,9 +418,7 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
           {t('alcFindingSub')}
         </div>
         {findings.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              {t('alcFindingEmpty')}
-            </div>
+          ? <InlineEmpty>{t('alcFindingEmpty')}</InlineEmpty>
           : findings.map(f => (
               <div key={f.id} style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 8 }}>
@@ -527,9 +524,7 @@ function CapaTab({ findings, allCapas, onTransition }: {
           {t('alcCapaSub')}
         </div>
         {relevantCapas.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              {t('alcCapaEmpty')}
-            </div>
+          ? <InlineEmpty>{t('alcCapaEmpty')}</InlineEmpty>
           : (
             <table className="tbl" style={{ width: '100%' }}>
               <thead>

@@ -480,6 +480,21 @@ textarea.input { resize: vertical; min-height: 80px; }
 .placeholder h4 { font: 700 15px var(--font-sans); color: var(--ink-1); margin: 0 0 4px; }
 .placeholder p  { font: 500 12px var(--font-sans); color: var(--ink-3); margin: 0; max-width: 360px; }
 
+/* `.placeholder` is the full-page empty (60px padding + icon + headline).
+ * For the small "no rows in this sub-section / drawer / sidebar list"
+ * case, that's 5× too big. `.empty-inline` is the calibrated mini version.
+ * Migration target: every `<div style={{ padding: X, fontSize: 12,
+ * color: 'var(--ink-3)', textAlign: 'center' }}>{t('xEmpty')}</div>` in
+ * pages/ — those were all reinvented inline because the full placeholder
+ * felt too heavy for inside-a-card. */
+.empty-inline {
+  padding: 16px 12px;
+  font: 500 12px var(--font-sans);
+  color: var(--ink-3);
+  text-align: center;
+}
+.empty-inline-compact { padding: 12px; }   /* even denser for sidebars / KPI cells */
+
 /* ─── Settings page ─────────────────────────────── */
 
 /* Section eyebrow inside the colors card. */

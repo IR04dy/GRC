@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Siren, Calendar, Users, ShieldAlert, AlertOctagon, Award, Phone,
   Play, StopCircle, Download, CheckCircle2, Clock, Building2,
@@ -316,7 +317,7 @@ export function CrisisManagementPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 16 }}>
             {upcomingExercises.length === 0
-              ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>{t('crisisUpcomingEmpty')}</div>
+              ? <InlineEmpty compact>{t('crisisUpcomingEmpty')}</InlineEmpty>
               : upcomingExercises.map(e => (
                   <div key={e.code} style={{
                     padding: '10px 0', borderBottom: '1px dashed var(--border)',

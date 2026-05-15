@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   PenLine, Inbox, Clock, CheckCircle2, XCircle, AlertOctagon,
   ShieldCheck, FileSignature,
@@ -119,7 +120,7 @@ export function SignaturesPage() {
       {tab === 'inbox' && (
         <Card title={t('sigInboxTitle')} Icon={Inbox}>
           {loading
-            ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>{t('loadingEllipsis')}</div>
+            ? <InlineEmpty>{t('loadingEllipsis')}</InlineEmpty>
             : inbox.length === 0
               ? <EmptyState Icon={ShieldCheck} title={t('sigInboxEmpty')} sub={t('sigInboxEmptySub')} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -134,7 +135,7 @@ export function SignaturesPage() {
       {tab === 'all' && (
         <Card title={t('sigAllTitle')} Icon={FileSignature}>
           {loading
-            ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>{t('loadingEllipsis')}</div>
+            ? <InlineEmpty>{t('loadingEllipsis')}</InlineEmpty>
             : all.length === 0
               ? <EmptyState Icon={FileSignature} title={t('sigAllEmpty')} sub={t('sigAllEmptySub')} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

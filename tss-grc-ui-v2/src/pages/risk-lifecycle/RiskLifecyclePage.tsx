@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   AlertTriangle, ShieldCheck, TrendingUp, Calculator, GitBranch,
   CheckCircle2, AlertOctagon, Activity, ArrowUpRight,
@@ -430,9 +431,7 @@ function KriBreachCard({ riskId: _riskId, breaches, onFire, onEscalate, onResolv
           {t('rlcKriSub')}
         </div>
         {breaches.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              {t('rlcKriEmpty')}
-            </div>
+          ? <InlineEmpty>{t('rlcKriEmpty')}</InlineEmpty>
           : [...open, ...resolved].map(b => (
               <div key={b.id} style={{ padding: 10, marginBottom: 8, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -497,9 +496,7 @@ function TreatmentCard({ riskId: _riskId, plans, onCreate, onSubmit, onApprove, 
           {t('rlcTreatSub')}
         </div>
         {plans.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              {t('rlcTreatEmpty')}
-            </div>
+          ? <InlineEmpty>{t('rlcTreatEmpty')}</InlineEmpty>
           : plans.map(p => {
               const completedActions = p.actions.filter(a => a.status === 'COMPLETED').length;
               const totalReduction = p.actions.filter(a => a.status === 'COMPLETED').reduce((acc, a) => acc + a.expectedRiskReduction, 0);
@@ -603,9 +600,7 @@ function AcceptanceCard({ riskId: _riskId, risk: _risk, accepts, onCreate, onSub
           {t('rlcAcceptSub')}
         </div>
         {accepts.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              {t('rlcAcceptEmpty')}
-            </div>
+          ? <InlineEmpty>{t('rlcAcceptEmpty')}</InlineEmpty>
           : accepts.map(a => (
               <div key={a.id} style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -664,9 +659,7 @@ function ControlLinkageCard({ controls }: { controls: ReturnType<typeof controls
           {t('rlcControlsSub')}
         </div>
         {controls.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-              {t('rlcControlsEmpty')}
-            </div>
+          ? <InlineEmpty>{t('rlcControlsEmpty')}</InlineEmpty>
           : (
             <table className="tbl" style={{ width: '100%' }}>
               <thead>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Microscope, Plus, Send, CheckCircle2, XCircle, FileText,
   ChevronRight, ChevronDown, Clock, Wrench,
@@ -178,7 +179,7 @@ export function RcaPage() {
 
       <Card title={t('rcaListTitle')} Icon={Microscope}>
         {loading
-          ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>{t('loadingEllipsis')}</div>
+          ? <InlineEmpty>{t('loadingEllipsis')}</InlineEmpty>
           : visible.length === 0
             ? <EmptyState Icon={Microscope} title={t('rcaEmpty')} sub={t('rcaEmptySub')} />
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

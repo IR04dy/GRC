@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useParams } from 'react-router-dom';
 import { Truck, ListChecks, FileCheck2, Link2, RefreshCw, ShieldOff, CheckCheck, Archive } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -44,7 +45,7 @@ export function VendorDetailPage() {
     toast.success(t(msgKey));
   }
 
-  if (loading) return <Shell title={t('modThirdParty')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
+  if (loading) return <Shell title={t('modThirdParty')}><InlineEmpty>{t('riskLoading')}</InlineEmpty></Shell>;
   if (!item)   return <Shell title={t('modThirdParty')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const name = lang === 'ar' && item.vendorNameAr ? item.vendorNameAr : item.vendorName;
@@ -115,7 +116,7 @@ export function VendorDetailPage() {
         <Card title={t('detailTabAssessments')} Icon={ListChecks}
           action={<Badge tone="primary">{(VENDOR_ASSESSMENTS_BY_ID[item.id] ?? []).length}</Badge>}>
           {(VENDOR_ASSESSMENTS_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailAssessmentsHint')}</div>
+            ? <InlineEmpty compact>{t('detailAssessmentsHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(VENDOR_ASSESSMENTS_BY_ID[item.id] ?? []).map(a => (
                   <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '110px 80px 1fr 80px 90px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -136,7 +137,7 @@ export function VendorDetailPage() {
         <Card title={t('detailTabContracts')} Icon={FileCheck2}
           action={<Badge tone="primary">{(VENDOR_CONTRACTS_BY_ID[item.id] ?? []).length}</Badge>}>
           {(VENDOR_CONTRACTS_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailContractsHint')}</div>
+            ? <InlineEmpty compact>{t('detailContractsHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(VENDOR_CONTRACTS_BY_ID[item.id] ?? []).map(c => (
                   <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr 90px 110px 110px 100px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -153,9 +154,7 @@ export function VendorDetailPage() {
       )}
       {tab === 'links' && (
         <Card title={t('detailTabLinks')} Icon={Link2}>
-          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
-            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
-          </div>
+          <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
       )}
         </>}

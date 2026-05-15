@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -386,7 +387,7 @@ export function RiskRegisterPage() {
           <Card padded={false}>
             {error && <div style={{ padding: 12, color: 'var(--danger-fg)', background: 'var(--danger-bg)', borderBottom: '1px solid #ECCFCC', fontSize: 13 }}>{error}</div>}
             {loading
-              ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>
+              ? <InlineEmpty>{t('riskLoading')}</InlineEmpty>
               : <DataTable columns={cols} rows={filteredRisks} rowHref={r => `/risk/${r.id}`} empty={<EmptyState Icon={AlertTriangle} title={hasFilters ? t('riskNoMatchTitle') : t('riskEmpty')} sub={hasFilters ? t('riskNoMatchSub') : t('riskEmptySub')} />} />}
           </Card>
         </>
@@ -527,9 +528,9 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
         <Kpi Icon={ClipboardCheck} label="Open breaches" value={stats?.openBreaches ?? 0} tone="accent" />
       </div>
       {loading
-        ? <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
+        ? <InlineEmpty>Loading…</InlineEmpty>
         : kris.length === 0
-          ? <Card><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>No KRIs defined yet.</div></Card>
+          ? <Card><InlineEmpty>No KRIs defined yet.</InlineEmpty></Card>
           : (
             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
               {kris.map(k => {
@@ -677,9 +678,9 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         <Kpi Icon={ClipboardCheck} label="No exposure data" value={stats?.noExposure ?? 0} tone="info" />
       </div>
       {loading
-        ? <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
+        ? <InlineEmpty>Loading…</InlineEmpty>
         : items.length === 0
-          ? <Card><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>No appetite statements yet.</div></Card>
+          ? <Card><InlineEmpty>No appetite statements yet.</InlineEmpty></Card>
           : (
             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
               {items.map(s => {

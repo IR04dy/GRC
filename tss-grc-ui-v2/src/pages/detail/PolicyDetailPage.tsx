@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useParams } from 'react-router-dom';
 import { BookCopy, History, Award, Link2, Send, CheckCheck, Megaphone, RefreshCw, Archive } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -57,7 +58,7 @@ export function PolicyDetailPage() {
     toast.success(t(msgKey));
   }
 
-  if (loading) return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
+  if (loading) return <Shell title={t('modCompliance')}><InlineEmpty>{t('riskLoading')}</InlineEmpty></Shell>;
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const title = lang === 'ar' && item.titleAr ? item.titleAr : item.titleEn;
@@ -143,7 +144,7 @@ export function PolicyDetailPage() {
       {tab === 'mappings' && (
         <Card title={t('detailTabMappings')} Icon={Award}>
           {mappings.length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailMappingsEmpty')}</div>
+            ? <InlineEmpty compact>{t('detailMappingsEmpty')}</InlineEmpty>
             : <div style={{ display: 'grid', gap: 6, padding: 4 }}>
               {mappings.map(m => (
                 <div key={m.mappingId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
@@ -161,7 +162,7 @@ export function PolicyDetailPage() {
         <Card title={t('detailTabLifecycle')} Icon={History}
           action={<Badge tone="primary">{(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).length}</Badge>}>
           {(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailLifecycleHint')}</div>
+            ? <InlineEmpty compact>{t('detailLifecycleHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).map(ev => (
                   <div key={ev.id} style={{ display: 'grid', gridTemplateColumns: '160px 140px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
@@ -178,9 +179,7 @@ export function PolicyDetailPage() {
       )}
       {tab === 'links' && (
         <Card title={t('detailTabLinks')} Icon={Link2}>
-          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
-            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
-          </div>
+          <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
       )}
         </>}

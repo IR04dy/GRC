@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ShieldCheck, Clock, AlertTriangle, Flame, Landmark,
@@ -160,7 +161,7 @@ export function ApprovalInboxPage() {
           action={<Badge tone="primary">{pending.length}</Badge>}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {sortedPending.length === 0
-              ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>{t('approvalsEmpty')}</div>
+              ? <InlineEmpty>{t('approvalsEmpty')}</InlineEmpty>
               : sortedPending.map(req => (
                   <ApprovalRow key={req.id} req={req}
                     sla={liveById.get(req.id)}
@@ -176,7 +177,7 @@ export function ApprovalInboxPage() {
         <Card title={t('approvalsRecentTitle')} Icon={ShieldCheck}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {decided.length === 0
-              ? <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>{t('approvalsRecentEmpty')}</div>
+              ? <InlineEmpty>{t('approvalsRecentEmpty')}</InlineEmpty>
               : decided.map(req => (
                   <div key={req.id} style={{
                     padding: '10px 0', borderBottom: '1px dashed var(--border)',

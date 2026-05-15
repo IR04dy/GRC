@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Plus, BarChart3, Building2, AlertTriangle,
@@ -864,7 +865,7 @@ function ScorePillCompliance({ score }: { score: number }) {
 }
 function LoadingRow() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <InlineEmpty>{t('riskLoading')}</InlineEmpty>;
 }
 
 // ─── Framework anchor view (IA-1 — policies organised by framework sheets) ──
@@ -986,7 +987,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
               })}
             </div>
           ))}
-          {frameworks.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>{t('frameworkEmpty')}</div>}
+          {frameworks.length === 0 && <InlineEmpty>{t('frameworkEmpty')}</InlineEmpty>}
         </div>
       </Card>
 

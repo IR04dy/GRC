@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ClipboardCheck, FileCheck2, ListChecks, Link2, CheckCheck, AlertTriangle, ShieldOff, Calendar } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -49,7 +50,7 @@ export function ControlDetailPage() {
     toast.success(t(msgKey));
   }
 
-  if (loading) return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
+  if (loading) return <Shell title={t('modCompliance')}><InlineEmpty>{t('riskLoading')}</InlineEmpty></Shell>;
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const name = lang === 'ar' && item.nameAr ? item.nameAr : item.nameEn;
@@ -128,7 +129,7 @@ export function ControlDetailPage() {
         <Card title={t('detailTabSubControls')} Icon={ListChecks}
           action={<Badge tone="primary">{(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).length}</Badge>}>
           {(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailSubControlsHint')}</div>
+            ? <InlineEmpty compact>{t('detailSubControlsHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).map(s => (
                   <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 100px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -148,7 +149,7 @@ export function ControlDetailPage() {
         <Card title={t('detailTabEvidence')} Icon={FileCheck2}
           action={<Badge tone="primary">{(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).length}</Badge>}>
           {(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div>
+            ? <InlineEmpty compact>{t('detailEvidenceHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).map(e => (
                   <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 90px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -166,7 +167,7 @@ export function ControlDetailPage() {
         <Card title={t('detailTabTests')} Icon={ListChecks}
           action={<Badge tone="primary">{(CONTROL_TESTS_BY_ID[item.id] ?? []).length}</Badge>}>
           {(CONTROL_TESTS_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailTestsHint')}</div>
+            ? <InlineEmpty compact>{t('detailTestsHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(CONTROL_TESTS_BY_ID[item.id] ?? []).map(tt => (
                   <div key={tt.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 80px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -184,9 +185,7 @@ export function ControlDetailPage() {
       )}
       {tab === 'links' && (
         <Card title={t('detailTabLinks')} Icon={Link2}>
-          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
-            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
-          </div>
+          <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
       )}
         </>}

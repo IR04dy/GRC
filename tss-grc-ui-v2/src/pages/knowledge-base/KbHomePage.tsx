@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Link } from 'react-router-dom';
 import { Search, BookOpen, FileText, ArrowRight, Plus } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -84,9 +85,7 @@ export function KbHomePage() {
 
       <Card title={lang === 'ar' ? 'المقالات' : 'Articles'}>
         {loading && (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>
-            {lang === 'ar' ? 'جارٍ التحميل…' : 'Loading…'}
-          </div>
+          <InlineEmpty>{lang === 'ar' ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
         )}
         {!loading && filtered.length === 0 && (
           <EmptyState

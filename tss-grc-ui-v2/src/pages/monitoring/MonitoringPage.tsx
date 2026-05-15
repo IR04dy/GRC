@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Activity, AlertOctagon, ShieldCheck, Calendar, Server, TrendingUp, Clock,
 } from 'lucide-react';
@@ -140,9 +141,7 @@ export function MonitoringPage() {
             {t('monAlertsSub')}
           </div>
           {ACTIVE_ALERTS.length === 0
-            ? <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>
-                {t('monAlertsEmpty')}
-              </div>
+            ? <InlineEmpty>{t('monAlertsEmpty')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {ACTIVE_ALERTS.map(a => (
                   <div key={a.id} style={{

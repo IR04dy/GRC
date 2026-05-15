@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   GitBranch, Cloud, Truck, Activity, AlertTriangle, ChevronRight, Building2, Server,
 } from 'lucide-react';
@@ -190,7 +191,7 @@ export function BcmDependencyPage() {
                 {t('bdVendorRollupSub')}
               </div>
               {vendors.length === 0
-                ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>{t('bdRollupEmpty')}</div>
+                ? <InlineEmpty compact>{t('bdRollupEmpty')}</InlineEmpty>
                 : <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {vendors.slice(0, 8).map(v => (
                       <div key={v.vendorCode} style={rollupRow}>
@@ -209,7 +210,7 @@ export function BcmDependencyPage() {
                 {t('bdRegionRollupSub')}
               </div>
               {regions.length === 0
-                ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>{t('bdRollupEmpty')}</div>
+                ? <InlineEmpty compact>{t('bdRollupEmpty')}</InlineEmpty>
                 : <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {regions.map(r => (
                       <div key={r.regionCode} style={rollupRow}>

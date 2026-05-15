@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Files, Inbox, CalendarX, BadgeCheck, Filter, Download, Plus, BarChart3, FileText, Send, ClipboardCheck,
   Layers, Plug, ChevronDown, ChevronRight, History, Power, Zap,
@@ -367,7 +368,7 @@ export function EvidencePage() {
                               {isExpanded && (
                                 <div style={{ padding: '0 16px 12px 38px', background: 'var(--surface-2)' }}>
                                   {ctrl.subControls.length === 0 && (
-                                    <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>No sub-controls catalogued for this control.</div>
+                                    <InlineEmpty compact>No sub-controls catalogued for this control.</InlineEmpty>
                                   )}
                                   {ctrl.subControls.map((sub: SubControlBlock) => (
                                     <div key={sub.subControlId} style={{
@@ -512,7 +513,7 @@ export function EvidencePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <p style={{ fontSize: 12, color: 'var(--ink-3)', margin: 0 }}>{t('evidenceVersionsSub')}</p>
             {versionsModal.versions.length === 0
-              ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>No prior versions on file.</div>
+              ? <InlineEmpty>No prior versions on file.</InlineEmpty>
               : versionsModal.versions.map(v => (
                 <div key={v.id} style={{
                   display: 'grid', gridTemplateColumns: '60px 1fr auto', gap: 12,
@@ -546,5 +547,5 @@ export function EvidencePage() {
 
 function LoadingRow() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <InlineEmpty>{t('riskLoading')}</InlineEmpty>;
 }

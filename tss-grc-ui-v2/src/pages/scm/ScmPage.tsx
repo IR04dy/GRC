@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Truck, AlertTriangle, ListChecks, Star, Filter, Download, Plus, BarChart3,
   Workflow, FileSignature, ClipboardCheck, Network, ShieldAlert,
@@ -845,7 +846,7 @@ export function ScmPage() {
           <div className="dash-grid" style={{ marginTop: 16 }}>
             <Card title={t('scmCardRecentDisruptions')} Icon={AlertOctagon}>
               {incidents.data.length === 0
-                ? <div style={{ padding: 12, color: 'var(--ink-3)' }}>No recent disruptions.</div>
+                ? <InlineEmpty compact>No recent disruptions.</InlineEmpty>
                 : incidents.data.slice(0, 5).map(i => (
                   <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px dashed var(--border)' }}>
                     <div>
@@ -867,7 +868,7 @@ export function ScmPage() {
                 </div>
               ))}
               {vendors.data.filter(v => v.criticality === 'CRITICAL').length === 0 && (
-                <div style={{ padding: 12, color: 'var(--ink-3)' }}>No critical suppliers.</div>
+                <InlineEmpty compact>No critical suppliers.</InlineEmpty>
               )}
             </Card>
           </div>
@@ -1001,7 +1002,7 @@ function countryDistribution(vendors: ScmVendorDto[]) {
 }
 function LoadingRow() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <InlineEmpty>{t('riskLoading')}</InlineEmpty>;
 }
 
 // ── Workflow & Map tab ─────────────────────────────────────────────────────
@@ -1045,7 +1046,7 @@ function ScmWorkflowMap({
       {/* 1. Onboarding pipeline */}
       <Card title={t('scmWfPanelOnboarding')} Icon={Workflow} action={<Badge tone="info">{inFlight.length}</Badge>}>
         {inFlight.length === 0
-          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfOnboardingEmpty')}</div>
+          ? <InlineEmpty compact>{t('scmWfOnboardingEmpty')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {inFlight.map(o => (
                 <div key={o.id} style={{ padding: '10px 4px', borderBottom: '1px dashed var(--border)' }}>
@@ -1069,7 +1070,7 @@ function ScmWorkflowMap({
       {/* 2. Dependency map */}
       <Card title={t('scmWfPanelDependencyMap')} Icon={Network} action={<Badge tone="primary">{dependencies.length}</Badge>}>
         {dependencies.length === 0
-          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfDepEmpty')}</div>
+          ? <InlineEmpty compact>{t('scmWfDepEmpty')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span>{t('scmWfDepLegend')}:</span>
@@ -1137,7 +1138,7 @@ function ScmWorkflowMap({
       {/* 3. Disruption response workflow */}
       <Card title={t('scmWfPanelResponse')} Icon={AlertOctagon} action={<Badge tone="warning">{incidents.filter(i => i.status !== 'CLOSED' && i.status !== 'RESOLVED').length}</Badge>}>
         {incidents.length === 0
-          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfResponseEmpty')}</div>
+          ? <InlineEmpty compact>{t('scmWfResponseEmpty')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {incidents.slice(0, 6).map(i => (
                 <div key={i.id} style={{ padding: '10px 4px', borderBottom: '1px dashed var(--border)' }}>

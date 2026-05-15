@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   RefreshCw, Activity, TimerReset, Gauge, Filter, Download, Plus, BarChart3, Cpu, Calendar,
@@ -491,7 +492,7 @@ export function BcmPage() {
                 tone={(e.score ?? 0) >= 90 ? 'success' : (e.score ?? 0) >= 70 ? 'primary' : 'accent'} />
             ))}
             {exercises.data.filter(e => e.score != null).length === 0 && (
-              <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('bcmExercisesEmptyInline')}</div>
+              <InlineEmpty compact>{t('bcmExercisesEmptyInline')}</InlineEmpty>
             )}
           </Card>
         </div>
@@ -654,7 +655,7 @@ function CrisisCommsTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: R
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Send failed'); }
   }
 
-  if (loading) return <Card padded><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Card>;
+  if (loading) return <Card padded><InlineEmpty>{t('riskLoading')}</InlineEmpty></Card>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -662,7 +663,7 @@ function CrisisCommsTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: R
         {/* Templates */}
         <Card title={t('bcmCommsTemplates')} Icon={Megaphone} action={<Badge tone="primary">{templates.length}</Badge>}>
           {templates.length === 0
-            ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>No templates configured.</div>
+            ? <InlineEmpty compact>No templates configured.</InlineEmpty>
             : templates.map(tmpl => (
               <div key={tmpl.id} style={{
                 padding: '10px 0', borderBottom: '1px dashed var(--border)',
@@ -686,7 +687,7 @@ function CrisisCommsTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: R
         {/* Audiences */}
         <Card title={t('bcmCommsAudiences')} Icon={Activity} action={<Badge tone="primary">{audiences.length}</Badge>}>
           {audiences.length === 0
-            ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>No audience groups configured.</div>
+            ? <InlineEmpty compact>No audience groups configured.</InlineEmpty>
             : audiences.map(a => (
               <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{a.name}</div>
@@ -703,7 +704,7 @@ function CrisisCommsTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: R
       {/* Distribution audit log */}
       <Card title={t('bcmCommsDistributions')} padded>
         {distributions.length === 0
-          ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>No distributions recorded yet.</div>
+          ? <InlineEmpty>No distributions recorded yet.</InlineEmpty>
           : distributions.slice(0, 12).map(d => (
             <div key={d.id} style={{
               display: 'grid', gridTemplateColumns: '180px 1fr 100px 110px 90px', gap: 10,
@@ -730,7 +731,7 @@ function CrisisCommsTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: R
 
 function LoadingRow() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <InlineEmpty>{t('riskLoading')}</InlineEmpty>;
 }
 
 // ─── BIA dependency graph (M3) ──────────────────────────────────────────────
@@ -777,7 +778,7 @@ function DependencyGraphTab({ t }: { t: (k: string) => string }) {
   const downstreamIds = focusId != null ? closure(focusId, edges, 'down') : new Set<number>();
 
   if (!isAuthenticated()) {
-    return <Card title={t('bcmTabDepGraph')}><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>{t('signInToView')}</div></Card>;
+    return <Card title={t('bcmTabDepGraph')}><InlineEmpty>{t('signInToView')}</InlineEmpty></Card>;
   }
   if (loading) return <Card><LoadingRow /></Card>;
   if (nodes.length === 0) {
