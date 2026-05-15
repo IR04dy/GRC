@@ -54,10 +54,10 @@
 .badge-neutral { background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--border); }
 .badge-primary { background: var(--primary-50); color: var(--primary-700); border-color: var(--primary-100); }
 .badge-accent  { background: var(--accent-50);  color: var(--accent-700);  border-color: var(--accent-100); }
-.badge-success { background: var(--success-bg); color: var(--success-fg);  border-color: #C9DEC9; }
-.badge-warning { background: var(--warning-bg); color: var(--warning-fg);  border-color: var(--accent-100); }
-.badge-danger  { background: var(--danger-bg);  color: var(--danger-fg);   border-color: #ECCFCC; }
-.badge-info    { background: var(--info-bg);    color: var(--info-fg);     border-color: #CFD9DD; }
+.badge-success { background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border); }
+.badge-warning { background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border); }
+.badge-danger  { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--danger-border);  }
+.badge-info    { background: var(--info-bg);    color: var(--info-fg);    border-color: var(--info-border);    }
 
 /* ─── Input / Select ─────────────────────────────── */
 .input-label {
