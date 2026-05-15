@@ -28,6 +28,12 @@ import {
   type GhgEmissionRecord, type GhgScope, type GhgAggregate, type GhgYoY,
 } from '../../lib/ghgInventory';
 import {
+  listReportingYears, listReportsForYear, generateAnnex,
+  submitReport, approveReport, publishReport, exportReport,
+  ryStatusTone, reportStatusTone,
+  type ReportingYear as Ry, type SustainabilityReport as SR,
+} from '../../lib/sustainabilityAnnex';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   TCFD_ITEMS, CMA_ARTICLES, SGI_COMMITMENTS,
   PILLAR_LABEL, STATUS_TONE, STATUS_LABEL, SECTOR_LABEL,
@@ -40,7 +46,7 @@ import {
 } from '../../lib/esg';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 
-type EsgTab = 'overview' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'ghg' | 'climate' | 'survey';
+type EsgTab = 'overview' | 'annex' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'ghg' | 'climate' | 'survey';
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -128,6 +134,7 @@ export function EsgPage() {
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
         {([
           { id: 'overview',   labelKey: 'esgTabOverview',  Icon: Leaf },
+          { id: 'annex',      labelKey: 'esgTabAnnex',     Icon: FileText },
           { id: 'calculator', labelKey: 'esgTabCalc',      Icon: Calculator },
           { id: 'cma',        labelKey: 'esgTabCma',       Icon: FileText },
           { id: 'tcfd',       labelKey: 'esgTabTcfd',      Icon: FileText },
@@ -150,6 +157,7 @@ export function EsgPage() {
       </div>
 
       {tab === 'overview'   && <OverviewTab />}
+      {tab === 'annex'      && <AnnexTab />}
       {tab === 'calculator' && <CalculatorTab entries={calcEntries}
         onAdd={(e) => { appendCalcEntry(e); toast.success(t('esgCalcAddedToast')); }}
         onDelete={(id) => { deleteCalcEntry(id); toast.info(t('esgCalcDeletedToast')); }} />}
@@ -664,6 +672,207 @@ function TcfdTab({ tcfdByPillar }: { tcfdByPillar: Map<string, typeof TCFD_ITEMS
         </div>
       ))}
     </Card>
+  );
+}
+
+// ─── Annual Sustainability Annex tab (V57) ───────────────────────────────────
+//
+// The headline Saudi compliance deliverable: bilingual annex covering CMA
+// Articles 91-94, Saudi Green Initiative, TCFD, GHG inventory, and Climate
+// Risks. Click "Generate" → backend composes Markdown + HTML + JSON from
+// live data → DRAFT report row appears. Submit → Approve → Publish moves
+// it through the lifecycle. Export downloads any of the three formats.
+
+function AnnexTab() {
+  const { t, lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [years, setYears]     = useState<Ry[]>([]);
+  const [activeRy, setActive] = useState<Ry | null>(null);
+  const [reports, setReports] = useState<SR[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGen]  = useState(false);
+  const [previewId, setPreviewId] = useState<number | null>(null);
+
+  async function loadYears() {
+    setLoading(true);
+    try {
+      const ys = await listReportingYears();
+      setYears(ys);
+      if (ys.length > 0 && !activeRy) {
+        setActive(ys[0]);
+        await loadReports(ys[0].id!);
+      }
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('annexLoadFailed'));
+    } finally { setLoading(false); }
+  }
+  async function loadReports(ryId: number) {
+    try {
+      const list = await listReportsForYear(ryId);
+      setReports(list);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('annexLoadFailed'));
+    }
+  }
+  useEffect(() => { void loadYears(); }, []); // eslint-disable-line
+
+  async function pickYear(y: Ry) {
+    setActive(y);
+    setPreviewId(null);
+    await loadReports(y.id!);
+  }
+
+  async function onGenerate() {
+    if (!activeRy?.id) return;
+    setGen(true);
+    try {
+      const r = await generateAnnex(activeRy.id);
+      toast.success(t('annexGenerated').replace('{v}', r.version));
+      await loadReports(activeRy.id);
+      setPreviewId(r.id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('annexActionFailed'));
+    } finally { setGen(false); }
+  }
+
+  async function onSubmit_(id: number) {
+    try { await submitReport(id); toast.success(t('annexSubmitted')); await loadReports(activeRy!.id!); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('annexActionFailed')); }
+  }
+  async function onApprove(id: number) {
+    try { await approveReport(id); toast.success(t('annexApproved')); await loadReports(activeRy!.id!); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('annexActionFailed')); }
+  }
+  async function onPublish(id: number) {
+    if (!window.confirm(t('annexPublishConfirm'))) return;
+    try { await publishReport(id); toast.success(t('annexPublished')); await loadReports(activeRy!.id!); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('annexActionFailed')); }
+  }
+  async function onExport(id: number, fmt: 'md' | 'html' | 'json') {
+    try { await exportReport(id, fmt); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('annexActionFailed')); }
+  }
+
+  const previewReport = useMemo(
+    () => reports.find(r => r.id === previewId) ?? null,
+    [reports, previewId]
+  );
+
+  if (loading) return <InlineEmpty>{t('annexLoading')}</InlineEmpty>;
+  if (years.length === 0) return <InlineEmpty>{t('annexNoYears')}</InlineEmpty>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Year picker strip */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="text-2xs text-muted" style={{ textTransform: 'uppercase' }}>{t('annexYear')}</span>
+        {years.map(y => (
+          <button key={y.id} type="button" onClick={() => pickYear(y)}
+            style={{
+              padding: '6px 12px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600,
+              border: `1px solid ${y.id === activeRy?.id ? 'var(--primary)' : 'var(--border)'}`,
+              background: y.id === activeRy?.id ? 'var(--primary-50)' : 'var(--surface-1)',
+              cursor: 'pointer',
+            }}>
+            {y.year}
+          </button>
+        ))}
+      </div>
+
+      {/* Selected-year summary card */}
+      {activeRy && (
+        <Card title={t('annexYearTitle').replace('{y}', String(activeRy.year))} Icon={Building2}
+          action={<Badge tone={ryStatusTone(activeRy.status)}>{activeRy.status}</Badge>}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <div className="stat-tile">
+              <div className="stat-tile-label">{t('annexEntity')}</div>
+              <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>
+                {isAr && activeRy.reportingEntityAr ? activeRy.reportingEntityAr : activeRy.reportingEntityEn}
+              </div>
+            </div>
+            <div className={`stat-tile stat-tile-${(activeRy.readinessScorePct ?? 0) >= 80 ? 'success' : 'warning'}`}>
+              <div className="stat-tile-label">{t('annexReadiness')}</div>
+              <div className="stat-tile-value">{activeRy.readinessScorePct == null ? '—' : `${activeRy.readinessScorePct}%`}</div>
+            </div>
+            <div className={`stat-tile stat-tile-${(activeRy.openGapsCount ?? 0) === 0 ? 'success' : 'warning'}`}>
+              <div className="stat-tile-label">{t('annexOpenGaps')}</div>
+              <div className="stat-tile-value">{activeRy.openGapsCount ?? 0}</div>
+            </div>
+            <div className="stat-tile">
+              <div className="stat-tile-label">{t('annexPrepared')}</div>
+              <div style={{ fontWeight: 500, color: 'var(--ink-2)', fontSize: 13 }}>{activeRy.preparedBy ?? '—'}</div>
+            </div>
+          </div>
+          {activeRy.notes && (
+            <div style={{ marginTop: 12, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 12, color: 'var(--ink-2)' }}>
+              {activeRy.notes}
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <Button variant="primary" Icon={FileText} onClick={onGenerate} disabled={generating || !activeRy.id}>
+              {generating ? t('annexGenerating') : t('annexGenerateBtn')}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Reports list */}
+      <Card title={t('annexReportsTitle')} Icon={FileText}>
+        {reports.length === 0
+          ? <InlineEmpty>{t('annexNoReports')}</InlineEmpty>
+          : (
+            <table className="grc-table">
+              <thead>
+                <tr>
+                  <th>{t('annexColCode')}</th>
+                  <th>{t('annexColType')}</th>
+                  <th>{t('annexColVersion')}</th>
+                  <th>{t('annexColGenerated')}</th>
+                  <th>{t('annexColStatus')}</th>
+                  <th style={{ textAlign: 'end' }}>{t('annexColActions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map(r => (
+                  <tr key={r.id} style={r.id === previewId ? { background: 'var(--primary-50)' } : undefined}>
+                    <td className="mono">{r.reportCode ?? `#${r.id}`}</td>
+                    <td><Badge tone="info">{r.reportType}</Badge></td>
+                    <td className="mono">{r.version}</td>
+                    <td className="mono text-xs">{r.generatedAt?.slice(0, 16).replace('T', ' ')}</td>
+                    <td><Badge tone={reportStatusTone(r.status)}>{r.status}</Badge></td>
+                    <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
+                      <Button variant="ghost"     size="sm" onClick={() => setPreviewId(r.id!)}>{t('annexActPreview')}</Button>
+                      <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'md')}>MD</Button>
+                      <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'html')}>HTML</Button>
+                      <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'json')}>JSON</Button>
+                      {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight}   onClick={() => onSubmit_(r.id!)}>{t('annexActSubmit')}</Button>}
+                      {r.status === 'SUBMITTED' && <Button variant="secondary" size="sm" Icon={CheckCircle2} onClick={() => onApprove(r.id!)}>{t('annexActApprove')}</Button>}
+                      {r.status === 'APPROVED'  && <Button variant="primary"   size="sm" Icon={CheckCircle2} onClick={() => onPublish(r.id!)}>{t('annexActPublish')}</Button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </Card>
+
+      {/* Live preview pane */}
+      {previewReport && previewReport.contentMarkdown && (
+        <Card title={t('annexPreviewTitle').replace('{v}', previewReport.version)} Icon={FileText}
+          action={<Badge tone={reportStatusTone(previewReport.status)}>{previewReport.status}</Badge>}>
+          <pre style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.55,
+            background: 'var(--surface-2)', color: 'var(--ink-1)',
+            padding: 16, borderRadius: 'var(--r-sm)',
+            border: '1px solid var(--border)',
+            whiteSpace: 'pre-wrap', maxHeight: 480, overflow: 'auto',
+            direction: 'ltr',
+          }}>{previewReport.contentMarkdown}</pre>
+        </Card>
+      )}
+    </div>
   );
 }
 
