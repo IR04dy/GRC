@@ -488,12 +488,52 @@ textarea.input { resize: vertical; min-height: 80px; }
  * pages/ — those were all reinvented inline because the full placeholder
  * felt too heavy for inside-a-card. */
 .empty-inline {
-  padding: 16px 12px;
-  font: 500 12px var(--font-sans);
+  padding: var(--sp-6) var(--sp-5);
+  font: 500 var(--text-xs) var(--font-sans);
   color: var(--ink-3);
   text-align: center;
 }
-.empty-inline-compact { padding: 12px; }   /* even denser for sidebars / KPI cells */
+.empty-inline-compact { padding: var(--sp-5); }   /* even denser for sidebars / KPI cells */
+
+/* ─── Text utility classes ───────────────────────
+ * Use these instead of inline `style={{ fontSize: 11, color: 'var(--ink-3)' }}`.
+ * 1300+ inline fontSize props were measured across pages/ — utility classes
+ * give new code a clean path without a 1300-edit mass migration of existing
+ * sites. Sizes track the --text-* scale in tokens.css. */
+.text-2xs { font-size: var(--text-2xs); }
+.text-xs  { font-size: var(--text-xs);  }
+.text-sm  { font-size: var(--text-sm);  }
+.text-md  { font-size: var(--text-md);  }
+.text-lg  { font-size: var(--text-lg);  }
+.text-xl  { font-size: var(--text-xl);  }
+
+/* Common colour-on-surface modifiers — saves an inline color: ink-3/4 prop. */
+.text-muted  { color: var(--ink-3); }
+.text-dim    { color: var(--ink-4); }
+.text-strong { color: var(--ink-1); font-weight: 600; }
+.text-mono   { font-family: var(--font-mono); letter-spacing: 0; }
+
+/* ─── Skeleton loaders ───────────────────────────
+ * One shimmering bar at three useful densities — drop into a row when
+ * data is loading instead of showing the placeholder dash or leaving the
+ * cell blank. `SkeletonRow.tsx` wraps these for table rows. */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position:  200px 0; }
+}
+.skeleton {
+  display: inline-block;
+  height: 12px;
+  border-radius: var(--r-xs);
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 400px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+.skeleton-line  { display: block; height: 12px; margin: 6px 0; }
+.skeleton-line.sm { height: 10px; }
+.skeleton-line.lg { height: 16px; }
+.skeleton-pill { width: 56px; height: 16px; border-radius: var(--r-pill); }
 
 /* ─── Settings page ─────────────────────────────── */
 
