@@ -1,4 +1,4 @@
--- V55 — Sustainability schema + Climate Risk & Opportunity register
+﻿-- V55 — Sustainability schema + Climate Risk & Opportunity register
 --
 -- First slice of the Sustainability & Environmental Governance module
 -- (ESG-SUST). Creates the dedicated `sust` schema and the first table —

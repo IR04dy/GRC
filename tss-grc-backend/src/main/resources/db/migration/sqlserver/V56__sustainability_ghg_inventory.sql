@@ -1,4 +1,4 @@
--- V56 — GHG Emission Inventory (Sustainability module · vertical slice 2)
+﻿-- V56 — GHG Emission Inventory (Sustainability module · vertical slice 2)
 --
 -- Per-record GHG inventory keyed on (reporting_year, scope, source).
 -- Replaces the static mock-data display on the existing /esg overview

@@ -1,4 +1,4 @@
--- V57 — Annual Sustainability Annex + Reporting-Year lifecycle
+﻿-- V57 — Annual Sustainability Annex + Reporting-Year lifecycle
 --
 -- Slice 3 of the Sustainability module. Produces the canonical Saudi-
 -- listed-company deliverable: a bilingual EN/AR annex covering CMA
