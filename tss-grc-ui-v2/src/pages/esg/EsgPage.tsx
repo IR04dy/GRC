@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Leaf, TrendingDown, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
+  CloudLightning, Plus, ArrowRight, Link2,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -9,8 +10,17 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import {
+  listClimateItems, createClimateItem, assessClimateItem, treatClimateItem,
+  closeClimateItem, retireClimateItem, linkClimateItemToErm,
+  riskScoreTone, riskScoreBand, shouldOfferErmLink,
+  type ClimateRiskOpportunity, type CroKind,
+} from '../../lib/climateRisk';
 import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   TCFD_ITEMS, CMA_ARTICLES, SGI_COMMITMENTS,
@@ -24,7 +34,7 @@ import {
 } from '../../lib/esg';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 
-type EsgTab = 'overview' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'survey';
+type EsgTab = 'overview' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'climate' | 'survey';
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -116,6 +126,7 @@ export function EsgPage() {
           { id: 'cma',        labelKey: 'esgTabCma',       Icon: FileText },
           { id: 'tcfd',       labelKey: 'esgTabTcfd',      Icon: FileText },
           { id: 'sgi',        labelKey: 'esgTabSgi',       Icon: Target },
+          { id: 'climate',    labelKey: 'esgTabClimate',   Icon: CloudLightning },
           { id: 'survey',     labelKey: 'esgTabSurvey',    Icon: Truck },
         ] as { id: EsgTab; labelKey: string; Icon: typeof Leaf }[]).map(tabDef => (
           <button key={tabDef.id} onClick={() => setTab(tabDef.id)}
@@ -138,9 +149,199 @@ export function EsgPage() {
       {tab === 'cma'        && <CmaTab cmaByArticle={cmaByArticle} />}
       {tab === 'tcfd'       && <TcfdTab tcfdByPillar={tcfdByPillar} />}
       {tab === 'sgi'        && <SgiTab />}
+      {tab === 'climate'    && <ClimateTab />}
       {tab === 'survey'     && <SurveyTab surveys={surveys}
         onSubmit={(id, patch) => { saveSurveyOverride(id, patch); toast.success(t('esgSurveySavedToast')); }} />}
     </Shell>
+  );
+}
+
+/**
+ * Climate Risks & Opportunities tab — V55 vertical slice.
+ *
+ * Reads from `/api/sustainability/climate-risks` (Sustainability module
+ * backend). Each row is a risk OR an opportunity (kind discriminator),
+ * scored on a 5×5 likelihood/impact matrix. Items with risk-score ≥15
+ * (High/Critical) and no existing ERM link surface an inline "Link to
+ * ERM" prompt — that's Rule 8 from the spec.
+ */
+function ClimateTab() {
+  const { t, lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [items, setItems] = useState<ClimateRiskOpportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const page = await listClimateItems({ size: 100 });
+      setItems(page.content);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('cliLoadFailed'));
+      setItems([]);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  const risks         = items.filter(i => i.kind === 'RISK');
+  const opportunities = items.filter(i => i.kind === 'OPPORTUNITY');
+  const needsErmLink  = risks.filter(shouldOfferErmLink);
+
+  async function onCreate(values: Record<string, unknown>) {
+    try {
+      await createClimateItem({
+        kind:          (values.kind as CroKind) ?? 'RISK',
+        category:      String(values.category ?? 'PHYSICAL'),
+        titleEn:       String(values.titleEn ?? '').trim(),
+        titleAr:       String(values.titleAr ?? '').trim() || undefined,
+        descriptionEn: String(values.descriptionEn ?? '').trim() || undefined,
+        timeHorizon:   (values.timeHorizon as 'SHORT' | 'MEDIUM' | 'LONG') ?? 'MEDIUM',
+        likelihood:    Number(values.likelihood ?? 3),
+        impact:        Number(values.impact ?? 3),
+        reportingYear: Number(values.reportingYear ?? new Date().getFullYear()),
+        ownerName:     String(values.ownerName ?? '').trim() || undefined,
+      });
+      toast.success(t('cliCreated'));
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed'));
+    }
+  }
+  async function onAssess(id: number)  { try { await assessClimateItem(id);  toast.success(t('cliAssessed'));  await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); } }
+  async function onTreat(id: number)   { try { await treatClimateItem(id);   toast.success(t('cliTreated'));   await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); } }
+  async function onClose_(id: number)  { try { await closeClimateItem(id);   toast.success(t('cliClosed'));    await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); } }
+  async function onRetire(id: number)  { if (!window.confirm(t('cliRetireConfirm'))) return; try { await retireClimateItem(id); toast.success(t('cliRetired')); await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); } }
+  async function onLinkErm(id: number) {
+    const raw = window.prompt(isAr ? 'مُعرّف المخاطرة في سجلّ ERM:' : 'ERM risk ID to link:', '');
+    const ermId = Number(raw);
+    if (!Number.isFinite(ermId) || ermId <= 0) return;
+    try { await linkClimateItemToErm(id, ermId); toast.success(t('cliLinkedErm')); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); }
+  }
+
+  const FIELDS: FieldDef[] = [
+    { kind: 'select', key: 'kind',         label: t('cliFldKind') + ' *',        required: true, span: 4,
+      options: [{ value: 'RISK', label: isAr ? 'مخاطرة' : 'Risk' }, { value: 'OPPORTUNITY', label: isAr ? 'فرصة' : 'Opportunity' }] },
+    { kind: 'select', key: 'category',     label: t('cliFldCategory') + ' *',    required: true, span: 4,
+      options: [
+        { value: 'PHYSICAL',     label: isAr ? 'مادي'          : 'Physical' },
+        { value: 'TRANSITION',   label: isAr ? 'انتقالي'        : 'Transition' },
+        { value: 'REGULATORY',   label: isAr ? 'تنظيمي'         : 'Regulatory' },
+        { value: 'MARKET',       label: isAr ? 'سوق'           : 'Market' },
+        { value: 'TECHNOLOGY',   label: isAr ? 'تقني'          : 'Technology' },
+        { value: 'REPUTATION',   label: isAr ? 'سُمعة'          : 'Reputation' },
+        { value: 'SUPPLY_CHAIN', label: isAr ? 'سلسلة الإمداد' : 'Supply chain' },
+        { value: 'RESOURCE_EFFICIENCY', label: isAr ? 'كفاءة الموارد' : 'Resource efficiency (opp.)' },
+        { value: 'ENERGY_SOURCE',       label: isAr ? 'مصدر طاقة'      : 'Energy source (opp.)' },
+        { value: 'PRODUCT_SERVICE',     label: isAr ? 'منتج/خدمة'     : 'Product/service (opp.)' },
+        { value: 'MARKETS',             label: isAr ? 'أسواق'         : 'Markets (opp.)' },
+        { value: 'RESILIENCE',          label: isAr ? 'صمود'          : 'Resilience (opp.)' },
+      ] },
+    { kind: 'select', key: 'timeHorizon',  label: t('cliFldHorizon') + ' *',     required: true, span: 4,
+      options: [
+        { value: 'SHORT',  label: isAr ? 'قصير المدى (≤ سنة)'  : 'Short (≤1y)' },
+        { value: 'MEDIUM', label: isAr ? 'متوسط المدى (1-5 س)' : 'Medium (1-5y)' },
+        { value: 'LONG',   label: isAr ? 'طويل المدى (> 5 س)'  : 'Long (>5y)' },
+      ] },
+    { kind: 'text',     key: 'titleEn',       label: t('cliFldTitleEn') + ' *', required: true, span: 12 },
+    { kind: 'text',     key: 'titleAr',       label: t('cliFldTitleAr'),         span: 12 },
+    { kind: 'textarea', key: 'descriptionEn', label: t('cliFldDescription'),     rows: 3, span: 12 },
+    { kind: 'number',   key: 'likelihood',    label: t('cliFldLikelihood') + ' *', required: true, min: 1, max: 5, span: 3 },
+    { kind: 'number',   key: 'impact',        label: t('cliFldImpact') + ' *',     required: true, min: 1, max: 5, span: 3 },
+    { kind: 'number',   key: 'reportingYear', label: t('cliFldYear'),              min: 2020, max: 2050, span: 3 },
+    { kind: 'text',     key: 'ownerName',     label: t('cliFldOwner'),             span: 3 },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip — risks vs opportunities + Rule-8 alert chip */}
+      <div className="kpi-grid">
+        <Kpi Icon={CloudLightning} label={t('cliKpiRisks')}    value={risks.length}         tone="warning" />
+        <Kpi Icon={Target}          label={t('cliKpiOpps')}      value={opportunities.length} tone="success" />
+        <Kpi Icon={AlertCircle}     label={t('cliKpiHighScore')} value={risks.filter(r => (r.riskScore ?? 0) >= 15).length} tone="danger" />
+        <Kpi Icon={Link2}           label={t('cliKpiNeedsErm')}  value={needsErmLink.length}  tone={needsErmLink.length > 0 ? 'danger' : 'success'} />
+      </div>
+
+      <Card title={t('cliPageTitle')} Icon={CloudLightning}
+        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>{t('cliNew')}</Button>}>
+        {loading
+          ? <InlineEmpty>{t('cliLoading')}</InlineEmpty>
+          : items.length === 0
+            ? <InlineEmpty>{t('cliEmpty')}</InlineEmpty>
+            : (
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th>{t('cliColCode')}</th>
+                    <th>{t('cliColTitle')}</th>
+                    <th>{t('cliColKind')}</th>
+                    <th>{t('cliColCategory')}</th>
+                    <th>{t('cliColHorizon')}</th>
+                    <th style={{ textAlign: 'center' }}>{t('cliColScore')}</th>
+                    <th>{t('cliColStatus')}</th>
+                    <th style={{ textAlign: 'end' }}>{t('cliColActions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(it => {
+                    const tone = riskScoreTone(it.riskScore ?? 0);
+                    const band = riskScoreBand(it.riskScore ?? 0, isAr ? 'ar' : 'en');
+                    return (
+                      <tr key={it.id}>
+                        <td className="mono">{it.itemCode ?? `#${it.id}`}</td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                            {isAr && it.titleAr ? it.titleAr : it.titleEn}
+                          </div>
+                          {it.ownerName && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{it.ownerName}</div>}
+                        </td>
+                        <td><Badge tone={it.kind === 'RISK' ? 'danger' : 'success'}>{isAr ? (it.kind === 'RISK' ? 'مخاطرة' : 'فرصة') : it.kind}</Badge></td>
+                        <td className="text-xs">{it.category}</td>
+                        <td><Badge tone="neutral">{it.timeHorizon}</Badge></td>
+                        <td style={{ textAlign: 'center' }}>
+                          <Badge tone={tone}>{it.riskScore} · {band}</Badge>
+                        </td>
+                        <td><Badge tone={it.status === 'CLOSED' ? 'success' : it.status === 'RETIRED' ? 'neutral' : it.status === 'TREATED' ? 'info' : 'warning'}>{it.status}</Badge></td>
+                        <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
+                          {/* Rule 8: offer ERM link inline when score >= 15 and not yet linked */}
+                          {shouldOfferErmLink(it) && (
+                            <Button variant="primary" size="sm" Icon={Link2}
+                              onClick={() => onLinkErm(it.id!)}>{t('cliActLinkErm')}</Button>
+                          )}
+                          {it.status === 'IDENTIFIED' && (
+                            <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onAssess(it.id!)}>{t('cliActAssess')}</Button>
+                          )}
+                          {it.status === 'ASSESSED' && (
+                            <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onTreat(it.id!)}>{t('cliActTreat')}</Button>
+                          )}
+                          {it.status === 'TREATED' && (
+                            <Button variant="secondary" size="sm" Icon={CheckCircle2} onClick={() => onClose_(it.id!)}>{t('cliActClose')}</Button>
+                          )}
+                          {it.status !== 'RETIRED' && it.status !== 'CLOSED' && (
+                            <Button variant="ghost" size="sm" Icon={Trash2} onClick={() => onRetire(it.id!)} />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+      </Card>
+
+      <FormModal
+        open={openNew}
+        title={t('cliNewTitle')}
+        fields={FIELDS}
+        initial={{ kind: 'RISK', category: 'PHYSICAL', timeHorizon: 'MEDIUM', likelihood: 3, impact: 3, reportingYear: new Date().getFullYear() }}
+        onClose={() => setOpenNew(false)}
+        onSubmit={onCreate}
+      />
+    </div>
   );
 }
 
