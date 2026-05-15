@@ -17,7 +17,7 @@ import { useToast } from '../../lib/toast';
 import {
   listProcessorAssessments, approveProcessorAssessment, rejectProcessorAssessment,
   PROC_STATUS_TONE, PROC_OUTCOME_TONE, ART28_CONTROLS,
-  type ProcessorAssessment, type ProcStatus,
+  type ProcessorAssessment,
 } from '../../lib/processorAssessments';
 
 type TabId = 'all' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';

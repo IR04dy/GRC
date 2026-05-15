@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Bug, ChevronRight, ChevronDown, Shield, AlertTriangle, CheckCircle2, Lock, Plus,
+  Bug, ChevronRight, ChevronDown, AlertTriangle, CheckCircle2, Lock, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -18,7 +18,7 @@ import { useToast } from '../../lib/toast';
 import {
   listTpc, submitTpc, approveTpc, retireTpc,
   TPC_STATUS_TONE, TPC_RESIDUAL_TONE, TPC_INHERENT_TONE,
-  type ThirdPartyCyberAssessment, type TpcStatus,
+  type ThirdPartyCyberAssessment,
 } from '../../lib/thirdPartyCyber';
 
 type TabId = 'all' | 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'RETIRED' | 'high-risk';

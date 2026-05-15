@@ -17,7 +17,7 @@ import { useToast } from '../../lib/toast';
 import {
   listFourthParty, validateFourthParty, mitigateFourthParty, retireFourthParty,
   FP_STATUS_TONE, FP_CRIT_TONE, FP_CONC_TONE,
-  type FourthPartyExposure, type FpStatus,
+  type FourthPartyExposure,
 } from '../../lib/fourthParty';
 
 /**

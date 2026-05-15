@@ -201,6 +201,9 @@ function ClimateTab() {
   const [items, setItems] = useState<ClimateRiskOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  // ERM-link prompt modal (replaces window.prompt). Holds the climate-item
+  // id so the modal knows which row to link when the user submits.
+  const [linkingErmFor, setLinkingErmFor] = useState<number | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -243,13 +246,29 @@ function ClimateTab() {
   async function onTreat(id: number)   { try { await treatClimateItem(id);   toast.success(t('cliTreated'));   await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); } }
   async function onClose_(id: number)  { try { await closeClimateItem(id);   toast.success(t('cliClosed'));    await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); } }
   async function onRetire(id: number)  { if (!window.confirm(t('cliRetireConfirm'))) return; try { await retireClimateItem(id); toast.success(t('cliRetired')); await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); } }
-  async function onLinkErm(id: number) {
-    const raw = window.prompt(isAr ? 'مُعرّف المخاطرة في سجلّ ERM:' : 'ERM risk ID to link:', '');
-    const ermId = Number(raw);
-    if (!Number.isFinite(ermId) || ermId <= 0) return;
-    try { await linkClimateItemToErm(id, ermId); toast.success(t('cliLinkedErm')); await reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed')); }
+  async function submitErmLink(values: Record<string, unknown>) {
+    const id = linkingErmFor;
+    if (id == null) return;
+    const ermId = Number(values.ermRiskId);
+    if (!Number.isFinite(ermId) || ermId <= 0) {
+      toast.danger(isAr ? 'مُعرّف غير صالح' : 'Invalid ERM risk ID');
+      return;
+    }
+    try {
+      await linkClimateItemToErm(id, ermId);
+      toast.success(t('cliLinkedErm'));
+      setLinkingErmFor(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed'));
+    }
   }
+
+  const ermLinkFields: FieldDef[] = [
+    { kind: 'number', key: 'ermRiskId', required: true, min: 1, span: 12,
+      label: isAr ? 'مُعرّف المخاطرة في سجلّ المخاطر المؤسسية (ERM)'
+                  : 'ERM risk ID to link' },
+  ];
 
   const FIELDS: FieldDef[] = [
     { kind: 'select', key: 'kind',         label: t('cliFldKind') + ' *',        required: true, span: 4,
@@ -334,24 +353,28 @@ function ClimateTab() {
                           <Badge tone={tone}>{it.riskScore} · {band}</Badge>
                         </td>
                         <td><Badge tone={it.status === 'CLOSED' ? 'success' : it.status === 'RETIRED' ? 'neutral' : it.status === 'TREATED' ? 'info' : 'warning'}>{it.status}</Badge></td>
-                        <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
-                          {/* Rule 8: offer ERM link inline when score >= 15 and not yet linked */}
-                          {shouldOfferErmLink(it) && (
-                            <Button variant="primary" size="sm" Icon={Link2}
-                              onClick={() => onLinkErm(it.id!)}>{t('cliActLinkErm')}</Button>
-                          )}
-                          {it.status === 'IDENTIFIED' && (
-                            <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onAssess(it.id!)}>{t('cliActAssess')}</Button>
-                          )}
-                          {it.status === 'ASSESSED' && (
-                            <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onTreat(it.id!)}>{t('cliActTreat')}</Button>
-                          )}
-                          {it.status === 'TREATED' && (
-                            <Button variant="secondary" size="sm" Icon={CheckCircle2} onClick={() => onClose_(it.id!)}>{t('cliActClose')}</Button>
-                          )}
-                          {it.status !== 'RETIRED' && it.status !== 'CLOSED' && (
-                            <Button variant="ghost" size="sm" Icon={Trash2} onClick={() => onRetire(it.id!)} />
-                          )}
+                        <td style={{ textAlign: 'end' }}>
+                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {/* Rule 8: offer ERM link inline when score >= 15 and not yet linked */}
+                            {shouldOfferErmLink(it) && (
+                              <Button variant="primary" size="sm" Icon={Link2}
+                                onClick={() => setLinkingErmFor(it.id!)}>{t('cliActLinkErm')}</Button>
+                            )}
+                            {it.status === 'IDENTIFIED' && (
+                              <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onAssess(it.id!)}>{t('cliActAssess')}</Button>
+                            )}
+                            {it.status === 'ASSESSED' && (
+                              <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onTreat(it.id!)}>{t('cliActTreat')}</Button>
+                            )}
+                            {it.status === 'TREATED' && (
+                              <Button variant="secondary" size="sm" Icon={CheckCircle2} onClick={() => onClose_(it.id!)}>{t('cliActClose')}</Button>
+                            )}
+                            {it.status !== 'RETIRED' && it.status !== 'CLOSED' && (
+                              <Button variant="ghost" size="sm" Icon={Trash2}
+                                title={isAr ? 'سحب من السجل' : 'Retire'}
+                                onClick={() => onRetire(it.id!)} />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -368,6 +391,19 @@ function ClimateTab() {
         initial={{ kind: 'RISK', category: 'PHYSICAL', timeHorizon: 'MEDIUM', likelihood: 3, impact: 3, reportingYear: new Date().getFullYear() }}
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
+      />
+
+      {/* ERM-link prompt — replaces window.prompt. Stays in-window so the
+          user can see which row they're linking from. */}
+      <FormModal
+        open={linkingErmFor !== null}
+        title={isAr ? 'ربط بسجل المخاطر المؤسسية' : 'Link to ERM register'}
+        fields={ermLinkFields}
+        initial={{ ermRiskId: '' }}
+        size="md"
+        submitLabel={isAr ? 'ربط' : 'Link'}
+        onClose={() => setLinkingErmFor(null)}
+        onSubmit={submitErmLink}
       />
     </div>
   );
@@ -1129,14 +1165,16 @@ function AnnexTab() {
                     <td className="mono">{r.version}</td>
                     <td className="mono text-xs">{r.generatedAt?.slice(0, 16).replace('T', ' ')}</td>
                     <td><Badge tone={reportStatusTone(r.status)}>{r.status}</Badge></td>
-                    <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
-                      <Button variant="ghost"     size="sm" onClick={() => setPreviewId(r.id!)}>{t('annexActPreview')}</Button>
-                      <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'md')}>MD</Button>
-                      <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'html')}>HTML</Button>
-                      <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'json')}>JSON</Button>
-                      {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight}   onClick={() => onSubmit_(r.id!)}>{t('annexActSubmit')}</Button>}
-                      {r.status === 'SUBMITTED' && <Button variant="secondary" size="sm" Icon={CheckCircle2} onClick={() => onApprove(r.id!)}>{t('annexActApprove')}</Button>}
-                      {r.status === 'APPROVED'  && <Button variant="primary"   size="sm" Icon={CheckCircle2} onClick={() => onPublish(r.id!)}>{t('annexActPublish')}</Button>}
+                    <td style={{ textAlign: 'end' }}>
+                      <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <Button variant="ghost"     size="sm" onClick={() => setPreviewId(r.id!)}>{t('annexActPreview')}</Button>
+                        <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'md')}>MD</Button>
+                        <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'html')}>HTML</Button>
+                        <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'json')}>JSON</Button>
+                        {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight}   onClick={() => onSubmit_(r.id!)}>{t('annexActSubmit')}</Button>}
+                        {r.status === 'SUBMITTED' && <Button variant="secondary" size="sm" Icon={CheckCircle2} onClick={() => onApprove(r.id!)}>{t('annexActApprove')}</Button>}
+                        {r.status === 'APPROVED'  && <Button variant="primary"   size="sm" Icon={CheckCircle2} onClick={() => onPublish(r.id!)}>{t('annexActPublish')}</Button>}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1375,17 +1413,19 @@ function GhgInventoryTab() {
                         </Badge>
                       </td>
                       <td><Badge tone={ghgStatusTone(r.status)}>{r.status}</Badge></td>
-                      <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
-                        {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onSubmit_(r.id!)}>{t('ghgActSubmit')}</Button>}
-                        {r.status === 'SUBMITTED' && (
-                          <Button variant="secondary" size="sm" Icon={CheckCircle2}
-                            onClick={() => onVerify(r.id!)}
-                            disabled={!canVerify(r)}
-                            title={canVerify(r) ? '' : (isAr ? 'يجب إرفاق دليل قبل التحقّق (قاعدة 2)' : 'Attach evidence before verifying (Rule 2)')}>
-                            {t('ghgActVerify')}
-                          </Button>
-                        )}
-                        {r.status === 'VERIFIED'  && <Button variant="primary"   size="sm" Icon={CheckCircle2} onClick={() => onApprove(r.id!)}>{t('ghgActApprove')}</Button>}
+                      <td style={{ textAlign: 'end' }}>
+                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onSubmit_(r.id!)}>{t('ghgActSubmit')}</Button>}
+                          {r.status === 'SUBMITTED' && (
+                            <Button variant="secondary" size="sm" Icon={CheckCircle2}
+                              onClick={() => onVerify(r.id!)}
+                              disabled={!canVerify(r)}
+                              title={canVerify(r) ? '' : (isAr ? 'يجب إرفاق دليل قبل التحقّق (قاعدة 2)' : 'Attach evidence before verifying (Rule 2)')}>
+                              {t('ghgActVerify')}
+                            </Button>
+                          )}
+                          {r.status === 'VERIFIED'  && <Button variant="primary"   size="sm" Icon={CheckCircle2} onClick={() => onApprove(r.id!)}>{t('ghgActApprove')}</Button>}
+                        </div>
                       </td>
                     </tr>
                   ))}

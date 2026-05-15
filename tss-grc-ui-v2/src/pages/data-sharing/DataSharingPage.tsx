@@ -17,7 +17,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listDsas, submitDsa, activateDsa, expireDsa, terminateDsa,
-  DSA_STATUS_TONE, type DataSharingAgreement, type DsaStatus,
+  DSA_STATUS_TONE, type DataSharingAgreement,
 } from '../../lib/dataSharing';
 
 type TabId = 'all' | 'DRAFT' | 'IN_REVIEW' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED';

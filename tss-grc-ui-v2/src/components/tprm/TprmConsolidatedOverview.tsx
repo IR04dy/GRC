@@ -56,11 +56,9 @@ export function TprmConsolidatedOverview() {
 
   // ── Roll-ups ─────────────────────────────────────────────────────────────
   const fpHighConc   = fp.filter(r => r.concentrationRisk === 'HIGH').length;
-  const fpCritical   = fp.filter(r => r.downstreamCriticality === 'CRITICAL').length;
   const tpcHigh      = tpc.filter(r => r.residualRiskTier === 'HIGH' || r.residualRiskTier === 'CRITICAL').length;
   const tpcOk        = tpc.filter(r => r.residualRiskTier === 'LOW' || r.residualRiskTier === 'MODERATE').length;
   const procFail     = proc.filter(r => r.overallOutcome === 'FAIL').length;
-  const procPwc      = proc.filter(r => r.overallOutcome === 'PASS_WITH_CONDITIONS').length;
   const srtFail      = srt.filter(r => r.outcome === 'FAIL').length;
   const srtUpcoming  = srt.filter(r => r.status === 'SCHEDULED').length;
   const dsaActive    = dsa.filter(r => r.status === 'ACTIVE').length;

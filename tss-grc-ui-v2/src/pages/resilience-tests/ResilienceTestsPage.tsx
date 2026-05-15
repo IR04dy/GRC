@@ -18,7 +18,7 @@ import { useToast } from '../../lib/toast';
 import {
   listSrt, startSrt, completeSrt, approveSrt, cancelSrt,
   SRT_STATUS_TONE, SRT_OUTCOME_TONE,
-  type SupplierResilienceTest, type SrtStatus,
+  type SupplierResilienceTest,
 } from '../../lib/resilienceTests';
 
 type TabId = 'all' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'CANCELLED';
