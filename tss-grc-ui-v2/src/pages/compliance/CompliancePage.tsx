@@ -809,7 +809,10 @@ export function CompliancePage() {
       )}
       {tab === 'findings' && (
         <>
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))', marginBottom: 12 }}>
+          {/* Use default .kpi-grid auto-fit instead of forcing 4 fixed cols
+              at 180px min — matches the Risk page's 4-tile strip and the
+              rest of the app's KPI rows. */}
+          <div className="kpi-grid" style={{ marginBottom: 12 }}>
             <Kpi Icon={ClipboardCheck} label={t('agingKpiOnTrack')}        value={aging.filter(f => f.escalationTier === 'ON_TRACK').length} tone="success" />
             <Kpi Icon={Flag}           label={t('agingKpiManager')}        value={aging.filter(f => f.escalationTier === 'MANAGER_ESCALATED').length} tone="info" />
             <Kpi Icon={AlertTriangle}  label={t('agingKpiDirector')}       value={aging.filter(f => f.escalationTier === 'DIRECTOR_ESCALATED').length} tone="accent" />
@@ -1082,7 +1085,14 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                   {active.family   && <Badge tone="info">{FAMILY_LABELS[active.family] ?? active.family}</Badge>}
                 </>}>
             {active.issuer && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>{t('frameworkIssuer')}: {active.issuer}</div>}
-            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, minmax(100px, 1fr))', gap: 8 }}>
+            {/* 6 tiles — let the canonical .kpi-grid auto-fit handle column
+                count instead of forcing 6 columns at minmax(100px). The old
+                override crammed each tile to ~100px width which squeezed
+                Arabic labels ("ضوابط مُطبَّقة", "نضج الإطار") against the
+                box edges and made the row look distinct from every other
+                page. Default 220px-minimum auto-fit gives 3-4 cols at the
+                usual viewport and wraps to 2 below ~700px. */}
+            <div className="kpi-grid">
               <Kpi Icon={ClipboardCheck} label={t('frameworkKpiControls')}     value={activeCov?.controlCount ?? 0} tone="primary" />
               <Kpi Icon={CheckCheck}     label={t('frameworkKpiImplemented')} value={activeCov?.implementedControls ?? 0} tone="success" />
               <Kpi Icon={Award}          label={t('frameworkKpiMaturity')}     value={typeof activeCov?.avgMaturity === 'number' ? `L${activeCov.avgMaturity}` : '—'} tone="accent" />

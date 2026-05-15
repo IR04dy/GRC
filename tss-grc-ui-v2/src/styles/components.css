@@ -199,7 +199,11 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 20px 20px 18px;
+  /* Padding bumped from 20/20/18 — the old values let the label hug the
+   * box edge in RTL where a long Arabic phrase ("إجمالي المخاطر") would
+   * extend almost to the trailing border. 24/22/20 gives every side a
+   * comfortable margin while keeping the tile compact. */
+  padding: 22px 22px 20px;
   box-shadow: var(--shadow-1);
   transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast), border-color var(--dur-fast);
   min-height: 124px;
@@ -318,6 +322,13 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+/* Same Arabic-shaping fix as .kpi-label — uppercase + positive letter-
+ * spacing are Latin conventions that don't translate. */
+[dir="rtl"] .stat-tile-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
 .stat-tile-value {
   font: 800 clamp(24px, 3vw, 32px)/1 var(--font-sans);
   color: var(--ink-1);
@@ -338,13 +349,28 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .stat-tile-primary .stat-tile-value { color: var(--primary-700); }
 
 /* Label — the metric name. Bumped to ink-2 (11.16:1 contrast) + 700 weight
- * + uppercase letter-spacing so it reads as a header, not a hint. */
+ * + uppercase letter-spacing so it reads as a header, not a hint.
+ *
+ * RTL override below: positive letter-spacing forces Arabic letters apart
+ * and breaks the shaping engine's ligatures (e.g. م-خ in "المخاطر" should
+ * connect — with 0.06em spacing it's visually split). text-transform:
+ * uppercase has no effect on Arabic glyphs at all, so dropping it costs
+ * nothing. Result: Arabic labels read naturally and stop looking
+ * stretched-to-the-border on the Risk and Compliance KPI strips. */
 .kpi-label {
   font: 700 11px var(--font-sans);
   color: var(--ink-2);
-  margin-top: 6px;
+  margin-top: 8px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+[dir="rtl"] .kpi-label {
+  text-transform: none;
+  letter-spacing: 0;
+  /* Slightly larger Arabic — 11px tight uppercase ENG labels balance
+   * visually against ~12px naturally-shaped Arabic at the same column
+   * width. */
+  font-size: 12px;
 }
 
 /* ─── ModuleCard ─────────────────────────────────── */
