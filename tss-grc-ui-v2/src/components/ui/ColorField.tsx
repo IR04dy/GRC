@@ -21,7 +21,10 @@ export function ColorField({ label, value, onChange, isCustom, onReset }: ColorF
       />
       <div className="cf-info">
         <div className="cf-label">{label}</div>
-        <div className="cf-value mono">{value}</div>
+        {/* Hex code is an LTR token (#0E5E5E) — without `dir="ltr"` it
+         * inherits RTL from <html dir="rtl"> and renders the '#' at the
+         * end of the string, looking misaligned next to the swatch. */}
+        <div className="cf-value mono" dir="ltr">{value}</div>
       </div>
       <button
         type="button"

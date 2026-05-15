@@ -464,6 +464,8 @@ export const en = {
   presetPetrol: 'Petrol',
   presetMono: 'Mono',
   presetRose: 'Rose',
+  presetCobalt: 'Cobalt · Clean Enterprise',
+  presetMint: 'Mint · Fresh & Matched',
 
   // ─── Common module verbs ────────────────────────
   actionNew: 'New',

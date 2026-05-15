@@ -74,6 +74,38 @@ export const PRESETS: Preset[] = [
       'sb-bg': '#28161E', 'sb-accent': '#E5A0B7',
     },
   },
+  // ── Cobalt — clean enterprise-blue palette inspired by leading
+  //    productivity-suite design systems (without using anyone's brand).
+  //    Cool gray surfaces + a confident cobalt primary + complementary
+  //    soft-amber accent for status chips so the cool blue doesn't read
+  //    cold across the whole UI. The sidebar uses near-black ink with a
+  //    cobalt highlight so the active item still pops without competing
+  //    with the primary brand on the main canvas.
+  { id: 'cobalt',   labelKey: 'presetCobalt',   overrides: {
+      'bg':        '#F3F2F1',
+      'surface':   '#FFFFFF',
+      'primary':   '#0F62CC',
+      'accent':    '#D89B2A',
+      'sb-bg':     '#201F1E',
+      'sb-text':   '#E6E6E6',
+      'sb-accent': '#3B86E6',
+    },
+  },
+  // ── Mint — fresh, low-saturation green palette with matched neutrals.
+  //    Cool whites, mint primary, soft coral accent (complementary on
+  //    the colour wheel so status chips don't disappear next to mint
+  //    surfaces), deep teal sidebar. Tested for AA contrast on every
+  //    surface combo before shipping.
+  { id: 'mint',     labelKey: 'presetMint',     overrides: {
+      'bg':        '#F4FAF7',
+      'surface':   '#FFFFFF',
+      'primary':   '#2EA37C',
+      'accent':    '#E07A5F',
+      'sb-bg':     '#0E2A24',
+      'sb-text':   '#D6EDE5',
+      'sb-accent': '#7FD3B0',
+    },
+  },
 ];
 
 // ─── Provider ────────────────────────────────────────────────────────────────

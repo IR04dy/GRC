@@ -460,6 +460,8 @@ export const ar = {
   presetPetrol: 'بترولي',
   presetMono: 'أحادي',
   presetRose: 'وردي',
+  presetCobalt: 'كوبالت · مظهر مؤسسي نقي',
+  presetMint: 'نعناعي · ألوان منسجمة',
 
   // ─── Common module verbs ────────────────────────
   actionNew: 'إضافة',

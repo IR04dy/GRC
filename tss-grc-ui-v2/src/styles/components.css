@@ -829,10 +829,13 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 
 /* ─── Theme presets ─────────────────────────────── */
+/* Preset gallery — wider tiles (180 vs 150) so longer bilingual names like
+ * "Cobalt · Clean Enterprise" / "كوبالت · مظهر مؤسسي نقي" don't wrap
+ * mid-phrase. Increased gap 10 → 12 matches the new tile padding. */
 .presets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
 }
 
 .preset-card {
@@ -840,10 +843,13 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 12px 14px;
+  padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
   text-align: start;
   transition: all var(--dur-fast) var(--ease-spring);
+  /* Equal heights so a 4-tile row stays flush even when one name wraps
+   * (Arabic compound names like "كوبالت · مظهر مؤسسي نقي" are longer). */
+  min-height: 96px;
 }
 .preset-card:hover {
   transform: translateY(-2px);
@@ -856,10 +862,14 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 
 .preset-name {
-  font: 700 12.5px var(--font-sans);
+  font: 700 13px var(--font-sans);
   color: var(--ink-1);
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px;
+  line-height: 1.35;
+  /* Allow wrapping for long bilingual names but keep the active check
+   * on the trailing edge. */
+  flex-wrap: wrap;
 }
 
 .preset-swatches { display: flex; gap: 4px; }
