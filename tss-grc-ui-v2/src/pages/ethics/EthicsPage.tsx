@@ -56,8 +56,27 @@ const CATEGORY_OPTIONS = [
   'AML_SUSPICION', 'POLICY_VIOLATION', 'SAFETY', 'OTHER',
 ].map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
 const SEVERITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(v => ({ value: v, label: v }));
-const CHANNEL_OPTIONS = ['HOTLINE', 'WEB_FORM', 'EMAIL', 'IN_PERSON', 'LETTER', 'REGULATOR']
-  .map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
+// Whistleblowing intake channels — expanded to cover every path a Saudi
+// employee / stakeholder might use to raise an ethics concern. Aligned
+// with NAZAHA-mandated channels + the AML/sanctions reporting routes.
+const CHANNEL_OPTIONS = [
+  { value: 'HOTLINE',            label: 'Hotline (24/7 voice)' },
+  { value: 'WEB_FORM',           label: 'Web form (this portal)' },
+  { value: 'EMAIL',              label: 'Email' },
+  { value: 'MOBILE_APP',         label: 'Mobile app' },
+  { value: 'SMS_WHATSAPP',       label: 'SMS / WhatsApp' },
+  { value: 'IN_PERSON',          label: 'In-person disclosure' },
+  { value: 'LETTER',             label: 'Postal letter' },
+  { value: 'MANAGER',            label: 'Manager / supervisor' },
+  { value: 'HR_PARTNER',         label: 'HR partner' },
+  { value: 'COMPLIANCE_OFFICER', label: 'Compliance officer' },
+  { value: 'AUDIT_COMMITTEE',    label: 'Audit committee' },
+  { value: 'OMBUDSMAN',          label: 'Ombudsman' },
+  { value: 'REGULATOR',          label: 'Regulator (NAZAHA / SAMA / NCA / SDAIA)' },
+  { value: 'EXTERNAL_COUNSEL',   label: 'External legal counsel' },
+  { value: 'ANONYMOUS_DROPBOX',  label: 'Anonymous physical dropbox' },
+  { value: 'OTHER',              label: 'Other' },
+];
 
 const KANBAN_LANES = [
   { id: 'INTAKE',          statuses: ['INTAKE'] },

@@ -43,10 +43,42 @@ const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
   { value: 'MEDIUM', label: 'Medium' }, { value: 'LOW', label: 'Low' },
 ];
+// Incident category taxonomy — Saudi-aligned. Covers what a SAMA/NCA-
+// regulated entity is required to triage:
+//   • Technical:    cyber, privacy, infrastructure, application, network
+//   • Operational:  ops, physical, third-party, supply-chain, business-continuity
+//   • People:       safety, insider-threat, hr (workplace violation)
+//   • Compliance:   regulatory breach, AML/sanctions, financial-fraud, ethics
+// Each row carries an explicit Arabic label so RTL renders natively, not as
+// a transliterated value. Use the value-side for stable enum identifiers.
 const CATEGORY_OPTIONS = [
-  { value: 'CYBER', label: 'Cyber' }, { value: 'PRIVACY', label: 'Privacy' },
-  { value: 'OPS', label: 'Operations' }, { value: 'PHYSICAL', label: 'Physical' },
-  { value: 'COMPLIANCE', label: 'Compliance' },
+  // Technical
+  { value: 'CYBER',                label: 'Cyber',                labelAr: 'الأمن السيبراني' },
+  { value: 'PRIVACY',              label: 'Privacy',              labelAr: 'الخصوصية' },
+  { value: 'INFRASTRUCTURE',       label: 'Infrastructure',       labelAr: 'البنية التحتية' },
+  { value: 'APPLICATION',          label: 'Application',          labelAr: 'تطبيق' },
+  { value: 'NETWORK',              label: 'Network',              labelAr: 'الشبكة' },
+  { value: 'CLOUD',                label: 'Cloud',                labelAr: 'السحابة' },
+  { value: 'DATA_LOSS',            label: 'Data loss / leak',     labelAr: 'فقد أو تسرّب بيانات' },
+  // Operational
+  { value: 'OPS',                  label: 'Operations',           labelAr: 'العمليات' },
+  { value: 'PHYSICAL',             label: 'Physical',             labelAr: 'مادي / منشآت' },
+  { value: 'THIRD_PARTY',          label: 'Third party',          labelAr: 'طرف ثالث' },
+  { value: 'SUPPLY_CHAIN',         label: 'Supply chain',         labelAr: 'سلسلة الإمداد' },
+  { value: 'BUSINESS_CONTINUITY',  label: 'Business continuity',  labelAr: 'استمرارية الأعمال' },
+  { value: 'DR_FAILOVER',          label: 'DR / failover',        labelAr: 'التعافي من الكوارث' },
+  // People
+  { value: 'SAFETY',               label: 'Health & safety',      labelAr: 'الصحة والسلامة' },
+  { value: 'INSIDER_THREAT',       label: 'Insider threat',       labelAr: 'تهديد داخلي' },
+  { value: 'HR_VIOLATION',         label: 'HR / workplace',       labelAr: 'مخالفة موارد بشرية' },
+  // Compliance / regulatory
+  { value: 'COMPLIANCE',           label: 'Compliance',           labelAr: 'الالتزام' },
+  { value: 'REGULATORY_BREACH',    label: 'Regulatory breach',    labelAr: 'مخالفة تنظيمية' },
+  { value: 'AML_SANCTIONS',        label: 'AML / sanctions',      labelAr: 'غسل أموال / عقوبات' },
+  { value: 'FINANCIAL_FRAUD',      label: 'Financial fraud',      labelAr: 'احتيال مالي' },
+  { value: 'ETHICS',               label: 'Ethics / misconduct',  labelAr: 'مخالفة سلوكية' },
+  // Other / catch-all
+  { value: 'OTHER',                label: 'Other',                labelAr: 'أخرى' },
 ];
 const STATUS_OPTIONS = [
   { value: 'OPEN', label: 'Open' }, { value: 'INVESTIGATING', label: 'Investigating' },
@@ -175,11 +207,22 @@ export function IncidentsPage() {
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Notify failed'); }
   }
 
+  // Pick AR or EN labels for the dropdown depending on UI locale. The enum
+  // value stays the same regardless of locale (it's the wire format).
+  const categoryOptionsLocalized = CATEGORY_OPTIONS.map(c => ({
+    value: c.value,
+    label: lang === 'ar' ? c.labelAr : c.label,
+  }));
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'title',         label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 200, span: 8 },
     { kind: 'select', key: 'severity',    label: t('fldSeverity') + ' *', options: SEVERITY_OPTIONS, required: true, span: 4 },
     { kind: 'text', key: 'titleAr',       label: t('fldTitleArLbl'), maxLength: 200, span: 12 },
-    { kind: 'select', key: 'category',    label: t('fldCategory'), options: CATEGORY_OPTIONS, span: 4 },
+    // Switched to select-searchable: 22 categories is long enough to want
+    // typeahead; users who think in their own term ("data leak", "AML",
+    // "insider") find the right enum without scanning the list.
+    { kind: 'select-searchable', key: 'category', label: t('fldCategory'),
+      options: categoryOptionsLocalized, span: 4,
+      placeholder: lang === 'ar' ? 'ابحث عن فئة…' : 'Search category…' },
     { kind: 'select', key: 'status',      label: t('fldStatusLbl'), options: STATUS_OPTIONS, span: 4 },
     { kind: 'date', key: 'discoveryDate', label: t('incidentsDetectedCol'), span: 4 },
     { kind: 'text', key: 'assignee',      label: t('cyberFldIncLead'), span: 12 },
