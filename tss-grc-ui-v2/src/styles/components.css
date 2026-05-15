@@ -173,14 +173,37 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .card-title { display: flex; align-items: center; gap: 8px; font: 700 13px var(--font-sans); color: var(--ink-1); }
 .card-body { padding: 16px 18px; }
 
-/* ─── KPI ────────────────────────────────────────── */
+/* ─── KPI ──────────────────────────────────────────
+ * UX retune. Old issues:
+ *   • 28px value felt small inside a 220px+ tile — the number is the
+ *     point of a KPI; it should anchor the tile.
+ *   • --ink-3 label was muted enough to read as decoration, not as the
+ *     metric name. 6.3:1 contrast, technically OK but visually weak.
+ *   • r-xl (14px) corners read as marketing-card, not enterprise-grid.
+ *   • Padding 16/18 was tight — numbers had no breathing room above.
+ *   • Value colour was always --ink-1 regardless of tone, so a "1
+ *     مرفوضة" tile read with the same weight as "42 Total risks".
+ * Fixed:
+ *   • Value 28px → 32px, tabular numerals so digits align column-wise
+ *     across a row (so a "12" doesn't look fatter than "9").
+ *   • Label --ink-3 → --ink-2, weight 600 → 700, letter-spacing 0.06em
+ *     uppercase. Reads as a header, not a hint. Contrast: 11.16:1.
+ *   • Border-radius r-xl → r-lg for a tighter enterprise feel.
+ *   • Padding 18/20 with extra top room above the value.
+ *   • New: .kpi.kpi-tone-success / .kpi-tone-warning / .kpi-tone-danger
+ *     classes (set by Kpi.tsx when tone != 'primary') colour the VALUE
+ *     in the matching -fg token. Small-count status tiles like
+ *     "0 معتمدة" / "3 قيد المراجعة" / "1 مرفوضة" now read instantly
+ *     because the number itself carries the meaning. */
 .kpi {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  padding: 20px 20px 18px;
   box-shadow: var(--shadow-1);
-  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast), border-color var(--dur-fast);
+  min-height: 124px;
+  display: flex; flex-direction: column;
 }
 .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
 
@@ -210,11 +233,14 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .kpi-clickable:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 [dir="rtl"] .kpi-arrow { transform: scaleX(-1); }
 [dir="rtl"] .kpi-clickable:hover .kpi-arrow { transform: scaleX(-1) translateX(2px); }
-.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+/* Icon chip — 36px (down from 40) so it feels like a marker, not a logo.
+ * Border radius drops to r-sm for a tighter UI-system look. */
 .kpi-icon-wrap {
-  width: 40px; height: 40px;
-  border-radius: var(--r-md);
+  width: 36px; height: 36px;
+  border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 .kpi-trend {
   display: inline-flex; align-items: center; gap: 4px;
@@ -224,8 +250,37 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .kpi-trend.up   { background: var(--success-bg); color: var(--success-fg); }
 .kpi-trend.down { background: var(--danger-bg);  color: var(--danger-fg); }
-.kpi-value { font: 800 28px/1 var(--font-sans); color: var(--ink-1); letter-spacing: -.02em; }
-.kpi-label { font: 600 12px var(--font-sans); color: var(--ink-3); margin-top: 6px; }
+
+/* Value — the headline number. font-feature-settings 'tnum' enables
+ * tabular numerals so 1/2/3/11 line up under each other across a row.
+ * Slight tightening of letter-spacing (-0.025em) for a confident headline
+ * look without going to display-type extremes. */
+.kpi-value {
+  font: 800 32px/1 var(--font-sans);
+  color: var(--ink-1);
+  letter-spacing: -.025em;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  margin-top: auto;
+}
+
+/* Tone-aware value colour — Kpi.tsx adds .kpi-tone-{tone} for non-primary
+ * tiles. Drives the NUMBER colour to the semantic -fg, so a "3 At risk"
+ * tile reads warning-amber without needing a colored background. */
+.kpi.kpi-tone-success .kpi-value { color: var(--success-fg); }
+.kpi.kpi-tone-warning .kpi-value { color: var(--warning-fg); }
+.kpi.kpi-tone-danger  .kpi-value { color: var(--danger-fg);  }
+.kpi.kpi-tone-info    .kpi-value { color: var(--info-fg);    }
+.kpi.kpi-tone-accent  .kpi-value { color: var(--accent-700); }
+
+/* Label — the metric name. Bumped to ink-2 (11.16:1 contrast) + 700 weight
+ * + uppercase letter-spacing so it reads as a header, not a hint. */
+.kpi-label {
+  font: 700 11px var(--font-sans);
+  color: var(--ink-2);
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 
 /* ─── ModuleCard ─────────────────────────────────── */
 .module-card {

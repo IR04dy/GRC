@@ -139,7 +139,10 @@
 .page-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
 /* ─── Grids ─────────────────────────────────────── */
-.kpi-grid     { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+/* KPI grid — auto-fit so 4 tiles fit a desktop row (220–360px each), 2 on
+ * mobile (see breakpoints.css). Gap bumped from 14 → 16px to match the
+ * tighter card padding so adjacent tiles don't visually merge. */
+.kpi-grid     { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
 .dash-grid    { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 20px; }
 .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 

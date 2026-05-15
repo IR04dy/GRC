@@ -30,12 +30,16 @@ interface KpiProps {
   onClick?: () => void;
 }
 
+// Icon-chip palette. `bg` is the tinted square behind the icon glyph.
+// Using the soft semantic -bg tokens gives the icon a subtle marker
+// presence without the chip dominating the tile — the VALUE should be
+// the focal point, not the icon.
 const TONES: Record<KpiTone, { bg: string; fg: string; line: string }> = {
-  primary: { bg: 'var(--primary-50)', fg: 'var(--primary)',     line: 'var(--primary)' },
-  danger:  { bg: 'var(--danger-bg)',  fg: 'var(--danger-fg)',   line: 'var(--danger)' },
+  primary: { bg: 'var(--primary-50)', fg: 'var(--primary-700)', line: 'var(--primary)' },
+  danger:  { bg: 'var(--danger-bg)',  fg: 'var(--danger-fg)',   line: 'var(--danger)'  },
   success: { bg: 'var(--success-bg)', fg: 'var(--success-fg)',  line: 'var(--success)' },
   warning: { bg: 'var(--warning-bg)', fg: 'var(--warning-fg)',  line: 'var(--warning)' },
-  info:    { bg: 'var(--info-bg)',    fg: 'var(--info-fg)',     line: 'var(--info)' },
+  info:    { bg: 'var(--info-bg)',    fg: 'var(--info-fg)',     line: 'var(--info)'    },
   accent:  { bg: 'var(--accent-50)',  fg: 'var(--accent-700)',  line: 'var(--accent-500)' },
 };
 
@@ -86,7 +90,9 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
     <>
       <div className="kpi-top">
         <div className="kpi-icon-wrap" style={{ background: bg, color: fg }}>
-          <Icon size={20} strokeWidth={2} />
+          {/* Icon sized to sit comfortably in the 36px chip (was 20 in 40 →
+              cramped). 18 / 36 = 50% — the textbook glyph-in-chip ratio. */}
+          <Icon size={18} strokeWidth={2} />
         </div>
         {effectiveTrend && (
           <div className={`kpi-trend ${effectiveTrend.dir}`}>
@@ -112,7 +118,11 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
   );
 
   // Wrap classNames with the flash class so the kpi tile briefly highlights.
-  const baseClass = 'kpi' + (flashClass ? ' ' + flashClass : '');
+  // For non-primary tones, add .kpi-tone-{tone} so the VALUE colour reflects
+  // the semantic palette (a "1 مرفوضة" tile renders the number in danger-fg,
+  // not in ink-1, so the count carries the meaning on its own).
+  const toneClass = tone !== 'primary' ? `kpi-tone-${tone}` : '';
+  const baseClass = ['kpi', flashClass, toneClass].filter(Boolean).join(' ');
   const linkClass = baseClass + ' kpi-clickable';
 
   if (to) {
