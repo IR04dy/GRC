@@ -49,8 +49,14 @@ import {
   type SgiCommitment as SgiC, type SgiAggregate as SgiAgg,
 } from '../../lib/sustainabilitySgi';
 import {
+  listCma, cmaReadiness, markDisclosed, markPartial, markNotDisclosed,
+  markNotApplicable, markUnderReview, attachCmaEvidence, recordCmaGap,
+  cmaStatusTone, cmaStatusLabel, articleLabel, hasGap, hasEvidence,
+  type CmaDisclosure as CmaD, type CmaReadiness as CmaR,
+} from '../../lib/sustainabilityCma';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
-  TCFD_ITEMS, CMA_ARTICLES,
+  TCFD_ITEMS,
   PILLAR_LABEL, STATUS_TONE, STATUS_LABEL,
   SURVEY_TONE, SURVEY_LABEL,
   aggregateEsg, yoyChange,
@@ -116,15 +122,8 @@ export function EsgPage() {
     return map;
   }, []);
 
-  // CMA grouping by article
-  const cmaByArticle = useMemo(() => {
-    const map = new Map<string, typeof CMA_ARTICLES>();
-    for (const item of CMA_ARTICLES) {
-      if (!map.has(item.article)) map.set(item.article, []);
-      map.get(item.article)!.push(item);
-    }
-    return map;
-  }, []);
+  // CMA grouping was previously a static useMemo against CMA_ARTICLES;
+  // V60 promoted CmaTab to API-driven so it self-loads + self-groups.
 
   return (
     <Shell title={t('esgTitle')} sub={t('esgSub')}>
@@ -179,7 +178,7 @@ export function EsgPage() {
       {tab === 'calculator' && <CalculatorTab entries={calcEntries}
         onAdd={(e) => { appendCalcEntry(e); toast.success(t('esgCalcAddedToast')); }}
         onDelete={(id) => { deleteCalcEntry(id); toast.info(t('esgCalcDeletedToast')); }} />}
-      {tab === 'cma'        && <CmaTab cmaByArticle={cmaByArticle} />}
+      {tab === 'cma'        && <CmaTab />}
       {tab === 'tcfd'       && <TcfdTab tcfdByPillar={tcfdByPillar} />}
       {tab === 'sgi'        && <SgiTab />}
       {tab === 'ghg'        && <GhgInventoryTab />}
@@ -907,57 +906,269 @@ function CalculatorTab({ entries, onAdd, onDelete }: {
   );
 }
 
-// ─── CMA tab ────────────────────────────────────────────────────────────────
+// ─── CMA Articles 91–94 disclosure tab (V60 — slice 6) ─────────────────────
+//
+// Promoted from the static CMA_ARTICLES constant to a live API-driven
+// matrix. Per-row workflow:
+//   - Mark Disclosed / Partial / Not Disclosed / Not Applicable
+//     (Rule 5 requires a gap for PARTIAL/NOT_DISCLOSED — captured via
+//      dialog; Rule 6 auto-flips DISCLOSED/PARTIAL to EVIDENCE_REQUIRED
+//      server-side when no evidence is attached)
+//   - Attach Evidence (text reference + owner)
+//   - Record Gap (English/Arabic narrative for the audit trail)
 
-function CmaTab({ cmaByArticle }: { cmaByArticle: Map<string, typeof CMA_ARTICLES> }) {
-  const { t, lang } = useI18n();
+function CmaTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [items, setItems]       = useState<CmaD[]>([]);
+  const [readiness, setReadi]   = useState<CmaR | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [evidencingId, setEvidencingId] = useState<number | null>(null);
+  const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, r] = await Promise.all([listCma({ year: 2025, size: 100 }), cmaReadiness(2025)]);
+      setItems(pg.content);
+      setReadi(r);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل سجلّ الإفصاحات' : 'Failed to load disclosure matrix'));
+      setItems([]); setReadi(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  // Group by article (91 → 92 → 93 → 94).
+  const byArticle = useMemo(() => {
+    const map = new Map<string, CmaD[]>();
+    for (const d of items) {
+      if (!map.has(d.article)) map.set(d.article, []);
+      map.get(d.article)!.push(d);
+    }
+    return map;
+  }, [items]);
+
+  async function runTransition(action: () => Promise<unknown>) {
+    try {
+      await action();
+      toast.success(isAr ? 'تم التحديث' : 'Updated');
+      await reload();
+    } catch (e) {
+      // Rule 5/6 violations surface as 400 with a clear message — pipe through.
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+
+  async function onMarkDisclosed(d: CmaD) {
+    await runTransition(() => markDisclosed(d.id!));
+  }
+  async function onMarkPartial(d: CmaD) {
+    // Rule 5 — refuse PARTIAL without a gap. If the row already carries
+    // one (e.g. from edit), let the server handle it. Otherwise prompt.
+    if (!hasGap(d)) {
+      setGappingId({ id: d.id!, toStatus: 'PARTIAL' });
+      return;
+    }
+    await runTransition(() => markPartial(d.id!));
+  }
+  async function onMarkNotDisclosed(d: CmaD) {
+    if (!hasGap(d)) {
+      setGappingId({ id: d.id!, toStatus: 'NOT_DISCLOSED' });
+      return;
+    }
+    await runTransition(() => markNotDisclosed(d.id!));
+  }
+  async function onMarkNotApplicable(d: CmaD) {
+    await runTransition(() => markNotApplicable(d.id!));
+  }
+  async function onMarkUnderReview(d: CmaD) {
+    await runTransition(() => markUnderReview(d.id!));
+  }
+
+  async function submitAttachEvidence(values: Record<string, unknown>) {
+    if (evidencingId == null) return;
+    const ref = String(values.evidenceRef ?? '').trim();
+    const owner = String(values.owner ?? '').trim() || undefined;
+    if (!ref) { toast.danger(isAr ? 'مرجع الدليل مطلوب' : 'Evidence reference is required'); return; }
+    try {
+      await attachCmaEvidence(evidencingId, ref, owner);
+      toast.success(isAr ? 'تم إرفاق الدليل' : 'Evidence attached');
+      setEvidencingId(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+
+  async function submitGap(values: Record<string, unknown>) {
+    if (gappingId == null) return;
+    const gapEn = String(values.gapEn ?? '').trim() || undefined;
+    const gapAr = String(values.gapAr ?? '').trim() || undefined;
+    if (!gapEn && !gapAr) {
+      toast.danger(isAr ? 'وصف الفجوة مطلوب (إنجليزي أو عربي)' : 'Gap description is required (en or ar)');
+      return;
+    }
+    try {
+      await recordCmaGap(gappingId.id, gapEn, gapAr);
+      // If the user opened this dialog from a Mark Partial / Not Disclosed
+      // attempt, chase the transition after the gap is recorded.
+      if (gappingId.toStatus === 'PARTIAL')     await markPartial(gappingId.id);
+      if (gappingId.toStatus === 'NOT_DISCLOSED') await markNotDisclosed(gappingId.id);
+      toast.success(isAr ? 'تم تسجيل الفجوة' : 'Gap recorded');
+      setGappingId(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+
+  const evidenceFields: FieldDef[] = [
+    { kind: 'text', key: 'evidenceRef', required: true, span: 12,
+      label: isAr ? 'مرجع الدليل (مسار، قسم، URL، إلخ)' : 'Evidence reference (path, section, URL, etc.)',
+      placeholder: isAr ? 'مثال: Annual Report 2025 §3.4' : 'e.g. Annual Report 2025 §3.4' },
+    { kind: 'text', key: 'owner', span: 12,
+      label: isAr ? 'مالك الدليل (اختياري)' : 'Evidence owner (optional)',
+      placeholder: isAr ? 'مثال: سارة الزهراني' : 'e.g. Sara Al-Zahrani' },
+  ];
+
+  // FieldDef.textarea doesn't accept `placeholder`. The labels carry
+  // enough hint in this case; submitGap re-validates that at least one
+  // of the two fields was filled before dispatch.
+  const gapFields: FieldDef[] = [
+    { kind: 'textarea', key: 'gapEn', span: 12, rows: 3,
+      label: isAr ? 'وصف الفجوة (إنجليزي)' : 'Gap description (English)' },
+    { kind: 'textarea', key: 'gapAr', span: 12, rows: 3,
+      label: isAr ? 'وصف الفجوة (عربي)' : 'Gap description (Arabic)' },
+  ];
+
   return (
-    <Card title={t('esgCmaTitle')} Icon={FileText}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
-        {t('esgCmaSub')}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Readiness KPI strip */}
+      <div className="kpi-grid">
+        <Kpi Icon={FileText}     label={isAr ? 'جاهزية الإفصاح' : 'Disclosure readiness'} value={`${readiness?.readinessPct ?? 0}%`}
+             tone={(readiness?.readinessPct ?? 0) >= 80 ? 'success' : (readiness?.readinessPct ?? 0) >= 50 ? 'warning' : 'danger'} />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'مُفصَح' : 'Disclosed'}      value={readiness?.byStatus.DISCLOSED ?? 0}         tone="success" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'جزئي' : 'Partial'}          value={readiness?.byStatus.PARTIAL ?? 0}           tone="warning" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'غير مُفصَح' : 'Not disclosed'} value={readiness?.byStatus.NOT_DISCLOSED ?? 0}  tone="danger" />
+        <Kpi Icon={Paperclip}    label={isAr ? 'يتطلّب دليلاً' : 'Evidence required'} value={readiness?.byStatus.EVIDENCE_REQUIRED ?? 0} tone="danger" />
+        <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Under review'}      value={readiness?.byStatus.UNDER_REVIEW ?? 0}      tone="info" />
       </div>
-      {Array.from(cmaByArticle.entries()).map(([article, items]) => (
-        <div key={article} style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>
-            {t('esgCmaArticle')} {article}
-          </div>
-          {items.map(item => {
-            const tone = item.status === 'DISCLOSED' ? 'success' :
-                         item.status === 'PARTIAL' ? 'warning' :
-                         item.status === 'NOT_DISCLOSED' ? 'danger' : 'neutral';
-            return (
-              <div key={`${item.article}${item.clause}`} style={{
-                padding: '12px 0', borderBottom: '1px dashed var(--border)',
-                display: 'grid', gridTemplateColumns: '1fr auto', gap: 10,
-              }}>
-                <div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                      Art. {item.article}{item.clause ?? ''}
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>
-                      {lang === 'ar' ? item.titleAr : item.titleEn}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-                    {lang === 'ar' ? item.requirementAr : item.requirementEn}
-                  </div>
-                  {item.evidenceRef && (
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4 }}>
-                      <FileText size={10} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 3 }} />
-                      {item.evidenceRef}
-                    </div>
-                  )}
-                </div>
-                <Badge tone={tone}>
-                  {STATUS_LABEL[item.status][lang]}
-                </Badge>
-              </div>
-            );
-          })}
+
+      <Card title={isAr ? 'سجلّ إفصاحات المواد 91–94' : 'CMA Articles 91–94 disclosure matrix'} Icon={FileText}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+          {isAr
+            ? 'مصفوفة الإفصاحات الإلزامية لهيئة السوق المالية. الجزئي وغير المُفصَح يتطلّبان وصف فجوة (القاعدة 5). الإفصاحات المعتمدة بلا دليل تُعلَّم تلقائياً «يتطلّب دليلاً» (القاعدة 6).'
+            : 'CMA mandatory disclosure matrix. Partial and Not-Disclosed states require a gap description (Rule 5). Disclosed items without evidence are auto-flagged Evidence Required (Rule 6).'}
         </div>
-      ))}
-    </Card>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : items.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد إفصاحات لهذه السنة' : 'No disclosures for this year'}</InlineEmpty>
+            : Array.from(byArticle.entries()).map(([article, articleItems]) => (
+                <div key={article} style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>
+                    {isAr ? `المادة ${article}` : `Article ${article}`}
+                  </div>
+                  {articleItems.map(d => (
+                    <div key={d.id} style={{
+                      padding: '12px 0', borderBottom: '1px dashed var(--border)',
+                      display: 'grid', gridTemplateColumns: '1fr auto', gap: 10,
+                    }}>
+                      <div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                            {articleLabel(d, isAr ? 'ar' : 'en')}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>
+                            {isAr && d.titleAr ? d.titleAr : d.titleEn}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                          {isAr && d.requirementAr ? d.requirementAr : d.requirementEn}
+                        </div>
+                        {hasEvidence(d) && (
+                          <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Paperclip size={10} />
+                            <span>{isAr ? 'الدليل:' : 'Evidence:'}</span>
+                            <span className="mono">{d.evidenceRef}</span>
+                            {d.evidenceOwner && <span>· {d.evidenceOwner}</span>}
+                          </div>
+                        )}
+                        {hasGap(d) && (
+                          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--warning-fg)', lineHeight: 1.5,
+                              padding: 8, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)' }}>
+                            <AlertCircle size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+                            <strong>{isAr ? 'فجوة:' : 'Gap:'}</strong>{' '}
+                            {isAr && d.gapDescriptionAr ? d.gapDescriptionAr : (d.gapDescriptionEn ?? d.gapDescriptionAr)}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', minWidth: 220 }}>
+                        <Badge tone={cmaStatusTone(d.disclosureStatus)}>{cmaStatusLabel(d.disclosureStatus, isAr ? 'ar' : 'en')}</Badge>
+                        <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {d.disclosureStatus !== 'DISCLOSED' && (
+                            <Button size="sm" variant="ghost" onClick={() => onMarkDisclosed(d)}>{isAr ? 'مُفصَح' : 'Disclosed'}</Button>
+                          )}
+                          {d.disclosureStatus !== 'PARTIAL' && (
+                            <Button size="sm" variant="ghost" onClick={() => onMarkPartial(d)}>{isAr ? 'جزئي' : 'Partial'}</Button>
+                          )}
+                          {d.disclosureStatus !== 'NOT_DISCLOSED' && (
+                            <Button size="sm" variant="ghost" onClick={() => onMarkNotDisclosed(d)}>{isAr ? 'غير مُفصَح' : 'Not'}</Button>
+                          )}
+                          {d.disclosureStatus !== 'UNDER_REVIEW' && (
+                            <Button size="sm" variant="ghost" onClick={() => onMarkUnderReview(d)}>{isAr ? 'مراجعة' : 'Review'}</Button>
+                          )}
+                          {d.disclosureStatus !== 'NOT_APPLICABLE' && (
+                            <Button size="sm" variant="ghost" onClick={() => onMarkNotApplicable(d)}>{isAr ? 'لا ينطبق' : 'N/A'}</Button>
+                          )}
+                        </div>
+                        <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <Button size="sm" variant="secondary" Icon={Paperclip} onClick={() => setEvidencingId(d.id!)}>
+                            {isAr ? 'إرفاق دليل' : 'Attach'}
+                          </Button>
+                          <Button size="sm" variant="secondary" Icon={AlertCircle} onClick={() => setGappingId({ id: d.id! })}>
+                            {isAr ? 'تسجيل فجوة' : 'Gap'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+      </Card>
+
+      <FormModal
+        open={evidencingId !== null}
+        title={isAr ? 'إرفاق دليل للإفصاح' : 'Attach evidence to disclosure'}
+        fields={evidenceFields}
+        initial={{ evidenceRef: '', owner: '' }}
+        size="md"
+        submitLabel={isAr ? 'إرفاق' : 'Attach'}
+        onClose={() => setEvidencingId(null)}
+        onSubmit={submitAttachEvidence}
+      />
+      <FormModal
+        open={gappingId !== null}
+        title={
+          gappingId?.toStatus
+            ? (isAr
+                ? `الفجوة مطلوبة لـ ${gappingId.toStatus === 'PARTIAL' ? 'الإفصاح الجزئي' : 'عدم الإفصاح'} (القاعدة 5)`
+                : `Gap required for ${gappingId.toStatus === 'PARTIAL' ? 'Partial' : 'Not Disclosed'} (Rule 5)`)
+            : (isAr ? 'تسجيل فجوة' : 'Record gap')
+        }
+        fields={gapFields}
+        initial={{ gapEn: '', gapAr: '' }}
+        size="md"
+        submitLabel={isAr ? 'حفظ' : 'Save'}
+        onClose={() => setGappingId(null)}
+        onSubmit={submitGap}
+      />
+    </div>
   );
 }
 
