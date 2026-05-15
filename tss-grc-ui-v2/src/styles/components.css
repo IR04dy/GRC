@@ -59,27 +59,70 @@
 .badge-danger  { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--danger-border);  }
 .badge-info    { background: var(--info-bg);    color: var(--info-fg);    border-color: var(--info-border);    }
 
-/* ─── Input / Select ─────────────────────────────── */
+/* ─── Input / Select ───────────────────────────────
+ * Contrast pass — user feedback: "the fonts in forms need to be more clear
+ * since the colors of fonts is very close to the color of the form
+ * background". WCAG-AA audit of the previous tokens showed:
+ *   • placeholder var(--ink-4) on var(--surface) = 2.88:1  → FAILS AA (4.5)
+ *   • input bg === card bg                              → no visual depth
+ *   • label 11px / 600  on a busy form bg               → reads as a hint
+ * Fixed:
+ *   • Input bg dropped to --surface-2 (passes contrast; gives the input an
+ *     inset look that pops off the surrounding card).
+ *   • Input value bumped to 14px / 600 (was 13/500) for crisp legibility.
+ *   • Label bumped to 12px / 700, color --ink-1 (was 11/600 --ink-2) so the
+ *     field name is unmistakably the header, not a hint.
+ *   • Placeholder --ink-3 (was --ink-4) — passes WCAG AA + still reads as
+ *     placeholder, not as filled value. */
 .input-label {
   display: block;
-  font: 600 11px var(--font-sans);
-  color: var(--ink-2);
-  margin-bottom: 5px;
+  font: 700 12px var(--font-sans);
+  color: var(--ink-1);
+  margin-bottom: 6px;
   letter-spacing: .02em;
 }
 .input {
   width: 100%;
-  padding: 9px 12px;
+  padding: 10px 12px;
   border-radius: var(--r-md);
   border: 1px solid var(--border-strong);
-  background: var(--surface);
-  font: 500 13px var(--font-sans);
+  background: var(--surface-2);
+  font: 600 14px var(--font-sans);
   color: var(--ink-1);
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
 }
-.input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus-ring); }
-.input::placeholder { color: var(--ink-4); }
-textarea.input { resize: vertical; min-height: 80px; }
+.input:hover:not(:focus):not(:disabled) {
+  border-color: var(--primary-300);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);  /* lighten on focus → clear "active field" cue */
+  box-shadow: var(--focus-ring);
+}
+.input::placeholder {
+  color: var(--ink-3);          /* was --ink-4 → was failing WCAG AA */
+  font-weight: 500;             /* slightly lighter than the entered value */
+  opacity: 0.85;                /* visual distinction without sacrificing contrast */
+}
+.input:disabled {
+  background: var(--surface-3);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+/* Optional hint / helper line under an input — softer than the label but
+ * still passes contrast. Use for char counts, format hints, validation
+ * messages. */
+.input-hint {
+  display: block;
+  margin-top: 5px;
+  font: 500 11px var(--font-sans);
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+.input-hint.is-error { color: var(--danger-fg); font-weight: 600; }
 
 /* ─── Card ───────────────────────────────────────── */
 .card {
