@@ -1504,8 +1504,61 @@ export const en = {
   esgTabCma:                'CMA Articles',
   esgTabTcfd:               'TCFD',
   esgTabSgi:                'SGI commitments',
+  esgTabGhg:                'GHG inventory',
   esgTabClimate:            'Climate risks & opportunities',
   esgTabSurvey:             'Vendor survey',
+
+  // ─── GHG inventory (V56) ───────────────
+  ghgPageTitle:    'GHG emission inventory',
+  ghgNew:          'New emission record',
+  ghgNewTitle:     'Add GHG emission record',
+  ghgEmpty:        'No emission records for this year/scope. Add the first to start tracking.',
+  ghgLoading:      'Loading inventory…',
+  ghgLoadFailed:   'Failed to load GHG inventory',
+  ghgCreated:      'Record created (DRAFT)',
+  ghgSubmitted:    'Record submitted for verification',
+  ghgVerified:     'Record verified',
+  ghgApproved:     'Record approved',
+  ghgActionFailed: 'Action failed',
+  // Filters
+  ghgFilterYear:   'Year',
+  ghgFilterScope:  'Scope',
+  // KPIs
+  ghgKpiScope1:     'Scope 1 tCO₂e',
+  ghgKpiScope2:     'Scope 2 tCO₂e',
+  ghgKpiScope3:     'Scope 3 tCO₂e',
+  ghgKpiTotal:      'Total tCO₂e',
+  ghgKpiS3Coverage: 'Scope 3 coverage',
+  // Columns
+  ghgColCode:      'Code',
+  ghgColScope:     'Scope',
+  ghgColSource:    'Source',
+  ghgColCategory:  'Category',
+  ghgColValue:     'tCO₂e',
+  ghgColCoverage:  'Coverage',
+  ghgColStatus:    'Status',
+  ghgColActions:   'Actions',
+  // Form fields
+  ghgFldYear:        'Reporting year',
+  ghgFldScope:       'Scope',
+  ghgFldCategory:    'Category',
+  ghgFldSourceEn:    'Source (English)',
+  ghgFldSourceAr:    'Source (Arabic)',
+  ghgFldValue:       'Emission value (tCO₂e)',
+  ghgFldCoverage:    'Coverage % (Scope 3 typically < 100)',
+  ghgFldMethodology: 'Methodology',
+  ghgFldEvidence:    'Evidence reference',
+  ghgFldOwner:       'Owner',
+  // Actions
+  ghgActSubmit:  'Submit',
+  ghgActVerify:  'Verify',
+  ghgActApprove: 'Approve',
+  // YoY
+  ghgYoyTitle:  'Year-over-year change',
+  ghgYoyTotal:  'Total',
+  // Rule 1 alert
+  ghgRule1Title: 'Scope 3 disclosure is partial',
+  ghgRule1Body:  'Weighted Scope-3 coverage is {coverage}% — below the 70% threshold. Annual annex will mark the Scope-3 disclosure as Partial and create a coverage gap.',
 
   // ─── Climate Risk & Opportunity (V55 vertical slice) ───────────────
   cliPageTitle:       'Climate risks & opportunities register',

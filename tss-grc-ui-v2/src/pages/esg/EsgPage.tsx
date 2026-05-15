@@ -22,6 +22,12 @@ import {
   type ClimateRiskOpportunity, type CroKind,
 } from '../../lib/climateRisk';
 import {
+  listGhgRecords, ghgAggregate, ghgYoy,
+  createGhgRecord, submitGhgRecord, verifyGhgRecord, approveGhgRecord,
+  ghgStatusTone, canVerify,
+  type GhgEmissionRecord, type GhgScope, type GhgAggregate, type GhgYoY,
+} from '../../lib/ghgInventory';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   TCFD_ITEMS, CMA_ARTICLES, SGI_COMMITMENTS,
   PILLAR_LABEL, STATUS_TONE, STATUS_LABEL, SECTOR_LABEL,
@@ -34,7 +40,7 @@ import {
 } from '../../lib/esg';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 
-type EsgTab = 'overview' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'climate' | 'survey';
+type EsgTab = 'overview' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'ghg' | 'climate' | 'survey';
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -126,6 +132,7 @@ export function EsgPage() {
           { id: 'cma',        labelKey: 'esgTabCma',       Icon: FileText },
           { id: 'tcfd',       labelKey: 'esgTabTcfd',      Icon: FileText },
           { id: 'sgi',        labelKey: 'esgTabSgi',       Icon: Target },
+          { id: 'ghg',        labelKey: 'esgTabGhg',       Icon: Leaf },
           { id: 'climate',    labelKey: 'esgTabClimate',   Icon: CloudLightning },
           { id: 'survey',     labelKey: 'esgTabSurvey',    Icon: Truck },
         ] as { id: EsgTab; labelKey: string; Icon: typeof Leaf }[]).map(tabDef => (
@@ -149,6 +156,7 @@ export function EsgPage() {
       {tab === 'cma'        && <CmaTab cmaByArticle={cmaByArticle} />}
       {tab === 'tcfd'       && <TcfdTab tcfdByPillar={tcfdByPillar} />}
       {tab === 'sgi'        && <SgiTab />}
+      {tab === 'ghg'        && <GhgInventoryTab />}
       {tab === 'climate'    && <ClimateTab />}
       {tab === 'survey'     && <SurveyTab surveys={surveys}
         onSubmit={(id, patch) => { saveSurveyOverride(id, patch); toast.success(t('esgSurveySavedToast')); }} />}
@@ -656,6 +664,249 @@ function TcfdTab({ tcfdByPillar }: { tcfdByPillar: Map<string, typeof TCFD_ITEMS
         </div>
       ))}
     </Card>
+  );
+}
+
+// ─── GHG Inventory tab (V56) ─────────────────────────────────────────────────
+//
+// Live, queryable, verifiable GHG inventory — replaces the static mock
+// totals on the overview tab with a per-record register. Surfaces:
+//   • Aggregate KPIs (Scope 1/2/3 totals, grand total, Scope-3 coverage %)
+//   • Rule-1 dashboard alert when Scope-3 weighted coverage < 70%
+//   • YoY chips per scope (computed server-side from prior-year aggregate)
+//   • Status-gated lifecycle buttons (Submit → Verify → Approve)
+//   • Rule-2 client mirror: Verify button disabled until evidence_ref set
+
+function GhgInventoryTab() {
+  const { t, lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [year, setYear]   = useState<number>(new Date().getFullYear() - 1); // align with seed (2025)
+  const [scope, setScope] = useState<GhgScope | undefined>(undefined);
+  const [rows, setRows]   = useState<GhgEmissionRecord[]>([]);
+  const [agg, setAgg]     = useState<GhgAggregate | null>(null);
+  const [yoy, setYoy]     = useState<GhgYoY | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [page, aggData, yoyData] = await Promise.all([
+        listGhgRecords({ year, scope, size: 200 }),
+        ghgAggregate(year),
+        ghgYoy(year),
+      ]);
+      setRows(page.content);
+      setAgg(aggData);
+      setYoy(yoyData);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('ghgLoadFailed'));
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, [year, scope]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function onCreate(values: Record<string, unknown>) {
+    try {
+      await createGhgRecord({
+        reportingYear: Number(values.reportingYear ?? year),
+        scope: Number(values.scope ?? 1) as GhgScope,
+        category: String(values.category ?? 'STATIONARY_COMBUSTION'),
+        sourceNameEn: String(values.sourceNameEn ?? '').trim(),
+        sourceNameAr: String(values.sourceNameAr ?? '').trim() || undefined,
+        emissionValueTco2e: Number(values.emissionValueTco2e ?? 0),
+        coveragePercent:    Number(values.coveragePercent ?? 100),
+        evidenceRef: String(values.evidenceRef ?? '').trim() || undefined,
+        ownerName:   String(values.ownerName ?? '').trim() || undefined,
+        methodology: String(values.methodology ?? '').trim() || undefined,
+        verified: false,
+      });
+      toast.success(t('ghgCreated'));
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed'));
+    }
+  }
+  async function onSubmit_(id: number) {
+    try { await submitGhgRecord(id); toast.success(t('ghgSubmitted')); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed')); }
+  }
+  async function onVerify(id: number) {
+    try { await verifyGhgRecord(id); toast.success(t('ghgVerified')); await reload(); }
+    catch (e) {
+      // Rule 2 — server rejects with a clear message if evidence missing.
+      toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed'));
+    }
+  }
+  async function onApprove(id: number) {
+    try { await approveGhgRecord(id); toast.success(t('ghgApproved')); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed')); }
+  }
+
+  const FIELDS: FieldDef[] = [
+    { kind: 'number',   key: 'reportingYear',      label: t('ghgFldYear') + ' *',  required: true, min: 2020, max: 2050, span: 3 },
+    { kind: 'select',   key: 'scope',              label: t('ghgFldScope') + ' *', required: true, span: 3,
+      options: [{ value: '1', label: 'Scope 1' }, { value: '2', label: 'Scope 2' }, { value: '3', label: 'Scope 3' }] },
+    { kind: 'select',   key: 'category',           label: t('ghgFldCategory') + ' *', required: true, span: 6,
+      options: [
+        { value: 'STATIONARY_COMBUSTION',    label: 'Stationary combustion (S1)' },
+        { value: 'MOBILE_COMBUSTION',        label: 'Mobile combustion (S1)' },
+        { value: 'FUGITIVE',                 label: 'Fugitive (S1)' },
+        { value: 'PROCESS',                  label: 'Process (S1)' },
+        { value: 'PURCHASED_ELECTRICITY',    label: 'Purchased electricity (S2)' },
+        { value: 'PURCHASED_HEAT_STEAM',     label: 'Purchased heat/steam (S2)' },
+        { value: 'PURCHASED_GOODS_SERVICES', label: 'Purchased goods & services (S3)' },
+        { value: 'CAPITAL_GOODS',            label: 'Capital goods (S3)' },
+        { value: 'BUSINESS_TRAVEL',          label: 'Business travel (S3)' },
+        { value: 'EMPLOYEE_COMMUTING',       label: 'Employee commuting (S3)' },
+        { value: 'UPSTREAM_TRANSPORT',       label: 'Upstream transport (S3)' },
+        { value: 'WASTE_OPERATIONS',         label: 'Waste from operations (S3)' },
+        { value: 'USE_OF_SOLD_PRODUCTS',     label: 'Use of sold products (S3)' },
+      ] },
+    { kind: 'text',     key: 'sourceNameEn',       label: t('ghgFldSourceEn') + ' *', required: true, span: 12 },
+    { kind: 'text',     key: 'sourceNameAr',       label: t('ghgFldSourceAr'),         span: 12 },
+    { kind: 'number',   key: 'emissionValueTco2e', label: t('ghgFldValue') + ' *',     required: true, min: 0, span: 6 },
+    { kind: 'number',   key: 'coveragePercent',    label: t('ghgFldCoverage'),         min: 0, max: 100, span: 6 },
+    { kind: 'text',     key: 'methodology',        label: t('ghgFldMethodology'),      placeholder: 'GHG Protocol Corporate Standard', span: 6 },
+    { kind: 'text',     key: 'evidenceRef',        label: t('ghgFldEvidence'),         span: 6 },
+    { kind: 'text',     key: 'ownerName',          label: t('ghgFldOwner'),            span: 6 },
+  ];
+
+  function pctChip(v?: number) {
+    if (v == null) return '—';
+    const sign = v > 0 ? '+' : '';
+    return `${sign}${Number(v).toFixed(1)}%`;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Year + scope filter strip */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="text-2xs text-muted" style={{ textTransform: 'uppercase' }}>{t('ghgFilterYear')}</span>
+        <select className="input" style={{ width: 'auto' }} value={year} onChange={e => setYear(Number(e.target.value))}>
+          {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <span className="text-2xs text-muted" style={{ textTransform: 'uppercase', marginInlineStart: 12 }}>{t('ghgFilterScope')}</span>
+        <select className="input" style={{ width: 'auto' }} value={scope ?? ''} onChange={e => setScope(e.target.value ? Number(e.target.value) as GhgScope : undefined)}>
+          <option value="">{isAr ? 'الكل' : 'All'}</option>
+          <option value="1">Scope 1</option>
+          <option value="2">Scope 2</option>
+          <option value="3">Scope 3</option>
+        </select>
+      </div>
+
+      {/* KPI strip — totals + YoY + Rule-1 flag */}
+      <div className="kpi-grid">
+        <Kpi Icon={Leaf} label={t('ghgKpiScope1')} value={agg ? `${(Number(agg.scope1Total) / 1000).toFixed(1)}k` : '—'} tone="success" />
+        <Kpi Icon={Leaf} label={t('ghgKpiScope2')} value={agg ? `${(Number(agg.scope2Total) / 1000).toFixed(1)}k` : '—'} tone="success" />
+        <Kpi Icon={Leaf} label={t('ghgKpiScope3')} value={agg ? `${(Number(agg.scope3Total) / 1000).toFixed(1)}k` : '—'} tone="warning" />
+        <Kpi Icon={Leaf} label={t('ghgKpiTotal')}  value={agg ? `${(Number(agg.grandTotal) / 1000).toFixed(1)}k` : '—'} tone="primary" />
+        <Kpi Icon={CheckCircle2} label={t('ghgKpiS3Coverage')} value={agg ? `${Number(agg.scope3Coverage).toFixed(0)}%` : '—'}
+          tone={agg?.scope3PartialFlag ? 'danger' : 'success'} />
+      </div>
+
+      {/* Rule 1 — Scope-3 partial-disclosure warning */}
+      {agg?.scope3PartialFlag && (
+        <div style={{
+          display: 'flex', gap: 10, alignItems: 'flex-start',
+          padding: 12, borderRadius: 'var(--r-md)',
+          background: 'var(--danger-bg)', borderInlineStart: '4px solid var(--danger)',
+        }}>
+          <AlertCircle size={18} style={{ color: 'var(--danger-fg)', flexShrink: 0, marginTop: 2 }} />
+          <div className="text-sm" style={{ color: 'var(--danger-fg)', lineHeight: 1.5 }}>
+            <strong>{t('ghgRule1Title')}:</strong> {t('ghgRule1Body').replace('{coverage}', Number(agg.scope3Coverage).toFixed(0))}
+          </div>
+        </div>
+      )}
+
+      {/* YoY chips */}
+      {yoy && (
+        <Card title={t('ghgYoyTitle')} Icon={TrendingDown}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Scope 1', v: Number(yoy.scope1YoY) },
+              { label: 'Scope 2', v: Number(yoy.scope2YoY) },
+              { label: 'Scope 3', v: Number(yoy.scope3YoY) },
+              { label: t('ghgYoyTotal'), v: Number(yoy.totalYoY) },
+            ].map((it, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span className="text-2xs text-muted" style={{ textTransform: 'uppercase' }}>{it.label}</span>
+                <Badge tone={it.v < 0 ? 'success' : it.v > 0 ? 'danger' : 'neutral'}>{pctChip(it.v)}</Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <Card title={t('ghgPageTitle')} Icon={Leaf}
+        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>{t('ghgNew')}</Button>}>
+        {loading
+          ? <InlineEmpty>{t('ghgLoading')}</InlineEmpty>
+          : rows.length === 0
+            ? <InlineEmpty>{t('ghgEmpty')}</InlineEmpty>
+            : (
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th>{t('ghgColCode')}</th>
+                    <th>{t('ghgColScope')}</th>
+                    <th>{t('ghgColSource')}</th>
+                    <th>{t('ghgColCategory')}</th>
+                    <th style={{ textAlign: 'end' }}>{t('ghgColValue')}</th>
+                    <th style={{ textAlign: 'center' }}>{t('ghgColCoverage')}</th>
+                    <th>{t('ghgColStatus')}</th>
+                    <th style={{ textAlign: 'end' }}>{t('ghgColActions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.id}>
+                      <td className="mono">{r.recordCode ?? `#${r.id}`}</td>
+                      <td><Badge tone={r.scope === 1 ? 'success' : r.scope === 2 ? 'info' : 'warning'}>S{r.scope}</Badge></td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 320, lineHeight: 1.3 }}>
+                          {isAr && r.sourceNameAr ? r.sourceNameAr : r.sourceNameEn}
+                        </div>
+                        {r.facility && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{r.facility}</div>}
+                      </td>
+                      <td className="text-xs">{r.category}</td>
+                      <td style={{ textAlign: 'end' }} className="mono">{Number(r.emissionValueTco2e).toLocaleString()}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <Badge tone={Number(r.coveragePercent) >= 90 ? 'success' : Number(r.coveragePercent) >= 70 ? 'info' : 'warning'}>
+                          {Number(r.coveragePercent).toFixed(0)}%
+                        </Badge>
+                      </td>
+                      <td><Badge tone={ghgStatusTone(r.status)}>{r.status}</Badge></td>
+                      <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
+                        {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onSubmit_(r.id!)}>{t('ghgActSubmit')}</Button>}
+                        {r.status === 'SUBMITTED' && (
+                          <Button variant="secondary" size="sm" Icon={CheckCircle2}
+                            onClick={() => onVerify(r.id!)}
+                            disabled={!canVerify(r)}
+                            title={canVerify(r) ? '' : (isAr ? 'يجب إرفاق دليل قبل التحقّق (قاعدة 2)' : 'Attach evidence before verifying (Rule 2)')}>
+                            {t('ghgActVerify')}
+                          </Button>
+                        )}
+                        {r.status === 'VERIFIED'  && <Button variant="primary"   size="sm" Icon={CheckCircle2} onClick={() => onApprove(r.id!)}>{t('ghgActApprove')}</Button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+      </Card>
+
+      <FormModal
+        open={openNew}
+        title={t('ghgNewTitle')}
+        fields={FIELDS}
+        initial={{ reportingYear: year, scope: 1, coveragePercent: 100 }}
+        onClose={() => setOpenNew(false)}
+        onSubmit={onCreate}
+      />
+    </div>
   );
 }
 
