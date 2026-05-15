@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { ShieldCheck, Languages, LogIn, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useI18n } from '../lib/i18n';
 import { login as apiLogin, ApiError } from '../lib/api';
 import { Input } from '../components/ui/Input';
@@ -12,6 +12,16 @@ const FRAMEWORKS = ['NCA ECC', 'SDAIA', 'PDPL', 'SAMA', 'ISO 27001', 'ISO 22301'
 export function LoginPage() {
   const { t, toggleLang } = useI18n();
   const navigate = useNavigate();
+  // Honour the ?next= param set by api.ts when a 401-refresh-fail bounced
+  // the user here mid-session. Without it, an expired session always lands
+  // back on /risk regardless of which page the user was actually on.
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get('next');
+  // Defence-in-depth: only allow relative paths so a hostile redirect URL
+  // can't open phishing pages (e.g. ?next=https://evil.example).
+  const landing = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+    ? nextParam
+    : '/risk';
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('Admin@12345');
   const [submitting, setSubmitting] = useState(false);
@@ -28,7 +38,7 @@ export function LoginPage() {
       // navigates to /risk still wearing the default palette because
       // applyWhiteLabel() at boot ran with no tenant context.
       applyWhiteLabel();
-      navigate('/risk', { replace: true });
+      navigate(landing, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.status === 401 ? t('loginInvalid') : err.message);
@@ -41,7 +51,7 @@ export function LoginPage() {
   }
 
   function continueDemo() {
-    navigate('/risk', { replace: true });
+    navigate(landing, { replace: true });
   }
 
   return (
