@@ -14,6 +14,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { useDialog } from '../../lib/dialog';
 import {
   listMyInbox, listSignatures, signTransaction, rejectTransaction,
   sha256Hex,
@@ -39,6 +40,7 @@ type TabId = 'inbox' | 'all' | 'stats';
 export function SignaturesPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const dialog = useDialog();
   const [tab, setTab] = useState<TabId>('inbox');
   const [inbox, setInbox] = useState<DigitalSignatureTransaction[]>([]);
   const [all, setAll] = useState<DigitalSignatureTransaction[]>([]);
@@ -76,11 +78,17 @@ export function SignaturesPage() {
   }
 
   async function onReject(row: DigitalSignatureTransaction) {
-    const reason = window.prompt(t('sigRejectPrompt'), '');
-    if (!reason || !reason.trim()) return;
+    const reason = await dialog.prompt({
+      title: t('sigRejectPrompt'),
+      label: lang === 'ar' ? 'سبب الرفض' : 'Rejection reason',
+      type: 'textarea',
+      required: true,
+      placeholder: lang === 'ar' ? 'مثال: المستند لا يطابق المعتمد...' : 'e.g. Document does not match the approved version...',
+    });
+    if (!reason) return;
     setBusyId(row.id);
     try {
-      await rejectTransaction(row.id, reason.trim());
+      await rejectTransaction(row.id, reason);
       toast.success(t('sigRejectedToast'));
       await reload();
     } catch {

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { I18nProvider } from './lib/i18n';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
+import { DialogProvider } from './lib/dialog';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -98,7 +99,8 @@ export function App() {
     <ThemeProvider>
       <I18nProvider>
         <ToastProvider>
-          <BrowserRouter>
+          <DialogProvider>
+            <BrowserRouter>
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<LoginPage />} />
@@ -280,7 +282,8 @@ export function App() {
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
-          </BrowserRouter>
+            </BrowserRouter>
+          </DialogProvider>
         </ToastProvider>
       </I18nProvider>
     </ThemeProvider>

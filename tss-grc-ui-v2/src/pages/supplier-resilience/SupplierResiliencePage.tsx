@@ -14,6 +14,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { useDialog } from '../../lib/dialog';
 import {
   listAlternates, createAlternate, approveAlternate, archiveAlternate,
   listExitPlans, createExitPlan, approvePlan, rejectPlan, activatePlan, archivePlan, recordPlanTest,
@@ -61,6 +62,8 @@ const PLAN_INITIAL: PlanFormValues = {
 export function SupplierResiliencePage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
 
   const [tab, setTab]         = useState<TabId>('alternates');
   const [alts, setAlts]       = useState<AlternateSupplier[]>([]);
@@ -124,10 +127,14 @@ export function SupplierResiliencePage() {
     finally { setBusyId(null); }
   }
   async function onArchiveAlt(id: number) {
-    const reason = window.prompt(t('srpArchivePrompt'), '');
-    if (!reason || !reason.trim()) return;
+    const reason = await dialog.prompt({
+      title: t('srpArchivePrompt'),
+      label: isAr ? 'سبب الأرشفة' : 'Archive reason',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
     setBusyId(id);
-    try { await archiveAlternate(id, reason.trim()); toast.success(t('srpAltArchived')); await reload(); }
+    try { await archiveAlternate(id, reason); toast.success(t('srpAltArchived')); await reload(); }
     catch { toast.danger(t('srpActionFailed')); }
     finally { setBusyId(null); }
   }
@@ -140,38 +147,62 @@ export function SupplierResiliencePage() {
     finally { setBusyId(null); }
   }
   async function onRejectPlan(id: number) {
-    const reason = window.prompt(t('srpRejectPrompt'), '');
-    if (!reason || !reason.trim()) return;
+    const reason = await dialog.prompt({
+      title: t('srpRejectPrompt'),
+      label: isAr ? 'سبب الرفض' : 'Rejection reason',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
     setBusyId(id);
-    try { await rejectPlan(id, reason.trim()); toast.success(t('srpPlanRejected')); await reload(); }
+    try { await rejectPlan(id, reason); toast.success(t('srpPlanRejected')); await reload(); }
     catch { toast.danger(t('srpActionFailed')); }
     finally { setBusyId(null); }
   }
   async function onActivatePlan(id: number) {
-    const reason = window.prompt(t('srpActivatePrompt'), '');
-    if (!reason || !reason.trim()) return;
+    const reason = await dialog.prompt({
+      title: t('srpActivatePrompt'),
+      label: isAr ? 'سبب التفعيل' : 'Activation reason',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
     setBusyId(id);
-    try { await activatePlan(id, reason.trim()); toast.success(t('srpPlanActivated')); await reload(); }
+    try { await activatePlan(id, reason); toast.success(t('srpPlanActivated')); await reload(); }
     catch { toast.danger(t('srpActionFailed')); }
     finally { setBusyId(null); }
   }
   async function onArchivePlan(id: number) {
-    const reason = window.prompt(t('srpArchivePrompt'), '');
-    if (!reason || !reason.trim()) return;
+    const reason = await dialog.prompt({
+      title: t('srpArchivePrompt'),
+      label: isAr ? 'سبب الأرشفة' : 'Archive reason',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
     setBusyId(id);
-    try { await archivePlan(id, reason.trim()); toast.success(t('srpPlanArchived')); await reload(); }
+    try { await archivePlan(id, reason); toast.success(t('srpPlanArchived')); await reload(); }
     catch { toast.danger(t('srpActionFailed')); }
     finally { setBusyId(null); }
   }
   async function onRecordTest(id: number) {
-    const outcome = window.prompt(t('srpTestPrompt'), 'PASSED');
+    // Three-way outcome — kept as a text prompt for now since the legacy
+    // input was a plain text field. A select-style dialog upgrade can
+    // come when we promote dialog.prompt() with `kind: 'select'` support.
+    const outcome = await dialog.prompt({
+      title: t('srpTestPrompt'),
+      label: isAr ? 'النتيجة (PASSED · GAP_IDENTIFIED · FAILED)'
+                  : 'Outcome (PASSED · GAP_IDENTIFIED · FAILED)',
+      initial: 'PASSED',
+      required: true,
+      validate: (v) => {
+        const up = v.trim().toUpperCase();
+        if (up !== 'PASSED' && up !== 'GAP_IDENTIFIED' && up !== 'FAILED') {
+          return t('srpTestInvalid');
+        }
+        return null;
+      },
+    });
     if (!outcome) return;
-    const up = outcome.toUpperCase();
-    if (up !== 'PASSED' && up !== 'GAP_IDENTIFIED' && up !== 'FAILED') {
-      toast.danger(t('srpTestInvalid')); return;
-    }
     setBusyId(id);
-    try { await recordPlanTest(id, up as 'PASSED'); toast.success(t('srpTestRecorded')); await reload(); }
+    try { await recordPlanTest(id, outcome.toUpperCase() as 'PASSED'); toast.success(t('srpTestRecorded')); await reload(); }
     catch { toast.danger(t('srpActionFailed')); }
     finally { setBusyId(null); }
   }
