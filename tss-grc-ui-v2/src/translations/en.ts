@@ -109,6 +109,27 @@ export const en = {
   kpiCriticalRisks: 'Critical Risks',
   kpiCompliance: 'Compliance Level',
   kpiActiveControls: 'Active Controls',
+  // Risk register status KPIs (were hardcoded English; now bilingual).
+  kpiTreated: 'Treated',
+  kpiOpen: 'Open',
+  // KRI dashboard KPIs.
+  kriKpiTotal: 'Total KRIs',
+  kriKpiGreen: 'Green',
+  kriKpiAmber: 'Amber',
+  kriKpiRed: 'Red',
+  kriKpiOpenBreaches: 'Open breaches',
+  // Risk-appetite statement KPIs.
+  appKpiStatements: 'Statements',
+  appKpiWithin: 'Within tolerance',
+  appKpiExceeded: 'Exceeded',
+  appKpiCritical: 'Critical',
+  appKpiNoData: 'No exposure data',
+  // Authority workspace KPIs.
+  authKpiFrameworks: 'Frameworks owned',
+  authKpiCited: 'Cited controls',
+  authKpiEvidence: 'Anchored evidence',
+  authKpiFindings: 'Open findings',
+  authKpiEngagements: 'Audit engagements',
   cardHeatTitle: 'Risk Heat Map',
   cardByCategory: 'Risks by Category',
   cardFrameworks: 'Framework Readiness',

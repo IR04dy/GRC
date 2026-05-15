@@ -108,6 +108,27 @@ export const ar = {
   kpiCriticalRisks: 'المخاطر الحرجة',
   kpiCompliance: 'مستوى الامتثال',
   kpiActiveControls: 'الضوابط الفعّالة',
+  // مفاتيح كانت بالإنجليزية فقط — الآن مترجمة بالكامل.
+  kpiTreated: 'مُعالَجة',
+  kpiOpen: 'مفتوحة',
+  // لوحة مؤشّرات المخاطر (KRI).
+  kriKpiTotal: 'إجمالي المؤشّرات',
+  kriKpiGreen: 'أخضر',
+  kriKpiAmber: 'كهرماني',
+  kriKpiRed: 'أحمر',
+  kriKpiOpenBreaches: 'تجاوزات مفتوحة',
+  // بيانات شهية المخاطر.
+  appKpiStatements: 'بيانات الشهية',
+  appKpiWithin: 'ضمن الحدود',
+  appKpiExceeded: 'متجاوزة',
+  appKpiCritical: 'حرجة',
+  appKpiNoData: 'لا تتوفّر بيانات تعرّض',
+  // مساحة عمل الجهة التنظيمية.
+  authKpiFrameworks: 'الأطر المرتبطة',
+  authKpiCited: 'الضوابط المُستشهَد بها',
+  authKpiEvidence: 'الأدلّة المرتبطة',
+  authKpiFindings: 'ملاحظات مفتوحة',
+  authKpiEngagements: 'مهام التدقيق',
   cardHeatTitle: 'الخريطة الحرارية للمخاطر',
   cardByCategory: 'المخاطر حسب الفئة',
   cardFrameworks: 'جاهزية الأطر التنظيمية',

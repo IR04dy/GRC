@@ -339,8 +339,8 @@ export function RiskRegisterPage() {
       <div className="kpi-grid">
         <Kpi Icon={AlertTriangle}   label={t('kpiTotalRisks')}    value={risks.length} tone="primary" onClick={() => setFilters(() => ({}))} />
         <Kpi Icon={Flame}           label={t('kpiCriticalRisks')} value={criticalCount} tone="danger"  onClick={() => { setFilters(prev => ({ ...prev, status: undefined })); setTab('register'); }} />
-        <Kpi Icon={ShieldCheck}     label="Treated"               value={treatedCount} tone="success" onClick={() => { setFilters(prev => ({ ...prev, status: 'CLOSED' })); setTab('register'); }} />
-        <Kpi Icon={ClipboardCheck}  label="Open"                  value={openCount} tone="warning"   onClick={() => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); }} />
+        <Kpi Icon={ShieldCheck}     label={t('kpiTreated')}        value={treatedCount} tone="success" onClick={() => { setFilters(prev => ({ ...prev, status: 'CLOSED' })); setTab('register'); }} />
+        <Kpi Icon={ClipboardCheck}  label={t('kpiOpen')}           value={openCount}    tone="warning" onClick={() => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); }} />
       </div>
 
       <OverviewStrip
@@ -463,6 +463,7 @@ export function RiskRegisterPage() {
 const BAND_TONE: Record<string, BadgeTone> = { GREEN: 'success', AMBER: 'warning', RED: 'danger' };
 
 function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }) {
+  const { t } = useI18n();
   const [kris, setKris] = useState<KriDefinitionDto[]>([]);
   const [latest, setLatest] = useState<Record<number, string>>({});
   const [breaches, setBreaches] = useState<Record<number, KriBreachEventDto[]>>({});
@@ -531,11 +532,11 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
         </div>
       )}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
-        <Kpi Icon={Activity}      label="Total KRIs"   value={stats?.totalKris ?? 0} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label="Green"        value={stats?.green ?? 0}     tone="success" />
-        <Kpi Icon={AlertTriangle} label="Amber"        value={stats?.amber ?? 0}     tone="warning" />
-        <Kpi Icon={Flame}         label="Red"          value={stats?.red ?? 0}       tone="danger" />
-        <Kpi Icon={ClipboardCheck} label="Open breaches" value={stats?.openBreaches ?? 0} tone="accent" />
+        <Kpi Icon={Activity}      label={t('kriKpiTotal')}        value={stats?.totalKris ?? 0}    tone="primary" />
+        <Kpi Icon={ShieldCheck}   label={t('kriKpiGreen')}        value={stats?.green ?? 0}        tone="success" />
+        <Kpi Icon={AlertTriangle} label={t('kriKpiAmber')}        value={stats?.amber ?? 0}        tone="warning" />
+        <Kpi Icon={Flame}         label={t('kriKpiRed')}          value={stats?.red ?? 0}          tone="danger" />
+        <Kpi Icon={ClipboardCheck} label={t('kriKpiOpenBreaches')} value={stats?.openBreaches ?? 0} tone="accent" />
       </div>
       {loading
         ? <InlineEmpty>Loading…</InlineEmpty>
@@ -591,6 +592,7 @@ const SEVERITY_TONE_APP: Record<string, BadgeTone> = {
 };
 
 function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<RiskAppetiteStatementDto[]>([]);
   const [breaches, setBreaches] = useState<Record<number, AppetiteBreachEventDto[]>>({});
   const [stats, setStats] = useState<{ total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number } | null>(null);
@@ -681,11 +683,11 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         <AppetiteBreachFeed />
       </div>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
-        <Kpi Icon={Target}        label="Statements"        value={stats?.total ?? 0} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label="Within tolerance"  value={stats?.withinTolerance ?? 0} tone="success" />
-        <Kpi Icon={AlertTriangle} label="Exceeded"          value={stats?.exceeded ?? 0} tone="warning" />
-        <Kpi Icon={Flame}         label="Critical"          value={stats?.critical ?? 0} tone="danger" />
-        <Kpi Icon={ClipboardCheck} label="No exposure data" value={stats?.noExposure ?? 0} tone="info" />
+        <Kpi Icon={Target}         label={t('appKpiStatements')} value={stats?.total ?? 0}            tone="primary" />
+        <Kpi Icon={ShieldCheck}    label={t('appKpiWithin')}     value={stats?.withinTolerance ?? 0} tone="success" />
+        <Kpi Icon={AlertTriangle}  label={t('appKpiExceeded')}   value={stats?.exceeded ?? 0}        tone="warning" />
+        <Kpi Icon={Flame}          label={t('appKpiCritical')}   value={stats?.critical ?? 0}        tone="danger" />
+        <Kpi Icon={ClipboardCheck} label={t('appKpiNoData')}     value={stats?.noExposure ?? 0}      tone="info" />
       </div>
       {loading
         ? <InlineEmpty>Loading…</InlineEmpty>
