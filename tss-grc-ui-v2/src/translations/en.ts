@@ -466,6 +466,7 @@ export const en = {
   presetRose: 'Rose',
   presetCobalt: 'Cobalt · Clean Enterprise',
   presetMint: 'Mint · Fresh & Matched',
+  presetSky: 'Sky · Calm & Coral',
 
   // ─── Common module verbs ────────────────────────
   actionNew: 'New',

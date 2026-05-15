@@ -462,6 +462,7 @@ export const ar = {
   presetRose: 'وردي',
   presetCobalt: 'كوبالت · مظهر مؤسسي نقي',
   presetMint: 'نعناعي · ألوان منسجمة',
+  presetSky: 'سماوي · هادئ بلمسة مرجانية',
 
   // ─── Common module verbs ────────────────────────
   actionNew: 'إضافة',

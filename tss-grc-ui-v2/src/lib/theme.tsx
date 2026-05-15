@@ -106,6 +106,24 @@ export const PRESETS: Preset[] = [
       'sb-accent': '#7FD3B0',
     },
   },
+  // ── Sky — soft baby-blue palette with warm coral accent.
+  //    The matched-pair convention here is the classic cool-primary +
+  //    warm-complement: sky blue surfaces with a coral/peach accent
+  //    that sits opposite blue on the colour wheel. Result: status
+  //    chips (warning amber, danger red) stay legible against the cool
+  //    canvas, and the accent doesn't get lost in the surrounding blue.
+  //    Sidebar uses deep navy so the cool palette has visual depth at
+  //    the leading edge without going to pure black.
+  { id: 'sky',      labelKey: 'presetSky',      overrides: {
+      'bg':        '#F2F7FB',
+      'surface':   '#FFFFFF',
+      'primary':   '#4A90D9',
+      'accent':    '#F2A07B',
+      'sb-bg':     '#0F2030',
+      'sb-text':   '#DCE6EF',
+      'sb-accent': '#79B8E8',
+    },
+  },
 ];
 
 // ─── Provider ────────────────────────────────────────────────────────────────
