@@ -189,9 +189,28 @@ textarea.input { resize: vertical; min-height: 80px; }
   color: var(--ink-3);
   cursor: pointer;
   transition: all var(--dur-fast);
+  /* Allow the count chip to sit beside the label */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .tab:hover { color: var(--primary); }
 .tab.active { background: var(--surface); color: var(--primary-700); box-shadow: var(--shadow-1); }
+
+/* Tab row-count chip — shown after the tab label when the parent passes
+ * `count` on the TabItem. Gives the user instant feedback on how much
+ * data sits behind each tab without having to click through, and pairs
+ * with `hideEmpty` on <Tabs> to drop 0-count tabs entirely. */
+.tab-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px;
+  padding: 0 5px;
+  font: 700 10px var(--font-sans);
+  border-radius: var(--r-pill);
+  background: var(--neutral-bg);
+  color: var(--ink-3);
+}
+.tab.active .tab-count { background: var(--primary-100); color: var(--primary-700); }
 
 /* ─── Progress ───────────────────────────────────── */
 .progress-row { margin-bottom: 12px; }

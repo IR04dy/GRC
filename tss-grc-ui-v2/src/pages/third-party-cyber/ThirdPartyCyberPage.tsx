@@ -57,13 +57,14 @@ export function ThirdPartyCyberPage() {
     return rows.filter(r => r.status === tab);
   }, [tab, rows]);
 
+  const highRiskCount = rows.filter(r => ['ELEVATED','HIGH','CRITICAL'].includes(r.residualRiskTier)).length;
   const tabs: TabItem<TabId>[] = [
-    { id: 'all',       label: `${t('tpcTabAll')} (${rows.length})` },
-    { id: 'DRAFT',     label: `${t('tpcTabDraft')} (${stats.DRAFT})` },
-    { id: 'IN_REVIEW', label: `${t('tpcTabReview')} (${stats.IN_REVIEW})` },
-    { id: 'APPROVED',  label: `${t('tpcTabApproved')} (${stats.APPROVED})` },
-    { id: 'RETIRED',   label: `${t('tpcTabRetired')} (${stats.RETIRED})` },
-    { id: 'high-risk', label: `${t('tpcTabHighRisk')} (${rows.filter(r => ['ELEVATED','HIGH','CRITICAL'].includes(r.residualRiskTier)).length})` },
+    { id: 'all',       label: t('tpcTabAll') },
+    { id: 'DRAFT',     label: t('tpcTabDraft'),     count: stats.DRAFT },
+    { id: 'IN_REVIEW', label: t('tpcTabReview'),    count: stats.IN_REVIEW },
+    { id: 'APPROVED',  label: t('tpcTabApproved'),  count: stats.APPROVED },
+    { id: 'RETIRED',   label: t('tpcTabRetired'),   count: stats.RETIRED },
+    { id: 'high-risk', label: t('tpcTabHighRisk'),  count: highRiskCount },
   ];
 
   function toggle(id: number) {
@@ -123,7 +124,7 @@ export function ThirdPartyCyberPage() {
         <Kpi Icon={Lock}           label={t('tpcKpiReview')}   value={stats.IN_REVIEW + stats.DRAFT} tone="primary" />
       </div>
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />
 
       <Card title={t('tpcPageTitle')} Icon={Bug}>
         {loading

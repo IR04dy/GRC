@@ -56,11 +56,11 @@ export function ProcessorAssessmentsPage() {
     tab === 'all' ? rows : rows.filter(r => r.status === tab), [tab, rows]);
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'all',         label: `${t('procTabAll')} (${rows.length})` },
-    { id: 'IN_PROGRESS', label: `${t('procTabInProgress')} (${stats.IN_PROGRESS})` },
-    { id: 'COMPLETED',   label: `${t('procTabCompleted')} (${stats.COMPLETED})` },
-    { id: 'APPROVED',    label: `${t('procTabApproved')} (${stats.APPROVED})` },
-    { id: 'REJECTED',    label: `${t('procTabRejected')} (${stats.REJECTED})` },
+    { id: 'all',         label: t('procTabAll') },
+    { id: 'IN_PROGRESS', label: t('procTabInProgress'), count: stats.IN_PROGRESS },
+    { id: 'COMPLETED',   label: t('procTabCompleted'),  count: stats.COMPLETED },
+    { id: 'APPROVED',    label: t('procTabApproved'),   count: stats.APPROVED },
+    { id: 'REJECTED',    label: t('procTabRejected'),   count: stats.REJECTED },
   ];
 
   function toggle(id: number) {
@@ -123,7 +123,7 @@ export function ProcessorAssessmentsPage() {
         <Kpi Icon={Shield}         label={t('procKpiInProgress')} value={stats.IN_PROGRESS + stats.COMPLETED} tone="primary" />
       </div>
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />
 
       <Card title={t('procPageTitle')} Icon={ClipboardCheck}>
         {loading

@@ -67,13 +67,17 @@ export function FourthPartyPage() {
     return rows.filter(r => r.status === tab);
   }, [tab, rows]);
 
+  // `count` on each tab feeds the chip in Tabs.tsx; combined with
+  // <Tabs hideEmpty> below, any status tab with 0 rows is dropped from
+  // the bar entirely. "All" never gets `count` so it always stays visible.
+  const concentrationCount = stats.highConc + rows.filter(r => r.concentrationRisk === 'MEDIUM').length;
   const tabs: TabItem<TabId>[] = [
-    { id: 'all',           label: `${t('f4pTabAll')} (${rows.length})` },
-    { id: 'DISCOVERED',    label: `${t('f4pTabDiscovered')} (${stats.DISCOVERED})` },
-    { id: 'VALIDATED',     label: `${t('f4pTabValidated')} (${stats.VALIDATED})` },
-    { id: 'MITIGATED',     label: `${t('f4pTabMitigated')} (${stats.MITIGATED})` },
-    { id: 'RETIRED',       label: `${t('f4pTabRetired')} (${stats.RETIRED})` },
-    { id: 'concentration', label: `${t('f4pTabConcentration')} (${stats.highConc + rows.filter(r=>r.concentrationRisk==='MEDIUM').length})` },
+    { id: 'all',           label: t('f4pTabAll') },
+    { id: 'DISCOVERED',    label: t('f4pTabDiscovered'),    count: stats.DISCOVERED },
+    { id: 'VALIDATED',     label: t('f4pTabValidated'),     count: stats.VALIDATED },
+    { id: 'MITIGATED',     label: t('f4pTabMitigated'),     count: stats.MITIGATED },
+    { id: 'RETIRED',       label: t('f4pTabRetired'),       count: stats.RETIRED },
+    { id: 'concentration', label: t('f4pTabConcentration'), count: concentrationCount },
   ];
 
   function toggle(id: number) {
@@ -147,7 +151,7 @@ export function FourthPartyPage() {
         <Kpi Icon={Shield}        label={t('f4pKpiCritical')}    value={stats.critical} tone="warning" />
       </div>
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />
 
       <Card title={t('f4pPageTitle')} Icon={Network}>
         {loading

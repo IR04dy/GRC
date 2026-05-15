@@ -55,12 +55,12 @@ export function ResilienceTestsPage() {
     tab === 'all' ? rows : rows.filter(r => r.status === tab), [tab, rows]);
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'all',         label: `${t('srtTabAll')} (${rows.length})` },
-    { id: 'SCHEDULED',   label: `${t('srtTabScheduled')} (${stats.SCHEDULED})` },
-    { id: 'IN_PROGRESS', label: `${t('srtTabInProgress')} (${stats.IN_PROGRESS})` },
-    { id: 'COMPLETED',   label: `${t('srtTabCompleted')} (${stats.COMPLETED})` },
-    { id: 'APPROVED',    label: `${t('srtTabApproved')} (${stats.APPROVED})` },
-    { id: 'CANCELLED',   label: `${t('srtTabCancelled')} (${stats.CANCELLED})` },
+    { id: 'all',         label: t('srtTabAll') },
+    { id: 'SCHEDULED',   label: t('srtTabScheduled'),   count: stats.SCHEDULED },
+    { id: 'IN_PROGRESS', label: t('srtTabInProgress'),  count: stats.IN_PROGRESS },
+    { id: 'COMPLETED',   label: t('srtTabCompleted'),   count: stats.COMPLETED },
+    { id: 'APPROVED',    label: t('srtTabApproved'),    count: stats.APPROVED },
+    { id: 'CANCELLED',   label: t('srtTabCancelled'),   count: stats.CANCELLED },
   ];
 
   function toggle(id: number) {
@@ -139,7 +139,7 @@ export function ResilienceTestsPage() {
         <Kpi Icon={AlertTriangle} label={t('srtKpiApproved')}  value={stats.APPROVED} tone="info" />
       </div>
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />
 
       <Card title={t('srtPageTitle')} Icon={Activity}>
         {loading

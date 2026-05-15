@@ -58,12 +58,12 @@ export function DataSharingPage() {
   }, [tab, rows]);
 
   const tabs: TabItem<TabId>[] = [
-    { id: 'all',        label: `${t('dsaTabAll')} (${rows.length})` },
-    { id: 'DRAFT',      label: `${t('dsaTabDraft')} (${stats.DRAFT})` },
-    { id: 'IN_REVIEW',  label: `${t('dsaTabReview')} (${stats.IN_REVIEW})` },
-    { id: 'ACTIVE',     label: `${t('dsaTabActive')} (${stats.ACTIVE})` },
-    { id: 'EXPIRED',    label: `${t('dsaTabExpired')} (${stats.EXPIRED})` },
-    { id: 'TERMINATED', label: `${t('dsaTabTerminated')} (${stats.TERMINATED})` },
+    { id: 'all',        label: t('dsaTabAll') },
+    { id: 'DRAFT',      label: t('dsaTabDraft'),      count: stats.DRAFT },
+    { id: 'IN_REVIEW',  label: t('dsaTabReview'),     count: stats.IN_REVIEW },
+    { id: 'ACTIVE',     label: t('dsaTabActive'),     count: stats.ACTIVE },
+    { id: 'EXPIRED',    label: t('dsaTabExpired'),    count: stats.EXPIRED },
+    { id: 'TERMINATED', label: t('dsaTabTerminated'), count: stats.TERMINATED },
   ];
 
   function toggle(id: number) {
@@ -138,7 +138,7 @@ export function DataSharingPage() {
         <Kpi Icon={AlertOctagon} label={t('dsaKpiRegulator')}  value={stats.regulator} tone="primary" />
       </div>
 
-      <Tabs items={tabs} active={tab} onChange={setTab} />
+      <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />
 
       <Card title={t('dsaPageTitle')} Icon={Share2}>
         {loading
