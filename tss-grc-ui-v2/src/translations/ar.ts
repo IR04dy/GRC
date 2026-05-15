@@ -1504,6 +1504,7 @@ export const ar = {
   esgTabGhg:                'سجلّ الانبعاثات',
   esgTabClimate:            'المخاطر والفرص المناخية',
   esgTabAnnex:              'الملحق السنوي',
+  esgTabCapa:               'الإجراءات التصحيحية',
   esgTabSurvey:             'استبيان المورّدين',
 
   // ─── Annual Sustainability Annex (V57) ───────────────

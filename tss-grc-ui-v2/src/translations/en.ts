@@ -1507,6 +1507,7 @@ export const en = {
   esgTabGhg:                'GHG inventory',
   esgTabClimate:            'Climate risks & opportunities',
   esgTabAnnex:              'Annual annex',
+  esgTabCapa:               'Corrective actions',
   esgTabSurvey:             'Vendor survey',
 
   // ─── Annual Sustainability Annex (V57) ───────────────

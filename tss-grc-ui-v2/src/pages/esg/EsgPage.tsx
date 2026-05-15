@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Leaf, TrendingDown, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
-  CloudLightning, Plus, ArrowRight, Link2,
+  CloudLightning, Plus, ArrowRight, Link2, Wrench, Clock,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -34,6 +34,14 @@ import {
   type ReportingYear as Ry, type SustainabilityReport as SR,
 } from '../../lib/sustainabilityAnnex';
 import {
+  listCapas, capaAggregate,
+  startCapa, completeCapa, verifyCapa, closeCapa, cancelCapa,
+  capaStatusTone, capaPriorityTone, capaAllowedNext,
+  canComplete, capaSourceLabel, capaStatusLabel, capaPriorityLabel,
+  daysRemaining,
+  type CorrectiveAction, type CapaAggregate, type CapaStatus,
+} from '../../lib/sustainabilityCapa';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   TCFD_ITEMS, CMA_ARTICLES, SGI_COMMITMENTS,
   PILLAR_LABEL, STATUS_TONE, STATUS_LABEL, SECTOR_LABEL,
@@ -46,7 +54,7 @@ import {
 } from '../../lib/esg';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 
-type EsgTab = 'overview' | 'annex' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'ghg' | 'climate' | 'survey';
+type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'ghg' | 'climate' | 'survey';
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -135,6 +143,7 @@ export function EsgPage() {
         {([
           { id: 'overview',   labelKey: 'esgTabOverview',  Icon: Leaf },
           { id: 'annex',      labelKey: 'esgTabAnnex',     Icon: FileText },
+          { id: 'capa',       labelKey: 'esgTabCapa',      Icon: Wrench },
           { id: 'calculator', labelKey: 'esgTabCalc',      Icon: Calculator },
           { id: 'cma',        labelKey: 'esgTabCma',       Icon: FileText },
           { id: 'tcfd',       labelKey: 'esgTabTcfd',      Icon: FileText },
@@ -158,6 +167,7 @@ export function EsgPage() {
 
       {tab === 'overview'   && <OverviewTab />}
       {tab === 'annex'      && <AnnexTab />}
+      {tab === 'capa'       && <CapaTab />}
       {tab === 'calculator' && <CalculatorTab entries={calcEntries}
         onAdd={(e) => { appendCalcEntry(e); toast.success(t('esgCalcAddedToast')); }}
         onDelete={(id) => { deleteCalcEntry(id); toast.info(t('esgCalcDeletedToast')); }} />}
@@ -357,6 +367,206 @@ function ClimateTab() {
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
       />
+    </div>
+  );
+}
+
+// ─── Corrective Actions tab (V58) ──────────────────────────────────────────
+//
+// CAPA-like remediation register that closes the loop on gaps surfaced
+// by V55 (Climate Risks), V56 (GHG Scope-3 coverage <70%) and V57 (annex
+// open_gaps_count). State machine: OPEN → IN_PROGRESS → COMPLETED →
+// VERIFIED → CLOSED (any → CANCELLED). Per-row inline buttons mirror the
+// allowed transitions; Rule B disables Complete until evidenceRef is set
+// and Rule A prompts for a verifier name distinct from the owner.
+
+function CapaTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [items, setItems] = useState<CorrectiveAction[]>([]);
+  const [agg, setAgg]     = useState<CapaAggregate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<CapaStatus | 'ALL'>('ALL');
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([
+        listCapas({ size: 200 }),
+        capaAggregate(),
+      ]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل الإجراءات التصحيحية' : 'Failed to load corrective actions'));
+      setItems([]);
+      setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  const filtered = statusFilter === 'ALL'
+    ? items
+    : items.filter(it => it.status === statusFilter);
+
+  async function onStart(id: number)    { try { await startCapa(id);    toast.success(isAr ? 'بدأ التنفيذ' : 'Started');     await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); } }
+  async function onComplete(id: number) { try { await completeCapa(id); toast.success(isAr ? 'تم الإكمال — في انتظار التحقّق' : 'Completed — awaiting verification'); await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); } }
+  async function onClose_(id: number)   { try { await closeCapa(id);    toast.success(isAr ? 'تم الإغلاق' : 'Closed');         await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); } }
+  async function onCancel(id: number)   {
+    if (!window.confirm(isAr ? 'إلغاء هذا الإجراء التصحيحي؟ هذا الإجراء نهائي.' : 'Cancel this corrective action? This is terminal.')) return;
+    try { await cancelCapa(id); toast.info(isAr ? 'تم الإلغاء' : 'Cancelled'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onVerify(a: CorrectiveAction) {
+    // Rule A — prompt for a verifier name distinct from the owner.
+    const raw = window.prompt(
+      isAr ? 'اسم الجهة المتحقّقة (يجب أن يختلف عن المالك):'
+           : 'Verifier name (must differ from owner):',
+      '',
+    );
+    const verifier = (raw ?? '').trim();
+    if (!verifier) return;
+    if (a.ownerName && verifier.toLowerCase() === a.ownerName.trim().toLowerCase()) {
+      toast.danger(isAr
+        ? 'لا يمكن أن يكون المتحقّق هو نفس المالك (القاعدة A — فصل المهام).'
+        : 'Verifier must differ from owner (Rule A — separation of duties).');
+      return;
+    }
+    try { await verifyCapa(a.id!, verifier); toast.success(isAr ? 'تم التحقّق' : 'Verified'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip — live status counts + overdue alarm */}
+      <div className="kpi-grid">
+        <Kpi Icon={Wrench}        label={isAr ? 'مفتوحة' : 'Open'}          value={agg?.open ?? 0}        tone="warning" />
+        <Kpi Icon={ArrowRight}    label={isAr ? 'قيد التنفيذ' : 'In progress'} value={agg?.inProgress ?? 0} tone="info" />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'بانتظار التحقّق' : 'Awaiting verification'} value={agg?.completed ?? 0} tone="primary" />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'مُتحقَّق منها' : 'Verified'} value={agg?.verified ?? 0}   tone="success" />
+        <Kpi Icon={AlertCircle}   label={isAr ? 'متأخّرة' : 'Overdue'}        value={agg?.overdue ?? 0}     tone={(agg?.overdue ?? 0) > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={Clock}         label={isAr ? 'مستحقّة قريباً' : 'Due soon'} value={agg?.dueSoon ?? 0}     tone={(agg?.dueSoon ?? 0) > 0 ? 'warning' : 'success'} />
+      </div>
+
+      <Card title={isAr ? 'سجلّ الإجراءات التصحيحية للاستدامة' : 'Sustainability Corrective Actions'}
+            Icon={Wrench}>
+        {/* Status filter chips */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          {(['ALL', 'OPEN', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED', 'CLOSED', 'CANCELLED'] as const).map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              style={{
+                padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                border: `1px solid ${statusFilter === s ? 'var(--primary)' : 'var(--border)'}`,
+                background: statusFilter === s ? 'var(--primary-50)' : 'var(--surface-1)',
+                color: statusFilter === s ? 'var(--primary)' : 'var(--ink-2)',
+                borderRadius: 'var(--r-sm)', cursor: 'pointer',
+              }}>
+              {s === 'ALL' ? (isAr ? 'الكل' : 'All') : capaStatusLabel(s as CapaStatus, isAr ? 'ar' : 'en')}
+            </button>
+          ))}
+          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+            {filtered.length} / {items.length}
+          </span>
+        </div>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : filtered.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد إجراءات مطابقة' : 'No matching actions'}</InlineEmpty>
+            : (
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th>{isAr ? 'الكود' : 'Code'}</th>
+                    <th>{isAr ? 'العنوان' : 'Title'}</th>
+                    <th>{isAr ? 'المصدر' : 'Source'}</th>
+                    <th>{isAr ? 'الأولوية' : 'Priority'}</th>
+                    <th>{isAr ? 'الحالة' : 'Status'}</th>
+                    <th>{isAr ? 'تاريخ الاستحقاق' : 'Due'}</th>
+                    <th>{isAr ? 'المالك' : 'Owner'}</th>
+                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(a => {
+                    const dr = daysRemaining(a);
+                    const overdue = dr !== null && dr < 0
+                      && a.status !== 'CLOSED' && a.status !== 'CANCELLED' && a.status !== 'VERIFIED';
+                    const dueSoon = dr !== null && dr >= 0 && dr <= 30
+                      && a.status !== 'CLOSED' && a.status !== 'CANCELLED' && a.status !== 'VERIFIED';
+                    const allowed = capaAllowedNext(a.status);
+                    return (
+                      <tr key={a.id}>
+                        <td className="mono text-2xs">{a.actionCode ?? `#${a.id}`}</td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                            {isAr && a.titleAr ? a.titleAr : a.titleEn}
+                          </div>
+                          {a.evidenceRef && (
+                            <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                              {isAr ? '📎 الدليل: ' : '📎 Evidence: '}<span className="mono">{a.evidenceRef}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <Badge tone="neutral">{capaSourceLabel(a.sourceType, isAr ? 'ar' : 'en')}</Badge>
+                          {a.sourceRef && (
+                            <div className="mono text-2xs text-muted" style={{ marginTop: 2 }}>{a.sourceRef}</div>
+                          )}
+                        </td>
+                        <td><Badge tone={capaPriorityTone(a.priority)}>{capaPriorityLabel(a.priority, isAr ? 'ar' : 'en')}</Badge></td>
+                        <td><Badge tone={capaStatusTone(a.status)}>{capaStatusLabel(a.status, isAr ? 'ar' : 'en')}</Badge></td>
+                        <td className="mono text-2xs">
+                          <div style={{ color: overdue ? 'var(--danger-fg)' : dueSoon ? 'var(--warning-fg)' : undefined }}>
+                            {a.targetDate ?? '—'}
+                          </div>
+                          {dr !== null && a.status !== 'CLOSED' && a.status !== 'CANCELLED' && (
+                            <div className="text-2xs" style={{ color: overdue ? 'var(--danger-fg)' : dueSoon ? 'var(--warning-fg)' : 'var(--ink-3)' }}>
+                              {overdue
+                                ? (isAr ? `متأخّر ${Math.abs(dr)} يوماً` : `${Math.abs(dr)}d overdue`)
+                                : (isAr ? `${dr} يوماً متبقّياً` : `${dr}d left`)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-xs">{a.ownerName ?? '—'}</td>
+                        <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
+                          {allowed.includes('IN_PROGRESS') && (
+                            <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onStart(a.id!)}>
+                              {isAr ? 'بدء' : 'Start'}
+                            </Button>
+                          )}
+                          {allowed.includes('COMPLETED') && (
+                            <Button variant="secondary" size="sm" Icon={CheckCircle2}
+                              disabled={!canComplete(a)}
+                              title={!canComplete(a) ? (isAr ? 'يجب إضافة دليل (القاعدة B) قبل الإكمال' : 'Evidence required before Complete (Rule B)') : undefined}
+                              onClick={() => onComplete(a.id!)}>
+                              {isAr ? 'إكمال' : 'Complete'}
+                            </Button>
+                          )}
+                          {allowed.includes('VERIFIED') && (
+                            <Button variant="primary" size="sm" Icon={CheckCircle2} onClick={() => onVerify(a)}>
+                              {isAr ? 'تحقّق' : 'Verify'}
+                            </Button>
+                          )}
+                          {allowed.includes('CLOSED') && (
+                            <Button variant="primary" size="sm" Icon={CheckCircle2} onClick={() => onClose_(a.id!)}>
+                              {isAr ? 'إغلاق' : 'Close'}
+                            </Button>
+                          )}
+                          {allowed.includes('CANCELLED') && (
+                            <Button variant="ghost" size="sm" Icon={Trash2} onClick={() => onCancel(a.id!)} />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+      </Card>
     </div>
   );
 }
