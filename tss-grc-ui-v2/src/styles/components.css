@@ -254,13 +254,33 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 /* Value — the headline number. font-feature-settings 'tnum' enables
  * tabular numerals so 1/2/3/11 line up under each other across a row.
  * Slight tightening of letter-spacing (-0.025em) for a confident headline
- * look without going to display-type extremes. */
+ * look without going to display-type extremes.
+ *
+ * Overflow protection — belt-and-suspenders for cases the value string
+ * is unexpectedly long ("SAR 12,480,000" used to overflow a 220px tile):
+ *   • min-width: 0 lets the value shrink inside its flex parent (without
+ *     this, flex children default to min-content, forcing horizontal
+ *     overflow).
+ *   • white-space: nowrap keeps the number on one line — wrapping
+ *     destroys the headline read.
+ *   • overflow: hidden + text-overflow: ellipsis truncates with "…" if
+ *     the value is STILL too long after compact formatting. Callers
+ *     should set title={fullValue} on the parent tile so the hover
+ *     tooltip reveals the truncated digits.
+ *   • clamp() font-size: scales DOWN automatically on narrow tiles
+ *     (down to 24px) and UP on wide ones (up to 36px). The 4vw middle
+ *     value reacts to viewport width — caps prevent it from going
+ *     comically small on mobile or huge on a 4K monitor. */
 .kpi-value {
-  font: 800 32px/1 var(--font-sans);
+  font: 800 clamp(24px, 4vw, 36px)/1 var(--font-sans);
   color: var(--ink-1);
   letter-spacing: -.025em;
   font-feature-settings: 'tnum' 1, 'lnum' 1;
   margin-top: auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Tone-aware value colour — Kpi.tsx adds .kpi-tone-{tone} for non-primary

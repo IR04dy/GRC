@@ -159,8 +159,7 @@ export const PLAN_TEST_TONE: Record<PlanTestOutcome, 'success'|'warning'|'danger
   NOT_TESTED: 'info', PASSED: 'success', GAP_IDENTIFIED: 'warning', FAILED: 'danger',
 };
 
-export function fmtSar(amount?: number): string {
-  if (amount == null) return '—';
-  return new Intl.NumberFormat('en-US',
-    { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }).format(amount);
-}
+// Delegate to the central compact formatter so KPI tiles render
+// "SAR 12.5M" instead of overflowing with "SAR 12,480,000". See
+// lib/format.ts for the full set (compact / full / number / percent).
+export { formatSarCompact as fmtSar, formatSarFull as fmtSarFull } from './format';

@@ -111,7 +111,13 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
           </span>
         )}
       </div>
-      <div className="kpi-value">{value}</div>
+      {/* title= exposes the full string on hover so an ellipsised long
+       * value (e.g. "SAR 12.5M" rendered from "SAR 12,480,000") stays
+       * inspectable. Browsers don't fire title on touch, but the
+       * underlying compact formatter (lib/format.ts) already produces a
+       * mostly-fits value, so ellipsis is rare and the tooltip is the
+       * desktop-only fallback. */}
+      <div className="kpi-value" title={String(value)}>{value}</div>
       <div className="kpi-label">{label}</div>
       {spark && spark.length >= 2 && <Sparkline values={spark} color={line} />}
     </>

@@ -104,8 +104,8 @@ export const SCENARIO_TYPE_LABEL_KEY: Record<ScenarioType, string> = {
   MONTE_CARLO: 'scnTypeMonteCarlo', STRESS_TEST: 'scnTypeStress', WHAT_IF: 'scnTypeWhatIf',
 };
 
-export function fmtSar(amount?: number): string {
-  if (amount == null) return '—';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })
-    .format(amount);
-}
+// Re-export from the central format module so every caller picks up the
+// same compact-on-KPI / full-in-tables semantics. `fmtSar` was previously
+// always returning the full "SAR 12,480,000" which overflowed KPI tiles;
+// see lib/format.ts for the rationale.
+export { formatSarCompact as fmtSar, formatSarFull as fmtSarFull } from './format';
