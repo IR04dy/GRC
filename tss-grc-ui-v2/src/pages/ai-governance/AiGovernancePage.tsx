@@ -131,24 +131,32 @@ function AiModelDetail({ model, t, lang }: { model: AiModel; t: (k: string) => s
               ? <Badge tone="success">{t('aiAiaSigned')}</Badge>
               : <Badge tone="warning">{t('aiAiaPending')}</Badge>
           }>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-            <div className="mono" style={{ fontSize: 32, fontWeight: 800, color: (model.aiaScore ?? 0) >= 75 ? 'var(--success-fg)' : (model.aiaScore ?? 0) >= 50 ? 'var(--warning-fg)' : 'var(--danger)' }}>
-              {model.aiaScore ?? '—'}
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>/100</div>
-          </div>
+          {(() => {
+            const aia = model.aiaScore ?? 0;
+            const tone = aia >= 75 ? 'success' : aia >= 50 ? 'warning' : 'danger';
+            return (
+              <div className={`stat-tile stat-tile-${tone}`} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12 }}>
+                <div className="stat-tile-value">{model.aiaScore ?? '—'}</div>
+                <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>/100</div>
+              </div>
+            );
+          })()}
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
             {t('aiAiaScoreSub')}
           </div>
         </Card>
 
         <Card title={t('aiCardFairness')} Icon={Shield}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-            <div className="mono" style={{ fontSize: 32, fontWeight: 800, color: (model.fairnessScore ?? 0) >= 0.85 ? 'var(--success-fg)' : (model.fairnessScore ?? 0) >= 0.70 ? 'var(--warning-fg)' : 'var(--danger)' }}>
-              {model.fairnessScore != null ? model.fairnessScore.toFixed(2) : '—'}
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>/1.00</div>
-          </div>
+          {(() => {
+            const f = model.fairnessScore ?? 0;
+            const tone = f >= 0.85 ? 'success' : f >= 0.70 ? 'warning' : 'danger';
+            return (
+              <div className={`stat-tile stat-tile-${tone}`} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12 }}>
+                <div className="stat-tile-value">{model.fairnessScore != null ? model.fairnessScore.toFixed(2) : '—'}</div>
+                <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>/1.00</div>
+              </div>
+            );
+          })()}
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
             {t('aiFairnessScoreSub')}
             {model.lastBiasAuditAt && (

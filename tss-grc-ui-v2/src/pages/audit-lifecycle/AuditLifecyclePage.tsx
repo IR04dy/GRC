@@ -614,11 +614,10 @@ function PacketTab({ plan, findings, capas: _capas, stats }: { plan: AnnualPlan;
           </div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>{t('alcPacketCapaSection')}</div>
-            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{t('alcCapaClosureRate')}</div>
-              <div style={{ fontSize: 32, fontWeight: 700, marginTop: 4, color: stats.closureRate >= 80 ? 'var(--success-fg)' : 'var(--warning-fg)' }} className="mono">
-                {stats.closureRate}%
-              </div>
+            <div className={`stat-tile stat-tile-${stats.closureRate >= 80 ? 'success' : 'warning'}`}
+                 style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
+              <div className="stat-tile-label">{t('alcCapaClosureRate')}</div>
+              <div className="stat-tile-value">{stats.closureRate}%</div>
               <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>
                 <span>{t('alcCapaClosed')}: <b>{stats.capaClosed}</b></span>
                 <span>{t('alcCapaTotal')}: <b>{stats.capaTotal}</b></span>

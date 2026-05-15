@@ -197,11 +197,10 @@ function EccTab({ filing, onTransition }: { filing: EccFiling; onTransition: (s:
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 16, marginBottom: 16, alignItems: 'center' }}>
-          <div style={{ textAlign: 'center', padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--r-md)' }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase' }}>{t('cycCompositeMaturity')}</div>
-            <div className="mono" style={{ fontSize: 42, fontWeight: 700, color: filing.compositeMaturity >= 4 ? 'var(--success-fg)' : 'var(--warning-fg)' }}>
-              {filing.compositeMaturity}
-            </div>
+          <div className={`stat-tile stat-tile-${filing.compositeMaturity >= 4 ? 'success' : 'warning'}`}
+               style={{ textAlign: 'center', padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--r-md)', alignItems: 'center' }}>
+            <div className="stat-tile-label">{t('cycCompositeMaturity')}</div>
+            <div className="stat-tile-value">{filing.compositeMaturity}</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>/ 5.0</div>
           </div>
           <div>

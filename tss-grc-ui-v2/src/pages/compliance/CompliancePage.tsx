@@ -838,11 +838,20 @@ export function CompliancePage() {
           {['ISO_27001','NCA_ECC','PDPL','ISO_22301','SAMA_CSF','ISO_27701'].map(fw => {
             const v = frameworkScore(fw);
             const cs = controls.data.filter(c => c.framework === fw).length;
+            // Tone maps to the same threshold ladder used elsewhere — < 40 danger,
+            // < 60 accent (amber), < 80 primary (teal), ≥ 80 success.
+            const tone: 'success' | 'primary' | 'accent' | 'danger' =
+              v >= 80 ? 'success' : v >= 60 ? 'primary' : v >= 40 ? 'accent' : 'danger';
             return (
               <Card key={fw} title={fw.replace(/_/g, ' ')} Icon={Award} action={<Badge tone="primary">{cs} controls</Badge>}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 38, fontWeight: 800, color: v >= 80 ? 'var(--success-fg)' : v >= 60 ? 'var(--primary-700)' : v >= 40 ? 'var(--accent-700)' : 'var(--danger-fg)', letterSpacing: '-0.02em' }}>{v}%</div>
+                {/* Use the shared .stat-tile pattern so this scorecard tile reads
+                 * with the same typography as the KPI strip at the top of the
+                 * page — no more "this card looks different from the row above". */}
+                <div className={`stat-tile stat-tile-${tone}`}>
+                  <div className="stat-tile-value">{v}%</div>
+                </div>
                 <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 'var(--r-pill)', overflow: 'hidden', margin: '8px 0 6px' }}>
-                  <div style={{ width: `${v}%`, height: '100%', background: v >= 80 ? 'var(--success)' : v >= 60 ? 'var(--primary)' : v >= 40 ? 'var(--accent)' : 'var(--danger)' }} />
+                  <div style={{ width: `${v}%`, height: '100%', background: `var(--${tone === 'accent' ? 'accent' : tone === 'primary' ? 'primary' : tone === 'success' ? 'success' : 'danger'})` }} />
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                   {controls.data.filter(c => c.framework === fw && c.status === 'IMPLEMENTED').length} implemented ·

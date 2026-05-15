@@ -292,6 +292,51 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .kpi.kpi-tone-info    .kpi-value { color: var(--info-fg);    }
 .kpi.kpi-tone-accent  .kpi-value { color: var(--accent-700); }
 
+/* ─── .stat-tile — KPI's little sibling ───────────
+ * Use INSIDE an existing Card when you need a "label + big number"
+ * combo but the full Kpi tile (with icon chip + trend chip + sparkline)
+ * would be overkill or visually misaligned with the surrounding card
+ * content. Same typography and overflow safety as .kpi-value, so a
+ * stat-tile sits coherently next to a Kpi grid row.
+ *
+ * Use cases (refactored):
+ *   • Compliance scorecard per-framework "87%" tile
+ *   • Audit lifecycle CAPA closure-rate "82%"
+ *   • Cyber lifecycle composite-maturity "4.2"
+ *   • AI governance AIA-score "73", fairness-score "0.86"
+ * Each was previously a one-off inline-style div with a different
+ * fontSize and palette. */
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.stat-tile-label {
+  font: 700 11px var(--font-sans);
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.stat-tile-value {
+  font: 800 clamp(24px, 3vw, 32px)/1 var(--font-sans);
+  color: var(--ink-1);
+  letter-spacing: -.025em;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Threshold-tone modifiers — same convention as .kpi-tone-* so callers
+ * have one mental model: pick a tone, the value renders in that colour. */
+.stat-tile-success .stat-tile-value { color: var(--success-fg); }
+.stat-tile-warning .stat-tile-value { color: var(--warning-fg); }
+.stat-tile-danger  .stat-tile-value { color: var(--danger-fg);  }
+.stat-tile-info    .stat-tile-value { color: var(--info-fg);    }
+.stat-tile-accent  .stat-tile-value { color: var(--accent-700); }
+.stat-tile-primary .stat-tile-value { color: var(--primary-700); }
+
 /* Label — the metric name. Bumped to ink-2 (11.16:1 contrast) + 700 weight
  * + uppercase letter-spacing so it reads as a header, not a hint. */
 .kpi-label {
