@@ -13,7 +13,7 @@ import { searchIndex, getSearchItemById, type SearchItem, type EntityKind } from
  *   "auth: nca"        — only authorities matching "nca"
  *   "ev: pam"          — only evidence matching "pam"
  *
- * Pattern: ServiceNow IRM Now Platform global search + Linear/Notion's
+ * Pattern: industry-standard GRC tooling Now Platform global search + Linear/Notion's
  * Cmd-K modal idiom. Recent selections persist in localStorage.
  */
 

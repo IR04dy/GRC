@@ -4,9 +4,9 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.ResourceBundleMessageSource;
-import org.springframework.web.servlet.LocaleResolver;
+import org.springframework.web.servlet.Localeindustry-standard tooling;
 import org.springframework.web.servlet.i18n.LocaleChangeInterceptor;
-import org.springframework.web.servlet.i18n.SessionLocaleResolver;
+import org.springframework.web.servlet.i18n.SessionLocaleindustry-standard tooling;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -27,8 +27,8 @@ public class LocaleConfig {
      * Default: English (en).
      */
     @Bean
-    public LocaleResolver localeResolver() {
-        SessionLocaleResolver resolver = new SessionLocaleResolver();
+    public Localeindustry-standard tooling localeindustry-standard tooling() {
+        SessionLocaleindustry-standard tooling resolver = new SessionLocaleindustry-standard tooling();
         resolver.setDefaultLocale(Locale.ENGLISH);
         resolver.setLocaleAttributeName("CURRENT_LOCALE");
         return resolver;

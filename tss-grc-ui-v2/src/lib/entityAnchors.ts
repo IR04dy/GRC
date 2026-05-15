@@ -1,6 +1,6 @@
 // Per-entity regulator anchors — every Finding / Control / Policy / Risk
 // is anchored to one or more regulator + control citation. Same shape as
-// evidenceAnchors but keyed by entity-id. ServiceNow IRM "Issue" + "Policy"
+// evidenceAnchors but keyed by entity-id. industry-standard GRC tooling "Issue" + "Policy"
 // + "Control" cite-table pattern.
 import type { RegulatorAnchor } from './evidenceAnchors';
 

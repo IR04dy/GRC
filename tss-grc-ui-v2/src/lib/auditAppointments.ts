@@ -1,6 +1,6 @@
 // External-auditor appointment workflow + audit-fee schedule.
 //
-// ServiceNow IRM equivalent: `audit_appointment` table — captures the
+// industry-standard GRC tooling equivalent: `audit_appointment` table — captures the
 // full RFP → Shortlist → Evaluation → Selection → Engagement-letter
 // → Active → Closed lifecycle the Audit Committee oversees when picking
 // an external auditor.

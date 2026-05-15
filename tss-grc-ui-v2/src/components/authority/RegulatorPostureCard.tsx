@@ -15,7 +15,7 @@ interface PerAuthority {
 }
 
 /**
- * "Regulator Posture" card — drives ServiceNow IRM-style cross-authority
+ * "Regulator Posture" card — drives industry-standard cross-authority
  * insight on every module overview. Aggregates anchor chips into per-
  * authority coverage stats and renders them as horizontal stacked bars
  * with a hard count on the right. Auditors recognise this as the

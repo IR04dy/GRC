@@ -28,8 +28,7 @@ export const en = {
   // New item labels
   kbSidebar:            'Knowledge Base',
   engSidebar:           'Audit Engagements',
-  // Sprint 4 final — market-leader-aligned 11-group structure
-  // (mirrors ServiceNow IRM / OneTrust / MetricStream pattern: My Work + per-domain verticals + Tools + Admin)
+  // 11-group sidebar structure: My Work + per-domain verticals + Tools + Admin
   navMyWork:            'My Work',
   navRisk:              'Risk Management',
   navCompliancePolicy:  'Compliance & Policy',
@@ -800,7 +799,7 @@ export const en = {
   sigStatus_REJECTED:      'Rejected',
   sigStatus_EXPIRED:       'Expired',
   approvalsTitle:          'Approval Inbox',
-  approvalsSub:            'Cross-module approval queue · ServiceNow IRM-style',
+  approvalsSub:            'Cross-module approval queue · single inbox for every domain',
   approvalsEyebrow:        'Approval Engine',
   approvalsPageSub:        'Single queue for every parallel, sequential, or conditional approval the platform raises. Each request carries a Saudi regulator citation and a live SLA countdown driven by the Sprint 4 SLA engine.',
   approvalsKpiPending:     'Pending',
@@ -1542,7 +1541,7 @@ export const en = {
   wvTitle:                 'Workflow Versioning',
   wvSub:                   'Publish v2.0 without breaking in-flight v1.0 instances.',
   wvEyebrow:               'Workflow Lifecycle',
-  wvPageSub:               'Each workflow definition is a family of versions. New instances bind to the PUBLISHED version; older in-flight instances continue on their original version until they reach a terminal state. ServiceNow Flow Designer parity.',
+  wvPageSub:               'Each workflow definition is a family of versions. New instances bind to the PUBLISHED version; older in-flight instances continue on their original version until they reach a terminal state.',
   wvKpiFamilies:           'Workflow families',
   wvKpiVersions:           'Total versions',
   wvKpiPublished:          'Published',

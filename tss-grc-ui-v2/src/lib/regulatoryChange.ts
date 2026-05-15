@@ -1,6 +1,6 @@
 // Regulatory change feed (Saudi) — Sprint 5.
 //
-// ServiceNow + OneTrust ship "regulatory change" feeds covering US/EU
+// the industry pattern + industry-standard tooling ship "regulatory change" feeds covering US/EU
 // regulators (Thomson Reuters, RegulatoryDataX). Saudi-listed entities
 // have to track NCA, SAMA, SDAIA, ZATCA, CMA, MOC, HRSD, CITC, NCEMA
 // every week — none of those feeds cover the Arabic-only sources.

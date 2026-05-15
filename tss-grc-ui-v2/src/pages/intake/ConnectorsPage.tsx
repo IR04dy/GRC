@@ -25,7 +25,7 @@ import { CcmDashboard } from '../../components/compliance/CcmDashboard';
  * row shows source / what it auto-creates / cadence / status / 30-day
  * intake count.
  *
- * ServiceNow IRM "Continuous Monitoring" + Vanta "Integrations" pattern.
+ * industry-standard GRC tooling "Continuous Monitoring" + continuous-monitoring tooling "Integrations" pattern.
  */
 export function ConnectorsPage() {
   const { t, lang } = useI18n();

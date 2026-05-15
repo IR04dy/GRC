@@ -22,7 +22,7 @@ const CANVAS_PAD = 80;
  *
  * SVG canvas where each state is a draggable node and transitions are
  * curved arrows. Add / remove buttons mutate a localStorage overlay so
- * the canonical mock seed stays untouched. ServiceNow Flow Designer pitch
+ * the canonical mock seed stays untouched. the industry pattern Flow Designer pitch
  * scoped to a single screen.
  *
  *   Canvas: nodes positioned via auto-layout (BFS from initial state).

@@ -21,8 +21,8 @@ import type { ProcessLifecycle } from './ProcessLifecycleBar';
  *     wired to the lifecycle's onClick if present, otherwise a
  *     toast-info hint pointing at the upcoming wizard)
  *
- * Modelled on ServiceNow IRM "Process Details" pop-out and
- * Diligent HighBond's process dictionary.
+ * Modelled on industry-standard GRC tooling "Process Details" pop-out and
+ * industry-standard tooling's process dictionary.
  */
 export function ProcessDetailModal({ lc, onClose }: {
   lc: ProcessLifecycle;

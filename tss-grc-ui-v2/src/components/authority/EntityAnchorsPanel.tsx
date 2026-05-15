@@ -19,7 +19,7 @@ const STATUS_TONE: Record<RegulatorAnchor['controlStatus'], 'success' | 'warning
  * direct hyperlink to the authority workspace so an auditor can pivot
  * from "this finding" → "every other finding under NCA ECC".
  *
- * ServiceNow IRM Issue + Policy + Control records expose the same
+ * Issue + Policy + Control records expose the same
  * "Citations" related list — this is its compact equivalent.
  */
 export function EntityAnchorsPanel({

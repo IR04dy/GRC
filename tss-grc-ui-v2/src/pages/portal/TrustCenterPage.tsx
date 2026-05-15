@@ -11,7 +11,7 @@ import { useI18n } from '../../lib/i18n';
 /**
  * Trust Center — DD-61.
  *
- * Public-facing transparency page modelled on Vanta + Drata + OneTrust
+ * Public-facing transparency page modelled on continuous-monitoring tooling + continuous-monitoring tooling + industry-standard tooling
  * Trust Center patterns. Single source of truth for "is TSS GRC safe to
  * trust with my data?" — no auth, browseable by customers, regulators,
  * insurers, prospects, security researchers.

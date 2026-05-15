@@ -28,8 +28,8 @@ import {
  * population (control owners / employees / suppliers), tracks
  * per-respondent completion, and surfaces a single dashboard.
  *
- * Modelled on Archer Issue Campaigns + ServiceNow GRC Attestation +
- * OneTrust Privacy Awareness campaigns.
+ * Modelled on industry-standard tooling Issue Campaigns + the industry pattern GRC Attestation +
+ * industry-standard tooling Privacy Awareness campaigns.
  */
 type TabId = 'in_flight' | 'closing' | 'completed' | 'draft' | 'all';
 

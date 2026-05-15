@@ -28,7 +28,7 @@
 //                              corrective actions
 //   NCA ECC 1.5              — Continual cybersecurity improvement
 //
-// ServiceNow IRM equivalent: the `capa` table — every CA/PA carries
+// industry-standard GRC tooling equivalent: the `capa` table — every CA/PA carries
 // its own row, RCA artefacts, verification log, and recurrence link.
 
 import { useCallback, useEffect, useState } from 'react';

@@ -16,7 +16,7 @@ import { useI18n } from '../../lib/i18n';
  * localStorage so a user who always wants the full overview gets it back
  * on next visit.
  *
- * ServiceNow IRM pattern: list view stays primary; analytics live in an
+ * industry-standard pattern: list view stays primary; analytics live in an
  * explicit dashboard or a togglable upper drawer.
  */
 export function OverviewStrip({

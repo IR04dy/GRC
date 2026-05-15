@@ -1,6 +1,6 @@
 // Bilingual communication templates per notification spec.
 //
-// ServiceNow IRM equivalent: "Notification Template Library". Each
+// industry-standard GRC tooling equivalent: "Notification Template Library". Each
 // template is a structured message body with `{placeholders}` that the
 // Compose modal substitutes at runtime so the auditor sees a pre-filled
 // draft they can review and tweak before "sending."

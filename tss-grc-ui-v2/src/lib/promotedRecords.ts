@@ -11,7 +11,7 @@
 // matching slice and merges with its native seed/API data. The overlay
 // also stores the source intake id so the audit trail is preserved.
 //
-// ServiceNow IRM equivalent: every promoted intake creates a row in
+// industry-standard GRC tooling equivalent: every promoted intake creates a row in
 // the target table with a `parent_intake` foreign key. We mirror that
 // with `sourceIntakeId` and `sourceReferenceCode` on each promoted
 // record.

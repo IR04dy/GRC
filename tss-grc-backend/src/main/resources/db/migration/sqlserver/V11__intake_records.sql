@@ -7,8 +7,8 @@
 -- a kind-specific register (incident, risk, vendor, etc.).
 --
 -- Architecture mirrors:
---   ServiceNow IRM Service Catalog tables (request[item] + variables)
---   OneTrust Privacy intake table
+--   industry-standard GRC tooling Service Catalog tables (request[item] + variables)
+--   industry-standard tooling Privacy intake table
 --   NAVEX EthicsPoint case table
 --
 -- This migration creates only the parent table. Promoted-record back-

@@ -2,7 +2,7 @@
 // platform recognises. Every Framework / Control / Evidence / Finding /
 // Issue / Audit Engagement is anchored to one or more of these.
 //
-// Mirrors ServiceNow IRM's "Authority Document" library pattern.
+// Mirrors industry-standard GRC tooling's "Authority Document" library pattern.
 // Each authority owns one or more Frameworks; Frameworks own Controls;
 // Evidence anchors back to controls via {authorityCode, frameworkCode,
 // controlRef}.

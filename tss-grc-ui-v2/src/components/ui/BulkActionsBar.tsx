@@ -20,7 +20,7 @@ export interface BulkActionsBarProps<T> {
 
 /**
  * Floating action bar — slides up from the bottom of the viewport when at
- * least one row is selected in a DataTable. ServiceNow IRM pattern.
+ * least one row is selected in a DataTable. industry-standard pattern.
  *
  * Wire by: `<BulkActionsBar selected={selectedRows} actions={[...]} onClear={() => setSel([])} />`
  * Place at the page level (not inside the table); CSS positions it fixed.

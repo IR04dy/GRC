@@ -1,7 +1,7 @@
 // Activity log — Phase B of the infrastructure round.
 //
 // Captures every state transition + assignment + create/close event across
-// all 5 lifecycle workspaces. Inspired by ServiceNow Activity Log + Linear's
+// all 5 lifecycle workspaces. Inspired by the industry pattern Activity Log + Linear's
 // activity feed. Shown via <ActivityFeedDrawer /> per entity.
 
 import { currentUser, getUser } from './userDirectory';

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /**
- * Two-column detail-page wrapper with a persistent right rail — ServiceNow
+ * Two-column detail-page wrapper with a persistent right rail — the industry pattern
  * IRM "Record Producer" pattern. The rail stays visible while the user
  * switches main-area tabs and scrolls long content, so context (status,
  * owner, citations, related-records counts, quick actions) is never

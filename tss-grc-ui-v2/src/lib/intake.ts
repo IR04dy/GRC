@@ -7,19 +7,19 @@
 // register lifecycle.
 //
 // Architecture references:
-//   ServiceNow IRM     — Service-Catalog model: every intake is a typed
+//   industry-standard GRC tooling     — Service-Catalog model: every intake is a typed
 //                        catalog item with form schema, SLA, RACI, target
 //                        register. Generic Issue entity classifies into
 //                        risk / finding / incident.
-//   OneTrust Privacy   — Customer-facing DSR webform with reference-code
+//   industry-standard tooling Privacy   — Customer-facing DSR webform with reference-code
 //                        tracker (multi-lingual, captcha-protected,
 //                        auto-acknowledgement)
 //   NAVEX EthicsPoint  — Anonymous whistleblower portal, multi-channel,
 //                        case-tracking by reference code
-//   Vanta / Drata      — Customer Trust Center (public certifications,
+//   continuous-monitoring tooling / continuous-monitoring tooling      — Customer Trust Center (public certifications,
 //                        sub-processors), connector-first auto-intake
-//   Archer (RSA)       — Generic Findings Library with auto-classification
-//   MetricStream       — Loss-event capture (Basel-style operational
+//   industry-standard tooling (RSA)       — Generic Findings Library with auto-classification
+//   industry-standard tooling       — Loss-event capture (Basel-style operational
 //                        risk), risk self-assessment
 //
 // Standards anchor:

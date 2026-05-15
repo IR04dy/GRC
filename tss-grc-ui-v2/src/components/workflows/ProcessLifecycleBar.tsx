@@ -25,7 +25,7 @@ export interface ProcessAction {
 }
 
 /**
- * One named end-to-end process — modelled on ServiceNow IRM's Process
+ * One named end-to-end process — modelled on industry-standard GRC tooling's Process
  * Center. Naming follows ISO / SAMA / NCA standards rather than internal
  * jargon so auditors recognise the steps.
  *
@@ -73,7 +73,7 @@ export interface ProcessLifecycle {
 }
 
 /**
- * ServiceNow-style Process Center bar. Mounts under the KPI strip on every
+ * the industry pattern-style Process Center bar. Mounts under the KPI strip on every
  * module. Each tile is one named process the module supports, with a
  * launcher button and a register link.
  */
@@ -131,7 +131,7 @@ function ProcessChip({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
 
   // Click opens the process-detail modal so the user sees the lifecycle
   // stages, regulatory anchor, steward, SLA and a primary "Start" button
-  // — rather than just navigating to a tab. Modelled on ServiceNow IRM
+  // — rather than just navigating to a tab. Modelled on industry-standard GRC tooling
   // "Process Details" pop-out.
   const trigger = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault();
@@ -205,7 +205,7 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   const overdue = lc.overdueCount;
   const active  = lc.activeCount;
 
-  // ServiceNow-style left-edge health stripe
+  // the industry pattern-style left-edge health stripe
   const stripe =
     overdue > 0 ? 'var(--danger)' :
     active  > 0 ? 'var(--accent-700)' :
@@ -317,7 +317,7 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   );
 }
 
-/** ServiceNow-style green/blue primary button. */
+/** the industry pattern-style green/blue primary button. */
 function PrimaryButton({ action, lang }: { action: ProcessAction; lang: string }) {
   const label = lang === 'ar' && action.labelAr ? action.labelAr : action.label;
   const content = (

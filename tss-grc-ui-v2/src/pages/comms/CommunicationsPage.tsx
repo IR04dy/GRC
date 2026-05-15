@@ -86,7 +86,7 @@ interface SentRow {
  *   5. RACI register — every workflow stage with its canonical R/A/C/I
  *      assignments and standards anchor
  *
- * ServiceNow IRM "Notification Engine" + "Stakeholder Management" home.
+ * industry-standard GRC tooling "Notification Engine" + "Stakeholder Management" home.
  */
 export function CommunicationsPage() {
   const { t, lang } = useI18n();

@@ -27,7 +27,7 @@ import {
  *      with statutory deadlines and live SLA clocks
  *   3. Communications log — chain-of-custody trail of comms already sent
  *
- * ServiceNow IRM "Stakeholder Management" + "Notification Engine" pattern.
+ * industry-standard GRC tooling "Stakeholder Management" + "Notification Engine" pattern.
  */
 export function CommsPanel({
   module, eventKind, severity, eventDetectedAt, recordKey, now,

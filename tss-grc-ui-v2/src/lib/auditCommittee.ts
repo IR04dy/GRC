@@ -1,6 +1,6 @@
 // Audit Committee charter + meeting register.
 //
-// ServiceNow IRM equivalent: `audit_committee_meeting` table — each
+// industry-standard GRC tooling equivalent: `audit_committee_meeting` table — each
 // meeting is its own record with agenda + minutes + attendance +
 // decisions, all linked back to the charter that mandates the
 // committee's authority.

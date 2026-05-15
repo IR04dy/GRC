@@ -152,10 +152,10 @@ export function VulnerabilitiesV2Page() {
   };
 
   return (
-    <Shell title={lang === 'ar' ? 'الثغرات (الإصدار الثاني)' : 'Vulnerabilities (V2)'} sub="ServiceNow IRM parity stack">
+    <Shell title={lang === 'ar' ? 'الثغرات (الإصدار الثاني)' : 'Vulnerabilities (V2)'} sub="industry-standard GRC tooling parity stack">
       <PageHeader
         title={lang === 'ar' ? 'الثغرات (الإصدار الثاني)' : 'Vulnerabilities (V2)'}
-        sub={lang === 'ar' ? 'قائمة TanStack · مكافئة لنظام ServiceNow IRM' : 'TanStack-powered list · ServiceNow IRM parity stack'}
+        sub={lang === 'ar' ? 'قائمة TanStack · مكافئة لنظام industry-standard GRC tooling' : 'TanStack-powered list · industry-standard GRC tooling parity stack'}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>

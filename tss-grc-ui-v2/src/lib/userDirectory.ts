@@ -2,7 +2,7 @@
 //
 // Realistic Saudi user directory powering the assignee picker. Replaces
 // the seeded-string owner fields scattered across all the lifecycle
-// workspaces. Inspired by ServiceNow `sys_user` table + OneTrust's
+// workspaces. Inspired by the industry pattern `sys_user` table + industry-standard tooling's
 // people directory.
 //
 // In production the source is SCIM/AD/IAM, but the consumer-side API is

@@ -34,7 +34,7 @@ import { MocPanel } from '../../components/compliance/MocPanel';
 import { MocProcessInitiation } from '../../components/compliance/MocProcessInitiation';
 
 /**
- * Authority Workspace — ServiceNow IRM "Authority Document workspace"
+ * Authority Workspace — industry-standard GRC tooling "Authority Document workspace"
  * pattern. The auditor's home page for a single regulator.
  *
  * Aggregates everything that touches this authority across the platform:

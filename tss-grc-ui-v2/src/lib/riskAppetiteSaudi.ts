@@ -4,7 +4,7 @@
 // expected to maintain at board level. Each statement carries a regulator
 // citation so an internal auditor or regulator inspection can trace it
 // back to the obligation that drove it. This is the localization wedge —
-// ServiceNow ships generic appetite templates; we ship the framework
+// the industry pattern ships generic appetite templates; we ship the framework
 // boards in Riyadh / Jeddah are actually being asked for.
 //
 // Sources:

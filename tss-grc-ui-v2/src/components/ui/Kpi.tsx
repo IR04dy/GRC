@@ -19,7 +19,7 @@ interface KpiProps {
   spark?: number[];
   /**
    * When supplied, the tile becomes a clickable handle that navigates to the
-   * given route. Pattern matches ServiceNow / MetricStream / OneTrust where
+   * given route. Pattern matches the industry pattern / industry-standard tooling where
    * every KPI is a drill-down anchor.
    */
   to?: string;

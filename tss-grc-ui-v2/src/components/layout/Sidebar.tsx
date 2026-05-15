@@ -21,7 +21,7 @@ interface NavGroup { id: string; titleKey: string; items: NavItem[]; }
 /**
  * Sidebar — market-leader-aligned navigation (Sprint 4 final).
  *
- * Pattern lifted from ServiceNow IRM, OneTrust, MetricStream, Diligent HighBond:
+ * Pattern lifted from industry-standard GRC tooling, industry-standard tooling, industry-standard tooling, industry-standard tooling:
  *   1. "My Work" at the top — universal, role-agnostic landing
  *   2. Per-domain verticals in frequency order (Risk → Compliance → Audit → ...)
  *   3. Cross-cutting tools and reports near the bottom
@@ -30,8 +30,8 @@ interface NavGroup { id: string; titleKey: string; items: NavItem[]; }
  *
  * Order rationale:
  *   - Risk Management is the highest-frequency GRC domain in every benchmark
- *   - Compliance/Policy is #2; Audit gets its own group per ServiceNow IRM
- *   - Privacy is its own vertical per OneTrust (their flagship pattern)
+ *   - Compliance/Policy is #2; Audit gets its own group per industry convention.
+ *   - Privacy is its own vertical per industry convention (their flagship pattern)
  *   - Cyber + BCM + Third-Party each follow as standalone verticals
  *   - "Saudi Regulators" is OUR differentiator — kept visible, not buried in admin
  *   - Service Catalog + Knowledge live together (universal employee surface)
@@ -41,7 +41,7 @@ interface NavGroup { id: string; titleKey: string; items: NavItem[]; }
 const NAV_GROUPS: NavGroup[] = [
   // ─── 1. My Work ─────────────────────────────────────────────────────
   // Universal landing — what every authenticated user opens first.
-  // Mirrors ServiceNow's "Workspace Manager" home + OneTrust's "My Work".
+  // Mirrors the industry pattern's "Workspace Manager" home + industry-standard tooling's "My Work".
   {
     id: 'my-work', titleKey: 'navMyWork',
     items: [
@@ -55,7 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 2. Risk Management ─────────────────────────────────────────────
-  // Highest-frequency GRC domain (per ServiceNow telemetry, OneTrust benchmarks).
+  // Highest-frequency GRC domain (per industry research.).
   {
     id: 'risk', titleKey: 'navRisk',
     items: [
@@ -71,9 +71,9 @@ const NAV_GROUPS: NavGroup[] = [
 
   // ─── 3. Compliance & Policy ────────────────────────────────────────
   // Second-highest frequency. Frameworks + policies + reg-change + crosswalks
-  // + evidence + attestations all belong here per ServiceNow's "Policy and
-  // Compliance" application structure. Ethics + ESG fold in as compliance
-  // sub-domains (OneTrust groups them similarly).
+  // + evidence + attestations all belong here per the industry-standard Policy and
+  // Compliance application structure. Ethics + ESG fold in as compliance
+  // sub-domains ((industry practice).).
   {
     id: 'compliance', titleKey: 'navCompliancePolicy',
     items: [
@@ -90,7 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 4. Audit ───────────────────────────────────────────────────────
-  // Own top-level group per ServiceNow ("Audit Management") + Diligent HighBond
+  // Own top-level group per industry convention (Audit Management). + industry-standard tooling
   // (their flagship). NCA ECC Filing is here because it's an annual audit-style
   // self-assessment, not a continuous compliance activity.
   {
@@ -104,7 +104,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 5. Privacy ─────────────────────────────────────────────────────
-  // Standalone vertical per OneTrust (whose entire product is built around this).
+  // Standalone vertical per industry convention.
   // PDPL, DSR, ROPA — three pillars.
   {
     id: 'privacy', titleKey: 'navPrivacy',
@@ -120,7 +120,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 6. Cybersecurity ───────────────────────────────────────────────
-  // Standalone vertical per ServiceNow IRM ("IT and Cyber Risk"). Assets folded
+  // Standalone vertical per industry convention (IT and Cyber Risk). Assets folded
   // in as the asset register is cyber-owned in our domain model.
   {
     id: 'cyber', titleKey: 'navCyber',
@@ -133,7 +133,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 7. Business Continuity ─────────────────────────────────────────
-  // Standalone vertical per ServiceNow ("Business Continuity Management").
+  // Standalone vertical per industry convention (Business Continuity Management).
   // BIA → Plans → Invocations → Crisis is a coherent operational arc.
   {
     id: 'bcm', titleKey: 'navBcm',
@@ -179,7 +179,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 10. Service Catalog & Knowledge ────────────────────────────────
-  // Cross-cutting employee surface. ServiceNow's "Service Catalog" is the
+  // Cross-cutting employee surface. the industry pattern's "Service Catalog" is the
   // model. CAPA + Board Pack + Knowledge live here as universal outputs.
   {
     id: 'service-catalog', titleKey: 'navServiceCatalog',

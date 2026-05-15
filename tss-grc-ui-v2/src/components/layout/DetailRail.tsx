@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 /**
  * Compact key/value row for the persistent detail rail. Designed to be
  * stacked inside a single Card so the rail stays scannable rather than
- * bloating into many separate cards. ServiceNow IRM convention.
+ * bloating into many separate cards. industry convention.
  */
 export function RailField({
   label, value, mono, accent,

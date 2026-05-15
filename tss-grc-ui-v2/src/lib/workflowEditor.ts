@@ -1,6 +1,6 @@
 // Visual workflow editor overlay — Sprint 5.
 //
-// Promotes the read-only WorkflowsPage to ServiceNow Flow Designer parity.
+// Promotes the read-only WorkflowsPage to Workflow versioning parity.
 // Stores edits as a localStorage overlay keyed by definition id; the
 // canonical seed in mockWorkflowDefs.ts stays untouched, edits are
 // additive on top so a refresh restores user changes without polluting

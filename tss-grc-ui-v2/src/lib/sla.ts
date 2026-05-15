@@ -106,7 +106,7 @@ export interface SlaInput {
 }
 
 /**
- * Compute SLA snapshot. Default escalation rule (matching ServiceNow IRM
+ * Compute SLA snapshot. Default escalation rule (matching industry-standard GRC tooling
  * conventions and our memo):
  *   AT_RISK    when ≤ 5 calendar days remain (or ≤20% of budget left)
  *   OVERDUE    when past due, breach < 50% of budget

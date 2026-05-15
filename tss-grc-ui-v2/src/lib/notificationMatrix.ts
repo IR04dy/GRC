@@ -1,7 +1,7 @@
 // Per-event notification matrix — "who must be told, on what channel, by
 // when, with what regulatory citation."
 //
-// ServiceNow IRM equivalent: "Notification Engine" + "Regulatory Reporting
+// industry-standard GRC tooling equivalent: "Notification Engine" + "Regulatory Reporting
 // Calendar". Indexed by event-kind so the comms tab on a detail page can
 // answer "what notifications does this record trigger?" deterministically.
 //

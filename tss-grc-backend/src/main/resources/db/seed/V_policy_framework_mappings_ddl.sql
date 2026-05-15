@@ -2,7 +2,7 @@
 -- TSS GRC — Policy ↔ Framework many-to-many mappings (IA-1 framework anchor)
 -- ============================================================================
 -- Mirrors the Evidence module pattern but as M2M: one Policy can satisfy
--- multiple frameworks (ServiceNow UCF / MetricStream "Unified Control"
+-- multiple frameworks (the industry pattern UCF / industry-standard tooling "Unified Control"
 -- model). Each row binds a policy to a specific framework + clause/control
 -- reference, with optional satisfaction notes.
 --

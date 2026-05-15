@@ -36,7 +36,7 @@ const TYPE_ICON: Record<AssetType, typeof Server> = {
  * Left rail: filterable asset list grouped by type.
  * Right pane: selected asset's blast radius — what depends on it (downstream),
  * what it depends on (upstream), CCM checks monitoring it, pending approvals
- * waiting on its owner. The single demo that answers ServiceNow's CMDB pitch:
+ * waiting on its owner. The single demo that answers the industry pattern's CMDB pitch:
  * "if AWS Riyadh goes down, here's the full impact across modules."
  */
 export function AssetRegisterPage() {

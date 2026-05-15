@@ -3,7 +3,7 @@
 // annual, PDPL annual, AML annual, Nazaha integrity, plus internal
 // quarterly Audit-Cte briefings).
 //
-// ServiceNow IRM equivalent: "Regulatory Reporting Calendar". Each
+// industry-standard GRC tooling equivalent: "Regulatory Reporting Calendar". Each
 // PeriodicFiling carries a baseline "lastFiled" date plus a cadence; the
 // generator emits a synthetic CommLogEntry pending row whose deadline =
 // lastFiled + cadence. The Communications workspace merges these with
