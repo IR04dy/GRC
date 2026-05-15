@@ -187,12 +187,12 @@ export const AUTHORITIES: AuthorityDto[] = [
     domains: ['CYBER', 'PRIVACY', 'BCM', 'RISK', 'ETHICS', 'COMPLIANCE'],
     colorToken: 'var(--ink-3)',
     frameworkCodes: ['ISO_27001', 'ISO_27701', 'ISO_22301', 'ISO_31000', 'ISO_37001', 'ISO_28001'] },
-  { code: 'NIST', nameEn: 'NIST', nameAr: 'المعهد الوطني للمعايير والتقنية (الأمريكي)',
-    taglineEn: 'US National Institute of Standards & Technology',
-    jurisdiction: 'International', authorityType: 'INTERNATIONAL',
-    domains: ['CYBER', 'RISK', 'TPRM'],
-    colorToken: 'var(--ink-4)',
-    frameworkCodes: ['NIST_CSF', 'NIST_800_61', 'NIST_800_161', 'NIST_RMF'] },
+  // NIST (US standards body) intentionally removed per user feedback:
+  // "NIST is not suitable to Saudi". For Saudi-context dashboards the
+  // equivalent posture comes from NCA ECC (cyber), NCA OTCC (operational
+  // tech / supply chain) and ISO 31000 (risk) — all already in the list.
+  // Anyone still wanting NIST as a benchmark can pull it from the
+  // controlCrosswalk page where it's a column option, not a tile.
   { code: 'AICPA', nameEn: 'AICPA', nameAr: 'المعهد الأمريكي للمحاسبين القانونيين',
     taglineEn: 'Trust Services Criteria (SOC 2)',
     jurisdiction: 'International', authorityType: 'INTERNATIONAL',
