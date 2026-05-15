@@ -3,6 +3,7 @@ import {
   Leaf, TrendingDown, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
   CloudLightning, Plus, ArrowRight, Link2, Wrench, Clock,
+  Paperclip, Coins, Hourglass, X as XIcon,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -53,6 +54,7 @@ import {
   type CalculatorEntry, type VendorEsgSurvey,
 } from '../../lib/esg';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
+import { formatSarCompact, formatSarFull } from '../../lib/format';
 
 type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'ghg' | 'climate' | 'survey';
 
@@ -390,6 +392,12 @@ function CapaTab() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CapaStatus | 'ALL'>('ALL');
 
+  // Verify-flow modal state. We replace `window.prompt` (which is jarring
+  // and unstyled) with a small inline FormModal: it holds the verifier
+  // name, mirrors Rule A as you type, and stays in the same window so the
+  // user can see the action they're verifying.
+  const [verifyingAction, setVerifyingAction] = useState<CorrectiveAction | null>(null);
+
   async function reload() {
     setLoading(true);
     try {
@@ -420,24 +428,38 @@ function CapaTab() {
     try { await cancelCapa(id); toast.info(isAr ? 'تم الإلغاء' : 'Cancelled'); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
-  async function onVerify(a: CorrectiveAction) {
-    // Rule A — prompt for a verifier name distinct from the owner.
-    const raw = window.prompt(
-      isAr ? 'اسم الجهة المتحقّقة (يجب أن يختلف عن المالك):'
-           : 'Verifier name (must differ from owner):',
-      '',
-    );
-    const verifier = (raw ?? '').trim();
-    if (!verifier) return;
+  async function submitVerify(values: Record<string, unknown>) {
+    const a = verifyingAction;
+    if (!a) return;
+    const verifier = String(values.verifiedBy ?? '').trim();
+    if (!verifier) {
+      toast.danger(isAr ? 'اسم الجهة المتحقّقة مطلوب' : 'Verifier name is required');
+      return;
+    }
+    // Rule A — client-side mirror so the user gets immediate feedback
+    // instead of waiting for the 400 round-trip.
     if (a.ownerName && verifier.toLowerCase() === a.ownerName.trim().toLowerCase()) {
       toast.danger(isAr
         ? 'لا يمكن أن يكون المتحقّق هو نفس المالك (القاعدة A — فصل المهام).'
         : 'Verifier must differ from owner (Rule A — separation of duties).');
       return;
     }
-    try { await verifyCapa(a.id!, verifier); toast.success(isAr ? 'تم التحقّق' : 'Verified'); await reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+    try {
+      await verifyCapa(a.id!, verifier);
+      toast.success(isAr ? 'تم التحقّق' : 'Verified');
+      setVerifyingAction(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
   }
+
+  const verifyFields: FieldDef[] = [
+    { kind: 'text', key: 'verifiedBy', required: true, span: 12,
+      label: isAr ? 'اسم الجهة المتحقّقة (يجب أن يختلف عن المالك)'
+                  : 'Verifier name (must differ from owner)',
+      placeholder: isAr ? 'مثال: لينا الحربي (مدير المخاطر)' : 'e.g. Lina Al-Harbi (Risk Manager)' },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -475,7 +497,20 @@ function CapaTab() {
         {loading
           ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
           : filtered.length === 0
-            ? <InlineEmpty>{isAr ? 'لا توجد إجراءات مطابقة' : 'No matching actions'}</InlineEmpty>
+            ? (
+              <InlineEmpty>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                  <span>{statusFilter === 'ALL'
+                    ? (isAr ? 'لا توجد إجراءات تصحيحية بعد' : 'No corrective actions yet')
+                    : (isAr ? 'لا توجد إجراءات بهذه الحالة' : 'No actions match this filter')}</span>
+                  {statusFilter !== 'ALL' && (
+                    <Button variant="ghost" size="sm" Icon={XIcon} onClick={() => setStatusFilter('ALL')}>
+                      {isAr ? 'إزالة التصفية' : 'Clear filter'}
+                    </Button>
+                  )}
+                </div>
+              </InlineEmpty>
+            )
             : (
               <table className="grc-table">
                 <thead>
@@ -486,6 +521,7 @@ function CapaTab() {
                     <th>{isAr ? 'الأولوية' : 'Priority'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
                     <th>{isAr ? 'تاريخ الاستحقاق' : 'Due'}</th>
+                    <th>{isAr ? 'الكلفة · المجهود' : 'Cost · Effort'}</th>
                     <th>{isAr ? 'المالك' : 'Owner'}</th>
                     <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
@@ -498,6 +534,8 @@ function CapaTab() {
                     const dueSoon = dr !== null && dr >= 0 && dr <= 30
                       && a.status !== 'CLOSED' && a.status !== 'CANCELLED' && a.status !== 'VERIFIED';
                     const allowed = capaAllowedNext(a.status);
+                    const showCost = a.costEstimateSar != null && a.costEstimateSar > 0;
+                    const showEffort = a.effortHours != null && a.effortHours > 0;
                     return (
                       <tr key={a.id}>
                         <td className="mono text-2xs">{a.actionCode ?? `#${a.id}`}</td>
@@ -506,8 +544,11 @@ function CapaTab() {
                             {isAr && a.titleAr ? a.titleAr : a.titleEn}
                           </div>
                           {a.evidenceRef && (
-                            <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
-                              {isAr ? '📎 الدليل: ' : '📎 Evidence: '}<span className="mono">{a.evidenceRef}</span>
+                            <div className="text-2xs text-muted"
+                              style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <Paperclip size={11} style={{ flexShrink: 0 }} />
+                              <span>{isAr ? 'الدليل:' : 'Evidence:'}</span>
+                              <span className="mono">{a.evidenceRef}</span>
                             </div>
                           )}
                         </td>
@@ -531,34 +572,54 @@ function CapaTab() {
                             </div>
                           )}
                         </td>
+                        <td className="text-2xs">
+                          {showCost && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--ink-2)' }}
+                                 title={formatSarFull(a.costEstimateSar!, isAr ? 'ar' : 'en')}>
+                              <Coins size={11} style={{ flexShrink: 0 }} />
+                              <span className="mono">{formatSarCompact(a.costEstimateSar!, isAr ? 'ar' : 'en')}</span>
+                            </div>
+                          )}
+                          {showEffort && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--ink-3)', marginInlineStart: showCost ? 8 : 0 }}>
+                              <Hourglass size={11} style={{ flexShrink: 0 }} />
+                              <span className="mono">{a.effortHours}{isAr ? ' س' : 'h'}</span>
+                            </div>
+                          )}
+                          {!showCost && !showEffort && <span className="text-muted">—</span>}
+                        </td>
                         <td className="text-xs">{a.ownerName ?? '—'}</td>
-                        <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
-                          {allowed.includes('IN_PROGRESS') && (
-                            <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onStart(a.id!)}>
-                              {isAr ? 'بدء' : 'Start'}
-                            </Button>
-                          )}
-                          {allowed.includes('COMPLETED') && (
-                            <Button variant="secondary" size="sm" Icon={CheckCircle2}
-                              disabled={!canComplete(a)}
-                              title={!canComplete(a) ? (isAr ? 'يجب إضافة دليل (القاعدة B) قبل الإكمال' : 'Evidence required before Complete (Rule B)') : undefined}
-                              onClick={() => onComplete(a.id!)}>
-                              {isAr ? 'إكمال' : 'Complete'}
-                            </Button>
-                          )}
-                          {allowed.includes('VERIFIED') && (
-                            <Button variant="primary" size="sm" Icon={CheckCircle2} onClick={() => onVerify(a)}>
-                              {isAr ? 'تحقّق' : 'Verify'}
-                            </Button>
-                          )}
-                          {allowed.includes('CLOSED') && (
-                            <Button variant="primary" size="sm" Icon={CheckCircle2} onClick={() => onClose_(a.id!)}>
-                              {isAr ? 'إغلاق' : 'Close'}
-                            </Button>
-                          )}
-                          {allowed.includes('CANCELLED') && (
-                            <Button variant="ghost" size="sm" Icon={Trash2} onClick={() => onCancel(a.id!)} />
-                          )}
+                        <td style={{ textAlign: 'end' }}>
+                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {allowed.includes('IN_PROGRESS') && (
+                              <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onStart(a.id!)}>
+                                {isAr ? 'بدء' : 'Start'}
+                              </Button>
+                            )}
+                            {allowed.includes('COMPLETED') && (
+                              <Button variant="secondary" size="sm" Icon={CheckCircle2}
+                                disabled={!canComplete(a)}
+                                title={!canComplete(a) ? (isAr ? 'يجب إضافة دليل (القاعدة B) قبل الإكمال' : 'Evidence required before Complete (Rule B)') : undefined}
+                                onClick={() => onComplete(a.id!)}>
+                                {isAr ? 'إكمال' : 'Complete'}
+                              </Button>
+                            )}
+                            {allowed.includes('VERIFIED') && (
+                              <Button variant="primary" size="sm" Icon={CheckCircle2} onClick={() => setVerifyingAction(a)}>
+                                {isAr ? 'تحقّق' : 'Verify'}
+                              </Button>
+                            )}
+                            {allowed.includes('CLOSED') && (
+                              <Button variant="primary" size="sm" Icon={CheckCircle2} onClick={() => onClose_(a.id!)}>
+                                {isAr ? 'إغلاق' : 'Close'}
+                              </Button>
+                            )}
+                            {allowed.includes('CANCELLED') && (
+                              <Button variant="ghost" size="sm" Icon={Trash2}
+                                title={isAr ? 'إلغاء' : 'Cancel'}
+                                onClick={() => onCancel(a.id!)} />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -567,6 +628,22 @@ function CapaTab() {
               </table>
             )}
       </Card>
+
+      {/* Verify-action modal (replaces window.prompt). The header carries
+          the action code + title so the user has full context while they
+          type the verifier name; Rule A is enforced on submit. */}
+      <FormModal
+        open={verifyingAction !== null}
+        title={verifyingAction
+          ? `${isAr ? 'تحقّق من الإجراء' : 'Verify action'} · ${verifyingAction.actionCode ?? `#${verifyingAction.id}`}`
+          : ''}
+        fields={verifyFields}
+        initial={{ verifiedBy: '' }}
+        size="md"
+        submitLabel={isAr ? 'تأكيد التحقّق' : 'Confirm verification'}
+        onClose={() => setVerifyingAction(null)}
+        onSubmit={submitVerify}
+      />
     </div>
   );
 }
