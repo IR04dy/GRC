@@ -488,6 +488,8 @@ export const en = {
   presetCobalt: 'Cobalt · Clean Enterprise',
   presetMint: 'Mint · Fresh & Matched',
   presetSky: 'Sky · Calm & Coral',
+  presetNordic: 'Nordic · Aurora Minimal',
+  presetTuscan: 'Tuscan · Terracotta & Olive',
 
   // ─── Common module verbs ────────────────────────
   actionNew: 'New',

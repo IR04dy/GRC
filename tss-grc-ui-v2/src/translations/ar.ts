@@ -484,6 +484,8 @@ export const ar = {
   presetCobalt: 'كوبالت · مظهر مؤسسي نقي',
   presetMint: 'نعناعي · ألوان منسجمة',
   presetSky: 'سماوي · هادئ بلمسة مرجانية',
+  presetNordic: 'نوردي · بساطة الشفق القطبي',
+  presetTuscan: 'توسكاني · طيني وزيتوني',
 
   // ─── Common module verbs ────────────────────────
   actionNew: 'إضافة',

@@ -124,6 +124,44 @@ export const PRESETS: Preset[] = [
       'sb-accent': '#79B8E8',
     },
   },
+  // ── Nordic — inspired by Scandinavian minimalism + the aurora borealis.
+  //    Cool off-white surfaces (the famous "Copenhagen white" — not pure
+  //    white, has a tiny gray-blue undertone that reads quieter on long
+  //    sessions). Aurora-teal primary, soft amber accent (the classic
+  //    cool/warm Nordic pairing seen in Marimekko + Ikea catalogues), and
+  //    a deep night-sky sidebar with aurora-green highlight. Calm,
+  //    professional, time-tested.
+  { id: 'nordic',   labelKey: 'presetNordic',   overrides: {
+      'bg':        '#F5F7F8',
+      'surface':   '#FFFFFF',
+      'primary':   '#1E5F74',
+      // Accent retuned: original #E0A458 was 2.18:1 on white (below
+      // 3:1 UI minimum). #B97A2A keeps the warm aurora-amber character
+      // and clears 3.4:1 on white surfaces so icon glyphs + chip
+      // strokes stay visible. Pairs naturally with the deep aurora teal.
+      'accent':    '#B97A2A',
+      'sb-bg':     '#14213D',
+      'sb-text':   '#E5E5E5',
+      'sb-accent': '#80CFA9',
+    },
+  },
+  // ── Tuscan — warm Italian Mediterranean palette (terracotta + olive).
+  //    Warm cream canvas reminiscent of sun-bleached stone, terracotta
+  //    primary in the tradition of Italian roof tiles, olive accent
+  //    (olive is the textbook complement to terracotta — see Pantone's
+  //    Tuscan Sun colour stories). Sidebar in deep wine with a golden
+  //    ochre highlight, so the accent palette feels coherent end-to-end.
+  //    Best for tenants who want warmth without going to full beige.
+  { id: 'tuscan',   labelKey: 'presetTuscan',   overrides: {
+      'bg':        '#FAF4E8',
+      'surface':   '#FFFCF5',
+      'primary':   '#B85042',
+      'accent':    '#7C9070',
+      'sb-bg':     '#3D1F1F',
+      'sb-text':   '#EDE5D8',
+      'sb-accent': '#D4A437',
+    },
+  },
 ];
 
 // ─── Provider ────────────────────────────────────────────────────────────────
