@@ -199,17 +199,15 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  /* Padding tuned for RTL: 28px inline so Arabic labels ("إجمالي المخاطر",
-   * "الأطر الفعّالة") have real breathing room from the box border instead
-   * of running edge-to-edge. Vertical 22/20 keeps the tile compact. The
-   * shorthand `22 28 20` = top 22 / right+left 28 / bottom 20. */
-  padding: 22px 28px 20px;
+  /* HORIZONTAL padding is what was wrong — Arabic labels were running
+   * edge-to-edge with the box border. 36px inline gives real breathing
+   * room without bloating the tile vertically. Block padding stays at
+   * the original 20/18 (vertical was fine, user explicitly confirmed).
+   * Shorthand `20 36 18` = top 20 / right+left 36 / bottom 18. */
+  padding: 20px 36px 18px;
   box-shadow: var(--shadow-1);
   transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast), border-color var(--dur-fast);
-  /* Bumped from 124 — extra padding eats into the content area, so the
-   * floor needs to grow with it or short-label tiles (e.g. "مفتوحة")
-   * would lose vertical balance with their richer-content neighbours. */
-  min-height: 132px;
+  min-height: 124px;
   display: flex; flex-direction: column;
 }
 .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
@@ -240,7 +238,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .kpi-clickable:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 [dir="rtl"] .kpi-arrow { transform: scaleX(-1); }
 [dir="rtl"] .kpi-clickable:hover .kpi-arrow { transform: scaleX(-1) translateX(2px); }
-.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 /* Icon chip — 36px (down from 40) so it feels like a marker, not a logo.
  * Border radius drops to r-sm for a tighter UI-system look. */
 .kpi-icon-wrap {
@@ -361,12 +359,9 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
  * nothing. Result: Arabic labels read naturally and stop looking
  * stretched-to-the-border on the Risk and Compliance KPI strips. */
 .kpi-label {
-  /* line-height bumped to 1.45 so multi-line labels ("بانتظار التحقّق",
-   * "Awaiting verification") don't read as a single dense block — each
-   * line gets vertical air. */
-  font: 700 11px/1.45 var(--font-sans);
+  font: 700 11px var(--font-sans);
   color: var(--ink-2);
-  margin-top: 10px;
+  margin-top: 6px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -377,7 +372,6 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
    * visually against ~12px naturally-shaped Arabic at the same column
    * width. */
   font-size: 12px;
-  line-height: 1.55;
 }
 
 /* ─── ModuleCard ─────────────────────────────────── */
