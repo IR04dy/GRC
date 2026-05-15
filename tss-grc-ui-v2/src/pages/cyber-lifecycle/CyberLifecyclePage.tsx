@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Activity, Server, Bug, Radio,
   Download, Send, ThumbsUp, CheckCircle2, ArrowUpRight, Clock,
@@ -35,11 +36,22 @@ import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 
 type CycTab = 'pipeline' | 'ecc' | 'vulns' | 'assets' | 'threats' | 'soc' | 'pentest';
 
+const CYC_TABS: ReadonlyArray<CycTab> = ['pipeline', 'ecc', 'vulns', 'assets', 'threats', 'soc', 'pentest'];
+
+function isCycTab(value: string | null | undefined): value is CycTab {
+  return !!value && (CYC_TABS as readonly string[]).includes(value);
+}
+
 export function CyberLifecyclePage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<CycTab>('pipeline');
+  // Honor `?tab=` deep-links from other pages (e.g. the V2 vulnerabilities
+  // page navigating here on row click). Falls back to 'pipeline' for any
+  // unknown tab value.
+  const initialTab: CycTab = isCycTab(searchParams.get('tab')) ? (searchParams.get('tab') as CycTab) : 'pipeline';
+  const [tab, setTab] = useState<CycTab>(initialTab);
   const [_tick, setTick] = useState(0);
   useEffect(() => subscribeCyber(() => setTick(t => t + 1)), []);
 

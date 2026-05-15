@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Filter as FilterIcon, UserCheck, X as XIcon } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Shell } from '../../components/layout/Shell';
@@ -35,6 +36,7 @@ import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
 export function VulnerabilitiesV2Page() {
   const { lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [allVulns, setAllVulns] = useState<Vulnerability[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | undefined>();
   const [filterOpen, setFilterOpen] = useState(false);
@@ -220,15 +222,16 @@ export function VulnerabilitiesV2Page() {
           columns={columns}
           getRowId={(v) => v.id}
           enableSelection
+          onSelectionChange={setSelectedRows}
           pageSize={25}
           virtualization={{ enabled: filtered.length > 500 }}
           emptyState={lang === 'ar' ? 'لا توجد ثغرات' : 'No vulnerabilities'}
-          onRowClick={(v) => console.log('row click', v.id)}
+          onRowClick={(v) => navigate(`/cyber-lifecycle?tab=vulns&vulnId=${encodeURIComponent(v.id)}`)}
         />
       </Card>
 
       <BulkActionsBar
-        selected={selectedRows /* TODO: wire from DataTableV2 selection state */}
+        selected={selectedRows}
         onClear={() => setSelectedRows([])}
         actions={[
           {

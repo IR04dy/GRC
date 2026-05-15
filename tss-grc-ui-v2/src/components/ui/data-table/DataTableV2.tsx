@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { flexRender, type ColumnDef, type Row } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
@@ -50,6 +50,12 @@ export interface DataTableV2Props<TRow> {
   pageSize?: number;
   /** Enable selection (rows must include a checkbox column you define). */
   enableSelection?: boolean;
+  /**
+   * Called when the selected-row set changes. Parent uses this to drive
+   * BulkActionsBar / cross-row workflow actions. Receives the original
+   * row objects (already typed as `TRow`), not the TanStack `Row<TRow>`.
+   */
+  onSelectionChange?: (rows: TRow[]) => void;
   /** Virtualize large lists. Recommended when data.length > 500. */
   virtualization?: VirtualizationConfig;
 }
@@ -65,14 +71,24 @@ export function DataTableV2<TRow>({
   initialSorting = [],
   pageSize = 50,
   enableSelection = false,
+  onSelectionChange,
   virtualization = { enabled: false },
 }: DataTableV2Props<TRow>) {
-  const { table } = useDataTable<TRow>({
+  const { table, selectedRows } = useDataTable<TRow>({
     data, columns, getRowId,
     initialPageSize: pageSize,
     initialSorting,
     enableSelection,
   });
+
+  // Forward selection changes to the parent. The hook already memoizes
+  // `selectedRows` against the rowSelection state, so this fires exactly
+  // when the set genuinely changes — no extra renders or render-loop risk
+  // even though the dependency is a fresh array each time (useDataTable's
+  // useMemo ensures identity is stable until selection actually moves).
+  useEffect(() => {
+    if (onSelectionChange) onSelectionChange(selectedRows);
+  }, [selectedRows, onSelectionChange]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const rows = table.getRowModel().rows;
