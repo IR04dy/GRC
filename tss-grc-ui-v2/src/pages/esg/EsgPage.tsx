@@ -43,9 +43,15 @@ import {
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
 } from '../../lib/sustainabilityCapa';
 import {
+  listSgi, sgiAggregate, achieveSgi, retireSgi,
+  sgiStatusTone, sgiSectorLabel, sgiStatusLabel,
+  computeProgressPct, canAchieve,
+  type SgiCommitment as SgiC, type SgiAggregate as SgiAgg,
+} from '../../lib/sustainabilitySgi';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
-  TCFD_ITEMS, CMA_ARTICLES, SGI_COMMITMENTS,
-  PILLAR_LABEL, STATUS_TONE, STATUS_LABEL, SECTOR_LABEL,
+  TCFD_ITEMS, CMA_ARTICLES,
+  PILLAR_LABEL, STATUS_TONE, STATUS_LABEL,
   SURVEY_TONE, SURVEY_LABEL,
   aggregateEsg, yoyChange,
   loadCalcEntries, appendCalcEntry, deleteCalcEntry,
@@ -1448,74 +1454,232 @@ function GhgInventoryTab() {
 
 // ─── SGI tab ────────────────────────────────────────────────────────────────
 
+// ─── SGI commitments tab (V59 — slice 5) ───────────────────────────────────
+//
+// Promoted from the static SGI_COMMITMENTS constant (kept for backwards
+// compatibility with the overview KPI math in lib/esg.ts) to a live
+// API-driven register. Per-commitment lifecycle:
+//   - Achieve: requires current value to actually meet target (Rule A
+//     mirrored client-side via canAchieve)
+//   - Retire: requires a written reason (Rule B — captured via dialog)
+//
+// Progress bars are computed client-side from baseline/current/target so
+// the tab doesn't have to hit /progress for every row.
+
 function SgiTab() {
-  const { t, lang } = useI18n();
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [items, setItems] = useState<SgiC[]>([]);
+  const [agg, setAgg]     = useState<SgiAgg | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [achievingId, setAchievingId] = useState<number | null>(null);
+  const [retiringId, setRetiringId]   = useState<number | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([listSgi({ size: 200 }), sgiAggregate()]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل الالتزامات' : 'Failed to load commitments'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  // Group active commitments by sector, in display order.
   const bySector = useMemo(() => {
-    const map = new Map<string, typeof SGI_COMMITMENTS>();
-    for (const c of SGI_COMMITMENTS) {
+    const map = new Map<string, SgiC[]>();
+    for (const c of items) {
       if (!map.has(c.sector)) map.set(c.sector, []);
       map.get(c.sector)!.push(c);
     }
     return map;
-  }, []);
+  }, [items]);
+
+  async function submitAchieve(values: Record<string, unknown>) {
+    if (achievingId == null) return;
+    const achievedBy = String(values.achievedBy ?? '').trim();
+    if (!achievedBy) { toast.danger(isAr ? 'اسم مُعتمِد الإنجاز مطلوب' : 'Approver name required'); return; }
+    try {
+      await achieveSgi(achievingId, achievedBy);
+      toast.success(isAr ? 'تم الإنجاز' : 'Achieved');
+      setAchievingId(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+  async function submitRetire(values: Record<string, unknown>) {
+    if (retiringId == null) return;
+    const retiredBy = String(values.retiredBy ?? '').trim();
+    const reason    = String(values.reason    ?? '').trim();
+    if (!retiredBy || !reason) {
+      toast.danger(isAr ? 'الاسم والسبب مطلوبان' : 'Name and reason are required'); return;
+    }
+    try {
+      await retireSgi(retiringId, retiredBy, reason);
+      toast.info(isAr ? 'تم التقاعد' : 'Retired');
+      setRetiringId(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+
+  const achieveFields: FieldDef[] = [
+    { kind: 'text', key: 'achievedBy', required: true, span: 12,
+      label: isAr ? 'اسم المعتَمِد للإنجاز' : 'Approved-by name',
+      placeholder: isAr ? 'مثال: سارة الزهراني (مدير الاستدامة)' : 'e.g. Sara Al-Zahrani (CSO)' },
+  ];
+  const retireFields: FieldDef[] = [
+    { kind: 'text', key: 'retiredBy', required: true, span: 12,
+      label: isAr ? 'اسم المعتَمِد للتقاعد' : 'Retired-by name',
+      placeholder: isAr ? 'مثال: سارة الزهراني (مدير الاستدامة)' : 'e.g. Sara Al-Zahrani (CSO)' },
+    // FieldDef.textarea doesn't carry a `required` flag — submitRetire
+    // re-validates that the reason isn't empty before dispatch (Rule B).
+    { kind: 'textarea', key: 'reason', span: 12, rows: 3,
+      label: isAr ? 'سبب التقاعد (للسجل المراجعي) *' : 'Reason (for audit trail) *' },
+  ];
 
   return (
-    <Card title={t('esgSgiTitle')} Icon={Target}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
-        {t('esgSgiSub')}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip — tier counts + lifecycle totals */}
+      <div className="kpi-grid">
+        <Kpi Icon={Target}       label={isAr ? 'الالتزامات النشطة' : 'Active commitments'} value={agg?.activeTotal ?? 0}   tone="primary" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'على المسار' : 'On track'}                  value={agg?.byTier.ON_TRACK ?? 0} tone="success" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'مُعرَّض للخطر' : 'At risk'}                value={agg?.byTier.AT_RISK ?? 0}  tone="warning" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'متأخّر' : 'Delayed'}                       value={agg?.byTier.DELAYED ?? 0}  tone="danger" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'مُنجَزة' : 'Achieved'}                     value={agg?.achievedTotal ?? 0}   tone="success" />
+        {/* Retired is intentionally tone-less (primary default — black ink)
+            so it reads as a quiet historical counter alongside the
+            louder status colors. KpiTone doesn't have a "neutral". */}
+        <Kpi Icon={Trash2}       label={isAr ? 'مُتقاعَدة' : 'Retired'}                   value={agg?.retiredTotal ?? 0} />
       </div>
-      {Array.from(bySector.entries()).map(([sector, items]) => (
-        <div key={sector} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            <Leaf size={12} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
-            {SECTOR_LABEL[sector as keyof typeof SECTOR_LABEL][lang]}
-          </div>
-          {items.map(c => (
-            <div key={c.code} style={{
-              padding: 12, marginBottom: 8, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
-                    {lang === 'ar' ? c.titleAr : c.titleEn}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-                    <span className="mono">{c.code}</span>
-                    {' · '}
-                    {t('esgSgiTarget')} {c.targetYear}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {c.onTrack
-                    ? <Badge tone="success"><CheckCircle2 size={11} /> {t('esgSgiOnTrack')}</Badge>
-                    : <Badge tone="warning"><AlertCircle size={11} /> {t('esgSgiBehind')}</Badge>}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', width: `${Math.min(100, c.progressPct)}%`,
-                    background: c.onTrack ? 'var(--success)' : 'var(--warning)',
-                    borderRadius: 4,
-                  }} />
-                </div>
-                <div className="mono" style={{ fontSize: 12, fontWeight: 700, minWidth: 60, textAlign: 'end' }}>
-                  {c.progressPct.toFixed(1)}%
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: 'var(--ink-3)' }}>
-                <span>{t('esgSgiBaseline')}: <span className="mono">{c.baseline.toLocaleString()}</span> {c.unit}</span>
-                <span>{t('esgSgiCurrent')}: <span className="mono">{c.current.toLocaleString()}</span> {c.unit}</span>
-                <span>{t('esgSgiTargetVal')}: <span className="mono">{c.target.toLocaleString()}</span> {c.unit}</span>
-              </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6, padding: 8, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
-                {lang === 'ar' ? c.notesAr : c.notesEn}
-              </div>
-            </div>
-          ))}
+
+      <Card title={isAr ? 'التزامات المبادرة السعودية الخضراء' : 'Saudi Green Initiative commitments'} Icon={Target}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+          {isAr
+            ? 'سجلّ الالتزامات المحفوظ مع تتبّع التقدّم، المالك، الموعد التالي، والسجل المراجعي. الإنجاز يتطلّب الوصول للهدف؛ التقاعد يتطلّب سبباً موثّقاً.'
+            : 'Registered commitments with progress tracking, owner, next milestone, and audit trail. Achievement requires the target to be met; retirement requires a documented reason.'}
         </div>
-      ))}
-    </Card>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : items.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد التزامات' : 'No commitments yet'}</InlineEmpty>
+            : Array.from(bySector.entries()).map(([sector, sectorItems]) => (
+              <div key={sector} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <Leaf size={12} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+                  {sgiSectorLabel(sector as 'ENERGY', isAr ? 'ar' : 'en')}
+                </div>
+                {sectorItems.map(c => {
+                  const progressPct = computeProgressPct(c);
+                  const isActive = c.status === 'ACTIVE';
+                  return (
+                    <div key={c.id} style={{
+                      padding: 12, marginBottom: 8, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                      background: c.status === 'ACHIEVED' ? 'var(--success-bg)'
+                                : c.status === 'RETIRED'  ? 'var(--surface-2)' : undefined,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>
+                            {isAr && c.titleAr ? c.titleAr : c.titleEn}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                            <span className="mono">{c.commitmentCode}</span>
+                            {' · '}
+                            {isAr ? 'الهدف' : 'Target'} {c.targetYear}
+                            {c.ownerName && <> {' · '} {c.ownerName}</>}
+                          </div>
+                        </div>
+                        <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <Badge tone={sgiStatusTone(c.status)}>{sgiStatusLabel(c.status, isAr ? 'ar' : 'en')}</Badge>
+                          {isActive && (
+                            <>
+                              <Button size="sm" variant="secondary" Icon={CheckCircle2}
+                                disabled={!canAchieve(c)}
+                                title={!canAchieve(c) ? (isAr ? 'لم يصل القياس الحالي إلى الهدف بعد' : 'Current value has not met target yet') : undefined}
+                                onClick={() => setAchievingId(c.id!)}>
+                                {isAr ? 'إنجاز' : 'Achieve'}
+                              </Button>
+                              <Button size="sm" variant="ghost" Icon={Trash2}
+                                title={isAr ? 'تقاعد' : 'Retire'}
+                                onClick={() => setRetiringId(c.id!)} />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ flex: 1, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', width: `${Math.min(100, progressPct)}%`,
+                            background: progressPct >= 75 ? 'var(--success)'
+                                       : progressPct >= 40 ? 'var(--primary)'
+                                       : 'var(--warning)',
+                            borderRadius: 4,
+                          }} />
+                        </div>
+                        <div className="mono" style={{ fontSize: 12, fontWeight: 700, minWidth: 60, textAlign: 'end' }}>
+                          {progressPct.toFixed(1)}%
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
+                        {c.baselineValue != null && <span>{isAr ? 'خط الأساس' : 'Baseline'}: <span className="mono">{Number(c.baselineValue).toLocaleString()}</span> {c.unit}</span>}
+                        {c.currentValue != null && <span>{isAr ? 'الحالي' : 'Current'}: <span className="mono">{Number(c.currentValue).toLocaleString()}</span> {c.unit}</span>}
+                        <span>{isAr ? 'الهدف' : 'Target'}: <span className="mono">{Number(c.targetValue).toLocaleString()}</span> {c.unit}</span>
+                      </div>
+                      {(isAr ? c.notesAr : c.notesEn) && (
+                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6, padding: 8, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
+                          {isAr && c.notesAr ? c.notesAr : c.notesEn}
+                        </div>
+                      )}
+                      {c.nextMilestoneDate && (
+                        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--info-fg)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <ArrowRight size={11} />
+                          <span>{isAr ? 'المرحلة التالية' : 'Next milestone'} ({c.nextMilestoneDate}):</span>
+                          <span>{isAr && c.nextMilestoneAr ? c.nextMilestoneAr : c.nextMilestoneEn}</span>
+                        </div>
+                      )}
+                      {c.status === 'RETIRED' && c.retiredReason && (
+                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-2)', fontStyle: 'italic' }}>
+                          {isAr ? 'سبب التقاعد:' : 'Retired:'} {c.retiredReason}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+      </Card>
+
+      <FormModal
+        open={achievingId !== null}
+        title={isAr ? 'تأكيد إنجاز الالتزام' : 'Confirm commitment achievement'}
+        fields={achieveFields}
+        initial={{ achievedBy: '' }}
+        size="md"
+        submitLabel={isAr ? 'تأكيد' : 'Confirm'}
+        onClose={() => setAchievingId(null)}
+        onSubmit={submitAchieve}
+      />
+      <FormModal
+        open={retiringId !== null}
+        title={isAr ? 'تقاعد الالتزام' : 'Retire commitment'}
+        fields={retireFields}
+        initial={{ retiredBy: '', reason: '' }}
+        size="md"
+        submitLabel={isAr ? 'تقاعد' : 'Retire'}
+        onClose={() => setRetiringId(null)}
+        onSubmit={submitRetire}
+      />
+    </div>
   );
 }
 
