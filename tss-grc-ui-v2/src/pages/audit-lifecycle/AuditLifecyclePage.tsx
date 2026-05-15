@@ -684,7 +684,7 @@ function FindingsPipeline({ allFindings, onAdvance, onCardClick }: {
       stages={stages}
       cards={cards}
       introEn="Live findings pipeline across all engagements. Click a card to drill into its engagement; click the arrow to advance the finding to the next stage."
-      introAr="خط أنابيب الملاحظات الحيّ عبر جميع الارتباطات. انقر على بطاقة للانتقال إلى ارتباطها، وانقر السهم لتقدّم الملاحظة إلى المرحلة التالية."
+      introAr="مسار الملاحظات الحيّ عبر جميع الارتباطات. انقر على بطاقة للانتقال إلى ارتباطها، وانقر السهم لتقدّم الملاحظة إلى المرحلة التالية."
       onAdvance={onAdvance}
       onCardClick={onCardClick}
       emptyEn="No findings raised yet across any engagement."

@@ -691,7 +691,7 @@ function VulnPipeline({ vulns, assets, onAdvance, onCardClick }: {
       stages={stages}
       cards={cards}
       introEn="Live vulnerability pipeline. SLA in days driven by CVSS severity (Critical 7d / High 14d / Medium 30d / Low 60d). Click a card to drill into the detailed vulnerability tab."
-      introAr="خط أنابيب الثغرات الحيّ. SLA بالأيام مدفوع بخطورة CVSS (حرجة 7 / عالية 14 / متوسطة 30 / منخفضة 60). انقر على بطاقة للانتقال إلى تبويب تفاصيل الثغرات."
+      introAr="مسار الثغرات الحيّ. SLA بالأيام مدفوع بخطورة CVSS (حرجة 7 / عالية 14 / متوسطة 30 / منخفضة 60). انقر على بطاقة للانتقال إلى تبويب تفاصيل الثغرات."
       onAdvance={onAdvance}
       onCardClick={onCardClick}
       emptyEn="No vulnerabilities recorded yet."

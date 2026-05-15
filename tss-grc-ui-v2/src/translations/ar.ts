@@ -2195,7 +2195,7 @@ export const ar = {
   rlcSidebar:             'دورة حياة المخاطر',
   rlcEyebrow:             'المخاطر · سير عمل حيّ',
   rlcTitle:               'مساحة عمل دورة حياة المخاطر',
-  rlcSub:                 'التقييم الكمي وخط أنابيب اختراقات KRI واعتمادات المعالجة والقبول.',
+  rlcSub:                 'التقييم الكمي ومسار اختراقات KRI واعتمادات المعالجة والقبول.',
   rlcPageSub:             'اختر مخاطرة لتسييرها عبر تقييم Monte Carlo، والاستجابة لاختراقات KRI، وسير عمل خطة المعالجة، واعتماد المجلس للقبول، وربط الضوابط بأدلة CCM.',
   rlcKpiTotal:            'المخاطر',
   rlcKpiOpenBreach:       'اختراقات KRI مفتوحة',
@@ -2220,7 +2220,7 @@ export const ar = {
   rlcMcStdev:             'الانحراف المعياري',
   rlcMcHistogram:         'توزيع الخسارة',
   rlcMcLossSar:           'الخسارة بالريال',
-  rlcKriTitle:            'خط أنابيب اختراقات KRI',
+  rlcKriTitle:            'مسار اختراقات KRI',
   rlcKriSub:              'عند تجاوز عتبة KRI يُنشأ حدث تصعيد بتوجيه تلقائي. يُصعَّد إلى رئيس المخاطر إن لم يُحَل خلال 24 ساعة، ثم لجنة المخاطر، ثم المجلس خلال 30 يوماً وفق المادة 71 من لائحة الحوكمة.',
   rlcKriOpen:             'مفتوحة',
   rlcKriEmpty:            'لا أحداث اختراق KRI لهذه المخاطرة بعد. يُنشئ المُكتشِف الأحداث تلقائياً عند تجاوز العتبات.',
@@ -2274,7 +2274,7 @@ export const ar = {
   rlcControlMaturity:     'النضج',
   rlcControlCcm:          'تغطية CCM',
   rlcControlEvidence:     'آخر دليل',
-  rlcPipelineTitle:       'خط أنابيب خطط المعالجة',
+  rlcPipelineTitle:       'مسار خطط المعالجة',
 
   // Audit lifecycle — production hardening (Option 2)
   alcSidebar:             'دورة حياة التدقيق',
@@ -2689,7 +2689,7 @@ export const ar = {
   loBcmTitle:             'BCM · تفعيلات خطط الاستمرارية',
   loBcmSub:               'تفعيلات خطط استمرارية الأعمال السابقة والنشطة. حقيقي = انقطاع فعلي؛ تمرين = تدريب.',
   loCyberTitle:           'الأمن السيبراني · الثغرات',
-  loCyberSub:             'خط أنابيب الثغرات الحيّ. مدفوع بـ SLA؛ البطاقات المتأخّرة بالأحمر.',
+  loCyberSub:             'مسار الثغرات الحيّ. مدفوع بـ SLA؛ البطاقات المتأخّرة بالأحمر.',
   loOpenWorkspace:        'فتح مساحة العمل',
 
   // User picker
@@ -2754,12 +2754,12 @@ export const ar = {
   bwModeSwitched:          'تم تبديل وضع التخزين.',
 
   // Shared lifecycle pipeline
-  lpcTabPipeline:          'خط الأنابيب',
+  lpcTabPipeline:          'المسار',
   lpcDaysLate:             ' يوم متأخّر',
   lpcDaysLeft:             ' يوم متبقّي',
   lpcDueToday:             'مستحق اليوم',
   lpcAdvancedToast:        'تم التقدّم للمرحلة التالية.',
-  lpcEmpty:                'لا عناصر في خط الأنابيب بعد. أنشئ عنصراً من تبويب التفاصيل المناسب.',
+  lpcEmpty:                'لا عناصر في المسار بعد. أنشئ عنصراً من تبويب التفاصيل المناسب.',
   lpcSearchPlaceholder:    'تصفية البطاقات (المعرّف، العنوان، المالك)…',
   lpcOverdueOn:            'عرض المتأخّر فقط',
   lpcOverdueOff:           'عرض المتأخّر فقط',

@@ -740,7 +740,7 @@ function RiskTreatmentPipeline({ allPlans, onAdvance, onBulkAdvance, onCardHisto
       stages={stages}
       cards={cards}
       introEn="Live treatment-plan pipeline across all risks. Click a card to jump to that risk; click the arrow to advance. Hold Shift+click for multi-select; click the clock icon for activity history."
-      introAr="خط أنابيب خطط المعالجة الحيّ عبر جميع المخاطر. انقر على بطاقة للانتقال إلى تلك المخاطرة، وانقر السهم لتقدّم الخطة. اضغط Shift+نقر للتحديد المتعدّد؛ انقر أيقونة الساعة للسجل."
+      introAr="مسار خطط المعالجة الحيّ عبر جميع المخاطر. انقر على بطاقة للانتقال إلى تلك المخاطرة، وانقر السهم لتقدّم الخطة. اضغط Shift+نقر للتحديد المتعدّد؛ انقر أيقونة الساعة للسجل."
       onAdvance={onAdvance}
       onCardClick={onCardClick}
       onBulkAdvance={onBulkAdvance}

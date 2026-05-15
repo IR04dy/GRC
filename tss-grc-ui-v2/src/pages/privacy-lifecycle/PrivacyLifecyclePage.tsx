@@ -598,7 +598,7 @@ function DsrPipeline({ dsrs, onAdvance, onCardClick }: {
       stages={stages}
       cards={cards}
       introEn="Live data subject request pipeline. PDPL Article 4 30-day SLA tracked per case; complex requests can be EXTENDED to 60 days. Click a card to drill into the DSR detail."
-      introAr="خط أنابيب طلبات أصحاب البيانات الحيّ. التزام 30 يوماً من المادة 4 لكل حالة؛ الطلبات المعقّدة يمكن تمديدها إلى 60 يوماً. انقر على بطاقة لفتح تفاصيل الطلب."
+      introAr="مسار طلبات أصحاب البيانات الحيّ. التزام 30 يوماً من المادة 4 لكل حالة؛ الطلبات المعقّدة يمكن تمديدها إلى 60 يوماً. انقر على بطاقة لفتح تفاصيل الطلب."
       onAdvance={onAdvance}
       onCardClick={onCardClick}
       emptyEn="No data subject requests yet."
