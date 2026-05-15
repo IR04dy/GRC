@@ -765,38 +765,41 @@ export const ar = {
   // صندوق الموافقات عبر الوحدات — السبرنت الخامس.
   approvalsSidebar:        'الموافقات',
   // Naming aligned with NCDC (المركز الوطني للتصديق الرقمي) — the Saudi
-  // authority for this. SADAD / Absher / Yesser all use "التوقيع الرقمي"
-  // (singular, collective form). The textbook-legal "التواقيع الإلكترونية"
-  // reads as a translation rather than a Saudi-native product label.
-  sigSidebar:              'التوقيع الرقمي',
-  sigPageTitle:            'التوقيع الرقمي',
+  // authority that owns this domain. "التصديق الرقمي" is the precise
+  // term: NCDC literally has it in its name, and Saudi business
+  // vernacular uses "صدّق على" for "formally attest / endorse a
+  // document". "التوقيع" is the mechanical PKI act; "التصديق" is the
+  // governance act we actually mean on an approval inbox. The
+  // textbook-legal "التواقيع الإلكترونية" reads as a translation.
+  sigSidebar:              'التصديق الرقمي',
+  sigPageTitle:            'التصديق الرقمي',
   sigPageEyebrow:          'الامتثال والأدلة',
-  sigPageSub:              'اعتمد أو ارفض، وراجع طلبات التوقيع الرقمي على قرارات مجلس الإدارة، تقييمات المخاطر، خطط استمرارية الأعمال، عقود الموردين، والإقرارات التنظيمية.',
+  sigPageSub:              'صدّق أو ارفض، وراجع طلبات التصديق الرقمي على قرارات مجلس الإدارة، تقييمات المخاطر، خطط استمرارية الأعمال، عقود الموردين، والإقرارات التنظيمية.',
   sigKpiInbox:             'في صندوقي',
-  sigKpiSigned:            'معتمدة',
+  sigKpiSigned:            'مُصدَّقة',
   sigKpiRejected:          'مرفوضة',
   sigKpiExpired:           'منتهية الصلاحية',
   sigTabInbox:             'صندوقي',
   sigTabAll:               'الكل',
   sigTabStats:             'الإحصائيات',
-  sigInboxTitle:           'طلبات توقيع رقمي معلّقة',
-  sigInboxEmpty:           'لا توجد طلبات توقيع رقمي معلّقة',
-  sigInboxEmptySub:        'لست المعتمِد على أي معاملة مفتوحة حالياً.',
+  sigInboxTitle:           'طلبات تصديق رقمي معلّقة',
+  sigInboxEmpty:           'لا توجد طلبات تصديق رقمي معلّقة',
+  sigInboxEmptySub:        'لست المصدِّق على أي معاملة مفتوحة حالياً.',
   sigAllTitle:             'جميع المعاملات',
   sigAllEmpty:             'لا توجد معاملات بعد',
-  sigAllEmptySub:          'ستظهر طلبات التوقيع الرقمي حالما يفتحها المُنشئون.',
+  sigAllEmptySub:          'ستظهر طلبات التصديق الرقمي حالما يفتحها المُنشئون.',
   sigStatsByStatus:        'حسب الحالة',
-  sigSigner:               'المعتمِد',
+  sigSigner:               'المصدِّق',
   sigExpires:              'تنتهي في',
-  sigActSign:              'اعتماد',
+  sigActSign:              'تصديق',
   sigActReject:            'رفض',
-  sigRejectPrompt:         'سبب رفض طلب التوقيع الرقمي:',
-  sigSignedToast:          'تم الاعتماد بنجاح',
-  sigSignFailedToast:      'تعذّر تسجيل التوقيع الرقمي',
+  sigRejectPrompt:         'سبب رفض طلب التصديق الرقمي:',
+  sigSignedToast:          'تمّ التصديق بنجاح',
+  sigSignFailedToast:      'تعذّر تسجيل التصديق الرقمي',
   sigRejectedToast:        'تم تسجيل الرفض',
   sigRejectFailedToast:    'تعذّر تسجيل الرفض',
   sigStatus_REQUESTED:     'قيد الانتظار',
-  sigStatus_SIGNED:        'معتمدة',
+  sigStatus_SIGNED:        'مُصدَّقة',
   sigStatus_REJECTED:      'مرفوضة',
   sigStatus_EXPIRED:       'منتهية',
   approvalsTitle:          'صندوق الموافقات',
