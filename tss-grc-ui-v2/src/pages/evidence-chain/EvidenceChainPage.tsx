@@ -214,7 +214,7 @@ export function EvidenceChainPage() {
                                       </tbody>
                                     </table>
                                     {rep.versions.some(v => v.chainBreakReason) && (
-                                      <div style={{ marginTop: 8, padding: 8, background: 'var(--danger-soft, #fee)',
+                                      <div style={{ marginTop: 8, padding: 8, background: 'var(--danger-bg)',
                                                     borderInlineStart: '3px solid var(--danger)', fontSize: 12 }}>
                                         <strong>{t('echBreakDetails')}</strong>
                                         <ul style={{ paddingInlineStart: 18, marginTop: 4 }}>

@@ -125,9 +125,9 @@
 .cs-badge {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px;
-  background: var(--warning-50, #fef3c7);
-  color: var(--warning-700, #92400e);
-  border: 1px solid var(--warning-200, #fde68a);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border: 1px solid var(--warning);
   border-radius: 9999px;
   font-size: 10px; font-weight: 600;
   text-transform: uppercase;

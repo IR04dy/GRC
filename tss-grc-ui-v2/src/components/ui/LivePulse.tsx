@@ -33,8 +33,8 @@ export function LivePulse({ pulse = 0, enabled = true, labelEn = 'Live', labelAr
   }, [pulse]);
 
   const tone = enabled
-    ? (flash ? 'var(--success-fg, #16a34a)' : 'var(--success-fg, #16a34a)')
-    : 'var(--ink-3, #94a3b8)';
+    ? (flash ? 'var(--success-fg)' : 'var(--success-fg)')
+    : 'var(--ink-3)';
 
   return (
     <span

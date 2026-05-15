@@ -82,7 +82,7 @@
 
 .filter-remove:hover {
   background: var(--danger-50, rgba(220,38,38,0.08));
-  color: var(--danger, #dc2626);
+  color: var(--danger);
 }
 
 .filter-actions {

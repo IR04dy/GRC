@@ -11,7 +11,7 @@
 .nca-cover {
   padding: 40px;
   text-align: center;
-  background: linear-gradient(135deg, var(--primary-50, #eef2ff) 0%, var(--surface-2, #f9fafb) 100%);
+  background: linear-gradient(135deg, var(--primary-50) 0%, var(--surface-2) 100%);
   border-radius: 12px;
   margin-bottom: 24px;
   page-break-after: always;
@@ -23,7 +23,7 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: var(--primary, #4f46e5);
+  background: var(--primary);
   color: white;
   margin: 0 auto 18px;
 }
@@ -92,7 +92,7 @@
   gap: 12px;
   width: 100%;
   padding: 14px 18px;
-  background: var(--primary-50, #eef2ff);
+  background: var(--primary-50);
   border: none;
   cursor: pointer;
   text-align: start;
