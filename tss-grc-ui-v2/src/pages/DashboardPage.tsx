@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw, Layers, RotateCcw, GripVertical, X as XIcon, Plus, Maximize2, Minimize2, FileText, Presentation } from 'lucide-react';
+import { RefreshCw, Layers, RotateCcw, GripVertical, X as XIcon, Plus, Maximize2, Minimize2, FileText, Presentation, ChevronDown, ChevronRight } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import { Shell } from '../components/layout/Shell';
-import { PageHeader } from '../components/layout/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -15,6 +14,7 @@ import { useToast } from '../lib/toast';
 import { useLiveRefresh } from '../lib/useLiveRefresh';
 import { WIDGETS, WIDGETS_BY_ID, type WidgetSize } from './dashboard/widgets';
 import { useDashboardLayout } from './dashboard/useDashboardLayout';
+import { ExecutiveDashboard } from './dashboard/ExecutiveDashboard';
 
 // All entity-change topics broadcast by lifecycle services that move values
 // inside the dashboard's stats response. Subscribing to all of them keeps
@@ -50,6 +50,19 @@ export function DashboardPage() {
   const [isDemo, setIsDemo] = useState<boolean>(!isAuthenticated());
   const [loading, setLoading] = useState<boolean>(isAuthenticated());
   const [customising, setCustomising] = useState(false);
+  // Customizable widget grid below the fixed executive section — collapsed
+  // by default so the first impression is the curated dashboard, not 13
+  // configurable tiles. Power users expand it (or jump to "Customize") when
+  // they want their own layout. State persists per session.
+  const [widgetsOpen, setWidgetsOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.sessionStorage.getItem('grc.dashboardWidgetsOpen') === 'true';
+  });
+  function toggleWidgets() {
+    const next = !widgetsOpen;
+    setWidgetsOpen(next);
+    try { window.sessionStorage.setItem('grc.dashboardWidgetsOpen', String(next)); } catch { /* noop */ }
+  }
   const layout = useDashboardLayout();
 
   // Hold load() in a ref so the realtime subscription doesn't tear down on
@@ -87,70 +100,116 @@ export function DashboardPage() {
 
   return (
     <Shell title={t('itemDashboard')} sub={t('brandSub')}>
-      <PageHeader
-        eyebrow={t('dashEyebrow')}
-        title={t('dashTitle')}
-        sub={t('dashSub')}
-        actions={
+      {/* Minimal page header — the ExecutiveDashboard hero owns the
+       * "wow" first impression below; the header carries only chrome
+       * actions (refresh, exports, demo badge) and stays out of the way. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, marginBottom: 4, flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
+          {!isDemo && <LivePulse pulse={pulse} enabled={!isDemo} />}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Button variant="ghost" Icon={RefreshCw} onClick={load} disabled={loading || refreshing}>
+            {t('dashRefresh')}
+          </Button>
+          <Button variant="secondary" Icon={FileText} disabled={isDemo}
+            onClick={async () => {
+              try { await reportingApi.boardPackPdf(lang); toast.success(t('boardPackStarted')); }
+              catch (e) { toast.danger(e instanceof ApiError ? e.message : t('boardPackFailed')); }
+            }}>{t('boardPackPdfBtn')}</Button>
+          <Button variant="secondary" Icon={Presentation} disabled={isDemo}
+            onClick={async () => {
+              try { await reportingApi.boardPackPptx(lang); toast.success(t('boardPackStarted')); }
+              catch (e) { toast.danger(e instanceof ApiError ? e.message : t('boardPackFailed')); }
+            }}>{t('boardPackPptxBtn')}</Button>
+          <ExportMenu
+            demoMode={isDemo} t={t} toast={toast}
+            onPdf={() => reportingApi.riskRegisterPdf(lang)}
+            onXlsx={() => reportingApi.riskRegisterXlsx()}
+          />
+        </div>
+      </div>
+
+      {/* Fixed executive dashboard — hero + KPI ribbon + heatmap + trends +
+       * framework readiness + attention/deadlines/activity columns. This
+       * is the canonical first-impression view; same for every user, no
+       * setup. */}
+      <ExecutiveDashboard stats={stats} heat={heat} />
+
+      {/* Optional customizable widget grid — collapsed by default so it
+       * doesn't compete with the executive section. Power users expand it
+       * to add their own widgets / arrange layout / drag-and-drop. */}
+      <div style={{ marginTop: 24 }}>
+        <button
+          type="button"
+          onClick={toggleWidgets}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            padding: '6px 0',
+            font: '700 13px var(--font-sans)', color: 'var(--ink-2)',
+          }}>
+          {widgetsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {t('dashCustomWidgetsToggle')}
+          <span className="text-2xs text-muted" style={{ fontWeight: 500, marginInlineStart: 4 }}>
+            ({layout.items.length})
+          </span>
+        </button>
+        {widgetsOpen && (
           <>
-            {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
-            {!isDemo && <LivePulse pulse={pulse} enabled={!isDemo} />}
-            {customising && <Badge tone="accent" dot>{t('dashCustomising')}</Badge>}
-            <Button variant="secondary" Icon={RefreshCw} onClick={load} disabled={loading || refreshing}>{t('dashRefresh')}</Button>
-            <Button variant={customising ? 'primary' : 'secondary'} Icon={Layers} onClick={() => setCustomising(c => !c)}>
-              {customising ? t('dashDoneCustomising') : t('dashCustomise')}
-            </Button>
-            {customising && <Button variant="ghost" Icon={RotateCcw} onClick={() => layout.reset()}>{t('dashResetLayout')}</Button>}
-            <Button variant="secondary" Icon={FileText} disabled={isDemo}
-              onClick={async () => {
-                try { await reportingApi.boardPackPdf(lang); toast.success(t('boardPackStarted')); }
-                catch (e) { toast.danger(e instanceof ApiError ? e.message : t('boardPackFailed')); }
-              }}>{t('boardPackPdfBtn')}</Button>
-            <Button variant="secondary" Icon={Presentation} disabled={isDemo}
-              onClick={async () => {
-                try { await reportingApi.boardPackPptx(lang); toast.success(t('boardPackStarted')); }
-                catch (e) { toast.danger(e instanceof ApiError ? e.message : t('boardPackFailed')); }
-              }}>{t('boardPackPptxBtn')}</Button>
-            <ExportMenu
-              demoMode={isDemo} t={t} toast={toast}
-              onPdf={() => reportingApi.riskRegisterPdf(lang)}
-              onXlsx={() => reportingApi.riskRegisterXlsx()}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+              marginTop: 8, marginBottom: 4,
+            }}>
+              <Button variant={customising ? 'primary' : 'secondary'} size="sm" Icon={Layers}
+                onClick={() => setCustomising(c => !c)}>
+                {customising ? t('dashDoneCustomising') : t('dashCustomise')}
+              </Button>
+              {customising && (
+                <Button variant="ghost" size="sm" Icon={RotateCcw} onClick={() => layout.reset()}>
+                  {t('dashResetLayout')}
+                </Button>
+              )}
+              {customising && <Badge tone="accent" dot>{t('dashCustomising')}</Badge>}
+            </div>
+
+            {customising && addable.length > 0 && (
+              <Card title={t('dashAddWidgets')} Icon={Plus}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {addable.map(w => (
+                    <button key={w.id} onClick={() => layout.add(w.id)} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 10px', background: 'var(--surface-2)',
+                      border: '1px solid var(--border)', borderRadius: 'var(--r-pill)',
+                      cursor: 'pointer', fontSize: 12, color: 'var(--ink-1)',
+                    }}>
+                      <Plus size={12} /> {t(w.titleKey)}
+                      <span style={{ marginInlineStart: 4, fontSize: 10, color: 'var(--ink-3)' }}>· {w.category}</span>
+                    </button>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            <DashboardGrid
+              items={layout.items}
+              ctx={{ stats, heat, t }}
+              customising={customising}
+              onMove={layout.move}
+              onRemove={layout.remove}
+              onResize={(id) => {
+                const cur = layout.items.find(it => it.id === id);
+                if (!cur) return;
+                const next: WidgetSize = cur.size === 'sm' ? 'md' : cur.size === 'md' ? 'lg' : 'sm';
+                layout.setSize(id, next);
+              }}
             />
           </>
-        }
-      />
-
-      {customising && addable.length > 0 && (
-        <Card title={t('dashAddWidgets')} Icon={Plus}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {addable.map(w => (
-              <button key={w.id} onClick={() => layout.add(w.id)} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '6px 10px', background: 'var(--surface-2)',
-                border: '1px solid var(--border)', borderRadius: 'var(--r-pill)',
-                cursor: 'pointer', fontSize: 12, color: 'var(--ink-1)',
-              }}>
-                <Plus size={12} /> {t(w.titleKey)}
-                <span style={{ marginInlineStart: 4, fontSize: 10, color: 'var(--ink-3)' }}>· {w.category}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      <DashboardGrid
-        items={layout.items}
-        ctx={{ stats, heat, t }}
-        customising={customising}
-        onMove={layout.move}
-        onRemove={layout.remove}
-        onResize={(id) => {
-          const cur = layout.items.find(it => it.id === id);
-          if (!cur) return;
-          const next: WidgetSize = cur.size === 'sm' ? 'md' : cur.size === 'md' ? 'lg' : 'sm';
-          layout.setSize(id, next);
-        }}
-      />
+        )}
+      </div>
     </Shell>
   );
 }

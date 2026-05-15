@@ -99,6 +99,7 @@ export const en = {
   dashCustomising:      'Customising layout',
   dashResetLayout:      'Reset layout',
   dashAddWidgets:       'Add widgets',
+  dashCustomWidgetsToggle: 'Show customisable widget grid',
   dashGrip:             'Drag to reorder',
   dashResize:           'Resize',
   dashRemove:           'Remove',

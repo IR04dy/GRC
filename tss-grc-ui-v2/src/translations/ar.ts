@@ -98,6 +98,7 @@ export const ar = {
   dashCustomising:      'جارٍ تخصيص التخطيط',
   dashResetLayout:      'استعادة التخطيط',
   dashAddWidgets:       'إضافة عناصر',
+  dashCustomWidgetsToggle: 'عرض شبكة العناصر القابلة للتخصيص',
   dashGrip:             'اسحب لإعادة الترتيب',
   dashResize:           'تغيير الحجم',
   dashRemove:           'إزالة',
