@@ -385,7 +385,17 @@ export function RiskRegisterPage() {
         <>
           {hasFilters && <FilterChips filters={filters} setFilters={setFilters} t={t} totalShown={filteredRisks.length} totalAll={risks.length} />}
           <Card padded={false}>
-            {error && <div style={{ padding: 12, color: 'var(--danger-fg)', background: 'var(--danger-bg)', borderBottom: '1px solid #ECCFCC', fontSize: 13 }}>{error}</div>}
+            {/* Error banner — use --danger-border (added to tokens in the
+              * earlier polish pass) instead of the hardcoded #ECCFCC so
+              * dark theme + white-label co-vary correctly. */}
+            {error && (
+              <div style={{
+                padding: 12, fontSize: 13,
+                color: 'var(--danger-fg)',
+                background: 'var(--danger-bg)',
+                borderBottom: '1px solid var(--danger-border)',
+              }}>{error}</div>
+            )}
             {loading
               ? <InlineEmpty>{t('riskLoading')}</InlineEmpty>
               : <DataTable columns={cols} rows={filteredRisks} rowHref={r => `/risk/${r.id}`} empty={<EmptyState Icon={AlertTriangle} title={hasFilters ? t('riskNoMatchTitle') : t('riskEmpty')} sub={hasFilters ? t('riskNoMatchSub') : t('riskEmptySub')} />} />}

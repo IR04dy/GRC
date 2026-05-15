@@ -1036,7 +1036,17 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
         <div style={{ maxHeight: 540, overflowY: 'auto' }}>
           {Array.from(byFamily.entries()).map(([family, list]) => (
             <div key={family}>
-              <div style={{ padding: '10px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'var(--surface-2)' }}>
+              {/* Family eyebrow — reuses the canonical section-header
+                * vocabulary (.text-2xs .text-muted with letter-spacing)
+                * so it matches every other "uppercase metric eyebrow"
+                * on the page instead of being a one-off inline style. */}
+              <div className="text-2xs text-muted" style={{
+                padding: '10px 12px 4px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                background: 'var(--surface-2)',
+              }}>
                 {FAMILY_LABELS[family] ?? family}
               </div>
               {list.map(f => {

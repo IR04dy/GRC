@@ -17,7 +17,10 @@
   color: var(--sb-text);
   padding: 14px 0;
   overflow-y: auto;
-  border-inline-end: 1px solid #0F1B19;
+  /* Use --sb-border (already token-driven) instead of hardcoded #0F1B19
+   * so the trailing separator co-varies with the sidebar palette when
+   * a tenant picks a non-default preset (Sky / Cobalt / Mint etc.). */
+  border-inline-end: 1px solid var(--sb-border);
 }
 
 .sb-brand { display: flex; align-items: center; gap: 10px; padding: 6px 16px 16px; border-bottom: 1px solid var(--sb-border); }

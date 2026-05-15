@@ -516,7 +516,21 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   outline-offset: -2px;
 }
 .risk-table tr:last-child td { border-bottom: none; }
-.mono { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); }
+/* .mono — monospace for codes, IDs, timestamps, hex values, file paths.
+ * `unicode-bidi: isolate` + `direction: ltr` lock the strong-LTR
+ * direction so an Arabic UI doesn't reorder "INC-0042" / "AC-2.1.2" /
+ * "12:34" / "#0E5E5E" / "/api/v1/risk". Without this, RTL inheritance
+ * flips chunks at bidi boundaries — e.g. "INC-0042" renders as "0042-INC"
+ * and "AC-2.1.2" renders with the dots in the wrong places.
+ * `display: inline-block` lets the isolation box align correctly inside
+ * mixed paragraphs without claiming a whole line. */
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  unicode-bidi: isolate;
+  direction: ltr;
+}
 .score-pill {
   font-family: var(--font-mono);
   font-weight: 700;
