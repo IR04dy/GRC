@@ -1,4 +1,4 @@
-import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, RefreshCw,
+import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
@@ -209,7 +209,9 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'file-upload',   to: '/file-upload',            Icon: FileCheck2,  labelKey: 'fuSidebar' },
       { id: 'onboarding',    to: '/onboarding',             Icon: Compass,     labelKey: 'onbSidebar' },
       { id: 'settings',      to: '/settings',               Icon: Settings,    labelKey: 'itemSettings' },
-      { id: 'about',         to: '/about',                  Icon: Info,        labelKey: 'itemAbout' },
+      // 'about' entry removed — it pointed at PlaceholderPage with no real
+      // content. Re-add when there's actual content (license terms,
+      // build/version info, support links).
     ],
   },
 ];

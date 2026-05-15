@@ -5,7 +5,6 @@ import { ThemeProvider } from './lib/theme';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
 import { RiskRegisterPage } from './pages/risk/RiskRegisterPage';
 import { CyberPage } from './pages/cyber/CyberPage';
 import { VulnerabilitiesV2Page } from './pages/cyber/VulnerabilitiesV2Page';
@@ -271,11 +270,13 @@ export function App() {
               {/* Saudi regulatory-change feed (Sprint 5) */}
               <Route path="/regulatory-change"  element={<RegulatoryChangePage />} />
 
-              {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
-              <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />
-              <Route path="/audit"  element={<PlaceholderPage moduleKey="modAudit" />} />
-              <Route path="/policy" element={<PlaceholderPage moduleKey="modPolicy" />} />
-              <Route path="/about"  element={<PlaceholderPage moduleKey="itemAbout" />} />
+              {/* /data, /audit, /policy, /about were vestigial placeholder
+                  routes from an earlier design vision. Removed per user
+                  feedback ("no tables tab or page with empty data") — every
+                  domain now has a real implementation: /data-lifecycle,
+                  /audit-workspace + /audit-lifecycle, /compliance +
+                  /policy-templates. The catch-all below sends any lingering
+                  link to /dashboard. */}
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
