@@ -55,9 +55,16 @@ import {
   type CmaDisclosure as CmaD, type CmaReadiness as CmaR,
 } from '../../lib/sustainabilityCma';
 import {
+  listTcfd, tcfdReadiness,
+  tcfdMarkDisclosed, tcfdMarkPartial, tcfdMarkNotDisclosed,
+  tcfdMarkNotApplicable, tcfdMarkUnderReview,
+  tcfdAttachEvidence, tcfdRecordGap,
+  tcfdStatusTone, tcfdStatusLabel, tcfdPillarLabel,
+  hasTcfdGap, hasTcfdEvidence,
+  type TcfdItem as TcfdI, type TcfdReadiness as TcfdR, type TcfdPillar,
+} from '../../lib/sustainabilityTcfd';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
-  TCFD_ITEMS,
-  PILLAR_LABEL, STATUS_TONE, STATUS_LABEL,
   SURVEY_TONE, SURVEY_LABEL,
   aggregateEsg, yoyChange,
   loadCalcEntries, appendCalcEntry, deleteCalcEntry,
@@ -112,18 +119,9 @@ export function EsgPage() {
     toast.success(t('esgAnnexDownloadedToast'));
   }
 
-  // TCFD grouping
-  const tcfdByPillar = useMemo(() => {
-    const map = new Map<string, typeof TCFD_ITEMS>();
-    for (const item of TCFD_ITEMS) {
-      if (!map.has(item.pillar)) map.set(item.pillar, []);
-      map.get(item.pillar)!.push(item);
-    }
-    return map;
-  }, []);
-
-  // CMA grouping was previously a static useMemo against CMA_ARTICLES;
-  // V60 promoted CmaTab to API-driven so it self-loads + self-groups.
+  // TCFD + CMA grouping were previously static useMemo blocks against
+  // TCFD_ITEMS / CMA_ARTICLES; V60 + V61 promoted both tabs to API-
+  // driven so they self-load and self-group.
 
   return (
     <Shell title={t('esgTitle')} sub={t('esgSub')}>
@@ -179,7 +177,7 @@ export function EsgPage() {
         onAdd={(e) => { appendCalcEntry(e); toast.success(t('esgCalcAddedToast')); }}
         onDelete={(id) => { deleteCalcEntry(id); toast.info(t('esgCalcDeletedToast')); }} />}
       {tab === 'cma'        && <CmaTab />}
-      {tab === 'tcfd'       && <TcfdTab tcfdByPillar={tcfdByPillar} />}
+      {tab === 'tcfd'       && <TcfdTab />}
       {tab === 'sgi'        && <SgiTab />}
       {tab === 'ghg'        && <GhgInventoryTab />}
       {tab === 'climate'    && <ClimateTab />}
@@ -1172,46 +1170,240 @@ function CmaTab() {
   );
 }
 
-// ─── TCFD tab ───────────────────────────────────────────────────────────────
+// ─── TCFD alignment tab (V61 — slice 7) ─────────────────────────────────────
+//
+// Promoted from the static TCFD_ITEMS constant to a live API-driven
+// matrix grouped by pillar. Mirrors CmaTab's lifecycle UX — same
+// 5 status buttons, Attach Evidence + Record Gap modals, Rule 5 + 6
+// enforcement client-side mirror — plus a Rule 7 banner when the
+// Strategy resilience recommendation is in a non-DISCLOSED state.
 
-function TcfdTab({ tcfdByPillar }: { tcfdByPillar: Map<string, typeof TCFD_ITEMS> }) {
-  const { t, lang } = useI18n();
+function TcfdTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [items, setItems]     = useState<TcfdI[]>([]);
+  const [readiness, setReadi] = useState<TcfdR | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [evidencingId, setEvidencingId] = useState<number | null>(null);
+  const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, r] = await Promise.all([listTcfd({ year: 2025, size: 100 }), tcfdReadiness(2025)]);
+      setItems(pg.content);
+      setReadi(r);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل مصفوفة TCFD' : 'Failed to load TCFD matrix'));
+      setItems([]); setReadi(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  const byPillar = useMemo(() => {
+    const map = new Map<TcfdPillar, TcfdI[]>();
+    for (const t of items) {
+      if (!map.has(t.pillar)) map.set(t.pillar, []);
+      map.get(t.pillar)!.push(t);
+    }
+    return map;
+  }, [items]);
+
+  async function runTransition(action: () => Promise<unknown>) {
+    try { await action(); toast.success(isAr ? 'تم التحديث' : 'Updated'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function onMarkDisclosed(t: TcfdI)    { await runTransition(() => tcfdMarkDisclosed(t.id!)); }
+  async function onMarkPartial(t: TcfdI) {
+    if (!hasTcfdGap(t)) { setGappingId({ id: t.id!, toStatus: 'PARTIAL' }); return; }
+    await runTransition(() => tcfdMarkPartial(t.id!));
+  }
+  async function onMarkNotDisclosed(t: TcfdI) {
+    if (!hasTcfdGap(t)) { setGappingId({ id: t.id!, toStatus: 'NOT_DISCLOSED' }); return; }
+    await runTransition(() => tcfdMarkNotDisclosed(t.id!));
+  }
+  async function onMarkNotApplicable(t: TcfdI) { await runTransition(() => tcfdMarkNotApplicable(t.id!)); }
+  async function onMarkUnderReview(t: TcfdI)   { await runTransition(() => tcfdMarkUnderReview(t.id!)); }
+
+  async function submitAttachEvidence(values: Record<string, unknown>) {
+    if (evidencingId == null) return;
+    const ref = String(values.evidenceRef ?? '').trim();
+    const owner = String(values.owner ?? '').trim() || undefined;
+    if (!ref) { toast.danger(isAr ? 'مرجع الدليل مطلوب' : 'Evidence reference is required'); return; }
+    try {
+      await tcfdAttachEvidence(evidencingId, ref, owner);
+      toast.success(isAr ? 'تم إرفاق الدليل' : 'Evidence attached');
+      setEvidencingId(null);
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function submitGap(values: Record<string, unknown>) {
+    if (gappingId == null) return;
+    const gapEn = String(values.gapEn ?? '').trim() || undefined;
+    const gapAr = String(values.gapAr ?? '').trim() || undefined;
+    if (!gapEn && !gapAr) {
+      toast.danger(isAr ? 'وصف الفجوة مطلوب' : 'Gap description is required'); return;
+    }
+    try {
+      await tcfdRecordGap(gappingId.id, gapEn, gapAr);
+      if (gappingId.toStatus === 'PARTIAL')        await tcfdMarkPartial(gappingId.id);
+      if (gappingId.toStatus === 'NOT_DISCLOSED')  await tcfdMarkNotDisclosed(gappingId.id);
+      toast.success(isAr ? 'تم تسجيل الفجوة' : 'Gap recorded');
+      setGappingId(null);
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  const evidenceFields: FieldDef[] = [
+    { kind: 'text', key: 'evidenceRef', required: true, span: 12,
+      label: isAr ? 'مرجع الدليل (مسار، قسم، URL، إلخ)' : 'Evidence reference (path, section, URL, etc.)' },
+    { kind: 'text', key: 'owner', span: 12,
+      label: isAr ? 'مالك الدليل (اختياري)' : 'Evidence owner (optional)' },
+  ];
+  const gapFields: FieldDef[] = [
+    { kind: 'textarea', key: 'gapEn', span: 12, rows: 3,
+      label: isAr ? 'وصف الفجوة (إنجليزي)' : 'Gap description (English)' },
+    { kind: 'textarea', key: 'gapAr', span: 12, rows: 3,
+      label: isAr ? 'وصف الفجوة (عربي)' : 'Gap description (Arabic)' },
+  ];
+
   return (
-    <Card title={t('esgTcfdTitle')} Icon={FileText}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
-        {t('esgTcfdSub')}
-      </div>
-      {Array.from(tcfdByPillar.entries()).map(([pillar, items]) => (
-        <div key={pillar} style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>
-            {PILLAR_LABEL[pillar as keyof typeof PILLAR_LABEL][lang]}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Rule 7 banner — Strategy resilience recommendation is missing/partial */}
+      {readiness?.strategyResilienceGap && (
+        <div style={{
+          padding: 12, borderRadius: 'var(--r-sm)',
+          background: 'var(--warning-bg)', color: 'var(--warning-fg)',
+          fontSize: 12, lineHeight: 1.5,
+          display: 'flex', gap: 8, alignItems: 'center',
+        }}>
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <div>
+            <strong>{isAr ? 'تنبيه القاعدة 7:' : 'Rule 7 alert:'}</strong>{' '}
+            {isAr
+              ? 'توصية «الصمود تحت سيناريوهات مناخية مختلفة» (الاستراتيجية ج) غير مُفصَحة بالكامل — يُنصح برفع إجراء تصحيحي مرتبط بمخاطر مناخية.'
+              : 'The Strategy resilience-scenario recommendation (Strategy c) is not fully disclosed — consider raising a climate-risk-linked corrective action.'}
           </div>
-          {items.map(item => (
-            <div key={`${item.pillar}-${item.recommendationCode}`} style={{
-              padding: '10px 0', borderBottom: '1px dashed var(--border)',
-              display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center',
-            }}>
-              <div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>({item.recommendationCode})</span>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>
-                    {lang === 'ar' ? item.titleAr : item.titleEn}
-                  </span>
-                </div>
-                {item.evidenceRef && (
-                  <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>
-                    {item.evidenceRef}
-                  </div>
-                )}
-              </div>
-              <Badge tone={STATUS_TONE[item.status]}>
-                {STATUS_LABEL[item.status][lang]}
-              </Badge>
-            </div>
-          ))}
         </div>
-      ))}
-    </Card>
+      )}
+
+      {/* Alignment KPI strip */}
+      <div className="kpi-grid">
+        <Kpi Icon={FileText}     label={isAr ? 'محاذاة TCFD' : 'TCFD alignment'} value={`${readiness?.alignmentPct ?? 0}%`}
+             tone={(readiness?.alignmentPct ?? 0) >= 80 ? 'success' : (readiness?.alignmentPct ?? 0) >= 50 ? 'warning' : 'danger'} />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'مُفصَح' : 'Disclosed'}    value={readiness?.byStatus.DISCLOSED ?? 0}      tone="success" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'جزئي' : 'Partial'}        value={readiness?.byStatus.PARTIAL ?? 0}        tone="warning" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'غير مُفصَح' : 'Not disclosed'} value={readiness?.byStatus.NOT_DISCLOSED ?? 0} tone="danger" />
+        <Kpi Icon={Paperclip}    label={isAr ? 'يتطلّب دليلاً' : 'Evidence required'} value={readiness?.byStatus.EVIDENCE_REQUIRED ?? 0} tone="danger" />
+        <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Under review'}      value={readiness?.byStatus.UNDER_REVIEW ?? 0}      tone="info" />
+      </div>
+
+      <Card title={isAr ? 'مصفوفة المحاذاة مع TCFD' : 'TCFD alignment matrix'} Icon={FileText}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+          {isAr
+            ? 'إفصاحات TCFD الـ 11 الموزّعة على 4 ركائز (الحوكمة، الاستراتيجية، إدارة المخاطر، المقاييس والأهداف). نفس قواعد CMA (5 و 6) تنطبق هنا، بالإضافة إلى القاعدة 7 لتوصية صمود الاستراتيجية.'
+            : 'TCFD’s 11 recommendations across the 4 pillars (Governance, Strategy, Risk Mgmt, Metrics & Targets). CMA Rules 5 + 6 apply here too, plus Rule 7 on the Strategy resilience recommendation.'}
+        </div>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : items.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد توصيات' : 'No recommendations'}</InlineEmpty>
+            : (['GOVERNANCE', 'STRATEGY', 'RISK_MGMT', 'METRICS_TARGETS'] as TcfdPillar[]).map(pillar => {
+                const pillarItems = byPillar.get(pillar) ?? [];
+                if (pillarItems.length === 0) return null;
+                return (
+                  <div key={pillar} style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>
+                      {tcfdPillarLabel(pillar, isAr ? 'ar' : 'en')}
+                    </div>
+                    {pillarItems.map(t => (
+                      <div key={t.id} style={{
+                        padding: '12px 0', borderBottom: '1px dashed var(--border)',
+                        display: 'grid', gridTemplateColumns: '1fr auto', gap: 10,
+                      }}>
+                        <div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                              ({t.recommendationCode})
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>
+                              {isAr && t.titleAr ? t.titleAr : t.titleEn}
+                            </span>
+                          </div>
+                          {(isAr ? t.recommendationAr : t.recommendationEn) && (
+                            <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                              {isAr && t.recommendationAr ? t.recommendationAr : t.recommendationEn}
+                            </div>
+                          )}
+                          {hasTcfdEvidence(t) && (
+                            <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <Paperclip size={10} />
+                              <span>{isAr ? 'الدليل:' : 'Evidence:'}</span>
+                              <span className="mono">{t.evidenceRef}</span>
+                            </div>
+                          )}
+                          {hasTcfdGap(t) && (
+                            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--warning-fg)', lineHeight: 1.5,
+                                padding: 8, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)' }}>
+                              <AlertCircle size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+                              <strong>{isAr ? 'فجوة:' : 'Gap:'}</strong>{' '}
+                              {isAr && t.gapDescriptionAr ? t.gapDescriptionAr : (t.gapDescriptionEn ?? t.gapDescriptionAr)}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', minWidth: 220 }}>
+                          <Badge tone={tcfdStatusTone(t.disclosureStatus)}>{tcfdStatusLabel(t.disclosureStatus, isAr ? 'ar' : 'en')}</Badge>
+                          <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {t.disclosureStatus !== 'DISCLOSED'     && <Button size="sm" variant="ghost" onClick={() => onMarkDisclosed(t)}>{isAr ? 'مُفصَح' : 'Disclosed'}</Button>}
+                            {t.disclosureStatus !== 'PARTIAL'       && <Button size="sm" variant="ghost" onClick={() => onMarkPartial(t)}>{isAr ? 'جزئي' : 'Partial'}</Button>}
+                            {t.disclosureStatus !== 'NOT_DISCLOSED' && <Button size="sm" variant="ghost" onClick={() => onMarkNotDisclosed(t)}>{isAr ? 'غير مُفصَح' : 'Not'}</Button>}
+                            {t.disclosureStatus !== 'UNDER_REVIEW'  && <Button size="sm" variant="ghost" onClick={() => onMarkUnderReview(t)}>{isAr ? 'مراجعة' : 'Review'}</Button>}
+                            {t.disclosureStatus !== 'NOT_APPLICABLE'&& <Button size="sm" variant="ghost" onClick={() => onMarkNotApplicable(t)}>{isAr ? 'لا ينطبق' : 'N/A'}</Button>}
+                          </div>
+                          <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <Button size="sm" variant="secondary" Icon={Paperclip}   onClick={() => setEvidencingId(t.id!)}>{isAr ? 'إرفاق' : 'Attach'}</Button>
+                            <Button size="sm" variant="secondary" Icon={AlertCircle} onClick={() => setGappingId({ id: t.id! })}>{isAr ? 'فجوة' : 'Gap'}</Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+      </Card>
+
+      <FormModal
+        open={evidencingId !== null}
+        title={isAr ? 'إرفاق دليل للتوصية' : 'Attach evidence to recommendation'}
+        fields={evidenceFields}
+        initial={{ evidenceRef: '', owner: '' }}
+        size="md"
+        submitLabel={isAr ? 'إرفاق' : 'Attach'}
+        onClose={() => setEvidencingId(null)}
+        onSubmit={submitAttachEvidence}
+      />
+      <FormModal
+        open={gappingId !== null}
+        title={
+          gappingId?.toStatus
+            ? (isAr ? `الفجوة مطلوبة لـ ${gappingId.toStatus === 'PARTIAL' ? 'الإفصاح الجزئي' : 'عدم الإفصاح'} (القاعدة 5)`
+                    : `Gap required for ${gappingId.toStatus === 'PARTIAL' ? 'Partial' : 'Not Disclosed'} (Rule 5)`)
+            : (isAr ? 'تسجيل فجوة' : 'Record gap')
+        }
+        fields={gapFields}
+        initial={{ gapEn: '', gapAr: '' }}
+        size="md"
+        submitLabel={isAr ? 'حفظ' : 'Save'}
+        onClose={() => setGappingId(null)}
+        onSubmit={submitGap}
+      />
+    </div>
   );
 }
 
