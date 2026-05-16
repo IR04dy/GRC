@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Database, FileText, Target, Wrench, AlertCircle, CheckCircle2,
-  Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon,
+  Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -21,6 +21,12 @@ import {
   cycleStatusTone, cycleStatusLabel, readinessTone, readinessLabel,
   type NdiAssessmentCycle, type NdiCycleAggregate,
 } from '../../lib/ndiCycles';
+import {
+  listFramework, frameworkAggregate, markOfficial, markPlaceholder,
+  importFrameworkJson, deleteFrameworkItem,
+  componentTone, componentLabel, priorityTone, priorityLabel,
+  type NdiFrameworkItem, type NdiFrameworkAggregate, type NdiComponent,
+} from '../../lib/ndiFramework';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -99,8 +105,9 @@ export function NdiPage() {
         ))}
       </div>
 
-      {tab === 'cycles' && <CyclesTab />}
-      {tab !== 'cycles' && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
+      {tab === 'cycles'    && <CyclesTab />}
+      {tab === 'framework' && <FrameworkTab />}
+      {tab !== 'cycles' && tab !== 'framework' && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
 }
@@ -336,10 +343,228 @@ function CyclesTab() {
   );
 }
 
+// ─── Framework Library tab (slice 2 — V67) ─────────────────────────
+
+function FrameworkTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [items, setItems] = useState<NdiFrameworkItem[]>([]);
+  const [agg, setAgg] = useState<NdiFrameworkAggregate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [filterComponent, setFilterComponent] = useState<NdiComponent | 'ALL'>('ALL');
+  const [importOpen, setImportOpen] = useState(false);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([listFramework({ size: 500 }), frameworkAggregate()]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل مكتبة الإطار' : 'Failed to load framework library'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  const filtered = useMemo(() => filterComponent === 'ALL'
+    ? items
+    : items.filter(i => i.component === filterComponent), [items, filterComponent]);
+
+  async function onMarkOfficial(it: NdiFrameworkItem) {
+    try { await markOfficial(it.id!); toast.success(isAr ? 'علّمت كرسمي' : 'Marked as official'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onMarkPlaceholder(it: NdiFrameworkItem) {
+    try { await markPlaceholder(it.id!); toast.info(isAr ? 'أُعيد وضع المؤقت' : 'Marked as placeholder'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onDelete(it: NdiFrameworkItem) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف العنصر؟' : 'Delete framework item?',
+      body: isAr ? 'حذف ناعم — يمكن استرجاعه من قاعدة البيانات.' : 'Soft delete — can be restored from the database.',
+      destructive: true, submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try { await deleteFrameworkItem(it.id!); toast.info(isAr ? 'تم الحذف' : 'Deleted'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function onImport(values: Record<string, unknown>) {
+    const raw = String(values.json ?? '').trim();
+    if (!raw) {
+      toast.danger(isAr ? 'الصق JSON' : 'Paste JSON');
+      return;
+    }
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); }
+    catch { toast.danger(isAr ? 'JSON غير صالح' : 'Invalid JSON'); return; }
+
+    const items = Array.isArray(parsed)
+      ? parsed
+      : (parsed as { items?: unknown }).items;
+    if (!Array.isArray(items)) {
+      toast.danger(isAr ? 'يجب أن يكون JSON مصفوفة أو {items: [...]}'
+                        : 'JSON must be an array or {items: [...]}');
+      return;
+    }
+
+    try {
+      const summary = await importFrameworkJson(items as Partial<NdiFrameworkItem>[]);
+      const msg = isAr
+        ? `أُدرج ${summary.inserted} • حُدّث ${summary.updated} • فشل ${summary.failed}`
+        : `${summary.inserted} inserted · ${summary.updated} updated · ${summary.failed} failed`;
+      if (summary.failed > 0) toast.warning(msg);
+      else toast.success(msg);
+      setImportOpen(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Import failed');
+    }
+  }
+
+  const importFields: FieldDef[] = [
+    { kind: 'textarea', key: 'json', span: 12, rows: 12,
+      label: isAr ? 'JSON للاستيراد' : 'JSON to import' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="kpi-grid">
+        <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}   value={agg?.total ?? 0}            tone="primary" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'بنود رسمية'   : 'Official'}      value={agg?.officialCount ?? 0}    tone="success" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'بنود مؤقتة'   : 'Placeholder'}   value={agg?.placeholderCount ?? 0} tone="warning" />
+        <Kpi Icon={Target}       label={isAr ? 'إلزامية'      : 'Mandatory'}     value={agg?.mandatoryCount ?? 0}   tone="danger" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'الامتثال'    : 'Compliance'}    value={agg?.byComponent.COMPLIANCE ?? 0}             tone="info" />
+        <Kpi Icon={Target}       label={isAr ? 'النضج'        : 'Maturity'}      value={agg?.byComponent.MATURITY ?? 0}               tone="primary" />
+        <Kpi Icon={Target}       label={isAr ? 'تميز تشغيلي' : 'Op. excellence'} value={agg?.byComponent.OPERATIONAL_EXCELLENCE ?? 0} tone="success" />
+      </div>
+
+      {agg && agg.placeholderCount > 0 && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 'var(--r-md)',
+          background: 'var(--warning-bg)', color: 'var(--warning-fg)',
+          border: '1px solid var(--warning)',
+          display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center',
+        }}>
+          <AlertCircle size={20} />
+          <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+            <strong>{isAr ? 'تنبيه:' : 'Notice:'}</strong>{' '}
+            {isAr
+              ? `${agg.placeholderCount} من أصل ${agg.total} عنصر مؤقت — يتطلب استيراد مكتبة الضوابط الرسمية من سدايا/نضيء قبل التقديم الرسمي.`
+              : `${agg.placeholderCount} of ${agg.total} items are placeholders — requires official SDAIA/NDI control library import before formal submission.`}
+          </div>
+        </div>
+      )}
+
+      <Card title={isAr ? 'مكتبة إطار نضيء' : 'NDI framework library'} Icon={FileText}
+        action={
+          <Button size="sm" variant="primary" Icon={Upload} onClick={() => setImportOpen(true)}>
+            {isAr ? 'استيراد JSON' : 'Import JSON'}
+          </Button>
+        }>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          {(['ALL', 'COMPLIANCE', 'MATURITY', 'OPERATIONAL_EXCELLENCE'] as const).map(c => (
+            <button key={c} onClick={() => setFilterComponent(c)}
+              style={{
+                padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                border: `1px solid ${filterComponent === c ? 'var(--primary)' : 'var(--border)'}`,
+                background: filterComponent === c ? 'var(--primary-50)' : 'var(--surface-1)',
+                color: filterComponent === c ? 'var(--primary)' : 'var(--ink-2)',
+                borderRadius: 'var(--r-sm)', cursor: 'pointer',
+              }}>
+              {c === 'ALL' ? (isAr ? 'الكل' : 'All') : componentLabel(c as NdiComponent, isAr ? 'ar' : 'en')}
+            </button>
+          ))}
+          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+            {filtered.length} / {items.length}
+          </span>
+        </div>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : filtered.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد بنود — ابدأ بالاستيراد' : 'No items — try import'}</InlineEmpty>
+            : (
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th>{isAr ? 'الكود' : 'Code'}</th>
+                    <th>{isAr ? 'العنوان' : 'Title'}</th>
+                    <th>{isAr ? 'المكوّن' : 'Component'}</th>
+                    <th>{isAr ? 'المجال' : 'Domain'}</th>
+                    <th>{isAr ? 'الأولوية' : 'Priority'}</th>
+                    <th>{isAr ? 'الإلزام' : 'Mandatory'}</th>
+                    <th>{isAr ? 'المصدر' : 'Source'}</th>
+                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(it => (
+                    <tr key={it.id}>
+                      <td className="mono text-2xs">{it.requirementCode}</td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{isAr && it.titleAr ? it.titleAr : it.titleEn}</div>
+                        {it.subdomain && (
+                          <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{it.subdomain}</div>
+                        )}
+                      </td>
+                      <td><Badge tone={componentTone(it.component)}>{componentLabel(it.component, isAr ? 'ar' : 'en')}</Badge></td>
+                      <td className="text-xs">{it.domain}</td>
+                      <td><Badge tone={priorityTone(it.priority)}>{priorityLabel(it.priority, isAr ? 'ar' : 'en')}</Badge></td>
+                      <td>{it.mandatory ? <Badge tone="danger">{isAr ? 'إلزامي' : 'Yes'}</Badge> : <span className="text-muted">—</span>}</td>
+                      <td>
+                        {it.isOfficialImport
+                          ? <Badge tone="success">{isAr ? 'رسمي' : 'Official'}</Badge>
+                          : <Badge tone="warning">{isAr ? 'مؤقت' : 'Placeholder'}</Badge>}
+                      </td>
+                      <td style={{ textAlign: 'end' }}>
+                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {!it.isOfficialImport && (
+                            <Button size="sm" variant="secondary" Icon={Check}
+                              onClick={() => onMarkOfficial(it)}>
+                              {isAr ? 'علّم رسمي' : 'Mark official'}
+                            </Button>
+                          )}
+                          {it.isOfficialImport && (
+                            <Button size="sm" variant="ghost" Icon={AlertCircle}
+                              onClick={() => onMarkPlaceholder(it)}
+                              title={isAr ? 'إعادة وضع المؤقت' : 'Mark as placeholder'} />
+                          )}
+                          <Button size="sm" variant="ghost" Icon={Trash2}
+                            title={isAr ? 'حذف' : 'Delete'}
+                            onClick={() => onDelete(it)} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+      </Card>
+
+      <FormModal
+        open={importOpen}
+        title={isAr ? 'استيراد بنود الإطار (JSON)' : 'Import framework items (JSON)'}
+        fields={importFields}
+        initial={{ json: '' }}
+        size="lg"
+        submitLabel={isAr ? 'استيراد' : 'Import'}
+        onClose={() => setImportOpen(false)}
+        onSubmit={onImport}
+      />
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
-  dashboard: 12, cycles: null, framework: 2, maturity: 3, compliance: 4,
+  dashboard: 12, cycles: null, framework: null, maturity: 3, compliance: 4,
   opex: 5, domains: 6, evidence: 7, gaps: 8, improvement: 9,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };
