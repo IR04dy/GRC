@@ -1466,6 +1466,7 @@ export const en = {
 
   // ESG / Saudi Green Initiative — C2.
   esgSidebar:              'ESG',
+  ndiSidebar:              'NDI · نضيء',
   esgTitle:                'ESG · Saudi Green Initiative',
   esgSub:                  'TCFD-aligned · CMA ESG annex · Vision 2030.',
   esgEyebrow:              'Sustainability',

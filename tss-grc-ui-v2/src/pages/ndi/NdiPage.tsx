@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Database, FileText, Target, Wrench, AlertCircle, CheckCircle2,
-  Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check,
+  Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check, Paperclip,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -34,6 +34,14 @@ import {
   maturityStatusTone, maturityStatusLabel, levelLabel, levelColor,
   type NdiMaturityAssessment, type NdiMaturityAggregate,
 } from '../../lib/ndiMaturity';
+import {
+  listCompliance, complianceAggregate, startComplianceForCycle,
+  setComplianceStatus, attachComplianceEvidence,
+  submitCompliance, markUnderReviewCompliance, returnCompliance,
+  approveCompliance, reopenCompliance,
+  complianceStatusLabel, lifecycleTone, lifecycleLabel,
+  type NdiComplianceAssessment, type NdiComplianceAggregate, type NdiComplianceStatus,
+} from '../../lib/ndiCompliance';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -112,10 +120,12 @@ export function NdiPage() {
         ))}
       </div>
 
-      {tab === 'cycles'    && <CyclesTab />}
-      {tab === 'framework' && <FrameworkTab />}
-      {tab === 'maturity'  && <MaturityTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
+      {tab === 'cycles'     && <CyclesTab />}
+      {tab === 'framework'  && <FrameworkTab />}
+      {tab === 'maturity'   && <MaturityTab />}
+      {tab === 'compliance' && <ComplianceTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance'
+        && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
 }
@@ -906,10 +916,342 @@ function MaturityTab() {
   );
 }
 
+// ─── Compliance Assessment tab (slice 4 — V69) ──────────────────────
+//
+// Mirrors MaturityTab in shape — cycle picker, bulk-start, KPI strip,
+// per-domain grouped items. Differs in the per-row interaction: instead
+// of a level dropdown, a compliance-status dropdown applies Rules 3/4/5
+// on the server side (auto-flips to EVIDENCE_REQUIRED when COMPLIANT
+// with no evidence, sets needs_gap=true for PARTIAL/NON_COMPLIANT,
+// refuses NOT_APPLICABLE without a justification).
+
+function ComplianceTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [items, setItems] = useState<NdiComplianceAssessment[]>([]);
+  const [agg, setAgg] = useState<NdiComplianceAggregate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [evidencing, setEvidencing] = useState<NdiComplianceAssessment | null>(null);
+
+  async function loadCycles() {
+    try {
+      const pg = await listCycles({ size: 100 });
+      setCycles(pg.content);
+      if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+    }
+  }
+  useEffect(() => { void loadCycles(); }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([
+        listCompliance(cycleId, { size: 500 }),
+        complianceAggregate(cycleId),
+      ]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل الامتثال' : 'Failed to load compliance'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
+
+  async function onStart() {
+    if (!cycleId) return;
+    try {
+      const s = await startComplianceForCycle(cycleId);
+      toast.success(isAr
+        ? `أُنشئ ${s.created} • تُجوهل ${s.skipped}`
+        : `Created ${s.created} · Skipped ${s.skipped}`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+
+  async function onStatusChange(it: NdiComplianceAssessment, status: NdiComplianceStatus) {
+    // Rule 5 — prompt for justification when picking NOT_APPLICABLE.
+    let justification: string | undefined;
+    if (status === 'NOT_APPLICABLE') {
+      const ans = await dialog.prompt({
+        title: isAr ? 'مبرر "غير منطبق" (القاعدة 5)' : 'NOT_APPLICABLE justification (Rule 5)',
+        label: isAr ? 'سبب عدم انطباق هذا البند' : 'Why is this item not applicable?',
+        type: 'textarea', required: true,
+        initial: it.naJustification ?? '',
+      });
+      if (!ans) return;
+      justification = ans;
+    }
+    try {
+      await setComplianceStatus(it.id!, status, justification);
+      toast.success(isAr ? 'تم تحديث الحالة' : 'Status updated');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onSubmit(it: NdiComplianceAssessment) {
+    try { await submitCompliance(it.id!); toast.success(isAr ? 'مُقدَّم' : 'Submitted'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onReview(it: NdiComplianceAssessment) {
+    try { await markUnderReviewCompliance(it.id!); toast.info(isAr ? 'تحت المراجعة' : 'Under review'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onReturn(it: NdiComplianceAssessment) {
+    const reason = await dialog.prompt({
+      title: isAr ? 'إعادة للتعديل' : 'Return for changes',
+      label: isAr ? 'سبب الإرجاع' : 'Reason',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
+    try { await returnCompliance(it.id!, reason); toast.info(isAr ? 'أُعيد' : 'Returned'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onApprove(it: NdiComplianceAssessment) {
+    const approverName = await dialog.prompt({
+      title: isAr ? 'اعتماد البند' : 'Approve item',
+      label: isAr ? 'اسم المعتمد' : 'Approver name',
+      required: true,
+    });
+    if (!approverName) return;
+    try { await approveCompliance(it.id!, approverName); toast.success(isAr ? 'مُعتمَد' : 'Approved'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onReopen(it: NdiComplianceAssessment) {
+    try { await reopenCompliance(it.id!); toast.info(isAr ? 'أُعيد الفتح' : 'Reopened'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function onSaveEvidence(values: Record<string, unknown>) {
+    if (!evidencing) return;
+    const ref = String(values.evidenceRef ?? '').trim();
+    if (!ref) { toast.danger(isAr ? 'المرجع مطلوب' : 'evidence_ref required'); return; }
+    try {
+      await attachComplianceEvidence(evidencing.id!, ref, String(values.evidenceOwner ?? '').trim() || undefined);
+      toast.success(isAr ? 'أُرفق الدليل' : 'Evidence attached');
+      setEvidencing(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }
+
+  const evidenceFields: FieldDef[] = [
+    { kind: 'text', key: 'evidenceRef',   required: true, span: 12,
+      label: isAr ? 'مرجع الدليل' : 'Evidence reference',
+      placeholder: 'e.g. Annual Report 2025 §3.4' },
+    { kind: 'text', key: 'evidenceOwner', span: 12,
+      label: isAr ? 'مالك الدليل' : 'Evidence owner' },
+  ];
+
+  const groupedByDomain = useMemo(() => {
+    const m = new Map<string, NdiComplianceAssessment[]>();
+    for (const i of items) {
+      if (!m.has(i.domain)) m.set(i.domain, []);
+      m.get(i.domain)!.push(i);
+    }
+    return m;
+  }, [items]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'تقييم الامتثال' : 'Compliance assessment'} Icon={CheckCircle2}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            <select
+              value={cycleId ?? ''}
+              onChange={e => setCycleId(Number(e.target.value))}
+              style={{
+                padding: '6px 10px', fontSize: 12, minWidth: 240,
+                border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                background: 'var(--surface-1)', color: 'var(--ink-1)',
+              }}>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={onStart}>
+              {isAr ? 'إنشاء بنود من الإطار' : 'Start from framework'}
+            </Button>
+          </div>
+        }>
+        {agg && (
+          <div className="kpi-grid">
+            <Kpi Icon={CheckCircle2} label={isAr ? 'نقاط الامتثال' : 'Compliance score'} value={`${Number(agg.compliancePct).toFixed(0)}%`}
+                 tone={agg.compliancePct >= 80 ? 'success' : agg.compliancePct >= 50 ? 'warning' : 'danger'} />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}     value={agg.total}                                  tone="primary" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'ملتزم' : 'Compliant'}              value={agg.byCompliance.COMPLIANT ?? 0}             tone="success" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'جزئي' : 'Partial'}                 value={agg.byCompliance.PARTIAL ?? 0}               tone="warning" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'غير ملتزم' : 'Non-compliant'}      value={agg.byCompliance.NON_COMPLIANT ?? 0}         tone="danger" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'يتطلب دليلاً' : 'Evidence req.'}    value={agg.evidenceRequiredCount}                  tone="warning" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'تحتاج فجوة' : 'Need gap'}          value={agg.needsGapCount}                          tone={agg.needsGapCount > 0 ? 'danger' : 'success'} />
+          </div>
+        )}
+      </Card>
+
+      {loading
+        ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+        : items.length === 0
+          ? <InlineEmpty>
+              <div>
+                {isAr ? 'لا توجد بنود امتثال في هذه الدورة بعد.' : 'No compliance items in this cycle yet.'}
+                <div style={{ marginTop: 8 }}>
+                  <Button variant="primary" Icon={Plus} onClick={onStart}>
+                    {isAr ? 'إنشاء من الإطار' : 'Generate from framework'}
+                  </Button>
+                </div>
+              </div>
+            </InlineEmpty>
+          : Array.from(groupedByDomain.entries()).map(([domain, rows]) => {
+              const domainPct = agg?.byDomainPct[domain];
+              return (
+                <Card key={domain}
+                  title={domain}
+                  Icon={CheckCircle2}
+                  action={domainPct != null
+                    ? <Badge tone={Number(domainPct) >= 80 ? 'success' : Number(domainPct) >= 50 ? 'warning' : 'danger'}>
+                        {Number(domainPct).toFixed(0)}%
+                      </Badge>
+                    : undefined}>
+                  <table className="grc-table">
+                    <thead>
+                      <tr>
+                        <th>{isAr ? 'الكود' : 'Code'}</th>
+                        <th style={{ width: 220 }}>{isAr ? 'حالة الامتثال' : 'Compliance status'}</th>
+                        <th>{isAr ? 'الدليل' : 'Evidence'}</th>
+                        <th>{isAr ? 'مسار العمل' : 'Lifecycle'}</th>
+                        <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(it => {
+                        const isApproved = it.lifecycleStatus === 'APPROVED';
+                        const canSubmit = ['DRAFT', 'IN_PROGRESS', 'RETURNED'].includes(it.lifecycleStatus);
+                        return (
+                          <tr key={it.id}>
+                            <td className="mono text-2xs">
+                              {it.requirementCode}
+                              {it.subdomain && (
+                                <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{it.subdomain}</div>
+                              )}
+                              {it.needsGap && (
+                                <Badge tone="danger">{isAr ? 'فجوة' : 'Gap'}</Badge>
+                              )}
+                            </td>
+                            <td>
+                              <select
+                                value={it.complianceStatus}
+                                disabled={isApproved}
+                                onChange={e => onStatusChange(it, e.target.value as NdiComplianceStatus)}
+                                style={{
+                                  padding: '4px 6px', fontSize: 12, width: '100%',
+                                  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                                  background: 'var(--surface-1)',
+                                }}>
+                                {(['COMPLIANT', 'PARTIAL', 'NON_COMPLIANT', 'NOT_APPLICABLE', 'EVIDENCE_REQUIRED', 'UNDER_REVIEW'] as NdiComplianceStatus[])
+                                  .map(s => (
+                                    <option key={s} value={s}>{complianceStatusLabel(s, isAr ? 'ar' : 'en')}</option>
+                                  ))}
+                              </select>
+                              {it.complianceStatus === 'NOT_APPLICABLE' && it.naJustification && (
+                                <div className="text-2xs text-muted" style={{ marginTop: 4, lineHeight: 1.4 }}>
+                                  {isAr ? 'المبرّر:' : 'Justification:'} {it.naJustification.slice(0, 80)}{it.naJustification.length > 80 ? '…' : ''}
+                                </div>
+                              )}
+                            </td>
+                            <td className="text-xs">
+                              {it.evidenceRef ?? <span className="text-muted">—</span>}
+                              {!it.evidenceRef && (it.complianceStatus === 'COMPLIANT' || it.complianceStatus === 'PARTIAL') && (
+                                <div style={{ fontSize: 10, color: 'var(--danger-fg)', marginTop: 2 }}>
+                                  {isAr ? 'القاعدة 3: مطلوب' : 'Rule 3: required'}
+                                </div>
+                              )}
+                            </td>
+                            <td><Badge tone={lifecycleTone(it.lifecycleStatus)}>{lifecycleLabel(it.lifecycleStatus, isAr ? 'ar' : 'en')}</Badge></td>
+                            <td style={{ textAlign: 'end' }}>
+                              <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                {!isApproved && (
+                                  <Button size="sm" variant="ghost" Icon={Paperclip}
+                                    onClick={() => setEvidencing(it)}>
+                                    {isAr ? 'إرفاق' : 'Attach'}
+                                  </Button>
+                                )}
+                                {canSubmit && (
+                                  <Button size="sm" variant="secondary" Icon={ArrowRight} onClick={() => onSubmit(it)}>
+                                    {isAr ? 'تقديم' : 'Submit'}
+                                  </Button>
+                                )}
+                                {it.lifecycleStatus === 'SUBMITTED' && (
+                                  <Button size="sm" variant="secondary" onClick={() => onReview(it)}>
+                                    {isAr ? 'مراجعة' : 'Review'}
+                                  </Button>
+                                )}
+                                {it.lifecycleStatus === 'UNDER_REVIEW' && (
+                                  <>
+                                    <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onApprove(it)}>
+                                      {isAr ? 'اعتماد' : 'Approve'}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => onReturn(it)}>
+                                      {isAr ? 'إعادة' : 'Return'}
+                                    </Button>
+                                  </>
+                                )}
+                                {isApproved && (
+                                  <Button size="sm" variant="ghost" onClick={() => onReopen(it)}>
+                                    {isAr ? 'إعادة فتح' : 'Reopen'}
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </Card>
+              );
+            })}
+
+      <FormModal
+        open={evidencing !== null}
+        title={isAr ? 'إرفاق دليل' : 'Attach evidence'}
+        fields={evidenceFields}
+        initial={{
+          evidenceRef: evidencing?.evidenceRef ?? '',
+          evidenceOwner: evidencing?.evidenceOwnerName ?? '',
+        }}
+        size="md"
+        submitLabel={isAr ? 'إرفاق' : 'Attach'}
+        onClose={() => setEvidencing(null)}
+        onSubmit={onSaveEvidence}
+      />
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
-  dashboard: 12, cycles: null, framework: null, maturity: null, compliance: 4,
+  dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
   opex: 5, domains: 6, evidence: 7, gaps: 8, improvement: 9,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };

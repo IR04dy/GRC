@@ -2,7 +2,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
-         Newspaper, Briefcase, Activity, Leaf, Layers, Compass, BookOpen, PenLine, Microscope,
+         Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
          Network, Share2, Bug,
          type LucideIcon } from 'lucide-react';
@@ -86,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'attestations', to: '/attestations',      Icon: FileCheck2,     labelKey: 'campaignsTitle' },
       { id: 'ethics',       to: '/ethics',            Icon: ShieldAlert,    labelKey: 'modEthics' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
+      { id: 'ndi',          to: '/ndi',               Icon: Database,       labelKey: 'ndiSidebar' },
     ],
   },
 
