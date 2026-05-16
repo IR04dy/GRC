@@ -56,11 +56,9 @@ public class SustainabilityDashboardService {
     private final SustainabilityEvidenceService evidenceService;
     private final MaterialTopicService         materialityService;
     private final EsgMetricService             metricsService;
-    // Climate-risk service intentionally not injected — the existing
-    // ClimateRiskOpportunityService aggregates are exposed via the
-    // climate-risks list endpoint; the dashboard pulls climate risk
-    // counts from the metrics aggregate to avoid widening the import
-    // surface. Heat-map rendering is client-side from the list call.
+    // Slice 14-D — climate-risk aggregate replaces the previous
+    // placeholder constant in climateTreatedRate().
+    private final com.tss.grc.module.sust.climate.service.ClimateRiskOpportunityService climateService;
 
     /**
      * Build the full dashboard payload. Returned shape is JSON-stable
@@ -191,19 +189,17 @@ public class SustainabilityDashboardService {
     }
 
     /**
-     * Climate risks marked TREATED or CLOSED / all. Pulled with a
-     * narrow direct repository call to avoid coupling the dashboard
-     * service to ClimateRiskOpportunityService internals.
+     * Climate risks marked TREATED or CLOSED / all. Reads from the
+     * ClimateRiskOpportunityService aggregate (slice 14-D). Replaces
+     * the previous placeholder constant.
+     *
+     * <p>The {@code year} parameter is currently unused — climate
+     * risks aren't year-scoped in V55. Kept on the signature so the
+     * caller can pass through the dashboard year without a branch.
      */
     private BigDecimal climateTreatedRate(Short year) {
-        // The climate risk service exposes a list endpoint paged.
-        // For the dashboard we just need counts — use the metrics
-        // aggregate as a proxy heuristic since both services don't
-        // share an injected helper. This is a known simplification.
-        // For now: return a placeholder that's enough to validate the
-        // composite score wiring. Refining this once the climate-risk
-        // service exposes an aggregate() endpoint.
-        return new BigDecimal("60");  // placeholder neutral score
+        Map<String, Object> agg = climateService.aggregate();
+        return asPct(agg.get("treatedRatePct"));
     }
 
     // ── Top gaps list ────────────────────────────────────────────────

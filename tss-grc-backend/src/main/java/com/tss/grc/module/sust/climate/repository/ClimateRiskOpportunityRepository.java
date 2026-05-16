@@ -20,4 +20,7 @@ public interface ClimateRiskOpportunityRepository extends JpaRepository<ClimateR
 
     /** Used by the dashboard widget — top-5 highest-scoring open items. */
     List<ClimateRiskOpportunity> findTop5ByOrganisationIdAndStatusNotOrderByRiskScoreDescIdDesc(Long org, String excludeStatus);
+
+    /** Full per-org pull — used by the aggregate / treated-rate computation. */
+    List<ClimateRiskOpportunity> findByOrganisationId(Long org);
 }

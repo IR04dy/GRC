@@ -49,6 +49,11 @@ public class ClimateRiskOpportunityController {
         return service.topByRisk();
     }
 
+    /** Whole-org rollup — drives the dashboard composite's climate-treated component. */
+    @GetMapping("/aggregate")
+    @PreAuthorize("isAuthenticated()")
+    public java.util.Map<String, Object> aggregate() { return service.aggregate(); }
+
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ClimateRiskOpportunity get(@PathVariable Long id) { return service.get(id); }

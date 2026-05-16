@@ -1512,6 +1512,7 @@ export const en = {
   esgTabMetrics:            'ESG metrics',
   esgTabEvidence:           'Evidence',
   esgTabSurvey:             'Vendor survey',
+  esgTabSettings:           'Settings',
 
   // ─── Annual Sustainability Annex (V57) ───────────────
   annexYear:           'Reporting year:',

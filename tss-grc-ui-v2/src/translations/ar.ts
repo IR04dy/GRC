@@ -1509,6 +1509,7 @@ export const ar = {
   esgTabMetrics:            'مؤشّرات الاستدامة',
   esgTabEvidence:           'مستودع الأدلة',
   esgTabSurvey:             'استبيان المورّدين',
+  esgTabSettings:           'الإعدادات',
 
   // ─── Annual Sustainability Annex (V57) ───────────────
   annexYear:           'سنة الإبلاغ:',
