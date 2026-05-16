@@ -42,6 +42,11 @@ import {
   complianceStatusLabel, lifecycleTone, lifecycleLabel,
   type NdiComplianceAssessment, type NdiComplianceAggregate, type NdiComplianceStatus,
 } from '../../lib/ndiCompliance';
+import {
+  listOpex, opexAggregate, updateOpexActual,
+  kpiStatusTone, kpiStatusLabel, progressFraction,
+  type NdiOpexKpi, type NdiOpexAggregate,
+} from '../../lib/ndiOpex';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -124,7 +129,8 @@ export function NdiPage() {
       {tab === 'framework'  && <FrameworkTab />}
       {tab === 'maturity'   && <MaturityTab />}
       {tab === 'compliance' && <ComplianceTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance'
+      {tab === 'opex'       && <OpexTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex'
         && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
@@ -1248,11 +1254,193 @@ function ComplianceTab() {
   );
 }
 
+// ─── Operational Excellence KPI tab (slice 5 — V70) ─────────────────
+//
+// Per-cycle KPI register. Differs from maturity/compliance:
+//   - No bulk-start from framework — KPIs are standalone metrics
+//   - Status is computed server-side from actual vs target (Rule 13)
+//   - Primary user action is "record new actual" (slider + as-of date)
+//   - Visualisation = progress bar toward target, not status badge alone
+
+function OpexTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [items, setItems] = useState<NdiOpexKpi[]>([]);
+  const [agg, setAgg] = useState<NdiOpexAggregate | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function loadCycles() {
+    try {
+      const pg = await listCycles({ size: 100 });
+      setCycles(pg.content);
+      if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+    }
+  }
+  useEffect(() => { void loadCycles(); }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([
+        listOpex(cycleId, { size: 500 }),
+        opexAggregate(cycleId),
+      ]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل المؤشّرات' : 'Failed to load KPIs'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
+
+  async function onUpdateActual(k: NdiOpexKpi) {
+    const ans = await dialog.prompt({
+      title: isAr ? 'تسجيل قراءة جديدة' : 'Record new actual',
+      label: isAr
+        ? `الهدف ${k.target}${k.unit ?? ''} • الحالي ${k.actual ?? '—'}${k.unit ?? ''}`
+        : `Target ${k.target}${k.unit ?? ''} · Current ${k.actual ?? '—'}${k.unit ?? ''}`,
+      type: 'number', required: true,
+      initial: String(k.actual ?? ''),
+    });
+    if (!ans) return;
+    try {
+      await updateOpexActual(k.id!, Number(ans));
+      toast.success(isAr ? 'تم التحديث وأُعيد حساب الحالة' : 'Updated · status recomputed');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  const groupedByCategory = useMemo(() => {
+    const m = new Map<string, NdiOpexKpi[]>();
+    for (const i of items) {
+      if (!m.has(i.category)) m.set(i.category, []);
+      m.get(i.category)!.push(i);
+    }
+    return m;
+  }, [items]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'مؤشّرات التميز التشغيلي' : 'Operational excellence KPIs'} Icon={Target}
+        action={
+          <select
+            value={cycleId ?? ''}
+            onChange={e => setCycleId(Number(e.target.value))}
+            style={{
+              padding: '6px 10px', fontSize: 12, minWidth: 240,
+              border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+              background: 'var(--surface-1)', color: 'var(--ink-1)',
+            }}>
+            {cycles.map(c => (
+              <option key={c.id} value={c.id}>
+                {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+              </option>
+            ))}
+          </select>
+        }>
+        {agg && (
+          <div className="kpi-grid">
+            <Kpi Icon={Target}       label={isAr ? 'نقاط التميز التشغيلي' : 'OpEx score'} value={`${Number(agg.opexScorePct).toFixed(0)}%`}
+                 tone={agg.opexScorePct >= 80 ? 'success' : agg.opexScorePct >= 50 ? 'warning' : 'danger'} />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي المؤشّرات' : 'Total KPIs'}    value={agg.total}                              tone="primary" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مُحقَّق'         : 'Achieved'}      value={agg.achievedCount}                      tone="success" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'على المسار'    : 'On track'}      value={agg.byStatus.ON_TRACK ?? 0}             tone="success" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'مُعرَّض'         : 'At risk'}       value={agg.atRiskCount}                        tone="warning" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'متأخّر'         : 'Behind plan'}   value={agg.behindPlanCount}                    tone={agg.behindPlanCount > 0 ? 'danger' : 'success'} />
+          </div>
+        )}
+      </Card>
+
+      {loading
+        ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+        : items.length === 0
+          ? <InlineEmpty>{isAr ? 'لا توجد مؤشّرات' : 'No KPIs yet'}</InlineEmpty>
+          : Array.from(groupedByCategory.entries()).map(([category, rows]) => (
+              <Card key={category} title={category} Icon={Target}>
+                <table className="grc-table">
+                  <thead>
+                    <tr>
+                      <th>{isAr ? 'الكود' : 'Code'}</th>
+                      <th>{isAr ? 'المؤشّر' : 'KPI'}</th>
+                      <th style={{ width: 220 }}>{isAr ? 'التقدّم' : 'Progress'}</th>
+                      <th>{isAr ? 'الحالة' : 'Status'}</th>
+                      <th>{isAr ? 'آخر تحديث' : 'Last updated'}</th>
+                      <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(k => {
+                      const pct = progressFraction(k) * 100;
+                      const barColor = k.status === 'ACHIEVED' || k.status === 'ON_TRACK' ? 'var(--success)'
+                                     : k.status === 'AT_RISK' ? 'var(--warning)'
+                                     : k.status === 'BEHIND_PLAN' ? 'var(--danger)'
+                                     : 'var(--surface-3)';
+                      return (
+                        <tr key={k.id}>
+                          <td className="mono text-2xs">{k.kpiCode ?? `#${k.id}`}</td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{isAr && k.indicatorNameAr ? k.indicatorNameAr : k.indicatorNameEn}</div>
+                            <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                              {isAr ? 'الهدف' : 'Target'}: {k.target}{k.unit ?? ''}{' · '}
+                              {isAr ? 'خط الأساس' : 'Baseline'}: {k.baseline ?? '—'}{k.unit ?? ''}
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{
+                                width: 100, height: 8, background: 'var(--surface-2)',
+                                borderRadius: 4, overflow: 'hidden', flexShrink: 0,
+                              }}>
+                                <div style={{
+                                  width: `${Math.min(100, Math.max(0, pct))}%`,
+                                  height: '100%', background: barColor,
+                                  transition: 'width 0.3s ease',
+                                }} />
+                              </div>
+                              <span className="mono text-2xs" style={{ minWidth: 80 }}>
+                                {k.actual ?? '—'}{k.unit ?? ''} / {k.target}{k.unit ?? ''}
+                              </span>
+                            </div>
+                          </td>
+                          <td><Badge tone={kpiStatusTone(k.status)}>{kpiStatusLabel(k.status, isAr ? 'ar' : 'en')}</Badge></td>
+                          <td className="text-xs">{k.lastActualAt ?? <span className="text-muted">—</span>}</td>
+                          <td style={{ textAlign: 'end' }}>
+                            <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onUpdateActual(k)}>
+                              {isAr ? 'تسجيل قراءة' : 'Record actual'}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Card>
+            ))}
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
   dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
-  opex: 5, domains: 6, evidence: 7, gaps: 8, improvement: 9,
+  opex: null, domains: 6, evidence: 7, gaps: 8, improvement: 9,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };
 
