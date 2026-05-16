@@ -82,6 +82,46 @@ export function generateAnnex(ryId: number) {
   return api.post<SustainabilityReport>(`/api/sustainability/reporting-years/${ryId}/generate-annex`);
 }
 
+/**
+ * Generic report generator (slice 12). Composes any of the 10 report
+ * types via the backend dispatcher.
+ */
+export function generateReport(ryId: number, type: ReportType) {
+  return api.post<SustainabilityReport>(
+    `/api/sustainability/reporting-years/${ryId}/generate`,
+    { type }
+  );
+}
+
+/** Bilingual labels for the 10 report types — used by the dropdown. */
+export function reportTypeLabel(type: ReportType, lang: 'en' | 'ar'): string {
+  const en: Record<ReportType, string> = {
+    ANNUAL_ANNEX:  'Annual Sustainability Annex',
+    BOARD_ESG:     'Board ESG Report',
+    CMA_MATRIX:    'CMA Disclosure Matrix',
+    TCFD_REPORT:   'TCFD Alignment Report',
+    GHG_REPORT:    'GHG Inventory Report',
+    SGI_PROGRESS:  'SGI Progress Report',
+    EVIDENCE_PKG:  'Evidence Package',
+    CLIMATE_RISK:  'Climate Risk Register',
+    CAPA_STATUS:   'Corrective Actions Status',
+    DASH_EXPORT:   'Executive Dashboard Export',
+  };
+  const ar: Record<ReportType, string> = {
+    ANNUAL_ANNEX:  'ملحق الاستدامة السنوي',
+    BOARD_ESG:     'تقرير الاستدامة لمجلس الإدارة',
+    CMA_MATRIX:    'مصفوفة إفصاحات CMA',
+    TCFD_REPORT:   'تقرير محاذاة TCFD',
+    GHG_REPORT:    'تقرير سجل الانبعاثات',
+    SGI_PROGRESS:  'تقرير تقدّم التزامات SGI',
+    EVIDENCE_PKG:  'حزمة الأدلة',
+    CLIMATE_RISK:  'سجلّ المخاطر المناخية',
+    CAPA_STATUS:   'تقرير حالة الإجراءات التصحيحية',
+    DASH_EXPORT:   'تصدير لوحة الإدارة',
+  };
+  return (lang === 'ar' ? ar : en)[type];
+}
+
 export function submitReport(id: number)  { return api.post<SustainabilityReport>(`/api/sustainability/reports/${id}/submit`); }
 export function approveReport(id: number) { return api.post<SustainabilityReport>(`/api/sustainability/reports/${id}/approve`); }
 export function publishReport(id: number) { return api.post<SustainabilityReport>(`/api/sustainability/reports/${id}/publish`); }

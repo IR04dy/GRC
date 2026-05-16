@@ -39,9 +39,16 @@ public class SustainabilityReportService {
     private static final Set<String> REPORT_STATUSES = Set.of("DRAFT","SUBMITTED","APPROVED","PUBLISHED","SUPERSEDED");
     private static final Set<String> YEAR_STATUSES   = Set.of("ACTIVE","DATA_COLLECTION","REVIEW","APPROVED","PUBLISHED","ARCHIVED");
 
+    /** Report types supported by ReportComposerService (slice 12). */
+    private static final Set<String> REPORT_TYPES = Set.of(
+        "ANNUAL_ANNEX", "BOARD_ESG", "CMA_MATRIX", "TCFD_REPORT",
+        "GHG_REPORT",   "SGI_PROGRESS", "CLIMATE_RISK", "CAPA_STATUS",
+        "EVIDENCE_PKG", "DASH_EXPORT");
+
     private final ReportingYearRepository           yearRepo;
     private final SustainabilityReportRepository    reportRepo;
     private final AnnexGeneratorService             generator;
+    private final ReportComposerService             composer;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -101,39 +108,101 @@ public class SustainabilityReportService {
     }
 
     /**
-     * Generate an annual annex report for the given reporting-year. Always
-     * creates a fresh DRAFT row — the caller can submit/approve later.
-     * Re-running generation produces a new draft row at version v(N+1).
+     * Generate an annual annex report — kept for backwards compatibility
+     * with the existing /generate-annex endpoint. Delegates to the
+     * generic {@link #generateReport(Long, String)}.
      */
     @Transactional
     public SustainabilityReport generateAnnex(Long ryId) {
+        return generateReport(ryId, "ANNUAL_ANNEX");
+    }
+
+    /**
+     * Generic report generator (slice 12). Dispatches per reportType
+     * through {@link ReportComposerService}. Always creates a fresh
+     * DRAFT row — re-running generates v(N+1) at the same type.
+     */
+    @Transactional
+    public SustainabilityReport generateReport(Long ryId, String reportType) {
+        if (!REPORT_TYPES.contains(reportType))
+            throw new IllegalArgumentException("Unknown reportType: " + reportType);
         ReportingYear ry = getYear(ryId);
 
-        var content = generator.generate(
+        var content = composer.compose(reportType,
             ry.getYear(),
             ry.getReportingEntityEn(),
             ry.getReportingEntityAr());
 
-        // Version = v{N+1} of the existing rows for this year + type.
+        // Version = v{N+1} of existing rows for this year + type.
         List<SustainabilityReport> existing = reportRepo
             .findByOrganisationIdAndReportingYearIdOrderByGeneratedAtDescIdDesc(org(), ryId);
-        long annualCount = existing.stream().filter(r -> "ANNUAL_ANNEX".equals(r.getReportType())).count();
-        String version = "v" + (annualCount + 1) + ".0";
+        long sameTypeCount = existing.stream().filter(r -> reportType.equals(r.getReportType())).count();
+        String version = "v" + (sameTypeCount + 1) + ".0";
 
         SustainabilityReport r = new SustainabilityReport();
         r.setOrganisationId(org());
         r.setReportingYearId(ryId);
-        r.setReportType("ANNUAL_ANNEX");
-        r.setTitleEn(String.format("Sustainability Annex %d — %s", ry.getYear(), ry.getReportingEntityEn()));
+        r.setReportType(reportType);
+        r.setTitleEn(reportTitleEn(reportType, ry.getYear(), ry.getReportingEntityEn()));
         r.setTitleAr(ry.getReportingEntityAr() == null ? null
-            : String.format("ملحق الاستدامة %d — %s", ry.getYear(), ry.getReportingEntityAr()));
+            : reportTitleAr(reportType, ry.getYear(), ry.getReportingEntityAr()));
         r.setVersion(version);
         r.setStatus("DRAFT");
-        r.setReportCode(String.format("ANN-%d-%s", ry.getYear(), version));
+        r.setReportCode(String.format("%s-%d-%s", reportCodePrefix(reportType), ry.getYear(), version));
         r.setContentMarkdown(content.markdown());
         r.setContentHtml(content.html());
         r.setContentJson(content.json());
         return reportRepo.save(r);
+    }
+
+    private static String reportTitleEn(String type, short year, String org) {
+        String name = switch (type) {
+            case "ANNUAL_ANNEX"  -> "Sustainability Annex";
+            case "BOARD_ESG"     -> "Board ESG Report";
+            case "CMA_MATRIX"    -> "CMA Disclosure Matrix";
+            case "TCFD_REPORT"   -> "TCFD Alignment Report";
+            case "GHG_REPORT"    -> "GHG Inventory Report";
+            case "SGI_PROGRESS"  -> "SGI Progress Report";
+            case "CLIMATE_RISK"  -> "Climate Risk & Opportunity Register";
+            case "CAPA_STATUS"   -> "Corrective Actions Status Report";
+            case "EVIDENCE_PKG"  -> "Evidence Package";
+            case "DASH_EXPORT"   -> "Executive Dashboard Export";
+            default -> "Sustainability Report";
+        };
+        return String.format("%s %d — %s", name, year, org == null ? "" : org);
+    }
+
+    private static String reportTitleAr(String type, short year, String orgAr) {
+        String name = switch (type) {
+            case "ANNUAL_ANNEX"  -> "ملحق الاستدامة";
+            case "BOARD_ESG"     -> "تقرير الاستدامة لمجلس الإدارة";
+            case "CMA_MATRIX"    -> "مصفوفة إفصاحات هيئة السوق المالية";
+            case "TCFD_REPORT"   -> "تقرير محاذاة TCFD";
+            case "GHG_REPORT"    -> "تقرير سجل الانبعاثات";
+            case "SGI_PROGRESS"  -> "تقرير تقدّم التزامات SGI";
+            case "CLIMATE_RISK"  -> "سجلّ المخاطر والفرص المناخية";
+            case "CAPA_STATUS"   -> "تقرير حالة الإجراءات التصحيحية";
+            case "EVIDENCE_PKG"  -> "حزمة الأدلة";
+            case "DASH_EXPORT"   -> "تصدير لوحة الإدارة";
+            default -> "تقرير استدامة";
+        };
+        return String.format("%s %d — %s", name, year, orgAr);
+    }
+
+    private static String reportCodePrefix(String type) {
+        return switch (type) {
+            case "ANNUAL_ANNEX"  -> "ANN";
+            case "BOARD_ESG"     -> "BRD";
+            case "CMA_MATRIX"    -> "CMA";
+            case "TCFD_REPORT"   -> "TCFD";
+            case "GHG_REPORT"    -> "GHG";
+            case "SGI_PROGRESS"  -> "SGI";
+            case "CLIMATE_RISK"  -> "CLI";
+            case "CAPA_STATUS"   -> "CAPA";
+            case "EVIDENCE_PKG"  -> "EVP";
+            case "DASH_EXPORT"   -> "DASH";
+            default -> "RPT";
+        };
     }
 
     @Transactional

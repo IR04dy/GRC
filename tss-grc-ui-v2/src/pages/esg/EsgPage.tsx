@@ -29,10 +29,12 @@ import {
   type GhgEmissionRecord, type GhgScope, type GhgAggregate, type GhgYoY,
 } from '../../lib/ghgInventory';
 import {
-  listReportingYears, listReportsForYear, generateAnnex,
+  listReportingYears, listReportsForYear, generateAnnex, generateReport,
+  reportTypeLabel,
   submitReport, approveReport, publishReport, exportReport,
   ryStatusTone, reportStatusTone,
   type ReportingYear as Ry, type SustainabilityReport as SR,
+  type ReportType,
 } from '../../lib/sustainabilityAnnex';
 import {
   listCapas, capaAggregate,
@@ -2558,6 +2560,8 @@ function AnnexTab() {
   const [loading, setLoading] = useState(true);
   const [generating, setGen]  = useState(false);
   const [previewId, setPreviewId] = useState<number | null>(null);
+  // Slice-12 — selected report type for the Generate flow.
+  const [selectedReportType, setSelectedReportType] = useState<ReportType>('ANNUAL_ANNEX');
 
   async function loadYears() {
     setLoading(true);
@@ -2592,7 +2596,11 @@ function AnnexTab() {
     if (!activeRy?.id) return;
     setGen(true);
     try {
-      const r = await generateAnnex(activeRy.id);
+      // Slice 12 — dispatch via the generic generator when a non-default
+      // type is selected; otherwise stay on the legacy endpoint.
+      const r = selectedReportType === 'ANNUAL_ANNEX'
+        ? await generateAnnex(activeRy.id)
+        : await generateReport(activeRy.id, selectedReportType);
       toast.success(t('annexGenerated').replace('{v}', r.version));
       await loadReports(activeRy.id);
       setPreviewId(r.id!);
@@ -2674,7 +2682,24 @@ function AnnexTab() {
               {activeRy.notes}
             </div>
           )}
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Slice-12 — report-type picker. Default ANNUAL_ANNEX
+                preserves the legacy one-button flow. */}
+            <select
+              value={selectedReportType}
+              onChange={e => setSelectedReportType(e.target.value as ReportType)}
+              style={{
+                padding: '8px 10px', fontSize: 12,
+                border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                background: 'var(--surface-1)', color: 'var(--ink-1)', minWidth: 240,
+              }}
+              disabled={generating}
+            >
+              {(['ANNUAL_ANNEX', 'BOARD_ESG', 'CMA_MATRIX', 'TCFD_REPORT', 'GHG_REPORT',
+                 'SGI_PROGRESS', 'CLIMATE_RISK', 'CAPA_STATUS', 'EVIDENCE_PKG', 'DASH_EXPORT'] as ReportType[]).map(t => (
+                <option key={t} value={t}>{reportTypeLabel(t, lang)}</option>
+              ))}
+            </select>
             <Button variant="primary" Icon={FileText} onClick={onGenerate} disabled={generating || !activeRy.id}>
               {generating ? t('annexGenerating') : t('annexGenerateBtn')}
             </Button>

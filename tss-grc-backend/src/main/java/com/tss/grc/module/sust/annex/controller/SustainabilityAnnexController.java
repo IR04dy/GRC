@@ -85,6 +85,22 @@ public class SustainabilityAnnexController {
         return ResponseEntity.status(201).body(service.generateAnnex(ryId));
     }
 
+    /**
+     * Generic report generator (slice 12). Body: {@code { "type": "..." }}
+     * where type is one of ANNUAL_ANNEX / BOARD_ESG / CMA_MATRIX /
+     * TCFD_REPORT / GHG_REPORT / SGI_PROGRESS / CLIMATE_RISK /
+     * CAPA_STATUS / EVIDENCE_PKG / DASH_EXPORT.
+     */
+    @PostMapping("/api/sustainability/reporting-years/{ryId}/generate")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<SustainabilityReport> generateReport(
+            @PathVariable Long ryId,
+            @RequestBody java.util.Map<String, String> body) {
+        String type = body == null ? null : body.get("type");
+        if (type == null || type.isBlank()) type = "ANNUAL_ANNEX";
+        return ResponseEntity.status(201).body(service.generateReport(ryId, type));
+    }
+
     @PostMapping("/api/sustainability/reports/{id}/submit")
     @PreAuthorize("isAuthenticated()")
     public SustainabilityReport submit(@PathVariable Long id) { return service.transitionReport(id, "SUBMITTED"); }
