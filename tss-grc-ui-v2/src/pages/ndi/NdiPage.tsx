@@ -27,6 +27,13 @@ import {
   componentTone, componentLabel, priorityTone, priorityLabel,
   type NdiFrameworkItem, type NdiFrameworkAggregate, type NdiComponent,
 } from '../../lib/ndiFramework';
+import {
+  listMaturity, maturityAggregate, startMaturityForCycle, updateMaturity,
+  submitMaturity, markUnderReviewMaturity, returnMaturity, approveMaturity,
+  reopenMaturity,
+  maturityStatusTone, maturityStatusLabel, levelLabel, levelColor,
+  type NdiMaturityAssessment, type NdiMaturityAggregate,
+} from '../../lib/ndiMaturity';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -107,7 +114,8 @@ export function NdiPage() {
 
       {tab === 'cycles'    && <CyclesTab />}
       {tab === 'framework' && <FrameworkTab />}
-      {tab !== 'cycles' && tab !== 'framework' && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
+      {tab === 'maturity'  && <MaturityTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
 }
@@ -561,10 +569,347 @@ function FrameworkTab() {
   );
 }
 
+// ─── Maturity Assessment tab (slice 3 — V68) ────────────────────────
+//
+// Per-cycle responses to MATURITY framework items. Picks the most-
+// recent active cycle on load; "Start maturity assessment" bulk-creates
+// rows from MATURITY framework items if none exist yet. Per-row edit
+// uses an inline level dropdown — submit/approve flows go through
+// state-machine endpoints with bilingual toasts.
+
+function MaturityTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [items, setItems] = useState<NdiMaturityAssessment[]>([]);
+  const [agg, setAgg] = useState<NdiMaturityAggregate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<NdiMaturityAssessment | null>(null);
+
+  async function loadCycles() {
+    try {
+      const pg = await listCycles({ size: 100 });
+      setCycles(pg.content);
+      if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+    }
+  }
+  useEffect(() => { void loadCycles(); }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([
+        listMaturity(cycleId, { size: 500 }),
+        maturityAggregate(cycleId),
+      ]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل النضج' : 'Failed to load maturity'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
+
+  async function onStart() {
+    if (!cycleId) return;
+    try {
+      const s = await startMaturityForCycle(cycleId);
+      toast.success(isAr
+        ? `أُنشئ ${s.created} • تُجوهل ${s.skipped}`
+        : `Created ${s.created} · Skipped ${s.skipped}`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+
+  async function onLevelChange(it: NdiMaturityAssessment, field: 'currentLevel' | 'targetLevel', val: number) {
+    try {
+      await updateMaturity(it.id!, { [field]: val });
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onSubmit(it: NdiMaturityAssessment) {
+    try { await submitMaturity(it.id!); toast.success(isAr ? 'مُقدَّم' : 'Submitted'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onReview(it: NdiMaturityAssessment) {
+    try { await markUnderReviewMaturity(it.id!); toast.info(isAr ? 'تحت المراجعة' : 'Under review'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onReturn(it: NdiMaturityAssessment) {
+    const reason = await dialog.prompt({
+      title: isAr ? 'إعادة للتعديل' : 'Return for changes',
+      label: isAr ? 'سبب الإرجاع' : 'Reason',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
+    try { await returnMaturity(it.id!, reason); toast.info(isAr ? 'أُعيد للتعديل' : 'Returned'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onApprove(it: NdiMaturityAssessment) {
+    const approverName = await dialog.prompt({
+      title: isAr ? 'اعتماد البند' : 'Approve item',
+      label: isAr ? 'اسم المعتمد' : 'Approver name',
+      required: true,
+    });
+    if (!approverName) return;
+    try { await approveMaturity(it.id!, approverName); toast.success(isAr ? 'مُعتمَد' : 'Approved'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  async function onReopen(it: NdiMaturityAssessment) {
+    try { await reopenMaturity(it.id!); toast.info(isAr ? 'أُعيد الفتح' : 'Reopened'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function onSaveEvidence(values: Record<string, unknown>) {
+    if (!editing) return;
+    try {
+      await updateMaturity(editing.id!, {
+        evidenceRef: String(values.evidenceRef ?? '').trim() || undefined,
+        responseTextEn: String(values.responseTextEn ?? '').trim() || undefined,
+        responseTextAr: String(values.responseTextAr ?? '').trim() || undefined,
+        justification:  String(values.justification  ?? '').trim() || undefined,
+      });
+      toast.success(isAr ? 'تم الحفظ' : 'Saved');
+      setEditing(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }
+
+  const evidenceFields: FieldDef[] = [
+    { kind: 'text',     key: 'evidenceRef',     span: 12,
+      label: isAr ? 'مرجع الدليل' : 'Evidence reference',
+      placeholder: 'e.g. Q1-2026-DG-policy.pdf' },
+    { kind: 'textarea', key: 'responseTextEn',  rows: 3, span: 12,
+      label: isAr ? 'الرد (إنجليزي)' : 'Response (English)' },
+    { kind: 'textarea', key: 'responseTextAr',  rows: 3, span: 12,
+      label: isAr ? 'الرد (عربي)' : 'Response (Arabic)' },
+    { kind: 'textarea', key: 'justification',   rows: 3, span: 12,
+      label: isAr ? 'مبرّر (إن كان الهدف < الحالي)' : 'Justification (if target < current)' },
+  ];
+
+  const groupedByDomain = useMemo(() => {
+    const m = new Map<string, NdiMaturityAssessment[]>();
+    for (const i of items) {
+      if (!m.has(i.domain)) m.set(i.domain, []);
+      m.get(i.domain)!.push(i);
+    }
+    return m;
+  }, [items]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'تقييم النضج' : 'Maturity assessment'} Icon={Target}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            <select
+              value={cycleId ?? ''}
+              onChange={e => setCycleId(Number(e.target.value))}
+              style={{
+                padding: '6px 10px', fontSize: 12, minWidth: 240,
+                border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                background: 'var(--surface-1)', color: 'var(--ink-1)',
+              }}>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={onStart}>
+              {isAr ? 'إنشاء بنود من الإطار' : 'Start from framework'}
+            </Button>
+          </div>
+        }>
+        {agg && (
+          <div className="kpi-grid">
+            <Kpi Icon={Target}       label={isAr ? 'نقاط النضج' : 'Maturity score'} value={`${Number(agg.maturityScorePct).toFixed(0)}%`}
+                 tone={agg.maturityScorePct >= 60 ? 'success' : agg.maturityScorePct >= 40 ? 'warning' : 'danger'} />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}    value={agg.total}            tone="primary" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'بلا رد'        : 'Unresponded'}    value={agg.unresponded}      tone="warning" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مُعتمَد'        : 'Approved'}      value={agg.byStatus.APPROVED ?? 0}  tone="success" />
+            <Kpi Icon={ArrowRight}   label={isAr ? 'تحسين مقترح'  : 'Improv. suggested'} value={agg.improvementSuggestedCount} tone="info" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'مخالفة القاعدة 2' : 'Rule 2 violations'} value={agg.rule2ViolationCount} tone={agg.rule2ViolationCount > 0 ? 'danger' : 'success'} />
+          </div>
+        )}
+      </Card>
+
+      {loading
+        ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+        : items.length === 0
+          ? <InlineEmpty>
+              <div>
+                {isAr ? 'لا توجد بنود نضج في هذه الدورة بعد.' : 'No maturity items in this cycle yet.'}
+                <div style={{ marginTop: 8 }}>
+                  <Button variant="primary" Icon={Plus} onClick={onStart}>
+                    {isAr ? 'إنشاء من الإطار' : 'Generate from framework'}
+                  </Button>
+                </div>
+              </div>
+            </InlineEmpty>
+          : Array.from(groupedByDomain.entries()).map(([domain, rows]) => {
+              const domainPct = agg?.byDomainPct[domain];
+              return (
+                <Card key={domain}
+                  title={domain}
+                  Icon={Target}
+                  action={domainPct != null
+                    ? <Badge tone={Number(domainPct) >= 60 ? 'success' : Number(domainPct) >= 40 ? 'warning' : 'danger'}>
+                        {Number(domainPct).toFixed(0)}%
+                      </Badge>
+                    : undefined}>
+                  <table className="grc-table">
+                    <thead>
+                      <tr>
+                        <th>{isAr ? 'البند' : 'Item'}</th>
+                        <th style={{ width: 130 }}>{isAr ? 'المستوى الحالي' : 'Current level'}</th>
+                        <th style={{ width: 130 }}>{isAr ? 'الهدف' : 'Target'}</th>
+                        <th>{isAr ? 'الحالة' : 'Status'}</th>
+                        <th>{isAr ? 'الدليل' : 'Evidence'}</th>
+                        <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(it => {
+                        const isApproved = it.status === 'APPROVED';
+                        const canSubmit = ['DRAFT', 'IN_PROGRESS', 'RETURNED'].includes(it.status);
+                        return (
+                          <tr key={it.id}>
+                            <td>
+                              <div className="text-2xs mono text-muted">{it.frameworkItemId}</div>
+                              <div className="text-2xs">{it.subdomain ?? '—'}</div>
+                              {it.improvementActionSuggested && (
+                                <Badge tone="info">{isAr ? 'تحسين مقترح' : 'Improvement suggested'}</Badge>
+                              )}
+                            </td>
+                            <td>
+                              <select
+                                value={it.currentLevel ?? ''}
+                                disabled={isApproved}
+                                onChange={e => onLevelChange(it, 'currentLevel', Number(e.target.value))}
+                                style={{
+                                  padding: '4px 6px', fontSize: 12, width: '100%',
+                                  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                                  background: 'var(--surface-1)',
+                                  borderLeft: `4px solid ${levelColor(it.currentLevel)}`,
+                                }}>
+                                <option value="">—</option>
+                                {[0, 1, 2, 3, 4, 5].map(l => (
+                                  <option key={l} value={l}>{l} · {levelLabel(l, isAr ? 'ar' : 'en')}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <select
+                                value={it.targetLevel ?? ''}
+                                disabled={isApproved}
+                                onChange={e => onLevelChange(it, 'targetLevel', Number(e.target.value))}
+                                style={{
+                                  padding: '4px 6px', fontSize: 12, width: '100%',
+                                  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                                  background: 'var(--surface-1)',
+                                  borderLeft: `4px solid ${levelColor(it.targetLevel)}`,
+                                }}>
+                                <option value="">—</option>
+                                {[0, 1, 2, 3, 4, 5].map(l => (
+                                  <option key={l} value={l}>{l} · {levelLabel(l, isAr ? 'ar' : 'en')}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td><Badge tone={maturityStatusTone(it.status)}>{maturityStatusLabel(it.status, isAr ? 'ar' : 'en')}</Badge></td>
+                            <td className="text-xs">
+                              {it.evidenceRef ?? <span className="text-muted">—</span>}
+                              {it.currentLevel != null && it.currentLevel >= 4 && !it.evidenceRef && (
+                                <div style={{ fontSize: 10, color: 'var(--danger-fg)', marginTop: 2 }}>
+                                  {isAr ? 'القاعدة 2: مطلوب' : 'Rule 2: required'}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'end' }}>
+                              <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                {!isApproved && (
+                                  <Button size="sm" variant="ghost" onClick={() => setEditing(it)}>
+                                    {isAr ? 'تعديل' : 'Edit'}
+                                  </Button>
+                                )}
+                                {canSubmit && (
+                                  <Button size="sm" variant="secondary" Icon={ArrowRight} onClick={() => onSubmit(it)}>
+                                    {isAr ? 'تقديم' : 'Submit'}
+                                  </Button>
+                                )}
+                                {it.status === 'SUBMITTED' && (
+                                  <Button size="sm" variant="secondary" onClick={() => onReview(it)}>
+                                    {isAr ? 'مراجعة' : 'Review'}
+                                  </Button>
+                                )}
+                                {it.status === 'UNDER_REVIEW' && (
+                                  <>
+                                    <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onApprove(it)}>
+                                      {isAr ? 'اعتماد' : 'Approve'}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => onReturn(it)}>
+                                      {isAr ? 'إعادة' : 'Return'}
+                                    </Button>
+                                  </>
+                                )}
+                                {isApproved && (
+                                  <Button size="sm" variant="ghost" onClick={() => onReopen(it)}>
+                                    {isAr ? 'إعادة فتح' : 'Reopen'}
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </Card>
+              );
+            })}
+
+      <FormModal
+        open={editing !== null}
+        title={isAr ? 'تعديل بند النضج' : 'Edit maturity item'}
+        fields={evidenceFields}
+        initial={{
+          evidenceRef:    editing?.evidenceRef ?? '',
+          responseTextEn: editing?.responseTextEn ?? '',
+          responseTextAr: editing?.responseTextAr ?? '',
+          justification:  editing?.justification ?? '',
+        }}
+        size="lg"
+        submitLabel={isAr ? 'حفظ' : 'Save'}
+        onClose={() => setEditing(null)}
+        onSubmit={onSaveEvidence}
+      />
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
-  dashboard: 12, cycles: null, framework: null, maturity: 3, compliance: 4,
+  dashboard: 12, cycles: null, framework: null, maturity: null, compliance: 4,
   opex: 5, domains: 6, evidence: 7, gaps: 8, improvement: 9,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };
