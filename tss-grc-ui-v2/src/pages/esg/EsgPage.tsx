@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Leaf, TrendingDown, Target, Calculator, FileText, Truck,
+  Leaf, TrendingDown, TrendingUp, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
   CloudLightning, Plus, ArrowRight, Link2, Wrench, Clock,
   Paperclip, Coins, Hourglass, X as XIcon,
@@ -86,9 +86,13 @@ import {
   type EvidenceApprovalStatus,
 } from '../../lib/sustainabilityEvidence';
 import {
+  getDashboard, esgBandTone, esgBandLabel, esgBandColor, topGapLabel,
+  type DashboardPayload,
+} from '../../lib/sustainabilityDashboard';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   SURVEY_TONE, SURVEY_LABEL,
-  aggregateEsg, yoyChange,
+  aggregateEsg,
   loadCalcEntries, appendCalcEntry, deleteCalcEntry,
   effectiveSurveys, saveSurveyOverride,
   subscribeEsg, buildEsgAnnex,
@@ -715,97 +719,510 @@ function CapaTab() {
   );
 }
 
-// ─── Overview tab ──────────────────────────────────────────────────────────
+// ─── Executive Sustainability Dashboard (V64 follow-up — slice 11) ──────────
+//
+// The 12-widget executive dashboard composed from /api/sustainability/
+// dashboard. One read-only round-trip hydrates every widget; widgets
+// pull from sub-objects on the payload (cma, tcfd, ghg, sgi, etc.).
+//
+// Widget grid (responsive auto-fit):
+//   Row 1 (hero):  ESG Overall Score gauge | Top Gaps panel
+//   Row 2 (GHG):   Total emissions card | Scope breakdown | Verification donut
+//   Row 3 (regs):  SGI tier counts | CMA readiness | TCFD alignment
+//   Row 4 (ops):   Climate risks | Corrective actions | Evidence completeness
+//   Row 5 (close): Annex readiness gauge | Materiality matrix preview
+//   Row 6 (trend): Existing emissions timeseries chart (preserved)
 
 function OverviewTab() {
-  const { t } = useI18n();
-  const maxTotal = Math.max(...EMISSIONS_TIMESERIES.map(r => r.scope1 + r.scope2 + r.scope3));
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+  const [data, setData] = useState<DashboardPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      setData(await getDashboard(2025));
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل لوحة المعلومات' : 'Failed to load dashboard'));
+      setData(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  if (loading) {
+    return <InlineEmpty>{isAr ? 'جارٍ تحميل لوحة المعلومات…' : 'Loading dashboard…'}</InlineEmpty>;
+  }
+  if (!data) {
+    return <InlineEmpty>{isAr ? 'لا توجد بيانات' : 'No data'}</InlineEmpty>;
+  }
 
   return (
-    <>
-      <Card title={t('esgTrendTitle')} Icon={TrendingDown}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
-          {t('esgTrendSub')}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Row 1: Hero — ESG Overall Score + Top Gaps ────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.5fr)', gap: 16 }}>
+        <EsgOverallScoreWidget data={data} isAr={isAr} />
+        <TopGapsWidget data={data} isAr={isAr} />
+      </div>
+
+      {/* ── Row 2: GHG cluster ───────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+        <GhgTotalWidget data={data} isAr={isAr} />
+        <ScopeBreakdownWidget data={data} isAr={isAr} />
+        <VerificationStatusWidget data={data} isAr={isAr} />
+      </div>
+
+      {/* ── Row 3: Regulatory readiness ──────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+        <SgiProgressWidget data={data} isAr={isAr} />
+        <CmaReadinessWidget data={data} isAr={isAr} />
+        <TcfdAlignmentWidget data={data} isAr={isAr} />
+      </div>
+
+      {/* ── Row 4: Operational tracking ──────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+        <ClimateRiskWidget data={data} isAr={isAr} />
+        <CapaTrackerWidget data={data} isAr={isAr} />
+        <EvidenceCompletenessWidget data={data} isAr={isAr} />
+      </div>
+
+      {/* ── Row 5: Annex readiness + Materiality matrix ──────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.5fr)', gap: 16 }}>
+        <AnnexReadinessWidget data={data} isAr={isAr} />
+        <MaterialityMatrixWidget data={data} isAr={isAr} />
+      </div>
+
+      {/* ── Row 6: Emissions timeseries trend (preserved chart) ──── */}
+      <Card title={isAr ? 'مسار الانبعاثات السنوية' : 'Annual emissions trend'} Icon={TrendingDown}>
+        <EmissionsTrendChart isAr={isAr} />
+      </Card>
+    </div>
+  );
+}
+
+// ─── Dashboard widgets ──────────────────────────────────────────────────────
+
+function EsgOverallScoreWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const score = Number(data.overall.score);
+  const band = data.overall.band;
+  const color = esgBandColor(band);
+  // SVG ring: arc length proportional to score
+  const radius = 64;
+  const stroke = 12;
+  const circ = 2 * Math.PI * radius;
+  const dash = (Math.min(100, Math.max(0, score)) / 100) * circ;
+
+  return (
+    <Card title={isAr ? 'مؤشّر الاستدامة الشامل' : 'ESG Overall Score'} Icon={Target}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <svg width={160} height={160} viewBox="0 0 160 160">
+          <circle cx={80} cy={80} r={radius} stroke="var(--surface-2)" strokeWidth={stroke} fill="none" />
+          <circle cx={80} cy={80} r={radius} stroke={color} strokeWidth={stroke} fill="none"
+                  strokeDasharray={`${dash} ${circ}`} strokeDashoffset={0}
+                  strokeLinecap="round" transform="rotate(-90 80 80)" />
+          <text x={80} y={78} textAnchor="middle" style={{ fontSize: 32, fontWeight: 800, fill: 'var(--ink-1)' }}>{score}</text>
+          <text x={80} y={100} textAnchor="middle" style={{ fontSize: 11, fill: 'var(--ink-3)' }}>/ 100</text>
+        </svg>
+        <div style={{ flex: 1 }}>
+          <Badge tone={esgBandTone(band)}>{esgBandLabel(band, isAr ? 'ar' : 'en')}</Badge>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.5 }}>
+            {isAr
+              ? 'مؤشّر مركّب موزون (التحقّق من الانبعاثات + التزامات SGI + إفصاحات CMA + TCFD + الإجراءات التصحيحية + الأدلة + المخاطر المناخية).'
+              : 'Weighted composite (GHG verification + SGI on-track + CMA + TCFD + corrective actions + evidence + climate risks).'}
+          </div>
+          <details style={{ marginTop: 8, fontSize: 11 }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--ink-2)', fontWeight: 600 }}>
+              {isAr ? 'تفاصيل الحساب' : 'Score breakdown'}
+            </summary>
+            <table style={{ width: '100%', marginTop: 6, fontSize: 11 }}>
+              <tbody>
+                {Object.entries(data.overall.breakdown).map(([k, v]) => (
+                  <tr key={k}>
+                    <td style={{ color: 'var(--ink-3)', padding: '2px 0' }}>{k}</td>
+                    <td className="mono" style={{ textAlign: 'end' }}>{Number(v).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
         </div>
-        {/* Stacked bar chart */}
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${EMISSIONS_TIMESERIES.length}, 1fr)`, gap: 12, alignItems: 'end', height: 220 }}>
-          {EMISSIONS_TIMESERIES.map(r => {
-            const total = r.scope1 + r.scope2 + r.scope3;
-            const heightPct = (total / maxTotal) * 100;
-            const s1Pct = (r.scope1 / total) * 100;
-            const s2Pct = (r.scope2 / total) * 100;
-            const s3Pct = (r.scope3 / total) * 100;
-            return (
-              <div key={r.year} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
-                <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column-reverse', alignItems: 'center' }}>
-                  <div style={{ width: '60%', height: `${heightPct}%`, display: 'flex', flexDirection: 'column', borderRadius: '4px 4px 0 0', overflow: 'hidden', boxShadow: '0 1px 0 rgba(0,0,0,0.08)' }}>
-                    <div style={{ flex: s3Pct, background: '#f59e0b', minHeight: 2 }} title={`Scope 3: ${r.scope3.toLocaleString()}`} />
-                    <div style={{ flex: s2Pct, background: '#0ea5e9', minHeight: 2 }} title={`Scope 2: ${r.scope2.toLocaleString()}`} />
-                    <div style={{ flex: s1Pct, background: '#10b981', minHeight: 2 }} title={`Scope 1: ${r.scope1.toLocaleString()}`} />
-                  </div>
-                </div>
-                <div style={{ fontSize: 11, fontWeight: 700 }}>{r.year}</div>
-                <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{(total / 1000).toFixed(0)}k</div>
+      </div>
+    </Card>
+  );
+}
+
+function TopGapsWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  return (
+    <Card title={isAr ? 'أبرز الثغرات التنفيذية' : 'Top ESG gaps'} Icon={AlertCircle}>
+      {data.topGaps.length === 0 ? (
+        <div style={{ padding: 12, fontSize: 12, color: 'var(--success-fg)', lineHeight: 1.5 }}>
+          <CheckCircle2 size={14} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 6 }} />
+          {isAr ? 'لا توجد ثغرات تنفيذية ظاهرة في الدورة الحالية.' : 'No executive-level gaps detected for the current cycle.'}
+        </div>
+      ) : (
+        <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.8 }}>
+          {data.topGaps.map(g => (
+            <li key={g} style={{ marginBottom: 6 }}>
+              <span style={{ color: g.includes('OVERDUE') || g.includes('SCOPE_3') || g.includes('RESILIENCE') ? 'var(--danger-fg)' : 'var(--warning-fg)' }}>●</span>
+              {' '}
+              {topGapLabel(g, isAr ? 'ar' : 'en')}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function GhgTotalWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const total = Number(data.ghg.grandTotal);
+  const yoy = Number(data.ghgYoy.totalYoY);
+  return (
+    <Card title={isAr ? 'إجمالي الانبعاثات' : 'GHG total emissions'} Icon={Leaf}>
+      <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--ink-1)', lineHeight: 1, letterSpacing: '-0.025em' }}>
+        {total.toLocaleString()}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>tCO2e — {data.ghg.year}</div>
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+        <span style={{ color: yoy < 0 ? 'var(--success-fg)' : yoy > 0 ? 'var(--danger-fg)' : 'var(--ink-3)' }}>
+          {yoy < 0 ? <TrendingDown size={14} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : <TrendingUp size={14} style={{ display: 'inline-block', verticalAlign: 'middle' }} />}
+          {' '}{yoy > 0 ? '+' : ''}{yoy.toFixed(1)}% {isAr ? 'مقارنة بـ' : 'vs'} {data.ghgYoy.year - 1}
+        </span>
+      </div>
+      {data.ghg.scope3PartialFlag && (
+        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warning-fg)' }}>
+          <AlertCircle size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+          {isAr ? 'تغطية النطاق 3 جزئية' : 'Scope 3 partial coverage'} ({Number(data.ghg.scope3Coverage).toFixed(0)}%)
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ScopeBreakdownWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const s1 = Number(data.ghg.scope1Total);
+  const s2 = Number(data.ghg.scope2Total);
+  const s3 = Number(data.ghg.scope3Total);
+  const total = s1 + s2 + s3;
+  const rows = [
+    { label: isAr ? 'النطاق 1' : 'Scope 1', value: s1, color: '#10b981', yoy: Number(data.ghgYoy.scope1YoY) },
+    { label: isAr ? 'النطاق 2' : 'Scope 2', value: s2, color: '#0ea5e9', yoy: Number(data.ghgYoy.scope2YoY) },
+    { label: isAr ? 'النطاق 3' : 'Scope 3', value: s3, color: '#f59e0b', yoy: Number(data.ghgYoy.scope3YoY) },
+  ];
+  return (
+    <Card title={isAr ? 'توزيع النطاقات' : 'Scope breakdown'} Icon={Leaf}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {rows.map(r => {
+          const pct = total > 0 ? (r.value / total) * 100 : 0;
+          return (
+            <div key={r.label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600 }}>{r.label}</span>
+                <span className="mono">{r.value.toLocaleString()} ({pct.toFixed(0)}%)</span>
               </div>
-            );
+              <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: r.color, borderRadius: 3 }} />
+              </div>
+              <div className="text-2xs" style={{ marginTop: 2, color: r.yoy < 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
+                YoY {r.yoy > 0 ? '+' : ''}{r.yoy.toFixed(1)}%
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function VerificationStatusWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  // Verification rate from the dashboard breakdown
+  const verifRate = Number(data.overall.breakdown.ghgVerification);
+  return (
+    <Card title={isAr ? 'حالة التحقّق' : 'Verification status'} Icon={CheckCircle2}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ position: 'relative', width: 100, height: 100 }}>
+          <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx={50} cy={50} r={40} stroke="var(--surface-2)" strokeWidth={12} fill="none" />
+            <circle cx={50} cy={50} r={40} stroke="var(--success)" strokeWidth={12} fill="none"
+                    strokeDasharray={`${(verifRate / 100) * 2 * Math.PI * 40} ${2 * Math.PI * 40}`}
+                    strokeLinecap="round" />
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: 18, fontWeight: 800 }}>{verifRate.toFixed(0)}%</div>
+            <div style={{ fontSize: 9, color: 'var(--ink-3)' }}>{isAr ? 'مُتحقَّق' : 'verified'}</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5, flex: 1 }}>
+          {isAr
+            ? `${data.ghg.recordCount} سجل انبعاثات إجمالاً. التحقّق الخارجي يدعم الإفصاحات الرئيسية.`
+            : `${data.ghg.recordCount} GHG records total. External verification underpins the headline disclosures.`}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function SgiProgressWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const onTrack = data.sgi.byTier.ON_TRACK ?? 0;
+  const atRisk  = data.sgi.byTier.AT_RISK ?? 0;
+  const delayed = data.sgi.byTier.DELAYED ?? 0;
+  const total = onTrack + atRisk + delayed;
+  return (
+    <Card title={isAr ? 'التزامات SGI' : 'SGI commitments'} Icon={Target}>
+      <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>
+        {onTrack}/{total} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-3)' }}>{isAr ? 'على المسار' : 'on track'}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 12, fontSize: 11 }}>
+        <div style={{ padding: 8, background: 'var(--success-bg)', borderRadius: 'var(--r-sm)' }}>
+          <div style={{ color: 'var(--success-fg)', fontWeight: 700, fontSize: 16 }}>{onTrack}</div>
+          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'على المسار' : 'On track'}</div>
+        </div>
+        <div style={{ padding: 8, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)' }}>
+          <div style={{ color: 'var(--warning-fg)', fontWeight: 700, fontSize: 16 }}>{atRisk}</div>
+          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'مُعرَّض' : 'At risk'}</div>
+        </div>
+        <div style={{ padding: 8, background: 'var(--danger-bg)', borderRadius: 'var(--r-sm)' }}>
+          <div style={{ color: 'var(--danger-fg)', fontWeight: 700, fontSize: 16 }}>{delayed}</div>
+          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'متأخّر' : 'Delayed'}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function CmaReadinessWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const pct = data.cma.readinessPct;
+  const disclosed = data.cma.byStatus.DISCLOSED ?? 0;
+  const partial   = data.cma.byStatus.PARTIAL ?? 0;
+  const evidenceReq = data.cma.byStatus.EVIDENCE_REQUIRED ?? 0;
+  return (
+    <Card title={isAr ? 'جاهزية إفصاحات CMA' : 'CMA disclosure readiness'} Icon={FileText}>
+      <div style={{ fontSize: 24, fontWeight: 800 }}>{pct}%</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+        {disclosed}/{data.cma.applicable} {isAr ? 'مُفصَح' : 'disclosed'}
+      </div>
+      <div style={{ height: 8, background: 'var(--surface-2)', borderRadius: 4, marginBottom: 8 }}>
+        <div style={{ height: '100%', width: `${pct}%`,
+          background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)',
+          borderRadius: 4 }} />
+      </div>
+      <div style={{ display: 'flex', gap: 6, fontSize: 10, flexWrap: 'wrap' }}>
+        <Badge tone="warning">{partial} {isAr ? 'جزئي' : 'Partial'}</Badge>
+        {evidenceReq > 0 && <Badge tone="danger">{evidenceReq} {isAr ? 'يتطلّب دليلاً' : 'Evidence req.'}</Badge>}
+      </div>
+    </Card>
+  );
+}
+
+function TcfdAlignmentWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const pct = data.tcfd.alignmentPct;
+  return (
+    <Card title={isAr ? 'محاذاة TCFD' : 'TCFD alignment'} Icon={FileText}>
+      <div style={{ fontSize: 24, fontWeight: 800 }}>{pct}%</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+        {data.tcfd.byStatus.DISCLOSED}/{data.tcfd.applicable} {isAr ? 'مُفصَح' : 'disclosed'}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, fontSize: 10, marginBottom: 8 }}>
+        {(['GOVERNANCE', 'STRATEGY', 'RISK_MGMT', 'METRICS_TARGETS'] as const).map(p => {
+          const total = data.tcfd.byPillar[p] ?? 0;
+          const ok = data.tcfd.disclosedByPillar[p] ?? 0;
+          return (
+            <div key={p} style={{ padding: 6, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, fontSize: 12 }}>{ok}/{total}</div>
+              <div style={{ color: 'var(--ink-3)', fontSize: 9, marginTop: 2 }}>
+                {p === 'GOVERNANCE' ? (isAr ? 'حوكمة' : 'Gov')
+                 : p === 'STRATEGY' ? (isAr ? 'استراتيجية' : 'Strat')
+                 : p === 'RISK_MGMT' ? (isAr ? 'مخاطر' : 'Risk')
+                 : (isAr ? 'مقاييس' : 'Metrics')}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {data.tcfd.strategyResilienceGap && (
+        <div style={{ fontSize: 10, color: 'var(--warning-fg)' }}>
+          <AlertCircle size={10} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+          {isAr ? 'القاعدة 7: ثغرة في صمود الاستراتيجية' : 'Rule 7: Strategy resilience gap'}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ClimateRiskWidget({ isAr }: { data: DashboardPayload; isAr: boolean }) {
+  // Lean preview — the full heat-map lives on the climate-risks tab.
+  // Dashboard shows the 5×5 grid with placeholder counts.
+  return (
+    <Card title={isAr ? 'مصفوفة المخاطر المناخية' : 'Climate risk heatmap'} Icon={CloudLightning}>
+      <div style={{ position: 'relative', width: '100%', maxWidth: 180, aspectRatio: '1 / 1', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gridTemplateRows: 'repeat(5, 1fr)', gap: 2, width: '100%', height: '100%' }}>
+          {Array.from({ length: 25 }, (_, i) => {
+            const x = i % 5;
+            const y = Math.floor(i / 5);
+            const severity = (4 - y) * (x + 1);  // higher right + top = worse
+            const bg = severity >= 16 ? 'var(--danger)'
+                    : severity >= 9 ? 'var(--warning)'
+                    : severity >= 4 ? 'var(--info)' : 'var(--success-bg)';
+            return <div key={i} style={{ background: bg, borderRadius: 2 }} />;
           })}
         </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 16, fontSize: 11, color: 'var(--ink-3)' }}>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#10b981', borderRadius: 2, verticalAlign: 'middle', marginInlineEnd: 4 }} />{t('esgKpiScope1')}</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#0ea5e9', borderRadius: 2, verticalAlign: 'middle', marginInlineEnd: 4 }} />{t('esgKpiScope2')}</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#f59e0b', borderRadius: 2, verticalAlign: 'middle', marginInlineEnd: 4 }} />{t('esgKpiScope3')}</span>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--ink-3)', textAlign: 'center', marginTop: 8 }}>
+        {isAr ? 'الأثر × الاحتمالية' : 'Impact × Likelihood'}
+      </div>
+    </Card>
+  );
+}
+
+function CapaTrackerWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  return (
+    <Card title={isAr ? 'الإجراءات التصحيحية' : 'Corrective actions'} Icon={Wrench}>
+      <div style={{ fontSize: 24, fontWeight: 800 }}>{data.capa.activeTotal}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>{isAr ? 'نشطة' : 'active'}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, fontSize: 10 }}>
+        <div style={{ padding: 6, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.capa.open}</div>
+          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'مفتوحة' : 'Open'}</div>
         </div>
-      </Card>
+        <div style={{ padding: 6, background: 'var(--info-bg)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.capa.inProgress}</div>
+          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'تنفيذ' : 'WIP'}</div>
+        </div>
+        <div style={{ padding: 6, background: 'var(--success-bg)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.capa.verified}</div>
+          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'مُتحقَّق' : 'Verified'}</div>
+        </div>
+        <div style={{ padding: 6, background: data.capa.overdue > 0 ? 'var(--danger-bg)' : 'var(--surface-2)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: data.capa.overdue > 0 ? 'var(--danger-fg)' : undefined }}>{data.capa.overdue}</div>
+          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'متأخّرة' : 'Overdue'}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
-      <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Card title={t('esgScopeBreakdownTitle')} Icon={Leaf}>
-          <table className="tbl" style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>{t('esgScope')}</th>
-                <th>tCO2e</th>
-                <th>{t('esgYoY')}</th>
-                <th>{t('esgVerified')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[1, 2, 3].map(scope => {
-                const v = scope === 1 ? CURRENT_YEAR_RECORD.scope1 : scope === 2 ? CURRENT_YEAR_RECORD.scope2 : CURRENT_YEAR_RECORD.scope3;
-                const yoy = yoyChange(scope as 1 | 2 | 3);
-                const verified = scope === 1 ? CURRENT_YEAR_RECORD.verifiedScope1 : scope === 2 ? CURRENT_YEAR_RECORD.verifiedScope2 : CURRENT_YEAR_RECORD.verifiedScope3;
-                return (
-                  <tr key={scope}>
-                    <td><Badge tone="primary">Scope {scope}</Badge></td>
-                    <td className="mono">{v.toLocaleString()}</td>
-                    <td className="mono">
-                      <span style={{ color: yoy < 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
-                        {yoy > 0 ? '+' : ''}{yoy}%
-                      </span>
-                    </td>
-                    <td>
-                      {verified
-                        ? <Badge tone="success">{t('esgVerifiedYes')}</Badge>
-                        : <Badge tone="warning">{t('esgVerifiedNo')}</Badge>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 10, lineHeight: 1.5 }}>
-            {t('esgScope3Coverage')}: {CURRENT_YEAR_RECORD.scope3CoveragePct}%
+function EvidenceCompletenessWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const approved = data.evidence.byStatus.APPROVED ?? 0;
+  const total = data.evidence.total;
+  const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
+  return (
+    <Card title={isAr ? 'اكتمال الأدلة' : 'Evidence completeness'} Icon={Paperclip}>
+      <div style={{ fontSize: 24, fontWeight: 800 }}>{pct}%</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+        {approved}/{total} {isAr ? 'معتمدة' : 'approved'}
+      </div>
+      <div style={{ height: 8, background: 'var(--surface-2)', borderRadius: 4, marginBottom: 8 }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--info)' : 'var(--warning)', borderRadius: 4 }} />
+      </div>
+      {data.evidence.expiringSoon30d > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--warning-fg)' }}>
+          <Clock size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+          {data.evidence.expiringSoon30d} {isAr ? 'تنتهي خلال 30 يوماً' : 'expiring in 30d'}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function AnnexReadinessWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  // Composite — averages CMA readiness + TCFD alignment + evidence approval rate
+  const cma = data.cma.readinessPct;
+  const tcfd = data.tcfd.alignmentPct;
+  const evidence = Number(data.overall.breakdown.evidenceApproved);
+  const composite = Math.round((cma + tcfd + evidence) / 3);
+  return (
+    <Card title={isAr ? 'جاهزية الملحق السنوي' : 'Annex readiness gauge'} Icon={FileText}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0' }}>
+        <svg viewBox="0 0 200 110" style={{ width: '100%', maxWidth: 200 }}>
+          {/* Semi-circle gauge */}
+          <path d="M 20 100 A 80 80 0 0 1 180 100" stroke="var(--surface-2)" strokeWidth={14} fill="none" />
+          <path d={`M 20 100 A 80 80 0 0 1 ${20 + (160 * composite / 100)} ${100 - Math.sin(Math.PI * composite / 100) * 80}`}
+                stroke={composite >= 80 ? 'var(--success)' : composite >= 50 ? 'var(--warning)' : 'var(--danger)'}
+                strokeWidth={14} fill="none" strokeLinecap="round" />
+          <text x={100} y={88} textAnchor="middle" style={{ fontSize: 28, fontWeight: 800, fill: 'var(--ink-1)' }}>{composite}%</text>
+        </svg>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: -8, textAlign: 'center' }}>
+          {isAr ? 'المتوسّط الموزون لـ CMA + TCFD + الأدلة' : 'Weighted mean of CMA + TCFD + Evidence'}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MaterialityMatrixWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
+  const matrix = data.materiality.matrix;
+  return (
+    <Card title={isAr ? 'الجوهرية — أهم الموضوعات' : 'Materiality — top topics'} Icon={Target}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 11 }}>
+        <Badge tone="danger">{data.materiality.criticalCount} {isAr ? 'حرج' : 'Critical'}</Badge>
+        <Badge tone="warning">{data.materiality.highCount} {isAr ? 'مرتفع' : 'High'}</Badge>
+      </div>
+      {matrix.slice(0, 4).map(t => (
+        <div key={t.id} style={{
+          padding: 8, marginBottom: 6, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
+          display: 'grid', gridTemplateColumns: '1fr auto', gap: 8,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-1)' }}>
+            {isAr && t.topicAr ? t.topicAr : t.topicEn}
           </div>
-        </Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+            <span className="mono" style={{ fontWeight: 700 }}>{Number(t.materialityScore).toFixed(1)}</span>
+            <span style={{
+              width: 10, height: 10, borderRadius: '50%',
+              background: t.priorityTier === 'CRITICAL' ? 'var(--danger)'
+                       : t.priorityTier === 'HIGH'    ? 'var(--warning)'
+                       : t.priorityTier === 'MEDIUM'  ? 'var(--info)' : 'var(--ink-3)',
+            }} />
+          </div>
+        </div>
+      ))}
+      {matrix.length === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', padding: 12 }}>
+          {isAr ? 'لا توجد موضوعات جوهرية مُقيَّمة بعد' : 'No materiality topics scored yet'}
+        </div>
+      )}
+    </Card>
+  );
+}
 
-        <Card title={t('esgRegulatorTitle')} Icon={Building2}>
-          <ul style={{ margin: 0, paddingInlineStart: 16, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
-            <li><b>CMA</b> — {t('esgRegCma')}</li>
-            <li><b>SGI</b> — {t('esgRegSgi')}</li>
-            <li><b>SDAIA</b> — {t('esgRegSdaia')}</li>
-            <li><b>Tadawul</b> — {t('esgRegTadawul')}</li>
-            <li><b>NCEMA</b> — {t('esgRegNcema')}</li>
-          </ul>
-        </Card>
+function EmissionsTrendChart({ isAr }: { isAr: boolean }) {
+  // Preserve the existing visual chart from EMISSIONS_TIMESERIES so the
+  // multi-year trend story is retained even though the rest of the
+  // dashboard pulls from live aggregates.
+  const maxTotal = Math.max(...EMISSIONS_TIMESERIES.map(r => r.scope1 + r.scope2 + r.scope3));
+  return (
+    <>
+      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+        {isAr ? 'الانبعاثات الإجمالية مكدّسة بالنطاقات عبر السنوات.' : 'Total emissions stacked by scope across years.'}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${EMISSIONS_TIMESERIES.length}, 1fr)`, gap: 12, alignItems: 'end', height: 220 }}>
+        {EMISSIONS_TIMESERIES.map(r => {
+          const total = r.scope1 + r.scope2 + r.scope3;
+          const heightPct = (total / maxTotal) * 100;
+          const s1Pct = (r.scope1 / total) * 100;
+          const s2Pct = (r.scope2 / total) * 100;
+          const s3Pct = (r.scope3 / total) * 100;
+          return (
+            <div key={r.year} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
+              <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column-reverse', alignItems: 'center' }}>
+                <div style={{ width: '60%', height: `${heightPct}%`, display: 'flex', flexDirection: 'column', borderRadius: '4px 4px 0 0', overflow: 'hidden', boxShadow: '0 1px 0 rgba(0,0,0,0.08)' }}>
+                  <div style={{ flex: s3Pct, background: '#f59e0b', minHeight: 2 }} title={`Scope 3: ${r.scope3.toLocaleString()}`} />
+                  <div style={{ flex: s2Pct, background: '#0ea5e9', minHeight: 2 }} title={`Scope 2: ${r.scope2.toLocaleString()}`} />
+                  <div style={{ flex: s1Pct, background: '#10b981', minHeight: 2 }} title={`Scope 1: ${r.scope1.toLocaleString()}`} />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>{r.year}</div>
+              <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{(total / 1000).toFixed(0)}k</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 16, fontSize: 11, color: 'var(--ink-3)' }}>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#10b981', borderRadius: 2, verticalAlign: 'middle', marginInlineEnd: 4 }} />{isAr ? 'النطاق 1' : 'Scope 1'}</span>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#0ea5e9', borderRadius: 2, verticalAlign: 'middle', marginInlineEnd: 4 }} />{isAr ? 'النطاق 2' : 'Scope 2'}</span>
+        <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#f59e0b', borderRadius: 2, verticalAlign: 'middle', marginInlineEnd: 4 }} />{isAr ? 'النطاق 3' : 'Scope 3'}</span>
       </div>
     </>
   );
