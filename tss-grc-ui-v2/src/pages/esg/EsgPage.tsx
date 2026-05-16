@@ -71,6 +71,12 @@ import {
   type MaterialTopic, type MaterialMatrix, type MaterialCategory,
 } from '../../lib/sustainabilityMateriality';
 import {
+  listMetrics, metricsAggregate, recordMetricReading, archiveMetric,
+  computeMetricProgress, metricStatusTone, metricStatusLabel,
+  metricCategoryLabel as esgMetricCategoryLabel,
+  type EsgMetric as EsgM, type MetricAggregate, type MetricCategory,
+} from '../../lib/sustainabilityMetrics';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   SURVEY_TONE, SURVEY_LABEL,
   aggregateEsg, yoyChange,
@@ -82,7 +88,7 @@ import {
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
 
-type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'materiality' | 'sgi' | 'ghg' | 'climate' | 'survey';
+type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'materiality' | 'metrics' | 'sgi' | 'ghg' | 'climate' | 'survey';
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -160,6 +166,7 @@ export function EsgPage() {
           { id: 'cma',        labelKey: 'esgTabCma',       Icon: FileText },
           { id: 'tcfd',       labelKey: 'esgTabTcfd',      Icon: FileText },
           { id: 'materiality',labelKey: 'esgTabMateriality', Icon: Target },
+          { id: 'metrics',    labelKey: 'esgTabMetrics',   Icon: TrendingDown },
           { id: 'sgi',        labelKey: 'esgTabSgi',       Icon: Target },
           { id: 'ghg',        labelKey: 'esgTabGhg',       Icon: Leaf },
           { id: 'climate',    labelKey: 'esgTabClimate',   Icon: CloudLightning },
@@ -187,6 +194,7 @@ export function EsgPage() {
       {tab === 'cma'        && <CmaTab />}
       {tab === 'tcfd'       && <TcfdTab />}
       {tab === 'materiality' && <MaterialityTab />}
+      {tab === 'metrics'    && <MetricsTab />}
       {tab === 'sgi'        && <SgiTab />}
       {tab === 'ghg'        && <GhgInventoryTab />}
       {tab === 'climate'    && <ClimateTab />}
@@ -1669,6 +1677,210 @@ function MaterialityTab() {
         submitLabel={isAr ? 'اعتماد' : 'Approve'}
         onClose={() => setApprovingId(null)}
         onSubmit={submitApprove}
+      />
+    </div>
+  );
+}
+
+// ─── ESG Metrics tab (V63 — slice 9) ─────────────────────────────────────────
+//
+// Unified register for Environmental / Social / Governance metrics.
+// Each row tracks baseline / current / target with a unit; progress is
+// direction-aware (renewable % rises to target; LTIFR + water intensity
+// fall to target). "Record reading" updates current_value + as_of so
+// the dashboard reflects the latest data without rewriting the whole row.
+
+function MetricsTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [items, setItems]   = useState<EsgM[]>([]);
+  const [agg, setAgg]       = useState<MetricAggregate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<MetricCategory | 'ALL'>('ALL');
+  const [readingMetric, setReadingMetric]   = useState<EsgM | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([listMetrics({ year: 2025, size: 200 }), metricsAggregate(2025)]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل المؤشّرات' : 'Failed to load metrics'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  const filtered = categoryFilter === 'ALL'
+    ? items
+    : items.filter(m => m.category === categoryFilter);
+
+  async function submitReading(values: Record<string, unknown>) {
+    if (!readingMetric) return;
+    const cur = Number(values.currentValue);
+    const asOf = String(values.asOf ?? '').trim() || undefined;
+    if (!Number.isFinite(cur)) { toast.danger(isAr ? 'القيمة غير صالحة' : 'Invalid value'); return; }
+    try {
+      await recordMetricReading(readingMetric.id!, cur, asOf);
+      toast.success(isAr ? 'تم تسجيل القراءة' : 'Reading recorded');
+      setReadingMetric(null);
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function onArchive(m: EsgM) {
+    if (!window.confirm(isAr ? 'أرشفة هذا المؤشّر؟' : 'Archive this metric?')) return;
+    try { await archiveMetric(m.id!); toast.info(isAr ? 'تم الأرشفة' : 'Archived'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  const readingFields: FieldDef[] = [
+    { kind: 'number', key: 'currentValue', required: true, span: 6,
+      label: isAr ? 'القيمة الحالية' : 'Current value' },
+    { kind: 'date', key: 'asOf', span: 6,
+      label: isAr ? 'تاريخ القياس' : 'As of' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Per-pillar mean-progress strip */}
+      <div className="kpi-grid">
+        <Kpi Icon={TrendingDown} label={isAr ? 'إجمالي المؤشّرات' : 'Total metrics'}                value={agg?.total ?? 0} tone="primary" />
+        <Kpi Icon={Leaf}         label={isAr ? 'متوسّط تقدّم البيئة' : 'Env. mean progress'}     value={`${agg ? Number(agg.meanProgressByCategory.ENVIRONMENTAL ?? 0).toFixed(0) : 0}%`} tone="success" />
+        <Kpi Icon={Building2}    label={isAr ? 'متوسّط تقدّم الاجتماع' : 'Social mean progress'} value={`${agg ? Number(agg.meanProgressByCategory.SOCIAL ?? 0).toFixed(0) : 0}%`}        tone="info" />
+        <Kpi Icon={Building2}    label={isAr ? 'متوسّط تقدّم الحوكمة' : 'Gov. mean progress'}   value={`${agg ? Number(agg.meanProgressByCategory.GOVERNANCE ?? 0).toFixed(0) : 0}%`}    tone="primary" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'بلغ الهدف' : 'At target'}                       value={agg
+          ? (agg.atTargetByCategory.ENVIRONMENTAL + agg.atTargetByCategory.SOCIAL + agg.atTargetByCategory.GOVERNANCE)
+          : 0} tone="success" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'خارج المسار' : 'Off track'}                     value={agg
+          ? (agg.offTrackByCategory.ENVIRONMENTAL + agg.offTrackByCategory.SOCIAL + agg.offTrackByCategory.GOVERNANCE)
+          : 0} tone="danger" />
+      </div>
+
+      <Card title={isAr ? 'سجلّ مؤشّرات الاستدامة (E/S/G)' : 'ESG Metrics Register (E/S/G)'} Icon={TrendingDown}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+          {isAr
+            ? 'سجلّ موحَّد لمؤشّرات البيئة والاجتماع والحوكمة. التقدّم يُحسب وفق الاتجاه — يدعم أهداف الارتفاع («حصة المتجدّدة») وأهداف الانخفاض («LTIFR»).'
+            : 'Unified register for Environmental, Social, and Governance metrics. Progress is direction-aware — supports both raise-to-target ("renewable share") and lower-to-target ("LTIFR").'}
+        </div>
+
+        {/* Category filter chips */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          {(['ALL', 'ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => (
+            <button key={c} onClick={() => setCategoryFilter(c)}
+              style={{
+                padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                border: `1px solid ${categoryFilter === c ? 'var(--primary)' : 'var(--border)'}`,
+                background: categoryFilter === c ? 'var(--primary-50)' : 'var(--surface-1)',
+                color: categoryFilter === c ? 'var(--primary)' : 'var(--ink-2)',
+                borderRadius: 'var(--r-sm)', cursor: 'pointer',
+              }}>
+              {c === 'ALL' ? (isAr ? 'الكل' : 'All') : esgMetricCategoryLabel(c as MetricCategory, isAr ? 'ar' : 'en')}
+            </button>
+          ))}
+          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+            {filtered.length} / {items.length}
+          </span>
+        </div>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : filtered.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد مؤشّرات' : 'No metrics yet'}</InlineEmpty>
+            : (
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th>{isAr ? 'الكود' : 'Code'}</th>
+                    <th>{isAr ? 'المؤشّر' : 'Metric'}</th>
+                    <th>{isAr ? 'الفئة' : 'Category'}</th>
+                    <th>{isAr ? 'خط الأساس' : 'Baseline'}</th>
+                    <th>{isAr ? 'الحالي' : 'Current'}</th>
+                    <th>{isAr ? 'الهدف' : 'Target'}</th>
+                    <th>{isAr ? 'التقدّم' : 'Progress'}</th>
+                    <th>{isAr ? 'الحالة' : 'Status'}</th>
+                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(m => {
+                    const pct = computeMetricProgress(m);
+                    return (
+                      <tr key={m.id}>
+                        <td className="mono text-2xs">{m.metricCode ?? `#${m.id}`}</td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 320, lineHeight: 1.3 }}>
+                            {isAr && m.metricNameAr ? m.metricNameAr : m.metricNameEn}
+                          </div>
+                          {m.ownerName && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{m.ownerName}</div>}
+                        </td>
+                        <td>
+                          <Badge tone="neutral">{esgMetricCategoryLabel(m.category, isAr ? 'ar' : 'en')}</Badge>
+                          {m.subcategory && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{m.subcategory}</div>}
+                        </td>
+                        <td className="mono text-xs" style={{ textAlign: 'end' }}>
+                          {m.baselineValue != null ? Number(m.baselineValue).toLocaleString() : '—'}
+                          <div className="text-2xs text-muted">{m.unit}</div>
+                        </td>
+                        <td className="mono text-xs" style={{ textAlign: 'end', fontWeight: 700 }}>
+                          {m.currentValue != null ? Number(m.currentValue).toLocaleString() : '—'}
+                          {m.currentValueAsOf && <div className="text-2xs text-muted">{m.currentValueAsOf}</div>}
+                        </td>
+                        <td className="mono text-xs" style={{ textAlign: 'end' }}>
+                          {m.targetValue != null ? Number(m.targetValue).toLocaleString() : '—'}
+                          {m.targetYear && <div className="text-2xs text-muted">→ {m.targetYear}</div>}
+                        </td>
+                        <td style={{ minWidth: 120 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ flex: 1, height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{
+                                height: '100%', width: `${Math.min(100, pct)}%`,
+                                background: pct >= 100 ? 'var(--success)' : pct >= 50 ? 'var(--primary)' : 'var(--warning)',
+                                borderRadius: 3,
+                              }} />
+                            </div>
+                            <span className="mono text-2xs" style={{ minWidth: 40, textAlign: 'end' }}>{pct.toFixed(0)}%</span>
+                          </div>
+                        </td>
+                        <td><Badge tone={metricStatusTone(m.status)}>{metricStatusLabel(m.status, isAr ? 'ar' : 'en')}</Badge></td>
+                        <td style={{ textAlign: 'end' }}>
+                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {m.status !== 'ARCHIVED' && (
+                              <Button size="sm" variant="secondary" onClick={() => setReadingMetric(m)}>
+                                {isAr ? 'تسجيل' : 'Record'}
+                              </Button>
+                            )}
+                            {m.status !== 'ARCHIVED' && (
+                              <Button size="sm" variant="ghost" Icon={Trash2}
+                                title={isAr ? 'أرشفة' : 'Archive'}
+                                onClick={() => onArchive(m)} />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+      </Card>
+
+      <FormModal
+        open={readingMetric !== null}
+        title={isAr ? `تسجيل قراءة · ${readingMetric?.metricCode ?? ''}` : `Record reading · ${readingMetric?.metricCode ?? ''}`}
+        fields={readingFields}
+        initial={{
+          currentValue: readingMetric?.currentValue ?? 0,
+          asOf: new Date().toISOString().slice(0, 10),
+        }}
+        size="md"
+        submitLabel={isAr ? 'حفظ' : 'Save'}
+        onClose={() => setReadingMetric(null)}
+        onSubmit={submitReading}
       />
     </div>
   );
