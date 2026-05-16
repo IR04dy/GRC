@@ -47,6 +47,12 @@ import {
   kpiStatusTone, kpiStatusLabel, progressFraction,
   type NdiOpexKpi, type NdiOpexAggregate,
 } from '../../lib/ndiOpex';
+import {
+  listDomains, rollupForCycle, updateDomain, deleteDomain,
+  markDomainOfficial, markDomainPlaceholder,
+  ndiScoreTone, ndiScoreLabel,
+  type NdiGovernanceDomain, type CycleRollup, type DomainRollup,
+} from '../../lib/ndiDomains';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -130,7 +136,8 @@ export function NdiPage() {
       {tab === 'maturity'   && <MaturityTab />}
       {tab === 'compliance' && <ComplianceTab />}
       {tab === 'opex'       && <OpexTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex'
+      {tab === 'domains'    && <DomainsTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains'
         && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
@@ -1436,11 +1443,324 @@ function OpexTab() {
   );
 }
 
+// ─── Governance Domains tab (slice 6) ────────────────────────────────
+
+function DomainsTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [domains, setDomains] = useState<NdiGovernanceDomain[]>([]);
+  const [rollup, setRollup] = useState<CycleRollup | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function loadCycles() {
+    try {
+      const pg = await listCycles({ size: 100 });
+      setCycles(pg.content);
+      if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+    }
+  }
+  useEffect(() => { void loadCycles(); }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      const [list, r] = await Promise.all([
+        listDomains(false),
+        rollupForCycle(cycleId),
+      ]);
+      setDomains(list);
+      setRollup(r);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل المجالات' : 'Failed to load domains'));
+      setDomains([]); setRollup(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
+
+  async function onEditWeight(d: NdiGovernanceDomain) {
+    const ans = await dialog.prompt({
+      title: isAr ? 'تعديل وزن المجال' : 'Edit domain weight',
+      label: isAr
+        ? `النسبة الحالية للمجال "${d.nameAr ?? d.nameEn}" هي ${d.weight}. أدخل النسبة الجديدة (0-100).`
+        : `Current weight for "${d.nameEn}" is ${d.weight}. Enter the new weight (0-100).`,
+      type: 'number', required: true,
+      initial: String(d.weight),
+    });
+    if (ans == null) return;
+    const n = Number(ans);
+    if (!isFinite(n) || n < 0 || n > 100) {
+      toast.danger(isAr ? 'القيمة يجب أن تكون بين 0 و 100' : 'Value must be between 0 and 100');
+      return;
+    }
+    try {
+      await updateDomain(d.id!, { weight: n });
+      toast.success(isAr ? 'تم تحديث الوزن' : 'Weight updated');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onMarkOfficial(d: NdiGovernanceDomain) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'تعليم كرسمي' : 'Mark as official',
+      body: isAr
+        ? 'سيتم إزالة شارة "عنصر مؤقت" من هذا المجال. تابع فقط إذا تم استيراد المكتبة الرسمية من سدايا.'
+        : 'This removes the "Placeholder" flag from the domain. Only proceed if the official SDAIA library has been imported.',
+      submitLabel: isAr ? 'تأكيد' : 'Confirm',
+    });
+    if (!ok) return;
+    try {
+      await markDomainOfficial(d.id!);
+      toast.success(isAr ? 'تم التعليم كرسمي' : 'Marked as official');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onMarkPlaceholder(d: NdiGovernanceDomain) {
+    try {
+      await markDomainPlaceholder(d.id!);
+      toast.success(isAr ? 'أُعيد المجال إلى حالة مؤقتة' : 'Reset to placeholder');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onDelete(d: NdiGovernanceDomain) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف المجال' : 'Delete domain',
+      body: isAr
+        ? `سيتم حذف المجال "${d.nameAr ?? d.nameEn}". هذا الإجراء مرن (حذف منطقي).`
+        : `Domain "${d.nameEn}" will be soft-deleted.`,
+      destructive: true,
+      submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteDomain(d.id!);
+      toast.success(isAr ? 'تم الحذف' : 'Deleted');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  const rollupByDomainId = useMemo(() => {
+    const m = new Map<number, DomainRollup>();
+    if (rollup) for (const r of rollup.domains) m.set(r.domainId, r);
+    return m;
+  }, [rollup]);
+
+  const unmatched = useMemo(() => {
+    if (!rollup || rollup.domains.length === 0) return [] as string[];
+    return rollup.domains[0].unmatchedDomains ?? [];
+  }, [rollup]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+
+  const overallTone = ndiScoreTone(rollup?.overallNdiPct);
+  const placeholderCount = domains.filter(d => d.isPlaceholder).length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'مجالات حوكمة البيانات' : 'Data governance domains'} Icon={Database}
+        action={
+          <select
+            value={cycleId ?? ''}
+            onChange={e => setCycleId(Number(e.target.value))}
+            style={{
+              padding: '6px 10px', fontSize: 12, minWidth: 240,
+              border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+              background: 'var(--surface-1)', color: 'var(--ink-1)',
+            }}>
+            {cycles.map(c => (
+              <option key={c.id} value={c.id}>
+                {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+              </option>
+            ))}
+          </select>
+        }>
+        {rollup && (
+          <div className="kpi-grid">
+            <Kpi Icon={Database}     label={isAr ? 'مؤشّر نضيء الإجمالي' : 'Overall NDI score'}
+                 value={`${Number(rollup.overallNdiPct).toFixed(0)}% · ${ndiScoreLabel(rollup.overallNdiPct, isAr ? 'ar' : 'en')}`}
+                 tone={overallTone === 'success' ? 'success' : overallTone === 'info' ? 'primary'
+                       : overallTone === 'warning' ? 'warning' : overallTone === 'danger' ? 'danger' : 'primary'} />
+            <Kpi Icon={FileText}     label={isAr ? 'عدد المجالات' : 'Domains'}        value={domains.length}                    tone="primary" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مجالات مفعّلة' : 'Active'}        value={domains.filter(d => d.isActive).length} tone="success" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'مكتبة مؤقتة' : 'Placeholder'}     value={placeholderCount}                  tone={placeholderCount > 0 ? 'warning' : 'success'} />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي الوزن' : 'Total weight'}   value={`${Number(rollup.totalWeight).toFixed(1)}`} tone="primary" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'سلاسل غير مطابقة' : 'Unmatched strings'} value={unmatched.length}            tone={unmatched.length > 0 ? 'warning' : 'success'} />
+          </div>
+        )}
+      </Card>
+
+      {placeholderCount > 0 && (
+        <Card title={isAr ? 'تنبيه: مكتبة المجالات مؤقتة' : 'Heads-up: placeholder domain library'} Icon={AlertCircle}>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+            {isAr
+              ? `يوجد ${placeholderCount} مجال مُعلَّم كـ "عنصر مؤقت — يتطلب استيراد مكتبة الضوابط الرسمية من سدايا/نضيء". لا تَدَّعِ الاكتمال الرسمي حتى يتم استيراد المكتبة الرسمية. بعد الاستيراد، علِّم كل مجال يدوياً عبر زر "تعليم كرسمي".`
+              : `${placeholderCount} domain${placeholderCount === 1 ? ' is' : 's are'} flagged as "Placeholder — requires official SDAIA/NDI control library import". Do not claim official completeness until the official library is imported. After import, flip each domain to official via the "Mark official" action.`}
+          </div>
+        </Card>
+      )}
+
+      {unmatched.length > 0 && (
+        <Card title={isAr ? 'سلاسل بلا تخصيص' : 'Unmatched domain strings'} Icon={AlertCircle}>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 8 }}>
+            {isAr
+              ? 'هذه السلاسل تُستخدَم في تقييمات النضج أو الالتزام أو مؤشّرات التميز التشغيلي، لكنها لا تتطابق مع أي مجال في القائمة أعلاه. أضِفها إلى أسماء البدائل (aliases) في المجال المناسب.'
+              : 'These strings are used by maturity, compliance or operational-excellence rows but match no domain in the catalog above. Add them to the appropriate domain\'s aliases.'}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {unmatched.map(s => (
+              <span key={s} className="mono text-2xs" style={{
+                padding: '3px 8px', background: 'var(--surface-2)',
+                borderRadius: 'var(--r-sm)', color: 'var(--ink-2)',
+              }}>{s}</span>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {loading ? (
+        <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+      ) : domains.length === 0 ? (
+        <InlineEmpty>{isAr ? 'لا توجد مجالات' : 'No domains'}</InlineEmpty>
+      ) : (
+        <Card title={isAr ? 'تفصيل لكل مجال' : 'Per-domain breakdown'} Icon={Target}>
+          <table className="grc-table">
+            <thead>
+              <tr>
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'المجال' : 'Domain'}</th>
+                <th style={{ width: 70 }}>{isAr ? 'الوزن' : 'Weight'}</th>
+                <th>{isAr ? 'نضج' : 'Maturity'}</th>
+                <th>{isAr ? 'التزام' : 'Compliance'}</th>
+                <th>{isAr ? 'تميز' : 'OpEx'}</th>
+                <th style={{ width: 200 }}>{isAr ? 'مجموع المجال' : 'Domain score'}</th>
+                <th>{isAr ? 'الحالة' : 'Status'}</th>
+                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {domains.map(d => {
+                const r = rollupByDomainId.get(d.id!);
+                const blended = r?.blendedScorePct;
+                const tone = ndiScoreTone(blended);
+                const barColor = tone === 'success' ? 'var(--success)'
+                               : tone === 'info'    ? 'var(--primary)'
+                               : tone === 'warning' ? 'var(--warning)'
+                               : tone === 'danger'  ? 'var(--danger)'
+                               : 'var(--surface-3)';
+                return (
+                  <tr key={d.id}>
+                    <td className="mono text-2xs">{d.code}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{isAr && d.nameAr ? d.nameAr : d.nameEn}</div>
+                      {d.isPlaceholder && (
+                        <div className="text-2xs" style={{ color: 'var(--warning)', marginTop: 2 }}>
+                          {isAr ? 'عنصر مؤقت — يتطلب استيراد مكتبة سدايا' : 'Placeholder — requires official SDAIA import'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="mono text-xs">{Number(d.weight).toFixed(1)}</td>
+                    <td className="text-xs">
+                      {r && r.maturityCount > 0
+                        ? <>
+                            <div>{r.maturityAvgLevel?.toFixed(2)} / 5</div>
+                            <div className="text-2xs text-muted">{r.maturityCount} {isAr ? 'تقييم' : 'rows'}</div>
+                          </>
+                        : <span className="text-muted">—</span>}
+                    </td>
+                    <td className="text-xs">
+                      {r && r.compliancePct != null
+                        ? <>
+                            <div>{r.compliancePct.toFixed(0)}%</div>
+                            <div className="text-2xs text-muted">{r.complianceCount} {isAr ? 'تقييم' : 'rows'}</div>
+                          </>
+                        : r && r.complianceCount > 0
+                          ? <span className="text-muted">{r.complianceCount} {isAr ? 'بلا نتيجة' : 'no score'}</span>
+                          : <span className="text-muted">—</span>}
+                    </td>
+                    <td className="text-xs">
+                      {r && r.opexScorePct != null
+                        ? <>
+                            <div>{r.opexScorePct.toFixed(0)}%</div>
+                            <div className="text-2xs text-muted">{r.opexCount} {isAr ? 'مؤشّر' : 'kpis'}</div>
+                          </>
+                        : <span className="text-muted">—</span>}
+                    </td>
+                    <td>
+                      {blended != null ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{
+                            width: 120, height: 8, background: 'var(--surface-2)',
+                            borderRadius: 4, overflow: 'hidden', flexShrink: 0,
+                          }}>
+                            <div style={{
+                              width: `${Math.min(100, Math.max(0, blended))}%`,
+                              height: '100%', background: barColor,
+                              transition: 'width 0.3s ease',
+                            }} />
+                          </div>
+                          <span className="mono text-2xs" style={{ minWidth: 40 }}>
+                            {blended.toFixed(0)}%
+                          </span>
+                        </div>
+                      ) : <span className="text-muted text-2xs">{isAr ? 'بلا بيانات' : 'No data'}</span>}
+                    </td>
+                    <td>
+                      <Badge tone={
+                        tone === 'success' ? 'success'
+                        : tone === 'info'    ? 'info'
+                        : tone === 'warning' ? 'warning'
+                        : tone === 'danger'  ? 'danger' : 'neutral'
+                      }>{ndiScoreLabel(blended, isAr ? 'ar' : 'en')}</Badge>
+                    </td>
+                    <td style={{ textAlign: 'end' }}>
+                      <div style={{ display: 'inline-flex', gap: 4 }}>
+                        <Button size="sm" variant="ghost" Icon={Target} onClick={() => onEditWeight(d)}
+                          title={isAr ? 'تعديل الوزن' : 'Edit weight'} />
+                        {d.isPlaceholder
+                          ? <Button size="sm" variant="ghost" Icon={Check} onClick={() => onMarkOfficial(d)}
+                              title={isAr ? 'تعليم كرسمي' : 'Mark official'} />
+                          : <Button size="sm" variant="ghost" Icon={ArchiveIcon} onClick={() => onMarkPlaceholder(d)}
+                              title={isAr ? 'إعادة كحالة مؤقتة' : 'Reset to placeholder'} />}
+                        <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(d)}
+                          title={isAr ? 'حذف' : 'Delete'} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
   dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
-  opex: null, domains: 6, evidence: 7, gaps: 8, improvement: 9,
+  opex: null, domains: null, evidence: 7, gaps: 8, improvement: 9,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };
 
