@@ -1510,6 +1510,7 @@ export const en = {
   esgTabCapa:               'Corrective actions',
   esgTabMateriality:        'Materiality',
   esgTabMetrics:            'ESG metrics',
+  esgTabEvidence:           'Evidence',
   esgTabSurvey:             'Vendor survey',
 
   // ─── Annual Sustainability Annex (V57) ───────────────

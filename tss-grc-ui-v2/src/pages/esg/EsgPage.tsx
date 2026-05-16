@@ -77,6 +77,15 @@ import {
   type EsgMetric as EsgM, type MetricAggregate, type MetricCategory,
 } from '../../lib/sustainabilityMetrics';
 import {
+  listEvidence, evidenceAggregate, approveEvidence, rejectEvidence,
+  sweepExpiredEvidence,
+  evidenceStatusTone, evidenceStatusLabel,
+  evidenceConfidentialityTone, evidenceConfidentialityLabel,
+  evidenceModuleLabel, daysUntilExpiry,
+  type SustainabilityEvidence as SE, type EvidenceAggregate as EvidenceAgg,
+  type EvidenceApprovalStatus,
+} from '../../lib/sustainabilityEvidence';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   SURVEY_TONE, SURVEY_LABEL,
   aggregateEsg, yoyChange,
@@ -88,7 +97,7 @@ import {
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
 
-type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'materiality' | 'metrics' | 'sgi' | 'ghg' | 'climate' | 'survey';
+type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'materiality' | 'metrics' | 'evidence' | 'sgi' | 'ghg' | 'climate' | 'survey';
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -167,6 +176,7 @@ export function EsgPage() {
           { id: 'tcfd',       labelKey: 'esgTabTcfd',      Icon: FileText },
           { id: 'materiality',labelKey: 'esgTabMateriality', Icon: Target },
           { id: 'metrics',    labelKey: 'esgTabMetrics',   Icon: TrendingDown },
+          { id: 'evidence',   labelKey: 'esgTabEvidence',  Icon: Paperclip },
           { id: 'sgi',        labelKey: 'esgTabSgi',       Icon: Target },
           { id: 'ghg',        labelKey: 'esgTabGhg',       Icon: Leaf },
           { id: 'climate',    labelKey: 'esgTabClimate',   Icon: CloudLightning },
@@ -195,6 +205,7 @@ export function EsgPage() {
       {tab === 'tcfd'       && <TcfdTab />}
       {tab === 'materiality' && <MaterialityTab />}
       {tab === 'metrics'    && <MetricsTab />}
+      {tab === 'evidence'   && <EvidenceTab />}
       {tab === 'sgi'        && <SgiTab />}
       {tab === 'ghg'        && <GhgInventoryTab />}
       {tab === 'climate'    && <ClimateTab />}
@@ -1881,6 +1892,231 @@ function MetricsTab() {
         submitLabel={isAr ? 'حفظ' : 'Save'}
         onClose={() => setReadingMetric(null)}
         onSubmit={submitReading}
+      />
+    </div>
+  );
+}
+
+// ─── ESG Evidence Repository tab (V64 — slice 10) ────────────────────────────
+//
+// Backs the evidence_ref text columns scattered across the V55-V63
+// entities (climate risks, GHG, CMA, TCFD, SGI, materiality, metrics,
+// CAPA). Single repository view filterable by module area + approval
+// status + expiry window. Approve / Reject lifecycle for governance.
+// Rule 9 sweep button surfaces evidence whose valid_to has passed.
+
+function EvidenceTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [items, setItems] = useState<SE[]>([]);
+  const [agg, setAgg]     = useState<EvidenceAgg | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<EvidenceApprovalStatus | 'ALL'>('ALL');
+  const [approvingId, setApprovingId]   = useState<number | null>(null);
+  const [rejectingId, setRejectingId]   = useState<number | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([listEvidence({ size: 200 }), evidenceAggregate()]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل مستودع الأدلة' : 'Failed to load evidence repository'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  const filtered = statusFilter === 'ALL'
+    ? items
+    : items.filter(e => e.approvalStatus === statusFilter);
+
+  async function submitApprove(values: Record<string, unknown>) {
+    if (approvingId == null) return;
+    const by = String(values.approvedBy ?? '').trim();
+    if (!by) { toast.danger(isAr ? 'الاسم مطلوب' : 'Name required'); return; }
+    try { await approveEvidence(approvingId, by); toast.success(isAr ? 'تم الاعتماد' : 'Approved'); setApprovingId(null); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function submitReject(values: Record<string, unknown>) {
+    if (rejectingId == null) return;
+    const reviewerName = String(values.reviewerName ?? '').trim();
+    const reason       = String(values.reason ?? '').trim();
+    if (!reviewerName || !reason) {
+      toast.danger(isAr ? 'الاسم والسبب مطلوبان' : 'Name and reason required'); return;
+    }
+    try { await rejectEvidence(rejectingId, reviewerName, reason); toast.info(isAr ? 'تم الرفض' : 'Rejected'); setRejectingId(null); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function onSweep() {
+    if (!window.confirm(isAr ? 'فحص الأدلة المنتهية وتعليمها كـ EXPIRED؟' : 'Sweep expired evidence and mark them EXPIRED?')) return;
+    try {
+      const expired = await sweepExpiredEvidence();
+      toast.success(isAr ? `تم تحديث ${expired.length} دليل` : `Marked ${expired.length} evidence row(s) expired`);
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  const approveFields: FieldDef[] = [
+    { kind: 'text', key: 'approvedBy', required: true, span: 12,
+      label: isAr ? 'اسم المعتَمِد' : 'Approver name' },
+  ];
+  const rejectFields: FieldDef[] = [
+    { kind: 'text', key: 'reviewerName', required: true, span: 12,
+      label: isAr ? 'اسم المراجِع' : 'Reviewer name' },
+    { kind: 'textarea', key: 'reason', span: 12, rows: 3,
+      label: isAr ? 'سبب الرفض' : 'Rejection reason' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip */}
+      <div className="kpi-grid">
+        <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total evidence'}            value={agg?.total ?? 0} tone="primary" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'معتمدة' : 'Approved'}                          value={agg?.byStatus.APPROVED ?? 0}       tone="success" />
+        <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Pending review'}              value={agg?.byStatus.PENDING_REVIEW ?? 0} tone="info" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'مرفوضة' : 'Rejected'}                          value={agg?.byStatus.REJECTED ?? 0}       tone="danger" />
+        <Kpi Icon={Clock}        label={isAr ? 'تنتهي خلال 30 يوماً' : 'Expiring within 30d'}  value={agg?.expiringSoon30d ?? 0}         tone={(agg?.expiringSoon30d ?? 0) > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'منتهية' : 'Expired'}                           value={agg?.byStatus.EXPIRED ?? 0}        tone={(agg?.byStatus.EXPIRED ?? 0) > 0 ? 'danger' : 'success'} />
+      </div>
+
+      <Card title={isAr ? 'مستودع أدلة الاستدامة' : 'Sustainability Evidence Repository'}
+            Icon={Paperclip}
+            action={
+              <Button size="sm" variant="secondary" Icon={Clock} onClick={onSweep}>
+                {isAr ? 'فحص الانتهاء (القاعدة 9)' : 'Sweep expired (Rule 9)'}
+              </Button>
+            }>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+          {isAr
+            ? 'مستودع موحَّد للأدلة الداعمة لجميع كيانات الاستدامة. كل دليل له فترة صلاحية، ومراجعة، وحالة اعتماد. عند انتهاء valid_to يتم وسم الإفصاحات المرتبطة بـ EVIDENCE_REQUIRED (القاعدة 9).'
+            : 'Unified repository for evidence supporting every sustainability entity. Each row has a validity window, reviewer, and approval state. When valid_to passes, linked disclosures are auto-flagged EVIDENCE_REQUIRED (Rule 9).'}
+        </div>
+
+        {/* Status filter chips */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          {(['ALL', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'SUPERSEDED'] as const).map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              style={{
+                padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                border: `1px solid ${statusFilter === s ? 'var(--primary)' : 'var(--border)'}`,
+                background: statusFilter === s ? 'var(--primary-50)' : 'var(--surface-1)',
+                color: statusFilter === s ? 'var(--primary)' : 'var(--ink-2)',
+                borderRadius: 'var(--r-sm)', cursor: 'pointer',
+              }}>
+              {s === 'ALL' ? (isAr ? 'الكل' : 'All') : evidenceStatusLabel(s as EvidenceApprovalStatus, isAr ? 'ar' : 'en')}
+            </button>
+          ))}
+          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+            {filtered.length} / {items.length}
+          </span>
+        </div>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : filtered.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد أدلة مطابقة' : 'No matching evidence'}</InlineEmpty>
+            : (
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th>{isAr ? 'الكود' : 'Code'}</th>
+                    <th>{isAr ? 'العنوان' : 'Title'}</th>
+                    <th>{isAr ? 'الوحدة' : 'Module'}</th>
+                    <th>{isAr ? 'النوع' : 'Type'}</th>
+                    <th>{isAr ? 'الإصدار' : 'Version'}</th>
+                    <th>{isAr ? 'انتهاء الصلاحية' : 'Valid to'}</th>
+                    <th>{isAr ? 'سرّية' : 'Confidentiality'}</th>
+                    <th>{isAr ? 'الحالة' : 'Status'}</th>
+                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(e => {
+                    const days = daysUntilExpiry(e);
+                    const expiringSoon = days != null && days >= 0 && days <= 30
+                      && e.approvalStatus === 'APPROVED';
+                    return (
+                      <tr key={e.id}>
+                        <td className="mono text-2xs">{e.evidenceCode ?? `#${e.id}`}</td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                            {isAr && e.titleAr ? e.titleAr : e.titleEn}
+                          </div>
+                          {e.fileName && (
+                            <div className="text-2xs text-muted mono" style={{ marginTop: 2 }}>
+                              <Paperclip size={9} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 3 }} />
+                              {e.fileName}
+                            </div>
+                          )}
+                          {e.verificationStatus === 'EXTERNAL_VERIFIED' && e.verificationProvider && (
+                            <div className="text-2xs" style={{ marginTop: 2, color: 'var(--success-fg)' }}>
+                              ✓ {isAr ? 'تحقّق خارجي:' : 'External verification:'} {e.verificationProvider}
+                            </div>
+                          )}
+                        </td>
+                        <td>{e.moduleArea && <Badge tone="neutral">{evidenceModuleLabel(e.moduleArea, isAr ? 'ar' : 'en')}</Badge>}</td>
+                        <td className="text-xs">{e.evidenceType ?? '—'}</td>
+                        <td className="mono text-2xs">{e.version ?? '—'}</td>
+                        <td className="mono text-2xs">
+                          {e.validTo ?? '—'}
+                          {days != null && e.approvalStatus === 'APPROVED' && (
+                            <div className="text-2xs" style={{ color: days < 0 ? 'var(--danger-fg)' : expiringSoon ? 'var(--warning-fg)' : 'var(--ink-3)' }}>
+                              {days < 0
+                                ? (isAr ? `منتهي قبل ${Math.abs(days)} يوماً` : `${Math.abs(days)}d expired`)
+                                : (isAr ? `${days} يوماً متبقّياً` : `${days}d left`)}
+                            </div>
+                          )}
+                        </td>
+                        <td><Badge tone={evidenceConfidentialityTone(e.confidentiality)}>{evidenceConfidentialityLabel(e.confidentiality, isAr ? 'ar' : 'en')}</Badge></td>
+                        <td><Badge tone={evidenceStatusTone(e.approvalStatus)}>{evidenceStatusLabel(e.approvalStatus, isAr ? 'ar' : 'en')}</Badge></td>
+                        <td style={{ textAlign: 'end' }}>
+                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {e.approvalStatus === 'PENDING_REVIEW' && (
+                              <>
+                                <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => setApprovingId(e.id!)}>
+                                  {isAr ? 'اعتماد' : 'Approve'}
+                                </Button>
+                                <Button size="sm" variant="ghost" Icon={Trash2}
+                                  title={isAr ? 'رفض' : 'Reject'}
+                                  onClick={() => setRejectingId(e.id!)} />
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+      </Card>
+
+      <FormModal
+        open={approvingId !== null}
+        title={isAr ? 'اعتماد الدليل' : 'Approve evidence'}
+        fields={approveFields}
+        initial={{ approvedBy: '' }}
+        size="md"
+        submitLabel={isAr ? 'اعتماد' : 'Approve'}
+        onClose={() => setApprovingId(null)}
+        onSubmit={submitApprove}
+      />
+      <FormModal
+        open={rejectingId !== null}
+        title={isAr ? 'رفض الدليل' : 'Reject evidence'}
+        fields={rejectFields}
+        initial={{ reviewerName: '', reason: '' }}
+        size="md"
+        submitLabel={isAr ? 'رفض' : 'Reject'}
+        onClose={() => setRejectingId(null)}
+        onSubmit={submitReject}
       />
     </div>
   );

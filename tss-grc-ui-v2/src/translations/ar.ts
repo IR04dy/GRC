@@ -1507,6 +1507,7 @@ export const ar = {
   esgTabCapa:               'الإجراءات التصحيحية',
   esgTabMateriality:        'الجوهرية',
   esgTabMetrics:            'مؤشّرات الاستدامة',
+  esgTabEvidence:           'مستودع الأدلة',
   esgTabSurvey:             'استبيان المورّدين',
 
   // ─── Annual Sustainability Annex (V57) ───────────────
