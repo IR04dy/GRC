@@ -64,6 +64,13 @@ import {
   type TcfdItem as TcfdI, type TcfdReadiness as TcfdR, type TcfdPillar,
 } from '../../lib/sustainabilityTcfd';
 import {
+  listMateriality, generateMatrix, scoreMaterialTopic, approveMaterialTopic,
+  archiveMaterialTopic,
+  materialTierTone, materialTierLabel, materialCategoryLabel,
+  materialStatusTone, materialStatusLabel,
+  type MaterialTopic, type MaterialMatrix, type MaterialCategory,
+} from '../../lib/sustainabilityMateriality';
+import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
   SURVEY_TONE, SURVEY_LABEL,
   aggregateEsg, yoyChange,
@@ -75,7 +82,7 @@ import {
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
 
-type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'sgi' | 'ghg' | 'climate' | 'survey';
+type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'materiality' | 'sgi' | 'ghg' | 'climate' | 'survey';
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -152,6 +159,7 @@ export function EsgPage() {
           { id: 'calculator', labelKey: 'esgTabCalc',      Icon: Calculator },
           { id: 'cma',        labelKey: 'esgTabCma',       Icon: FileText },
           { id: 'tcfd',       labelKey: 'esgTabTcfd',      Icon: FileText },
+          { id: 'materiality',labelKey: 'esgTabMateriality', Icon: Target },
           { id: 'sgi',        labelKey: 'esgTabSgi',       Icon: Target },
           { id: 'ghg',        labelKey: 'esgTabGhg',       Icon: Leaf },
           { id: 'climate',    labelKey: 'esgTabClimate',   Icon: CloudLightning },
@@ -178,6 +186,7 @@ export function EsgPage() {
         onDelete={(id) => { deleteCalcEntry(id); toast.info(t('esgCalcDeletedToast')); }} />}
       {tab === 'cma'        && <CmaTab />}
       {tab === 'tcfd'       && <TcfdTab />}
+      {tab === 'materiality' && <MaterialityTab />}
       {tab === 'sgi'        && <SgiTab />}
       {tab === 'ghg'        && <GhgInventoryTab />}
       {tab === 'climate'    && <ClimateTab />}
@@ -1402,6 +1411,264 @@ function TcfdTab() {
         submitLabel={isAr ? 'حفظ' : 'Save'}
         onClose={() => setGappingId(null)}
         onSubmit={submitGap}
+      />
+    </div>
+  );
+}
+
+// ─── ESG Materiality tab (V62 — slice 8) ─────────────────────────────────────
+//
+// Double-materiality assessment: each topic gets two scores on a 1-5
+// scale (stakeholder importance × business impact). Service computes
+// materiality_score = (s+b)/2 and bucket into CRITICAL/HIGH/MEDIUM/LOW
+// on every save. Approved topics anchor CMA Article 92(a) and the
+// climate-risk topic register.
+
+function MaterialityTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [topics, setTopics]   = useState<MaterialTopic[]>([]);
+  const [matrix, setMatrix]   = useState<MaterialMatrix | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<MaterialCategory | 'ALL'>('ALL');
+  const [scoringTopic, setScoringTopic]     = useState<MaterialTopic | null>(null);
+  const [approvingId, setApprovingId]       = useState<number | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, m] = await Promise.all([listMateriality({ year: 2025, size: 100 }), generateMatrix(2025)]);
+      setTopics(pg.content);
+      setMatrix(m);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل تقييم الجوهرية' : 'Failed to load materiality assessment'));
+      setTopics([]); setMatrix(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  const filtered = categoryFilter === 'ALL'
+    ? topics
+    : topics.filter(t => t.category === categoryFilter);
+
+  async function submitScore(values: Record<string, unknown>) {
+    if (!scoringTopic) return;
+    const s = Number(values.stakeholderImportance);
+    const b = Number(values.businessImpact);
+    if (!Number.isFinite(s) || !Number.isFinite(b) || s < 0 || s > 5 || b < 0 || b > 5) {
+      toast.danger(isAr ? 'القيم يجب أن تكون 0..5' : 'Values must be 0..5'); return;
+    }
+    try {
+      await scoreMaterialTopic(scoringTopic.id!, s, b);
+      toast.success(isAr ? 'تم التقييم' : 'Scored');
+      setScoringTopic(null);
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function submitApprove(values: Record<string, unknown>) {
+    if (approvingId == null) return;
+    const by = String(values.approvedBy ?? '').trim();
+    if (!by) { toast.danger(isAr ? 'الاسم مطلوب' : 'Name required'); return; }
+    try {
+      await approveMaterialTopic(approvingId, by);
+      toast.success(isAr ? 'تم الاعتماد' : 'Approved');
+      setApprovingId(null);
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  async function onArchive(t: MaterialTopic) {
+    if (!window.confirm(isAr ? 'أرشفة هذا الموضوع؟' : 'Archive this topic?')) return;
+    try {
+      await archiveMaterialTopic(t.id!);
+      toast.info(isAr ? 'تم الأرشفة' : 'Archived');
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+
+  const scoreFields: FieldDef[] = [
+    { kind: 'number', key: 'stakeholderImportance', required: true, min: 0, max: 5, span: 6,
+      label: isAr ? 'أهمية لأصحاب المصلحة (0–5)' : 'Stakeholder importance (0–5)' },
+    { kind: 'number', key: 'businessImpact', required: true, min: 0, max: 5, span: 6,
+      label: isAr ? 'الأثر على الأعمال (0–5)' : 'Business impact (0–5)' },
+  ];
+  const approveFields: FieldDef[] = [
+    { kind: 'text', key: 'approvedBy', required: true, span: 12,
+      label: isAr ? 'اسم المعتَمِد' : 'Approver name',
+      placeholder: isAr ? 'مثال: خالد العتيبي' : 'e.g. Khalid Al-Otaibi' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* KPI strip — tier counts + category counts */}
+      <div className="kpi-grid">
+        <Kpi Icon={Target}       label={isAr ? 'إجمالي الموضوعات' : 'Total topics'}     value={matrix?.total ?? 0} tone="primary" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'حرج' : 'Critical'}                       value={matrix?.byTier.CRITICAL ?? 0} tone="danger" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'مرتفع' : 'High'}                         value={matrix?.byTier.HIGH ?? 0}     tone="warning" />
+        <Kpi Icon={Leaf}         label={isAr ? 'البيئة' : 'Environmental'}                value={matrix?.byCategory.ENVIRONMENTAL ?? 0} tone="success" />
+        <Kpi Icon={Building2}    label={isAr ? 'الاجتماع' : 'Social'}                     value={matrix?.byCategory.SOCIAL ?? 0}        tone="info" />
+        <Kpi Icon={Building2}    label={isAr ? 'الحوكمة' : 'Governance'}                  value={matrix?.byCategory.GOVERNANCE ?? 0}    tone="primary" />
+      </div>
+
+      <Card title={isAr ? 'مصفوفة تقييم الجوهرية المزدوجة' : 'Double-materiality assessment matrix'} Icon={Target}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+          {isAr
+            ? 'كل موضوع يحصل على درجتين على مقياس 1-5: الأهمية لأصحاب المصلحة والأثر على الأعمال. درجة الجوهرية = المتوسط. يُحدَّد المستوى تلقائياً عند الحفظ.'
+            : 'Each topic is scored on two axes (1-5): stakeholder importance and business impact. Materiality score = mean. Priority tier is auto-bucketed on save.'}
+        </div>
+
+        {/* Category filter chips */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          {(['ALL', 'ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => (
+            <button key={c} onClick={() => setCategoryFilter(c)}
+              style={{
+                padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                border: `1px solid ${categoryFilter === c ? 'var(--primary)' : 'var(--border)'}`,
+                background: categoryFilter === c ? 'var(--primary-50)' : 'var(--surface-1)',
+                color: categoryFilter === c ? 'var(--primary)' : 'var(--ink-2)',
+                borderRadius: 'var(--r-sm)', cursor: 'pointer',
+              }}>
+              {c === 'ALL' ? (isAr ? 'الكل' : 'All') : materialCategoryLabel(c as MaterialCategory, isAr ? 'ar' : 'en')}
+            </button>
+          ))}
+        </div>
+
+        {loading
+          ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+          : filtered.length === 0
+            ? <InlineEmpty>{isAr ? 'لا توجد موضوعات مطابقة' : 'No matching topics'}</InlineEmpty>
+            : (
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th>{isAr ? 'الكود' : 'Code'}</th>
+                    <th>{isAr ? 'الموضوع' : 'Topic'}</th>
+                    <th>{isAr ? 'الفئة' : 'Category'}</th>
+                    <th>{isAr ? 'أصحاب المصلحة' : 'Stakeholder'}</th>
+                    <th>{isAr ? 'الأعمال' : 'Business'}</th>
+                    <th>{isAr ? 'الدرجة' : 'Score'}</th>
+                    <th>{isAr ? 'المستوى' : 'Tier'}</th>
+                    <th>{isAr ? 'الحالة' : 'Status'}</th>
+                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(t => (
+                    <tr key={t.id}>
+                      <td className="mono text-2xs">{t.topicCode ?? `#${t.id}`}</td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                          {isAr && t.topicAr ? t.topicAr : t.topicEn}
+                        </div>
+                        {t.ownerName && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{t.ownerName}</div>}
+                      </td>
+                      <td><Badge tone="neutral">{materialCategoryLabel(t.category, isAr ? 'ar' : 'en')}</Badge></td>
+                      <td className="mono text-xs" style={{ textAlign: 'center' }}>{Number(t.stakeholderImportance).toFixed(1)}</td>
+                      <td className="mono text-xs" style={{ textAlign: 'center' }}>{Number(t.businessImpact).toFixed(1)}</td>
+                      <td className="mono text-xs" style={{ textAlign: 'center', fontWeight: 700 }}>
+                        {t.materialityScore != null ? Number(t.materialityScore).toFixed(1) : '—'}
+                      </td>
+                      <td>
+                        {t.priorityTier && <Badge tone={materialTierTone(t.priorityTier)}>{materialTierLabel(t.priorityTier, isAr ? 'ar' : 'en')}</Badge>}
+                      </td>
+                      <td><Badge tone={materialStatusTone(t.status)}>{materialStatusLabel(t.status, isAr ? 'ar' : 'en')}</Badge></td>
+                      <td style={{ textAlign: 'end' }}>
+                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {t.status !== 'ARCHIVED' && (
+                            <Button size="sm" variant="secondary" onClick={() => setScoringTopic(t)}>
+                              {isAr ? 'تقييم' : 'Score'}
+                            </Button>
+                          )}
+                          {t.status === 'SCORED' && (
+                            <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => setApprovingId(t.id!)}>
+                              {isAr ? 'اعتماد' : 'Approve'}
+                            </Button>
+                          )}
+                          {t.status !== 'ARCHIVED' && (
+                            <Button size="sm" variant="ghost" Icon={Trash2}
+                              title={isAr ? 'أرشفة' : 'Archive'}
+                              onClick={() => onArchive(t)} />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+      </Card>
+
+      {/* Materiality matrix — visual grid where Y = stakeholder, X = business */}
+      {matrix && matrix.matrix.length > 0 && (
+        <Card title={isAr ? 'الرسم المرئي للمصفوفة' : 'Matrix visualization'} Icon={Target}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '0 auto', aspectRatio: '1 / 1', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)' }}>
+            {/* Axis labels */}
+            <div style={{ position: 'absolute', top: '50%', insetInlineStart: -8, transform: 'translate(-100%, -50%) rotate(-90deg)', fontSize: 10, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+              {isAr ? '← الأهمية لأصحاب المصلحة' : 'Stakeholder importance →'}
+            </div>
+            <div style={{ position: 'absolute', bottom: -20, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'var(--ink-3)' }}>
+              {isAr ? '← الأثر على الأعمال' : 'Business impact →'}
+            </div>
+            {/* Quadrant guides at 2.5 / 4.0 */}
+            <div style={{ position: 'absolute', insetInlineStart: '50%', top: 0, bottom: 0, width: 1, background: 'var(--border)' }} />
+            <div style={{ position: 'absolute', insetBlockStart: '50%', left: 0, right: 0, height: 1, background: 'var(--border)' }} />
+            {/* Plot points */}
+            {matrix.matrix.map(e => {
+              // X = business_impact / 5 * width; Y = (5 - stakeholder) / 5 * height (invert Y so high = top)
+              const x = (Number(e.businessImpact) / 5) * 100;
+              const y = (1 - Number(e.stakeholderImportance) / 5) * 100;
+              const bg = e.priorityTier === 'CRITICAL' ? 'var(--danger)'
+                       : e.priorityTier === 'HIGH'    ? 'var(--warning)'
+                       : e.priorityTier === 'MEDIUM'   ? 'var(--info)' : 'var(--ink-3)';
+              return (
+                <div key={e.id}
+                     title={`${e.topicCode ?? e.id}: ${isAr && e.topicAr ? e.topicAr : e.topicEn} (${Number(e.materialityScore).toFixed(1)})`}
+                     style={{
+                       position: 'absolute',
+                       insetInlineStart: `${x}%`, top: `${y}%`,
+                       transform: 'translate(-50%, -50%)',
+                       width: 14, height: 14, borderRadius: '50%',
+                       background: bg, border: '2px solid var(--surface)',
+                       boxShadow: 'var(--shadow-1)',
+                     }} />
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 16, marginTop: 24, fontSize: 11, color: 'var(--ink-3)', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: 'var(--danger)', verticalAlign: 'middle', marginInlineEnd: 4 }} />{materialTierLabel('CRITICAL', isAr ? 'ar' : 'en')}</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: 'var(--warning)', verticalAlign: 'middle', marginInlineEnd: 4 }} />{materialTierLabel('HIGH', isAr ? 'ar' : 'en')}</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: 'var(--info)', verticalAlign: 'middle', marginInlineEnd: 4 }} />{materialTierLabel('MEDIUM', isAr ? 'ar' : 'en')}</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: 'var(--ink-3)', verticalAlign: 'middle', marginInlineEnd: 4 }} />{materialTierLabel('LOW', isAr ? 'ar' : 'en')}</span>
+          </div>
+        </Card>
+      )}
+
+      <FormModal
+        open={scoringTopic !== null}
+        title={isAr ? `تقييم الموضوع · ${scoringTopic?.topicCode ?? ''}` : `Score topic · ${scoringTopic?.topicCode ?? ''}`}
+        fields={scoreFields}
+        initial={{
+          stakeholderImportance: scoringTopic?.stakeholderImportance ?? 3,
+          businessImpact: scoringTopic?.businessImpact ?? 3,
+        }}
+        size="md"
+        submitLabel={isAr ? 'حفظ التقييم' : 'Save score'}
+        onClose={() => setScoringTopic(null)}
+        onSubmit={submitScore}
+      />
+      <FormModal
+        open={approvingId !== null}
+        title={isAr ? 'اعتماد الموضوع' : 'Approve topic'}
+        fields={approveFields}
+        initial={{ approvedBy: '' }}
+        size="md"
+        submitLabel={isAr ? 'اعتماد' : 'Approve'}
+        onClose={() => setApprovingId(null)}
+        onSubmit={submitApprove}
       />
     </div>
   );
