@@ -60,6 +60,7 @@ import { ControlCrosswalkPage } from './pages/control-crosswalk/ControlCrosswalk
 import { BcmDependencyPage } from './pages/bcm-dependency/BcmDependencyPage';
 import { RopaPage } from './pages/ropa/RopaPage';
 import { EsgPage } from './pages/esg/EsgPage';
+import { NdiPage } from './pages/ndi/NdiPage';
 import { WorkflowVersionsPage } from './pages/workflow-versions/WorkflowVersionsPage';
 import { CrisisManagementPage } from './pages/crisis/CrisisManagementPage';
 import { FileUploadDemoPage } from './pages/file-upload/FileUploadDemoPage';
@@ -203,6 +204,7 @@ export function App() {
 
               {/* ESG / Saudi Green Initiative — C2 */}
               <Route path="/esg"                element={<EsgPage />} />
+              <Route path="/ndi"                element={<NdiPage />} />
 
               {/* Workflow versioning — A3 */}
               <Route path="/workflow-versions"  element={<WorkflowVersionsPage />} />
