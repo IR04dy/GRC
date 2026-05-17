@@ -1,0 +1,193 @@
+package com.tss.grc.module.platform.service;
+
+import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.entity.Issue;
+import com.tss.grc.module.platform.repository.IssueRepository;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Issue tracker — generic cross-module finding lifecycle.
+ *
+ * <p>Lifecycle: {@code OPEN → IN_PROGRESS → (BLOCKED →)? RESOLVED → CLOSED}
+ * with {@code OPEN → CANCELLED} as the only short-circuit. Transitions are
+ * validated by {@link #transition(Long, String)} — bypass via {@link #update}
+ * is rejected to keep the state machine inspectable.
+ *
+ * <p>Resolution and close timestamps stamp themselves automatically on the
+ * matching transition. {@code resolution} is required when moving to
+ * {@code RESOLVED} or {@code CLOSED}; lifecycle codes are limited to the
+ * fixed set in {@link #RESOLUTIONS}.
+ */
+@Service
+@RequiredArgsConstructor
+public class IssueService {
+
+    private static final Set<String> STATUSES = Set.of(
+        "OPEN", "IN_PROGRESS", "BLOCKED", "RESOLVED", "CLOSED", "CANCELLED");
+    private static final Set<String> SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
+    private static final Set<String> PRIORITIES = Set.of("LOW", "NORMAL", "HIGH", "URGENT");
+    private static final Set<String> RESOLUTIONS = Set.of(
+        "FIXED", "WONT_FIX", "DUPLICATE", "NOT_REPRODUCIBLE", "DEFERRED");
+
+    private final IssueRepository repo;
+    private final AuditLogService audit;
+
+    @Transactional(readOnly = true)
+    public Page<Issue> list(int page, int size) {
+        return repo.findByOrganisationIdOrderByIdDesc(
+            TenantContext.getCurrentTenant(), PageRequest.of(page, size));
+    }
+
+    @Transactional(readOnly = true)
+    public Issue get(Long id) {
+        return repo.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())
+            .orElseThrow(() -> new EntityNotFoundException("Issue not found: " + id));
+    }
+
+    @Transactional
+    public Issue create(Issue body) {
+        validateBase(body);
+        body.setId(null);
+        body.setOrganisationId(TenantContext.getCurrentTenant());
+        if (body.getStatus() == null) body.setStatus("OPEN");
+        if (body.getIssueCode() == null || body.getIssueCode().isBlank()) {
+            body.setIssueCode(nextCode());
+        }
+        Issue saved = repo.save(body);
+        audit.log("CREATE", "Issue", saved.getId(),
+            "Issue created: " + saved.getIssueCode() + " — " + saved.getTitleEn());
+        return saved;
+    }
+
+    @Transactional
+    public Issue update(Long id, Issue patch) {
+        Issue existing = get(id);
+        if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus()))
+            throw new IllegalArgumentException("Use transition() to change status");
+        if (patch.getTitleEn()          != null) existing.setTitleEn(patch.getTitleEn());
+        if (patch.getTitleAr()          != null) existing.setTitleAr(patch.getTitleAr());
+        if (patch.getDescription()      != null) existing.setDescription(patch.getDescription());
+        if (patch.getSeverity()         != null) {
+            if (!SEVERITIES.contains(patch.getSeverity()))
+                throw new IllegalArgumentException("severity must be one of " + SEVERITIES);
+            existing.setSeverity(patch.getSeverity());
+        }
+        if (patch.getPriority()         != null) {
+            if (!PRIORITIES.contains(patch.getPriority()))
+                throw new IllegalArgumentException("priority must be one of " + PRIORITIES);
+            existing.setPriority(patch.getPriority());
+        }
+        if (patch.getAssigneeUserId()   != null) existing.setAssigneeUserId(patch.getAssigneeUserId());
+        if (patch.getAssigneeRole()     != null) existing.setAssigneeRole(patch.getAssigneeRole());
+        if (patch.getDueDate()          != null) existing.setDueDate(patch.getDueDate());
+        if (patch.getCapaId()           != null) existing.setCapaId(patch.getCapaId());
+        if (patch.getEvidenceId()       != null) existing.setEvidenceId(patch.getEvidenceId());
+
+        Issue saved = repo.save(existing);
+        audit.log("UPDATE", "Issue", saved.getId(),
+            "Issue updated: " + saved.getIssueCode());
+        return saved;
+    }
+
+    /**
+     * State-machine transition. Stamps {@code resolvedAt}/{@code closedAt}
+     * automatically and demands {@code resolution} be set on the patch when
+     * moving to RESOLVED or CLOSED.
+     */
+    @Transactional
+    public Issue transition(Long id, String toStatus, String resolution) {
+        Issue issue = get(id);
+        if (toStatus == null || !STATUSES.contains(toStatus))
+            throw new IllegalArgumentException("status must be one of " + STATUSES);
+
+        String from = issue.getStatus();
+        boolean ok = switch (from) {
+            case "OPEN"        -> Set.of("IN_PROGRESS", "BLOCKED", "RESOLVED", "CANCELLED").contains(toStatus);
+            case "IN_PROGRESS" -> Set.of("BLOCKED", "RESOLVED", "CANCELLED").contains(toStatus);
+            case "BLOCKED"     -> Set.of("IN_PROGRESS", "RESOLVED", "CANCELLED").contains(toStatus);
+            case "RESOLVED"    -> Set.of("CLOSED", "IN_PROGRESS").contains(toStatus);
+            case "CLOSED"      -> false;
+            case "CANCELLED"   -> false;
+            default            -> false;
+        };
+        if (!ok) throw new IllegalArgumentException(
+            "Illegal transition: " + from + " → " + toStatus);
+
+        if ("RESOLVED".equals(toStatus) || "CLOSED".equals(toStatus)) {
+            if (resolution == null || resolution.isBlank())
+                throw new IllegalArgumentException("resolution is required when closing/resolving");
+            if (!RESOLUTIONS.contains(resolution))
+                throw new IllegalArgumentException("resolution must be one of " + RESOLUTIONS);
+            issue.setResolution(resolution);
+        }
+
+        issue.setStatus(toStatus);
+        LocalDateTime now = LocalDateTime.now();
+        if ("RESOLVED".equals(toStatus)) {
+            issue.setResolvedAt(now);
+        } else if ("CLOSED".equals(toStatus)) {
+            if (issue.getResolvedAt() == null) issue.setResolvedAt(now);
+            issue.setClosedAt(now);
+        }
+        Issue saved = repo.save(issue);
+        audit.log("TRANSITION", "Issue", saved.getId(),
+            "Issue " + saved.getIssueCode() + " " + from + " → " + toStatus);
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> stats() {
+        Long org = TenantContext.getCurrentTenant();
+        Map<String, Long> out = new HashMap<>();
+        for (String s : STATUSES)   out.put("status_" + s.toLowerCase(),   repo.countByOrganisationIdAndStatus(org, s));
+        for (String s : SEVERITIES) out.put("severity_" + s.toLowerCase(), repo.countByOrganisationIdAndSeverity(org, s));
+        return out;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Issue> bySource(String sourceModule) {
+        return repo.findByOrganisationIdAndSourceModuleOrderByIdDesc(
+            TenantContext.getCurrentTenant(), sourceModule);
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────
+
+    private void validateBase(Issue i) {
+        if (i.getTitleEn() == null || i.getTitleEn().isBlank())
+            throw new IllegalArgumentException("titleEn is required");
+        if (i.getSourceModule() == null || i.getSourceModule().isBlank())
+            throw new IllegalArgumentException("sourceModule is required");
+        if (i.getSeverity() != null && !SEVERITIES.contains(i.getSeverity()))
+            throw new IllegalArgumentException("severity must be one of " + SEVERITIES);
+        if (i.getPriority() != null && !PRIORITIES.contains(i.getPriority()))
+            throw new IllegalArgumentException("priority must be one of " + PRIORITIES);
+    }
+
+    /**
+     * Generates an issue code in the form ISS-YYYY-NNNNNN. The counter is
+     * derived from the existing row count for the year — cheap and good
+     * enough for the issue-tracker scale. If two creates land in the same
+     * millisecond and pick the same number, the unique index rejects the
+     * second; the service does not retry by design (the caller can submit
+     * again with a clearer title).
+     */
+    private String nextCode() {
+        Long org = TenantContext.getCurrentTenant();
+        int year = Year.now().getValue();
+        long count = repo.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1)).getTotalElements();
+        return String.format("ISS-%d-%06d", year, count + 1);
+    }
+}
