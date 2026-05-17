@@ -139,9 +139,9 @@ class CmaDisclosureServiceTest {
 
     @Test
     void attachEvidence_refusesEmptyRef() {
-        CmaDisclosure d = baseDisclosure();
-        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(d));
-
+        // attachEvidence validates evidenceRef BEFORE touching the repo,
+        // so we deliberately do not stub findByIdAndOrganisationId here —
+        // Mockito strict mode would flag it as an unused stubbing.
         assertThatThrownBy(() -> service.attachEvidence(5L, "  ", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("evidence_ref");
