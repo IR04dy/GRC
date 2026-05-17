@@ -83,6 +83,24 @@ import {
   submissionStatusTone, submissionStatusLabel,
   type NdiSubmissionPackage, type Preflight,
 } from '../../lib/ndiSubmission';
+import {
+  listReports, runReport, runAdHocReport, deleteReport,
+  reportTypeLabel,
+  type NdiReportDefinition, type NdiReportType, type ReportResult,
+} from '../../lib/ndiReports';
+import {
+  getDashboard,
+  type DashboardSnapshot, type UpcomingItem,
+} from '../../lib/ndiDashboard';
+import {
+  listSettingsGrouped, setSettingValue, resetSetting,
+  settingCategoryLabel,
+  type NdiSetting,
+} from '../../lib/ndiSettings';
+import {
+  searchAudit, auditAggregate, severityTone as auditSeverityTone,
+  type NdiAuditEvent, type AuditAggregate, type AuditSeverity, type AuditAction,
+} from '../../lib/ndiAudit';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -171,7 +189,12 @@ export function NdiPage() {
       {tab === 'gaps'       && <GapsTab />}
       {tab === 'improvement' && <ImprovementTab />}
       {tab === 'submission' && <SubmissionTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence' && tab !== 'gaps' && tab !== 'improvement' && tab !== 'submission'
+      {tab === 'reports'    && <ReportsTab />}
+      {tab === 'dashboard'  && <DashboardTab />}
+      {tab === 'settings'   && <SettingsTab />}
+      {tab === 'audit'      && <AuditTab />}
+      {tab === 'import'     && <FrameworkTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence' && tab !== 'gaps' && tab !== 'improvement' && tab !== 'submission' && tab !== 'reports' && tab !== 'dashboard' && tab !== 'settings' && tab !== 'audit' && tab !== 'import'
         && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
@@ -3229,12 +3252,591 @@ function tryFormat(s: string | undefined): string {
   catch { return s; }
 }
 
+// ─── Reports tab (slice 11) ──────────────────────────────────────────
+
+function ReportsTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [defs, setDefs] = useState<NdiReportDefinition[]>([]);
+  const [result, setResult] = useState<ReportResult | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const pg = await listCycles({ size: 100 });
+        setCycles(pg.content);
+        if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+      } catch (e) {
+        toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+      }
+    })();
+  }, []);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      setDefs(await listReports());
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل التقارير' : 'Failed to load reports'));
+      setDefs([]);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  async function onRun(d: NdiReportDefinition) {
+    if (!cycleId && d.reportType !== 'CYCLE_HISTORY') {
+      toast.danger(isAr ? 'اختر دورة أولاً' : 'Pick a cycle first');
+      return;
+    }
+    try {
+      const r = await runReport(d.id!, d.reportType === 'CYCLE_HISTORY' ? undefined : cycleId!);
+      setResult(r);
+      toast.success(isAr ? 'تم التشغيل' : 'Report executed');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Run failed');
+    }
+  }
+
+  async function onRunAdHoc(type: NdiReportType) {
+    if (!cycleId && type !== 'CYCLE_HISTORY') {
+      toast.danger(isAr ? 'اختر دورة أولاً' : 'Pick a cycle first');
+      return;
+    }
+    try {
+      const r = await runAdHocReport(type, type === 'CYCLE_HISTORY' ? undefined : cycleId!);
+      setResult(r);
+      toast.success(isAr ? 'تم التشغيل' : 'Ad-hoc report executed');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Run failed');
+    }
+  }
+
+  async function onDelete(d: NdiReportDefinition) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف التقرير' : 'Delete report',
+      body: isAr ? 'سيتم حذف تعريف التقرير منطقياً.' : 'The report definition will be soft-deleted.',
+      destructive: true, submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteReport(d.id!);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'التقارير' : 'Reports'} Icon={FileText}
+        action={
+          <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
+            style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
+                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+            {cycles.map(c => (
+              <option key={c.id} value={c.id}>
+                {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+              </option>
+            ))}
+          </select>
+        }>
+        {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+         : defs.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد تقارير محفوظة' : 'No saved reports'}</InlineEmpty>
+         : (
+          <table className="grc-table">
+            <thead>
+              <tr>
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'الاسم' : 'Name'}</th>
+                <th>{isAr ? 'النوع' : 'Type'}</th>
+                <th>{isAr ? 'الصيغة' : 'Format'}</th>
+                <th>{isAr ? 'آخر تشغيل' : 'Last run'}</th>
+                <th>{isAr ? 'الحالة' : 'Status'}</th>
+                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {defs.map(d => (
+                <tr key={d.id}>
+                  <td className="mono text-2xs">{d.reportCode ?? `#${d.id}`}</td>
+                  <td>{isAr && d.nameAr ? d.nameAr : d.nameEn}</td>
+                  <td className="text-xs">{reportTypeLabel(d.reportType, isAr ? 'ar' : 'en')}</td>
+                  <td className="text-xs">{d.format}</td>
+                  <td className="text-xs">{d.lastRunAt ?? <span className="text-muted">—</span>}</td>
+                  <td>
+                    <Badge tone={d.lastRunStatus === 'SUCCESS' ? 'success'
+                               : d.lastRunStatus === 'FAILED' ? 'danger' : 'neutral'}>
+                      {d.lastRunStatus ?? (isAr ? 'لم يُشغَّل' : 'Not run')}
+                    </Badge>
+                  </td>
+                  <td style={{ textAlign: 'end' }}>
+                    <div style={{ display: 'inline-flex', gap: 4 }}>
+                      <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onRun(d)}>
+                        {isAr ? 'تشغيل' : 'Run'}
+                      </Button>
+                      <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(d)} title={isAr ? 'حذف' : 'Delete'} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card title={isAr ? 'تشغيل تقرير عابر' : 'Ad-hoc report'} Icon={Target}>
+        <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 8 }}>
+          {isAr ? 'اختر نوع التقرير وشغّله مباشرة دون حفظ التعريف.' : 'Pick a report type and run without saving a definition.'}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {(['NDI_EXECUTIVE_SUMMARY','DOMAIN_ROLLUP','GAP_REGISTER','CAPA_REGISTER','EVIDENCE_INVENTORY','OPEX_KPI_DASHBOARD','CYCLE_HISTORY'] as NdiReportType[])
+            .map(t => (
+              <Button key={t} size="sm" variant="secondary" Icon={ArrowRight} onClick={() => onRunAdHoc(t)}>
+                {reportTypeLabel(t, isAr ? 'ar' : 'en')}
+              </Button>
+            ))}
+        </div>
+      </Card>
+
+      {result && (
+        <Card title={`${isAr ? 'النتيجة:' : 'Result:'} ${reportTypeLabel(result.reportType, isAr ? 'ar' : 'en')}`} Icon={FileText}>
+          <div className="text-xs text-muted" style={{ marginBottom: 8 }}>
+            {isAr ? 'تاريخ التوليد' : 'Generated at'}: {result.generatedAt} · {result.rows.length} {isAr ? 'صف' : 'rows'}
+          </div>
+          <details>
+            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+              {isAr ? 'الملخص' : 'Summary'}
+            </summary>
+            <pre style={{ marginTop: 6, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
+                          fontSize: 10, lineHeight: 1.5, maxHeight: 200, overflow: 'auto' }}>
+              {JSON.stringify(result.summary, null, 2)}
+            </pre>
+          </details>
+          <details style={{ marginTop: 8 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+              {isAr ? 'الصفوف' : 'Rows'}
+            </summary>
+            <pre style={{ marginTop: 6, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
+                          fontSize: 10, lineHeight: 1.5, maxHeight: 320, overflow: 'auto' }}>
+              {JSON.stringify(result.rows, null, 2)}
+            </pre>
+          </details>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Dashboard tab (slice 12) ────────────────────────────────────────
+
+function DashboardTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [snap, setSnap] = useState<DashboardSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const pg = await listCycles({ size: 100 });
+        setCycles(pg.content);
+        if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+      } catch (e) {
+        toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+      }
+    })();
+  }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      setSnap(await getDashboard(cycleId));
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل لوحة المعلومات' : 'Failed to load dashboard'));
+      setSnap(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+  if (loading || !snap) return <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>;
+
+  const ndi = snap.overallNdiPct;
+  const ndiTone = ndi == null ? 'primary'
+    : ndi >= 80 ? 'success'
+    : ndi >= 60 ? 'info'
+    : ndi >= 40 ? 'warning' : 'danger';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'نظرة عامة' : 'Overview'} Icon={Database}
+        action={
+          <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
+            style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
+                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+            {cycles.map(c => (
+              <option key={c.id} value={c.id}>
+                {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+              </option>
+            ))}
+          </select>
+        }>
+        <div className="kpi-grid">
+          <Kpi Icon={Database}     label={isAr ? 'مؤشّر نضيء' : 'NDI score'}
+               value={ndi != null ? `${Number(ndi).toFixed(0)}%` : '—'} tone={ndiTone} />
+          <Kpi Icon={Target}       label={isAr ? 'نضج' : 'Maturity'}
+               value={snap.maturityScorePct != null ? `${Number(snap.maturityScorePct).toFixed(0)}%` : '—'} tone="primary" />
+          <Kpi Icon={Check}        label={isAr ? 'التزام' : 'Compliance'}
+               value={snap.compliancePct != null ? `${Number(snap.compliancePct).toFixed(0)}%` : '—'} tone="info" />
+          <Kpi Icon={Target}       label={isAr ? 'تميز تشغيلي' : 'OpEx'}
+               value={snap.opexScorePct != null ? `${Number(snap.opexScorePct).toFixed(0)}%` : '—'} tone="primary" />
+          <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات حرجة' : 'Critical open'} value={snap.criticalOpen}
+               tone={snap.criticalOpen > 0 ? 'danger' : 'success'} />
+          <Kpi Icon={Paperclip}    label={isAr ? 'أدلة سارية' : 'Active evidence'} value={snap.evidenceActive} tone="success" />
+        </div>
+      </Card>
+
+      <Card title={isAr ? 'تقدّم العمل' : 'Work in flight'} Icon={ArrowRight}>
+        <div className="kpi-grid">
+          <Kpi Icon={FileText}     label={isAr ? 'نضج مُعتمَد' : 'Maturity approved'} value={`${snap.maturityApproved}/${snap.totalMaturity}`} tone="primary" />
+          <Kpi Icon={FileText}     label={isAr ? 'التزام مُعتمَد' : 'Compliance approved'} value={`${snap.complianceApproved}/${snap.totalCompliance}`} tone="primary" />
+          <Kpi Icon={Target}       label={isAr ? 'مؤشّرات مُحقَّقة' : 'KPIs achieved'} value={`${snap.opexAchieved}/${snap.totalOpex}`} tone="success" />
+          <Kpi Icon={AlertCircle}  label={isAr ? 'مؤشّرات متأخّرة' : 'KPIs behind plan'} value={snap.opexBehindPlan}
+               tone={snap.opexBehindPlan > 0 ? 'danger' : 'success'} />
+          <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات محلولة' : 'Gaps resolved'} value={`${snap.gapsResolved}/${snap.totalGaps}`} tone="success" />
+          <Kpi Icon={AlertCircle}  label={isAr ? 'إجراءات متأخّرة' : 'CAPAs overdue'} value={snap.capasOverdue}
+               tone={snap.capasOverdue > 0 ? 'danger' : 'success'} />
+          <Kpi Icon={Target}       label={isAr ? 'إجراءات مكتملة' : 'CAPAs completed'} value={`${snap.capasCompleted}/${snap.totalCapas}`} tone="primary" />
+          <Kpi Icon={AlertCircle}  label={isAr ? 'أدلة قريبة الانتهاء' : 'Evidence expiring'} value={snap.evidenceExpiringSoon}
+               tone={snap.evidenceExpiringSoon > 0 ? 'warning' : 'success'} />
+          <Kpi Icon={Upload}       label={isAr ? 'حزم مُعتمَدة من سدايا' : 'SDAIA acknowledged'} value={`${snap.submissionsAcknowledged}/${snap.submissionsTotal}`} tone="primary" />
+        </div>
+      </Card>
+
+      <Card title={isAr ? 'مجالات تحتاج تحسين' : 'Domains needing attention'} Icon={AlertCircle}>
+        {snap.topUnderperforming.length === 0
+          ? <InlineEmpty>{isAr ? 'كل المجالات في وضع جيد' : 'All domains in good shape'}</InlineEmpty>
+          : (
+            <table className="grc-table">
+              <thead>
+                <tr>
+                  <th>{isAr ? 'الكود' : 'Code'}</th>
+                  <th>{isAr ? 'المجال' : 'Domain'}</th>
+                  <th>{isAr ? 'الوزن' : 'Weight'}</th>
+                  <th>{isAr ? 'النتيجة' : 'Score'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {snap.topUnderperforming.map(d => (
+                  <tr key={d.code}>
+                    <td className="mono text-2xs">{d.code}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{isAr && d.nameAr ? d.nameAr : d.nameEn}</div>
+                      {d.isPlaceholder && (
+                        <div className="text-2xs" style={{ color: 'var(--warning)' }}>
+                          {isAr ? 'عنصر مؤقت' : 'Placeholder'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="mono text-xs">{Number(d.weight).toFixed(1)}</td>
+                    <td>
+                      <Badge tone={d.blendedScorePct >= 60 ? 'info'
+                                  : d.blendedScorePct >= 40 ? 'warning' : 'danger'}>
+                        {Number(d.blendedScorePct).toFixed(0)}%
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </Card>
+
+      <Card title={isAr ? 'أعمال قادمة' : 'Upcoming work'} Icon={ArrowRight}>
+        {snap.upcoming.length === 0
+          ? <InlineEmpty>{isAr ? 'لا توجد أعمال قادمة خلال 60 يوماً' : 'No upcoming work within 60 days'}</InlineEmpty>
+          : (
+            <table className="grc-table">
+              <thead>
+                <tr>
+                  <th>{isAr ? 'النوع' : 'Type'}</th>
+                  <th>{isAr ? 'الكود' : 'Code'}</th>
+                  <th>{isAr ? 'العنوان' : 'Title'}</th>
+                  <th>{isAr ? 'الاستحقاق' : 'Due'}</th>
+                  <th>{isAr ? 'متبقٍ' : 'Days left'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {snap.upcoming.map((u: UpcomingItem, i) => (
+                  <tr key={i}>
+                    <td><Badge tone={u.type === 'evidence' ? 'info' : 'warning'}>
+                      {u.type === 'evidence' ? (isAr ? 'دليل' : 'Evidence') : (isAr ? 'إجراء' : 'CAPA')}
+                    </Badge></td>
+                    <td className="mono text-2xs">{u.code ?? '—'}</td>
+                    <td className="text-xs">{isAr && u.titleAr ? u.titleAr : u.titleEn}</td>
+                    <td className="text-xs">{u.dueDate}</td>
+                    <td><Badge tone={u.daysUntil < 14 ? 'danger' : u.daysUntil < 30 ? 'warning' : 'info'}>
+                      {u.daysUntil}
+                    </Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+      </Card>
+
+      {Object.keys(snap.latestSubmission).length > 0 && (
+        <Card title={isAr ? 'آخر حزمة تقديم' : 'Latest submission'} Icon={Upload}>
+          <pre style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
+                        fontSize: 11, lineHeight: 1.5, maxHeight: 220, overflow: 'auto' }}>
+            {JSON.stringify(snap.latestSubmission, null, 2)}
+          </pre>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Settings tab (slice 13) ─────────────────────────────────────────
+
+function SettingsTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [grouped, setGrouped] = useState<Record<string, NdiSetting[]>>({});
+  const [loading, setLoading] = useState(true);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      setGrouped(await listSettingsGrouped());
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل الإعدادات' : 'Failed to load settings'));
+      setGrouped({});
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);
+
+  async function onEdit(s: NdiSetting) {
+    const ans = await dialog.prompt({
+      title: isAr ? 'تعديل قيمة' : 'Edit value',
+      label: `${isAr && s.nameAr ? s.nameAr : s.nameEn} · ${s.valueType}\n${isAr && s.descriptionAr ? s.descriptionAr : s.descriptionEn ?? ''}`,
+      type: s.valueType === 'INTEGER' || s.valueType === 'DECIMAL' ? 'number'
+          : s.valueType === 'JSON' ? 'textarea'
+          : 'text',
+      initial: s.valueText ?? '',
+      required: true,
+    });
+    if (ans == null) return;
+    try {
+      await setSettingValue(s.settingKey, ans);
+      toast.success(isAr ? 'تم التحديث' : 'Updated');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onReset(s: NdiSetting) {
+    try {
+      await resetSetting(s.settingKey);
+      toast.success(isAr ? 'تمت إعادة التعيين' : 'Reset to default');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Reset failed');
+    }
+  }
+
+  if (loading) return <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {Object.entries(grouped).map(([category, items]) => (
+        <Card key={category} title={settingCategoryLabel(category, isAr ? 'ar' : 'en')} Icon={Wrench}>
+          <table className="grc-table">
+            <thead>
+              <tr>
+                <th>{isAr ? 'المفتاح' : 'Key'}</th>
+                <th>{isAr ? 'الاسم' : 'Name'}</th>
+                <th>{isAr ? 'النوع' : 'Type'}</th>
+                <th>{isAr ? 'القيمة' : 'Value'}</th>
+                <th>{isAr ? 'الافتراضي' : 'Default'}</th>
+                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(s => (
+                <tr key={s.id}>
+                  <td className="mono text-2xs">{s.settingKey}</td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{isAr && s.nameAr ? s.nameAr : s.nameEn}</div>
+                    {(s.descriptionEn || s.descriptionAr) && (
+                      <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                        {isAr && s.descriptionAr ? s.descriptionAr : s.descriptionEn}
+                      </div>
+                    )}
+                  </td>
+                  <td className="text-xs">{s.valueType}</td>
+                  <td className="mono text-xs" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {s.valueText ?? <span className="text-muted">—</span>}
+                  </td>
+                  <td className="mono text-2xs text-muted">{s.defaultValue ?? '—'}</td>
+                  <td style={{ textAlign: 'end' }}>
+                    <div style={{ display: 'inline-flex', gap: 4 }}>
+                      <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => onEdit(s)} disabled={s.isLocked} />
+                      <Button size="sm" variant="ghost" Icon={ArchiveIcon} onClick={() => onReset(s)} disabled={s.isLocked} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── Audit trail tab (slice 14) ──────────────────────────────────────
+
+function AuditTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+
+  const [events, setEvents] = useState<NdiAuditEvent[]>([]);
+  const [agg, setAgg] = useState<AuditAggregate | null>(null);
+  const [actionFilter, setActionFilter] = useState<AuditAction | ''>('');
+  const [severityFilter, setSeverityFilter] = useState<AuditSeverity | ''>('');
+  const [entityTypeFilter, setEntityTypeFilter] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([
+        searchAudit({
+          action: actionFilter || undefined,
+          severity: severityFilter || undefined,
+          entityType: entityTypeFilter || undefined,
+          size: 500,
+        }),
+        auditAggregate(),
+      ]);
+      setEvents(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل السجل' : 'Failed to load audit log'));
+      setEvents([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, [actionFilter, severityFilter, entityTypeFilter]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'مسار التدقيق' : 'Audit trail'} Icon={FileText}>
+        {agg && (
+          <div className="kpi-grid">
+            <Kpi Icon={FileText}    label={isAr ? 'إجمالي الأحداث' : 'Total events'} value={agg.total} tone="primary" />
+            <Kpi Icon={AlertCircle} label={isAr ? 'تحذيرات' : 'Warnings'} value={agg.bySeverity.WARN ?? 0}
+                 tone={(agg.bySeverity.WARN ?? 0) > 0 ? 'warning' : 'success'} />
+            <Kpi Icon={AlertCircle} label={isAr ? 'أخطاء' : 'Errors'} value={agg.bySeverity.ERROR ?? 0}
+                 tone={(agg.bySeverity.ERROR ?? 0) > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'إنشاءات' : 'Creates'} value={agg.byAction.CREATE ?? 0} tone="info" />
+            <Kpi Icon={ArrowRight}   label={isAr ? 'انتقالات' : 'Transitions'} value={agg.byAction.TRANSITION ?? 0} tone="info" />
+            <Kpi Icon={Upload}       label={isAr ? 'تقديم' : 'Submits'} value={agg.byAction.SUBMIT ?? 0} tone="success" />
+          </div>
+        )}
+      </Card>
+
+      <Card title={isAr ? 'الأحداث' : 'Events'} Icon={FileText}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            <select value={entityTypeFilter} onChange={e => setEntityTypeFilter(e.target.value)}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 130, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الكيانات' : 'All entities'}</option>
+              {agg && Object.keys(agg.byEntityType).map(et => <option key={et} value={et}>{et}</option>)}
+            </select>
+            <select value={actionFilter} onChange={e => setActionFilter(e.target.value as AuditAction | '')}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 130, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الإجراءات' : 'All actions'}</option>
+              {agg && Object.keys(agg.byAction).map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value as AuditSeverity | '')}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 110, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل المستويات' : 'All severity'}</option>
+              <option value="INFO">INFO</option>
+              <option value="WARN">WARN</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+          </div>
+        }>
+        {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+         : events.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد أحداث' : 'No events match the filters'}</InlineEmpty>
+         : (
+          <table className="grc-table">
+            <thead>
+              <tr>
+                <th>{isAr ? 'الوقت' : 'Time'}</th>
+                <th>{isAr ? 'الكيان' : 'Entity'}</th>
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'الإجراء' : 'Action'}</th>
+                <th>{isAr ? 'الانتقال' : 'Transition'}</th>
+                <th>{isAr ? 'المستخدم' : 'Actor'}</th>
+                <th>{isAr ? 'الخطورة' : 'Severity'}</th>
+                <th>{isAr ? 'ملخص' : 'Summary'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map(e => (
+                <tr key={e.id}>
+                  <td className="mono text-2xs">{e.occurredAt.substring(0, 19).replace('T', ' ')}</td>
+                  <td className="text-xs">{e.entityType}</td>
+                  <td className="mono text-2xs">{e.entityCode ?? `#${e.entityId ?? ''}`}</td>
+                  <td><Badge tone="info">{e.action}</Badge></td>
+                  <td className="text-2xs">
+                    {e.fromState || e.toState
+                      ? <span>{e.fromState ?? '—'} → {e.toState ?? '—'}</span>
+                      : <span className="text-muted">—</span>}
+                  </td>
+                  <td className="text-xs">{e.actorUsername ?? <span className="text-muted">—</span>}</td>
+                  <td><Badge tone={auditSeverityTone(e.severity)}>{e.severity}</Badge></td>
+                  <td className="text-xs">{e.summary ?? <span className="text-muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
-  dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
+  dashboard: null, cycles: null, framework: null, maturity: null, compliance: null,
   opex: null, domains: null, evidence: null, gaps: null, improvement: null,
-  submission: null, reports: 11, settings: 13, import: 2, audit: 14,
+  submission: null, reports: null, settings: null, import: null, audit: null,
 };
 
 function NotYetShipped({ tab, isAr, t }: { tab: NdiTab; isAr: boolean; t: (k: string) => string }) {
