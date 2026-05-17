@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Workflow, Building2, AlertTriangle, CalendarClock, Filter, Download, Plus, BarChart3, FileText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -35,8 +35,14 @@ import { toVendorDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { TprmOnboardingPipeline, TprmReassessmentDashboard } from './TprmOnboardingPanel';
 import { TprmConsolidatedOverview } from '../../components/tprm/TprmConsolidatedOverview';
+import {
+  listQtTemplates, listQtQuestions, transitionQtTemplate,
+  qtStatusTone, qtStatusLabel,
+  type QuestionnaireTemplate, type QuestionnaireQuestion, type QtStatus,
+} from '../../lib/tprmQuestionnaire';
+import { useDialog } from '../../lib/dialog';
 
-type TabId = 'overview' | 'vendors' | 'onboarding' | 'reassessment' | 'assessments' | 'contracts' | 'workflows' | 'comms';
+type TabId = 'overview' | 'vendors' | 'onboarding' | 'reassessment' | 'assessments' | 'questionnaires' | 'contracts' | 'workflows' | 'comms';
 
 const RISK_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
@@ -65,7 +71,7 @@ function vendorToReq(v: TprmVendorDto): TprmVendorRequest {
 }
 
 export function TprmPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>('overview');
@@ -119,6 +125,7 @@ export function TprmPage() {
     { id: 'onboarding',   label: t('tprmTabOnboarding') },
     { id: 'reassessment', label: t('tprmTabReassessment') },
     { id: 'assessments',  label: t('tprmTabAssessments') },
+    { id: 'questionnaires', label: lang === 'ar' ? 'الاستبيانات' : 'Questionnaires' },
     { id: 'contracts',    label: t('tprmTabContracts') },
     { id: 'workflows',    label: t('tprmTabWorkflows') ?? 'Workflows' },
     { id: 'comms',        label: t('detailTabComms') },
@@ -263,6 +270,7 @@ export function TprmPage() {
                 rows={sampleAssessments} />}
         </Card>
       )}
+      {tab === 'questionnaires' && <QuestionnairesTab />}
       {tab === 'contracts' && (
         <div className="dash-grid">
           <Card title={t('tprmCardContractsExpiring')} Icon={CalendarClock} action={<Badge tone="warning">{t('tprmContractsBadgeWindow')}</Badge>}>
@@ -326,4 +334,154 @@ function ScorePill({ score }: { score: number }) {
 function LoadingRow() {
   const { t } = useI18n();
   return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+}
+
+// ─── Questionnaires tab — V81 ────────────────────────────────────────
+
+function QuestionnairesTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [templates, setTemplates] = useState<QuestionnaireTemplate[]>([]);
+  const [statusFilter, setStatusFilter] = useState<QtStatus | ''>('');
+  const [selected, setSelected] = useState<QuestionnaireTemplate | null>(null);
+  const [questions, setQuestions] = useState<QuestionnaireQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function reload() {
+    setLoading(true);
+    try { setTemplates(await listQtTemplates(statusFilter || undefined)); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed to load templates'); setTemplates([]); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, [statusFilter]);
+
+  async function loadQuestions(t: QuestionnaireTemplate) {
+    setSelected(t);
+    try { setQuestions(await listQtQuestions(t.id!)); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed to load questions'); setQuestions([]); }
+  }
+
+  async function onActivate(t: QuestionnaireTemplate) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'تفعيل النموذج' : 'Activate template',
+      body: isAr
+        ? `سيتم تجميد ${t.templateCode} v${t.version} — لا يمكن تعديل الأسئلة بعد التفعيل.`
+        : `${t.templateCode} v${t.version} will be frozen — questions can't be edited after activation.`,
+      submitLabel: isAr ? 'تفعيل' : 'Activate',
+    });
+    if (!ok) return;
+    try {
+      await transitionQtTemplate(t.id!, 'ACTIVE');
+      toast.success(isAr ? 'تم التفعيل' : 'Activated');
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Activate failed'); }
+  }
+
+  async function onArchive(t: QuestionnaireTemplate) {
+    try {
+      await transitionQtTemplate(t.id!, 'ARCHIVED');
+      toast.success(isAr ? 'تمت الأرشفة' : 'Archived');
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Archive failed'); }
+  }
+
+  return (
+    <div className="dash-grid">
+      <Card title={isAr ? 'مكتبة النماذج' : 'Template library'}
+        action={
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as QtStatus | '')}
+            style={{ padding: '6px 10px', fontSize: 12, minWidth: 140, border: '1px solid var(--border)',
+                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+            <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
+            <option value="DRAFT">{qtStatusLabel('DRAFT', isAr ? 'ar' : 'en')}</option>
+            <option value="ACTIVE">{qtStatusLabel('ACTIVE', isAr ? 'ar' : 'en')}</option>
+            <option value="ARCHIVED">{qtStatusLabel('ARCHIVED', isAr ? 'ar' : 'en')}</option>
+          </select>
+        }>
+        {loading ? <LoadingRow />
+         : templates.length === 0
+           ? <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>
+               {isAr ? 'لا توجد نماذج' : 'No questionnaire templates'}
+             </div>
+           : <table className="grc-table">
+              <thead><tr>
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'الاسم' : 'Name'}</th>
+                <th>{isAr ? 'الفئة' : 'Category'}</th>
+                <th>{isAr ? 'الإصدار' : 'Version'}</th>
+                <th>{isAr ? 'الحالة' : 'Status'}</th>
+                <th>{isAr ? 'العتبات' : 'Thresholds (L/M/H)'}</th>
+                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+              </tr></thead>
+              <tbody>
+                {templates.map(t => (
+                  <tr key={t.id} style={{ cursor: 'pointer', background: selected?.id === t.id ? 'var(--surface-2)' : undefined }}
+                      onClick={() => loadQuestions(t)}>
+                    <td className="mono text-2xs">{t.templateCode}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{isAr && t.nameAr ? t.nameAr : t.nameEn}</div>
+                    </td>
+                    <td className="text-xs">{t.category}</td>
+                    <td className="mono text-2xs">v{t.version}</td>
+                    <td><Badge tone={qtStatusTone(t.status)}>{qtStatusLabel(t.status, isAr ? 'ar' : 'en')}</Badge></td>
+                    <td className="mono text-2xs">{t.thresholdLowMax}/{t.thresholdMediumMax}/{t.thresholdHighMax}</td>
+                    <td style={{ textAlign: 'end' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'inline-flex', gap: 4 }}>
+                        {t.status === 'DRAFT' && (
+                          <Button size="sm" variant="primary" onClick={() => onActivate(t)}>
+                            {isAr ? 'تفعيل' : 'Activate'}
+                          </Button>
+                        )}
+                        {t.status === 'ACTIVE' && (
+                          <Button size="sm" variant="ghost" onClick={() => onArchive(t)}>
+                            {isAr ? 'أرشفة' : 'Archive'}
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>}
+      </Card>
+
+      {selected && (
+        <Card title={`${selected.templateCode} v${selected.version} — ${isAr ? 'الأسئلة' : 'Questions'}`}
+          action={<Badge tone="primary">{questions.length}</Badge>}>
+          {questions.length === 0
+            ? <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>
+                {isAr ? 'لا توجد أسئلة' : 'No questions yet'}
+              </div>
+            : <table className="grc-table">
+                <thead><tr>
+                  <th>{isAr ? 'الكود' : 'Code'}</th>
+                  <th>{isAr ? 'القسم' : 'Section'}</th>
+                  <th>{isAr ? 'السؤال' : 'Question'}</th>
+                  <th>{isAr ? 'النوع' : 'Type'}</th>
+                  <th>{isAr ? 'الوزن' : 'Weight'}</th>
+                  <th>{isAr ? 'إلزامي' : 'Mandatory'}</th>
+                </tr></thead>
+                <tbody>
+                  {questions.map(q => (
+                    <tr key={q.id}>
+                      <td className="mono text-2xs">{q.questionCode}</td>
+                      <td className="text-xs">{q.sectionCode} · {isAr && q.sectionNameAr ? q.sectionNameAr : q.sectionNameEn ?? '—'}</td>
+                      <td className="text-xs" style={{ maxWidth: 360 }}>
+                        {(isAr && q.questionAr ? q.questionAr : q.questionEn).substring(0, 120)}
+                        {q.invertScore && <span style={{ marginInlineStart: 4 }}><Badge tone="warning">inverted</Badge></span>}
+                      </td>
+                      <td className="text-2xs">{q.answerType}</td>
+                      <td className="mono text-2xs">{q.weight}</td>
+                      <td>{q.mandatory ? <Badge tone="info">✓</Badge> : <span className="text-muted text-2xs">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>}
+        </Card>
+      )}
+    </div>
+  );
 }
