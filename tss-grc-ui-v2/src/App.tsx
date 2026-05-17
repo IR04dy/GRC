@@ -71,6 +71,7 @@ import { AttestationCampaignsPage } from './pages/intake/AttestationCampaignsPag
 import { OnboardingPage } from './pages/onboarding/OnboardingPage';
 import { FrameworkPacksPage } from './pages/framework-packs/FrameworkPacksPage';
 import { PolicyTemplatesPage } from './pages/policy-templates/PolicyTemplatesPage';
+import { PolicyManagementPage } from './pages/policy/PolicyManagementPage';
 import { RiskLifecyclePage } from './pages/risk-lifecycle/RiskLifecyclePage';
 import { AuditLifecyclePage } from './pages/audit-lifecycle/AuditLifecyclePage';
 import { PrivacyLifecyclePage } from './pages/privacy-lifecycle/PrivacyLifecyclePage';
@@ -230,6 +231,8 @@ export function App() {
 
               {/* Policy template library — Track D2 (content moat) */}
               <Route path="/policy-templates"   element={<PolicyTemplatesPage />} />
+              <Route path="/policy-management"  element={<PolicyManagementPage />} />
+              <Route path="/policy"             element={<Navigate to="/policy-management" replace />} />
 
               {/* Risk lifecycle — Production hardening (Option 1) */}
               <Route path="/risk-lifecycle"     element={<RiskLifecyclePage />} />
