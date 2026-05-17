@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -32,5 +33,26 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("role") String role,
         @Param("enabled") Boolean enabled,
         Pageable pageable
+    );
+
+    /**
+     * Returns every active user in the tenant who holds the given role name. Used by
+     * the F8 automation engine's NOTIFY / ESCALATE handlers to fan a single rule out
+     * to all members of a role (e.g. "BCM_MANAGER") without paging.
+     *
+     * <p>Locked, inactive, and soft-deleted users are excluded — same filter the rest
+     * of the platform uses for "who can act on this right now".
+     */
+    @Query("""
+        SELECT DISTINCT u FROM User u
+        JOIN u.roles r
+        WHERE u.organisationId = :orgId
+          AND r.roleName = :role
+          AND u.isActive = true
+          AND (u.isLocked IS NULL OR u.isLocked = false)
+        """)
+    List<User> findActiveByOrganisationIdAndRoleName(
+        @Param("orgId") Long orgId,
+        @Param("role")  String role
     );
 }
