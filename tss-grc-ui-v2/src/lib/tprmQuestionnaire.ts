@@ -65,7 +65,32 @@ export interface QuestionnaireResponse {
   answeredAt?: string;
 }
 
+/** Vendor assessment shape we read for the questionnaire UI. Mirrors the
+ *  V81 ALTER additions on tprm.vendor_assessments.
+ */
+export interface QtVendorAssessment {
+  id: number;
+  vendorId: number;
+  assessmentDate: string;
+  assessor?: string;
+  riskScore?: number;
+  riskRating?: string;
+  status?: string;
+  findings?: string;
+  workflowStatus?: AssessmentWorkflowStatus | string;
+  templateId?: number;
+  answeredCount?: number;
+  totalQuestions?: number;
+  computedScorePct?: number;
+}
+
 const BASE = '/api/v1/tprm';
+
+/** List all vendor assessments — used by the questionnaire tab to pick one. */
+export function listVendorAssessments() {
+  return api.get<QtVendorAssessment[] | { content: QtVendorAssessment[] }>(`${BASE}/assessments`)
+    .then(r => Array.isArray(r) ? r : (r?.content ?? []));
+}
 
 // ─── Templates ───────────────────────────────────────────────────────
 
