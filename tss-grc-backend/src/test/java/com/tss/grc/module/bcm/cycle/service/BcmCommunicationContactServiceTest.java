@@ -88,7 +88,9 @@ class BcmCommunicationContactServiceTest {
     }
 
     @Test void recordTestResult_invalidValueRejected() {
-        when(contacts.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(contact()));
+        // The result enum is checked BEFORE the contact lookup, so we
+        // intentionally don't stub findByIdAndOrganisationId here —
+        // Mockito strict mode would flag it as an unused stubbing.
         assertThatThrownBy(() -> service.recordTestResult(1L, "MAYBE", null))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("result");
     }
