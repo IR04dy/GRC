@@ -2293,6 +2293,7 @@ export const ar = {
   polMgmtSidebar:         'إدارة السياسات',
   regLibrarySidebar:      'مكتبة المرجعيات',
   ctrlLibrarySidebar:     'مكتبة الضوابط',
+  postureHubSidebar:      'وضع الامتثال',
   ptEyebrow:              'المحتوى · مكتبة قوالب السياسات',
   ptTitle:                'مكتبة قوالب السياسات',
   ptSub:                  'قوالب سياسات ثنائية اللغة مهيّأة للسياق السعودي وجاهزة للنسخ والتخصيص.',
