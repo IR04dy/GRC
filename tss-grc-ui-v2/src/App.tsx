@@ -18,6 +18,11 @@ import { CompliancePage } from './pages/compliance/CompliancePage';
 import { RegulatoryLibraryPage } from './pages/regulatory/RegulatoryLibraryPage';
 import { ControlLibraryPage } from './pages/controls/ControlLibraryPage';
 import { PosturePage } from './pages/compliance/PosturePage';
+import { BcmDashboardPage } from './pages/dashboards/BcmDashboardPage';
+import { ScmDashboardPage } from './pages/dashboards/ScmDashboardPage';
+import { ErmDashboardPage } from './pages/dashboards/ErmDashboardPage';
+import { CyberDashboardPage } from './pages/dashboards/CyberDashboardPage';
+import { PdplDashboardPage } from './pages/dashboards/PdplDashboardPage';
 import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
@@ -132,6 +137,11 @@ export function App() {
               <Route path="/regulatory/library" element={<RegulatoryLibraryPage />} />
               <Route path="/controls/library"   element={<ControlLibraryPage />} />
               <Route path="/compliance/posture" element={<PosturePage />} />
+              <Route path="/bcm/dashboard"      element={<BcmDashboardPage />} />
+              <Route path="/scm/dashboard"      element={<ScmDashboardPage />} />
+              <Route path="/risk/dashboard"     element={<ErmDashboardPage />} />
+              <Route path="/cyber/dashboard"    element={<CyberDashboardPage />} />
+              <Route path="/privacy/dashboard"  element={<PdplDashboardPage />} />
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/rca"        element={<RcaPage />} />

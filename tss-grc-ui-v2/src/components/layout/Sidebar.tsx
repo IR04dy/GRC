@@ -59,6 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'risk', titleKey: 'navRisk',
     items: [
+      { id: 'risk-dash', to: '/risk/dashboard',  Icon: LayoutDashboard, labelKey: 'ermDashSidebar' },
       { id: 'risk',      to: '/risk',           Icon: AlertTriangle, labelKey: 'modRisk' },
       { id: 'risk-lc',   to: '/risk-lifecycle', Icon: GitBranch,     labelKey: 'rlcSidebar' },
       { id: 'scenarios', to: '/risk-scenarios', Icon: Sigma,         labelKey: 'scnSidebar' },
@@ -114,6 +115,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'privacy', titleKey: 'navPrivacy',
     items: [
+      { id: 'pdpl-dash',  to: '/privacy/dashboard', Icon: LayoutDashboard, labelKey: 'pdplDashSidebar' },
       { id: 'privacy',    to: '/privacy',           Icon: Fingerprint, labelKey: 'modPdpl' },
       { id: 'privacy-lc', to: '/privacy-lifecycle', Icon: UserCog,     labelKey: 'prcSidebar' },
       { id: 'ropa',       to: '/ropa',              Icon: Files,       labelKey: 'ropaSidebar' },
@@ -130,6 +132,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'cyber', titleKey: 'navCyber',
     items: [
+      { id: 'cyber-dash', to: '/cyber/dashboard',  Icon: LayoutDashboard, labelKey: 'cyberDashSidebar' },
       { id: 'cyber',    to: '/cyber',              Icon: LockKeyhole, labelKey: 'modCyber' },
       { id: 'cyber-lc', to: '/cyber-lifecycle',    Icon: ShieldCheck, labelKey: 'cycSidebar' },
       { id: 'fw-ctrls', to: '/framework-controls', Icon: BookOpen,    labelKey: 'fwcSidebar' },
@@ -143,6 +146,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'bcm', titleKey: 'navBcm',
     items: [
+      { id: 'bcm-dash', to: '/bcm/dashboard',     Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
       { id: 'bcm',      to: '/bcm',               Icon: RefreshCw,    labelKey: 'modBcm' },
       { id: 'bcm-lc',   to: '/bcm-lifecycle',     Icon: Activity,     labelKey: 'bclSidebar' },
       { id: 'bcm-deps', to: '/bcm-dependency',    Icon: GitBranch,    labelKey: 'bdSidebar' },
@@ -157,6 +161,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'third-party', titleKey: 'navThirdParty',
     items: [
+      { id: 'scm-dash',      to: '/scm/dashboard',         Icon: LayoutDashboard, labelKey: 'scmDashSidebar' },
       { id: 'tprm',          to: '/tprm',                  Icon: Workflow,    labelKey: 'modThirdParty' },
       { id: 'vendor-portal', to: '/portal/vendor',         Icon: Briefcase,   labelKey: 'vpSidebar' },
       { id: 'scm',           to: '/scm',                   Icon: Truck,       labelKey: 'scmEyebrow' },
