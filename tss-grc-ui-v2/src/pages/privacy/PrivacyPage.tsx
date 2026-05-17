@@ -31,12 +31,13 @@ import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { PRIVACY_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toDsrDto, toBreachDto, toDpiaDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PdplBreachConsole } from '../../components/privacy/PdplBreachConsole';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 
-type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows' | 'comms';
+type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows' | 'comms' | 'alignment';
 
 const TYPE_OPTIONS = [
   { value: 'ACCESS', label: 'Access' }, { value: 'ERASURE', label: 'Erasure' },
@@ -62,7 +63,7 @@ function dsrToReq(d: PrivacyDsrDto): PrivacyDsrRequest {
 }
 
 export function PrivacyPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>('overview');
@@ -127,6 +128,7 @@ export function PrivacyPage() {
     { id: 'consent',  label: t('privacyTabConsent') },
     { id: 'workflows', label: t('privacyTabWorkflows') ?? 'Workflows' },
     { id: 'comms',     label: t('detailTabComms') },
+    { id: 'alignment', label: lang === 'ar' ? 'التوافق التنظيمي' : 'Regulatory alignment' },
   ];
 
   const dsrCols: Column<PrivacyDsrDto>[] = [
@@ -399,6 +401,7 @@ export function PrivacyPage() {
         sub="DSR fulfilment (PDPL 30-day), breach notification (PDPL 72-hour) and DPIA review."
         t={t} />}
       {tab === 'comms' && <CommsPanel module="BREACH" />}
+      {tab === 'alignment' && <RegulatoryAlignmentTab domain="PRIVACY" families={['Privacy', 'International']} />}
 
       <FormModal<PrivacyDsrRequest>
         open={open}
