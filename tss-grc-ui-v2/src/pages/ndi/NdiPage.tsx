@@ -85,6 +85,7 @@ import {
 } from '../../lib/ndiSubmission';
 import {
   listReports, runReport, runAdHocReport, deleteReport,
+  downloadReport, downloadAdHocReport,
   reportTypeLabel,
   type NdiReportDefinition, type NdiReportType, type ReportResult,
 } from '../../lib/ndiReports';
@@ -3381,6 +3382,12 @@ function ReportsTab() {
                       <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onRun(d)}>
                         {isAr ? 'تشغيل' : 'Run'}
                       </Button>
+                      <Button size="sm" variant="ghost" Icon={FileText}
+                        onClick={() => downloadReport(d.id!, 'XLSX', cycleId ?? undefined).catch(e => toast.danger(String(e)))}
+                        title="XLSX">XLSX</Button>
+                      <Button size="sm" variant="ghost" Icon={FileText}
+                        onClick={() => downloadReport(d.id!, 'PDF', cycleId ?? undefined).catch(e => toast.danger(String(e)))}
+                        title="PDF">PDF</Button>
                       <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(d)} title={isAr ? 'حذف' : 'Delete'} />
                     </div>
                   </td>
@@ -3406,7 +3413,23 @@ function ReportsTab() {
       </Card>
 
       {result && (
-        <Card title={`${isAr ? 'النتيجة:' : 'Result:'} ${reportTypeLabel(result.reportType, isAr ? 'ar' : 'en')}`} Icon={FileText}>
+        <Card title={`${isAr ? 'النتيجة:' : 'Result:'} ${reportTypeLabel(result.reportType, isAr ? 'ar' : 'en')}`} Icon={FileText}
+          action={
+            <div style={{ display: 'inline-flex', gap: 6 }}>
+              <Button size="sm" variant="secondary" Icon={FileText}
+                onClick={() => downloadAdHocReport(result.reportType, 'XLSX', result.cycleId).catch(e => toast.danger(String(e)))}>
+                XLSX
+              </Button>
+              <Button size="sm" variant="secondary" Icon={FileText}
+                onClick={() => downloadAdHocReport(result.reportType, 'PDF', result.cycleId).catch(e => toast.danger(String(e)))}>
+                PDF
+              </Button>
+              <Button size="sm" variant="secondary" Icon={FileText}
+                onClick={() => downloadAdHocReport(result.reportType, 'CSV', result.cycleId).catch(e => toast.danger(String(e)))}>
+                CSV
+              </Button>
+            </div>
+          }>
           <div className="text-xs text-muted" style={{ marginBottom: 8 }}>
             {isAr ? 'تاريخ التوليد' : 'Generated at'}: {result.generatedAt} · {result.rows.length} {isAr ? 'صف' : 'rows'}
           </div>

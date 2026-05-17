@@ -60,6 +60,44 @@ export function runAdHocReport(type: NdiReportType, cycleId?: number) {
   return api.post<ReportResult>(`${BASE}/run-adhoc${q}`);
 }
 
+/** Trigger a browser download for the given saved-report export. */
+export function downloadReport(id: number, format: 'PDF' | 'XLSX' | 'CSV', cycleId?: number) {
+  const q = new URLSearchParams({ format });
+  if (cycleId != null) q.set('cycleId', String(cycleId));
+  const token = sessionStorage.getItem('grc.accessToken') ?? '';
+  const url = `${BASE}/${id}/export?${q.toString()}`;
+  return fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(async r => {
+      if (!r.ok) throw new Error(`Export failed: ${r.status} ${r.statusText}`);
+      const blob = await r.blob();
+      const cd = r.headers.get('content-disposition') ?? '';
+      const m = cd.match(/filename="([^"]+)"/);
+      const fname = m ? m[1] : `ndi-report.${format.toLowerCase()}`;
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl; a.download = fname; document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(objectUrl);
+    });
+}
+
+/** Same as downloadReport but for ad-hoc runs. */
+export function downloadAdHocReport(type: NdiReportType, format: 'PDF' | 'XLSX' | 'CSV', cycleId?: number) {
+  const q = new URLSearchParams({ type, format });
+  if (cycleId != null) q.set('cycleId', String(cycleId));
+  const token = sessionStorage.getItem('grc.accessToken') ?? '';
+  const url = `${BASE}/export-adhoc?${q.toString()}`;
+  return fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(async r => {
+      if (!r.ok) throw new Error(`Export failed: ${r.status} ${r.statusText}`);
+      const blob = await r.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `ndi-${type.toLowerCase().replace(/_/g, '-')}.${format.toLowerCase()}`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(objectUrl);
+    });
+}
+
 export function reportTypeLabel(t: NdiReportType, lang: 'en' | 'ar'): string {
   const en: Record<NdiReportType, string> = {
     NDI_EXECUTIVE_SUMMARY:     'NDI executive summary',
