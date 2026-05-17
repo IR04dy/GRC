@@ -1,6 +1,7 @@
 package com.tss.grc.module.ndi.gap.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.ndi.audit.service.NdiAuditPublisher;
 import com.tss.grc.module.ndi.gap.entity.NdiCorrectiveAction;
 import com.tss.grc.module.ndi.gap.entity.NdiGap;
 import com.tss.grc.module.ndi.gap.repository.NdiCorrectiveActionRepository;
@@ -45,6 +46,7 @@ class NdiGapServiceTest {
 
     @Mock private NdiGapRepository gaps;
     @Mock private NdiCorrectiveActionRepository capas;
+    @Mock private NdiAuditPublisher audit;
     @InjectMocks private NdiGapService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

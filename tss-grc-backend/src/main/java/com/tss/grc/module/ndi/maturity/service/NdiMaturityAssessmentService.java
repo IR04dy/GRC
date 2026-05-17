@@ -48,6 +48,7 @@ public class NdiMaturityAssessmentService {
 
     private final NdiMaturityAssessmentRepository repo;
     private final NdiFrameworkItemRepository frameworkRepo;
+    private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -155,10 +156,14 @@ public class NdiMaturityAssessmentService {
             throw new IllegalArgumentException(
                 "Current level " + cur.getCurrentLevel() + " requires evidence_ref (Rule 2). Attach evidence before submitting.");
         }
+        String from = cur.getStatus();
         cur.setStatus("SUBMITTED");
         cur.setSubmittedAt(LocalDateTime.now());
         applyRules(cur);
-        return repo.save(cur);
+        NdiMaturityAssessment saved = repo.save(cur);
+        audit.publishTransition("MATURITY", saved.getId(), "FI-" + saved.getFrameworkItemId(),
+            saved.getCycleId(), from, "SUBMITTED", "Maturity assessment submitted for review");
+        return saved;
     }
 
     @Transactional
@@ -170,7 +175,10 @@ public class NdiMaturityAssessmentService {
         if (reviewerName != null && !reviewerName.isBlank()) cur.setReviewerName(reviewerName);
         cur.setStatus("UNDER_REVIEW");
         cur.setReviewedAt(LocalDateTime.now());
-        return repo.save(cur);
+        NdiMaturityAssessment saved = repo.save(cur);
+        audit.publishTransition("MATURITY", saved.getId(), "FI-" + saved.getFrameworkItemId(),
+            saved.getCycleId(), "SUBMITTED", "UNDER_REVIEW", "Marked under review");
+        return saved;
     }
 
     @Transactional
@@ -182,10 +190,14 @@ public class NdiMaturityAssessmentService {
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("Return-for-changes requires a reason.");
         }
+        String from = cur.getStatus();
         cur.setStatus("RETURNED");
         cur.setReturnedAt(LocalDateTime.now());
         cur.setReturnReason(reason);
-        return repo.save(cur);
+        NdiMaturityAssessment saved = repo.save(cur);
+        audit.publishTransition("MATURITY", saved.getId(), "FI-" + saved.getFrameworkItemId(),
+            saved.getCycleId(), from, "RETURNED", "Returned: " + reason);
+        return saved;
     }
 
     @Transactional
@@ -203,7 +215,10 @@ public class NdiMaturityAssessmentService {
         cur.setStatus("APPROVED");
         cur.setApprovedAt(LocalDateTime.now());
         if (approverName != null && !approverName.isBlank()) cur.setApproverName(approverName);
-        return repo.save(cur);
+        NdiMaturityAssessment saved = repo.save(cur);
+        audit.publishTransition("MATURITY", saved.getId(), "FI-" + saved.getFrameworkItemId(),
+            saved.getCycleId(), "UNDER_REVIEW", "APPROVED", "Approved by " + approverName);
+        return saved;
     }
 
     @Transactional
@@ -215,7 +230,10 @@ public class NdiMaturityAssessmentService {
         cur.setStatus("IN_PROGRESS");
         cur.setApprovedAt(null);
         cur.setApproverName(null);
-        return repo.save(cur);
+        NdiMaturityAssessment saved = repo.save(cur);
+        audit.publishTransition("MATURITY", saved.getId(), "FI-" + saved.getFrameworkItemId(),
+            saved.getCycleId(), "APPROVED", "IN_PROGRESS", "Reopened from APPROVED");
+        return saved;
     }
 
     @Transactional
@@ -223,6 +241,8 @@ public class NdiMaturityAssessmentService {
         NdiMaturityAssessment cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.publish("MATURITY", cur.getId(), "FI-" + cur.getFrameworkItemId(),
+            cur.getCycleId(), "DELETE", "WARN", "Maturity assessment soft-deleted");
     }
 
     // ── Aggregate ─────────────────────────────────────────────────────

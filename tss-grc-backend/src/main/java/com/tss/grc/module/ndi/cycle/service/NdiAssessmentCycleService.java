@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.cycle.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.ndi.audit.service.NdiAuditPublisher;
 import com.tss.grc.module.ndi.cycle.entity.NdiAssessmentCycle;
 import com.tss.grc.module.ndi.cycle.repository.NdiAssessmentCycleRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -67,6 +68,7 @@ public class NdiAssessmentCycleService {
     private static final Set<String> END_STATUSES = Set.of("CLOSED", "ARCHIVED");
 
     private final NdiAssessmentCycleRepository repo;
+    private final NdiAuditPublisher audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -90,7 +92,10 @@ public class NdiAssessmentCycleService {
         if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("DRAFT");
         validate(req);
         guardOneActivePerYear(req.getReportingYear(), null);
-        return repo.save(req);
+        NdiAssessmentCycle saved = repo.save(req);
+        audit.publish("CYCLE", saved.getId(), saved.getCycleCode(), saved.getId(),
+            "CREATE", "Created cycle " + saved.getCycleNameEn() + " (" + saved.getReportingYear() + ")");
+        return saved;
     }
 
     @Transactional
@@ -150,7 +155,10 @@ public class NdiAssessmentCycleService {
             case "CLOSED"    -> cur.setClosedAt(now);
             default -> { /* no extra stamping */ }
         }
-        return repo.save(cur);
+        NdiAssessmentCycle saved = repo.save(cur);
+        audit.publishTransition("CYCLE", saved.getId(), saved.getCycleCode(), saved.getId(),
+            from, to, "Cycle transitioned " + from + " → " + to);
+        return saved;
     }
 
     /**
@@ -185,7 +193,10 @@ public class NdiAssessmentCycleService {
         copy.setStatus("DRAFT");
         copy.setNotes(String.format("Cloned from cycle %d (FY%d). Scores + evidence reset for the new year.",
             src.getId(), src.getReportingYear()));
-        return repo.save(copy);
+        NdiAssessmentCycle saved = repo.save(copy);
+        audit.publish("CYCLE", saved.getId(), saved.getCycleCode(), saved.getId(),
+            "CREATE", "Cloned from cycle " + sourceId + " (FY" + src.getReportingYear() + ")");
+        return saved;
     }
 
     @Transactional
@@ -193,6 +204,8 @@ public class NdiAssessmentCycleService {
         NdiAssessmentCycle cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.publish("CYCLE", cur.getId(), cur.getCycleCode(), cur.getId(),
+            "DELETE", "WARN", "Cycle soft-deleted");
     }
 
     // ── Aggregation ─────────────────────────────────────────────────

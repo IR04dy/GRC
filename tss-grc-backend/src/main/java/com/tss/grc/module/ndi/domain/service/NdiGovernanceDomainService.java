@@ -32,15 +32,18 @@ public class NdiGovernanceDomainService {
     private final NdiMaturityAssessmentRepository maturity;
     private final NdiComplianceAssessmentRepository compliance;
     private final NdiOperationalExcellenceKpiRepository opex;
+    private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
 
     public NdiGovernanceDomainService(NdiGovernanceDomainRepository domains,
                                       NdiMaturityAssessmentRepository maturity,
                                       NdiComplianceAssessmentRepository compliance,
-                                      NdiOperationalExcellenceKpiRepository opex) {
+                                      NdiOperationalExcellenceKpiRepository opex,
+                                      com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit) {
         this.domains = domains;
         this.maturity = maturity;
         this.compliance = compliance;
         this.opex = opex;
+        this.audit = audit;
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
@@ -104,14 +107,20 @@ public class NdiGovernanceDomainService {
     public NdiGovernanceDomain markOfficial(Long id) {
         NdiGovernanceDomain d = get(id);
         d.setIsPlaceholder(false);
-        return domains.save(d);
+        NdiGovernanceDomain saved = domains.save(d);
+        audit.publish("DOMAIN", saved.getId(), saved.getCode(), null,
+            "MARK_OFFICIAL", "Domain " + saved.getCode() + " flagged as official (placeholder banner removed)");
+        return saved;
     }
 
     /** Reset a domain to placeholder (e.g. for re-import). */
     public NdiGovernanceDomain markPlaceholder(Long id) {
         NdiGovernanceDomain d = get(id);
         d.setIsPlaceholder(true);
-        return domains.save(d);
+        NdiGovernanceDomain saved = domains.save(d);
+        audit.publish("DOMAIN", saved.getId(), saved.getCode(), null,
+            "MARK_PLACEHOLDER", "WARN", "Domain " + saved.getCode() + " reset to placeholder");
+        return saved;
     }
 
     private void validateWeights(NdiGovernanceDomain d) {

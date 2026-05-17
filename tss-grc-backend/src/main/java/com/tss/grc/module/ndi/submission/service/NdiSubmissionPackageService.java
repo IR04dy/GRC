@@ -3,6 +3,7 @@ package com.tss.grc.module.ndi.submission.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.ndi.audit.service.NdiAuditPublisher;
 import com.tss.grc.module.ndi.compliance.entity.NdiComplianceAssessment;
 import com.tss.grc.module.ndi.compliance.repository.NdiComplianceAssessmentRepository;
 import com.tss.grc.module.ndi.cycle.entity.NdiAssessmentCycle;
@@ -57,6 +58,7 @@ public class NdiSubmissionPackageService {
     private final NdiImprovementPlanRepository plans;
     private final NdiGovernanceDomainService domainService;
     private final ObjectMapper json;
+    private final NdiAuditPublisher audit;
 
     public NdiSubmissionPackageService(NdiSubmissionPackageRepository packages,
                                        NdiAssessmentCycleRepository cycles,
@@ -68,7 +70,8 @@ public class NdiSubmissionPackageService {
                                        NdiCorrectiveActionRepository capas,
                                        NdiImprovementPlanRepository plans,
                                        NdiGovernanceDomainService domainService,
-                                       ObjectMapper json) {
+                                       ObjectMapper json,
+                                       NdiAuditPublisher audit) {
         this.packages = packages;
         this.cycles = cycles;
         this.maturity = maturity;
@@ -80,6 +83,7 @@ public class NdiSubmissionPackageService {
         this.plans = plans;
         this.domainService = domainService;
         this.json = json;
+        this.audit = audit;
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
@@ -129,7 +133,10 @@ public class NdiSubmissionPackageService {
         p.setPreparedAt(LocalDateTime.now());
 
         regenerateSnapshotInPlace(p, cycle);
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publish("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "CREATE", "Created submission package v" + saved.getVersion());
+        return saved;
     }
 
     /** Rebuild snapshot from current NDI state. Only legal while DRAFT or READY. */
@@ -139,7 +146,10 @@ public class NdiSubmissionPackageService {
         NdiAssessmentCycle cycle = cycles.findByIdAndOrganisationId(p.getCycleId(), org())
             .orElseThrow(() -> new EntityNotFoundException("Cycle not found: " + p.getCycleId()));
         regenerateSnapshotInPlace(p, cycle);
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publish("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "REGENERATE", "Snapshot regenerated");
+        return saved;
     }
 
     /** DRAFT → READY. Refuses when pre-flight blockers exist (Rule 15). */
@@ -154,7 +164,10 @@ public class NdiSubmissionPackageService {
         regenerateSnapshotInPlace(p, cycle);
         p.setStatus("READY");
         p.setReviewedAt(LocalDateTime.now());
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publishTransition("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "DRAFT", "READY", "Finalized submission package");
+        return saved;
     }
 
     public NdiSubmissionPackage approve(Long id, String approverName) {
@@ -164,7 +177,10 @@ public class NdiSubmissionPackageService {
         p.setApproverName(approverName);
         p.setApprovedAt(LocalDateTime.now());
         // Approval stays in READY — submission is a separate explicit step.
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publish("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "APPROVE", "Approved by " + approverName);
+        return saved;
     }
 
     public NdiSubmissionPackage submit(Long id, String submitterName, String attestationEn, String attestationAr) {
@@ -186,9 +202,15 @@ public class NdiSubmissionPackageService {
             if (!Objects.equals(older.getId(), p.getId()) && !"ARCHIVED".equals(older.getStatus())) {
                 older.setStatus("ARCHIVED");
                 packages.save(older);
+                audit.publish("SUBMISSION_PACKAGE", older.getId(), older.getPackageCode(),
+                    older.getCycleId(), "TRANSITION", "Auto-archived by newer submission v" + p.getVersion());
             }
         }
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publishTransition("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "READY", "SUBMITTED",
+            "Submitted to SDAIA by " + submitterName + " with attestation");
+        return saved;
     }
 
     public NdiSubmissionPackage acknowledge(Long id, String sdaiaReference) {
@@ -198,7 +220,11 @@ public class NdiSubmissionPackageService {
         p.setStatus("ACKNOWLEDGED");
         p.setSdaiaReference(sdaiaReference);
         p.setAcknowledgedAt(LocalDateTime.now());
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publishTransition("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "SUBMITTED", "ACKNOWLEDGED",
+            "SDAIA acknowledged: " + sdaiaReference);
+        return saved;
     }
 
     public NdiSubmissionPackage reject(Long id, String reason) {
@@ -209,7 +235,10 @@ public class NdiSubmissionPackageService {
             throw new IllegalArgumentException("Rejection reason is required");
         p.setStatus("REJECTED");
         p.setRejectionReason(reason);
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publish("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "REJECT", "WARN", "SDAIA rejected: " + reason);
+        return saved;
     }
 
     /** REJECTED → DRAFT — clear submitter/approver stamps so the package can be re-worked. */
@@ -221,7 +250,10 @@ public class NdiSubmissionPackageService {
         p.setSubmittedAt(null);
         p.setApprovedAt(null);
         p.setReviewedAt(null);
-        return packages.save(p);
+        NdiSubmissionPackage saved = packages.save(p);
+        audit.publishTransition("SUBMISSION_PACKAGE", saved.getId(), saved.getPackageCode(),
+            saved.getCycleId(), "REJECTED", "DRAFT", "Reopened for re-work");
+        return saved;
     }
 
     public void delete(Long id) {

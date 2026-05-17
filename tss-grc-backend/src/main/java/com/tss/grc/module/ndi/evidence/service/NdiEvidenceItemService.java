@@ -24,9 +24,12 @@ import java.util.*;
 public class NdiEvidenceItemService {
 
     private final NdiEvidenceItemRepository repo;
+    private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
 
-    public NdiEvidenceItemService(NdiEvidenceItemRepository repo) {
+    public NdiEvidenceItemService(NdiEvidenceItemRepository repo,
+                                  com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit) {
         this.repo = repo;
+        this.audit = audit;
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
@@ -103,27 +106,42 @@ public class NdiEvidenceItemService {
         e.setReviewerName(reviewerName);
         e.setReviewedAt(LocalDate.now());
         applyExpiryRule(e);
-        return repo.save(e);
+        NdiEvidenceItem saved = repo.save(e);
+        audit.publishTransition("EVIDENCE", saved.getId(), saved.getEvidenceCode(),
+            saved.getCycleId(), "PENDING", saved.getStatus(), "Approved by " + reviewerName);
+        return saved;
     }
 
     public NdiEvidenceItem reject(Long id, String reason, String reviewerName) {
         NdiEvidenceItem e = get(id);
         if (reason == null || reason.isBlank())
             throw new IllegalArgumentException("rejection reason is required");
+        String from = e.getStatus();
         e.setStatus("REJECTED");
         e.setRejectionReason(reason);
         e.setReviewerName(reviewerName);
         e.setReviewedAt(LocalDate.now());
-        return repo.save(e);
+        NdiEvidenceItem saved = repo.save(e);
+        audit.publish("EVIDENCE", saved.getId(), saved.getEvidenceCode(),
+            saved.getCycleId(), "REJECT", "WARN", "Rejected: " + reason);
+        // also stamp the transition
+        audit.publishTransition("EVIDENCE", saved.getId(), saved.getEvidenceCode(),
+            saved.getCycleId(), from, "REJECTED", "Rejected by " + reviewerName);
+        return saved;
     }
 
     public NdiEvidenceItem supersede(Long oldId, Long newId) {
         NdiEvidenceItem older = get(oldId);
         NdiEvidenceItem newer = get(newId);
+        String oldFrom = older.getStatus();
         older.setStatus("SUPERSEDED");
         newer.setSupersedesId(oldId);
         repo.save(older);
-        return repo.save(newer);
+        NdiEvidenceItem saved = repo.save(newer);
+        audit.publishTransition("EVIDENCE", older.getId(), older.getEvidenceCode(),
+            older.getCycleId(), oldFrom, "SUPERSEDED",
+            "Superseded by " + (newer.getEvidenceCode() == null ? "#" + newId : newer.getEvidenceCode()));
+        return saved;
     }
 
     public void delete(Long id) {
@@ -141,6 +159,12 @@ public class NdiEvidenceItemService {
             e.setStatus("EXPIRED");
             repo.save(e);
             ids.add(e.getId());
+            audit.publishTransition("EVIDENCE", e.getId(), e.getEvidenceCode(),
+                e.getCycleId(), "ACTIVE", "EXPIRED", "Auto-flipped by expiry check (expired " + e.getExpiryDate() + ")");
+        }
+        if (!ids.isEmpty()) {
+            audit.publish("EVIDENCE", null, null, null,
+                "CHECK_EXPIRY", "INFO", "Expiry check flipped " + ids.size() + " evidence row(s) to EXPIRED");
         }
         return ids;
     }

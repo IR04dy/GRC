@@ -45,6 +45,7 @@ public class NdiComplianceAssessmentService {
 
     private final NdiComplianceAssessmentRepository repo;
     private final NdiFrameworkItemRepository frameworkRepo;
+    private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -191,10 +192,14 @@ public class NdiComplianceAssessmentService {
             throw new IllegalTransitionException(cur.getLifecycleStatus(), "SUBMITTED",
                 Set.of("DRAFT", "IN_PROGRESS", "RETURNED"));
         }
+        String from = cur.getLifecycleStatus();
         applyRules(cur);
         cur.setLifecycleStatus("SUBMITTED");
         cur.setSubmittedAt(LocalDateTime.now());
-        return repo.save(cur);
+        NdiComplianceAssessment saved = repo.save(cur);
+        audit.publishTransition("COMPLIANCE", saved.getId(), saved.getRequirementCode(),
+            saved.getCycleId(), from, "SUBMITTED", "Compliance assessment submitted");
+        return saved;
     }
 
     @Transactional
@@ -206,7 +211,10 @@ public class NdiComplianceAssessmentService {
         if (reviewerName != null && !reviewerName.isBlank()) cur.setReviewerName(reviewerName);
         cur.setLifecycleStatus("UNDER_REVIEW");
         cur.setReviewedAt(LocalDateTime.now());
-        return repo.save(cur);
+        NdiComplianceAssessment saved = repo.save(cur);
+        audit.publishTransition("COMPLIANCE", saved.getId(), saved.getRequirementCode(),
+            saved.getCycleId(), "SUBMITTED", "UNDER_REVIEW", "Marked under review");
+        return saved;
     }
 
     @Transactional
@@ -219,10 +227,14 @@ public class NdiComplianceAssessmentService {
         }
         if (reason == null || reason.isBlank())
             throw new IllegalArgumentException("Return-for-changes requires a reason.");
+        String from = cur.getLifecycleStatus();
         cur.setLifecycleStatus("RETURNED");
         cur.setReturnedAt(LocalDateTime.now());
         cur.setReturnReason(reason);
-        return repo.save(cur);
+        NdiComplianceAssessment saved = repo.save(cur);
+        audit.publishTransition("COMPLIANCE", saved.getId(), saved.getRequirementCode(),
+            saved.getCycleId(), from, "RETURNED", "Returned: " + reason);
+        return saved;
     }
 
     @Transactional
@@ -240,7 +252,10 @@ public class NdiComplianceAssessmentService {
         cur.setLifecycleStatus("APPROVED");
         cur.setApprovedAt(LocalDateTime.now());
         if (approverName != null && !approverName.isBlank()) cur.setApproverName(approverName);
-        return repo.save(cur);
+        NdiComplianceAssessment saved = repo.save(cur);
+        audit.publishTransition("COMPLIANCE", saved.getId(), saved.getRequirementCode(),
+            saved.getCycleId(), "UNDER_REVIEW", "APPROVED", "Approved by " + approverName);
+        return saved;
     }
 
     @Transactional
@@ -252,7 +267,10 @@ public class NdiComplianceAssessmentService {
         cur.setLifecycleStatus("IN_PROGRESS");
         cur.setApprovedAt(null);
         cur.setApproverName(null);
-        return repo.save(cur);
+        NdiComplianceAssessment saved = repo.save(cur);
+        audit.publishTransition("COMPLIANCE", saved.getId(), saved.getRequirementCode(),
+            saved.getCycleId(), "APPROVED", "IN_PROGRESS", "Reopened from APPROVED");
+        return saved;
     }
 
     @Transactional
@@ -260,6 +278,8 @@ public class NdiComplianceAssessmentService {
         NdiComplianceAssessment cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.publish("COMPLIANCE", cur.getId(), cur.getRequirementCode(),
+            cur.getCycleId(), "DELETE", "WARN", "Compliance assessment soft-deleted");
     }
 
     // ── Aggregate ────────────────────────────────────────────────────

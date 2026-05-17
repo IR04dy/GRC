@@ -36,13 +36,16 @@ public class NdiImprovementPlanService {
     private final NdiImprovementPlanRepository plans;
     private final NdiImprovementPlanItemRepository items;
     private final NdiCorrectiveActionRepository capas;
+    private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
 
     public NdiImprovementPlanService(NdiImprovementPlanRepository plans,
                                      NdiImprovementPlanItemRepository items,
-                                     NdiCorrectiveActionRepository capas) {
+                                     NdiCorrectiveActionRepository capas,
+                                     com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit) {
         this.plans = plans;
         this.items = items;
         this.capas = capas;
+        this.audit = audit;
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
@@ -118,7 +121,10 @@ public class NdiImprovementPlanService {
         p.setStatus("APPROVED");
         p.setApproverName(approverName);
         p.setApprovedAt(LocalDateTime.now());
-        return plans.save(p);
+        NdiImprovementPlan saved = plans.save(p);
+        audit.publishTransition("PLAN", saved.getId(), saved.getPlanCode(), saved.getCycleId(),
+            "DRAFT", "APPROVED", "Plan approved by " + approverName);
+        return saved;
     }
 
     public NdiImprovementPlan transition(Long id, String to) {
@@ -133,7 +139,10 @@ public class NdiImprovementPlanService {
         };
         if (!ok) throw new IllegalStateException("Invalid transition " + from + " → " + to);
         p.setStatus(to);
-        return plans.save(p);
+        NdiImprovementPlan saved = plans.save(p);
+        audit.publishTransition("PLAN", saved.getId(), saved.getPlanCode(), saved.getCycleId(),
+            from, to, "Plan transitioned");
+        return saved;
     }
 
     public void delete(Long id) {

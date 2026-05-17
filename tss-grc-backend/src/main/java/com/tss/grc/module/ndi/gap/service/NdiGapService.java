@@ -33,10 +33,13 @@ public class NdiGapService {
 
     private final NdiGapRepository gaps;
     private final NdiCorrectiveActionRepository capas;
+    private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
 
-    public NdiGapService(NdiGapRepository gaps, NdiCorrectiveActionRepository capas) {
+    public NdiGapService(NdiGapRepository gaps, NdiCorrectiveActionRepository capas,
+                         com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit) {
         this.gaps = gaps;
         this.capas = capas;
+        this.audit = audit;
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
@@ -77,7 +80,11 @@ public class NdiGapService {
         body.setId(null);
         body.setOrganisationId(org());
         if (body.getOpenDate() == null) body.setOpenDate(LocalDate.now());
-        return gaps.save(body);
+        NdiGap saved = gaps.save(body);
+        audit.publish("GAP", saved.getId(), saved.getGapCode(), saved.getCycleId(),
+            "CREATE", "CRITICAL".equals(saved.getSeverity()) ? "WARN" : "INFO",
+            "Opened " + saved.getSeverity() + " gap: " + saved.getTitleEn());
+        return saved;
     }
 
     public NdiGap updateGap(Long id, NdiGap body) {
@@ -96,10 +103,19 @@ public class NdiGapService {
         if (body.getOwnerEmail()    != null) g.setOwnerEmail(body.getOwnerEmail());
         if (body.getTargetDate()    != null) g.setTargetDate(body.getTargetDate());
         if (body.getActualCloseDate() != null) g.setActualCloseDate(body.getActualCloseDate());
+        String prevStatus = g.getStatus();
         if (body.getStatus()        != null) g.setStatus(body.getStatus());
         if (body.getRiskId()        != null) g.setRiskId(body.getRiskId());
         if (body.getNotes()         != null) g.setNotes(body.getNotes());
-        return gaps.save(g);
+        NdiGap saved = gaps.save(g);
+        if (body.getStatus() != null && !body.getStatus().equals(prevStatus)) {
+            audit.publishTransition("GAP", saved.getId(), saved.getGapCode(), saved.getCycleId(),
+                prevStatus, body.getStatus(), "Gap status changed");
+        } else {
+            audit.publish("GAP", saved.getId(), saved.getGapCode(), saved.getCycleId(),
+                "UPDATE", "Gap updated");
+        }
+        return saved;
     }
 
     public void deleteGap(Long id) {
@@ -111,6 +127,8 @@ public class NdiGapService {
             c.setIsDeleted(true);
             capas.save(c);
         }
+        audit.publish("GAP", g.getId(), g.getGapCode(), g.getCycleId(),
+            "DELETE", "WARN", "Gap and " + capas.findByOrganisationIdAndGapIdOrderByIdAsc(org(), id).size() + " CAPAs soft-deleted");
     }
 
     // ─── CAPA CRUD ─────────────────────────────────────────────────
