@@ -1,16 +1,20 @@
 package com.tss.grc.security;
 
+import com.tss.grc.module.platform.licensing.service.LicensingService;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 /**
  * JWT token creation and validation.
@@ -27,14 +31,23 @@ import java.util.List;
  * <h3>Claims</h3>
  * <pre>
  * {
- *   "sub":   "42",              // user ID (internal BIGINT, not username)
- *   "usr":   "jdoe",           // username for display
- *   "org":   "7",              // organisationId (tenant discriminator)
- *   "roles": ["RISK_MANAGER"], // role names for client-side UI decisions
- *   "iat":   ...,
- *   "exp":   ...
+ *   "sub":             "42",              // user ID (internal BIGINT, not username)
+ *   "usr":             "jdoe",           // username for display
+ *   "org":             "7",              // organisationId (tenant discriminator)
+ *   "roles":           ["RISK_MANAGER"], // role names for client-side UI decisions
+ *   "enabled_modules": ["RISK","BCM"],   // F9 — licensed modules at issue time
+ *   "iat":             ...,
+ *   "exp":             ...
  * }
  * </pre>
+ *
+ * <p><b>F9 licensing claim:</b> the {@code enabled_modules} claim is populated from
+ * {@link LicensingService#enabledModulesFor(Long)} at token-issue time. The frontend uses
+ * it to hide sidebar entries for unlicensed modules without a round trip; the backend
+ * still enforces via the {@code @RequireModule} aspect on every protected method.
+ * Wrapped in {@link ObjectProvider} so the security layer doesn't pull the licensing
+ * bean into its hard-init dependency graph — the provider returns an empty set if the
+ * service hasn't bootstrapped yet, which is fine for the very first request.
  */
 @Slf4j
 @Component
@@ -43,15 +56,18 @@ public class JwtTokenProvider {
     private final SecretKey secretKey;
     private final long accessTokenExpiryMs;
     private final long refreshTokenExpiryMs;
+    private final ObjectProvider<LicensingService> licensingProvider;
 
     public JwtTokenProvider(
             @Value("${grc.jwt.secret:}") String secret,
             @Value("${grc.jwt.access-token-expiry-ms:900000}") long accessTokenExpiryMs,
-            @Value("${grc.jwt.refresh-token-expiry-ms:604800000}") long refreshTokenExpiryMs) {
+            @Value("${grc.jwt.refresh-token-expiry-ms:604800000}") long refreshTokenExpiryMs,
+            ObjectProvider<LicensingService> licensingProvider) {
         validateSecret(secret);
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
         this.accessTokenExpiryMs = accessTokenExpiryMs;
         this.refreshTokenExpiryMs = refreshTokenExpiryMs;
+        this.licensingProvider = licensingProvider;
         log.info("JwtTokenProvider initialised: access={}ms refresh={}ms keyBytes={}",
                 accessTokenExpiryMs, refreshTokenExpiryMs, secret.getBytes().length);
     }
@@ -106,13 +122,33 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(String.valueOf(principal.getUserId()))
-                .claim("usr",   principal.getUsername())
-                .claim("org",   String.valueOf(principal.getOrganisationId()))
-                .claim("roles", roles)
+                .claim("usr",             principal.getUsername())
+                .claim("org",             String.valueOf(principal.getOrganisationId()))
+                .claim("roles",           roles)
+                .claim("enabled_modules", enabledModulesAsList(principal.getOrganisationId()))
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(secretKey)
                 .compact();
+    }
+
+    /**
+     * Look up the org's enabled modules, returning an empty list if the licensing service
+     * is unavailable (e.g. during the very first request after boot, or in test slices that
+     * exclude the licensing bean). Returning empty is safe because the LicenseGuard aspect
+     * is the authoritative check — the JWT claim is purely a UX hint for the frontend.
+     */
+    private List<String> enabledModulesAsList(Long organisationId) {
+        if (organisationId == null) return Collections.emptyList();
+        LicensingService svc = licensingProvider.getIfAvailable();
+        if (svc == null) return Collections.emptyList();
+        try {
+            Set<String> modules = svc.enabledModulesFor(organisationId);
+            return modules == null ? Collections.emptyList() : List.copyOf(modules);
+        } catch (Exception ex) {
+            log.warn("Failed to load enabled_modules for org {}: {}", organisationId, ex.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     public Long getUserIdFromToken(String token) {
@@ -138,11 +174,29 @@ public class JwtTokenProvider {
         Date expiry = new Date(now.getTime() + expiryMs);
         return Jwts.builder()
                 .subject(String.valueOf(userId))
-                .claim("org", String.valueOf(organisationId))
+                .claim("org",             String.valueOf(organisationId))
+                .claim("enabled_modules", enabledModulesAsList(organisationId))
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(secretKey)
                 .compact();
+    }
+
+    /**
+     * Read the {@code enabled_modules} claim if present. Returns an empty list if the claim
+     * is missing or the token is malformed — the LicenseGuard aspect re-checks the licence
+     * server-side regardless, so a missing claim only affects the frontend UX hint.
+     */
+    public List<String> getEnabledModulesFromToken(String token) {
+        try {
+            Object claim = parseClaims(token).get("enabled_modules");
+            if (claim instanceof List<?> list) {
+                return list.stream().map(String::valueOf).toList();
+            }
+            return Collections.emptyList();
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
     }
 
     public boolean validateToken(String token) {

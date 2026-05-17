@@ -28,6 +28,7 @@ import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
 import { AdminPage } from './pages/admin/AdminPage';
+import { LicensingPage } from './pages/admin/LicensingPage';
 import { ScmPage } from './pages/scm/ScmPage';
 import { WorkflowsPage } from './pages/workflow/WorkflowsPage';
 import { ChangesPage } from './pages/changes/ChangesPage';
@@ -162,6 +163,7 @@ export function App() {
               <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
+              <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />
               <Route path="/supplier-resilience" element={<SupplierResiliencePage />} />
               <Route path="/workflows"  element={<WorkflowsPage />} />

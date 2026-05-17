@@ -3276,6 +3276,7 @@ export const ar = {
   // ─── Administration ─────────────────────────────
   adminEyebrow: 'إدارة المنصة',
   adminTitle: 'المستخدمون والصلاحيات',
+  licensingSidebar: 'تراخيص الوحدات',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',
   adminKpiUsers: 'إجمالي المستخدمين',
   adminKpiActive: 'النشطون',

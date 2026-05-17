@@ -3291,6 +3291,7 @@ export const en = {
   // ─── Administration ─────────────────────────────
   adminEyebrow: 'Platform Admin',
   adminTitle: 'Users & Access',
+  licensingSidebar: 'Module licensing',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',
