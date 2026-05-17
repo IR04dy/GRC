@@ -126,10 +126,15 @@ export function LicensingPage() {
         <Kpi Icon={KeyRound}    label={isAr ? 'وحدات معروفة' : 'Known modules'}   value={catalog.length}    tone="info" />
         <Kpi Icon={ShieldCheck} label={isAr ? 'مفعّلة'         : 'Enabled'}        value={enabledCount}      tone="success" />
         <Kpi Icon={ShieldX}     label={isAr ? 'معطّلة'         : 'Disabled'}       value={disabledCount}     tone="warning" />
-        <Kpi Icon={BadgeDollarSign} label={isAr ? 'بدون ترخيص' : 'Not yet purchased'} value={uncatalogued}  tone="neutral" />
+        <Kpi Icon={BadgeDollarSign} label={isAr ? 'بدون ترخيص' : 'Not yet purchased'} value={uncatalogued}  tone="info" />
       </div>
 
-      <Card title={isAr ? 'الوحدات' : 'Modules'} loading={loading}>
+      <Card title={isAr ? 'الوحدات' : 'Modules'}>
+        {loading && (
+          <div className="text-muted" style={{ fontSize: 11, marginBottom: 6 }}>
+            {isAr ? 'جارٍ التحميل…' : 'Loading…'}
+          </div>
+        )}
         {rows.length === 0 ? (
           <InlineEmpty text={isAr ? 'لا توجد وحدات' : 'No modules in catalog'} />
         ) : (
@@ -185,7 +190,8 @@ export function LicensingPage() {
         )}
       </Card>
 
-      <Card title={isAr ? 'ملاحظات' : 'Notes'} className="mt-3">
+      <div style={{ marginTop: 12 }} />
+      <Card title={isAr ? 'ملاحظات' : 'Notes'}>
         <ul style={{ margin: 0, paddingInlineStart: 18, lineHeight: 1.9, fontSize: 13 }}>
           <li>{isAr
             ? 'تعطيل وحدة يحجب جميع نقاط النهاية التابعة لها على مستوى الخادم (LicenseGuard).'

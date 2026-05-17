@@ -148,6 +148,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'bcm-dash', to: '/bcm/dashboard',     Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
       { id: 'bcm-readiness', to: '/bcm/readiness', Icon: ShieldCheck,    labelKey: 'bcmReadinessSidebar' },
+      { id: 'bcm-reports',   to: '/bcm/reports',   Icon: BarChart3,      labelKey: 'bcmReportsSidebar' },
       { id: 'bcm',      to: '/bcm',               Icon: RefreshCw,    labelKey: 'modBcm' },
       { id: 'bcm-lc',   to: '/bcm-lifecycle',     Icon: Activity,     labelKey: 'bclSidebar' },
       { id: 'bcm-deps', to: '/bcm-dependency',    Icon: GitBranch,    labelKey: 'bdSidebar' },
