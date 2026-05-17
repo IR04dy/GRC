@@ -68,6 +68,14 @@ import {
   type NdiGap, type NdiCorrectiveAction, type GapAggregate,
   type GapSeverity, type GapStatus, type CapaStatus, type CapaActionType,
 } from '../../lib/ndiGaps';
+import {
+  listPlans, getPlan, createPlan, approvePlan, transitionPlan, deletePlan,
+  listItems as listPlanItems, updateItem as updatePlanItem,
+  deleteItem as deletePlanItem, recomputeAllPlans,
+  planStatusTone, planStatusLabel, priorityTone as planPriorityTone,
+  priorityLabelPlan, nextPlanStatuses,
+  type NdiImprovementPlan, type EnrichedPlanItem, type NdiPlanStatus, type NdiPlanItemPriority,
+} from '../../lib/ndiPlan';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -154,7 +162,8 @@ export function NdiPage() {
       {tab === 'domains'    && <DomainsTab />}
       {tab === 'evidence'   && <EvidenceTab />}
       {tab === 'gaps'       && <GapsTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence' && tab !== 'gaps'
+      {tab === 'improvement' && <ImprovementTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence' && tab !== 'gaps' && tab !== 'improvement'
         && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
@@ -2488,11 +2497,360 @@ function GapsTab() {
 
 void ((_a: CapaActionType) => _a);  // silence unused type-import warning
 
+// ─── Improvement Plan tab (slice 9) ──────────────────────────────────
+
+function ImprovementTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [plans, setPlans] = useState<NdiImprovementPlan[]>([]);
+  const [currentPlan, setCurrentPlan] = useState<NdiImprovementPlan | null>(null);
+  const [items, setItems] = useState<EnrichedPlanItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreatePlan, setShowCreatePlan] = useState(false);
+
+  async function loadCycles() {
+    try {
+      const pg = await listCycles({ size: 100 });
+      setCycles(pg.content);
+      if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+    }
+  }
+  useEffect(() => { void loadCycles(); }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      // Recompute first so the displayed totals reflect the latest CAPA state.
+      try { await recomputeAllPlans(); } catch { /* noop */ }
+      const list = await listPlans(cycleId);
+      setPlans(list);
+      const first = list[0] ?? null;
+      setCurrentPlan(first);
+      if (first?.id) {
+        const its = await listPlanItems(first.id);
+        setItems(its);
+      } else {
+        setItems([]);
+      }
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل الخطط' : 'Failed to load plans'));
+      setPlans([]); setItems([]); setCurrentPlan(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
+
+  async function loadPlan(p: NdiImprovementPlan) {
+    try {
+      const [latest, its] = await Promise.all([getPlan(p.id!), listPlanItems(p.id!)]);
+      setCurrentPlan(latest);
+      setItems(its);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load plan');
+    }
+  }
+
+  async function onCreatePlan(body: Record<string, unknown>) {
+    try {
+      const created = await createPlan({ ...body, cycleId } as unknown as Partial<NdiImprovementPlan>);
+      toast.success(isAr ? 'تم إنشاء الخطة' : 'Plan created');
+      setShowCreatePlan(false);
+      await reload();
+      if (created.id) await loadPlan(created);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Create failed');
+    }
+  }
+
+  async function onApprove() {
+    if (!currentPlan) return;
+    try {
+      await approvePlan(currentPlan.id!, 'admin');
+      toast.success(isAr ? 'تم الاعتماد' : 'Approved');
+      await loadPlan(currentPlan);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Approve failed');
+    }
+  }
+
+  async function onTransition(to: NdiPlanStatus) {
+    if (!currentPlan) return;
+    try {
+      await transitionPlan(currentPlan.id!, to);
+      toast.success(isAr ? 'تم التحديث' : `Moved to ${to}`);
+      await loadPlan(currentPlan);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Transition failed');
+    }
+  }
+
+  async function onDeletePlan() {
+    if (!currentPlan) return;
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف الخطة' : 'Delete plan',
+      body: isAr ? 'سيتم حذف الخطة وجميع بنودها.' : 'The plan and all its items will be soft-deleted.',
+      destructive: true,
+      submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deletePlan(currentPlan.id!);
+      toast.success(isAr ? 'تم الحذف' : 'Deleted');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  async function onUpdateItemPriority(it: EnrichedPlanItem, priority: NdiPlanItemPriority) {
+    try {
+      await updatePlanItem(it.id, { priority });
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onUpdateItemQuarter(it: EnrichedPlanItem) {
+    const ans = await dialog.prompt({
+      title: isAr ? 'تحديث الربع' : 'Update quarter',
+      label: isAr ? 'صيغة Y####-Q[1-4] (مثال: Y2026-Q3)' : 'Format Y####-Q[1-4] (e.g. Y2026-Q3)',
+      type: 'text', required: true,
+      initial: it.targetQuarter ?? '',
+    });
+    if (!ans) return;
+    try {
+      await updatePlanItem(it.id, { targetQuarter: ans });
+      toast.success(isAr ? 'تم التحديث' : 'Updated');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onDeleteItem(it: EnrichedPlanItem) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'إزالة البند' : 'Remove item',
+      body: isAr ? 'سيتم إزالة هذا البند من الخطة (الإجراء التصحيحي يبقى).' : 'Item will be removed from the plan (the corrective action itself stays).',
+      destructive: true,
+      submitLabel: isAr ? 'إزالة' : 'Remove',
+    });
+    if (!ok) return;
+    try {
+      await deletePlanItem(it.id);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  const planFields: FieldDef[] = useMemo(() => [
+    { kind: 'text',     key: 'nameEn',       required: true, span: 6, label: isAr ? 'الاسم (إنجليزي) *' : 'Name (EN) *' },
+    { kind: 'text',     key: 'nameAr',       span: 6,  label: isAr ? 'الاسم (عربي)' : 'Name (AR)' },
+    { kind: 'date',     key: 'periodStart',  required: true, span: 3, label: isAr ? 'بداية الفترة *' : 'Period start *' },
+    { kind: 'date',     key: 'periodEnd',    required: true, span: 3, label: isAr ? 'نهاية الفترة *' : 'Period end *' },
+    { kind: 'text',     key: 'planCode',     span: 6, label: isAr ? 'رمز الخطة' : 'Plan code' },
+    { kind: 'text',     key: 'ownerName',    span: 6, label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'number',   key: 'budgetTotal',  span: 6, label: isAr ? 'إجمالي الميزانية (ر.س.)' : 'Budget total (SAR)' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2, label: isAr ? 'الوصف (إنجليزي)' : 'Description (EN)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2, label: isAr ? 'الوصف (عربي)' : 'Description (AR)' },
+  ], [isAr]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+
+  // Group items by target quarter (sorted by quarter string ascending).
+  const itemsByQuarter = useMemo(() => {
+    const m = new Map<string, EnrichedPlanItem[]>();
+    for (const it of items) {
+      const k = it.targetQuarter ?? '(unassigned)';
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push(it);
+    }
+    return new Map(Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b)));
+  }, [items]);
+
+  const totalBudget = currentPlan?.budgetTotal ?? 0;
+  const allocated = items.reduce((s, it) => s + (it.allocatedBudget ?? 0), 0);
+  const completedBudget = items
+    .filter(it => it.capaStatus === 'COMPLETED')
+    .reduce((s, it) => s + (it.allocatedBudget ?? 0), 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'خطة التحسين' : 'Improvement plan'} Icon={Target}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={() => setShowCreatePlan(true)}>
+              {isAr ? 'خطة جديدة' : 'New plan'}
+            </Button>
+          </div>
+        }>
+        {plans.length === 0
+          ? <InlineEmpty>{isAr ? 'لا توجد خطة لهذه الدورة بعد.' : 'No plan exists for this cycle yet.'}</InlineEmpty>
+          : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              {plans.map(p => (
+                <button key={p.id}
+                  onClick={() => loadPlan(p)}
+                  style={{
+                    padding: '6px 12px', fontSize: 12,
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-sm)',
+                    background: currentPlan?.id === p.id ? 'var(--primary)' : 'var(--surface-1)',
+                    color: currentPlan?.id === p.id ? 'white' : 'var(--ink-1)',
+                    cursor: 'pointer',
+                  }}>
+                  {p.planCode ?? '—'} · {isAr && p.nameAr ? p.nameAr : p.nameEn}
+                </button>
+              ))}
+            </div>
+          )}
+
+        {currentPlan && (
+          <div className="kpi-grid">
+            <Kpi Icon={Target}       label={isAr ? 'الحالة' : 'Status'}        value={planStatusLabel(currentPlan.status, isAr ? 'ar' : 'en')}
+                 tone={planStatusTone(currentPlan.status) === 'primary' ? 'primary'
+                       : planStatusTone(currentPlan.status) === 'success' ? 'success'
+                       : planStatusTone(currentPlan.status) === 'warning' ? 'warning'
+                       : planStatusTone(currentPlan.status) === 'info' ? 'info' : 'primary'} />
+            <Kpi Icon={FileText}     label={isAr ? 'البنود' : 'Items'}         value={`${currentPlan.completedItems}/${currentPlan.totalItems}`} tone="primary" />
+            <Kpi Icon={ArrowRight}   label={isAr ? 'متوسط التقدّم' : 'Progress'} value={`${currentPlan.progressPct}%`}
+                 tone={currentPlan.progressPct >= 70 ? 'success' : currentPlan.progressPct >= 40 ? 'warning' : 'danger'} />
+            <Kpi Icon={Database}     label={isAr ? 'إجمالي الميزانية' : 'Budget'}   value={totalBudget ? totalBudget.toLocaleString() : '—'} tone="primary" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مُخصَّص' : 'Allocated'}    value={allocated.toLocaleString()} tone="info" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مُسلَّم' : 'Delivered'}    value={completedBudget.toLocaleString()}
+                 tone={completedBudget > 0 ? 'success' : 'primary'} />
+          </div>
+        )}
+
+        {currentPlan && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+            {currentPlan.status === 'DRAFT' && (
+              <Button size="sm" variant="primary" Icon={Check} onClick={onApprove}>
+                {isAr ? 'اعتماد' : 'Approve'}
+              </Button>
+            )}
+            {nextPlanStatuses(currentPlan.status).map(s => (
+              <Button key={s} size="sm" variant="secondary" Icon={ArrowRight} onClick={() => onTransition(s)}>
+                {planStatusLabel(s, isAr ? 'ar' : 'en')}
+              </Button>
+            ))}
+            <Button size="sm" variant="ghost" Icon={Trash2} onClick={onDeletePlan}>
+              {isAr ? 'حذف' : 'Delete'}
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+       : !currentPlan ? null
+       : itemsByQuarter.size === 0
+         ? <InlineEmpty>{isAr ? 'لا توجد بنود في الخطة' : 'No items in this plan yet'}</InlineEmpty>
+         : Array.from(itemsByQuarter.entries()).map(([q, rows]) => (
+            <Card key={q} title={`${q} · ${rows.length} ${isAr ? 'بنود' : 'items'}`} Icon={FileText}>
+              <table className="grc-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 50 }}>#</th>
+                    <th>{isAr ? 'كود الإجراء' : 'CAPA code'}</th>
+                    <th>{isAr ? 'الإجراء' : 'Action'}</th>
+                    <th>{isAr ? 'الأولوية' : 'Priority'}</th>
+                    <th>{isAr ? 'الميزانية' : 'Budget'}</th>
+                    <th style={{ width: 140 }}>{isAr ? 'التقدّم' : 'Progress'}</th>
+                    <th>{isAr ? 'حالة الإجراء' : 'CAPA status'}</th>
+                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(it => {
+                    const prog = it.capaProgressPct ?? 0;
+                    const color = prog >= 70 ? 'var(--success)' : prog >= 40 ? 'var(--warning)' : 'var(--danger)';
+                    return (
+                      <tr key={it.id}>
+                        <td className="mono text-2xs">{it.sequenceOrder}</td>
+                        <td className="mono text-2xs">{it.actionCode ?? `#${it.capaId}`}</td>
+                        <td className="text-xs">{isAr && it.actionAr ? it.actionAr : it.actionEn}</td>
+                        <td>
+                          <select value={it.priority}
+                            onChange={e => onUpdateItemPriority(it, e.target.value as NdiPlanItemPriority)}
+                            style={{ padding: '2px 6px', fontSize: 11, border: '1px solid var(--border)',
+                                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+                            <option value="CRITICAL">{priorityLabelPlan('CRITICAL', isAr ? 'ar' : 'en')}</option>
+                            <option value="HIGH">{priorityLabelPlan('HIGH', isAr ? 'ar' : 'en')}</option>
+                            <option value="MEDIUM">{priorityLabelPlan('MEDIUM', isAr ? 'ar' : 'en')}</option>
+                            <option value="LOW">{priorityLabelPlan('LOW', isAr ? 'ar' : 'en')}</option>
+                          </select>
+                          <span style={{ marginInlineStart: 4 }}>
+                            <Badge tone={planPriorityTone(it.priority)}>{priorityLabelPlan(it.priority, isAr ? 'ar' : 'en')}</Badge>
+                          </span>
+                        </td>
+                        <td className="mono text-2xs">{it.allocatedBudget?.toLocaleString() ?? '—'}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 80, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
+                              <div style={{ width: `${prog}%`, height: '100%', background: color, transition: 'width 0.3s ease' }} />
+                            </div>
+                            <span className="mono text-2xs">{prog}%</span>
+                          </div>
+                        </td>
+                        <td>
+                          {it.capaStatus
+                            ? <Badge tone={capaStatusTone(it.capaStatus)}>{capaStatusLabel(it.capaStatus, isAr ? 'ar' : 'en')}</Badge>
+                            : <span className="text-muted text-2xs">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'end' }}>
+                          <div style={{ display: 'inline-flex', gap: 4 }}>
+                            <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => onUpdateItemQuarter(it)}
+                              title={isAr ? 'تعديل الربع' : 'Edit quarter'} />
+                            <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDeleteItem(it)}
+                              title={isAr ? 'إزالة' : 'Remove'} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Card>
+          ))}
+
+      <FormModal
+        open={showCreatePlan}
+        title={isAr ? 'خطة تحسين جديدة' : 'New improvement plan'}
+        fields={planFields}
+        initial={{}}
+        size="lg"
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        onClose={() => setShowCreatePlan(false)}
+        onSubmit={onCreatePlan}
+      />
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
   dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
-  opex: null, domains: null, evidence: null, gaps: null, improvement: 9,
+  opex: null, domains: null, evidence: null, gaps: null, improvement: null,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };
 
