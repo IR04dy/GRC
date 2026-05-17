@@ -59,6 +59,13 @@ public class NdiGapController {
     @PreAuthorize("isAuthenticated()")
     public NdiGap getGap(@PathVariable Long id) { return service.getGap(id); }
 
+    /** Cross-module: returns the ERM risk row this gap's risk_id points to, or null. */
+    @GetMapping("/{id}/linked-risk")
+    @PreAuthorize("isAuthenticated()")
+    public com.tss.grc.module.ndi.integration.NdiCrossLinkService.LinkedRisk linkedRisk(@PathVariable Long id) {
+        return service.getLinkedRisk(id);
+    }
+
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<NdiGap> createGap(@RequestBody NdiGap body) {

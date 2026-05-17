@@ -34,12 +34,21 @@ public class NdiGapService {
     private final NdiGapRepository gaps;
     private final NdiCorrectiveActionRepository capas;
     private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
+    private final com.tss.grc.module.ndi.integration.NdiCrossLinkService crossLink;
 
     public NdiGapService(NdiGapRepository gaps, NdiCorrectiveActionRepository capas,
-                         com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit) {
+                         com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit,
+                         com.tss.grc.module.ndi.integration.NdiCrossLinkService crossLink) {
         this.gaps = gaps;
         this.capas = capas;
         this.audit = audit;
+        this.crossLink = crossLink;
+    }
+
+    /** Read-through to the ERM risk row this gap points to (Cross-module link). */
+    @Transactional(readOnly = true)
+    public com.tss.grc.module.ndi.integration.NdiCrossLinkService.LinkedRisk getLinkedRisk(Long gapId) {
+        return crossLink.getLinkedRisk(getGap(gapId).getRiskId());
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
@@ -80,6 +89,8 @@ public class NdiGapService {
         body.setId(null);
         body.setOrganisationId(org());
         if (body.getOpenDate() == null) body.setOpenDate(LocalDate.now());
+        // Cross-module integrity: validate risk_id resolves to a real ERM row.
+        crossLink.validateRiskExists(body.getRiskId());
         NdiGap saved = gaps.save(body);
         audit.publish("GAP", saved.getId(), saved.getGapCode(), saved.getCycleId(),
             "CREATE", "CRITICAL".equals(saved.getSeverity()) ? "WARN" : "INFO",
@@ -105,7 +116,7 @@ public class NdiGapService {
         if (body.getActualCloseDate() != null) g.setActualCloseDate(body.getActualCloseDate());
         String prevStatus = g.getStatus();
         if (body.getStatus()        != null) g.setStatus(body.getStatus());
-        if (body.getRiskId()        != null) g.setRiskId(body.getRiskId());
+        if (body.getRiskId()        != null) { crossLink.validateRiskExists(body.getRiskId()); g.setRiskId(body.getRiskId()); }
         if (body.getNotes()         != null) g.setNotes(body.getNotes());
         NdiGap saved = gaps.save(g);
         if (body.getStatus() != null && !body.getStatus().equals(prevStatus)) {

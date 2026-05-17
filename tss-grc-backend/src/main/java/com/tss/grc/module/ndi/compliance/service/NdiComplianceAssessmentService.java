@@ -46,6 +46,13 @@ public class NdiComplianceAssessmentService {
     private final NdiComplianceAssessmentRepository repo;
     private final NdiFrameworkItemRepository frameworkRepo;
     private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
+    private final com.tss.grc.module.ndi.integration.NdiCrossLinkService crossLink;
+
+    /** Read-through to the ERM risk row this compliance row points to. */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public com.tss.grc.module.ndi.integration.NdiCrossLinkService.LinkedRisk getLinkedRisk(Long complianceId) {
+        return crossLink.getLinkedRisk(get(complianceId).getRiskId());
+    }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 

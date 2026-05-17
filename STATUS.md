@@ -124,6 +124,15 @@ http://localhost:8087/login.html
 
 **Guardrail (Rule 0)** — Every domain / framework item / submission package seeded by V66-V78 carries `is_placeholder = 1` and the bilingual banner: *"Placeholder — requires official SDAIA/NDI control library import / عنصر مؤقت — يتطلب استيراد مكتبة الضوابط الرسمية من سدايا/نضيء"*. Flip `official_library_imported = true` in settings + each domain's `Mark official` action after the official library lands.
 
+### Audit Management — `audit_lc` entities filled in (commit `0a36252`) ← LANDED 2026-05-17
+V16 created 4 `audit_lc.*` tables but only `findings` was wired to Java. This commit added `AnnualPlan` / `WorkingPaper` / `CapaTask` entities + repositories + a combined `AuditLifecycleService` + `/api/audit-lc/{annual-plans, working-papers, capas}` REST endpoints. Frontend `lib/auditLifecycle.ts` swapped from localStorage mocks to real backend calls (commit `990e66a`) — `AuditLifecyclePage` consumes the same sync API but is now persistent.
+
+### Policy Management — full module (commit `8098e43`) ← LANDED 2026-05-17
+V79 migration: `policy.documents` + `policy.exceptions` + `policy.attestations` with 6/3/6 seeds. Three state machines (policy DRAFT → … → ARCHIVED, exception REQUESTED → … → REVOKED, attestation PENDING → ATTESTED|DECLINED). PUBLISHED-requires-effective-date guard, expiry sweeps, `/new-version` cloner, full UI at `/policy-management` with 4 tabs (Overview / Documents / Exceptions / Attestations).
+
+### Cross-module integration (commit pending) ← LANDED 2026-05-17
+NDI `gap.risk_id` and `compliance_assessment.risk_id` promoted from soft FK to validated ERM lookup. `NdiCrossLinkService` rejects non-existent risk ids on create/update with HTTP 400 + a clear message; `GET /api/ndi/gaps/{id}/linked-risk` and `GET /api/ndi/compliance/{id}/linked-risk` return a `LinkedRisk` enrichment record (id, externalId UUID, titleEn/Ar, status, sourceModule, inherentLikelihood/Impact, ownerId).
+
 ---
 
 ## ❌ REMAINING — Sprint 2 Completion
@@ -132,8 +141,6 @@ http://localhost:8087/login.html
 | Module | UI | Backend | Priority |
 |--------|----|---------|----------|
 | **Risk — Advanced** (risk appetite, treatment plans, full workflow) | ⚠️ basic only | ⚠️ | High |
-| **Audit Management** | ❌ | ❌ | Medium |
-| **Policy Management** | ❌ | ❌ | Medium |
 | **Vendor Risk Enhancements** (TPRM scoring, questionnaires) | ⚠️ | ⚠️ | Medium |
 
 ### Gaps in Existing Modules

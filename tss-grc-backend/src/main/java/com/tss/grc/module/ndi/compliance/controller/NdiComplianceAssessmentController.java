@@ -64,6 +64,13 @@ public class NdiComplianceAssessmentController {
     @PreAuthorize("isAuthenticated()")
     public NdiComplianceAssessment get(@PathVariable Long id) { return service.get(id); }
 
+    /** Cross-module: returns the ERM risk row this compliance assessment's risk_id points to, or null. */
+    @GetMapping("/{id}/linked-risk")
+    @PreAuthorize("isAuthenticated()")
+    public com.tss.grc.module.ndi.integration.NdiCrossLinkService.LinkedRisk linkedRisk(@PathVariable Long id) {
+        return service.getLinkedRisk(id);
+    }
+
     @PostMapping("/start")
     @PreAuthorize("isAuthenticated()")
     public Map<String, Object> startForCycle(@RequestParam Long cycleId) {

@@ -6,6 +6,7 @@ import com.tss.grc.module.ndi.gap.entity.NdiCorrectiveAction;
 import com.tss.grc.module.ndi.gap.entity.NdiGap;
 import com.tss.grc.module.ndi.gap.repository.NdiCorrectiveActionRepository;
 import com.tss.grc.module.ndi.gap.repository.NdiGapRepository;
+import com.tss.grc.module.ndi.integration.NdiCrossLinkService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class NdiGapServiceTest {
     @Mock private NdiGapRepository gaps;
     @Mock private NdiCorrectiveActionRepository capas;
     @Mock private NdiAuditPublisher audit;
+    @Mock private NdiCrossLinkService crossLink;
     @InjectMocks private NdiGapService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
