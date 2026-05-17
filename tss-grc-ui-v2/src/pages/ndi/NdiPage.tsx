@@ -60,6 +60,14 @@ import {
   classificationTone, classificationLabel, daysUntil,
   type NdiEvidenceItem, type NdiEvidenceAggregate, type NdiEvidenceType,
 } from '../../lib/ndiEvidence';
+import {
+  listGaps, gapsAggregate, createGap, updateGap, deleteGap,
+  listCapas, createCapa, updateCapa, deleteCapa,
+  severityTone, severityLabel, gapStatusTone, gapStatusLabel,
+  capaStatusTone, capaStatusLabel, actionTypeLabel,
+  type NdiGap, type NdiCorrectiveAction, type GapAggregate,
+  type GapSeverity, type GapStatus, type CapaStatus, type CapaActionType,
+} from '../../lib/ndiGaps';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -145,7 +153,8 @@ export function NdiPage() {
       {tab === 'opex'       && <OpexTab />}
       {tab === 'domains'    && <DomainsTab />}
       {tab === 'evidence'   && <EvidenceTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence'
+      {tab === 'gaps'       && <GapsTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence' && tab !== 'gaps'
         && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
@@ -2059,11 +2068,431 @@ function EvidenceTab() {
   );
 }
 
+// ─── Gaps + Corrective Actions tab (slice 8) ─────────────────────────
+
+function GapsTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [items, setItems] = useState<NdiGap[]>([]);
+  const [agg, setAgg] = useState<GapAggregate | null>(null);
+  const [capasByGap, setCapasByGap] = useState<Record<number, NdiCorrectiveAction[]>>({});
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<GapStatus | ''>('');
+  const [severityFilter, setSeverityFilter] = useState<GapSeverity | ''>('');
+  const [loading, setLoading] = useState(true);
+  const [showCreateGap, setShowCreateGap] = useState(false);
+
+  async function loadCycles() {
+    try {
+      const pg = await listCycles({ size: 100 });
+      setCycles(pg.content);
+      if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+    }
+  }
+  useEffect(() => { void loadCycles(); }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      const [pg, a] = await Promise.all([
+        listGaps(cycleId, { status: statusFilter || undefined, severity: severityFilter || undefined, size: 500 }),
+        gapsAggregate(cycleId),
+      ]);
+      setItems(pg.content);
+      setAgg(a);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل الفجوات' : 'Failed to load gaps'));
+      setItems([]); setAgg(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId, statusFilter, severityFilter]);
+
+  async function toggleExpand(g: NdiGap) {
+    const id = g.id!;
+    const nxt = new Set(expanded);
+    if (nxt.has(id)) { nxt.delete(id); setExpanded(nxt); return; }
+    nxt.add(id); setExpanded(nxt);
+    if (!capasByGap[id]) {
+      try {
+        const list = await listCapas(id);
+        setCapasByGap(prev => ({ ...prev, [id]: list }));
+      } catch (e) {
+        toast.danger(e instanceof ApiError ? e.message : 'Failed to load CAPAs');
+      }
+    }
+  }
+
+  async function refreshCapas(gapId: number) {
+    try {
+      const list = await listCapas(gapId);
+      setCapasByGap(prev => ({ ...prev, [gapId]: list }));
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Reload failed');
+    }
+  }
+
+  async function onCreateGap(body: Record<string, unknown>) {
+    try {
+      await createGap({ ...body, cycleId } as unknown as Partial<NdiGap>);
+      toast.success(isAr ? 'تم إنشاء الفجوة' : 'Gap created');
+      setShowCreateGap(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Create failed');
+    }
+  }
+
+  async function onChangeGapStatus(g: NdiGap, status: GapStatus) {
+    try {
+      await updateGap(g.id!, { status });
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onDeleteGap(g: NdiGap) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف الفجوة' : 'Delete gap',
+      body: isAr ? 'سيتم حذف الفجوة وكل إجراءاتها التصحيحية.' : 'The gap and all its corrective actions will be soft-deleted.',
+      destructive: true,
+      submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteGap(g.id!);
+      toast.success(isAr ? 'تم الحذف' : 'Deleted');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  async function onAddCapa(g: NdiGap) {
+    const action = await dialog.prompt({
+      title: isAr ? 'إجراء تصحيحي جديد' : 'New corrective action',
+      label: isAr ? 'اكتب وصف الإجراء التصحيحي.' : 'Describe the corrective action.',
+      type: 'textarea', required: true,
+    });
+    if (!action) return;
+    try {
+      await createCapa(g.id!, {
+        actionEn: action, actionType: 'CONTROL',
+        status: 'NOT_STARTED', progressPct: 0,
+      });
+      toast.success(isAr ? 'تم إضافة الإجراء' : 'CAPA added');
+      await refreshCapas(g.id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Add failed');
+    }
+  }
+
+  async function onUpdateCapaProgress(c: NdiCorrectiveAction) {
+    const ans = await dialog.prompt({
+      title: isAr ? 'تحديث التقدّم' : 'Update progress',
+      label: isAr ? `الحالي ${c.progressPct}%. أدخل النسبة الجديدة (0-100).` : `Current ${c.progressPct}%. New value (0-100).`,
+      type: 'number', required: true,
+      initial: String(c.progressPct),
+    });
+    if (ans == null) return;
+    const n = Number(ans);
+    if (n < 0 || n > 100) {
+      toast.danger(isAr ? 'القيمة 0-100' : 'Must be 0..100');
+      return;
+    }
+    const newStatus: CapaStatus = n >= 100 ? 'COMPLETED' : n > 0 ? 'IN_PROGRESS' : 'NOT_STARTED';
+    try {
+      await updateCapa(c.id!, { progressPct: n, status: newStatus });
+      toast.success(isAr ? 'تم التحديث' : 'Updated');
+      await refreshCapas(c.gapId);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onChangeCapaStatus(c: NdiCorrectiveAction, status: CapaStatus) {
+    try {
+      await updateCapa(c.id!, { status });
+      await refreshCapas(c.gapId);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function onDeleteCapa(c: NdiCorrectiveAction) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف الإجراء' : 'Delete CAPA',
+      body: isAr ? 'سيتم حذف الإجراء التصحيحي. هل تريد المتابعة؟' : 'The corrective action will be soft-deleted.',
+      destructive: true,
+      submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteCapa(c.id!);
+      await refreshCapas(c.gapId);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  const gapFields: FieldDef[] = useMemo(() => [
+    { kind: 'text',     key: 'titleEn',  required: true, span: 6, label: isAr ? 'العنوان (إنجليزي) *' : 'Title (EN) *' },
+    { kind: 'text',     key: 'titleAr',  span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { kind: 'select',   key: 'severity', required: true, span: 4, label: isAr ? 'الخطورة *' : 'Severity *',
+      options: [
+        { value: 'CRITICAL', label: isAr ? 'حرج' : 'Critical' },
+        { value: 'HIGH',     label: isAr ? 'مرتفع' : 'High' },
+        { value: 'MEDIUM',   label: isAr ? 'متوسط' : 'Medium' },
+        { value: 'LOW',      label: isAr ? 'منخفض' : 'Low' },
+      ] },
+    { kind: 'select', key: 'sourceType', span: 4, label: isAr ? 'المصدر' : 'Source',
+      options: [
+        { value: 'MANUAL',     label: isAr ? 'يدوي' : 'Manual' },
+        { value: 'COMPLIANCE', label: isAr ? 'الالتزام' : 'Compliance' },
+        { value: 'MATURITY',   label: isAr ? 'النضج' : 'Maturity' },
+        { value: 'KPI',        label: isAr ? 'مؤشّر' : 'KPI' },
+        { value: 'AUDIT',      label: isAr ? 'تدقيق' : 'Audit' },
+      ] },
+    { kind: 'text',     key: 'domain',      span: 4, label: isAr ? 'المجال' : 'Domain' },
+    { kind: 'text',     key: 'ownerName',   span: 6, label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'date',     key: 'targetDate',  span: 6, label: isAr ? 'تاريخ الهدف' : 'Target date' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2, label: isAr ? 'الوصف (إنجليزي)' : 'Description (EN)' },
+    { kind: 'textarea', key: 'rootCause',     span: 12, rows: 2, label: isAr ? 'السبب الجذري' : 'Root cause' },
+  ], [isAr]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'الفجوات والإجراءات التصحيحية' : 'Gaps & corrective actions'} Icon={AlertCircle}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={() => setShowCreateGap(true)}>
+              {isAr ? 'فجوة جديدة' : 'New gap'}
+            </Button>
+          </div>
+        }>
+        {agg && (
+          <div className="kpi-grid">
+            <Kpi Icon={AlertCircle}  label={isAr ? 'إجمالي الفجوات' : 'Total gaps'} value={agg.total}              tone="primary" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'حرجة مفتوحة'   : 'Critical open'} value={agg.criticalOpenCount}
+                 tone={agg.criticalOpenCount > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المعالجة'   : 'In progress'} value={agg.inProgressCount}   tone="warning" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'محلولة/مغلقة'   : 'Resolved'}    value={agg.resolvedOrClosedCount} tone="success" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'إجراءات متأخرة' : 'Overdue CAPAs'} value={agg.overdueCount}
+                 tone={agg.overdueCount > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={Target}       label={isAr ? 'متوسط التقدّم' : 'Avg progress'} value={`${agg.avgRollupProgress}%`}
+                 tone={agg.avgRollupProgress >= 70 ? 'success' : agg.avgRollupProgress >= 40 ? 'warning' : 'danger'} />
+          </div>
+        )}
+      </Card>
+
+      <Card title={isAr ? 'تفاصيل الفجوات' : 'Gap details'} Icon={FileText}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value as GapSeverity | '')}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 130, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الخطورات' : 'All severity'}</option>
+              <option value="CRITICAL">{isAr ? 'حرج' : 'Critical'}</option>
+              <option value="HIGH">{isAr ? 'مرتفع' : 'High'}</option>
+              <option value="MEDIUM">{isAr ? 'متوسط' : 'Medium'}</option>
+              <option value="LOW">{isAr ? 'منخفض' : 'Low'}</option>
+            </select>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as GapStatus | '')}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 140, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
+              <option value="OPEN">{isAr ? 'مفتوح' : 'Open'}</option>
+              <option value="IN_PROGRESS">{isAr ? 'قيد المعالجة' : 'In progress'}</option>
+              <option value="RESOLVED">{isAr ? 'محلول' : 'Resolved'}</option>
+              <option value="ACCEPTED_RISK">{isAr ? 'خطر مقبول' : 'Accepted risk'}</option>
+              <option value="CLOSED">{isAr ? 'مغلق' : 'Closed'}</option>
+            </select>
+          </div>
+        }>
+        {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+         : items.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد فجوات' : 'No gaps'}</InlineEmpty>
+         : (
+          <table className="grc-table">
+            <thead>
+              <tr>
+                <th style={{ width: 30 }} />
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'العنوان' : 'Title'}</th>
+                <th>{isAr ? 'الخطورة' : 'Severity'}</th>
+                <th>{isAr ? 'المالك' : 'Owner'}</th>
+                <th>{isAr ? 'الهدف' : 'Target'}</th>
+                <th style={{ width: 180 }}>{isAr ? 'التقدّم' : 'Progress'}</th>
+                <th>{isAr ? 'الحالة' : 'Status'}</th>
+                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(g => {
+                const open = expanded.has(g.id!);
+                const childCapas = capasByGap[g.id!] ?? [];
+                const progColor = g.rollupProgress >= 70 ? 'var(--success)'
+                                : g.rollupProgress >= 40 ? 'var(--warning)'
+                                : 'var(--danger)';
+                return (
+                  <>
+                    <tr key={g.id}>
+                      <td>
+                        <Button size="sm" variant="ghost" Icon={open ? ArchiveIcon : ArrowRight}
+                          onClick={() => toggleExpand(g)} title={open ? '−' : '+'} />
+                      </td>
+                      <td className="mono text-2xs">{g.gapCode ?? `#${g.id}`}</td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{isAr && g.titleAr ? g.titleAr : g.titleEn}</div>
+                        <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                          {g.domain ?? '—'} · {g.sourceType}
+                        </div>
+                      </td>
+                      <td><Badge tone={severityTone(g.severity)}>{severityLabel(g.severity, isAr ? 'ar' : 'en')}</Badge></td>
+                      <td className="text-xs">{g.ownerName ?? <span className="text-muted">—</span>}</td>
+                      <td className="text-xs">{g.targetDate ?? <span className="text-muted">—</span>}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 90, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
+                            <div style={{ width: `${g.rollupProgress}%`, height: '100%', background: progColor, transition: 'width 0.3s ease' }} />
+                          </div>
+                          <span className="mono text-2xs">{g.rollupProgress}% · {g.capaCompletedCount}/{g.capaCount}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <select value={g.status}
+                          onChange={e => onChangeGapStatus(g, e.target.value as GapStatus)}
+                          style={{ padding: '2px 6px', fontSize: 11, border: '1px solid var(--border)',
+                                   borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+                          <option value="OPEN">{gapStatusLabel('OPEN', isAr ? 'ar' : 'en')}</option>
+                          <option value="IN_PROGRESS">{gapStatusLabel('IN_PROGRESS', isAr ? 'ar' : 'en')}</option>
+                          <option value="RESOLVED">{gapStatusLabel('RESOLVED', isAr ? 'ar' : 'en')}</option>
+                          <option value="ACCEPTED_RISK">{gapStatusLabel('ACCEPTED_RISK', isAr ? 'ar' : 'en')}</option>
+                          <option value="CLOSED">{gapStatusLabel('CLOSED', isAr ? 'ar' : 'en')}</option>
+                        </select>
+                        <span style={{ marginInlineStart: 4 }}>
+                          <Badge tone={gapStatusTone(g.status)}>{gapStatusLabel(g.status, isAr ? 'ar' : 'en')}</Badge>
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'end' }}>
+                        <div style={{ display: 'inline-flex', gap: 4 }}>
+                          <Button size="sm" variant="ghost" Icon={Plus} onClick={() => onAddCapa(g)}
+                            title={isAr ? 'إضافة إجراء' : 'Add CAPA'} />
+                          <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDeleteGap(g)}
+                            title={isAr ? 'حذف' : 'Delete'} />
+                        </div>
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr key={`${g.id}-capas`}>
+                        <td />
+                        <td colSpan={8} style={{ background: 'var(--surface-2)', padding: 0 }}>
+                          {childCapas.length === 0
+                            ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>
+                                {isAr ? 'لا توجد إجراءات تصحيحية بعد.' : 'No corrective actions yet.'}
+                              </div>
+                            : <table className="grc-table" style={{ margin: 0 }}>
+                                <thead>
+                                  <tr>
+                                    <th>{isAr ? 'الكود' : 'Code'}</th>
+                                    <th>{isAr ? 'الإجراء' : 'Action'}</th>
+                                    <th>{isAr ? 'النوع' : 'Type'}</th>
+                                    <th>{isAr ? 'المالك' : 'Owner'}</th>
+                                    <th>{isAr ? 'الهدف' : 'Target'}</th>
+                                    <th>{isAr ? 'التقدّم' : 'Progress'}</th>
+                                    <th>{isAr ? 'الحالة' : 'Status'}</th>
+                                    <th style={{ textAlign: 'end' }}>{isAr ? '' : ''}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {childCapas.map(c => (
+                                    <tr key={c.id}>
+                                      <td className="mono text-2xs">{c.actionCode ?? `#${c.id}`}</td>
+                                      <td className="text-xs">{isAr && c.actionAr ? c.actionAr : c.actionEn}</td>
+                                      <td className="text-xs">{actionTypeLabel(c.actionType, isAr ? 'ar' : 'en')}</td>
+                                      <td className="text-xs">{c.ownerName ?? <span className="text-muted">—</span>}</td>
+                                      <td className="text-xs">{c.targetDate ?? <span className="text-muted">—</span>}</td>
+                                      <td className="mono text-2xs">{c.progressPct}%</td>
+                                      <td>
+                                        <select value={c.status}
+                                          onChange={e => onChangeCapaStatus(c, e.target.value as CapaStatus)}
+                                          style={{ padding: '2px 6px', fontSize: 11, border: '1px solid var(--border)',
+                                                   borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+                                          <option value="NOT_STARTED">{capaStatusLabel('NOT_STARTED', isAr ? 'ar' : 'en')}</option>
+                                          <option value="IN_PROGRESS">{capaStatusLabel('IN_PROGRESS', isAr ? 'ar' : 'en')}</option>
+                                          <option value="BLOCKED">{capaStatusLabel('BLOCKED', isAr ? 'ar' : 'en')}</option>
+                                          <option value="COMPLETED">{capaStatusLabel('COMPLETED', isAr ? 'ar' : 'en')}</option>
+                                          <option value="DEFERRED">{capaStatusLabel('DEFERRED', isAr ? 'ar' : 'en')}</option>
+                                        </select>
+                                        <span style={{ marginInlineStart: 4 }}>
+                                          <Badge tone={capaStatusTone(c.status)}>{capaStatusLabel(c.status, isAr ? 'ar' : 'en')}</Badge>
+                                        </span>
+                                      </td>
+                                      <td style={{ textAlign: 'end' }}>
+                                        <div style={{ display: 'inline-flex', gap: 4 }}>
+                                          <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => onUpdateCapaProgress(c)}
+                                            title={isAr ? 'تحديث التقدّم' : 'Update progress'} />
+                                          <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDeleteCapa(c)}
+                                            title={isAr ? 'حذف' : 'Delete'} />
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>}
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <FormModal
+        open={showCreateGap}
+        title={isAr ? 'فجوة جديدة' : 'New gap'}
+        fields={gapFields}
+        initial={{ severity: 'MEDIUM', sourceType: 'MANUAL' }}
+        size="lg"
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        onClose={() => setShowCreateGap(false)}
+        onSubmit={onCreateGap}
+      />
+    </div>
+  );
+}
+
+void ((_a: CapaActionType) => _a);  // silence unused type-import warning
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
   dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
-  opex: null, domains: null, evidence: null, gaps: 8, improvement: 9,
+  opex: null, domains: null, evidence: null, gaps: null, improvement: 9,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };
 
