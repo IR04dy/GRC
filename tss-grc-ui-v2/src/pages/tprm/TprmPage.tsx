@@ -36,6 +36,7 @@ import { toVendorDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { TprmOnboardingPipeline, TprmReassessmentDashboard } from './TprmOnboardingPanel';
 import { TprmConsolidatedOverview } from '../../components/tprm/TprmConsolidatedOverview';
+import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 import {
   listQtTemplates, listQtQuestions, transitionQtTemplate,
   listVendorAssessments, assignTemplateToAssessment, listAssessmentResponses,
@@ -46,7 +47,7 @@ import {
 } from '../../lib/tprmQuestionnaire';
 import { useDialog } from '../../lib/dialog';
 
-type TabId = 'overview' | 'vendors' | 'onboarding' | 'reassessment' | 'assessments' | 'questionnaires' | 'contracts' | 'workflows' | 'comms';
+type TabId = 'overview' | 'vendors' | 'onboarding' | 'reassessment' | 'assessments' | 'questionnaires' | 'contracts' | 'workflows' | 'comms' | 'alignment';
 
 const RISK_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
@@ -133,6 +134,7 @@ export function TprmPage() {
     { id: 'contracts',    label: t('tprmTabContracts') },
     { id: 'workflows',    label: t('tprmTabWorkflows') ?? 'Workflows' },
     { id: 'comms',        label: t('detailTabComms') },
+    { id: 'alignment',    label: lang === 'ar' ? 'التوافق التنظيمي' : 'Regulatory alignment' },
   ];
 
   const cols: Column<TprmVendorDto>[] = [
@@ -307,6 +309,7 @@ export function TprmPage() {
         sub={t('tprmWorkflowsSub')}
         t={t} />}
       {tab === 'comms' && <CommsPanel module="TPRM" />}
+      {tab === 'alignment' && <RegulatoryAlignmentTab domain="TPRM" families={['Third-Party', 'SAMA', 'NCA Cyber', 'Privacy']} />}
 
       <FormModal<TprmVendorRequest>
         open={open}

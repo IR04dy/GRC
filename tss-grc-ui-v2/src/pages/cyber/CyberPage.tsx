@@ -49,8 +49,9 @@ import { CYBER_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CYBER_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 
-type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions' | 'workflows' | 'comms';
+type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions' | 'workflows' | 'comms' | 'alignment';
 
 // ─── Workflow stage steppers (overview tab) ─────────────────────────────────
 const VULN_STAGES = [
@@ -400,7 +401,7 @@ function useEntityState<T>() {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 export function CyberPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const [tab, setTab] = useState<TabId>('overview');
   const [busy, setBusy] = useState(false);
@@ -583,6 +584,7 @@ export function CyberPage() {
     { id: 'actions',     label: t('cyberTabActions') },
     { id: 'workflows',   label: t('cyberTabWorkflows') ?? 'Workflows' },
     { id: 'comms',       label: t('detailTabComms') },
+    { id: 'alignment',   label: lang === 'ar' ? 'التوافق التنظيمي' : 'Regulatory alignment' },
   ];
 
   // ── Submit handlers ──
@@ -1049,6 +1051,7 @@ export function CyberPage() {
         sub="Cyber incident response (NIST 800-61), vulnerability remediation, control assessments, and exception approvals."
         t={t} />}
       {tab === 'comms' && <CommsPanel module="INCIDENT" />}
+      {tab === 'alignment' && <RegulatoryAlignmentTab domain="CYBER" families={['NCA Cyber', 'SAMA', 'International']} />}
 
       {/* ── Modals ── */}
       <FormModal<CyberControlRequest> open={ctrlS.open}

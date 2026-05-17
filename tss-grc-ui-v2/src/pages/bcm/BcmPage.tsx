@@ -44,8 +44,9 @@ import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { BCM_ANCHORS } from '../../lib/moduleAnchors';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toBiaDto } from '../../lib/promotedAdapters';
+import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 
-type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows';
+type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows' | 'alignment';
 
 const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Draft' }, { value: 'UNDER_REVIEW', label: 'Under Review' },
@@ -139,14 +140,14 @@ function useEntityState<T>() {
   };
 }
 
-const VALID_BCM_TABS: TabId[] = ['overview', 'plans', 'processes', 'bia', 'graph', 'exercises', 'comms', 'workflows'];
+const VALID_BCM_TABS: TabId[] = ['overview', 'plans', 'processes', 'bia', 'graph', 'exercises', 'comms', 'workflows', 'alignment'];
 
 function isBcmTab(s: string | null): s is TabId {
   return !!s && (VALID_BCM_TABS as string[]).includes(s);
 }
 
 export function BcmPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   // ?tab=<id> deep-link support — fixes the bug where /bcm?tab=plans
@@ -272,6 +273,7 @@ export function BcmPage() {
     { id: 'exercises', label: t('bcmTabExercises') },
     { id: 'comms',     label: t('bcmTabComms') },
     { id: 'workflows', label: t('bcmTabWorkflows') ?? 'Workflows' },
+    { id: 'alignment', label: lang === 'ar' ? 'التوافق التنظيمي' : 'Regulatory alignment' },
   ];
 
   const planCols: Column<BcmPlanDto>[] = [
@@ -554,6 +556,7 @@ export function BcmPage() {
         title={t('bcmTabWorkflows') ?? 'Workflows'}
         sub="BCP plan approvals, exercise execution, and crisis-management readiness."
         t={t} />}
+      {tab === 'alignment' && <RegulatoryAlignmentTab domain="BCM" families={['BCM', 'SAMA', 'Resilience', 'International']} />}
 
       {/* ── Modals ── */}
       <FormModal<BcmPlanRequest> open={planS.open}

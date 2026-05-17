@@ -40,8 +40,9 @@ import { SAUDI_APPETITES } from '../../lib/riskAppetiteSaudi';
 import { RISK_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { RISK_ANCHORS } from '../../lib/moduleAnchors';
+import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 
-type TabId = 'register' | 'heatmap' | 'kri' | 'appetite' | 'workflows';
+type TabId = 'register' | 'heatmap' | 'kri' | 'appetite' | 'workflows' | 'alignment';
 
 interface RiskFilters {
   l?: number; i?: number;       // heatmap drill-down
@@ -281,6 +282,7 @@ export function RiskRegisterPage() {
     { id: 'kri'       as const, label: t('riskTabKri') },
     { id: 'appetite'  as const, label: t('riskTabAppetite') },
     { id: 'workflows' as const, label: t('riskTabWorkflows') ?? 'Workflows' },
+    { id: 'alignment' as const, label: lang === 'ar' ? 'التوافق التنظيمي' : 'Regulatory alignment' },
   ];
 
   // Columns for the Register table — DataTable, with Inherent → Residual + actions
@@ -423,6 +425,8 @@ export function RiskRegisterPage() {
         title={t('riskTabWorkflows') ?? 'Workflows'}
         sub="Active risk-management workflows: lifecycle stages, KRI breach response, appetite breach escalation."
         t={t} />}
+
+      {tab === 'alignment' && <RegulatoryAlignmentTab domain="RISK" families={['Risk', 'SAMA', 'International']} />}
 
       <NewRiskModal
         open={modalOpen}

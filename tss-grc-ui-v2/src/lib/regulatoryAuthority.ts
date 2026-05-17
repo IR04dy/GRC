@@ -115,6 +115,90 @@ export function deleteCitation(id: number) {
   return api.delete<void>(`${BASE}/citations/${id}`);
 }
 
+// ─── Posture / coverage / alignment (F5 + F6) ─────────────────────
+
+export interface CitationView {
+  id: number;
+  authorityDocumentId: number;
+  citationCode: string;
+  titleEn: string;
+  titleAr?: string;
+  authorityCode: string;
+  authorityFamily: string;
+}
+
+export interface DocumentCoverage {
+  authorityDocumentId: number;
+  code: string;
+  family: string;
+  titleEn: string;
+  titleAr?: string;
+  totalCitations: number;
+  mappedCitations: number;
+  fullCoverage: number;
+  partialCoverage: number;
+  compensatingCoverage: number;
+  gapCitations: number;
+  controlsByDomain: Record<string, number>;
+  gaps: CitationView[];
+  coveragePct: number;
+}
+
+export interface PostureRow {
+  authorityDocumentId: number;
+  code: string;
+  family: string;
+  titleEn: string;
+  titleAr?: string;
+  totalCitations: number;
+  mappedCitations: number;
+  coveragePct: number;
+  controlsByDomain: Record<string, number>;
+}
+
+export interface PostureHeatmap {
+  rows: PostureRow[];
+  domains: string[];
+  familyTotals: Record<string, number>;
+}
+
+export interface DomainAlignment {
+  domain: string;
+  documents: DocumentCoverage[];
+  totalCitations: number;
+  mappedCitations: number;
+  gapCitations: number;
+  averageCoveragePct: number;
+}
+
+export function getCitationView(id: number) {
+  return api.get<CitationView>(`${BASE}/citations/${id}`);
+}
+
+export function getDocumentCoverage(id: number) {
+  return api.get<DocumentCoverage>(`${BASE}/authority-documents/${id}/coverage`);
+}
+
+export function getPostureHeatmap(family?: string) {
+  const q = family ? `?family=${encodeURIComponent(family)}` : '';
+  return api.get<PostureHeatmap>(`${BASE}/posture${q}`);
+}
+
+export function getDomainAlignment(domain: string, families?: string[]) {
+  const q = new URLSearchParams();
+  q.set('domain', domain);
+  (families ?? []).forEach(f => q.append('family', f));
+  return api.get<DomainAlignment>(`${BASE}/domain-alignment?${q.toString()}`);
+}
+
+/** Tone for a coverage % using the standard RAG bands. */
+export function coverageBandTone(pct: number): 'danger' | 'warning' | 'info' | 'success' {
+  if (pct < 30) return 'danger';
+  if (pct < 60) return 'warning';
+  if (pct < 85) return 'info';
+  return 'success';
+}
+
 // ─── UI helpers ───────────────────────────────────────────────────
 
 export function authorityStatusTone(s: AuthorityStatus): 'neutral' | 'success' | 'warning' | 'danger' {
