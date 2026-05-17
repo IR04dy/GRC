@@ -2311,6 +2311,7 @@ export const en = {
   postureHubSidebar:      'Compliance posture',
   ermDashSidebar:         'Risk dashboard',
   bcmDashSidebar:         'BCM dashboard',
+  bcmReadinessSidebar:    'BCM readiness',
   scmDashSidebar:         'Supply chain dashboard',
   cyberDashSidebar:       'Cyber dashboard',
   pdplDashSidebar:        'PDPL dashboard',

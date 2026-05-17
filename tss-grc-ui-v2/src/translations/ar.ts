@@ -2296,6 +2296,7 @@ export const ar = {
   postureHubSidebar:      'وضع الامتثال',
   ermDashSidebar:         'لوحة المخاطر',
   bcmDashSidebar:         'لوحة الاستمرارية',
+  bcmReadinessSidebar:    'جاهزية الاستمرارية',
   scmDashSidebar:         'لوحة سلسلة الإمداد',
   cyberDashSidebar:       'لوحة الأمن السيبراني',
   pdplDashSidebar:        'لوحة الخصوصية',
