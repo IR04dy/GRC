@@ -53,6 +53,13 @@ import {
   ndiScoreTone, ndiScoreLabel,
   type NdiGovernanceDomain, type CycleRollup, type DomainRollup,
 } from '../../lib/ndiDomains';
+import {
+  listEvidence, evidenceAggregate, createEvidence, approveEvidence,
+  rejectEvidence, runExpiryCheck, deleteEvidence,
+  evidenceStatusTone, evidenceStatusLabel, evidenceTypeLabel,
+  classificationTone, classificationLabel, daysUntil,
+  type NdiEvidenceItem, type NdiEvidenceAggregate, type NdiEvidenceType,
+} from '../../lib/ndiEvidence';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -137,7 +144,8 @@ export function NdiPage() {
       {tab === 'compliance' && <ComplianceTab />}
       {tab === 'opex'       && <OpexTab />}
       {tab === 'domains'    && <DomainsTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains'
+      {tab === 'evidence'   && <EvidenceTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence'
         && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
@@ -1756,11 +1764,306 @@ function DomainsTab() {
   );
 }
 
+// ─── Evidence Repository tab (slice 7) ───────────────────────────────
+
+function EvidenceTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [items, setItems] = useState<NdiEvidenceItem[]>([]);
+  const [agg, setAgg] = useState<NdiEvidenceAggregate | null>(null);
+  const [expiring, setExpiring] = useState<NdiEvidenceItem[]>([]);
+  const [typeFilter, setTypeFilter] = useState<NdiEvidenceType | ''>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [pg, a, exp] = await Promise.all([
+        listEvidence({ size: 500,
+          type: typeFilter || undefined,
+          status: (statusFilter as 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'SUPERSEDED' | 'REJECTED') || undefined }),
+        evidenceAggregate(),
+        runExpiryCheckSilently().then(() => /* re-run */ {/* noop */}).then(() =>
+          import('../../lib/ndiEvidence').then(m => m.expiringSoon(60))),
+      ]);
+      setItems(pg.content);
+      setAgg(a);
+      setExpiring(exp);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحميل الأدلة' : 'Failed to load evidence'));
+      setItems([]); setAgg(null); setExpiring([]);
+    } finally { setLoading(false); }
+  }
+
+  // Best-effort expiry flip — silently swallow errors so a misconfigured
+  // permission doesn't crash the tab load.
+  async function runExpiryCheckSilently() {
+    try { await runExpiryCheck(); } catch { /* noop */ }
+  }
+
+  useEffect(() => { void reload(); }, [typeFilter, statusFilter]);
+
+  async function onCreate(body: Partial<NdiEvidenceItem>) {
+    try {
+      await createEvidence(body);
+      toast.success(isAr ? 'تم إضافة الدليل' : 'Evidence created');
+      setShowCreate(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Create failed');
+    }
+  }
+
+  async function onApprove(e: NdiEvidenceItem) {
+    try {
+      await approveEvidence(e.id!, 'admin');
+      toast.success(isAr ? 'تم الاعتماد' : 'Approved');
+      await reload();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Approve failed');
+    }
+  }
+
+  async function onReject(e: NdiEvidenceItem) {
+    const reason = await dialog.prompt({
+      title: isAr ? 'سبب الرفض' : 'Rejection reason',
+      label: isAr ? 'اشرح بإيجاز لماذا تم رفض هذا الدليل.' : 'Briefly explain why this evidence is being rejected.',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
+    try {
+      await rejectEvidence(e.id!, reason, 'admin');
+      toast.success(isAr ? 'تم الرفض' : 'Rejected');
+      await reload();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Reject failed');
+    }
+  }
+
+  async function onDelete(e: NdiEvidenceItem) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف الدليل' : 'Delete evidence',
+      body: isAr
+        ? `سيتم حذف "${e.titleAr ?? e.titleEn}". الحذف منطقي (يمكن إستعادته من قاعدة البيانات).`
+        : `"${e.titleEn}" will be soft-deleted.`,
+      destructive: true,
+      submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteEvidence(e.id!);
+      toast.success(isAr ? 'تم الحذف' : 'Deleted');
+      await reload();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Delete failed');
+    }
+  }
+
+  async function onRunExpiry() {
+    try {
+      const r = await runExpiryCheck();
+      toast.success(isAr
+        ? `تم التحقق — ${r.flippedCount} دليلاً انتهت صلاحيته`
+        : `Checked — ${r.flippedCount} evidence item${r.flippedCount === 1 ? '' : 's'} flipped to expired`);
+      await reload();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Expiry check failed');
+    }
+  }
+
+  const createFields: FieldDef[] = [
+    { kind: 'text',   key: 'titleEn', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي) *' : 'Title (EN) *' },
+    { kind: 'text',   key: 'titleAr', span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { kind: 'select', key: 'evidenceType', required: true, span: 4, label: isAr ? 'النوع *' : 'Type *',
+      options: [
+        { value: 'POLICY',      label: isAr ? 'سياسة' : 'Policy' },
+        { value: 'PROCEDURE',   label: isAr ? 'إجراء' : 'Procedure' },
+        { value: 'REPORT',      label: isAr ? 'تقرير' : 'Report' },
+        { value: 'SCREENSHOT',  label: isAr ? 'لقطة شاشة' : 'Screenshot' },
+        { value: 'ATTESTATION', label: isAr ? 'تصريح' : 'Attestation' },
+        { value: 'CERTIFICATE', label: isAr ? 'شهادة' : 'Certificate' },
+        { value: 'AUDIT_LOG',   label: isAr ? 'سجل تدقيق' : 'Audit log' },
+        { value: 'DATASET',     label: isAr ? 'مجموعة بيانات' : 'Dataset' },
+        { value: 'OTHER',       label: isAr ? 'أخرى' : 'Other' },
+      ] },
+    { kind: 'select', key: 'classification', required: true, span: 4, label: isAr ? 'التصنيف *' : 'Classification *',
+      options: [
+        { value: 'PUBLIC',       label: isAr ? 'عام' : 'Public' },
+        { value: 'INTERNAL',     label: isAr ? 'داخلي' : 'Internal' },
+        { value: 'CONFIDENTIAL', label: isAr ? 'سرّي' : 'Confidential' },
+        { value: 'RESTRICTED',   label: isAr ? 'مقيَّد' : 'Restricted' },
+      ] },
+    { kind: 'number', key: 'cycleId', span: 4, label: isAr ? 'معرّف الدورة' : 'Cycle ID' },
+    { kind: 'text',     key: 'fileRef',       span: 12, label: isAr ? 'مرجع الملف / رابط' : 'File reference / URL' },
+    { kind: 'text',     key: 'ownerName',     span: 6,  label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'text',     key: 'ownerEmail',    span: 6,  label: isAr ? 'بريد المالك' : 'Owner email' },
+    { kind: 'date',     key: 'effectiveDate', span: 6,  label: isAr ? 'تاريخ السريان' : 'Effective date' },
+    { kind: 'date',     key: 'expiryDate',    span: 6,  label: isAr ? 'تاريخ الانتهاء' : 'Expiry date' },
+    { kind: 'text',     key: 'tags',          span: 12, label: isAr ? 'وسوم (مفصولة بـ |)' : 'Tags (pipe-separated)' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2, label: isAr ? 'الوصف (إنجليزي)' : 'Description (EN)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2, label: isAr ? 'الوصف (عربي)' : 'Description (AR)' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'مستودع الأدلة' : 'Evidence repository'} Icon={Paperclip}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            <Button size="sm" variant="ghost" Icon={Check} onClick={onRunExpiry}>
+              {isAr ? 'تحقق من الانتهاء' : 'Check expiry'}
+            </Button>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={() => setShowCreate(true)}>
+              {isAr ? 'إضافة دليل' : 'Add evidence'}
+            </Button>
+          </div>
+        }>
+        {agg && (
+          <div className="kpi-grid">
+            <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total'}        value={agg.total}            tone="primary" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'سارٍ'         : 'Active'}       value={agg.activeCount}      tone="success" />
+            <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'Pending'}      value={agg.pendingCount}     tone="primary" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'منتهي'        : 'Expired'}      value={agg.expiredCount}     tone={agg.expiredCount > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'قريب الانتهاء' : 'Expiring soon'} value={agg.expiringSoonCount}
+                 tone={agg.expiringSoonCount > 0 ? 'warning' : 'success'} />
+            <Kpi Icon={Trash2}       label={isAr ? 'مرفوض'        : 'Rejected'}     value={agg.rejectedCount}    tone={agg.rejectedCount > 0 ? 'danger' : 'success'} />
+          </div>
+        )}
+      </Card>
+
+      {expiring.length > 0 && (
+        <Card title={isAr ? `أدلة تنتهي خلال 60 يوماً (${expiring.length})` : `Evidence expiring within 60 days (${expiring.length})`} Icon={AlertCircle}>
+          <table className="grc-table">
+            <thead>
+              <tr>
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'العنوان' : 'Title'}</th>
+                <th>{isAr ? 'النوع' : 'Type'}</th>
+                <th>{isAr ? 'تاريخ الانتهاء' : 'Expiry'}</th>
+                <th>{isAr ? 'متبقٍ' : 'Days left'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expiring.map(e => {
+                const d = daysUntil(e.expiryDate);
+                return (
+                  <tr key={e.id}>
+                    <td className="mono text-2xs">{e.evidenceCode ?? `#${e.id}`}</td>
+                    <td>{isAr && e.titleAr ? e.titleAr : e.titleEn}</td>
+                    <td className="text-xs">{evidenceTypeLabel(e.evidenceType, isAr ? 'ar' : 'en')}</td>
+                    <td className="text-xs">{e.expiryDate}</td>
+                    <td><Badge tone={d != null && d < 30 ? 'danger' : 'warning'}>{d ?? '—'}</Badge></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      <Card title={isAr ? 'جميع الأدلة' : 'All evidence'} Icon={FileText}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            <select value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value as NdiEvidenceType | '')}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 140,
+                       border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                       background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
+              {(['POLICY','PROCEDURE','REPORT','SCREENSHOT','ATTESTATION','CERTIFICATE','AUDIT_LOG','DATASET','OTHER'] as NdiEvidenceType[])
+                .map(t => <option key={t} value={t}>{evidenceTypeLabel(t, isAr ? 'ar' : 'en')}</option>)}
+            </select>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 140,
+                       border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                       background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
+              <option value="PENDING">{isAr ? 'قيد المراجعة' : 'Pending'}</option>
+              <option value="ACTIVE">{isAr ? 'سارٍ' : 'Active'}</option>
+              <option value="EXPIRED">{isAr ? 'منتهٍ' : 'Expired'}</option>
+              <option value="SUPERSEDED">{isAr ? 'مُستبدَل' : 'Superseded'}</option>
+              <option value="REJECTED">{isAr ? 'مرفوض' : 'Rejected'}</option>
+            </select>
+          </div>
+        }>
+        {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+         : items.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد أدلة' : 'No evidence'}</InlineEmpty>
+         : (
+          <table className="grc-table">
+            <thead>
+              <tr>
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'العنوان' : 'Title'}</th>
+                <th>{isAr ? 'النوع' : 'Type'}</th>
+                <th>{isAr ? 'التصنيف' : 'Classification'}</th>
+                <th>{isAr ? 'المالك' : 'Owner'}</th>
+                <th>{isAr ? 'سريان' : 'Effective'}</th>
+                <th>{isAr ? 'انتهاء' : 'Expiry'}</th>
+                <th>{isAr ? 'الحالة' : 'Status'}</th>
+                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(e => (
+                <tr key={e.id}>
+                  <td className="mono text-2xs">{e.evidenceCode ?? `#${e.id}`}</td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{isAr && e.titleAr ? e.titleAr : e.titleEn}</div>
+                    {e.fileRef && (
+                      <div className="text-2xs text-muted mono" style={{ marginTop: 2 }}>{e.fileRef}</div>
+                    )}
+                  </td>
+                  <td className="text-xs">{evidenceTypeLabel(e.evidenceType, isAr ? 'ar' : 'en')}</td>
+                  <td><Badge tone={classificationTone(e.classification)}>{classificationLabel(e.classification, isAr ? 'ar' : 'en')}</Badge></td>
+                  <td className="text-xs">{e.ownerName ?? <span className="text-muted">—</span>}</td>
+                  <td className="text-xs">{e.effectiveDate ?? <span className="text-muted">—</span>}</td>
+                  <td className="text-xs">{e.expiryDate ?? <span className="text-muted">—</span>}</td>
+                  <td><Badge tone={evidenceStatusTone(e.status)}>{evidenceStatusLabel(e.status, isAr ? 'ar' : 'en')}</Badge></td>
+                  <td style={{ textAlign: 'end' }}>
+                    <div style={{ display: 'inline-flex', gap: 4 }}>
+                      {e.status === 'PENDING' && (
+                        <>
+                          <Button size="sm" variant="ghost" Icon={Check} onClick={() => onApprove(e)}
+                            title={isAr ? 'اعتماد' : 'Approve'} />
+                          <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onReject(e)}
+                            title={isAr ? 'رفض' : 'Reject'} />
+                        </>
+                      )}
+                      <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(e)}
+                        title={isAr ? 'حذف' : 'Delete'} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <FormModal
+        open={showCreate}
+        title={isAr ? 'إضافة دليل' : 'Add evidence'}
+        fields={createFields}
+        initial={{ classification: 'INTERNAL', evidenceType: 'POLICY' }}
+        size="lg"
+        submitLabel={isAr ? 'إضافة' : 'Create'}
+        onClose={() => setShowCreate(false)}
+        onSubmit={async (vals: Record<string, unknown>) => { await onCreate(vals as unknown as Partial<NdiEvidenceItem>); }}
+      />
+    </div>
+  );
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
   dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
-  opex: null, domains: null, evidence: 7, gaps: 8, improvement: 9,
+  opex: null, domains: null, evidence: null, gaps: 8, improvement: 9,
   submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
 };
 
