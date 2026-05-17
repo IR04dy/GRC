@@ -2695,9 +2695,11 @@ function ImprovementTab() {
     { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2, label: isAr ? 'الوصف (عربي)' : 'Description (AR)' },
   ], [isAr]);
 
-  if (cycles.length === 0) {
-    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
-  }
+  // ─── Derived state ──────────────────────────────────────────────────
+  // NOTE: every hook below MUST stay above the `cycles.length === 0` early
+  // return — moving it back below would break React's Rules of Hooks
+  // (different hook count on first render vs. once cycles populate) and
+  // would crash the tab to a blank page.
 
   // Group items by target quarter (sorted by quarter string ascending).
   const itemsByQuarter = useMemo(() => {
@@ -2709,6 +2711,10 @@ function ImprovementTab() {
     }
     return new Map(Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b)));
   }, [items]);
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
 
   const totalBudget = currentPlan?.budgetTotal ?? 0;
   const allocated = items.reduce((s, it) => s + (it.allocatedBudget ?? 0), 0);
