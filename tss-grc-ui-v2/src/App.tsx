@@ -16,6 +16,7 @@ import { BcmPage } from './pages/bcm/BcmPage';
 import { PrivacyPage } from './pages/privacy/PrivacyPage';
 import { CompliancePage } from './pages/compliance/CompliancePage';
 import { RegulatoryLibraryPage } from './pages/regulatory/RegulatoryLibraryPage';
+import { ControlLibraryPage } from './pages/controls/ControlLibraryPage';
 import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
@@ -128,6 +129,7 @@ export function App() {
               <Route path="/pdpl-extensions" element={<Navigate to="/data-lifecycle" replace />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/regulatory/library" element={<RegulatoryLibraryPage />} />
+              <Route path="/controls/library"   element={<ControlLibraryPage />} />
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/rca"        element={<RcaPage />} />

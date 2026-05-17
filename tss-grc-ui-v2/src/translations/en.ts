@@ -2307,6 +2307,7 @@ export const en = {
   ptSidebar:              'Policy templates',
   polMgmtSidebar:         'Policy management',
   regLibrarySidebar:      'Regulatory library',
+  ctrlLibrarySidebar:     'Control library',
   ptEyebrow:              'Content · Policy template library',
   ptTitle:                'Policy Template Library',
   ptSub:                  'Bilingual Saudi-context policy templates ready to clone and brand.',
