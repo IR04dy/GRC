@@ -2291,6 +2291,7 @@ export const ar = {
   // Policy template library — Track D2 (content moat)
   ptSidebar:              'قوالب السياسات',
   polMgmtSidebar:         'إدارة السياسات',
+  regLibrarySidebar:      'مكتبة المرجعيات',
   ptEyebrow:              'المحتوى · مكتبة قوالب السياسات',
   ptTitle:                'مكتبة قوالب السياسات',
   ptSub:                  'قوالب سياسات ثنائية اللغة مهيّأة للسياق السعودي وجاهزة للنسخ والتخصيص.',

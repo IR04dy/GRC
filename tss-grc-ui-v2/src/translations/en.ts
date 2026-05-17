@@ -2306,6 +2306,7 @@ export const en = {
   // Policy template library — Track D2 (content moat)
   ptSidebar:              'Policy templates',
   polMgmtSidebar:         'Policy management',
+  regLibrarySidebar:      'Regulatory library',
   ptEyebrow:              'Content · Policy template library',
   ptTitle:                'Policy Template Library',
   ptSub:                  'Bilingual Saudi-context policy templates ready to clone and brand.',
