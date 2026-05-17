@@ -866,7 +866,25 @@ function CommitteeTab({ notifs, digest }: {
       {/* Quarterly digest card */}
       <Card title={`${t('capaCommitteeDigest')} — ${digest.quarterLabel}`} Icon={Stamp}
         action={<Button variant="ghost" size="sm" Icon={FileText}
-          onClick={() => toast.info(t('capaCommitteeExportHint'))}>
+          onClick={() => {
+            // Real export: render the digest's per-metric rows as a CSV the
+            // audit committee can attach to the quarterly minutes pack.
+            const rows: ExportRow[] = [
+              { metric: t('capaCommitteeOpened'),               value: String(digest.opened) },
+              { metric: t('capaCommitteeClosed'),               value: String(digest.closed) },
+              { metric: t('capaCommitteeInFlight'),             value: String(digest.inFlight) },
+              { metric: t('capaCommitteeOverdue'),              value: String(digest.overdue) },
+              { metric: t('capaCommitteeVerificationFailed'),   value: String(digest.verificationFailed) },
+              { metric: t('capaCommitteeRecurrent'),            value: String(digest.recurrent) },
+              { metric: t('capaCommitteePreventive'),           value: String(digest.preventive) },
+              { metric: t('capaCommitteeCustomerDisclosures'),  value: String(digest.customerDisclosures) },
+              { metric: 'quarter',                              value: digest.quarterLabel },
+              { metric: 'period_start',                         value: digest.quarterStart },
+              { metric: 'period_end',                           value: digest.quarterEnd },
+            ];
+            downloadCsv(rows, stampFilename(`capa-committee-${digest.quarterLabel}`, 'csv'));
+            toast.success(t('exportCsvDone'));
+          }}>
           {t('capaCommitteeExport')}
         </Button>}>
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>

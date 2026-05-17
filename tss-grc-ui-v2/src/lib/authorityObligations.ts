@@ -1,6 +1,6 @@
 /**
  * Per-authority obligation register — what each regulator requires the
- * organisation to do. ServiceNow IRM "Obligation" / Continuous-Compliance
+ * organisation to do. industry-standard GRC tooling "Obligation" / Continuous-Compliance
  * pattern.
  *
  * Each obligation cites the source clause and tracks the org's internal

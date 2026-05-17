@@ -1,6 +1,6 @@
 // Approval engine — Sprint 5.
 //
-// ServiceNow IRM / OneTrust / Workiva ship a generic approval primitive
+// industry-standard GRC tooling / industry-standard tooling ship a generic approval primitive
 // that every workflow uses (parallel approvers, sequential gates,
 // conditional routing by data, delegation, out-of-office, SLA timers).
 // Until now this platform's "approvals" were just role-gated transitions

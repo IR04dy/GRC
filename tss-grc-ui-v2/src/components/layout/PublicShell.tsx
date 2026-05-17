@@ -7,9 +7,9 @@ import { useI18n } from '../../lib/i18n';
  * Layout for public-facing portals: DSR, SpeakUp, VRP, Trust Center, etc.
  * Strips the authenticated Shell (no sidebar, no app navigation, no auth-required
  * search bar). Inspired by:
- *  - OneTrust DSR webform — minimal chrome, multi-language, branded header
+ *  - industry-standard DSR webform — minimal chrome, multi-language, branded header
  *  - NAVEX EthicsPoint — neutral hosting, anonymity-first, no analytics calls
- *  - Vanta Trust Center — public credentialing surface
+ *  - continuous-monitoring tooling Trust Center — public credentialing surface
  *
  * Public pages must NEVER:
  *  - Render the authenticated Shell sidebar

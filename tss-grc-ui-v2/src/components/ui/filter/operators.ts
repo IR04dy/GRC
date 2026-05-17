@@ -1,4 +1,4 @@
-// Operator registry per field type — mirrors ServiceNow encoded-query operators
+// Operator registry per field type — mirrors the industry pattern encoded-query operators
 // (eq/ne/lt/lte/gt/gte/contains/in/...) and serializes to a URL-friendly JSON.
 
 export type FieldType = 'string' | 'number' | 'date' | 'select' | 'reference' | 'boolean';

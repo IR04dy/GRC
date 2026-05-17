@@ -30,7 +30,7 @@ import { ChangeRiskPanel } from '../../components/intake/ChangeRiskPanel';
  * Lead, Ethics Cte, Policy Officer, TPRM Lead) sees the intake records
  * routed to them, organised by SLA urgency.
  *
- * Architecture: ServiceNow IRM "Integrated Risk Center" — every actor
+ * Architecture: industry-standard GRC tooling "Integrated Risk Center" — every actor
  * sees their queue, from any kind, in one place.
  */
 type TabId = 'open' | 'overdue' | 'promoted' | 'closed' | 'all';

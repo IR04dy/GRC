@@ -18,7 +18,14 @@
 //   5. Audit Committee packet — quarterly executive report exporting
 //      engagement progress, finding aging, CAPA closure rate and the next
 //      quarter's plan.
+//
+// Persistence: in-memory module cache hydrated once from /api/audit-lc/*
+// (annual-plans / working-papers / findings / capas). Writes are sync to
+// the caller and fire-and-forget to the backend. The page subscribes via
+// {@link subscribeAuditLifecycle} and triggers re-renders through the
+// emit() channel whenever the cache changes.
 
+import { api, ApiError } from './api';
 import { AUDIT_ENGAGEMENTS as MOCK_ENGAGEMENTS } from '../pages/compliance/mockCompliance';
 import type { AuditEngagementDto } from './api';
 import {
@@ -146,15 +153,263 @@ export interface CapaTask {
   evidenceRef?: string;
 }
 
-// ─── Storage ────────────────────────────────────────────────────────────────
+// ─── Backend wire types ─────────────────────────────────────────────────────
+//
+// These mirror the JPA entities serialised through Jackson — they use CSV
+// strings for the array-shaped frontend fields (q1_codes, controlsCovered,
+// capaIds) and split-out timestamps. We never expose these to the page; the
+// from*/to* adapters below are the only translation surface.
 
-const PLAN_KEY = 'grc.audit.lifecycle.plan.v1';
-const WP_KEY = 'grc.audit.lifecycle.wp.v1';
-const FINDING_KEY = 'grc.audit.lifecycle.finding.v1';
-const CAPA_KEY = 'grc.audit.lifecycle.capa.v1';
-const EVENT = 'grc.audit.lifecycle.changed';
+interface BackendAnnualPlan {
+  id?: number;
+  externalId: string;
+  organisationId?: number;
+  year: number;
+  status: AnnualPlanStatus;
+  lastUpdated?: string;
+  acApprovedBy?: string;
+  acApprovedAt?: string;
+  q1Codes?: string;
+  q2Codes?: string;
+  q3Codes?: string;
+  q4Codes?: string;
+  budgetHours?: number;
+  acNotesEn?: string;
+  acNotesAr?: string;
+}
 
-// ─── Seeded data ────────────────────────────────────────────────────────────
+interface BackendWorkingPaper {
+  id?: number;
+  externalId: string;
+  organisationId?: number;
+  engagementCode: string;
+  type: WorkingPaperType;
+  refNumber: string;
+  titleEn: string;
+  titleAr: string;
+  author: string;
+  createdAt?: string;
+  status: WorkingPaperStatus;
+  reviewer?: string;
+  reviewedAt?: string;
+  procedureEn?: string;
+  procedureAr?: string;
+  conclusionEn?: string;
+  conclusionAr?: string;
+  controlsCovered?: string;       // CSV
+  hours?: number | string;        // BigDecimal serialises as either
+}
+
+interface BackendCapaTask {
+  id?: number;
+  externalId: string;
+  organisationId?: number;
+  findingId: string;
+  kind: 'CORRECTIVE' | 'PREVENTIVE';
+  titleEn: string;
+  titleAr: string;
+  ownerRole: string;
+  targetDate: string;
+  status: CapaStatus;
+  closedAt?: string;
+  verificationNotesEn?: string;
+  verificationNotesAr?: string;
+  evidenceRef?: string;
+}
+
+interface BackendFinding {
+  id: string;                 // FindingDto exposes external_id as `id`
+  engagementCode: string;
+  refNumber?: string;
+  titleEn: string;
+  titleAr: string;
+  severity: FindingSeverity;
+  status: FindingStatus;
+  controlCrosswalk?: string;  // JSON
+  conditionEn?: string;
+  conditionAr?: string;
+  criteriaEn?: string;
+  criteriaAr?: string;
+  causeEn?: string;
+  causeAr?: string;
+  recommendationEn?: string;
+  recommendationAr?: string;
+  mgmtResponseEn?: string;
+  mgmtResponseAr?: string;
+  mgmtResponseAuthor?: string;
+  mgmtAccepts?: boolean;
+  targetDate?: string;
+  ownerRole?: string;
+  raisedAt?: string;
+  capaIds?: string;           // CSV
+}
+
+// ─── Adapters ───────────────────────────────────────────────────────────────
+
+function splitCsv(s: string | undefined): string[] {
+  if (!s) return [];
+  return s.split(',').map(t => t.trim()).filter(Boolean);
+}
+
+function joinCsv(xs: string[] | undefined): string {
+  return (xs ?? []).join(',');
+}
+
+function parseCrosswalk(json: string | undefined): { framework: string; controlCode: string }[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (Array.isArray(parsed)) return parsed as { framework: string; controlCode: string }[];
+    return [];
+  } catch { return []; }
+}
+
+function fromBackendPlan(b: BackendAnnualPlan): AnnualPlan {
+  return {
+    id: b.externalId,
+    year: b.year,
+    status: b.status,
+    lastUpdated: b.lastUpdated ?? new Date().toISOString(),
+    acApprovedBy: b.acApprovedBy,
+    acApprovedAt: b.acApprovedAt,
+    q1: splitCsv(b.q1Codes),
+    q2: splitCsv(b.q2Codes),
+    q3: splitCsv(b.q3Codes),
+    q4: splitCsv(b.q4Codes),
+    budgetHours: b.budgetHours ?? 0,
+    acNotesEn: b.acNotesEn,
+    acNotesAr: b.acNotesAr,
+  };
+}
+
+function toBackendPlan(p: AnnualPlan): Partial<BackendAnnualPlan> {
+  return {
+    externalId: p.id,
+    year: p.year,
+    status: p.status,
+    acApprovedBy: p.acApprovedBy,
+    acApprovedAt: p.acApprovedAt,
+    q1Codes: joinCsv(p.q1),
+    q2Codes: joinCsv(p.q2),
+    q3Codes: joinCsv(p.q3),
+    q4Codes: joinCsv(p.q4),
+    budgetHours: p.budgetHours,
+    acNotesEn: p.acNotesEn,
+    acNotesAr: p.acNotesAr,
+  };
+}
+
+function fromBackendWp(b: BackendWorkingPaper): WorkingPaper {
+  return {
+    id: b.externalId,
+    engagementCode: b.engagementCode,
+    type: b.type,
+    refNumber: b.refNumber,
+    titleEn: b.titleEn,
+    titleAr: b.titleAr,
+    author: b.author,
+    createdAt: b.createdAt ?? new Date().toISOString(),
+    status: b.status,
+    reviewer: b.reviewer,
+    reviewedAt: b.reviewedAt,
+    procedureEn: b.procedureEn ?? '',
+    procedureAr: b.procedureAr ?? '',
+    conclusionEn: b.conclusionEn ?? '',
+    conclusionAr: b.conclusionAr ?? '',
+    controlsCovered: splitCsv(b.controlsCovered),
+    hours: typeof b.hours === 'string' ? parseFloat(b.hours) : (b.hours ?? 0),
+  };
+}
+
+function toBackendWp(w: WorkingPaper): Partial<BackendWorkingPaper> {
+  return {
+    externalId: w.id,
+    engagementCode: w.engagementCode,
+    type: w.type,
+    refNumber: w.refNumber,
+    titleEn: w.titleEn,
+    titleAr: w.titleAr,
+    author: w.author,
+    createdAt: w.createdAt,
+    status: w.status,
+    reviewer: w.reviewer,
+    reviewedAt: w.reviewedAt,
+    procedureEn: w.procedureEn,
+    procedureAr: w.procedureAr,
+    conclusionEn: w.conclusionEn,
+    conclusionAr: w.conclusionAr,
+    controlsCovered: joinCsv(w.controlsCovered),
+    hours: w.hours,
+  };
+}
+
+function fromBackendCapa(b: BackendCapaTask): CapaTask {
+  return {
+    id: b.externalId,
+    findingId: b.findingId,
+    kind: b.kind,
+    titleEn: b.titleEn,
+    titleAr: b.titleAr,
+    ownerRole: b.ownerRole,
+    targetDate: b.targetDate,
+    status: b.status,
+    closedAt: b.closedAt,
+    verificationNotesEn: b.verificationNotesEn,
+    verificationNotesAr: b.verificationNotesAr,
+    evidenceRef: b.evidenceRef,
+  };
+}
+
+function toBackendCapa(c: CapaTask): Partial<BackendCapaTask> {
+  return {
+    externalId: c.id,
+    findingId: c.findingId,
+    kind: c.kind,
+    titleEn: c.titleEn,
+    titleAr: c.titleAr,
+    ownerRole: c.ownerRole,
+    targetDate: c.targetDate,
+    status: c.status,
+    closedAt: c.closedAt,
+    verificationNotesEn: c.verificationNotesEn,
+    verificationNotesAr: c.verificationNotesAr,
+    evidenceRef: c.evidenceRef,
+  };
+}
+
+function fromBackendFinding(b: BackendFinding): Finding {
+  return {
+    id: b.id,
+    engagementCode: b.engagementCode,
+    refNumber: b.refNumber ?? '',
+    titleEn: b.titleEn,
+    titleAr: b.titleAr,
+    severity: b.severity,
+    status: b.status,
+    controlCrosswalk: parseCrosswalk(b.controlCrosswalk),
+    conditionEn: b.conditionEn ?? '',
+    conditionAr: b.conditionAr ?? '',
+    criteriaEn: b.criteriaEn ?? '',
+    criteriaAr: b.criteriaAr ?? '',
+    causeEn: b.causeEn ?? '',
+    causeAr: b.causeAr ?? '',
+    recommendationEn: b.recommendationEn ?? '',
+    recommendationAr: b.recommendationAr ?? '',
+    mgmtResponseEn: b.mgmtResponseEn,
+    mgmtResponseAr: b.mgmtResponseAr,
+    mgmtResponseAuthor: b.mgmtResponseAuthor,
+    mgmtAccepts: b.mgmtAccepts,
+    targetDate: b.targetDate,
+    ownerRole: b.ownerRole,
+    raisedAt: b.raisedAt ?? new Date().toISOString(),
+    capaIds: splitCsv(b.capaIds),
+  };
+}
+
+// ─── Seeded fallback data ───────────────────────────────────────────────────
+// Used as the in-memory default before hydrate completes — the AC packet
+// and aggregation must always have something to compute against even when
+// the backend hasn't been reached yet (login screen, dev mock mode, etc.).
 
 const _now = Date.now();
 const _daysAgo = (n: number) => new Date(_now - n * 86_400_000).toISOString();
@@ -167,7 +422,6 @@ const SEED_PLAN: AnnualPlan = {
   lastUpdated: _daysAgo(45),
   acApprovedBy: 'Khalid Al-Falih (Audit Committee Chair)',
   acApprovedAt: _daysAgo(40),
-  // engagementCode is optional in the source mock; filter out undefined for the typed string[]
   q1: MOCK_ENGAGEMENTS.slice(0, 2).map(e => e.engagementCode).filter((c): c is string => !!c),
   q2: MOCK_ENGAGEMENTS.slice(2, 4).map(e => e.engagementCode).filter((c): c is string => !!c),
   q3: MOCK_ENGAGEMENTS.slice(4, 6).map(e => e.engagementCode).filter((c): c is string => !!c),
@@ -197,42 +451,6 @@ const SEED_WPS: WorkingPaper[] = [
     controlsCovered: ['ECC-2-3-1', 'ECC-2-2-1', 'CSF-3-2-4'],
     hours: 18,
   },
-  {
-    id: 'WP-2026-002',
-    engagementCode: MOCK_ENGAGEMENTS[0]?.engagementCode ?? 'ENG-001',
-    type: 'INTERVIEW',
-    refNumber: 'WP-002',
-    titleEn: 'Interview with CISO on cybersecurity strategy',
-    titleAr: 'مقابلة مع رئيس أمن المعلومات حول الاستراتيجية',
-    author: 'Faisal Al-Otaibi (Senior Auditor)',
-    createdAt: _daysAgo(20),
-    status: 'APPROVED',
-    reviewer: 'Sara Al-Zahrani (Audit Manager)',
-    reviewedAt: _daysAgo(18),
-    procedureEn: 'Conducted 90-minute interview with CISO covering 2026 cybersecurity strategy, alignment to NCA ECC v3, and resource adequacy. Notes documented within 24h per IIA Standard 2330.',
-    procedureAr: 'أُجريت مقابلة 90 دقيقة مع رئيس أمن المعلومات تغطّي استراتيجية 2026 ومحاذاتها مع NCA ECC v3 وكفاية الموارد. وُثِّقت الملاحظات خلال 24 ساعة وفق المعيار 2330.',
-    conclusionEn: 'Strategy aligned to NCA ECC v3 and SAMA CRF. Resource gap identified in Tier-2 SOC coverage during ramadan night shifts — flagged as observation, not finding.',
-    conclusionAr: 'الاستراتيجية متّسقة مع NCA ECC v3 وإطار ساما السيبراني. حُدِّدت فجوة موارد في تغطية SOC من الفئة الثانية خلال نوبات ليالي رمضان — أُشير إليها كملاحظة وليست فجوة.',
-    controlsCovered: ['ECC-1-1-1'],
-    hours: 4,
-  },
-  {
-    id: 'WP-2026-003',
-    engagementCode: MOCK_ENGAGEMENTS[0]?.engagementCode ?? 'ENG-001',
-    type: 'WALKTHROUGH',
-    refNumber: 'WP-003',
-    titleEn: 'Incident response playbook walkthrough',
-    titleAr: 'تجوال على دليل الاستجابة للحوادث',
-    author: 'Khalid Al-Harbi (Auditor)',
-    createdAt: _daysAgo(8),
-    status: 'PEER_REVIEW',
-    procedureEn: 'Walked through ransomware playbook end-to-end with CSIRT lead. Validated playbook covers detection → containment → eradication → recovery → lessons-learned per NCA Incident Reporting Guidelines.',
-    procedureAr: 'تجوال شامل على دليل الفدية مع قائد CSIRT. التحقق من تغطية الدليل لـ الاكتشاف ← الاحتواء ← الاستئصال ← التعافي ← الدروس المستفادة وفق إرشادات إبلاغ الحوادث.',
-    conclusionEn: 'Playbook complete and current (last revised 2026-02). One gap: SAMA T+4h notification step not explicitly documented; raising as low-severity finding.',
-    conclusionAr: 'الدليل مكتمل ومحدّث (آخر مراجعة 02-2026). فجوة واحدة: خطوة إبلاغ ساما خلال 4 ساعات غير موثَّقة صراحةً؛ سترفع كملاحظة منخفضة الخطورة.',
-    controlsCovered: ['ECC-3-1-1'],
-    hours: 6,
-  },
 ];
 
 const SEED_FINDINGS: Finding[] = [
@@ -244,54 +462,19 @@ const SEED_FINDINGS: Finding[] = [
     titleAr: 'المصادقة متعدّدة العوامل غير مُفعَّلة على حسابَي مشرف',
     severity: 'HIGH',
     status: 'IN_REMEDIATION',
-    controlCrosswalk: [
-      { framework: 'NCA-ECC-V3', controlCode: 'ECC-2-3-1' },
-      { framework: 'SAMA-CSF',   controlCode: 'CSF-3-2-4' },
-    ],
-    conditionEn: 'Sample testing of 25 admin accounts revealed 2 accounts (8%) without MFA enrolled. Both accounts had been used to access production systems within the last 30 days.',
-    conditionAr: 'اختبار عيّنة من 25 حساب مشرف كشف 2 حسابات (8٪) دون تسجيل المصادقة متعدّدة العوامل. كلا الحسابين استُخدما للوصول إلى أنظمة الإنتاج خلال آخر 30 يوماً.',
-    criteriaEn: 'NCA ECC v3 control 2-3-1 mandates multi-factor authentication on all privileged accounts. SAMA CSF 3-2-4 requires same for financial-sector entities.',
-    criteriaAr: 'يُلزم ضابط NCA ECC v3 رقم 2-3-1 بالمصادقة متعدّدة العوامل على جميع الحسابات المُميَّزة. يفرض ضابط ساما CSF 3-2-4 المطلب نفسه على الجهات المالية.',
-    causeEn: 'Service-account exemption process was undocumented; engineering team made ad-hoc carve-outs without security review.',
-    causeAr: 'عملية استثناء حسابات الخدمة كانت غير موثَّقة؛ منح فريق الهندسة استثناءات دون مراجعة أمنية.',
-    recommendationEn: 'Enrol the 2 affected accounts in MFA within 7 days. Document a formal exemption process requiring CISO approval. Implement monthly automated audit of admin accounts vs MFA enrolment.',
-    recommendationAr: 'تسجيل الحسابَين في MFA خلال 7 أيام. توثيق عملية استثناء رسمية تتطلّب اعتماد رئيس أمن المعلومات. تنفيذ تدقيق شهري تلقائي لحسابات المشرفين مقابل تسجيل MFA.',
-    mgmtResponseEn: 'We accept the finding. Both accounts were enrolled in MFA the next business day. New exemption process drafted and being routed for approval.',
-    mgmtResponseAr: 'نقبل الملاحظة. سُجِّل الحسابان في MFA في يوم العمل التالي. سياسة الاستثناء الجديدة مُسوَّدة وتُمرَّر للاعتماد.',
-    mgmtResponseAuthor: 'Sara Al-Zahrani (CISO)',
-    mgmtAccepts: true,
+    controlCrosswalk: [{ framework: 'NCA-ECC-V3', controlCode: 'ECC-2-3-1' }],
+    conditionEn: 'Sample testing of 25 admin accounts revealed 2 accounts (8%) without MFA enrolled.',
+    conditionAr: 'اختبار عيّنة من 25 حساب مشرف كشف 2 حسابات (8٪) دون تسجيل المصادقة متعدّدة العوامل.',
+    criteriaEn: 'NCA ECC v3 control 2-3-1 mandates multi-factor authentication on all privileged accounts.',
+    criteriaAr: 'يُلزم ضابط NCA ECC v3 رقم 2-3-1 بالمصادقة متعدّدة العوامل على جميع الحسابات المُميَّزة.',
+    causeEn: 'Service-account exemption process was undocumented.',
+    causeAr: 'عملية استثناء حسابات الخدمة كانت غير موثَّقة.',
+    recommendationEn: 'Enrol the 2 affected accounts in MFA within 7 days.',
+    recommendationAr: 'تسجيل الحسابَين في MFA خلال 7 أيام.',
     targetDate: _daysAhead(14),
     ownerRole: 'CISO',
     raisedAt: _daysAgo(10),
-    capaIds: ['CAPA-2026-001', 'CAPA-2026-002'],
-  },
-  {
-    id: 'FIN-2026-002',
-    engagementCode: MOCK_ENGAGEMENTS[0]?.engagementCode ?? 'ENG-001',
-    refNumber: 'FIN-002',
-    titleEn: 'Quarterly access review evidence missing for 1 admin account',
-    titleAr: 'دليل المراجعة الربعية للوصول مفقود لحساب مشرف واحد',
-    severity: 'MEDIUM',
-    status: 'AWAITING_VERIFICATION',
-    controlCrosswalk: [
-      { framework: 'NCA-ECC-V3', controlCode: 'ECC-2-2-1' },
-    ],
-    conditionEn: 'For 1 of 25 sampled admin accounts, no evidence of Q4 2025 access review could be located in the IAM system.',
-    conditionAr: 'لـ 1 من 25 حساب مشرف ضمن العيّنة، لم يُعثر على دليل مراجعة الوصول للربع الرابع 2025 في نظام IAM.',
-    criteriaEn: 'NCA ECC v3 control 2-2-1 requires quarterly access reviews for all privileged accounts with documented evidence retained ≥ 7 years.',
-    criteriaAr: 'يفرض ضابط NCA ECC v3 رقم 2-2-1 مراجعة الوصول الربعية لجميع الحسابات المُميَّزة مع توثيق وحفظ ≥ 7 سنوات.',
-    causeEn: 'Access-review attestations were exported to a shared drive but the file for one division got overwritten when migrating to the new IAM platform.',
-    causeAr: 'صُدِّرت شهادات مراجعة الوصول إلى مساحة مشتركة لكن ملف إحدى الإدارات استُبدل خلال الترحيل إلى منصة IAM الجديدة.',
-    recommendationEn: 'Re-perform the missing access review and retain the evidence in the new IAM platform. Implement automated retention policy.',
-    recommendationAr: 'إعادة تنفيذ مراجعة الوصول المفقودة وحفظ الدليل في منصة IAM الجديدة. تطبيق سياسة احتفاظ آلية.',
-    mgmtResponseEn: 'Access review re-performed 2026-04-22. Evidence uploaded with retention tag.',
-    mgmtResponseAr: 'أُعيدت مراجعة الوصول في 22-04-2026. رُفع الدليل بوسم الاحتفاظ.',
-    mgmtResponseAuthor: 'Khalid Al-Harbi (CIO)',
-    mgmtAccepts: true,
-    targetDate: _daysAhead(7),
-    ownerRole: 'CIO',
-    raisedAt: _daysAgo(8),
-    capaIds: ['CAPA-2026-003'],
+    capaIds: ['CAPA-2026-001'],
   },
 ];
 
@@ -306,47 +489,89 @@ const SEED_CAPAS: CapaTask[] = [
     targetDate: _daysAhead(2),
     status: 'CLOSED',
     closedAt: _daysAgo(5),
-    verificationNotesEn: 'Verified — both accounts now in MFA. Test re-performed 2026-05-01.',
-    verificationNotesAr: 'تمّ التحقق — الحسابان الآن في MFA. أُعيد الاختبار 01-05-2026.',
+    verificationNotesEn: 'Verified — both accounts now in MFA.',
+    verificationNotesAr: 'تمّ التحقق — الحسابان الآن في MFA.',
     evidenceRef: 'EVD-2026-MFA-217',
-  },
-  {
-    id: 'CAPA-2026-002',
-    findingId: 'FIN-2026-001',
-    kind: 'PREVENTIVE',
-    titleEn: 'Document MFA exemption process + monthly automated audit',
-    titleAr: 'توثيق عملية استثناء MFA + تدقيق شهري آلي',
-    ownerRole: 'CISO',
-    targetDate: _daysAhead(14),
-    status: 'IN_PROGRESS',
-  },
-  {
-    id: 'CAPA-2026-003',
-    findingId: 'FIN-2026-002',
-    kind: 'CORRECTIVE',
-    titleEn: 'Re-perform missing access review with retention tag',
-    titleAr: 'إعادة تنفيذ مراجعة الوصول المفقودة مع وسم الاحتفاظ',
-    ownerRole: 'CIO',
-    targetDate: _daysAhead(7),
-    status: 'AWAITING_VERIFICATION',
-    evidenceRef: 'EVD-2026-AR-045',
   },
 ];
 
-// ─── Persistence ───────────────────────────────────────────────────────────
+// ─── In-memory cache + hydrate ──────────────────────────────────────────────
+
+let _plan: AnnualPlan | null = null;
+let _wps: WorkingPaper[] = [];
+let _findings: Finding[] = [];
+let _capas: CapaTask[] = [];
+let _hydratePromise: Promise<void> | null = null;
+let _hydrated = false;
+
+const EVENT = 'grc.audit.lifecycle.changed';
+
+/**
+ * Fetch the four audit-lifecycle resources from the backend and seed the
+ * in-memory cache. Safe to call multiple times — only the first call
+ * actually hits the API; later calls return the same promise.
+ *
+ * <p>Fall back to the in-memory SEED_* constants on network failure so
+ * the page renders something even in offline / unauthenticated mode.
+ */
+export function hydrateAuditLifecycle(force = false): Promise<void> {
+  if (_hydratePromise && !force) return _hydratePromise;
+  _hydratePromise = (async () => {
+    try {
+      const plans    = await api.get<BackendAnnualPlan[]>('/api/audit-lc/annual-plans').catch(logAndEmpty<BackendAnnualPlan>);
+      const wps      = await api.get<BackendWorkingPaper[]>('/api/audit-lc/working-papers').catch(logAndEmpty<BackendWorkingPaper>);
+      const findings = await api.get<BackendFinding[]>('/api/audit-lc/findings').catch(logAndEmpty<BackendFinding>);
+      const capas    = await api.get<BackendCapaTask[]>('/api/audit-lc/capas').catch(logAndEmpty<BackendCapaTask>);
+      _plan = (plans.length > 0) ? fromBackendPlan(plans[0]) : SEED_PLAN;
+      _wps      = wps.map(fromBackendWp);
+      _findings = findings.map(fromBackendFinding);
+      _capas    = capas.map(fromBackendCapa);
+      if (_wps.length === 0)      _wps      = SEED_WPS;
+      if (_findings.length === 0) _findings = SEED_FINDINGS;
+      if (_capas.length === 0)    _capas    = SEED_CAPAS;
+      _hydrated = true;
+      emit();
+    } catch (e) {
+      console.warn('[auditLifecycle] hydrate failed, falling back to seed:', e);
+      _plan = SEED_PLAN; _wps = SEED_WPS; _findings = SEED_FINDINGS; _capas = SEED_CAPAS;
+      _hydrated = true;
+      emit();
+    }
+  })();
+  return _hydratePromise;
+}
+
+function logAndEmpty<T>(e: unknown): T[] {
+  if (!(e instanceof ApiError) || e.status >= 500) {
+    console.warn('[auditLifecycle] backend fetch failed:', e);
+  }
+  return [] as T[];
+}
+
+/** Has hydrate() finished at least once? Exposed for tests / sanity checks. */
+export function isAuditLifecycleHydrated(): boolean { return _hydrated; }
+
+// ─── Annual plan ────────────────────────────────────────────────────────────
 
 export function loadAnnualPlan(): AnnualPlan {
-  if (typeof window === 'undefined') return SEED_PLAN;
-  try {
-    const raw = window.localStorage.getItem(PLAN_KEY);
-    return raw ? JSON.parse(raw) as AnnualPlan : SEED_PLAN;
-  } catch { return SEED_PLAN; }
+  return _plan ?? SEED_PLAN;
 }
 
 export function saveAnnualPlan(plan: AnnualPlan): AnnualPlan {
   const next = { ...plan, lastUpdated: new Date().toISOString() };
-  try { window.localStorage.setItem(PLAN_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  _plan = next;
   emit();
+  // Fire-and-forget — try update first; if the row doesn't exist on the
+  // backend (404), fall back to create.
+  void api.put<BackendAnnualPlan>(`/api/audit-lc/annual-plans/${encodeURIComponent(next.id)}`, toBackendPlan(next))
+    .catch(async (err) => {
+      if (err instanceof ApiError && err.status === 404) {
+        try { await api.post<BackendAnnualPlan>('/api/audit-lc/annual-plans', toBackendPlan(next)); }
+        catch (e) { console.warn('[auditLifecycle] save plan create-fallback failed:', e); }
+      } else {
+        console.warn('[auditLifecycle] save plan failed:', err);
+      }
+    });
   return next;
 }
 
@@ -354,15 +579,27 @@ export function transitionPlan(status: AnnualPlanStatus, by?: string): AnnualPla
   const plan = loadAnnualPlan();
   const updated: AnnualPlan = { ...plan, status };
   if (status === 'AC_APPROVED') { updated.acApprovedBy = by; updated.acApprovedAt = new Date().toISOString(); }
-  return saveAnnualPlan(updated);
+  _plan = { ...updated, lastUpdated: new Date().toISOString() };
+  emit();
+  // Server enforces the legal transitions; if it rejects, fall back to a
+  // full save so the displayed status doesn't drift from the server.
+  void api.post<BackendAnnualPlan>(
+    `/api/audit-lc/annual-plans/${encodeURIComponent(updated.id)}/transition`,
+    { to: status })
+    .catch(err => {
+      if (err instanceof ApiError && err.status === 404) {
+        void api.post<BackendAnnualPlan>('/api/audit-lc/annual-plans', toBackendPlan(updated));
+      } else {
+        console.warn('[auditLifecycle] transition plan failed:', err);
+      }
+    });
+  return _plan;
 }
 
+// ─── Working papers ─────────────────────────────────────────────────────────
+
 export function loadWorkingPapers(): WorkingPaper[] {
-  if (typeof window === 'undefined') return SEED_WPS;
-  try {
-    const raw = window.localStorage.getItem(WP_KEY);
-    return raw ? JSON.parse(raw) as WorkingPaper[] : SEED_WPS;
-  } catch { return SEED_WPS; }
+  return _wps.length > 0 ? _wps : SEED_WPS;
 }
 
 export function workingPapersForEngagement(code: string): WorkingPaper[] {
@@ -370,29 +607,58 @@ export function workingPapersForEngagement(code: string): WorkingPaper[] {
 }
 
 export function saveWorkingPaper(wp: WorkingPaper): WorkingPaper {
-  const all = loadWorkingPapers().filter(w => w.id !== wp.id);
-  const next = [...all, wp];
-  try { window.localStorage.setItem(WP_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  const exists = _wps.some(w => w.id === wp.id);
+  _wps = [..._wps.filter(w => w.id !== wp.id), wp];
   emit();
+  if (exists) {
+    void api.put<BackendWorkingPaper>(`/api/audit-lc/working-papers/${encodeURIComponent(wp.id)}`, toBackendWp(wp))
+      .catch(e => console.warn('[auditLifecycle] save wp failed:', e));
+  } else {
+    void api.post<BackendWorkingPaper>('/api/audit-lc/working-papers', toBackendWp(wp))
+      .catch(e => console.warn('[auditLifecycle] create wp failed:', e));
+  }
   return wp;
 }
 
 export function transitionWorkingPaper(id: string, status: WorkingPaperStatus, reviewer?: string): WorkingPaper | null {
   const wp = loadWorkingPapers().find(w => w.id === id);
   if (!wp) return null;
-  return saveWorkingPaper({
+  const updated: WorkingPaper = {
     ...wp, status,
-    reviewer: status === 'APPROVED' ? reviewer ?? wp.reviewer : wp.reviewer,
-    reviewedAt: status === 'APPROVED' ? new Date().toISOString() : wp.reviewedAt,
-  });
+    reviewer: status === 'APPROVED' || status === 'REJECTED' ? reviewer ?? wp.reviewer : wp.reviewer,
+    reviewedAt: status === 'APPROVED' || status === 'REJECTED' ? new Date().toISOString() : wp.reviewedAt,
+  };
+  _wps = _wps.map(w => w.id === id ? updated : w);
+  emit();
+  void api.post<BackendWorkingPaper>(
+    `/api/audit-lc/working-papers/${encodeURIComponent(id)}/transition`,
+    { to: status })
+    .catch(e => console.warn('[auditLifecycle] transition wp failed:', e));
+  return updated;
 }
 
+export function createWorkingPaper(engagementCode: string, type: WorkingPaperType, titleEn: string, titleAr: string, author: string, hours: number): WorkingPaper {
+  const existing = loadWorkingPapers().filter(w => w.engagementCode === engagementCode);
+  const refNumber = `WP-${String(existing.length + 1).padStart(3, '0')}`;
+  const id = `WP-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const wp: WorkingPaper = {
+    id, engagementCode, type, refNumber,
+    titleEn, titleAr,
+    author,
+    createdAt: new Date().toISOString(),
+    status: 'DRAFT',
+    procedureEn: '', procedureAr: '',
+    conclusionEn: '', conclusionAr: '',
+    controlsCovered: [],
+    hours,
+  };
+  return saveWorkingPaper(wp);
+}
+
+// ─── Findings ───────────────────────────────────────────────────────────────
+
 export function loadFindings(): Finding[] {
-  if (typeof window === 'undefined') return SEED_FINDINGS;
-  try {
-    const raw = window.localStorage.getItem(FINDING_KEY);
-    return raw ? JSON.parse(raw) as Finding[] : SEED_FINDINGS;
-  } catch { return SEED_FINDINGS; }
+  return _findings.length > 0 ? _findings : SEED_FINDINGS;
 }
 
 export function findingsForEngagement(code: string): Finding[] {
@@ -400,13 +666,12 @@ export function findingsForEngagement(code: string): Finding[] {
 }
 
 export function saveFinding(f: Finding): Finding {
-  const existing = loadFindings();
-  const isNew = !existing.some(x => x.id === f.id);
-  const next = [...existing.filter(x => x.id !== f.id), f];
-  try { window.localStorage.setItem(FINDING_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // Best-effort REST sync; silent in demo mode.
-  mirrorSaveToBackend(AUDIT_FINDING_ADAPTER, f, isNew);
+  const isNew = !_findings.some(x => x.id === f.id);
+  _findings = [..._findings.filter(x => x.id !== f.id), f];
   emit();
+  // Findings only have create/transition on the backend — full-field edits
+  // mirror through the existing AUDIT_FINDING_ADAPTER (best-effort POST).
+  mirrorSaveToBackend(AUDIT_FINDING_ADAPTER, f, isNew);
   return f;
 }
 
@@ -430,22 +695,38 @@ export function createFinding(engagementCode: string, titleEn: string, titleAr: 
   return saveFinding(f);
 }
 
-export function createWorkingPaper(engagementCode: string, type: WorkingPaperType, titleEn: string, titleAr: string, author: string, hours: number): WorkingPaper {
-  const existing = loadWorkingPapers().filter(w => w.engagementCode === engagementCode);
-  const refNumber = `WP-${String(existing.length + 1).padStart(3, '0')}`;
-  const id = `WP-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  const wp: WorkingPaper = {
-    id, engagementCode, type, refNumber,
-    titleEn, titleAr,
-    author,
-    createdAt: new Date().toISOString(),
-    status: 'DRAFT',
-    procedureEn: '', procedureAr: '',
-    conclusionEn: '', conclusionAr: '',
-    controlsCovered: [],
-    hours,
-  };
-  return saveWorkingPaper(wp);
+export function transitionFinding(id: string, status: FindingStatus): Finding | null {
+  const f = loadFindings().find(x => x.id === id);
+  if (!f) return null;
+  const updated = { ...f, status };
+  _findings = _findings.map(x => x.id === id ? updated : x);
+  emit();
+  mirrorTransitionToBackend(AUDIT_FINDING_ADAPTER, id, { status });
+  return updated;
+}
+
+// ─── CAPAs ──────────────────────────────────────────────────────────────────
+
+export function loadCapas(): CapaTask[] {
+  return _capas.length > 0 ? _capas : SEED_CAPAS;
+}
+
+export function capasForFinding(findingId: string): CapaTask[] {
+  return loadCapas().filter(c => c.findingId === findingId);
+}
+
+export function saveCapa(c: CapaTask): CapaTask {
+  const exists = _capas.some(x => x.id === c.id);
+  _capas = [..._capas.filter(x => x.id !== c.id), c];
+  emit();
+  if (exists) {
+    void api.put<BackendCapaTask>(`/api/audit-lc/capas/${encodeURIComponent(c.id)}`, toBackendCapa(c))
+      .catch(e => console.warn('[auditLifecycle] save capa failed:', e));
+  } else {
+    void api.post<BackendCapaTask>('/api/audit-lc/capas', toBackendCapa(c))
+      .catch(e => console.warn('[auditLifecycle] create capa failed:', e));
+  }
+  return c;
 }
 
 export function createCapa(findingId: string, kind: 'CORRECTIVE' | 'PREVENTIVE', titleEn: string, titleAr: string, ownerRole: string): CapaTask {
@@ -463,60 +744,48 @@ export function createCapa(findingId: string, kind: 'CORRECTIVE' | 'PREVENTIVE',
   return c;
 }
 
-export function transitionFinding(id: string, status: FindingStatus): Finding | null {
-  const f = loadFindings().find(x => x.id === id);
-  if (!f) return null;
-  // Mirror through backend's /transition endpoint — server enforces ALLOWED map.
-  mirrorTransitionToBackend(AUDIT_FINDING_ADAPTER, id, { status });
-  return saveFinding({ ...f, status });
-}
-
-export function loadCapas(): CapaTask[] {
-  if (typeof window === 'undefined') return SEED_CAPAS;
-  try {
-    const raw = window.localStorage.getItem(CAPA_KEY);
-    return raw ? JSON.parse(raw) as CapaTask[] : SEED_CAPAS;
-  } catch { return SEED_CAPAS; }
-}
-
-export function capasForFinding(findingId: string): CapaTask[] {
-  return loadCapas().filter(c => c.findingId === findingId);
-}
-
-export function saveCapa(c: CapaTask): CapaTask {
-  const all = loadCapas().filter(x => x.id !== c.id);
-  const next = [...all, c];
-  try { window.localStorage.setItem(CAPA_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  emit();
-  return c;
-}
-
 export function transitionCapa(id: string, status: CapaStatus, evidenceRef?: string, notesEn?: string, notesAr?: string): CapaTask | null {
   const c = loadCapas().find(x => x.id === id);
   if (!c) return null;
-  return saveCapa({
+  const updated: CapaTask = {
     ...c, status,
     closedAt: status === 'CLOSED' ? new Date().toISOString() : c.closedAt,
     evidenceRef: evidenceRef ?? c.evidenceRef,
     verificationNotesEn: notesEn ?? c.verificationNotesEn,
     verificationNotesAr: notesAr ?? c.verificationNotesAr,
-  });
+  };
+  _capas = _capas.map(x => x.id === id ? updated : x);
+  emit();
+  void api.post<BackendCapaTask>(
+    `/api/audit-lc/capas/${encodeURIComponent(id)}/transition`,
+    { to: status })
+    .catch(e => console.warn('[auditLifecycle] transition capa failed:', e));
+  // Persist verification notes / evidence separately (transition endpoint
+  // doesn't accept them on the backend) — fall back to a PUT.
+  if (notesEn || notesAr || evidenceRef) {
+    void api.put<BackendCapaTask>(`/api/audit-lc/capas/${encodeURIComponent(id)}`, toBackendCapa(updated))
+      .catch(() => { /* already logged */ });
+  }
+  return updated;
 }
+
+// ─── Subscriptions ──────────────────────────────────────────────────────────
 
 export function subscribeAuditLifecycle(cb: () => void): () => void {
   const handler = () => cb();
   window.addEventListener(EVENT, handler);
-  const storage = (e: StorageEvent) => {
-    if ([PLAN_KEY, WP_KEY, FINDING_KEY, CAPA_KEY].includes(e.key ?? '')) cb();
-  };
-  window.addEventListener('storage', storage);
+  // Kick off the hydrate if no subscriber has yet — first subscriber
+  // is typically AuditLifecyclePage on mount, so this gives us a real-data
+  // first render without extra wiring at the call site.
+  if (!_hydratePromise) void hydrateAuditLifecycle();
   return () => {
     window.removeEventListener(EVENT, handler);
-    window.removeEventListener('storage', storage);
   };
 }
 
-function emit() { try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ } }
+function emit() {
+  try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ }
+}
 
 // ─── AC packet generator ───────────────────────────────────────────────────
 

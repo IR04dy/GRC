@@ -7,7 +7,7 @@
 // from this check is good for N days; after that the control falls
 // out of CCM coverage and a finding is auto-raised".
 //
-// This is the Vanta / Drata / ServiceNow CCM pattern, scoped to the
+// This is the continuous-controls-monitoring pattern, scoped to the
 // Saudi-aligned controls our compliance module already lists.
 
 import type { ConnectorDefinition } from './connectors';

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Plus, BarChart3, Building2, AlertTriangle,
@@ -133,18 +134,40 @@ const STATUS_OPTIONS = [
 ];
 
 // Saudi authorities that publish regulations relevant to enterprise GRC.
+// Expanded to cover the full set a Saudi compliance lead actually tracks:
+// the original 10 + DGA (digital government), NAZAHA (anti-corruption),
+// MoI (interior — physical security), MoEnergy, MoEnv (environment), GAZT
+// (historical alias for ZATCA), SFDA (food/drug), SAGIA/MISA (investment),
+// MoT (transport), Saudi NRC (nuclear/radiological), Diwan al-Mazalim
+// (administrative judiciary), Saudi Customs (historical alias). Each row
+// has an Arabic label so the regulator name reads natively in RTL.
 const AUTHORITY_OPTIONS = [
-  { value: 'NCA',    label: 'NCA — National Cybersecurity Authority' },
-  { value: 'SDAIA',  label: 'SDAIA — Saudi Data & AI Authority' },
-  { value: 'SAMA',   label: 'SAMA — Saudi Central Bank' },
-  { value: 'CMA',    label: 'CMA — Capital Market Authority' },
-  { value: 'ZATCA',  label: 'ZATCA — Zakat, Tax & Customs Authority' },
-  { value: 'CITC',   label: 'CITC — Communications, Space & Technology Commission' },
-  { value: 'NCEMA',  label: 'NCEMA — National Center for Emergency Management' },
-  { value: 'MoCI',   label: 'MoCI — Ministry of Commerce' },
-  { value: 'HRSD',   label: 'HRSD — Ministry of Human Resources' },
-  { value: 'MoH',    label: 'MoH / HCIS — Ministry of Health' },
-  { value: 'OTHER',  label: 'Other' },
+  // Tier 1 — most-cited regulators
+  { value: 'NCA',     label: 'NCA — National Cybersecurity Authority',           labelAr: 'NCA — الهيئة الوطنية للأمن السيبراني' },
+  { value: 'SDAIA',   label: 'SDAIA — Saudi Data & AI Authority',                labelAr: 'سدايا — الهيئة السعودية للبيانات والذكاء الاصطناعي' },
+  { value: 'SAMA',    label: 'SAMA — Saudi Central Bank',                        labelAr: 'ساما — البنك المركزي السعودي' },
+  { value: 'CMA',     label: 'CMA — Capital Market Authority',                   labelAr: 'هيئة السوق المالية' },
+  { value: 'ZATCA',   label: 'ZATCA — Zakat, Tax & Customs Authority',           labelAr: 'هيئة الزكاة والضريبة والجمارك' },
+  { value: 'CITC',    label: 'CITC — Communications, Space & Technology',        labelAr: 'هيئة الاتصالات والفضاء والتقنية' },
+  // Tier 2 — sector-specific + advisory
+  { value: 'DGA',     label: 'DGA — Digital Government Authority',               labelAr: 'هيئة الحكومة الرقمية' },
+  { value: 'NCEMA',   label: 'NCEMA — National Emergency Management Center',     labelAr: 'المركز الوطني لإدارة الكوارث والأزمات' },
+  { value: 'NAZAHA',  label: 'NAZAHA — Anti-Corruption Authority',               labelAr: 'هيئة الرقابة ومكافحة الفساد (نزاهة)' },
+  { value: 'MoCI',    label: 'MoCI — Ministry of Commerce',                      labelAr: 'وزارة التجارة' },
+  { value: 'HRSD',    label: 'HRSD — Ministry of Human Resources',               labelAr: 'وزارة الموارد البشرية والتنمية الاجتماعية' },
+  { value: 'MoH',     label: 'MoH / HCIS — Ministry of Health',                  labelAr: 'وزارة الصحة / مركز التحول الصحي' },
+  { value: 'SFDA',    label: 'SFDA — Saudi Food & Drug Authority',               labelAr: 'الهيئة العامة للغذاء والدواء' },
+  { value: 'MISA',    label: 'MISA — Investment Ministry',                       labelAr: 'وزارة الاستثمار' },
+  { value: 'MoI',     label: 'MoI — Ministry of Interior',                       labelAr: 'وزارة الداخلية' },
+  { value: 'MoT',     label: 'MoT — Ministry of Transport',                      labelAr: 'وزارة النقل والخدمات اللوجستية' },
+  { value: 'MoENERGY', label: 'MoEnergy — Ministry of Energy',                   labelAr: 'وزارة الطاقة' },
+  { value: 'MoENV',   label: 'MoEnv — Ministry of Environment, Water & Agric.',  labelAr: 'وزارة البيئة والمياه والزراعة' },
+  { value: 'NRC',     label: 'NRC — Nuclear & Radiological Regulatory',          labelAr: 'هيئة الرقابة النووية والإشعاعية' },
+  { value: 'GACA',    label: 'GACA — General Authority of Civil Aviation',        labelAr: 'الهيئة العامة للطيران المدني' },
+  { value: 'GAZT',    label: 'GAZT — General Authority of Zakat & Tax (legacy)', labelAr: 'الهيئة العامة للزكاة والدخل (السابقة)' },
+  { value: 'CUSTOMS', label: 'Saudi Customs (legacy)',                           labelAr: 'الجمارك السعودية (السابقة)' },
+  // Catch-all
+  { value: 'OTHER',   label: 'Other',                                            labelAr: 'أخرى' },
 ];
 const APPLICABILITY_OPTIONS = [
   { value: 'UNKNOWN',         label: 'Unknown' },
@@ -159,15 +182,43 @@ const IMPACT_LEVEL_OPTIONS = [
   { value: 'MEDIUM',   label: 'Medium' },
   { value: 'LOW',      label: 'Low' },
 ];
+// Policy taxonomy — expanded from the original 8 to cover the policy
+// families a Saudi-regulated entity (SAMA/NCA/SDAIA/CMA) actually maintains.
+// Anchored to NCA ECC + ISO 27001 + ISO 22301 + COSO ERM domains so a
+// compliance lead can map any policy 1-to-1.
 const POLICY_CATEGORY_OPTIONS = [
   { value: 'INFORMATION_SECURITY', label: 'Information Security' },
+  { value: 'ACCESS_CONTROL',       label: 'Identity & Access Management' },
+  { value: 'CRYPTOGRAPHY',         label: 'Cryptography & Key Management' },
+  { value: 'NETWORK_SECURITY',     label: 'Network Security' },
+  { value: 'CLOUD_SECURITY',       label: 'Cloud Security' },
+  { value: 'ENDPOINT_SECURITY',    label: 'Endpoint & Device Security' },
+  { value: 'APPLICATION_SECURITY', label: 'Secure Software Development' },
   { value: 'PRIVACY',              label: 'Privacy / PDPL' },
-  { value: 'RISK_MANAGEMENT',      label: 'Risk Management' },
+  { value: 'DATA_GOVERNANCE',      label: 'Data Governance & Classification' },
+  { value: 'DATA_RETENTION',       label: 'Data Retention & Disposal' },
+  { value: 'RISK_MANAGEMENT',      label: 'Risk Management (ERM)' },
   { value: 'BUSINESS_CONTINUITY',  label: 'Business Continuity' },
-  { value: 'ACCEPTABLE_USE',       label: 'Acceptable Use' },
+  { value: 'DISASTER_RECOVERY',    label: 'Disaster Recovery (IT-DRP)' },
   { value: 'INCIDENT_RESPONSE',    label: 'Incident Response' },
+  { value: 'VULNERABILITY_MGMT',   label: 'Vulnerability Management' },
+  { value: 'THIRD_PARTY',          label: 'Third-Party & Vendor Management' },
+  { value: 'CHANGE_MANAGEMENT',    label: 'Change Management' },
+  { value: 'ASSET_MANAGEMENT',     label: 'Asset Management (CMDB)' },
+  { value: 'PHYSICAL_SECURITY',    label: 'Physical & Environmental Security' },
+  { value: 'ACCEPTABLE_USE',       label: 'Acceptable Use' },
+  { value: 'REMOTE_WORK',          label: 'Remote Work / BYOD' },
+  { value: 'AML_KYC',              label: 'AML / KYC / Sanctions' },
+  { value: 'CODE_OF_CONDUCT',      label: 'Code of Conduct & Ethics' },
+  { value: 'WHISTLEBLOWING',       label: 'Whistleblowing' },
+  { value: 'ANTI_BRIBERY',         label: 'Anti-Bribery & Anti-Corruption' },
+  { value: 'CONFLICT_OF_INTEREST', label: 'Conflict of Interest' },
   { value: 'HR',                   label: 'Human Resources' },
-  { value: 'FINANCE',              label: 'Finance' },
+  { value: 'SAUDIZATION',          label: 'Saudization (Nitaqat)' },
+  { value: 'FINANCE',              label: 'Finance & Treasury' },
+  { value: 'PROCUREMENT',          label: 'Procurement' },
+  { value: 'TRAINING_AWARENESS',   label: 'Training & Awareness' },
+  { value: 'AUDIT_ASSURANCE',      label: 'Audit & Assurance' },
 ];
 const CHANGE_EMPTY: RegulatoryChangeRequest = {
   sourceAuthority: 'NCA', titleEn: '', titleAr: '', citation: '',
@@ -240,7 +291,7 @@ function isTabId(s: string | null): s is TabId {
 }
 
 export function CompliancePage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -316,8 +367,18 @@ export function CompliancePage() {
   ];
 
   // ── Field defs for Regulatory Changes + Policies (built per-render so labels translate) ──
+  // Localize the regulator dropdown so the AR name renders natively in
+  // RTL. The enum value stays the same on the wire.
+  const authorityOptionsLocalized = AUTHORITY_OPTIONS.map(a => ({
+    value: a.value, label: lang === 'ar' ? a.labelAr : a.label,
+  }));
   const CHANGE_FIELDS: FieldDef[] = [
-    { kind: 'select',   key: 'sourceAuthority', label: t('complianceFldAuthority') + ' *', required: true, options: AUTHORITY_OPTIONS, span: 6 },
+    // 23 authorities — searchable so the user types "SAMA" / "ساما" instead
+    // of scrolling.
+    { kind: 'select-searchable', key: 'sourceAuthority',
+      label: t('complianceFldAuthority') + ' *',
+      required: true, options: authorityOptionsLocalized, span: 6,
+      placeholder: lang === 'ar' ? 'اختر الجهة التنظيمية…' : 'Choose regulator…' },
     { kind: 'text',     key: 'citation',        label: t('complianceFldCitation'), span: 6 },
     { kind: 'text',     key: 'titleEn',         label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
     { kind: 'text',     key: 'titleAr',         label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
@@ -331,7 +392,10 @@ export function CompliancePage() {
   const POLICY_FIELDS: FieldDef[] = [
     { kind: 'text',     key: 'code',     label: t('fldCode') + ' *', required: true, maxLength: 50, placeholder: 'POL-INFO-001', span: 4 },
     { kind: 'text',     key: 'version',  label: t('fldVersion'), placeholder: '1.0', span: 4 },
-    { kind: 'select',   key: 'category', label: t('fldCategory'), options: POLICY_CATEGORY_OPTIONS, span: 4 },
+    // 32 policy categories — typeahead is mandatory at this length.
+    { kind: 'select-searchable', key: 'category', label: t('fldCategory'),
+      options: POLICY_CATEGORY_OPTIONS, span: 4,
+      placeholder: lang === 'ar' ? 'ابحث عن الفئة…' : 'Search category…' },
     { kind: 'text',     key: 'titleEn',  label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
     { kind: 'text',     key: 'titleAr',  label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
     { kind: 'date',     key: 'effectiveFrom',   label: t('complianceFldEffectiveFrom'), span: 6 },
@@ -670,7 +734,10 @@ export function CompliancePage() {
           <>
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             {!isDemo && <LivePulse pulse={pulse} />}
-            <Button variant="secondary" Icon={Filter} onClick={() => toast.info(t('actionFilterHint'))}>{t('actionFilter')}</Button>
+            <Button variant="secondary" Icon={Filter}
+              onClick={() => window.dispatchEvent(new CustomEvent('grc:open-palette'))}>
+              {t('actionFilter')}
+            </Button>
             <ExportMenu
               demoMode={isDemo} t={t} toast={toast}
               onPdf={() => reportingApi.findingsPdf((typeof navigator !== 'undefined' && navigator.language?.startsWith('ar')) ? 'ar' : 'en')}
@@ -742,7 +809,10 @@ export function CompliancePage() {
       )}
       {tab === 'findings' && (
         <>
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))', marginBottom: 12 }}>
+          {/* Use default .kpi-grid auto-fit instead of forcing 4 fixed cols
+              at 180px min — matches the Risk page's 4-tile strip and the
+              rest of the app's KPI rows. */}
+          <div className="kpi-grid" style={{ marginBottom: 12 }}>
             <Kpi Icon={ClipboardCheck} label={t('agingKpiOnTrack')}        value={aging.filter(f => f.escalationTier === 'ON_TRACK').length} tone="success" />
             <Kpi Icon={Flag}           label={t('agingKpiManager')}        value={aging.filter(f => f.escalationTier === 'MANAGER_ESCALATED').length} tone="info" />
             <Kpi Icon={AlertTriangle}  label={t('agingKpiDirector')}       value={aging.filter(f => f.escalationTier === 'DIRECTOR_ESCALATED').length} tone="accent" />
@@ -771,11 +841,20 @@ export function CompliancePage() {
           {['ISO_27001','NCA_ECC','PDPL','ISO_22301','SAMA_CSF','ISO_27701'].map(fw => {
             const v = frameworkScore(fw);
             const cs = controls.data.filter(c => c.framework === fw).length;
+            // Tone maps to the same threshold ladder used elsewhere — < 40 danger,
+            // < 60 accent (amber), < 80 primary (teal), ≥ 80 success.
+            const tone: 'success' | 'primary' | 'accent' | 'danger' =
+              v >= 80 ? 'success' : v >= 60 ? 'primary' : v >= 40 ? 'accent' : 'danger';
             return (
               <Card key={fw} title={fw.replace(/_/g, ' ')} Icon={Award} action={<Badge tone="primary">{cs} controls</Badge>}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 38, fontWeight: 800, color: v >= 80 ? 'var(--success-fg)' : v >= 60 ? 'var(--primary-700)' : v >= 40 ? 'var(--accent-700)' : 'var(--danger-fg)', letterSpacing: '-0.02em' }}>{v}%</div>
+                {/* Use the shared .stat-tile pattern so this scorecard tile reads
+                 * with the same typography as the KPI strip at the top of the
+                 * page — no more "this card looks different from the row above". */}
+                <div className={`stat-tile stat-tile-${tone}`}>
+                  <div className="stat-tile-value">{v}%</div>
+                </div>
                 <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 'var(--r-pill)', overflow: 'hidden', margin: '8px 0 6px' }}>
-                  <div style={{ width: `${v}%`, height: '100%', background: v >= 80 ? 'var(--success)' : v >= 60 ? 'var(--primary)' : v >= 40 ? 'var(--accent)' : 'var(--danger)' }} />
+                  <div style={{ width: `${v}%`, height: '100%', background: `var(--${tone === 'accent' ? 'accent' : tone === 'primary' ? 'primary' : tone === 'success' ? 'success' : 'danger'})` }} />
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                   {controls.data.filter(c => c.framework === fw && c.status === 'IMPLEMENTED').length} implemented ·
@@ -861,7 +940,7 @@ function ScorePillCompliance({ score }: { score: number }) {
 }
 function LoadingRow() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <InlineEmpty>{t('riskLoading')}</InlineEmpty>;
 }
 
 // ─── Framework anchor view (IA-1 — policies organised by framework sheets) ──
@@ -960,7 +1039,17 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
         <div style={{ maxHeight: 540, overflowY: 'auto' }}>
           {Array.from(byFamily.entries()).map(([family, list]) => (
             <div key={family}>
-              <div style={{ padding: '10px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'var(--surface-2)' }}>
+              {/* Family eyebrow — reuses the canonical section-header
+                * vocabulary (.text-2xs .text-muted with letter-spacing)
+                * so it matches every other "uppercase metric eyebrow"
+                * on the page instead of being a one-off inline style. */}
+              <div className="text-2xs text-muted" style={{
+                padding: '10px 12px 4px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                background: 'var(--surface-2)',
+              }}>
                 {FAMILY_LABELS[family] ?? family}
               </div>
               {list.map(f => {
@@ -983,7 +1072,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
               })}
             </div>
           ))}
-          {frameworks.length === 0 && <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>{t('frameworkEmpty')}</div>}
+          {frameworks.length === 0 && <InlineEmpty>{t('frameworkEmpty')}</InlineEmpty>}
         </div>
       </Card>
 
@@ -996,7 +1085,14 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                   {active.family   && <Badge tone="info">{FAMILY_LABELS[active.family] ?? active.family}</Badge>}
                 </>}>
             {active.issuer && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>{t('frameworkIssuer')}: {active.issuer}</div>}
-            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6, minmax(100px, 1fr))', gap: 8 }}>
+            {/* 6 tiles — let the canonical .kpi-grid auto-fit handle column
+                count instead of forcing 6 columns at minmax(100px). The old
+                override crammed each tile to ~100px width which squeezed
+                Arabic labels ("ضوابط مُطبَّقة", "نضج الإطار") against the
+                box edges and made the row look distinct from every other
+                page. Default 220px-minimum auto-fit gives 3-4 cols at the
+                usual viewport and wraps to 2 below ~700px. */}
+            <div className="kpi-grid">
               <Kpi Icon={ClipboardCheck} label={t('frameworkKpiControls')}     value={activeCov?.controlCount ?? 0} tone="primary" />
               <Kpi Icon={CheckCheck}     label={t('frameworkKpiImplemented')} value={activeCov?.implementedControls ?? 0} tone="success" />
               <Kpi Icon={Award}          label={t('frameworkKpiMaturity')}     value={typeof activeCov?.avgMaturity === 'number' ? `L${activeCov.avgMaturity}` : '—'} tone="accent" />

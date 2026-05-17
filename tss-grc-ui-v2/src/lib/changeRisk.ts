@@ -13,7 +13,7 @@
 // Scoring is intentionally simple and inspectable — auditors should be able
 // to reproduce it on paper. Each input contributes a small weighted score,
 // which is summed and capped at 100. The classification thresholds match
-// ServiceNow's default Change Risk Calculator buckets (LOW < 25, MED 25-49,
+// the industry pattern's default Change Risk Calculator buckets (LOW < 25, MED 25-49,
 // HIGH 50-74, CRITICAL ≥ 75).
 //
 // References:
@@ -86,7 +86,7 @@ export function computeChangeRisk(payload: Record<string, unknown>): ChangeRiskB
   const rawScore = factors.reduce((s, f) => s + f.weight, 0);
   const score = Math.min(rawScore, 100);
 
-  // ── Classification thresholds (ServiceNow-aligned)
+  // ── Classification thresholds (the industry pattern-aligned)
   let classification: ChangeRiskClass;
   if      (score < 25)  classification = 'LOW';
   else if (score < 50)  classification = 'MEDIUM';

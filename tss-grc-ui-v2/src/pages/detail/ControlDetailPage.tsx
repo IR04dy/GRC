@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ClipboardCheck, FileCheck2, ListChecks, Link2, CheckCheck, AlertTriangle, ShieldOff, Calendar } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -29,6 +30,7 @@ export function ControlDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [item, setItem] = useState<ComplianceControlDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabId>('overview');
@@ -48,7 +50,7 @@ export function ControlDetailPage() {
     toast.success(t(msgKey));
   }
 
-  if (loading) return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
+  if (loading) return <Shell title={t('modCompliance')}><InlineEmpty>{t('riskLoading')}</InlineEmpty></Shell>;
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const name = lang === 'ar' && item.nameAr ? item.nameAr : item.nameEn;
@@ -80,7 +82,10 @@ export function ControlDetailPage() {
           {item.status !== 'IMPLEMENTED' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionControl('IMPLEMENTED', 'controlActMarkImplemented')}>{t('controlActMarkImplemented')}</Button>}
           {item.status !== 'PARTIAL' && <Button variant="secondary" Icon={AlertTriangle} onClick={() => transitionControl('PARTIAL', 'controlActMarkPartial')}>{t('controlActMarkPartial')}</Button>}
           {item.status !== 'NOT_APPLICABLE' && <Button variant="ghost" Icon={ShieldOff} onClick={() => transitionControl('NOT_APPLICABLE', 'controlActMarkNA')}>{t('controlActMarkNA')}</Button>}
-          <Button variant="ghost" Icon={Calendar} onClick={() => toast.info(t('controlActScheduleTestHint'))}>{t('controlActScheduleTest')}</Button>
+          <Button variant="ghost" Icon={Calendar}
+            onClick={() => navigate(`/audit-workspace?tab=plan&controlId=${encodeURIComponent(String(item.id))}&action=schedule-test`)}>
+            {t('controlActScheduleTest')}
+          </Button>
         </>}
       />
 
@@ -124,7 +129,7 @@ export function ControlDetailPage() {
         <Card title={t('detailTabSubControls')} Icon={ListChecks}
           action={<Badge tone="primary">{(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).length}</Badge>}>
           {(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailSubControlsHint')}</div>
+            ? <InlineEmpty compact>{t('detailSubControlsHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(CONTROL_SUBCONTROLS_BY_ID[item.id] ?? []).map(s => (
                   <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 100px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -144,7 +149,7 @@ export function ControlDetailPage() {
         <Card title={t('detailTabEvidence')} Icon={FileCheck2}
           action={<Badge tone="primary">{(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).length}</Badge>}>
           {(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div>
+            ? <InlineEmpty compact>{t('detailEvidenceHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(CONTROL_EVIDENCE_BY_ID[item.id] ?? []).map(e => (
                   <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 90px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -162,7 +167,7 @@ export function ControlDetailPage() {
         <Card title={t('detailTabTests')} Icon={ListChecks}
           action={<Badge tone="primary">{(CONTROL_TESTS_BY_ID[item.id] ?? []).length}</Badge>}>
           {(CONTROL_TESTS_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailTestsHint')}</div>
+            ? <InlineEmpty compact>{t('detailTestsHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(CONTROL_TESTS_BY_ID[item.id] ?? []).map(tt => (
                   <div key={tt.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 80px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -180,9 +185,7 @@ export function ControlDetailPage() {
       )}
       {tab === 'links' && (
         <Card title={t('detailTabLinks')} Icon={Link2}>
-          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
-            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
-          </div>
+          <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
       )}
         </>}

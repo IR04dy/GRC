@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, ListChecks, ArrowRight, ShieldCheck, Stamp, Lock, Wrench, Briefcase, Link2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -51,7 +52,7 @@ export function FindingDetailPage() {
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
-  if (loading) return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
+  if (loading) return <Shell title={t('modCompliance')}><InlineEmpty>{t('riskLoading')}</InlineEmpty></Shell>;
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const tabs: TabItem<TabId>[] = [
@@ -152,7 +153,7 @@ export function FindingDetailPage() {
         <Card title={t('detailTabEvidence')} Icon={ShieldCheck}
           action={<Badge tone="primary">{(FINDING_EVIDENCE_BY_ID[item.id] ?? []).length}</Badge>}>
           {(FINDING_EVIDENCE_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailEvidenceHint')}</div>
+            ? <InlineEmpty compact>{t('detailEvidenceHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(FINDING_EVIDENCE_BY_ID[item.id] ?? []).map(e => (
                   <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 90px 80px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -168,16 +169,14 @@ export function FindingDetailPage() {
       )}
       {tab === 'links' && (
         <Card title={t('detailTabLinks')} Icon={Link2}>
-          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
-            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
-          </div>
+          <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
       )}
       {tab === 'history' && (
         <Card title={t('detailTabHistory')} Icon={ListChecks}
           action={<Badge tone="primary">{(FINDING_HISTORY_BY_ID[item.id] ?? []).length}</Badge>}>
           {(FINDING_HISTORY_BY_ID[item.id] ?? []).length === 0
-            ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailHistoryHint')}</div>
+            ? <InlineEmpty compact>{t('detailHistoryHint')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(FINDING_HISTORY_BY_ID[item.id] ?? []).map(h => (
                   <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 130px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>

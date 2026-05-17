@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useParams } from 'react-router-dom';
 import { Fingerprint, ListChecks, ShieldCheck, MessageSquare, Link2, Send, CheckCheck, X as XIcon, RefreshCw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -49,7 +50,7 @@ export function DpiaDetailPage() {
     toast.success(t(msgKey));
   }
 
-  if (loading) return <Shell title={t('modPdpl')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div></Shell>;
+  if (loading) return <Shell title={t('modPdpl')}><InlineEmpty>{t('riskLoading')}</InlineEmpty></Shell>;
   if (!item)   return <Shell title={t('modPdpl')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const title = lang === 'ar' && item.titleAr ? item.titleAr : item.titleEn;
@@ -123,7 +124,7 @@ export function DpiaDetailPage() {
         return (
           <Card title={t('detailTabQuestions')} Icon={ListChecks} action={<Badge tone="primary">{rows.length}</Badge>}>
             {rows.length === 0
-              ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailQuestionsHint')}</div>
+              ? <InlineEmpty compact>{t('detailQuestionsHint')}</InlineEmpty>
               : <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {rows.map(q => (
                     <div key={q.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
@@ -144,7 +145,7 @@ export function DpiaDetailPage() {
         return (
           <Card title={t('detailTabMitigations')} Icon={ShieldCheck} action={<Badge tone="primary">{rows.length}</Badge>}>
             {rows.length === 0
-              ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailMitigationsHint')}</div>
+              ? <InlineEmpty compact>{t('detailMitigationsHint')}</InlineEmpty>
               : <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {rows.map(m => (
                     <div key={m.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
@@ -165,7 +166,7 @@ export function DpiaDetailPage() {
         return (
           <Card title={t('detailTabReviews')} Icon={MessageSquare} action={<Badge tone="primary">{rows.length}</Badge>}>
             {rows.length === 0
-              ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('detailReviewsHint')}</div>
+              ? <InlineEmpty compact>{t('detailReviewsHint')}</InlineEmpty>
               : <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {rows.map(r => (
                     <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '110px 200px 1fr 130px', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
@@ -184,9 +185,7 @@ export function DpiaDetailPage() {
       })()}
       {tab === 'links' && (
         <Card title={t('detailTabLinks')} Icon={Link2}>
-          <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>
-            Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.
-          </div>
+          <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
       )}
         </>}

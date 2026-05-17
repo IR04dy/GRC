@@ -1,6 +1,6 @@
 // Workflow versioning — Sprint 6 follow-on (A3).
 //
-// "Publish v2.0 without breaking in-flight v1.0 instances." ServiceNow
+// "Publish v2.0 without breaking in-flight v1.0 instances." the industry pattern
 // Flow Designer ships this; until now our workflow engine only had a
 // single version per definition.
 //

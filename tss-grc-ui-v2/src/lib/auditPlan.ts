@@ -1,6 +1,6 @@
 // Annual Audit Plan — risk-based selection from the AUDIT_UNIVERSE,
 // scheduled across the year, with explicit Audit-Committee approval gate.
-// ServiceNow IRM equivalent: `audit_plan` table.
+// industry-standard GRC tooling equivalent: `audit_plan` table.
 //
 // Standards anchor:
 //   IIA IPPF 2010    — risk-based plan establishing audit priorities

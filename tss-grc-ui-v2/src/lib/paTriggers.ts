@@ -24,7 +24,7 @@
 //   IIA IPPF 2010.A2       — Risk-based plans must consider
 //                              risks not yet realized
 //
-// ServiceNow IRM equivalent: the `risk_signal` table that feeds
+// industry-standard GRC tooling equivalent: the `risk_signal` table that feeds
 // the "Suggested PA" widget on the CAPA workspace.
 
 import type { Capa } from './capa';

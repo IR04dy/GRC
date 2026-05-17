@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Filter as FilterIcon, UserCheck, X as XIcon } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Shell } from '../../components/layout/Shell';
@@ -35,6 +36,7 @@ import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
 export function VulnerabilitiesV2Page() {
   const { lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [allVulns, setAllVulns] = useState<Vulnerability[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | undefined>();
   const [filterOpen, setFilterOpen] = useState(false);
@@ -152,10 +154,10 @@ export function VulnerabilitiesV2Page() {
   };
 
   return (
-    <Shell title={lang === 'ar' ? 'الثغرات (الإصدار الثاني)' : 'Vulnerabilities (V2)'} sub="ServiceNow IRM parity stack">
+    <Shell title={lang === 'ar' ? 'الثغرات (الإصدار الثاني)' : 'Vulnerabilities (V2)'} sub="industry-standard GRC tooling parity stack">
       <PageHeader
         title={lang === 'ar' ? 'الثغرات (الإصدار الثاني)' : 'Vulnerabilities (V2)'}
-        sub={lang === 'ar' ? 'قائمة TanStack · مكافئة لنظام ServiceNow IRM' : 'TanStack-powered list · ServiceNow IRM parity stack'}
+        sub={lang === 'ar' ? 'قائمة TanStack · مكافئة لنظام industry-standard GRC tooling' : 'TanStack-powered list · industry-standard GRC tooling parity stack'}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -220,15 +222,16 @@ export function VulnerabilitiesV2Page() {
           columns={columns}
           getRowId={(v) => v.id}
           enableSelection
+          onSelectionChange={setSelectedRows}
           pageSize={25}
           virtualization={{ enabled: filtered.length > 500 }}
           emptyState={lang === 'ar' ? 'لا توجد ثغرات' : 'No vulnerabilities'}
-          onRowClick={(v) => console.log('row click', v.id)}
+          onRowClick={(v) => navigate(`/cyber-lifecycle?tab=vulns&vulnId=${encodeURIComponent(v.id)}`)}
         />
       </Card>
 
       <BulkActionsBar
-        selected={selectedRows /* TODO: wire from DataTableV2 selection state */}
+        selected={selectedRows}
         onClear={() => setSelectedRows([])}
         actions={[
           {

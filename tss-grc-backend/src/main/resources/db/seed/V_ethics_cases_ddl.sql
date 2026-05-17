@@ -1,7 +1,7 @@
 -- ============================================================================
 -- TSS GRC — Phase B-1: Ethics & Compliance Cases (whistleblower + investigations)
 -- ============================================================================
--- Hotline reports + investigations workflow modeled on NAVEX Global / OneTrust
+-- Hotline reports + investigations workflow modeled on NAVEX Global / industry-standard tooling
 -- Ethics. Saudi Whistleblower Protection Law mandates a confidential channel
 -- with named protection, anonymity option, audit trail of disposition, and
 -- retaliation tracking. State machine:

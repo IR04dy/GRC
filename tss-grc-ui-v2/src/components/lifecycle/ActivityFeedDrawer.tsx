@@ -10,7 +10,7 @@ import { useI18n } from '../../lib/i18n';
  *
  * Shows every action (transitioned, assigned, created, closed, commented)
  * with the user, timestamp, and from/to context. Inspired by Linear's
- * activity feed + ServiceNow Activity Log.
+ * activity feed + the industry pattern Activity Log.
  */
 export function ActivityFeedDrawer({ open, onClose, entityType, entityId }: {
   open: boolean;

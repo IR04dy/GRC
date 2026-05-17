@@ -73,7 +73,12 @@ export function IntakeFormRenderer({ fields, submitLabel, onSubmit, onChange }: 
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-        <Button variant="primary" Icon={Send} onClick={() => { /* form onSubmit handles it */ }}>
+        {/* type="submit" is required: Button.tsx defaults to type="button"
+         * (to prevent accidental form submissions across the platform), so
+         * without an explicit type the click here did nothing — the form's
+         * onSubmit never fired. Bug surfaced as "send button not working"
+         * on every /intake/* form. */}
+        <Button type="submit" variant="primary" Icon={Send}>
           {submitLabel}
         </Button>
       </div>

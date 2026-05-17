@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Briefcase, ScrollText, AlertTriangle, FileCheck2,
   CalendarDays, ArrowRight, Play, Send, Lock, RefreshCw,
@@ -34,6 +34,7 @@ export function EngagementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>('timeline');
 
   const seed = useMemo(
@@ -94,7 +95,12 @@ export function EngagementDetailPage() {
           {e.status === 'PLANNED' && <Button variant="primary" Icon={Play} onClick={() => transition('FIELDWORK', 'engActStartFieldwork')}>{t('engActStartFieldwork')}</Button>}
           {e.status === 'FIELDWORK' && <Button variant="primary" Icon={Send} onClick={() => transition('REPORT_ISSUED', 'engActIssueReport')}>{t('engActIssueReport')}</Button>}
           {e.status === 'REPORT_ISSUED' && <Button variant="primary" Icon={Lock} onClick={() => transition('CLOSED', 'engActCloseEngagement')}>{t('engActCloseEngagement')}</Button>}
-          {e.status === 'CLOSED' && <Button variant="secondary" Icon={RefreshCw} onClick={() => toast.info(t('engActFollowupHint'))}>{t('engActScheduleFollowup')}</Button>}
+          {e.status === 'CLOSED' && (
+            <Button variant="secondary" Icon={RefreshCw}
+              onClick={() => navigate(`/audit-workspace?tab=plan&engagementCode=${encodeURIComponent(e.engagementCode ?? '')}&action=schedule-followup`)}>
+              {t('engActScheduleFollowup')}
+            </Button>
+          )}
         </>}
       />
 

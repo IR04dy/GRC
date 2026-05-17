@@ -1,7 +1,7 @@
 // Vendor onboarding workflow + tier-driven reassessment cadence — DD-74.
 //
-// Most TPRM platforms (OneTrust Vendorpedia, Prevalent, Aravo, ProcessUnity,
-// Archer Vendor) treat the vendor lifecycle as two separate flows that
+// Most TPRM platforms (industry-standard tooling Vendorpedia, Prevalent, Aravo, ProcessUnity,
+// industry-standard tooling Vendor) treat the vendor lifecycle as two separate flows that
 // mesh:
 //
 //   1) ONBOARDING — a 6-stage front-door pipeline that walks every new

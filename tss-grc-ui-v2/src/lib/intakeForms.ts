@@ -7,8 +7,8 @@
 // render the right control per field.
 //
 // Naming + field choices benchmarked against:
-//   ServiceNow IRM Service Catalog items
-//   OneTrust Privacy intake forms (DSR / PIA / DPIA)
+//   industry-standard GRC tooling Service Catalog items
+//   industry-standard tooling Privacy intake forms (DSR / PIA / DPIA)
 //   NAVEX EthicsPoint (whistleblower)
 //   ISACA Continuous Controls Monitoring
 //   ISO 27001 §6.8 — reporting information security events
@@ -370,7 +370,7 @@ export const INTAKE_FORM_FIELDS: Partial<Record<IntakeKind, IntakeFieldDef[]>> =
   // ── Change request — ITIL v4, ISO 27001 §A.8.32, NCA ECC-1 §2-10, SAMA CSF §3.3.13
   // Risk-assessment fields (DD-70) drive the CAB gate: low-risk standard changes
   // are auto-approved; medium routes to normal CAB; high/critical requires E-CAB
-  // sign-off. Mirrors the ServiceNow Change Risk Calculator and Jira Service
+  // sign-off. Mirrors the the industry pattern Change Risk Calculator and Jira Service
   // Management's Change Risk Assessment.
   CHANGE_REQUEST: [
     { key: 'changeType', kind: 'radio-cards', required: true,

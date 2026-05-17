@@ -5,7 +5,7 @@ import { STATUS_TONE, STATUS_LABEL, type RegulatorAnchor } from '../../lib/evide
 
 /**
  * Inline row of regulator-anchor chips. Each chip is one authority + one
- * cited control + the per-authority control status. ServiceNow IRM uses
+ * cited control + the per-authority control status. Leading platforms use
  * the same compact horizontal arrangement on its Evidence + Issue rows
  * so auditors can scan multi-authority coverage at a glance.
  */

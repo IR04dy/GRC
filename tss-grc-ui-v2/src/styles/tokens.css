@@ -56,21 +56,36 @@
   --accent:        var(--accent-500);
   --accent-hover:  var(--accent-600);
 
-  /* ─── Color · Semantic ────────────────────────────── */
-  --success:    #3F8C5C;
-  --success-bg: #E6F0E9;
-  --success-fg: #235D3D;
-  --warning:    #C8932A;
-  --warning-bg: #FBF3DD;
-  --warning-fg: #876019;
-  --danger:     #C0413A;
-  --danger-bg:  #F8E5E2;
-  --danger-fg:  #7E2A25;
-  --info:       #5A7A8C;
-  --info-bg:    #E5ECEF;
-  --info-fg:    #36505D;
-  --neutral-bg: #ECE7DB;
-  --neutral-fg: #5C6A65;
+  /* ─── Color · Semantic ──────────────────────────────
+     Each family is a 3-tone (or 4-tone) ramp:
+       -bg      → soft tinted background (pill / KPI fill)
+       -border  → matched outline for the pill (darker than -bg, lighter than -fg)
+       (base)   → the saturated brand colour (icon / button fill)
+       -fg      → readable foreground text on -bg
+     `-border` was historically hardcoded in components.css (#C9DEC9 / #ECCFCC /
+     #CFD9DD); promoted here so light + dark themes can co-vary. */
+  --success:        #3F8C5C;
+  --success-bg:     #E6F0E9;
+  --success-border: #C9DEC9;
+  --success-fg:     #235D3D;
+  --warning:        #C8932A;
+  --warning-bg:     #FBF3DD;
+  --warning-border: #F6E4B0;
+  --warning-fg:     #876019;
+  --danger:         #C0413A;
+  --danger-bg:      #F8E5E2;
+  --danger-border:  #ECCFCC;
+  --danger-fg:      #7E2A25;
+  /* Info — re-tuned: previously #5A7A8C slate-blue, which clashed with
+     the warm-cream + teal palette. Now a desaturated teal that sits
+     next to --primary in the same hue family so badges, KPIs and
+     widget chips no longer read as a different design system. */
+  --info:           #5F8A8A;
+  --info-bg:        #E8EFEF;
+  --info-border:    #CFD9DD;
+  --info-fg:        #2E5252;
+  --neutral-bg:     #ECE7DB;
+  --neutral-fg:     #5C6A65;
 
   /* ─── Color · Risk severity (heatmap) ─────────────── */
   --risk-vlow:  #C8DDC8;
@@ -83,7 +98,7 @@
   /* ─── Color · Categorical (charts) ────────────────── */
   --cat-1: #0E5E5E;
   --cat-2: #C8932A;
-  --cat-3: #5A7A8C;
+  --cat-3: #5F8A8A; /* was #5A7A8C slate-blue — re-tuned to match --info */
   --cat-4: #8E5A7A;
   --cat-5: #3F8C5C;
   --cat-6: #B5663C;
@@ -233,19 +248,25 @@
   --accent:        var(--accent-400);
   --accent-hover:  var(--accent-500);
 
-  /* Semantic — readable on dark */
-  --success:    #6FBF8E;
-  --success-bg: #15291E;
-  --success-fg: #9CE0B5;
-  --warning:    #E5B547;
-  --warning-bg: #2C2110;
-  --warning-fg: #F6E4B0;
-  --danger:     #E47B73;
-  --danger-bg:  #2A1614;
-  --danger-fg:  #F1A39C;
-  --info:       #7AA0B5;
-  --info-bg:    #16242C;
-  --info-fg:    #B8CFDC;
+  /* Semantic — readable on dark.
+     -border tones sit between -bg and -fg, matched to the dark palette. */
+  --success:        #6FBF8E;
+  --success-bg:     #15291E;
+  --success-border: #2D5A3F;
+  --success-fg:     #9CE0B5;
+  --warning:        #E5B547;
+  --warning-bg:     #2C2110;
+  --warning-border: #6E5224;
+  --warning-fg:     #F6E4B0;
+  --danger:         #E47B73;
+  --danger-bg:      #2A1614;
+  --danger-border:  #5B2A26;
+  --danger-fg:      #F1A39C;
+  /* Info dark — re-tuned to teal-gray, matches light theme shift */
+  --info:           #7FB0B0;
+  --info-bg:        #16282A;
+  --info-border:    #2D5557;
+  --info-fg:        #B8DCDC;
   --neutral-bg: #1F2A27;
   --neutral-fg: #93A19B;
 

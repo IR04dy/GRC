@@ -1,6 +1,6 @@
 // Per-entity regulator anchors — every Finding / Control / Policy / Risk
 // is anchored to one or more regulator + control citation. Same shape as
-// evidenceAnchors but keyed by entity-id. ServiceNow IRM "Issue" + "Policy"
+// evidenceAnchors but keyed by entity-id. industry-standard GRC tooling "Issue" + "Policy"
 // + "Control" cite-table pattern.
 import type { RegulatorAnchor } from './evidenceAnchors';
 
@@ -19,7 +19,7 @@ export const FINDING_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
   33: [
     { authorityCode: 'ISO',   frameworkCode: 'ISO_27001', controlRef: 'A.8.16', citationText: 'Monitoring activities.', controlStatus: 'PARTIAL' },
     { authorityCode: 'NCA',   frameworkCode: 'NCA_ECC',   controlRef: 'IR-3.2', controlStatus: 'PARTIAL' },
-    { authorityCode: 'NIST',  frameworkCode: 'NIST_CSF',  controlRef: 'DE.AE',  controlStatus: 'PARTIAL' },
+    { authorityCode: 'NCA', frameworkCode: 'NCA_ECC',  controlRef: 'DE.AE',  controlStatus: 'PARTIAL' },
   ],
   34: [
     { authorityCode: 'SAMA', frameworkCode: 'SAMA_CSF',  controlRef: 'CYB-1.4.3', citationText: 'Cryptographic key management.', controlStatus: 'PARTIAL' },
@@ -56,7 +56,7 @@ export const CONTROL_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
   ],
   2: [
     { authorityCode: 'ISO',  frameworkCode: 'ISO_27001', controlRef: 'A.5.7', citationText: 'Threat intelligence.', controlStatus: 'PARTIAL' },
-    { authorityCode: 'NIST', frameworkCode: 'NIST_CSF',  controlRef: 'ID.RA', controlStatus: 'PARTIAL' },
+    { authorityCode: 'NCA', frameworkCode: 'NCA_ECC',  controlRef: 'ID.RA', controlStatus: 'PARTIAL' },
   ],
   3: [
     { authorityCode: 'NCA',   frameworkCode: 'NCA_ECC',   controlRef: 'AC-2',   citationText: 'Account management lifecycle.', controlStatus: 'IMPLEMENTED' },
@@ -67,7 +67,7 @@ export const CONTROL_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
   4: [
     { authorityCode: 'NCA',  frameworkCode: 'NCA_ECC',   controlRef: 'IR-3', citationText: 'Incident response plan.', controlStatus: 'IMPLEMENTED' },
     { authorityCode: 'ISO',  frameworkCode: 'ISO_27001', controlRef: 'A.5.24', controlStatus: 'IMPLEMENTED' },
-    { authorityCode: 'NIST', frameworkCode: 'NIST_800_61', controlRef: '§3.2', controlStatus: 'IMPLEMENTED' },
+    { authorityCode: 'NCA', frameworkCode: 'NCA_ECC', controlRef: '§3.2', controlStatus: 'IMPLEMENTED' },
   ],
   5: [
     { authorityCode: 'SDAIA', frameworkCode: 'PDPL',      controlRef: 'Article 29', citationText: 'Cross-border transfer safeguards.', controlStatus: 'PARTIAL' },
@@ -124,7 +124,7 @@ export const POLICY_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
     { authorityCode: 'NCEMA', frameworkCode: 'NCEMA_BCP', controlRef: '§4.1', controlStatus: 'PARTIAL' },
   ],
   57: [
-    { authorityCode: 'NIST', frameworkCode: 'NIST_800_161', controlRef: 'SR-3', citationText: 'TPRM policy.', controlStatus: 'IMPLEMENTED' },
+    { authorityCode: 'NCA', frameworkCode: 'NCA_OTCC', controlRef: 'SR-3', citationText: 'TPRM policy.', controlStatus: 'IMPLEMENTED' },
     { authorityCode: 'ISO',  frameworkCode: 'ISO_28001',    controlRef: '§5',   controlStatus: 'IMPLEMENTED' },
     { authorityCode: 'SAMA', frameworkCode: 'SAMA_CSF',     controlRef: '4.1',  controlStatus: 'IMPLEMENTED' },
   ],
@@ -148,7 +148,7 @@ export const RISK_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
   ],
   3:  [ // Supplier concentration
     { authorityCode: 'NRC',  frameworkCode: 'NRC_TIER_MAPPING', controlRef: '§5.2', citationText: 'Single-point-of-failure register.', controlStatus: 'PARTIAL' },
-    { authorityCode: 'NIST', frameworkCode: 'NIST_800_161',     controlRef: 'SR-5', controlStatus: 'PARTIAL' },
+    { authorityCode: 'NCA', frameworkCode: 'NCA_OTCC',     controlRef: 'SR-5', controlStatus: 'PARTIAL' },
   ],
   4:  [ // Phishing
     { authorityCode: 'NCA',  frameworkCode: 'NCA_ECC',   controlRef: '2.10.1', citationText: 'Awareness programme.', controlStatus: 'IMPLEMENTED' },
@@ -171,7 +171,7 @@ export const RISK_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
   ],
   9:  [ // Vendor BCP inadequacy
     { authorityCode: 'NCEMA', frameworkCode: 'NCEMA_BCP', controlRef: '§7',  citationText: 'Vendor BCP requirements.', controlStatus: 'PARTIAL' },
-    { authorityCode: 'NIST',  frameworkCode: 'NIST_800_161', controlRef: 'SR-3', controlStatus: 'PARTIAL' },
+    { authorityCode: 'NCA', frameworkCode: 'NCA_OTCC', controlRef: 'SR-3', controlStatus: 'PARTIAL' },
   ],
   10: [ // Cross-border data transfer compliance
     { authorityCode: 'SDAIA', frameworkCode: 'PDPL',      controlRef: 'Article 29', citationText: 'Cross-border transfer.', controlStatus: 'PARTIAL' },

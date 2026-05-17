@@ -1,6 +1,6 @@
 // Multi-authority anchoring for evidence + controls + findings.
 // One evidence item can satisfy controls under several authorities at once
-// (collect-once / reuse-many) — ServiceNow IRM "Citation" pattern.
+// (collect-once / reuse-many) — industry-standard GRC tooling "Citation" pattern.
 
 export type ControlStatus = 'IMPLEMENTED' | 'PARTIAL' | 'COMPENSATING' | 'NOT_IMPLEMENTED' | 'NOT_APPLICABLE';
 

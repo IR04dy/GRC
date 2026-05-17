@@ -5,6 +5,7 @@ import {
   type SavedView,
 } from '../../lib/savedViews';
 import { useI18n } from '../../lib/i18n';
+import { useDialog } from '../../lib/dialog';
 
 export interface SavedViewSelectorProps {
   /** Stable key for this page, e.g. "cyber/vulns". */
@@ -27,6 +28,7 @@ export interface SavedViewSelectorProps {
  */
 export function SavedViewSelector({ pageKey, activeViewId, onApply, onSnapshot }: SavedViewSelectorProps) {
   const { lang } = useI18n();
+  const dialog = useDialog();
   const [views, setViews] = useState<SavedView[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -37,17 +39,28 @@ export function SavedViewSelector({ pageKey, activeViewId, onApply, onSnapshot }
 
   const active = views.find(v => v.id === activeViewId);
 
-  const handleSnapshot = () => {
+  const handleSnapshot = async () => {
     const snap = onSnapshot();
     if (!snap) return;
-    const name = window.prompt(lang === 'ar' ? 'اسم العرض' : 'View name');
+    const name = await dialog.prompt({
+      title: lang === 'ar' ? 'حفظ العرض الحالي' : 'Save current view',
+      label: lang === 'ar' ? 'اسم العرض' : 'View name',
+      placeholder: lang === 'ar' ? 'مثال: مخاطر حرجة هذا الربع' : 'e.g. Critical risks this quarter',
+      required: true,
+    });
     if (!name) return;
     saveView({ ...snap, pageKey, name });
     setOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (!window.confirm(lang === 'ar' ? 'حذف العرض؟' : 'Delete this view?')) return;
+  const handleDelete = async (id: string) => {
+    const ok = await dialog.confirm({
+      title: lang === 'ar' ? 'حذف العرض؟' : 'Delete this view?',
+      body: lang === 'ar' ? 'لا يمكن التراجع عن هذا الإجراء.' : 'This cannot be undone.',
+      destructive: true,
+      submitLabel: lang === 'ar' ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
     deleteView(id);
   };
 

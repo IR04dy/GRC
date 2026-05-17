@@ -5,7 +5,6 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Kpi } from '../ui/Kpi';
 import { useI18n } from '../../lib/i18n';
-import { useToast } from '../../lib/toast';
 import {
   PDPL_BREACH_STAGES, computeBreachClock, classifySeverity,
   generateSdaiaNotification, requiresDataSubjectNotification,
@@ -26,9 +25,19 @@ import type { PrivacyBreachDto } from '../../lib/api';
  * Picks the most-time-sensitive open breach automatically. If none, returns
  * a "compliant" empty state.
  */
-export function PdplBreachConsole({ breaches }: { breaches: ReadonlyArray<PrivacyBreachDto> }) {
+export function PdplBreachConsole({ breaches, onDispatch }: {
+  breaches: ReadonlyArray<PrivacyBreachDto>;
+  /**
+   * Real SDAIA dispatch action. When provided, the "Dispatch to SDAIA"
+   * button calls this with the active breach (parent owns the API call,
+   * confirm dialog, error toast, and reload). Without it the button
+   * is disabled — we never want this regulatory action to "succeed"
+   * without actually transitioning state.
+   */
+  onDispatch?: (breach: PrivacyBreachDto) => Promise<void> | void;
+}) {
   const { t, lang } = useI18n();
-  const toast = useToast();
+  const [dispatching, setDispatching] = useState(false);
   const [now, setNow] = useState<Date>(() => new Date());
 
   // Re-tick every 30s — operational console, fast feedback.
@@ -181,8 +190,20 @@ export function PdplBreachConsole({ breaches }: { breaches: ReadonlyArray<Privac
             <Button variant="secondary" Icon={FileDown} onClick={() => downloadPacket(packet, breach)}>
               {t('pdplDownloadPacket')}
             </Button>
-            <Button Icon={Send} disabled={reportedReady}
-              onClick={() => toast.success(t('pdplDispatchToast').replace('{ref}', packet.internalRef))}>
+            <Button Icon={Send} disabled={reportedReady || dispatching || !onDispatch}
+              onClick={async () => {
+                if (!onDispatch) return;
+                setDispatching(true);
+                try {
+                  await onDispatch(breach);
+                  // Success toast is owned by the parent (it has the canonical
+                  // bilingual copy + reload flow). We just clear the busy state.
+                } catch {
+                  // Parent owns error toast — swallow here so dispatching flips back.
+                } finally {
+                  setDispatching(false);
+                }
+              }}>
               {reportedReady ? t('pdplDispatched') : t('pdplDispatchToSdaia')}
             </Button>
           </div>

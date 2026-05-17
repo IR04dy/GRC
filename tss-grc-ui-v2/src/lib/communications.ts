@@ -9,7 +9,7 @@
 //     pass through before they go out
 //   - threaded follow-ups, amendments, retractions
 //
-// ServiceNow IRM equivalent: the `sn_communication` table — every
+// industry-standard GRC tooling equivalent: the `sn_communication` table — every
 // comm has its own row with a documented lifecycle and audit trail.
 // Standards anchor:
 //   ISO 22301 §7.4.2 — retain documented evidence of what was

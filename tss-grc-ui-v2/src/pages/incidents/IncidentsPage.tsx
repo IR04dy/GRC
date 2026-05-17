@@ -43,10 +43,42 @@ const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
   { value: 'MEDIUM', label: 'Medium' }, { value: 'LOW', label: 'Low' },
 ];
+// Incident category taxonomy — Saudi-aligned. Covers what a SAMA/NCA-
+// regulated entity is required to triage:
+//   • Technical:    cyber, privacy, infrastructure, application, network
+//   • Operational:  ops, physical, third-party, supply-chain, business-continuity
+//   • People:       safety, insider-threat, hr (workplace violation)
+//   • Compliance:   regulatory breach, AML/sanctions, financial-fraud, ethics
+// Each row carries an explicit Arabic label so RTL renders natively, not as
+// a transliterated value. Use the value-side for stable enum identifiers.
 const CATEGORY_OPTIONS = [
-  { value: 'CYBER', label: 'Cyber' }, { value: 'PRIVACY', label: 'Privacy' },
-  { value: 'OPS', label: 'Operations' }, { value: 'PHYSICAL', label: 'Physical' },
-  { value: 'COMPLIANCE', label: 'Compliance' },
+  // Technical
+  { value: 'CYBER',                label: 'Cyber',                labelAr: 'الأمن السيبراني' },
+  { value: 'PRIVACY',              label: 'Privacy',              labelAr: 'الخصوصية' },
+  { value: 'INFRASTRUCTURE',       label: 'Infrastructure',       labelAr: 'البنية التحتية' },
+  { value: 'APPLICATION',          label: 'Application',          labelAr: 'تطبيق' },
+  { value: 'NETWORK',              label: 'Network',              labelAr: 'الشبكة' },
+  { value: 'CLOUD',                label: 'Cloud',                labelAr: 'السحابة' },
+  { value: 'DATA_LOSS',            label: 'Data loss / leak',     labelAr: 'فقد أو تسرّب بيانات' },
+  // Operational
+  { value: 'OPS',                  label: 'Operations',           labelAr: 'العمليات' },
+  { value: 'PHYSICAL',             label: 'Physical',             labelAr: 'مادي / منشآت' },
+  { value: 'THIRD_PARTY',          label: 'Third party',          labelAr: 'طرف ثالث' },
+  { value: 'SUPPLY_CHAIN',         label: 'Supply chain',         labelAr: 'سلسلة الإمداد' },
+  { value: 'BUSINESS_CONTINUITY',  label: 'Business continuity',  labelAr: 'استمرارية الأعمال' },
+  { value: 'DR_FAILOVER',          label: 'DR / failover',        labelAr: 'التعافي من الكوارث' },
+  // People
+  { value: 'SAFETY',               label: 'Health & safety',      labelAr: 'الصحة والسلامة' },
+  { value: 'INSIDER_THREAT',       label: 'Insider threat',       labelAr: 'تهديد داخلي' },
+  { value: 'HR_VIOLATION',         label: 'HR / workplace',       labelAr: 'مخالفة موارد بشرية' },
+  // Compliance / regulatory
+  { value: 'COMPLIANCE',           label: 'Compliance',           labelAr: 'الالتزام' },
+  { value: 'REGULATORY_BREACH',    label: 'Regulatory breach',    labelAr: 'مخالفة تنظيمية' },
+  { value: 'AML_SANCTIONS',        label: 'AML / sanctions',      labelAr: 'غسل أموال / عقوبات' },
+  { value: 'FINANCIAL_FRAUD',      label: 'Financial fraud',      labelAr: 'احتيال مالي' },
+  { value: 'ETHICS',               label: 'Ethics / misconduct',  labelAr: 'مخالفة سلوكية' },
+  // Other / catch-all
+  { value: 'OTHER',                label: 'Other',                labelAr: 'أخرى' },
 ];
 const STATUS_OPTIONS = [
   { value: 'OPEN', label: 'Open' }, { value: 'INVESTIGATING', label: 'Investigating' },
@@ -69,7 +101,7 @@ function incToReq(i: IncidentDto): IncidentRequest {
 }
 
 export function IncidentsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -175,11 +207,22 @@ export function IncidentsPage() {
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Notify failed'); }
   }
 
+  // Pick AR or EN labels for the dropdown depending on UI locale. The enum
+  // value stays the same regardless of locale (it's the wire format).
+  const categoryOptionsLocalized = CATEGORY_OPTIONS.map(c => ({
+    value: c.value,
+    label: lang === 'ar' ? c.labelAr : c.label,
+  }));
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'title',         label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 200, span: 8 },
     { kind: 'select', key: 'severity',    label: t('fldSeverity') + ' *', options: SEVERITY_OPTIONS, required: true, span: 4 },
     { kind: 'text', key: 'titleAr',       label: t('fldTitleArLbl'), maxLength: 200, span: 12 },
-    { kind: 'select', key: 'category',    label: t('fldCategory'), options: CATEGORY_OPTIONS, span: 4 },
+    // Switched to select-searchable: 22 categories is long enough to want
+    // typeahead; users who think in their own term ("data leak", "AML",
+    // "insider") find the right enum without scanning the list.
+    { kind: 'select-searchable', key: 'category', label: t('fldCategory'),
+      options: categoryOptionsLocalized, span: 4,
+      placeholder: lang === 'ar' ? 'ابحث عن فئة…' : 'Search category…' },
     { kind: 'select', key: 'status',      label: t('fldStatusLbl'), options: STATUS_OPTIONS, span: 4 },
     { kind: 'date', key: 'discoveryDate', label: t('incidentsDetectedCol'), span: 4 },
     { kind: 'text', key: 'assignee',      label: t('cyberFldIncLead'), span: 12 },
@@ -188,15 +231,55 @@ export function IncidentsPage() {
 
   // Form for "Add lesson learned" — picks an incident, captures lesson text,
   // optional CAPA reference. Lessons are not their own entity; they live as a
-  // satellite annotation on closed incidents.
-  const lessonIncidentOptions = [
-    { value: '', label: t('selectPlaceholder') },
-    ...allIncidents
-      .filter(i => i.status === 'CLOSED' || i.status === 'RECOVERED')
-      .map(i => ({ value: String(i.id), label: i.title })),
-  ];
+  // satellite annotation on incidents.
+  //
+  // Source-incident dropdown:
+  //   • Includes the full incident pool, not just CLOSED/RECOVERED — lessons
+  //     can legitimately be drafted while an incident is still in CONTAINED
+  //     or INVESTIGATING (post-mortem early notes). Each row carries a status
+  //     subtitle so the user knows what they're picking.
+  //   • Uses select-searchable so a typeahead works for long pools (>20).
+  //   • onCreate spawns a quick incident inline if the lesson refers to
+  //     something the platform doesn't track yet (e.g. near-miss noticed
+  //     during a tabletop). The created incident lands in DETECTED status
+  //     and the new id flows back into the field automatically.
+  const lessonIncidentOptions = allIncidents.map(i => ({
+    value: String(i.id),
+    label: i.title,
+    sub: `${i.id ? `INC-${String(i.id).padStart(4, '0')} · ` : ''}${statusLabel(t, i.status)} · ${severityLabel(t, i.severity)}`,
+  }));
+  async function quickCreateIncident(typedTitle: string): Promise<string | null> {
+    try {
+      const body: IncidentRequest = {
+        title: typedTitle,
+        severity: 'MEDIUM',
+        category: 'OPS',
+        status: 'DETECTED',
+        description: lang === 'ar'
+          ? 'تمّ إنشاء الحادثة من نموذج الدرس المستفاد. حدّث التفاصيل لاحقاً.'
+          : 'Created inline from the Lessons-Learned form. Update the details later.',
+      } as IncidentRequest;
+      const created = await incidentApi.create(body);
+      toast.success(lang === 'ar' ? 'تمّ إنشاء الحادثة وتم اختيارها' : 'Incident created and selected');
+      incidents.reload();
+      return String(created.id);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر الإنشاء' : 'Create failed'));
+      return null;
+    }
+  }
   const LESSON_FIELDS: FieldDef[] = [
-    { kind: 'select', key: 'incidentId', label: t('incidentsLessonFldIncident') + ' *', required: true, options: lessonIncidentOptions, span: 12 },
+    { kind: 'select-searchable', key: 'incidentId',
+      label: t('incidentsLessonFldIncident') + ' *',
+      required: true,
+      options: lessonIncidentOptions,
+      placeholder: lang === 'ar' ? 'ابحث عن حادثة أو أنشئ جديدة…' : 'Search incidents or create new…',
+      emptyHint: lang === 'ar'
+        ? 'لا توجد حوادث بعد — استخدم زرّ "إنشاء" أعلاه.'
+        : 'No incidents yet — use the Create option above.',
+      onCreate: quickCreateIncident,
+      createLabel: (typed) => lang === 'ar' ? `+ إنشاء حادثة جديدة: "${typed}"` : `+ Create new incident: "${typed}"`,
+      span: 12 },
     { kind: 'textarea', key: 'lesson', label: t('incidentsLessonFldLesson') + ' *', rows: 3, span: 12 },
     { kind: 'text', key: 'capa', label: t('incidentsLessonFldCapa'), placeholder: 'CAPA-1234', span: 12 },
   ];

@@ -1,0 +1,116 @@
+package com.tss.grc.module.sust.capa.controller;
+
+import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Sustainability Corrective-Action REST endpoints —
+ * {@code /api/sustainability/corrective-actions/*}.
+ *
+ * <pre>
+ *   GET    /                       list (filterable by status / sourceType / priority)
+ *   GET    /aggregate              KPI rollup (by status / priority / source + overdue)
+ *   GET    /for-source             all actions raised against (sourceType, sourceRef)
+ *   GET    /:id                    fetch one
+ *   POST   /                       create (defaults: OPEN / MEDIUM)
+ *   PUT    /:id                    update (refused if status ∈ CLOSED, CANCELLED)
+ *   POST   /:id/start              OPEN        → IN_PROGRESS
+ *   POST   /:id/complete           IN_PROGRESS → COMPLETED   (Rule B: requires evidence)
+ *   POST   /:id/verify             COMPLETED   → VERIFIED    (Rule A: verifier ≠ owner)
+ *   POST   /:id/close              VERIFIED    → CLOSED      (terminal)
+ *   POST   /:id/cancel             any         → CANCELLED   (terminal)
+ *   DELETE /:id                    soft-delete
+ * </pre>
+ */
+@RestController
+@RequestMapping("/api/sustainability/corrective-actions")
+@RequiredArgsConstructor
+@Tag(name = "Sustainability — Corrective Actions")
+public class CorrectiveActionController {
+
+    private final CorrectiveActionService service;
+
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public Page<CorrectiveAction> list(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String sourceType,
+            @RequestParam(required = false) String priority,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        var p = PageRequest.of(page, size);
+        if (status     != null) return service.listByStatus(status, p);
+        if (sourceType != null) return service.listBySource(sourceType, p);
+        if (priority   != null) return service.listByPriority(priority, p);
+        return service.list(p);
+    }
+
+    @GetMapping("/aggregate")
+    @PreAuthorize("isAuthenticated()")
+    public Map<String, Object> aggregate() { return service.aggregate(); }
+
+    @GetMapping("/for-source")
+    @PreAuthorize("isAuthenticated()")
+    public List<CorrectiveAction> forSource(
+            @RequestParam String sourceType,
+            @RequestParam String sourceRef) {
+        return service.listForSource(sourceType, sourceRef);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public CorrectiveAction get(@PathVariable Long id) { return service.get(id); }
+
+    @PostMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<CorrectiveAction> create(@RequestBody CorrectiveAction req) {
+        return ResponseEntity.status(201).body(service.create(req));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public CorrectiveAction update(@PathVariable Long id, @RequestBody CorrectiveAction req) {
+        return service.update(id, req);
+    }
+
+    @PostMapping("/{id}/start")
+    @PreAuthorize("isAuthenticated()")
+    public CorrectiveAction start(@PathVariable Long id) { return service.transition(id, "IN_PROGRESS"); }
+
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("isAuthenticated()")
+    public CorrectiveAction complete(@PathVariable Long id) { return service.transition(id, "COMPLETED"); }
+
+    /** Body: {@code { "verifiedBy": "Verifier Name" }} — Rule A enforces verifier ≠ owner. */
+    @PostMapping("/{id}/verify")
+    @PreAuthorize("isAuthenticated()")
+    public CorrectiveAction verify(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
+        String verifier = body == null ? null : body.get("verifiedBy");
+        return service.transition(id, "VERIFIED", verifier);
+    }
+
+    @PostMapping("/{id}/close")
+    @PreAuthorize("isAuthenticated()")
+    public CorrectiveAction close(@PathVariable Long id) { return service.transition(id, "CLOSED"); }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
+    public CorrectiveAction cancel(@PathVariable Long id) { return service.transition(id, "CANCELLED"); }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        service.softDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+}

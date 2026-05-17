@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Server, Database, Cloud, Network, Building2, Cog, Smartphone, Layers,
   AlertOctagon, Activity, ChevronRight, Filter, Landmark, FileCheck2, GitBranch,
@@ -35,7 +36,7 @@ const TYPE_ICON: Record<AssetType, typeof Server> = {
  * Left rail: filterable asset list grouped by type.
  * Right pane: selected asset's blast radius — what depends on it (downstream),
  * what it depends on (upstream), CCM checks monitoring it, pending approvals
- * waiting on its owner. The single demo that answers ServiceNow's CMDB pitch:
+ * waiting on its owner. The single demo that answers the industry pattern's CMDB pitch:
  * "if AWS Riyadh goes down, here's the full impact across modules."
  */
 export function AssetRegisterPage() {
@@ -201,7 +202,7 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
           {t('assetsBlastDownstreamSub')}
         </div>
         {downstream.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>{t('assetsBlastNone')}</div>
+          ? <InlineEmpty>{t('assetsBlastNone')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column' }}>
               {downstream.map(d => {
                 const Icon = TYPE_ICON[d.type];
@@ -231,7 +232,7 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
           {t('assetsBlastUpstreamSub')}
         </div>
         {upstream.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>{t('assetsBlastUpstreamNone')}</div>
+          ? <InlineEmpty>{t('assetsBlastUpstreamNone')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column' }}>
               {upstream.map(u => {
                 const Icon = TYPE_ICON[u.type];
@@ -260,7 +261,7 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
           {t('assetsBlastCcmSub')}
         </div>
         {ccm.length === 0
-          ? <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>{t('assetsBlastCcmNone')}</div>
+          ? <InlineEmpty>{t('assetsBlastCcmNone')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column' }}>
               {ccm.map(c => {
                 const f = classifyFreshness(c);

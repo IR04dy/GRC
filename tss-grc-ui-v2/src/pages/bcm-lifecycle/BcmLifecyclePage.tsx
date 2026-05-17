@@ -838,7 +838,7 @@ function InvocationPipeline({ invocations, onAdvance, onCardClick }: {
       stages={stages}
       cards={cards}
       introEn="Live BCP invocation pipeline — DECLARED → INVOKED → STABILISED → STAND_DOWN → POST_INCIDENT_REVIEW. Click a card to drill into the history tab."
-      introAr="خط أنابيب تفعيل خطط الاستمرارية الحيّ — مُعلَن ← مُفعَّل ← مستقرّ ← مُنهى ← مراجعة ما بعد الحادثة. انقر على بطاقة لفتح تبويب السجل."
+      introAr="مسار تفعيل خطط الاستمرارية الحيّ — مُعلَن ← مُفعَّل ← مستقرّ ← مُنهى ← مراجعة ما بعد الحادثة. انقر على بطاقة لفتح تبويب السجل."
       onAdvance={onAdvance}
       onCardClick={onCardClick}
       emptyEn="No invocations recorded yet. Declare one from the Live invocation tab."

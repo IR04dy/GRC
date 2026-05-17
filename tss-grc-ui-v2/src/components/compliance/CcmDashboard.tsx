@@ -15,7 +15,7 @@ import { SlaCountdown } from '../workflows/SlaCountdown';
 /**
  * CcmDashboard — Sprint 4 Continuous Control Monitoring panel.
  *
- * Vanta / Drata / ServiceNow CCM pattern. Pulls together three pillars:
+ * continuous-controls-monitoring pattern. Pulls together three pillars:
  *   1. Connectors (catalogue) — already ship under DD-62 in connectors.ts
  *   2. Control catalogue — Saudi NCA ECC + ISO + SOC 2 + PDPL
  *   3. The mapping that says "this connector check satisfies that control"

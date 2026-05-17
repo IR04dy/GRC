@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Truck, AlertTriangle, ListChecks, Star, Filter, Download, Plus, BarChart3,
   Workflow, FileSignature, ClipboardCheck, Network, ShieldAlert,
@@ -61,15 +62,47 @@ const ONBOARDING_STAGES = [
 ];
 const STAGE_OPTIONS = ONBOARDING_STAGES.map(s => ({ value: s.id, label: s.label }));
 
-// vendor.category ∈ {IT_SERVICES, LOGISTICS, MANUFACTURING, FINANCIAL, UTILITIES, CONSULTING, OTHER}
+// Vendor category taxonomy — expanded from the original 7 to cover the
+// supplier mix a Saudi enterprise (banking, telecom, energy, healthcare,
+// government, retail) actually procures from. Aligned with MoCI sector
+// classification + ZATCA tax categories so a procurement officer can pick
+// without having to invent "OTHER" for half their spend.
 const CATEGORY_OPTIONS = [
-  { value: 'IT_SERVICES',   label: 'IT Services' },
-  { value: 'LOGISTICS',     label: 'Logistics' },
-  { value: 'MANUFACTURING', label: 'Manufacturing' },
-  { value: 'FINANCIAL',     label: 'Financial Services' },
-  { value: 'UTILITIES',     label: 'Utilities' },
-  { value: 'CONSULTING',    label: 'Consulting' },
-  { value: 'OTHER',         label: 'Other' },
+  // Technology
+  { value: 'IT_SERVICES',        label: 'IT Services' },
+  { value: 'CLOUD_SAAS',         label: 'Cloud / SaaS' },
+  { value: 'CYBERSECURITY',      label: 'Cybersecurity Services' },
+  { value: 'TELECOM',            label: 'Telecom / Connectivity' },
+  { value: 'HARDWARE_DEVICES',   label: 'Hardware & Devices' },
+  { value: 'SOFTWARE_LICENSING', label: 'Software Licensing' },
+  // Industrial & operations
+  { value: 'MANUFACTURING',      label: 'Manufacturing' },
+  { value: 'LOGISTICS',          label: 'Logistics & Shipping' },
+  { value: 'CONSTRUCTION',       label: 'Construction & Engineering' },
+  { value: 'ENERGY',             label: 'Energy & Oil/Gas' },
+  { value: 'UTILITIES',          label: 'Utilities (Power / Water)' },
+  { value: 'FACILITIES_MGMT',    label: 'Facilities Management' },
+  { value: 'SECURITY_GUARDING',  label: 'Physical Security / Guarding' },
+  { value: 'TRANSPORTATION',     label: 'Transportation' },
+  // Professional services
+  { value: 'CONSULTING',         label: 'Management Consulting' },
+  { value: 'LEGAL',              label: 'Legal & Compliance Advisory' },
+  { value: 'AUDIT_ASSURANCE',    label: 'Audit & Assurance' },
+  { value: 'STAFFING_HR',        label: 'Staffing / Outsourced HR' },
+  { value: 'MARKETING_ADVERTISING', label: 'Marketing & Advertising' },
+  { value: 'TRAINING',           label: 'Training & Development' },
+  // Finance / insurance
+  { value: 'FINANCIAL',          label: 'Financial Services' },
+  { value: 'INSURANCE',          label: 'Insurance' },
+  { value: 'PAYMENT_PROCESSING', label: 'Payment Processing' },
+  // Public-facing
+  { value: 'HEALTHCARE',         label: 'Healthcare Services' },
+  { value: 'EDUCATION',          label: 'Education' },
+  { value: 'REAL_ESTATE',        label: 'Real Estate' },
+  { value: 'HOSPITALITY',        label: 'Hospitality & Catering' },
+  { value: 'PRINTING_PUBLISHING', label: 'Printing & Publishing' },
+  // Catch-all
+  { value: 'OTHER',              label: 'Other' },
 ];
 // vendor.criticality + supplier_incidents.impact ∈ {CRITICAL,HIGH,MEDIUM,LOW}
 const CRITICALITY_OPTIONS = [
@@ -365,7 +398,10 @@ export function ScmPage() {
   const SUPPLIER_FIELDS: FieldDef[] = [
     { kind: 'text',   key: 'nameEn',          label: `${t('fldNameEnLbl')} *`, required: true, maxLength: 200, span: 6 },
     { kind: 'text',   key: 'nameAr',          label: t('fldNameArLbl'), maxLength: 200, span: 6 },
-    { kind: 'select', key: 'category',        label: t('fldCategory'), options: CATEGORY_OPTIONS, span: 6 },
+    // 30 categories — long enough that scanning is slow; typeahead helps.
+    { kind: 'select-searchable', key: 'category', label: t('fldCategory'),
+      options: CATEGORY_OPTIONS, span: 6,
+      placeholder: 'Search category…' },
     { kind: 'select', key: 'criticality',     label: t('fldCriticality'), options: CRITICALITY_OPTIONS, span: 6 },
     { kind: 'text',   key: 'country',         label: t('fldCountry'), span: 4 },
     { kind: 'text',   key: 'serviceType',     label: t('scmFldServiceType'), span: 4 },
@@ -845,7 +881,7 @@ export function ScmPage() {
           <div className="dash-grid" style={{ marginTop: 16 }}>
             <Card title={t('scmCardRecentDisruptions')} Icon={AlertOctagon}>
               {incidents.data.length === 0
-                ? <div style={{ padding: 12, color: 'var(--ink-3)' }}>No recent disruptions.</div>
+                ? <InlineEmpty compact>No recent disruptions.</InlineEmpty>
                 : incidents.data.slice(0, 5).map(i => (
                   <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px dashed var(--border)' }}>
                     <div>
@@ -867,7 +903,7 @@ export function ScmPage() {
                 </div>
               ))}
               {vendors.data.filter(v => v.criticality === 'CRITICAL').length === 0 && (
-                <div style={{ padding: 12, color: 'var(--ink-3)' }}>No critical suppliers.</div>
+                <InlineEmpty compact>No critical suppliers.</InlineEmpty>
               )}
             </Card>
           </div>
@@ -1001,7 +1037,7 @@ function countryDistribution(vendors: ScmVendorDto[]) {
 }
 function LoadingRow() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <InlineEmpty>{t('riskLoading')}</InlineEmpty>;
 }
 
 // ── Workflow & Map tab ─────────────────────────────────────────────────────
@@ -1045,7 +1081,7 @@ function ScmWorkflowMap({
       {/* 1. Onboarding pipeline */}
       <Card title={t('scmWfPanelOnboarding')} Icon={Workflow} action={<Badge tone="info">{inFlight.length}</Badge>}>
         {inFlight.length === 0
-          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfOnboardingEmpty')}</div>
+          ? <InlineEmpty compact>{t('scmWfOnboardingEmpty')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {inFlight.map(o => (
                 <div key={o.id} style={{ padding: '10px 4px', borderBottom: '1px dashed var(--border)' }}>
@@ -1069,7 +1105,7 @@ function ScmWorkflowMap({
       {/* 2. Dependency map */}
       <Card title={t('scmWfPanelDependencyMap')} Icon={Network} action={<Badge tone="primary">{dependencies.length}</Badge>}>
         {dependencies.length === 0
-          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfDepEmpty')}</div>
+          ? <InlineEmpty compact>{t('scmWfDepEmpty')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span>{t('scmWfDepLegend')}:</span>
@@ -1137,7 +1173,7 @@ function ScmWorkflowMap({
       {/* 3. Disruption response workflow */}
       <Card title={t('scmWfPanelResponse')} Icon={AlertOctagon} action={<Badge tone="warning">{incidents.filter(i => i.status !== 'CLOSED' && i.status !== 'RESOLVED').length}</Badge>}>
         {incidents.length === 0
-          ? <div style={{ padding: 12, color: 'var(--ink-3)', fontSize: 13 }}>{t('scmWfResponseEmpty')}</div>
+          ? <InlineEmpty compact>{t('scmWfResponseEmpty')}</InlineEmpty>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {incidents.slice(0, 6).map(i => (
                 <div key={i.id} style={{ padding: '10px 4px', borderBottom: '1px dashed var(--border)' }}>

@@ -7,10 +7,10 @@
 // external monitoring + scanner + regulator-watch sources.
 //
 // Modelled on:
-//   ServiceNow IRM Continuous Monitoring connectors
-//   Vanta + Drata: AWS / Okta / GitHub / Jira evidence + finding feeds
-//   ServiceNow GRC Threat-Intel TAXII feed
-//   OneTrust Regulatory Research feed
+//   industry-standard GRC tooling Continuous Monitoring connectors
+//   continuous-monitoring tooling + continuous-monitoring tooling: AWS / Okta / GitHub / Jira evidence + finding feeds
+//   the industry pattern GRC Threat-Intel TAXII feed
+//   industry-standard tooling Regulatory Research feed
 //
 // Each connector definition records:
 //   - source system (vendor, name)
@@ -182,7 +182,7 @@ export const CONNECTOR_REGISTRY: ConnectorDefinition[] = [
     reference: 'COSO ERM Component 5, ISO 31000 §6.5',
     lastRunAt: '2026-05-05T08:00:00', intake30d: 11, owner: 'risk.officer@tss.sa',
   },
-  // ── Evidence connector (Vanta-style) ──
+  // ── Evidence connector (continuous-monitoring tooling-style) ──
   {
     id: 'cn-evidence-aws',
     source: 'AWS Config + IAM',

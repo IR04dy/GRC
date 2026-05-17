@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Workflow, ChevronRight, ArrowRight, Hourglass, Filter, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -144,7 +145,7 @@ export function WorkflowsPage() {
             Definitions
           </div>
           {loading
-            ? <div style={{ padding: 24, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
+            ? <InlineEmpty>Loading…</InlineEmpty>
             : definitions.length === 0
               ? <EmptyState Icon={Workflow} title="No workflows defined" sub="Reference workflows are seeded by the V_workflow_engine_ddl.sql migration." />
               : filteredDefinitions.map(d => (
@@ -172,7 +173,7 @@ export function WorkflowsPage() {
           ? <WorkflowDesigner graph={graph} onClose={() => setDesignerMode(false)} />
           : <Card padded>
           {graphLoading
-            ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>Loading state machine…</div>
+            ? <InlineEmpty>Loading state machine…</InlineEmpty>
             : !graph
               ? <EmptyState Icon={Workflow} title="Pick a workflow to inspect" sub="The graph view shows every state and the transitions between them." />
               : (

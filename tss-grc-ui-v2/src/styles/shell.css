@@ -9,14 +9,19 @@
 .grc-main { display: flex; flex-direction: column; min-width: 0; }
 
 /* ─── Sidebar ────────────────────────────────────── */
+/* Logical properties everywhere so we don't need [dir="rtl"] override
+ * blocks. `border-inline-end` is "the trailing edge in the current
+ * writing direction" — flips automatically with <html dir>. */
 .sb {
   background: var(--sb-bg);
   color: var(--sb-text);
   padding: 14px 0;
   overflow-y: auto;
-  border-right: 1px solid #0F1B19;
+  /* Use --sb-border (already token-driven) instead of hardcoded #0F1B19
+   * so the trailing separator co-varies with the sidebar palette when
+   * a tenant picks a non-default preset (Sky / Cobalt / Mint etc.). */
+  border-inline-end: 1px solid var(--sb-border);
 }
-[dir="rtl"] .sb { border-right: none; border-left: 1px solid #0F1B19; }
 
 .sb-brand { display: flex; align-items: center; gap: 10px; padding: 6px 16px 16px; border-bottom: 1px solid var(--sb-border); }
 .sb-mark {
@@ -40,17 +45,17 @@
   cursor: pointer;
   transition: all var(--dur-fast);
   position: relative;
-  border-left: 3px solid transparent;
+  /* The accent stripe always sits on the leading edge — `inline-start`
+   * flips with dir, so no [dir="rtl"] override needed. */
+  border-inline-start: 3px solid transparent;
 }
-[dir="rtl"] .sb-item { border-left: none; border-right: 3px solid transparent; }
 .sb-item:hover { background: var(--sb-hover-bg); color: #fff; }
 .sb-item.active {
   background: var(--sb-active-bg);
   color: var(--sb-active-fg);
   font-weight: 600;
-  border-left-color: var(--accent-300);
+  border-inline-start-color: var(--accent-300);
 }
-[dir="rtl"] .sb-item.active { border-right-color: var(--accent-300); border-left-color: transparent; }
 
 /* ─── Topbar ─────────────────────────────────────── */
 .topbar {
@@ -97,13 +102,14 @@
   transition: all var(--dur-fast);
 }
 .icon-btn:hover { background: var(--primary-50); color: var(--primary); border-color: var(--primary-200); }
+/* Notification dot sits on the trailing-end corner of the icon button
+ * (top-right LTR, top-left RTL) — `inset-inline-end` handles the flip. */
 .icon-btn .dot {
-  position: absolute; top: 8px; right: 9px;
+  position: absolute; top: 8px; inset-inline-end: 9px;
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--accent);
   border: 2px solid var(--surface);
 }
-[dir="rtl"] .icon-btn .dot { right: auto; left: 9px; }
 
 .lang-toggle {
   display: flex; align-items: center; gap: 6px;
@@ -136,7 +142,10 @@
 .page-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
 /* ─── Grids ─────────────────────────────────────── */
-.kpi-grid     { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+/* KPI grid — auto-fit so 4 tiles fit a desktop row (220–360px each), 2 on
+ * mobile (see breakpoints.css). Gap bumped from 14 → 16px to match the
+ * tighter card padding so adjacent tiles don't visually merge. */
+.kpi-grid     { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
 .dash-grid    { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 20px; }
 .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 

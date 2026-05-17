@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Activity, Server, Bug, Radio,
   Download, Send, ThumbsUp, CheckCircle2, ArrowUpRight, Clock,
@@ -35,11 +36,22 @@ import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 
 type CycTab = 'pipeline' | 'ecc' | 'vulns' | 'assets' | 'threats' | 'soc' | 'pentest';
 
+const CYC_TABS: ReadonlyArray<CycTab> = ['pipeline', 'ecc', 'vulns', 'assets', 'threats', 'soc', 'pentest'];
+
+function isCycTab(value: string | null | undefined): value is CycTab {
+  return !!value && (CYC_TABS as readonly string[]).includes(value);
+}
+
 export function CyberLifecyclePage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<CycTab>('pipeline');
+  // Honor `?tab=` deep-links from other pages (e.g. the V2 vulnerabilities
+  // page navigating here on row click). Falls back to 'pipeline' for any
+  // unknown tab value.
+  const initialTab: CycTab = isCycTab(searchParams.get('tab')) ? (searchParams.get('tab') as CycTab) : 'pipeline';
+  const [tab, setTab] = useState<CycTab>(initialTab);
   const [_tick, setTick] = useState(0);
   useEffect(() => subscribeCyber(() => setTick(t => t + 1)), []);
 
@@ -197,11 +209,10 @@ function EccTab({ filing, onTransition }: { filing: EccFiling; onTransition: (s:
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 16, marginBottom: 16, alignItems: 'center' }}>
-          <div style={{ textAlign: 'center', padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--r-md)' }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase' }}>{t('cycCompositeMaturity')}</div>
-            <div className="mono" style={{ fontSize: 42, fontWeight: 700, color: filing.compositeMaturity >= 4 ? 'var(--success-fg)' : 'var(--warning-fg)' }}>
-              {filing.compositeMaturity}
-            </div>
+          <div className={`stat-tile stat-tile-${filing.compositeMaturity >= 4 ? 'success' : 'warning'}`}
+               style={{ textAlign: 'center', padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--r-md)', alignItems: 'center' }}>
+            <div className="stat-tile-label">{t('cycCompositeMaturity')}</div>
+            <div className="stat-tile-value">{filing.compositeMaturity}</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>/ 5.0</div>
           </div>
           <div>
@@ -692,7 +703,7 @@ function VulnPipeline({ vulns, assets, onAdvance, onCardClick }: {
       stages={stages}
       cards={cards}
       introEn="Live vulnerability pipeline. SLA in days driven by CVSS severity (Critical 7d / High 14d / Medium 30d / Low 60d). Click a card to drill into the detailed vulnerability tab."
-      introAr="خط أنابيب الثغرات الحيّ. SLA بالأيام مدفوع بخطورة CVSS (حرجة 7 / عالية 14 / متوسطة 30 / منخفضة 60). انقر على بطاقة للانتقال إلى تبويب تفاصيل الثغرات."
+      introAr="مسار الثغرات الحيّ. SLA بالأيام مدفوع بخطورة CVSS (حرجة 7 / عالية 14 / متوسطة 30 / منخفضة 60). انقر على بطاقة للانتقال إلى تبويب تفاصيل الثغرات."
       onAdvance={onAdvance}
       onCardClick={onCardClick}
       emptyEn="No vulnerabilities recorded yet."

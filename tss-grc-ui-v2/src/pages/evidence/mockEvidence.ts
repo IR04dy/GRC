@@ -7,7 +7,7 @@ import { ANCHOR_PACKS, type RegulatorAnchor } from '../../lib/evidenceAnchors';
 /**
  * Multi-authority anchor map: each evidence id is bound to one or more
  * authority + framework + control citations, tracking the control-status
- * each authority sees. ServiceNow IRM "Citation" pattern.
+ * each authority sees. industry-standard GRC tooling "Citation" pattern.
  */
 export const EVIDENCE_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
   1: ANCHOR_PACKS.ISMS_POLICY,

@@ -19,7 +19,7 @@ import {
  * the triager, and SLA countdown. No account needed.
  *
  * Modelled on:
- *  - OneTrust DSR self-service tracker
+ *  - industry-standard tooling DSR self-service tracker
  *  - NAVEX EthicsPoint case-status portal
  *
  * Privacy guardrails:

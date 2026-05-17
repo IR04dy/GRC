@@ -1,6 +1,6 @@
 // Per-module lifecycle / process catalogue using GRC market-leader naming.
-// References: ServiceNow IRM, RSA Archer, MetricStream, OneTrust Privacy +
-// TPRM, NAVEX Global (Speak-Up + WhistleB), AuditBoard, Resolver, Galvanize.
+// References: industry-standard GRC tooling, industry-standard tooling, industry-standard tooling, industry-standard tooling Privacy +
+// TPRM, NAVEX Global (Speak-Up + WhistleB), industry-standard tooling, industry-standard tooling, industry-standard tooling.
 import type { ProcessLifecycle } from '../components/workflows/ProcessLifecycleBar';
 import {
   AlertTriangle, Activity, Target,
@@ -376,7 +376,7 @@ export const BCM_LIFECYCLES: ProcessLifecycle[] = [
   },
 ];
 
-// ─── TPRM / Third-Party Risk (OneTrust + Prevalent + Archer) ───────────────
+// ─── TPRM / Third-Party Risk (industry-standard tooling + Prevalent + industry-standard tooling) ───────────────
 export const TPRM_LIFECYCLES: ProcessLifecycle[] = [
   {
     name: 'Vendor Onboarding & Due Diligence',

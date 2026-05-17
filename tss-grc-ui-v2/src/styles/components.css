@@ -54,32 +54,106 @@
 .badge-neutral { background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--border); }
 .badge-primary { background: var(--primary-50); color: var(--primary-700); border-color: var(--primary-100); }
 .badge-accent  { background: var(--accent-50);  color: var(--accent-700);  border-color: var(--accent-100); }
-.badge-success { background: var(--success-bg); color: var(--success-fg);  border-color: #C9DEC9; }
-.badge-warning { background: var(--warning-bg); color: var(--warning-fg);  border-color: var(--accent-100); }
-.badge-danger  { background: var(--danger-bg);  color: var(--danger-fg);   border-color: #ECCFCC; }
-.badge-info    { background: var(--info-bg);    color: var(--info-fg);     border-color: #CFD9DD; }
+.badge-success { background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border); }
+.badge-warning { background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border); }
+.badge-danger  { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--danger-border);  }
+.badge-info    { background: var(--info-bg);    color: var(--info-fg);    border-color: var(--info-border);    }
 
-/* ─── Input / Select ─────────────────────────────── */
+/* ─── Input / Select ───────────────────────────────
+ * Contrast pass — user feedback: "the fonts in forms need to be more clear
+ * since the colors of fonts is very close to the color of the form
+ * background". WCAG-AA audit of the previous tokens showed:
+ *   • placeholder var(--ink-4) on var(--surface) = 2.88:1  → FAILS AA (4.5)
+ *   • input bg === card bg                              → no visual depth
+ *   • label 11px / 600  on a busy form bg               → reads as a hint
+ * Fixed:
+ *   • Input bg dropped to --surface-2 (passes contrast; gives the input an
+ *     inset look that pops off the surrounding card).
+ *   • Input value bumped to 14px / 600 (was 13/500) for crisp legibility.
+ *   • Label bumped to 12px / 700, color --ink-1 (was 11/600 --ink-2) so the
+ *     field name is unmistakably the header, not a hint.
+ *   • Placeholder --ink-3 (was --ink-4) — passes WCAG AA + still reads as
+ *     placeholder, not as filled value. */
 .input-label {
   display: block;
-  font: 600 11px var(--font-sans);
-  color: var(--ink-2);
-  margin-bottom: 5px;
+  font: 700 12px var(--font-sans);
+  color: var(--ink-1);
+  margin-bottom: 6px;
   letter-spacing: .02em;
 }
 .input {
   width: 100%;
-  padding: 9px 12px;
+  padding: 10px 12px;
   border-radius: var(--r-md);
   border: 1px solid var(--border-strong);
-  background: var(--surface);
+  background: var(--surface-2);
+  font: 600 14px var(--font-sans);
+  color: var(--ink-1);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+}
+.input:hover:not(:focus):not(:disabled) {
+  border-color: var(--primary-300);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);  /* lighten on focus → clear "active field" cue */
+  box-shadow: var(--focus-ring);
+}
+.input::placeholder {
+  color: var(--ink-3);          /* was --ink-4 → was failing WCAG AA */
+  font-weight: 500;             /* slightly lighter than the entered value */
+  opacity: 0.85;                /* visual distinction without sacrificing contrast */
+}
+.input:disabled {
+  background: var(--surface-3);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+/* Optional hint / helper line under an input — softer than the label but
+ * still passes contrast. Use for char counts, format hints, validation
+ * messages. */
+.input-hint {
+  display: block;
+  margin-top: 5px;
+  font: 500 11px var(--font-sans);
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+.input-hint.is-error { color: var(--danger-fg); font-weight: 600; }
+
+/* ─── SearchableSelect — popover items ─────────────────
+ * Rows inside the SearchableSelect dropdown. Highlight tone matches the
+ * `.tab:hover` palette so the keyboard cursor reads as the same vocabulary
+ * as other interactive surfaces in the app. */
+.ss-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: start;
+  background: transparent;
+  border: none;
+  cursor: pointer;
   font: 500 13px var(--font-sans);
   color: var(--ink-1);
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  transition: background var(--dur-fast);
 }
-.input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus-ring); }
-.input::placeholder { color: var(--ink-4); }
-textarea.input { resize: vertical; min-height: 80px; }
+.ss-item.is-highlight { background: var(--primary-50); }
+.ss-item.is-selected  { background: var(--primary-50); color: var(--primary-700); font-weight: 600; }
+.ss-item:disabled     { opacity: 0.5; cursor: not-allowed; }
+.ss-item-label { display: block; line-height: 1.3; }
+.ss-item-sub   { display: block; margin-top: 2px; font: 500 11px var(--font-sans); color: var(--ink-3); }
+
+/* Create-new row at the bottom of the list — visually distinct from
+ * regular options via a top border + primary tint on hover. */
+.ss-item-create {
+  border-top: 1px solid var(--border);
+  color: var(--primary-700);
+}
+.ss-item-create.is-highlight { background: var(--primary-50); }
+.ss-item-create .ss-item-label { color: var(--primary-700); font-weight: 600; }
 
 /* ─── Card ───────────────────────────────────────── */
 .card {
@@ -99,14 +173,42 @@ textarea.input { resize: vertical; min-height: 80px; }
 .card-title { display: flex; align-items: center; gap: 8px; font: 700 13px var(--font-sans); color: var(--ink-1); }
 .card-body { padding: 16px 18px; }
 
-/* ─── KPI ────────────────────────────────────────── */
+/* ─── KPI ──────────────────────────────────────────
+ * UX retune. Old issues:
+ *   • 28px value felt small inside a 220px+ tile — the number is the
+ *     point of a KPI; it should anchor the tile.
+ *   • --ink-3 label was muted enough to read as decoration, not as the
+ *     metric name. 6.3:1 contrast, technically OK but visually weak.
+ *   • r-xl (14px) corners read as marketing-card, not enterprise-grid.
+ *   • Padding 16/18 was tight — numbers had no breathing room above.
+ *   • Value colour was always --ink-1 regardless of tone, so a "1
+ *     مرفوضة" tile read with the same weight as "42 Total risks".
+ * Fixed:
+ *   • Value 28px → 32px, tabular numerals so digits align column-wise
+ *     across a row (so a "12" doesn't look fatter than "9").
+ *   • Label --ink-3 → --ink-2, weight 600 → 700, letter-spacing 0.06em
+ *     uppercase. Reads as a header, not a hint. Contrast: 11.16:1.
+ *   • Border-radius r-xl → r-lg for a tighter enterprise feel.
+ *   • Padding 18/20 with extra top room above the value.
+ *   • New: .kpi.kpi-tone-success / .kpi-tone-warning / .kpi-tone-danger
+ *     classes (set by Kpi.tsx when tone != 'primary') colour the VALUE
+ *     in the matching -fg token. Small-count status tiles like
+ *     "0 معتمدة" / "3 قيد المراجعة" / "1 مرفوضة" now read instantly
+ *     because the number itself carries the meaning. */
 .kpi {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  /* HORIZONTAL padding is what was wrong — Arabic labels were running
+   * edge-to-edge with the box border. 36px inline gives real breathing
+   * room without bloating the tile vertically. Block padding stays at
+   * the original 20/18 (vertical was fine, user explicitly confirmed).
+   * Shorthand `20 36 18` = top 20 / right+left 36 / bottom 18. */
+  padding: 20px 36px 18px;
   box-shadow: var(--shadow-1);
-  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast), border-color var(--dur-fast);
+  min-height: 124px;
+  display: flex; flex-direction: column;
 }
 .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
 
@@ -136,11 +238,14 @@ textarea.input { resize: vertical; min-height: 80px; }
 .kpi-clickable:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 [dir="rtl"] .kpi-arrow { transform: scaleX(-1); }
 [dir="rtl"] .kpi-clickable:hover .kpi-arrow { transform: scaleX(-1) translateX(2px); }
-.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+/* Icon chip — 36px (down from 40) so it feels like a marker, not a logo.
+ * Border radius drops to r-sm for a tighter UI-system look. */
 .kpi-icon-wrap {
-  width: 40px; height: 40px;
-  border-radius: var(--r-md);
+  width: 36px; height: 36px;
+  border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 .kpi-trend {
   display: inline-flex; align-items: center; gap: 4px;
@@ -150,8 +255,124 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 .kpi-trend.up   { background: var(--success-bg); color: var(--success-fg); }
 .kpi-trend.down { background: var(--danger-bg);  color: var(--danger-fg); }
-.kpi-value { font: 800 28px/1 var(--font-sans); color: var(--ink-1); letter-spacing: -.02em; }
-.kpi-label { font: 600 12px var(--font-sans); color: var(--ink-3); margin-top: 6px; }
+
+/* Value — the headline number. font-feature-settings 'tnum' enables
+ * tabular numerals so 1/2/3/11 line up under each other across a row.
+ * Slight tightening of letter-spacing (-0.025em) for a confident headline
+ * look without going to display-type extremes.
+ *
+ * Overflow protection — belt-and-suspenders for cases the value string
+ * is unexpectedly long ("SAR 12,480,000" used to overflow a 220px tile):
+ *   • min-width: 0 lets the value shrink inside its flex parent (without
+ *     this, flex children default to min-content, forcing horizontal
+ *     overflow).
+ *   • white-space: nowrap keeps the number on one line — wrapping
+ *     destroys the headline read.
+ *   • overflow: hidden + text-overflow: ellipsis truncates with "…" if
+ *     the value is STILL too long after compact formatting. Callers
+ *     should set title={fullValue} on the parent tile so the hover
+ *     tooltip reveals the truncated digits.
+ *   • clamp() font-size: scales DOWN automatically on narrow tiles
+ *     (down to 24px) and UP on wide ones (up to 36px). The 4vw middle
+ *     value reacts to viewport width — caps prevent it from going
+ *     comically small on mobile or huge on a 4K monitor. */
+.kpi-value {
+  font: 800 clamp(24px, 4vw, 36px)/1 var(--font-sans);
+  color: var(--ink-1);
+  letter-spacing: -.025em;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  margin-top: auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tone-aware value colour — Kpi.tsx adds .kpi-tone-{tone} for non-primary
+ * tiles. Drives the NUMBER colour to the semantic -fg, so a "3 At risk"
+ * tile reads warning-amber without needing a colored background. */
+.kpi.kpi-tone-success .kpi-value { color: var(--success-fg); }
+.kpi.kpi-tone-warning .kpi-value { color: var(--warning-fg); }
+.kpi.kpi-tone-danger  .kpi-value { color: var(--danger-fg);  }
+.kpi.kpi-tone-info    .kpi-value { color: var(--info-fg);    }
+.kpi.kpi-tone-accent  .kpi-value { color: var(--accent-700); }
+
+/* ─── .stat-tile — KPI's little sibling ───────────
+ * Use INSIDE an existing Card when you need a "label + big number"
+ * combo but the full Kpi tile (with icon chip + trend chip + sparkline)
+ * would be overkill or visually misaligned with the surrounding card
+ * content. Same typography and overflow safety as .kpi-value, so a
+ * stat-tile sits coherently next to a Kpi grid row.
+ *
+ * Use cases (refactored):
+ *   • Compliance scorecard per-framework "87%" tile
+ *   • Audit lifecycle CAPA closure-rate "82%"
+ *   • Cyber lifecycle composite-maturity "4.2"
+ *   • AI governance AIA-score "73", fairness-score "0.86"
+ * Each was previously a one-off inline-style div with a different
+ * fontSize and palette. */
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.stat-tile-label {
+  font: 700 11px var(--font-sans);
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+/* Same Arabic-shaping fix as .kpi-label — uppercase + positive letter-
+ * spacing are Latin conventions that don't translate. */
+[dir="rtl"] .stat-tile-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.stat-tile-value {
+  font: 800 clamp(24px, 3vw, 32px)/1 var(--font-sans);
+  color: var(--ink-1);
+  letter-spacing: -.025em;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Threshold-tone modifiers — same convention as .kpi-tone-* so callers
+ * have one mental model: pick a tone, the value renders in that colour. */
+.stat-tile-success .stat-tile-value { color: var(--success-fg); }
+.stat-tile-warning .stat-tile-value { color: var(--warning-fg); }
+.stat-tile-danger  .stat-tile-value { color: var(--danger-fg);  }
+.stat-tile-info    .stat-tile-value { color: var(--info-fg);    }
+.stat-tile-accent  .stat-tile-value { color: var(--accent-700); }
+.stat-tile-primary .stat-tile-value { color: var(--primary-700); }
+
+/* Label — the metric name. Bumped to ink-2 (11.16:1 contrast) + 700 weight
+ * + uppercase letter-spacing so it reads as a header, not a hint.
+ *
+ * RTL override below: positive letter-spacing forces Arabic letters apart
+ * and breaks the shaping engine's ligatures (e.g. م-خ in "المخاطر" should
+ * connect — with 0.06em spacing it's visually split). text-transform:
+ * uppercase has no effect on Arabic glyphs at all, so dropping it costs
+ * nothing. Result: Arabic labels read naturally and stop looking
+ * stretched-to-the-border on the Risk and Compliance KPI strips. */
+.kpi-label {
+  font: 700 11px var(--font-sans);
+  color: var(--ink-2);
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+[dir="rtl"] .kpi-label {
+  text-transform: none;
+  letter-spacing: 0;
+  /* Slightly larger Arabic — 11px tight uppercase ENG labels balance
+   * visually against ~12px naturally-shaped Arabic at the same column
+   * width. */
+  font-size: 12px;
+}
 
 /* ─── ModuleCard ─────────────────────────────────── */
 .module-card {
@@ -189,9 +410,28 @@ textarea.input { resize: vertical; min-height: 80px; }
   color: var(--ink-3);
   cursor: pointer;
   transition: all var(--dur-fast);
+  /* Allow the count chip to sit beside the label */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .tab:hover { color: var(--primary); }
 .tab.active { background: var(--surface); color: var(--primary-700); box-shadow: var(--shadow-1); }
+
+/* Tab row-count chip — shown after the tab label when the parent passes
+ * `count` on the TabItem. Gives the user instant feedback on how much
+ * data sits behind each tab without having to click through, and pairs
+ * with `hideEmpty` on <Tabs> to drop 0-count tabs entirely. */
+.tab-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px;
+  padding: 0 5px;
+  font: 700 10px var(--font-sans);
+  border-radius: var(--r-pill);
+  background: var(--neutral-bg);
+  color: var(--ink-3);
+}
+.tab.active .tab-count { background: var(--primary-100); color: var(--primary-700); }
 
 /* ─── Progress ───────────────────────────────────── */
 .progress-row { margin-bottom: 12px; }
@@ -303,7 +543,21 @@ textarea.input { resize: vertical; min-height: 80px; }
   outline-offset: -2px;
 }
 .risk-table tr:last-child td { border-bottom: none; }
-.mono { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); }
+/* .mono — monospace for codes, IDs, timestamps, hex values, file paths.
+ * `unicode-bidi: isolate` + `direction: ltr` lock the strong-LTR
+ * direction so an Arabic UI doesn't reorder "INC-0042" / "AC-2.1.2" /
+ * "12:34" / "#0E5E5E" / "/api/v1/risk". Without this, RTL inheritance
+ * flips chunks at bidi boundaries — e.g. "INC-0042" renders as "0042-INC"
+ * and "AC-2.1.2" renders with the dots in the wrong places.
+ * `display: inline-block` lets the isolation box align correctly inside
+ * mixed paragraphs without claiming a whole line. */
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  unicode-bidi: isolate;
+  direction: ltr;
+}
 .score-pill {
   font-family: var(--font-mono);
   font-weight: 700;
@@ -379,19 +633,22 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 
 /* ─── Toast ──────────────────────────────────────── */
+/* Toast stack docks in the bottom-end corner: bottom-right in LTR,
+ * bottom-left in RTL. `inset-inline-end` is the logical equivalent so
+ * we don't need a separate [dir="rtl"] override. */
 .toast-stack {
   position: fixed;
-  bottom: 24px; right: 24px;
+  bottom: 24px; inset-inline-end: 24px;
   display: flex; flex-direction: column; gap: 8px;
   z-index: 2000;
   pointer-events: none;
 }
-[dir="rtl"] .toast-stack { right: auto; left: 24px; }
 .toast {
   pointer-events: auto;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--primary);
+  /* Accent stripe on the LEADING edge of the toast — flips with direction. */
+  border-inline-start: 3px solid var(--primary);
   box-shadow: var(--shadow-3);
   padding: 11px 16px;
   border-radius: var(--r-md);
@@ -401,11 +658,8 @@ textarea.input { resize: vertical; min-height: 80px; }
   min-width: 240px;
   animation: slide-up var(--dur-normal) var(--ease-spring);
 }
-[dir="rtl"] .toast { border-left: 1px solid var(--border); border-right: 3px solid var(--primary); }
-.toast.success { border-left-color: var(--success); }
-.toast.danger  { border-left-color: var(--danger); }
-[dir="rtl"] .toast.success { border-right-color: var(--success); }
-[dir="rtl"] .toast.danger  { border-right-color: var(--danger); }
+.toast.success { border-inline-start-color: var(--success); }
+.toast.danger  { border-inline-start-color: var(--danger);  }
 
 /* ─── Login ──────────────────────────────────────── */
 .login-shell {
@@ -479,6 +733,61 @@ textarea.input { resize: vertical; min-height: 80px; }
 .placeholder svg { color: var(--ink-4); margin-bottom: 12px; }
 .placeholder h4 { font: 700 15px var(--font-sans); color: var(--ink-1); margin: 0 0 4px; }
 .placeholder p  { font: 500 12px var(--font-sans); color: var(--ink-3); margin: 0; max-width: 360px; }
+
+/* `.placeholder` is the full-page empty (60px padding + icon + headline).
+ * For the small "no rows in this sub-section / drawer / sidebar list"
+ * case, that's 5× too big. `.empty-inline` is the calibrated mini version.
+ * Migration target: every `<div style={{ padding: X, fontSize: 12,
+ * color: 'var(--ink-3)', textAlign: 'center' }}>{t('xEmpty')}</div>` in
+ * pages/ — those were all reinvented inline because the full placeholder
+ * felt too heavy for inside-a-card. */
+.empty-inline {
+  padding: var(--sp-6) var(--sp-5);
+  font: 500 var(--text-xs) var(--font-sans);
+  color: var(--ink-3);
+  text-align: center;
+}
+.empty-inline-compact { padding: var(--sp-5); }   /* even denser for sidebars / KPI cells */
+
+/* ─── Text utility classes ───────────────────────
+ * Use these instead of inline `style={{ fontSize: 11, color: 'var(--ink-3)' }}`.
+ * 1300+ inline fontSize props were measured across pages/ — utility classes
+ * give new code a clean path without a 1300-edit mass migration of existing
+ * sites. Sizes track the --text-* scale in tokens.css. */
+.text-2xs { font-size: var(--text-2xs); }
+.text-xs  { font-size: var(--text-xs);  }
+.text-sm  { font-size: var(--text-sm);  }
+.text-md  { font-size: var(--text-md);  }
+.text-lg  { font-size: var(--text-lg);  }
+.text-xl  { font-size: var(--text-xl);  }
+
+/* Common colour-on-surface modifiers — saves an inline color: ink-3/4 prop. */
+.text-muted  { color: var(--ink-3); }
+.text-dim    { color: var(--ink-4); }
+.text-strong { color: var(--ink-1); font-weight: 600; }
+.text-mono   { font-family: var(--font-mono); letter-spacing: 0; }
+
+/* ─── Skeleton loaders ───────────────────────────
+ * One shimmering bar at three useful densities — drop into a row when
+ * data is loading instead of showing the placeholder dash or leaving the
+ * cell blank. `SkeletonRow.tsx` wraps these for table rows. */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position:  200px 0; }
+}
+.skeleton {
+  display: inline-block;
+  height: 12px;
+  border-radius: var(--r-xs);
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 400px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+.skeleton-line  { display: block; height: 12px; margin: 6px 0; }
+.skeleton-line.sm { height: 10px; }
+.skeleton-line.lg { height: 16px; }
+.skeleton-pill { width: 56px; height: 16px; border-radius: var(--r-pill); }
 
 /* ─── Settings page ─────────────────────────────── */
 
@@ -561,10 +870,13 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 
 /* ─── Theme presets ─────────────────────────────── */
+/* Preset gallery — wider tiles (180 vs 150) so longer bilingual names like
+ * "Cobalt · Clean Enterprise" / "كوبالت · مظهر مؤسسي نقي" don't wrap
+ * mid-phrase. Increased gap 10 → 12 matches the new tile padding. */
 .presets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
 }
 
 .preset-card {
@@ -572,10 +884,13 @@ textarea.input { resize: vertical; min-height: 80px; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 12px 14px;
+  padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
   text-align: start;
   transition: all var(--dur-fast) var(--ease-spring);
+  /* Equal heights so a 4-tile row stays flush even when one name wraps
+   * (Arabic compound names like "كوبالت · مظهر مؤسسي نقي" are longer). */
+  min-height: 96px;
 }
 .preset-card:hover {
   transform: translateY(-2px);
@@ -588,10 +903,14 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 
 .preset-name {
-  font: 700 12.5px var(--font-sans);
+  font: 700 13px var(--font-sans);
   color: var(--ink-1);
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px;
+  line-height: 1.35;
+  /* Allow wrapping for long bilingual names but keep the active check
+   * on the trailing edge. */
+  flex-wrap: wrap;
 }
 
 .preset-swatches { display: flex; gap: 4px; }
@@ -610,13 +929,12 @@ textarea.input { resize: vertical; min-height: 80px; }
 }
 .preset-sidebar-dot {
   position: absolute;
-  top: 50%; left: 6px;
+  top: 50%; inset-inline-start: 6px;
   transform: translateY(-50%);
   width: 6px; height: 6px;
   border-radius: 50%;
   box-shadow: 0 0 0 2px rgba(255,255,255,.12);
 }
-[dir="rtl"] .preset-sidebar-dot { left: auto; right: 6px; }
 
 /* ─── Stepper (workflow stages) ─────────────────── */
 .stepper {
@@ -652,15 +970,20 @@ textarea.input { resize: vertical; min-height: 80px; }
   max-width: 100px;
   line-height: 1.2;
 }
+/* Connector between two stepper dots. inset-inline-{start,end} are the
+ * direction-aware versions of left/right; in LTR start=left and the bar
+ * extends from the dot's centre to half-way into the next slot; in RTL
+ * the same logical sides map to right→start, which gives the same
+ * visual result on the mirrored row without any [dir="rtl"] override. */
 .step-bar {
   position: absolute;
   top: 14px;
-  left: 50%; right: -50%;
+  inset-inline-start: 50%;
+  inset-inline-end: -50%;
   height: 2px;
   background: var(--border-strong);
   z-index: 1;
 }
-[dir="rtl"] .step-bar { left: -50%; right: 50%; }
 
 .step-done .step-dot { background: var(--success); color: #fff; border-color: var(--success); }
 .step-done + .step .step-bar, .step-done .step-bar { background: var(--success); }
@@ -681,10 +1004,9 @@ textarea.input { resize: vertical; min-height: 80px; }
 .timeline::before {
   content: '';
   position: absolute;
-  top: 16px; bottom: 16px; left: 13px;
+  top: 16px; bottom: 16px; inset-inline-start: 13px;
   width: 2px; background: var(--border-strong);
 }
-[dir="rtl"] .timeline::before { left: auto; right: 13px; }
 
 .timeline-row {
   display: flex; gap: 14px;

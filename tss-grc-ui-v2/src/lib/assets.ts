@@ -4,7 +4,7 @@
 // BCM had processes, SCM had supply-chain components, TPRM had vendors,
 // CCM evidence checks referenced "systems" in narrative form. This module
 // introduces a unified asset spine that all those modules can hang from,
-// answering the ServiceNow CMDB question:
+// answering the the industry pattern CMDB question:
 //
 //   "If AWS Riyadh region goes down, what risks / controls / vendors /
 //    findings / BCM plans / pending approvals are affected?"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -338,8 +339,8 @@ export function RiskRegisterPage() {
       <div className="kpi-grid">
         <Kpi Icon={AlertTriangle}   label={t('kpiTotalRisks')}    value={risks.length} tone="primary" onClick={() => setFilters(() => ({}))} />
         <Kpi Icon={Flame}           label={t('kpiCriticalRisks')} value={criticalCount} tone="danger"  onClick={() => { setFilters(prev => ({ ...prev, status: undefined })); setTab('register'); }} />
-        <Kpi Icon={ShieldCheck}     label="Treated"               value={treatedCount} tone="success" onClick={() => { setFilters(prev => ({ ...prev, status: 'CLOSED' })); setTab('register'); }} />
-        <Kpi Icon={ClipboardCheck}  label="Open"                  value={openCount} tone="warning"   onClick={() => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); }} />
+        <Kpi Icon={ShieldCheck}     label={t('kpiTreated')}        value={treatedCount} tone="success" onClick={() => { setFilters(prev => ({ ...prev, status: 'CLOSED' })); setTab('register'); }} />
+        <Kpi Icon={ClipboardCheck}  label={t('kpiOpen')}           value={openCount}    tone="warning" onClick={() => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); }} />
       </div>
 
       <OverviewStrip
@@ -384,9 +385,19 @@ export function RiskRegisterPage() {
         <>
           {hasFilters && <FilterChips filters={filters} setFilters={setFilters} t={t} totalShown={filteredRisks.length} totalAll={risks.length} />}
           <Card padded={false}>
-            {error && <div style={{ padding: 12, color: 'var(--danger-fg)', background: 'var(--danger-bg)', borderBottom: '1px solid #ECCFCC', fontSize: 13 }}>{error}</div>}
+            {/* Error banner — use --danger-border (added to tokens in the
+              * earlier polish pass) instead of the hardcoded #ECCFCC so
+              * dark theme + white-label co-vary correctly. */}
+            {error && (
+              <div style={{
+                padding: 12, fontSize: 13,
+                color: 'var(--danger-fg)',
+                background: 'var(--danger-bg)',
+                borderBottom: '1px solid var(--danger-border)',
+              }}>{error}</div>
+            )}
             {loading
-              ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>
+              ? <InlineEmpty>{t('riskLoading')}</InlineEmpty>
               : <DataTable columns={cols} rows={filteredRisks} rowHref={r => `/risk/${r.id}`} empty={<EmptyState Icon={AlertTriangle} title={hasFilters ? t('riskNoMatchTitle') : t('riskEmpty')} sub={hasFilters ? t('riskNoMatchSub') : t('riskEmptySub')} />} />}
           </Card>
         </>
@@ -452,6 +463,7 @@ export function RiskRegisterPage() {
 const BAND_TONE: Record<string, BadgeTone> = { GREEN: 'success', AMBER: 'warning', RED: 'danger' };
 
 function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }) {
+  const { t } = useI18n();
   const [kris, setKris] = useState<KriDefinitionDto[]>([]);
   const [latest, setLatest] = useState<Record<number, string>>({});
   const [breaches, setBreaches] = useState<Record<number, KriBreachEventDto[]>>({});
@@ -520,16 +532,16 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
         </div>
       )}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
-        <Kpi Icon={Activity}      label="Total KRIs"   value={stats?.totalKris ?? 0} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label="Green"        value={stats?.green ?? 0}     tone="success" />
-        <Kpi Icon={AlertTriangle} label="Amber"        value={stats?.amber ?? 0}     tone="warning" />
-        <Kpi Icon={Flame}         label="Red"          value={stats?.red ?? 0}       tone="danger" />
-        <Kpi Icon={ClipboardCheck} label="Open breaches" value={stats?.openBreaches ?? 0} tone="accent" />
+        <Kpi Icon={Activity}      label={t('kriKpiTotal')}        value={stats?.totalKris ?? 0}    tone="primary" />
+        <Kpi Icon={ShieldCheck}   label={t('kriKpiGreen')}        value={stats?.green ?? 0}        tone="success" />
+        <Kpi Icon={AlertTriangle} label={t('kriKpiAmber')}        value={stats?.amber ?? 0}        tone="warning" />
+        <Kpi Icon={Flame}         label={t('kriKpiRed')}          value={stats?.red ?? 0}          tone="danger" />
+        <Kpi Icon={ClipboardCheck} label={t('kriKpiOpenBreaches')} value={stats?.openBreaches ?? 0} tone="accent" />
       </div>
       {loading
-        ? <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
+        ? <InlineEmpty>Loading…</InlineEmpty>
         : kris.length === 0
-          ? <Card><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>No KRIs defined yet.</div></Card>
+          ? <Card><InlineEmpty>No KRIs defined yet.</InlineEmpty></Card>
           : (
             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
               {kris.map(k => {
@@ -580,6 +592,7 @@ const SEVERITY_TONE_APP: Record<string, BadgeTone> = {
 };
 
 function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<RiskAppetiteStatementDto[]>([]);
   const [breaches, setBreaches] = useState<Record<number, AppetiteBreachEventDto[]>>({});
   const [stats, setStats] = useState<{ total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number } | null>(null);
@@ -670,16 +683,16 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         <AppetiteBreachFeed />
       </div>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
-        <Kpi Icon={Target}        label="Statements"        value={stats?.total ?? 0} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label="Within tolerance"  value={stats?.withinTolerance ?? 0} tone="success" />
-        <Kpi Icon={AlertTriangle} label="Exceeded"          value={stats?.exceeded ?? 0} tone="warning" />
-        <Kpi Icon={Flame}         label="Critical"          value={stats?.critical ?? 0} tone="danger" />
-        <Kpi Icon={ClipboardCheck} label="No exposure data" value={stats?.noExposure ?? 0} tone="info" />
+        <Kpi Icon={Target}         label={t('appKpiStatements')} value={stats?.total ?? 0}            tone="primary" />
+        <Kpi Icon={ShieldCheck}    label={t('appKpiWithin')}     value={stats?.withinTolerance ?? 0} tone="success" />
+        <Kpi Icon={AlertTriangle}  label={t('appKpiExceeded')}   value={stats?.exceeded ?? 0}        tone="warning" />
+        <Kpi Icon={Flame}          label={t('appKpiCritical')}   value={stats?.critical ?? 0}        tone="danger" />
+        <Kpi Icon={ClipboardCheck} label={t('appKpiNoData')}     value={stats?.noExposure ?? 0}      tone="info" />
       </div>
       {loading
-        ? <div style={{ padding: 24, color: 'var(--ink-3)', textAlign: 'center' }}>Loading…</div>
+        ? <InlineEmpty>Loading…</InlineEmpty>
         : items.length === 0
-          ? <Card><div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>No appetite statements yet.</div></Card>
+          ? <Card><InlineEmpty>No appetite statements yet.</InlineEmpty></Card>
           : (
             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
               {items.map(s => {

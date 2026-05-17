@@ -19,8 +19,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Spring Security configuration for the TSS GRC REST API.
@@ -94,6 +97,20 @@ public class SecurityConfig {
             // ── JWT filter: validates Bearer token on every request ───────
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
+            // ── Auth-failure semantics ────────────────────────────────────
+            // Without explicit handlers, Spring Security returns 403 for
+            // BOTH unauthenticated and unauthorized cases — which made the
+            // frontend unable to distinguish "your token expired" (should
+            // refresh + retry) from "you genuinely can't do that" (give
+            // up). Wire proper handlers so:
+            //   - missing / invalid / expired JWT → 401 Unauthorized
+            //   - authenticated but lacking permission → 403 Forbidden
+            // Both write empty bodies — error JSON is handled by the
+            // global @ControllerAdvice once requests reach a controller.
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(restAuthenticationEntryPoint())
+                .accessDeniedHandler(restAccessDeniedHandler()))
+
             // ── Security response headers ─────────────────────────────────
             .headers(headers -> headers
                 .frameOptions(frame -> frame.deny())
@@ -126,5 +143,30 @@ public class SecurityConfig {
         DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
         handler.setPermissionEvaluator(modulePermissionEvaluator);
         return handler;
+    }
+
+    /**
+     * Returns HTTP 401 (not 403) for missing/invalid/expired JWTs so the
+     * frontend can transparently call /api/auth/refresh and retry. The body
+     * is intentionally empty — the WWW-Authenticate header tells the
+     * caller this is a Bearer-token auth challenge.
+     */
+    @Bean
+    public AuthenticationEntryPoint restAuthenticationEntryPoint() {
+        return (request, response, authException) -> {
+            response.setHeader("WWW-Authenticate", "Bearer");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+        };
+    }
+
+    /**
+     * Returns HTTP 403 only for cases where the user IS authenticated but
+     * lacks the required permission for the endpoint. The frontend treats
+     * this as a hard "no" — no refresh attempt, no retry.
+     */
+    @Bean
+    public AccessDeniedHandler restAccessDeniedHandler() {
+        return (request, response, accessDeniedException) ->
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
     }
 }

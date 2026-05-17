@@ -24,7 +24,10 @@ export function RangeField({ label, value, min, max, unit, onChange, isCustom, o
       <div className="cf-info">
         <div className="cf-label-row">
           <span className="cf-label">{label}</span>
-          <span className="cf-value mono">{num}{unit}</span>
+          {/* "280px" is an LTR token (digits + unit). In RTL the absence
+           * of dir="ltr" puts the unit on the wrong side and the digits
+           * read awkwardly next to the Arabic label. */}
+          <span className="cf-value mono" dir="ltr">{num}{unit}</span>
         </div>
         <input
           type="range"

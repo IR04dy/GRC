@@ -14,10 +14,68 @@ interface FetchOpts extends Omit<RequestInit, 'body'> {
   body?: unknown;
   /** Skip Authorization header even if a token exists. */
   anonymous?: boolean;
+  /** Internal — set when we already retried, prevents infinite recursion. */
+  _retried?: boolean;
+}
+
+// ─── Transparent token refresh ─────────────────────────────────────────────
+//
+// Why: the access token is short-lived (1 h dev / 15 min prod) but the
+// refresh token sits in an HttpOnly cookie good for 7 days. Before this
+// change, the moment the access token expired EVERY page started showing
+// "Failed to load …" toasts forever — the only recovery was to navigate
+// back to /login manually.
+//
+// New flow: when a request comes back 401, we transparently call
+// /api/auth/refresh (which mints a new access token from the refresh
+// cookie), store it, and retry the original request once. If the refresh
+// itself returns 401 the refresh token is also expired — at that point we
+// clear the session and bounce to /login.
+//
+// Concurrency: many pages fire fetches in parallel. If 8 of them hit 401
+// at the same time we MUST NOT call /refresh 8 times — that would rotate
+// the refresh cookie 8 times and leave 7 of those rotations stranded.
+// `inflightRefresh` deduplicates: every caller awaits the same promise.
+
+let inflightRefresh: Promise<string | null> | null = null;
+
+async function performRefresh(): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',  // sends the HttpOnly refresh cookie
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null) as { accessToken?: string } | null;
+    const newToken = body?.accessToken;
+    if (!newToken) return null;
+    sessionStorage.setItem('grc.accessToken', newToken);
+    return newToken;
+  } catch {
+    return null;
+  }
+}
+
+function refreshAccessToken(): Promise<string | null> {
+  if (!inflightRefresh) {
+    inflightRefresh = performRefresh().finally(() => { inflightRefresh = null; });
+  }
+  return inflightRefresh;
+}
+
+/** Last-resort bounce when the refresh cookie is also dead. */
+function redirectToLogin(): void {
+  clearSession();
+  // Don't trample a deliberate visit to /login itself.
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    const next = window.location.pathname + window.location.search;
+    window.location.replace(`/login?next=${encodeURIComponent(next)}`);
+  }
 }
 
 async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
-  const { body, anonymous, headers, ...rest } = opts;
+  const { body, anonymous, headers, _retried, ...rest } = opts;
   const token = getAccessToken();
 
   const init: RequestInit = {
@@ -41,7 +99,28 @@ async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
 
   if (!res.ok) {
     const msg = (parsed as { message?: string })?.message ?? res.statusText ?? 'Request failed';
-    if (res.status === 401) clearSession();
+
+    // 401 handling: try once to refresh + retry. Skip if:
+    //   - this IS the refresh / login / logout endpoint (would loop)
+    //   - we already retried once (avoid recursion)
+    //   - this is an anonymous request (no token to refresh)
+    const isAuthEndpoint = path.startsWith('/api/auth/');
+    if (res.status === 401 && !_retried && !anonymous && !isAuthEndpoint) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        // Retry once with the fresh token. Recursion is bounded by _retried.
+        return request<T>(path, { ...opts, _retried: true });
+      }
+      // Refresh failed — refresh cookie itself expired. Bounce to /login.
+      redirectToLogin();
+    } else if (res.status === 401 && !isAuthEndpoint && !anonymous) {
+      // Already retried once and still 401 → give up.
+      // Skip for anonymous requests: those are public endpoints (e.g. DSR
+      // portal, trust-center); a 401 there means a route is misconfigured,
+      // not that the user's session expired.
+      redirectToLogin();
+    }
+
     throw new ApiError(res.status, msg, parsed);
   }
   return parsed as T;
@@ -61,14 +140,26 @@ export const api = {
  * otherwise falls back to the supplied `fallbackName`.
  */
 export async function downloadFile(path: string, fallbackName: string): Promise<void> {
-  const token = getAccessToken();
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'GET',
-    headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
-    credentials: 'include',
-  });
+  // Wrap in the same refresh-on-401 path as request(). We can't call
+  // request() directly because we need the raw Response (blob + headers).
+  const attempt = async (token: string | null): Promise<Response> => {
+    return fetch(`${API_BASE}${path}`, {
+      method: 'GET',
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+      credentials: 'include',
+    });
+  };
+
+  let res = await attempt(getAccessToken());
+  if (res.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      res = await attempt(newToken);
+    } else {
+      redirectToLogin();
+    }
+  }
   if (!res.ok) {
-    if (res.status === 401) clearSession();
     throw new ApiError(res.status, res.statusText || 'Download failed');
   }
   const cd = res.headers.get('Content-Disposition') ?? '';

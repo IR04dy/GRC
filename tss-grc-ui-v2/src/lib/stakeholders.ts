@@ -1,6 +1,6 @@
 // Stakeholder + RACI register — the platform's "who" layer.
 //
-// Mirrors ServiceNow IRM "Stakeholder Management" + the RACI design
+// Mirrors industry-standard GRC tooling "Stakeholder Management" + the RACI design
 // factor from COBIT 2019 (Design Factor #11). Every workflow / process
 // in the platform should resolve to a RACI assignment so the auditor
 // always knows who is Responsible / Accountable / Consulted / Informed

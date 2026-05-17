@@ -22,7 +22,7 @@ import { INTAKE_FORM_FIELDS } from '../../lib/intakeForms';
  * intake kind that has an employee-facing form (i.e. publicSurface =
  * false AND has a form schema in INTAKE_FORM_FIELDS).
  *
- * Modelled on ServiceNow IRM Service Catalog: tile per intake item,
+ * Modelled on industry-standard GRC tooling Service Catalog: tile per intake item,
  * regulator citation in the eyebrow, SLA badge, "Submit" CTA.
  */
 const KIND_ICON: Record<IntakeKind, LucideIcon> = {
@@ -61,7 +61,7 @@ export function IntakeCatalogPage() {
   const { t, lang } = useI18n();
 
   // Show only auth'd kinds that have a form schema wired up
-  // ── Domain grouping — 5 sections, ServiceNow-style category split ──
+  // ── Domain grouping — 5 sections, the industry pattern-style category split ──
   const sections: Array<{ titleKey: string; kinds: IntakeKind[] }> = [
     { titleKey: 'intakeCatalogSectionCyberOps', kinds: ['SECURITY_INCIDENT', 'CHANGE_REQUEST'] },
     { titleKey: 'intakeCatalogSectionRiskRes',  kinds: ['RISK_ISSUE', 'BIA_SUBMISSION'] },

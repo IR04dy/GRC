@@ -1,7 +1,7 @@
 // Attestation campaign engine — DD-63.
 //
-// Periodic "everyone please attest" pushes that ServiceNow / Archer /
-// MetricStream / OneTrust all support: the platform fans out an
+// Periodic "everyone please attest" pushes that the industry pattern / industry-standard tooling /
+// industry-standard tooling all support: the platform fans out an
 // attestation request to a defined population (control owners /
 // employees / suppliers), tracks per-respondent completion, and
 // surfaces a single dashboard for the campaign owner.

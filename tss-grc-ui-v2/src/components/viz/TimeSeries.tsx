@@ -5,7 +5,7 @@
  *
  * RTL-aware: x-axis ticks read right-to-left when lang === 'ar'.
  *
- * Modelled on ServiceNow Performance Analytics' breakdown sparkline.
+ * Modelled on the industry pattern Performance Analytics' breakdown sparkline.
  */
 import { useI18n } from '../../lib/i18n';
 

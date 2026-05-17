@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { Link } from 'react-router-dom';
 import {
   Database, Globe, Fingerprint, ShieldCheck, AlertTriangle, ChevronRight, Users,
+  FileText, Plane, Trash2, Plus, ArrowUpRight,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import {
   ROPA_ENTRIES, CONSENT_SUMMARIES, ropaSourceAsset, aggregateRopa,
@@ -14,6 +18,9 @@ import {
   type RopaEntry,
 } from '../../lib/ropaConsent';
 import { HijriDate } from '../../components/ui/HijriDate';
+import {
+  ropaWorkflowsCounts, buildDeepLink, type RopaCounts,
+} from '../../lib/ropaWorkflows';
 
 /**
  * RopaPage — Sprint 6 follow-on (B2).
@@ -91,7 +98,7 @@ export function RopaPage() {
             {t('ropaConsentSub')}
           </div>
           {CONSENT_SUMMARIES.length === 0
-            ? <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>{t('ropaConsentEmpty')}</div>
+            ? <InlineEmpty>{t('ropaConsentEmpty')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {CONSENT_SUMMARIES.map(c => {
                   const ropa = ROPA_ENTRIES.find(r => r.code === c.ropaCode);
@@ -135,6 +142,17 @@ export function RopaPage() {
 function RopaDetail({ entry, t, lang }: { entry: RopaEntry; t: (k: string) => string; lang: 'en' | 'ar' }) {
   const sourceAsset = ropaSourceAsset(entry);
   const retentionYears = Math.round((entry.retentionDays / 365) * 10) / 10;
+
+  // Live-fetched counts for the three PDPL workflows attached to this ROPA.
+  const [counts, setCounts] = useState<RopaCounts | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setCounts(null);
+    ropaWorkflowsCounts(entry.code)
+      .then(c => { if (!cancelled) setCounts(c); })
+      .catch(() => { if (!cancelled) setCounts({ notices: 0, crossBorder: 0, disposal: 0 }); });
+    return () => { cancelled = true; };
+  }, [entry.code]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -234,6 +252,119 @@ function RopaDetail({ entry, t, lang }: { entry: RopaEntry; t: (k: string) => st
               ))}
             </div>}
       </Card>
+
+      {/* PDPL workflows attached to this ROPA — entry point for the three
+       *  privacy-extension modules. Each chip shows live count + click
+       *  deep-links to /data-lifecycle filtered by ropaCode. "+ New"
+       *  opens the same page with the create modal pre-filled. */}
+      <RopaWorkflowsCard ropaCode={entry.code} counts={counts} t={t} />
+    </div>
+  );
+}
+
+/**
+ * Renders the three PDPL-workflow chips + action buttons for a ROPA.
+ * Pure presentation — fetch happens upstream in RopaDetail's useEffect.
+ */
+function RopaWorkflowsCard({ ropaCode, counts, t }: {
+  ropaCode: string;
+  counts: RopaCounts | null;
+  t: (k: string) => string;
+}) {
+  const loading = counts === null;
+  const c = counts ?? { notices: 0, crossBorder: 0, disposal: 0 };
+
+  return (
+    <Card title={t('ropaPdplWorkflowsTitle')} Icon={Fingerprint}
+      action={<Badge tone="info">PDPL Art. 12 · 18 · 29</Badge>}>
+      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        {t('ropaPdplWorkflowsSub')}
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12,
+      }}>
+        <WorkflowChip
+          Icon={FileText}
+          label={t('ropaWfNotices')}
+          articleLabel={t('ropaWfNoticesArticle')}
+          count={c.notices}
+          loading={loading}
+          viewLink={buildDeepLink({ tab: 'notice', ropaCode })}
+          newLink={buildDeepLink({ tab: 'notice', ropaCode, newRecord: true })}
+          tone="success"
+          t={t}
+        />
+        <WorkflowChip
+          Icon={Plane}
+          label={t('ropaWfCrossBorder')}
+          articleLabel={t('ropaWfCrossBorderArticle')}
+          count={c.crossBorder}
+          loading={loading}
+          viewLink={buildDeepLink({ tab: 'cbt', ropaCode })}
+          newLink={buildDeepLink({ tab: 'cbt', ropaCode, newRecord: true })}
+          tone="warning"
+          t={t}
+        />
+        <WorkflowChip
+          Icon={Trash2}
+          label={t('ropaWfDisposal')}
+          articleLabel={t('ropaWfDisposalArticle')}
+          count={c.disposal}
+          loading={loading}
+          viewLink={buildDeepLink({ tab: 'disposal', ropaCode })}
+          newLink={buildDeepLink({ tab: 'disposal', ropaCode, newRecord: true })}
+          tone="primary"
+          t={t}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function WorkflowChip({ Icon, label, articleLabel, count, loading, viewLink, newLink, tone, t }: {
+  Icon: typeof FileText;
+  label: string;
+  articleLabel: string;
+  count: number;
+  loading: boolean;
+  viewLink: string;
+  newLink: string;
+  tone: 'success' | 'warning' | 'primary';
+  t: (k: string) => string;
+}) {
+  const fg = tone === 'success' ? 'var(--success-fg)'
+           : tone === 'warning' ? 'var(--warning-fg)'
+           : 'var(--primary-700)';
+  return (
+    <div style={{
+      padding: 12, background: 'var(--surface-2)',
+      border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon size={16} color={fg} />
+        <div style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{label}</div>
+        <span style={{
+          fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: fg,
+        }}>
+          {loading ? '…' : count}
+        </span>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {articleLabel}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <Link to={viewLink} style={{ textDecoration: 'none', flex: 1 }}>
+          <Button size="sm" variant="ghost" Icon={ArrowUpRight} style={{ width: '100%' }}>
+            {count > 0 ? t('ropaWfActOpen') : t('ropaWfActOpenEmpty')}
+          </Button>
+        </Link>
+        <Link to={newLink} style={{ textDecoration: 'none' }}>
+          <Button size="sm" variant="primary" Icon={Plus} title={t('ropaWfActNew')}>
+            {t('ropaWfActNew')}
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

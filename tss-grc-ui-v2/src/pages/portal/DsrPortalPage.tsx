@@ -15,7 +15,7 @@ import { useIntake } from '../../lib/intake';
  * rectification / portability / objection requests. Until now this only
  * existed as an internal-only register; the customer had no way to file.
  *
- * Modelled on OneTrust's privacy portal:
+ * Modelled on industry-standard tooling's privacy portal:
  *   - No-auth public surface
  *   - Multi-language toggle (EN/AR)
  *   - Bilingual auto-acknowledgement with reference code

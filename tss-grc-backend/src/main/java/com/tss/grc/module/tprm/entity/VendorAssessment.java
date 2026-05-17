@@ -52,4 +52,25 @@ public class VendorAssessment {
 
     @Column(name = "deleted_by")
     private Long deletedBy;
+
+    // ─── V81: questionnaire engine fields ──────────────────────────
+    /** NOT_STARTED → IN_PROGRESS → COMPLETED → REVIEWED. */
+    @Column(name = "workflow_status", nullable = false, length = 20)
+    private String workflowStatus = "NOT_STARTED";
+
+    /** Optional link to the questionnaire template driving this assessment. */
+    @Column(name = "template_id")
+    private Long templateId;
+
+    /** Number of questions answered (service-set on every response save). */
+    @Column(name = "answered_count", nullable = false)
+    private Integer answeredCount = 0;
+
+    /** Total mandatory questions on the template (service-set when template assigned). */
+    @Column(name = "total_questions", nullable = false)
+    private Integer totalQuestions = 0;
+
+    /** Final 0..100 score from the rubric — replaces free-form risk_score for V81-driven flows. */
+    @Column(name = "computed_score_pct", precision = 5, scale = 2)
+    private BigDecimal computedScorePct;
 }

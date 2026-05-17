@@ -5,7 +5,7 @@ import { useI18n } from '../../lib/i18n';
 
 /**
  * UserPicker — type-ahead user picker with avatar + role + recent.
- * Modeled after ServiceNow `sys_user` field UI + Linear's assignee picker.
+ * Modeled after the industry pattern `sys_user` field UI + Linear's assignee picker.
  *
  * Usage:
  *   <UserPicker value={ownerId} onChange={setOwnerId} />

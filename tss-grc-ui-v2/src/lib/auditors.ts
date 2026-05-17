@@ -12,7 +12,7 @@
 //   IFAC §600 (non-audit services + independence)
 //   SOX §201 (prohibited non-audit services for issuer audits)
 //   IIA IPPF 1100 (independence + objectivity for internal auditors)
-//   ServiceNow IRM — `auditor` table with rotation flags
+//   industry-standard GRC tooling — `auditor` table with rotation flags
 
 export type AuditorRole =
   | 'INTERNAL'              // Internal audit team member

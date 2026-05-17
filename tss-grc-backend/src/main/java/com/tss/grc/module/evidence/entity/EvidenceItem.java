@@ -112,4 +112,21 @@ public class EvidenceItem extends BaseEntity {
 
     @Column(name = "current_version_no", nullable = false)
     private Integer currentVersionNo = 1;
+
+    // ─── Chain-of-custody rollup (V47 / gap-analysis item C) ──────────
+    /** VALID | BROKEN | UNVERIFIED. */
+    @Column(name = "chain_status", length = 15)
+    private String chainStatus;
+
+    @Column(name = "chain_last_verified_at")
+    private java.time.LocalDateTime chainLastVerifiedAt;
+
+    @Column(name = "chain_last_verified_by")
+    private Long chainLastVerifiedBy;
+
+    @Column(name = "chain_version_count")
+    private Integer chainVersionCount;
+
+    @Column(name = "chain_first_break_version")
+    private Integer chainFirstBreakVersion;
 }

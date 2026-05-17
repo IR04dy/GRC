@@ -3,7 +3,7 @@ import type { CommLogEntry, CommState } from './notificationMatrix';
 
 /**
  * Local mutation store for comm-log entries — overlays on the static
- * COMMS_LOG_BY_RECORD + scheduler output. ServiceNow IRM has a server-
+ * COMMS_LOG_BY_RECORD + scheduler output. industry-standard GRC tooling has a server-
  * persisted mutation log; in demo mode we mirror the same shape via
  * localStorage so an auditor's "mark sent" survives a page reload.
  */

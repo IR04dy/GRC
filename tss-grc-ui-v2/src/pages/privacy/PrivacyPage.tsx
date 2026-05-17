@@ -364,7 +364,7 @@ export function PrivacyPage() {
               time-sensitive open breach automatically and surfaces the
               auto-generated SDAIA notification packet (PDPL Art. 25). */}
           <div style={{ marginBottom: 12 }}>
-            <PdplBreachConsole breaches={allBreaches} />
+            <PdplBreachConsole breaches={allBreaches} onDispatch={notifyDataOfficeAction} />
           </div>
           <Card padded={false}>
             {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={filteredBreaches} empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Send, Mail, MessageCircle, Smartphone, Bell, Globe, Lock,
   Users, Megaphone, Phone, FileText, Hash, Eraser, Play, AlertTriangle,
@@ -196,9 +197,7 @@ export function NotificationDispatchPage() {
         <Card title={t('ndLogTitle')} Icon={Bell}
           action={<Badge tone="primary">{log.length}</Badge>}>
           {log.length === 0
-            ? <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>
-                {t('ndLogEmpty')}
-              </div>
+            ? <InlineEmpty>{t('ndLogEmpty')}</InlineEmpty>
             : <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {log.slice(0, 30).map(r => {
                   const Icon = CHANNEL_ICON[r.channel];

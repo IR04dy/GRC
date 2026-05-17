@@ -1,5 +1,5 @@
 // Audit Universe — the inventory of every auditable entity / process /
-// framework that *could* be audited. ServiceNow IRM equivalent:
+// framework that *could* be audited. industry-standard GRC tooling equivalent:
 // `audit_universe` table.
 //
 // Standards anchor:

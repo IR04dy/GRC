@@ -48,7 +48,7 @@ import { Users, CalendarDays, AlertOctagon, Banknote, FileSignature, Gavel, Scal
 type WsTabId = 'inbox' | 'plan' | 'auditors' | 'appointments' | 'committee';
 
 /**
- * Auditor Workspace — ServiceNow IRM "Audit Workspace" homepage.
+ * Auditor Workspace — industry-standard GRC tooling "Audit Workspace" homepage.
  * What the auditor sees when they sign in. Cross-authority + cross-module.
  *
  * Six panels:

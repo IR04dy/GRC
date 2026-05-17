@@ -34,7 +34,7 @@ import { MocPanel } from '../../components/compliance/MocPanel';
 import { MocProcessInitiation } from '../../components/compliance/MocProcessInitiation';
 
 /**
- * Authority Workspace — ServiceNow IRM "Authority Document workspace"
+ * Authority Workspace — industry-standard GRC tooling "Authority Document workspace"
  * pattern. The auditor's home page for a single regulator.
  *
  * Aggregates everything that touches this authority across the platform:
@@ -155,11 +155,11 @@ export function AuthorityWorkspacePage() {
 
       {/* KPI strip */}
       <div className="kpi-grid">
-        <Kpi Icon={BookCopy}        label="Frameworks owned" value={authority.frameworkCodes.length} tone="primary" />
-        <Kpi Icon={ClipboardCheck}  label="Cited controls"   value={myAnchors.length} tone="info" />
-        <Kpi Icon={FileText}        label="Anchored evidence" value={evidenceForMe.length} tone="success" />
-        <Kpi Icon={AlertTriangle}   label="Open findings"    value={findingsForMe.filter(f => f.status !== 'CLOSED').length} tone="danger" />
-        <Kpi Icon={Briefcase}       label="Audit engagements" value={engagementsForMe.length} tone="accent" />
+        <Kpi Icon={BookCopy}        label={t('authKpiFrameworks')}  value={authority.frameworkCodes.length}                          tone="primary" />
+        <Kpi Icon={ClipboardCheck}  label={t('authKpiCited')}       value={myAnchors.length}                                         tone="info" />
+        <Kpi Icon={FileText}        label={t('authKpiEvidence')}    value={evidenceForMe.length}                                     tone="success" />
+        <Kpi Icon={AlertTriangle}   label={t('authKpiFindings')}    value={findingsForMe.filter(f => f.status !== 'CLOSED').length}  tone="danger" />
+        <Kpi Icon={Briefcase}       label={t('authKpiEngagements')} value={engagementsForMe.length}                                  tone="accent" />
       </div>
 
       {/* DD-83 + DD-88: HRSD-specific surface — process-initiation tiles

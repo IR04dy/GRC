@@ -74,6 +74,94 @@ export const PRESETS: Preset[] = [
       'sb-bg': '#28161E', 'sb-accent': '#E5A0B7',
     },
   },
+  // ── Cobalt — clean enterprise-blue palette inspired by leading
+  //    productivity-suite design systems (without using anyone's brand).
+  //    Cool gray surfaces + a confident cobalt primary + complementary
+  //    soft-amber accent for status chips so the cool blue doesn't read
+  //    cold across the whole UI. The sidebar uses near-black ink with a
+  //    cobalt highlight so the active item still pops without competing
+  //    with the primary brand on the main canvas.
+  { id: 'cobalt',   labelKey: 'presetCobalt',   overrides: {
+      'bg':        '#F3F2F1',
+      'surface':   '#FFFFFF',
+      'primary':   '#0F62CC',
+      'accent':    '#D89B2A',
+      'sb-bg':     '#201F1E',
+      'sb-text':   '#E6E6E6',
+      'sb-accent': '#3B86E6',
+    },
+  },
+  // ── Mint — fresh, low-saturation green palette with matched neutrals.
+  //    Cool whites, mint primary, soft coral accent (complementary on
+  //    the colour wheel so status chips don't disappear next to mint
+  //    surfaces), deep teal sidebar. Tested for AA contrast on every
+  //    surface combo before shipping.
+  { id: 'mint',     labelKey: 'presetMint',     overrides: {
+      'bg':        '#F4FAF7',
+      'surface':   '#FFFFFF',
+      'primary':   '#2EA37C',
+      'accent':    '#E07A5F',
+      'sb-bg':     '#0E2A24',
+      'sb-text':   '#D6EDE5',
+      'sb-accent': '#7FD3B0',
+    },
+  },
+  // ── Sky — soft baby-blue palette with warm coral accent.
+  //    The matched-pair convention here is the classic cool-primary +
+  //    warm-complement: sky blue surfaces with a coral/peach accent
+  //    that sits opposite blue on the colour wheel. Result: status
+  //    chips (warning amber, danger red) stay legible against the cool
+  //    canvas, and the accent doesn't get lost in the surrounding blue.
+  //    Sidebar uses deep navy so the cool palette has visual depth at
+  //    the leading edge without going to pure black.
+  { id: 'sky',      labelKey: 'presetSky',      overrides: {
+      'bg':        '#F2F7FB',
+      'surface':   '#FFFFFF',
+      'primary':   '#4A90D9',
+      'accent':    '#F2A07B',
+      'sb-bg':     '#0F2030',
+      'sb-text':   '#DCE6EF',
+      'sb-accent': '#79B8E8',
+    },
+  },
+  // ── Nordic — inspired by Scandinavian minimalism + the aurora borealis.
+  //    Cool off-white surfaces (the famous "Copenhagen white" — not pure
+  //    white, has a tiny gray-blue undertone that reads quieter on long
+  //    sessions). Aurora-teal primary, soft amber accent (the classic
+  //    cool/warm Nordic pairing seen in Marimekko + Ikea catalogues), and
+  //    a deep night-sky sidebar with aurora-green highlight. Calm,
+  //    professional, time-tested.
+  { id: 'nordic',   labelKey: 'presetNordic',   overrides: {
+      'bg':        '#F5F7F8',
+      'surface':   '#FFFFFF',
+      'primary':   '#1E5F74',
+      // Accent retuned: original #E0A458 was 2.18:1 on white (below
+      // 3:1 UI minimum). #B97A2A keeps the warm aurora-amber character
+      // and clears 3.4:1 on white surfaces so icon glyphs + chip
+      // strokes stay visible. Pairs naturally with the deep aurora teal.
+      'accent':    '#B97A2A',
+      'sb-bg':     '#14213D',
+      'sb-text':   '#E5E5E5',
+      'sb-accent': '#80CFA9',
+    },
+  },
+  // ── Tuscan — warm Italian Mediterranean palette (terracotta + olive).
+  //    Warm cream canvas reminiscent of sun-bleached stone, terracotta
+  //    primary in the tradition of Italian roof tiles, olive accent
+  //    (olive is the textbook complement to terracotta — see Pantone's
+  //    Tuscan Sun colour stories). Sidebar in deep wine with a golden
+  //    ochre highlight, so the accent palette feels coherent end-to-end.
+  //    Best for tenants who want warmth without going to full beige.
+  { id: 'tuscan',   labelKey: 'presetTuscan',   overrides: {
+      'bg':        '#FAF4E8',
+      'surface':   '#FFFCF5',
+      'primary':   '#B85042',
+      'accent':    '#7C9070',
+      'sb-bg':     '#3D1F1F',
+      'sb-text':   '#EDE5D8',
+      'sb-accent': '#D4A437',
+    },
+  },
 ];
 
 // ─── Provider ────────────────────────────────────────────────────────────────

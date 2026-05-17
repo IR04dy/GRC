@@ -1,8 +1,10 @@
-import { ShieldCheck, LayoutDashboard, Info, AlertTriangle, LockKeyhole, RefreshCw,
+import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole, RefreshCw,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
-         Newspaper, Briefcase, Activity, Leaf, Layers, Compass, BookOpen,
+         Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
+         Sigma, Telescope, Landmark as LandmarkIcon,
+         Network, Share2, Bug,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -19,7 +21,7 @@ interface NavGroup { id: string; titleKey: string; items: NavItem[]; }
 /**
  * Sidebar — market-leader-aligned navigation (Sprint 4 final).
  *
- * Pattern lifted from ServiceNow IRM, OneTrust, MetricStream, Diligent HighBond:
+ * Pattern lifted from industry-standard GRC tooling, industry-standard tooling, industry-standard tooling, industry-standard tooling:
  *   1. "My Work" at the top — universal, role-agnostic landing
  *   2. Per-domain verticals in frequency order (Risk → Compliance → Audit → ...)
  *   3. Cross-cutting tools and reports near the bottom
@@ -28,8 +30,8 @@ interface NavGroup { id: string; titleKey: string; items: NavItem[]; }
  *
  * Order rationale:
  *   - Risk Management is the highest-frequency GRC domain in every benchmark
- *   - Compliance/Policy is #2; Audit gets its own group per ServiceNow IRM
- *   - Privacy is its own vertical per OneTrust (their flagship pattern)
+ *   - Compliance/Policy is #2; Audit gets its own group per industry convention.
+ *   - Privacy is its own vertical per industry convention (their flagship pattern)
  *   - Cyber + BCM + Third-Party each follow as standalone verticals
  *   - "Saudi Regulators" is OUR differentiator — kept visible, not buried in admin
  *   - Service Catalog + Knowledge live together (universal employee surface)
@@ -39,7 +41,7 @@ interface NavGroup { id: string; titleKey: string; items: NavItem[]; }
 const NAV_GROUPS: NavGroup[] = [
   // ─── 1. My Work ─────────────────────────────────────────────────────
   // Universal landing — what every authenticated user opens first.
-  // Mirrors ServiceNow's "Workspace Manager" home + OneTrust's "My Work".
+  // Mirrors the industry pattern's "Workspace Manager" home + industry-standard tooling's "My Work".
   {
     id: 'my-work', titleKey: 'navMyWork',
     items: [
@@ -47,44 +49,52 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'lc-overview',   to: '/lifecycle-overview',   Icon: Activity,        labelKey: 'loSidebar' },
       { id: 'inbox',         to: '/intake-inbox',         Icon: Inbox,           labelKey: 'inboxTitle' },
       { id: 'approvals',     to: '/approvals',            Icon: CheckCheck,      labelKey: 'approvalsSidebar' },
+      { id: 'signatures',    to: '/signatures',           Icon: PenLine,         labelKey: 'sigSidebar' },
       { id: 'notif-outbox',  to: '/notifications/outbox', Icon: Inbox,           labelKey: 'noxSidebar' },
     ],
   },
 
   // ─── 2. Risk Management ─────────────────────────────────────────────
-  // Highest-frequency GRC domain (per ServiceNow telemetry, OneTrust benchmarks).
+  // Highest-frequency GRC domain (per industry research.).
   {
     id: 'risk', titleKey: 'navRisk',
     items: [
       { id: 'risk',      to: '/risk',           Icon: AlertTriangle, labelKey: 'modRisk' },
       { id: 'risk-lc',   to: '/risk-lifecycle', Icon: GitBranch,     labelKey: 'rlcSidebar' },
+      { id: 'scenarios', to: '/risk-scenarios', Icon: Sigma,         labelKey: 'scnSidebar' },
+      { id: 'emerging',  to: '/emerging-risk',  Icon: Telescope,     labelKey: 'emrSidebar' },
       { id: 'incidents', to: '/incidents',      Icon: AlertOctagon,  labelKey: 'incidentsTitle' },
+      { id: 'rca',       to: '/rca',            Icon: Microscope,    labelKey: 'rcaSidebar' },
       { id: 'changes',   to: '/changes',        Icon: GitBranch,     labelKey: 'modChanges' },
     ],
   },
 
   // ─── 3. Compliance & Policy ────────────────────────────────────────
   // Second-highest frequency. Frameworks + policies + reg-change + crosswalks
-  // + evidence + attestations all belong here per ServiceNow's "Policy and
-  // Compliance" application structure. Ethics + ESG fold in as compliance
-  // sub-domains (OneTrust groups them similarly).
+  // + evidence + attestations all belong here per the industry-standard Policy and
+  // Compliance application structure. Ethics + ESG fold in as compliance
+  // sub-domains ((industry practice).).
   {
     id: 'compliance', titleKey: 'navCompliancePolicy',
     items: [
       { id: 'compliance',   to: '/compliance',        Icon: ClipboardCheck, labelKey: 'modCompliance' },
+      { id: 'reg-library',  to: '/regulatory/library', Icon: Landmark,      labelKey: 'regLibrarySidebar' },
+      { id: 'ctrl-library', to: '/controls/library',   Icon: ShieldCheck,   labelKey: 'ctrlLibrarySidebar' },
       { id: 'fw-packs',     to: '/framework-packs',   Icon: Layers,         labelKey: 'fpSidebar' },
       { id: 'pol-tpl',      to: '/policy-templates',  Icon: BookOpen,       labelKey: 'ptSidebar' },
+      { id: 'pol-mgmt',     to: '/policy-management', Icon: ShieldCheck,    labelKey: 'polMgmtSidebar' },
       { id: 'reg-change',   to: '/regulatory-change', Icon: Newspaper,      labelKey: 'regChangeSidebar' },
       { id: 'crosswalk',    to: '/control-crosswalk', Icon: GitBranch,      labelKey: 'cwSidebar' },
       { id: 'evidence',     to: '/evidence',          Icon: Files,          labelKey: 'evidenceTitle' },
       { id: 'attestations', to: '/attestations',      Icon: FileCheck2,     labelKey: 'campaignsTitle' },
       { id: 'ethics',       to: '/ethics',            Icon: ShieldAlert,    labelKey: 'modEthics' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
+      { id: 'ndi',          to: '/ndi',               Icon: Database,       labelKey: 'ndiSidebar' },
     ],
   },
 
   // ─── 4. Audit ───────────────────────────────────────────────────────
-  // Own top-level group per ServiceNow ("Audit Management") + Diligent HighBond
+  // Own top-level group per industry convention (Audit Management). + industry-standard tooling
   // (their flagship). NCA ECC Filing is here because it's an annual audit-style
   // self-assessment, not a continuous compliance activity.
   {
@@ -92,12 +102,13 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'audit-ws',  to: '/audit-workspace',   Icon: Stamp,       labelKey: 'modAuditWorkspace' },
       { id: 'audit-lc',  to: '/audit-lifecycle',   Icon: BookOpen,    labelKey: 'alcSidebar' },
+      { id: 'ev-chain',  to: '/evidence-chain',    Icon: Fingerprint, labelKey: 'echSidebar' },
       { id: 'nca-ecc',   to: '/nca-ecc-export',    Icon: ShieldCheck, labelKey: 'ncaSidebar' },
     ],
   },
 
   // ─── 5. Privacy ─────────────────────────────────────────────────────
-  // Standalone vertical per OneTrust (whose entire product is built around this).
+  // Standalone vertical per industry convention.
   // PDPL, DSR, ROPA — three pillars.
   {
     id: 'privacy', titleKey: 'navPrivacy',
@@ -105,23 +116,28 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'privacy',    to: '/privacy',           Icon: Fingerprint, labelKey: 'modPdpl' },
       { id: 'privacy-lc', to: '/privacy-lifecycle', Icon: UserCog,     labelKey: 'prcSidebar' },
       { id: 'ropa',       to: '/ropa',              Icon: Files,       labelKey: 'ropaSidebar' },
+      { id: 'data-lc',    to: '/data-lifecycle',    Icon: Compass,     labelKey: 'pdplExtSidebar' },
+      { id: 'cyb-pdpl',   to: '/cyber-pdpl-bridge', Icon: Workflow,    labelKey: 'cpbSidebar' },
+      { id: 'dsa',        to: '/data-sharing',         Icon: Share2,         labelKey: 'dsaSidebar' },
+      { id: 'proc-dd',    to: '/processor-assessments', Icon: ClipboardCheck, labelKey: 'procSidebar' },
     ],
   },
 
   // ─── 6. Cybersecurity ───────────────────────────────────────────────
-  // Standalone vertical per ServiceNow IRM ("IT and Cyber Risk"). Assets folded
+  // Standalone vertical per industry convention (IT and Cyber Risk). Assets folded
   // in as the asset register is cyber-owned in our domain model.
   {
     id: 'cyber', titleKey: 'navCyber',
     items: [
-      { id: 'cyber',    to: '/cyber',           Icon: LockKeyhole, labelKey: 'modCyber' },
-      { id: 'cyber-lc', to: '/cyber-lifecycle', Icon: ShieldCheck, labelKey: 'cycSidebar' },
-      { id: 'assets',   to: '/assets',          Icon: Server,      labelKey: 'assetsSidebar' },
+      { id: 'cyber',    to: '/cyber',              Icon: LockKeyhole, labelKey: 'modCyber' },
+      { id: 'cyber-lc', to: '/cyber-lifecycle',    Icon: ShieldCheck, labelKey: 'cycSidebar' },
+      { id: 'fw-ctrls', to: '/framework-controls', Icon: BookOpen,    labelKey: 'fwcSidebar' },
+      { id: 'assets',   to: '/assets',             Icon: Server,      labelKey: 'assetsSidebar' },
     ],
   },
 
   // ─── 7. Business Continuity ─────────────────────────────────────────
-  // Standalone vertical per ServiceNow ("Business Continuity Management").
+  // Standalone vertical per industry convention (Business Continuity Management).
   // BIA → Plans → Invocations → Crisis is a coherent operational arc.
   {
     id: 'bcm', titleKey: 'navBcm',
@@ -129,6 +145,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'bcm',      to: '/bcm',               Icon: RefreshCw,    labelKey: 'modBcm' },
       { id: 'bcm-lc',   to: '/bcm-lifecycle',     Icon: Activity,     labelKey: 'bclSidebar' },
       { id: 'bcm-deps', to: '/bcm-dependency',    Icon: GitBranch,    labelKey: 'bdSidebar' },
+      { id: 'dr-plans', to: '/dr-plans',          Icon: Server,       labelKey: 'drpSidebar' },
       { id: 'crisis',   to: '/crisis-management', Icon: AlertOctagon, labelKey: 'crisisSidebar' },
     ],
   },
@@ -139,9 +156,14 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'third-party', titleKey: 'navThirdParty',
     items: [
-      { id: 'tprm',          to: '/tprm',          Icon: Workflow,  labelKey: 'modThirdParty' },
-      { id: 'vendor-portal', to: '/portal/vendor', Icon: Briefcase, labelKey: 'vpSidebar' },
-      { id: 'scm',           to: '/scm',           Icon: Truck,     labelKey: 'scmEyebrow' },
+      { id: 'tprm',          to: '/tprm',                  Icon: Workflow,    labelKey: 'modThirdParty' },
+      { id: 'vendor-portal', to: '/portal/vendor',         Icon: Briefcase,   labelKey: 'vpSidebar' },
+      { id: 'scm',           to: '/scm',                   Icon: Truck,       labelKey: 'scmEyebrow' },
+      { id: 'srp',           to: '/supplier-resilience',   Icon: ShieldCheck, labelKey: 'srpSidebar' },
+      { id: 'clauses',       to: '/contract-clauses',      Icon: Stamp,       labelKey: 'cclSidebar' },
+      { id: 'fourth-party',  to: '/fourth-party',          Icon: Network,     labelKey: 'f4pSidebar' },
+      { id: 'tpc',           to: '/third-party-cyber',     Icon: Bug,         labelKey: 'tpcSidebar' },
+      { id: 'res-tests',     to: '/resilience-tests',      Icon: Activity,    labelKey: 'srtSidebar' },
     ],
   },
 
@@ -161,7 +183,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 10. Service Catalog & Knowledge ────────────────────────────────
-  // Cross-cutting employee surface. ServiceNow's "Service Catalog" is the
+  // Cross-cutting employee surface. the industry pattern's "Service Catalog" is the
   // model. CAPA + Board Pack + Knowledge live here as universal outputs.
   {
     id: 'service-catalog', titleKey: 'navServiceCatalog',
@@ -181,8 +203,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'administration', titleKey: 'navAdministration',
     items: [
-      { id: 'admin',         to: '/admin',                  Icon: UserCog,     labelKey: 'adminTitle' },
-      { id: 'sso',           to: '/sso',                    Icon: LockKeyhole, labelKey: 'ssoSidebar' },
+      { id: 'admin',         to: '/admin',                  Icon: UserCog,       labelKey: 'adminTitle' },
+      { id: 'committees',    to: '/committees',             Icon: LandmarkIcon,  labelKey: 'comSidebar' },
+      { id: 'sso',           to: '/sso',                    Icon: LockKeyhole,   labelKey: 'ssoSidebar' },
       { id: 'wf-versions',   to: '/workflow-versions',      Icon: Layers,      labelKey: 'wvSidebar' },
       { id: 'connectors',    to: '/connectors',             Icon: Plug,        labelKey: 'connectorsTitle' },
       { id: 'notifications', to: '/notifications/dispatch', Icon: Send,        labelKey: 'ndSidebar' },
@@ -190,7 +213,9 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'file-upload',   to: '/file-upload',            Icon: FileCheck2,  labelKey: 'fuSidebar' },
       { id: 'onboarding',    to: '/onboarding',             Icon: Compass,     labelKey: 'onbSidebar' },
       { id: 'settings',      to: '/settings',               Icon: Settings,    labelKey: 'itemSettings' },
-      { id: 'about',         to: '/about',                  Icon: Info,        labelKey: 'itemAbout' },
+      // 'about' entry removed — it pointed at PlaceholderPage with no real
+      // content. Re-add when there's actual content (license terms,
+      // build/version info, support links).
     ],
   },
 ];

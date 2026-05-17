@@ -17,7 +17,7 @@
 //   │  Monday morning is about.                                         │
 //   └────────────────────────────────────────────────────────────────────┘
 //
-// Architecture: ServiceNow Vendor Portal "Pipeline" board + OneTrust
+// Architecture: the industry pattern Vendor Portal "Pipeline" board + industry-standard tooling
 // Vendorpedia "Vendor Risk Calendar".
 
 import { useEffect, useState } from 'react';

@@ -98,16 +98,58 @@ http://localhost:8087/login.html
 
 ---
 
+### SDAIA NDI / نضيء — National Data Index Module (commits `2c79a6e` → `25e996a`) ← LANDED 2026-05-17
+| Slice | Migration | Tab | Status | Notes |
+|-------|-----------|-----|--------|-------|
+| 1 — Assessment Cycles      | V66 | Cycles      | ✅ | 13-state lifecycle, "one active per year" |
+| 2 — Framework Library      | V67 | Framework   | ✅ | 20 placeholder items, JSON import endpoint |
+| 3 — Maturity Assessment    | V68 | Maturity    | ✅ | CMMI 0-5, Rule 1 + 2 + D.Validation |
+| 4 — Compliance Assessment  | V69 | Compliance  | ✅ | Dual-axis (substantive + lifecycle), Rules 3-5 |
+| 5 — Operational Excellence | V70 | OpEx        | ✅ | 10 KPIs, Rule 13 direction-aware status |
+| 6 — Data Governance Domains| V71 | Domains     | ✅ | 8 placeholder domains, cross-slice rollup |
+| 7 — Evidence Repository    | V72 | Evidence    | ✅ | 8 artefacts, Rule 6 expiry auto-flip |
+| 8 — Gaps + CAPA            | V73 | Gaps        | ✅ | 5 gaps + 7 CAPAs, Rules 7-9, auto-resolve |
+| 9 — Improvement Plan       | V74 | Improvement | ✅ | PLAN-2026-01 IN_FLIGHT, Rules 10-12 |
+| 10 — Submission Package    | V75 | Submission  | ✅ | 6-state workflow, Rules 15-16, SHA-256 manifest |
+| 11 — Reports               | V76 | Reports     | ✅ | 12 saved reports + ad-hoc runner |
+| 12 — Dashboard             | (none) | Dashboard | ✅ | 14-widget aggregate, single round trip |
+| 13 — Settings              | V77 | Settings    | ✅ | 12 settings, 5 categories, typed values |
+| 14 — Audit Log             | V78 | Audit       | ✅ | 15 actions, 3 severity levels, append-only |
+| 15 — Tests + QA checklist  | (none) | (n/a)     | ✅ | 11 unit tests · docs/ndi/QA_CHECKLIST.md |
+
+**NDI follow-ups (commits `24b3409` → `25e996a`)**
+- **A — Auto-audit interceptor** (`24b3409`): `NdiAuditPublisher` wired into 8 services (cycle, maturity, compliance, evidence, gap, plan, domain, submission). Every state change emits an audit row automatically.
+- **B — PDF/XLSX/CSV exports** (`bf97588`): `NdiReportExporter` (OpenPDF + Apache POI). `GET /api/ndi/reports/:id/export?format=…` returns the binary; UI has XLSX/PDF download buttons on each saved report + on the ad-hoc result.
+- **C — Schedule executor** (`25e996a`): `NdiScheduler` runs the evidence expiry sweep every 6h and the report cron loop every 60s. Verified by setting `0 * * * * *` on RPT-001 and watching it auto-fire.
+
+**Guardrail (Rule 0)** — Every domain / framework item / submission package seeded by V66-V78 carries `is_placeholder = 1` and the bilingual banner: *"Placeholder — requires official SDAIA/NDI control library import / عنصر مؤقت — يتطلب استيراد مكتبة الضوابط الرسمية من سدايا/نضيء"*. Flip `official_library_imported = true` in settings + each domain's `Mark official` action after the official library lands.
+
+### Audit Management — `audit_lc` entities filled in (commit `0a36252`) ← LANDED 2026-05-17
+V16 created 4 `audit_lc.*` tables but only `findings` was wired to Java. This commit added `AnnualPlan` / `WorkingPaper` / `CapaTask` entities + repositories + a combined `AuditLifecycleService` + `/api/audit-lc/{annual-plans, working-papers, capas}` REST endpoints. Frontend `lib/auditLifecycle.ts` swapped from localStorage mocks to real backend calls (commit `990e66a`) — `AuditLifecyclePage` consumes the same sync API but is now persistent.
+
+### Policy Management — full module (commit `8098e43`) ← LANDED 2026-05-17
+V79 migration: `policy.documents` + `policy.exceptions` + `policy.attestations` with 6/3/6 seeds. Three state machines (policy DRAFT → … → ARCHIVED, exception REQUESTED → … → REVOKED, attestation PENDING → ATTESTED|DECLINED). PUBLISHED-requires-effective-date guard, expiry sweeps, `/new-version` cloner, full UI at `/policy-management` with 4 tabs (Overview / Documents / Exceptions / Attestations).
+
+### Cross-module integration (commit pending) ← LANDED 2026-05-17
+NDI `gap.risk_id` and `compliance_assessment.risk_id` promoted from soft FK to validated ERM lookup. `NdiCrossLinkService` rejects non-existent risk ids on create/update with HTTP 400 + a clear message; `GET /api/ndi/gaps/{id}/linked-risk` and `GET /api/ndi/compliance/{id}/linked-risk` return a `LinkedRisk` enrichment record (id, externalId UUID, titleEn/Ar, status, sourceModule, inherentLikelihood/Impact, ownerId).
+
+### TPRM Questionnaire Engine — V81 (commit pending) ← LANDED 2026-05-17
+TPRM had basic Vendor + VendorAssessment CRUD but `risk_score` was a free-form decimal with no rubric behind it. V81 adds a deterministic questionnaire engine: `tprm.questionnaire_templates` + `_questions` + `_responses`, plus 5 new columns on `vendor_assessments` (workflow_status, template_id, answered_count, total_questions, computed_score_pct). Seed: one ACTIVE *Critical Vendor Cyber Due Diligence v1.0* template with 8 bilingual questions across 3 sections (Information Security, Privacy, Operational Resilience). Service implements full template lifecycle (DRAFT → ACTIVE → ARCHIVED, frozen-once-ACTIVE rule), per-vendor response upsert with on-save weighted-sum recompute, NA-with-justification, and a NOT_STARTED → IN_PROGRESS → COMPLETED → REVIEWED workflow on the assessment. Scoring math: posture% = Σ(scored×weight) / Σ(max×weight) × 100; risk% = 100 − posture%; rating banded against the template's three thresholds. Verified live: a strong-vendor walkthrough (mostly YES + 4-out-of-5 scale answers) computed 17.31% risk → LOW band, matching hand-calc to two decimals.
+
+### Risk-Advanced (commit `e906c0f`) ← LANDED 2026-05-17
+The base ERM module already had `risk.risk_assessments` + `risk.risk_treatments` tables (V15) and Java entities + JPA repos, but no service/controller layer. This commit fills them in.
+- **`RiskAssessmentService`** — record periodic re-assessments (1..5 likelihood / impact scale). On every save the latest values promote to the parent Risk's `residual_likelihood`/`residual_impact`, which trips the DB-side computed `residual_score`. Correction endpoint mirrors only when the corrected row is still the most-recent assessment.
+- **`RiskTreatmentService`** — ISO 31000 treatment types (AVOID / MITIGATE / TRANSFER / ACCEPT) with a PLANNED → IN_PROGRESS → COMPLETED state machine (+ CANCELLED escape). Rule T1: a Risk in TREATMENT status refuses removal of its last live treatment with a clear message.
+- **V80 migration**: adds the `completed_at` column the original V15 migration omitted, plus a backfill that stamps existing COMPLETED rows.
+- `RiskAdvancedController` exposes the new endpoints under `/api/v1/risk/risks/{id}/assessments` and `/api/v1/risk/risks/{id}/treatments`.
+- The existing `RiskAppetiteService` + `KriEngineService` already covered the "appetite" leg of the spec; this commit completes the assessment + treatment legs. Workflow on the parent Risk (submit-for-review, approve, accept, close, reopen, incident-bump) was also already wired by `RiskController`.
+
+---
+
 ## ❌ REMAINING — Sprint 2 Completion
 
 ### Modules Not Yet Built
-| Module | UI | Backend | Priority |
-|--------|----|---------|----------|
-| **Data Governance** | ❌ | ❌ | High |
-| **Risk — Advanced** (risk appetite, treatment plans, full workflow) | ⚠️ basic only | ⚠️ | High |
-| **Audit Management** | ❌ | ❌ | Medium |
-| **Policy Management** | ❌ | ❌ | Medium |
-| **Vendor Risk Enhancements** (TPRM scoring, questionnaires) | ⚠️ | ⚠️ | Medium |
+All Sprint 2 modules now landed. Remaining items are polish / UI work (frontend for Policy Management, Risk-Advanced, and TPRM questionnaire engine all consume the new endpoints but don't have dedicated tabs yet).
 
 ### Gaps in Existing Modules
 | Module | Missing |

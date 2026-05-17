@@ -2,10 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { I18nProvider } from './lib/i18n';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
+import { DialogProvider } from './lib/dialog';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
 import { RiskRegisterPage } from './pages/risk/RiskRegisterPage';
 import { CyberPage } from './pages/cyber/CyberPage';
 import { VulnerabilitiesV2Page } from './pages/cyber/VulnerabilitiesV2Page';
@@ -15,6 +15,8 @@ import { KbEditorPage } from './pages/knowledge-base/KbEditorPage';
 import { BcmPage } from './pages/bcm/BcmPage';
 import { PrivacyPage } from './pages/privacy/PrivacyPage';
 import { CompliancePage } from './pages/compliance/CompliancePage';
+import { RegulatoryLibraryPage } from './pages/regulatory/RegulatoryLibraryPage';
+import { ControlLibraryPage } from './pages/controls/ControlLibraryPage';
 import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
@@ -45,6 +47,7 @@ import { IntakeCatalogPage } from './pages/intake/IntakeCatalogPage';
 import { IntakeFormPage } from './pages/intake/IntakeFormPage';
 import { ConnectorsPage } from './pages/intake/ConnectorsPage';
 import { ApprovalInboxPage } from './pages/approvals/ApprovalInboxPage';
+import { SignaturesPage } from './pages/signatures/SignaturesPage';
 import { AssetRegisterPage } from './pages/assets/AssetRegisterPage';
 import { BoardPackPage } from './pages/board-pack/BoardPackPage';
 import { RegulatoryChangePage } from './pages/regulatory-change/RegulatoryChangePage';
@@ -59,6 +62,7 @@ import { ControlCrosswalkPage } from './pages/control-crosswalk/ControlCrosswalk
 import { BcmDependencyPage } from './pages/bcm-dependency/BcmDependencyPage';
 import { RopaPage } from './pages/ropa/RopaPage';
 import { EsgPage } from './pages/esg/EsgPage';
+import { NdiPage } from './pages/ndi/NdiPage';
 import { WorkflowVersionsPage } from './pages/workflow-versions/WorkflowVersionsPage';
 import { CrisisManagementPage } from './pages/crisis/CrisisManagementPage';
 import { FileUploadDemoPage } from './pages/file-upload/FileUploadDemoPage';
@@ -69,6 +73,7 @@ import { AttestationCampaignsPage } from './pages/intake/AttestationCampaignsPag
 import { OnboardingPage } from './pages/onboarding/OnboardingPage';
 import { FrameworkPacksPage } from './pages/framework-packs/FrameworkPacksPage';
 import { PolicyTemplatesPage } from './pages/policy-templates/PolicyTemplatesPage';
+import { PolicyManagementPage } from './pages/policy/PolicyManagementPage';
 import { RiskLifecyclePage } from './pages/risk-lifecycle/RiskLifecyclePage';
 import { AuditLifecyclePage } from './pages/audit-lifecycle/AuditLifecyclePage';
 import { PrivacyLifecyclePage } from './pages/privacy-lifecycle/PrivacyLifecyclePage';
@@ -76,13 +81,30 @@ import { BcmLifecyclePage } from './pages/bcm-lifecycle/BcmLifecyclePage';
 import { CyberLifecyclePage } from './pages/cyber-lifecycle/CyberLifecyclePage';
 import { LifecycleOverviewPage } from './pages/lifecycle-overview/LifecycleOverviewPage';
 import { NotificationOutboxPage } from './pages/notification-outbox/NotificationOutboxPage';
+import { PdplExtensionsPage } from './pages/pdpl-extensions/PdplExtensionsPage';
+import { RcaPage } from './pages/rca/RcaPage';
+import { RiskScenariosPage } from './pages/risk-scenarios/RiskScenariosPage';
+import { SupplierResiliencePage } from './pages/supplier-resilience/SupplierResiliencePage';
+import { EmergingRiskPage } from './pages/emerging-risk/EmergingRiskPage';
+import { CommitteesPage } from './pages/committees/CommitteesPage';
+import { DrPlansPage } from './pages/dr-plans/DrPlansPage';
+import { FrameworkControlsPage } from './pages/framework-controls/FrameworkControlsPage';
+import { ContractClausesPage } from './pages/contract-clauses/ContractClausesPage';
+import { CyberPdplBridgePage } from './pages/cyber-pdpl-bridge/CyberPdplBridgePage';
+import { EvidenceChainPage } from './pages/evidence-chain/EvidenceChainPage';
+import { FourthPartyPage } from './pages/fourth-party/FourthPartyPage';
+import { DataSharingPage } from './pages/data-sharing/DataSharingPage';
+import { ProcessorAssessmentsPage } from './pages/processor-assessments/ProcessorAssessmentsPage';
+import { ThirdPartyCyberPage } from './pages/third-party-cyber/ThirdPartyCyberPage';
+import { ResilienceTestsPage } from './pages/resilience-tests/ResilienceTestsPage';
 
 export function App() {
   return (
     <ThemeProvider>
       <I18nProvider>
         <ToastProvider>
-          <BrowserRouter>
+          <DialogProvider>
+            <BrowserRouter>
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<LoginPage />} />
@@ -102,12 +124,32 @@ export function App() {
               <Route path="/bcm"        element={<BcmPage />} />
               <Route path="/privacy"    element={<PrivacyPage />} />
               <Route path="/pdpl"       element={<Navigate to="/privacy" replace />} />
+              <Route path="/data-lifecycle"  element={<PdplExtensionsPage />} />
+              {/* Legacy route from when this page was called "PDPL extensions". */}
+              <Route path="/pdpl-extensions" element={<Navigate to="/data-lifecycle" replace />} />
               <Route path="/compliance" element={<CompliancePage />} />
+              <Route path="/regulatory/library" element={<RegulatoryLibraryPage />} />
+              <Route path="/controls/library"   element={<ControlLibraryPage />} />
               <Route path="/tprm"       element={<TprmPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
+              <Route path="/rca"        element={<RcaPage />} />
+              <Route path="/risk-scenarios"   element={<RiskScenariosPage />} />
+              <Route path="/emerging-risk"    element={<EmergingRiskPage />} />
+              <Route path="/committees"       element={<CommitteesPage />} />
+              <Route path="/dr-plans"         element={<DrPlansPage />} />
+              <Route path="/framework-controls" element={<FrameworkControlsPage />} />
+              <Route path="/contract-clauses"   element={<ContractClausesPage />} />
+              <Route path="/cyber-pdpl-bridge"  element={<CyberPdplBridgePage />} />
+              <Route path="/evidence-chain"     element={<EvidenceChainPage />} />
+              <Route path="/fourth-party"           element={<FourthPartyPage />} />
+              <Route path="/data-sharing"           element={<DataSharingPage />} />
+              <Route path="/processor-assessments"  element={<ProcessorAssessmentsPage />} />
+              <Route path="/third-party-cyber"      element={<ThirdPartyCyberPage />} />
+              <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />
+              <Route path="/supplier-resilience" element={<SupplierResiliencePage />} />
               <Route path="/workflows"  element={<WorkflowsPage />} />
               <Route path="/changes"    element={<ChangesPage />} />
               <Route path="/ethics"     element={<EthicsPage />} />
@@ -167,6 +209,7 @@ export function App() {
 
               {/* ESG / Saudi Green Initiative — C2 */}
               <Route path="/esg"                element={<EsgPage />} />
+              <Route path="/ndi"                element={<NdiPage />} />
 
               {/* Workflow versioning — A3 */}
               <Route path="/workflow-versions"  element={<WorkflowVersionsPage />} />
@@ -192,6 +235,8 @@ export function App() {
 
               {/* Policy template library — Track D2 (content moat) */}
               <Route path="/policy-templates"   element={<PolicyTemplatesPage />} />
+              <Route path="/policy-management"  element={<PolicyManagementPage />} />
+              <Route path="/policy"             element={<Navigate to="/policy-management" replace />} />
 
               {/* Risk lifecycle — Production hardening (Option 1) */}
               <Route path="/risk-lifecycle"     element={<RiskLifecyclePage />} />
@@ -225,6 +270,7 @@ export function App() {
 
               {/* Cross-module approval inbox (Sprint 5) */}
               <Route path="/approvals"          element={<ApprovalInboxPage />} />
+              <Route path="/signatures"         element={<SignaturesPage />} />
 
               {/* Unified asset register / CMDB-lite (Sprint 5) */}
               <Route path="/assets"             element={<AssetRegisterPage />} />
@@ -235,15 +281,18 @@ export function App() {
               {/* Saudi regulatory-change feed (Sprint 5) */}
               <Route path="/regulatory-change"  element={<RegulatoryChangePage />} />
 
-              {/* Sidebar entries from the broader design vision that have no v1 equivalent — kept as placeholders. */}
-              <Route path="/data"   element={<PlaceholderPage moduleKey="modData" />} />
-              <Route path="/audit"  element={<PlaceholderPage moduleKey="modAudit" />} />
-              <Route path="/policy" element={<PlaceholderPage moduleKey="modPolicy" />} />
-              <Route path="/about"  element={<PlaceholderPage moduleKey="itemAbout" />} />
+              {/* /data, /audit, /policy, /about were vestigial placeholder
+                  routes from an earlier design vision. Removed per user
+                  feedback ("no tables tab or page with empty data") — every
+                  domain now has a real implementation: /data-lifecycle,
+                  /audit-workspace + /audit-lifecycle, /compliance +
+                  /policy-templates. The catch-all below sends any lingering
+                  link to /dashboard. */}
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
-          </BrowserRouter>
+            </BrowserRouter>
+          </DialogProvider>
         </ToastProvider>
       </I18nProvider>
     </ThemeProvider>
