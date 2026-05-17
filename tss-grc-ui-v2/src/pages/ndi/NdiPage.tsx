@@ -76,6 +76,13 @@ import {
   priorityLabelPlan, nextPlanStatuses,
   type NdiImprovementPlan, type EnrichedPlanItem, type NdiPlanStatus, type NdiPlanItemPriority,
 } from '../../lib/ndiPlan';
+import {
+  listSubmissions, preflight as fetchPreflight, createSubmission,
+  regenerateSubmission, finalizeSubmission, approveSubmission, submitSubmission,
+  acknowledgeSubmission, rejectSubmission, reopenSubmission, deleteSubmission,
+  submissionStatusTone, submissionStatusLabel,
+  type NdiSubmissionPackage, type Preflight,
+} from '../../lib/ndiSubmission';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -163,7 +170,8 @@ export function NdiPage() {
       {tab === 'evidence'   && <EvidenceTab />}
       {tab === 'gaps'       && <GapsTab />}
       {tab === 'improvement' && <ImprovementTab />}
-      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence' && tab !== 'gaps' && tab !== 'improvement'
+      {tab === 'submission' && <SubmissionTab />}
+      {tab !== 'cycles' && tab !== 'framework' && tab !== 'maturity' && tab !== 'compliance' && tab !== 'opex' && tab !== 'domains' && tab !== 'evidence' && tab !== 'gaps' && tab !== 'improvement' && tab !== 'submission'
         && <NotYetShipped tab={tab} isAr={isAr} t={t} />}
     </Shell>
   );
@@ -2846,12 +2854,387 @@ function ImprovementTab() {
   );
 }
 
+// ─── Submission Package tab (slice 10) ───────────────────────────────
+
+function SubmissionTab() {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const dialog = useDialog();
+  const isAr = lang === 'ar';
+
+  const [cycles, setCycles] = useState<NdiAssessmentCycle[]>([]);
+  const [cycleId, setCycleId] = useState<number | null>(null);
+  const [packages, setPackages] = useState<NdiSubmissionPackage[]>([]);
+  const [current, setCurrent] = useState<NdiSubmissionPackage | null>(null);
+  const [pf, setPf] = useState<Preflight | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function loadCycles() {
+    try {
+      const pg = await listCycles({ size: 100 });
+      setCycles(pg.content);
+      if (pg.content.length > 0 && !cycleId) setCycleId(pg.content[0].id!);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to load cycles');
+    }
+  }
+  useEffect(() => { void loadCycles(); }, []);
+
+  async function reload() {
+    if (!cycleId) return;
+    setLoading(true);
+    try {
+      const [list, p] = await Promise.all([
+        listSubmissions(cycleId),
+        fetchPreflight(cycleId),
+      ]);
+      setPackages(list);
+      setCurrent(list[0] ?? null);
+      setPf(p);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل الحزم' : 'Failed to load packages'));
+      setPackages([]); setCurrent(null); setPf(null);
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
+
+  async function onCreate() {
+    if (!cycleId) return;
+    try {
+      await createSubmission(cycleId, { preparerName: 'admin' });
+      toast.success(isAr ? 'تم إنشاء الحزمة' : 'Package created');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Create failed');
+    }
+  }
+
+  async function onRegenerate() {
+    if (!current) return;
+    try {
+      await regenerateSubmission(current.id!);
+      toast.success(isAr ? 'تم تحديث اللقطة' : 'Snapshot regenerated');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Regenerate failed');
+    }
+  }
+
+  async function onFinalize() {
+    if (!current) return;
+    try {
+      await finalizeSubmission(current.id!);
+      toast.success(isAr ? 'تم التجهيز' : 'Package finalized');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Finalize failed');
+    }
+  }
+
+  async function onApprove() {
+    if (!current) return;
+    try {
+      await approveSubmission(current.id!, 'admin');
+      toast.success(isAr ? 'تم الاعتماد' : 'Approved');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Approve failed');
+    }
+  }
+
+  async function onSubmit() {
+    if (!current) return;
+    const attestation = await dialog.prompt({
+      title: isAr ? 'نص الإقرار' : 'Attestation text',
+      label: isAr
+        ? 'أقرّ بصحّة البيانات المُقدَّمة وأنّها تمثل واقع الجهة في تاريخ التقديم. أدخل النص الإنجليزي للإقرار.'
+        : 'Declaration that the data submitted is accurate and represents the entity\'s state at submission date. Enter the English attestation text.',
+      type: 'textarea', required: true,
+      initial: 'I, the undersigned, declare that the data submitted in this NDI package is accurate and represents the entity\'s state as of the submission date.',
+    });
+    if (!attestation) return;
+    try {
+      await submitSubmission(current.id!, {
+        submitterName: 'admin',
+        attestationEn: attestation,
+      });
+      toast.success(isAr ? 'تم التقديم لسدايا' : 'Submitted to SDAIA');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Submit failed');
+    }
+  }
+
+  async function onAcknowledge() {
+    if (!current) return;
+    const ref = await dialog.prompt({
+      title: isAr ? 'مرجع سدايا' : 'SDAIA reference',
+      label: isAr ? 'أدخل المرجع الذي أعادته سدايا.' : 'Enter the reference returned by SDAIA.',
+      type: 'text', required: true,
+    });
+    if (!ref) return;
+    try {
+      await acknowledgeSubmission(current.id!, ref);
+      toast.success(isAr ? 'تم تسجيل الإقرار' : 'Acknowledgement recorded');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Acknowledge failed');
+    }
+  }
+
+  async function onReject() {
+    if (!current) return;
+    const reason = await dialog.prompt({
+      title: isAr ? 'سبب الرفض' : 'Rejection reason',
+      label: isAr ? 'أدخل سبب الرفض الذي أعادته سدايا.' : 'Reason returned by SDAIA.',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
+    try {
+      await rejectSubmission(current.id!, reason);
+      toast.success(isAr ? 'تم تسجيل الرفض' : 'Rejection recorded');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Reject failed');
+    }
+  }
+
+  async function onReopen() {
+    if (!current) return;
+    try {
+      await reopenSubmission(current.id!);
+      toast.success(isAr ? 'تم فتح الحزمة من جديد' : 'Package reopened');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Reopen failed');
+    }
+  }
+
+  async function onDelete() {
+    if (!current) return;
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف الحزمة' : 'Delete package',
+      body: isAr ? 'سيتم حذف الحزمة منطقياً.' : 'The package will be soft-deleted.',
+      destructive: true,
+      submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteSubmission(current.id!);
+      toast.success(isAr ? 'تم الحذف' : 'Deleted');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  if (cycles.length === 0) {
+    return <InlineEmpty>{isAr ? 'أنشئ دورة تقييم أولاً' : 'Create an assessment cycle first'}</InlineEmpty>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card title={isAr ? 'حزمة التقديم لسدايا' : 'SDAIA submission package'} Icon={Upload}
+        action={
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={onCreate}>
+              {isAr ? 'حزمة جديدة' : 'New package'}
+            </Button>
+          </div>
+        }>
+        {pf && (
+          <div className="kpi-grid">
+            <Kpi Icon={CheckCircle2} label={isAr ? 'جاهز للتجهيز' : 'Can finalize'}
+                 value={pf.canFinalize ? (isAr ? 'نعم' : 'Yes') : (isAr ? 'لا' : 'No')}
+                 tone={pf.canFinalize ? 'success' : 'danger'} />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات حرجة بلا إجراءات' : 'Critical w/o CAPA'}
+                 value={pf.criticalGapsWithoutCapa}
+                 tone={pf.criticalGapsWithoutCapa > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات حرجة مفتوحة' : 'Critical open'}
+                 value={pf.openCriticalGaps}
+                 tone={pf.openCriticalGaps > 0 ? 'warning' : 'success'} />
+            <Kpi Icon={FileText}     label={isAr ? 'التزام غير معتمد' : 'Compliance unapproved'} value={pf.complianceNotApproved}
+                 tone={pf.complianceNotApproved > 0 ? 'warning' : 'success'} />
+            <Kpi Icon={FileText}     label={isAr ? 'نضج غير معتمد' : 'Maturity unapproved'} value={pf.maturityNotApproved}
+                 tone={pf.maturityNotApproved > 0 ? 'warning' : 'success'} />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'أدلة منتهية' : 'Expired evidence'} value={pf.expiredEvidence}
+                 tone={pf.expiredEvidence > 0 ? 'danger' : 'success'} />
+          </div>
+        )}
+        {pf && pf.blockers.length > 0 && (
+          <div style={{
+            marginTop: 12, padding: 12, fontSize: 12, lineHeight: 1.6,
+            background: 'var(--danger-bg, #fef2f2)', borderLeft: '3px solid var(--danger)',
+            borderRadius: 'var(--r-sm)', color: 'var(--ink-1)',
+          }}>
+            <strong>{isAr ? 'حواجز قبل التجهيز:' : 'Blockers before finalize:'}</strong>
+            <ul style={{ margin: '6px 0 0', paddingInlineStart: 18 }}>
+              {pf.blockers.map((b, i) => <li key={i}>{b}</li>)}
+            </ul>
+          </div>
+        )}
+        {pf && pf.warnings.length > 0 && (
+          <div style={{
+            marginTop: 8, padding: 12, fontSize: 12, lineHeight: 1.6,
+            background: 'var(--warning-bg, #fffbeb)', borderLeft: '3px solid var(--warning)',
+            borderRadius: 'var(--r-sm)', color: 'var(--ink-1)',
+          }}>
+            <strong>{isAr ? 'تنبيهات (لا تمنع التجهيز):' : 'Warnings (do not block finalize):'}</strong>
+            <ul style={{ margin: '6px 0 0', paddingInlineStart: 18 }}>
+              {pf.warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        )}
+      </Card>
+
+      {packages.length === 0
+        ? <InlineEmpty>{isAr ? 'لا توجد حزمة لهذه الدورة بعد. اضغط "حزمة جديدة" لإنشاء أوّل لقطة.' : 'No package for this cycle yet. Click "New package" to create the first snapshot.'}</InlineEmpty>
+        : (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {packages.map(p => (
+              <button key={p.id} onClick={() => setCurrent(p)}
+                style={{
+                  padding: '6px 12px', fontSize: 12,
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-sm)',
+                  background: current?.id === p.id ? 'var(--primary)' : 'var(--surface-1)',
+                  color: current?.id === p.id ? 'white' : 'var(--ink-1)',
+                  cursor: 'pointer',
+                }}>
+                {p.packageCode ?? `#${p.id}`} · v{p.version} · {submissionStatusLabel(p.status, isAr ? 'ar' : 'en')}
+              </button>
+            ))}
+          </div>
+        )}
+
+      {current && (
+        <Card title={`${current.packageCode ?? `#${current.id}`} · v${current.version}`} Icon={FileText}>
+          <div className="kpi-grid">
+            <Kpi Icon={Upload}      label={isAr ? 'الحالة' : 'Status'}
+                 value={submissionStatusLabel(current.status, isAr ? 'ar' : 'en')}
+                 tone={submissionStatusTone(current.status) === 'success' ? 'success'
+                       : submissionStatusTone(current.status) === 'danger' ? 'danger'
+                       : submissionStatusTone(current.status) === 'warning' ? 'warning'
+                       : submissionStatusTone(current.status) === 'primary' ? 'primary'
+                       : submissionStatusTone(current.status) === 'info' ? 'info' : 'primary'} />
+            <Kpi Icon={Database}    label={isAr ? 'مؤشّر نضيء' : 'NDI score'}
+                 value={current.overallNdiPct != null ? `${Number(current.overallNdiPct).toFixed(0)}%` : '—'}
+                 tone={current.overallNdiPct != null && current.overallNdiPct >= 70 ? 'success'
+                       : current.overallNdiPct != null && current.overallNdiPct >= 40 ? 'warning' : 'danger'} />
+            <Kpi Icon={Paperclip}   label={isAr ? 'أدلة' : 'Evidence'}    value={current.totalEvidence}   tone="primary" />
+            <Kpi Icon={AlertCircle} label={isAr ? 'فجوات' : 'Gaps'}       value={`${current.criticalGaps}/${current.totalGaps}`}
+                 tone={current.criticalGaps > 0 ? 'warning' : 'primary'} />
+            <Kpi Icon={Target}      label={isAr ? 'إجراءات' : 'Actions'}  value={`${current.completedActions}/${current.totalActions}`} tone="primary" />
+            <Kpi Icon={FileText}    label={isAr ? 'بصمة' : 'Checksum'}    value={current.manifestChecksum ? current.manifestChecksum.substring(0, 12) + '…' : '—'}
+                 tone="primary" />
+          </div>
+
+          {current.isPlaceholder && (
+            <div style={{
+              marginTop: 12, padding: 12, fontSize: 12, lineHeight: 1.6,
+              background: 'var(--warning-bg, #fffbeb)', borderLeft: '3px solid var(--warning)',
+              borderRadius: 'var(--r-sm)', color: 'var(--ink-1)',
+            }}>
+              <strong>{isAr ? 'تنبيه: مكتبة مؤقتة' : 'Heads-up: placeholder content'}</strong><br/>
+              {isAr
+                ? 'هذه الحزمة تستند إلى مجالات/إطار مُعلَّمة كـ "عنصر مؤقت — يتطلب استيراد مكتبة سدايا الرسمية". لا تَدَّعِ الاكتمال الرسمي حتى يتم استيراد المكتبة.'
+                : 'This package is based on domains/framework flagged as "Placeholder — requires official SDAIA/NDI control library import". Do not claim official completeness until the official library is imported.'}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 16, flexWrap: 'wrap' }}>
+            {(current.status === 'DRAFT' || current.status === 'READY') && (
+              <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={onRegenerate}>
+                {isAr ? 'تحديث اللقطة' : 'Regenerate snapshot'}
+              </Button>
+            )}
+            {current.status === 'DRAFT' && (
+              <Button size="sm" variant="primary" Icon={Check} onClick={onFinalize}
+                disabled={!pf?.canFinalize}>
+                {isAr ? 'تجهيز (Ready)' : 'Finalize (Ready)'}
+              </Button>
+            )}
+            {current.status === 'READY' && !current.approvedAt && (
+              <Button size="sm" variant="primary" Icon={Check} onClick={onApprove}>
+                {isAr ? 'اعتماد' : 'Approve'}
+              </Button>
+            )}
+            {current.status === 'READY' && current.approvedAt && (
+              <Button size="sm" variant="primary" Icon={Upload} onClick={onSubmit}>
+                {isAr ? 'تقديم لسدايا' : 'Submit to SDAIA'}
+              </Button>
+            )}
+            {current.status === 'SUBMITTED' && (
+              <>
+                <Button size="sm" variant="primary" Icon={Check} onClick={onAcknowledge}>
+                  {isAr ? 'تسجيل الإقرار' : 'Record acknowledgement'}
+                </Button>
+                <Button size="sm" variant="ghost" Icon={Trash2} onClick={onReject}>
+                  {isAr ? 'تسجيل الرفض' : 'Record rejection'}
+                </Button>
+              </>
+            )}
+            {current.status === 'REJECTED' && (
+              <Button size="sm" variant="primary" Icon={ArrowRight} onClick={onReopen}>
+                {isAr ? 'إعادة الفتح' : 'Reopen as DRAFT'}
+              </Button>
+            )}
+            {(current.status === 'DRAFT' || current.status === 'READY' || current.status === 'REJECTED') && (
+              <Button size="sm" variant="ghost" Icon={Trash2} onClick={onDelete}>
+                {isAr ? 'حذف' : 'Delete'}
+              </Button>
+            )}
+          </div>
+
+          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+            <div><strong>{isAr ? 'إعداد:' : 'Prepared:'}</strong> {current.preparerName ?? '—'}{current.preparedAt ? ` · ${current.preparedAt}` : ''}</div>
+            {current.reviewedAt && <div><strong>{isAr ? 'مراجعة:' : 'Reviewed:'}</strong> {current.reviewedAt}</div>}
+            {current.approvedAt && <div><strong>{isAr ? 'اعتماد:' : 'Approved:'}</strong> {current.approverName ?? '—'} · {current.approvedAt}</div>}
+            {current.submittedAt && <div><strong>{isAr ? 'تقديم:' : 'Submitted:'}</strong> {current.submitterName ?? '—'} · {current.submittedAt}</div>}
+            {current.acknowledgedAt && <div><strong>{isAr ? 'إقرار سدايا:' : 'SDAIA acknowledged:'}</strong> {current.sdaiaReference ?? '—'} · {current.acknowledgedAt}</div>}
+            {current.rejectionReason && <div style={{ color: 'var(--danger)' }}><strong>{isAr ? 'سبب الرفض:' : 'Rejection reason:'}</strong> {current.rejectionReason}</div>}
+          </div>
+
+          {current.snapshotJson && (
+            <details style={{ marginTop: 16 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--ink-2)', fontWeight: 600 }}>
+                {isAr ? 'محتوى اللقطة (JSON)' : 'Snapshot JSON'}
+              </summary>
+              <pre style={{
+                marginTop: 8, padding: 12, maxHeight: 320, overflow: 'auto',
+                background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
+                fontSize: 10, lineHeight: 1.5,
+              }}>{tryFormat(current.snapshotJson)}</pre>
+            </details>
+          )}
+        </Card>
+      )}
+      {loading && <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>}
+    </div>
+  );
+}
+
+function tryFormat(s: string | undefined): string {
+  if (!s) return '';
+  try { return JSON.stringify(JSON.parse(s), null, 2); }
+  catch { return s; }
+}
+
 // ─── Tabs that aren't shipped yet (slices 2-14) ──────────────────────
 
 const PENDING_SLICE: Record<NdiTab, number | null> = {
   dashboard: 12, cycles: null, framework: null, maturity: null, compliance: null,
   opex: null, domains: null, evidence: null, gaps: null, improvement: null,
-  submission: 10, reports: 11, settings: 13, import: 2, audit: 14,
+  submission: null, reports: 11, settings: 13, import: 2, audit: 14,
 };
 
 function NotYetShipped({ tab, isAr, t }: { tab: NdiTab; isAr: boolean; t: (k: string) => string }) {
