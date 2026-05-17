@@ -133,6 +133,14 @@ V79 migration: `policy.documents` + `policy.exceptions` + `policy.attestations` 
 ### Cross-module integration (commit pending) ← LANDED 2026-05-17
 NDI `gap.risk_id` and `compliance_assessment.risk_id` promoted from soft FK to validated ERM lookup. `NdiCrossLinkService` rejects non-existent risk ids on create/update with HTTP 400 + a clear message; `GET /api/ndi/gaps/{id}/linked-risk` and `GET /api/ndi/compliance/{id}/linked-risk` return a `LinkedRisk` enrichment record (id, externalId UUID, titleEn/Ar, status, sourceModule, inherentLikelihood/Impact, ownerId).
 
+### Risk-Advanced (commit pending) ← LANDED 2026-05-17
+The base ERM module already had `risk.risk_assessments` + `risk.risk_treatments` tables (V15) and Java entities + JPA repos, but no service/controller layer. This commit fills them in.
+- **`RiskAssessmentService`** — record periodic re-assessments (1..5 likelihood / impact scale). On every save the latest values promote to the parent Risk's `residual_likelihood`/`residual_impact`, which trips the DB-side computed `residual_score`. Correction endpoint mirrors only when the corrected row is still the most-recent assessment.
+- **`RiskTreatmentService`** — ISO 31000 treatment types (AVOID / MITIGATE / TRANSFER / ACCEPT) with a PLANNED → IN_PROGRESS → COMPLETED state machine (+ CANCELLED escape). Rule T1: a Risk in TREATMENT status refuses removal of its last live treatment with a clear message.
+- **V80 migration**: adds the `completed_at` column the original V15 migration omitted, plus a backfill that stamps existing COMPLETED rows.
+- `RiskAdvancedController` exposes the new endpoints under `/api/v1/risk/risks/{id}/assessments` and `/api/v1/risk/risks/{id}/treatments`.
+- The existing `RiskAppetiteService` + `KriEngineService` already covered the "appetite" leg of the spec; this commit completes the assessment + treatment legs. Workflow on the parent Risk (submit-for-review, approve, accept, close, reopen, incident-bump) was also already wired by `RiskController`.
+
 ---
 
 ## ❌ REMAINING — Sprint 2 Completion
@@ -140,7 +148,6 @@ NDI `gap.risk_id` and `compliance_assessment.risk_id` promoted from soft FK to v
 ### Modules Not Yet Built
 | Module | UI | Backend | Priority |
 |--------|----|---------|----------|
-| **Risk — Advanced** (risk appetite, treatment plans, full workflow) | ⚠️ basic only | ⚠️ | High |
 | **Vendor Risk Enhancements** (TPRM scoring, questionnaires) | ⚠️ | ⚠️ | Medium |
 
 ### Gaps in Existing Modules
