@@ -98,6 +98,26 @@ public class BcmBiaAssessment {
     @Column(name = "overall_criticality", length = 20)
     private String overallCriticality;
 
+    // Tier-4 #24 (SAMA OPRES) ───────────────────────────────────────
+    /**
+     * SAMA Operational Resilience Framework — Article 9. The absolute upper
+     * bound a critical operation can tolerate disruption before unacceptable
+     * harm to the firm, customers, or financial stability. Stored separately
+     * from MTPD because OPRES uses tolerance as the contractual ceiling that
+     * MTPD must never exceed.
+     */
+    @Column(name = "impact_tolerance_hours")
+    private Integer impactToleranceHours;
+
+    /** Flagged as a "critical operation" under SAMA OPRES (Article 4 mapping). */
+    @Column(name = "opres_critical_operation_flag", nullable = false)
+    private Boolean opresCriticalOperationFlag = false;
+
+    // Tier-4 #27 (Sovereign / national-critical tier) ──────────────
+    /** SOVEREIGN | NATIONAL | SECTORAL | NORMAL — Vision-2030 service classification. */
+    @Column(name = "national_critical_tier", nullable = false, length = 20)
+    private String nationalCriticalTier = "NORMAL";
+
     @Column(name = "evidence_id")  private Long evidenceId;
     @Column(name = "reviewer_id")  private Long reviewerId;
 
