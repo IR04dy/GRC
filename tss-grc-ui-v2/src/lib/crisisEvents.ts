@@ -3,7 +3,16 @@
 // Talks to /api/v1/bcm/crisis-events/* and surfaces typed shapes that the
 // Crisis Room list + detail pages render directly.
 
-import { api } from './api';
+import { api, downloadFile } from './api';
+
+/**
+ * Tier-2 #12: trigger a browser download for the crisis event's
+ * after-action PDF (cover + SitReps + decisions + regulator notifications).
+ */
+export function downloadCrisisEventPdf(eventId: number, eventCode?: string): Promise<void> {
+  const fallback = (eventCode ? eventCode : `crisis-${eventId}`) + '.pdf';
+  return downloadFile(`/api/v1/bcm/crisis-events/${eventId}/export.pdf`, fallback);
+}
 
 export type CrisisStatus =
   | 'DETECTED' | 'ASSESSING' | 'ACTIVATED' | 'CONTAINED' | 'RECOVERED' | 'CLOSED' | 'CANCELLED';

@@ -1,6 +1,16 @@
 // BCP/DRP plan builder client — audit T1.4b.
 
-import { api } from './api';
+import { api, downloadFile } from './api';
+
+/**
+ * Tier-2 #12: trigger a browser download for the plan's PDF export.
+ * Uses the shared `downloadFile` helper so we get the same auth header
+ * + filename-from-Content-Disposition behaviour as other report exports.
+ */
+export function downloadPlanPdf(planId: number, planCode?: string): Promise<void> {
+  const fallback = (planCode ? planCode : `plan-${planId}`) + '.pdf';
+  return downloadFile(`/api/v1/bcm/plans/${planId}/export.pdf`, fallback);
+}
 
 export type BcpPlanType = 'BCP' | 'DRP';
 export type BcpPlanStatus =

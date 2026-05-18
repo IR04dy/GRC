@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Wrench, FileText, ChevronLeft, ChevronRight, History, GitCompare, Plus, ListOrdered, Send } from 'lucide-react';
+import { Wrench, FileText, ChevronLeft, ChevronRight, History, GitCompare, Plus, ListOrdered, Send, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -17,7 +17,7 @@ import {
   listPlans, planStats, getPlan, createPlan, transitionPlan, reopenPlan,
   listSections, editSection,
   listVersions, diffVersions,
-  planStatusTone,
+  planStatusTone, downloadPlanPdf,
   type BcpPlan, type BcpPlanType, type BcpPlanStatus, type BcpSection, type BcpVersion,
 } from '../../lib/bcpPlans';
 import {
@@ -434,6 +434,9 @@ export function BcpBuilderPage() {
         actions={<>
           <Button variant="ghost" onClick={backToRegister}>
             <ChevronLeft size={14} /> {isAr ? 'عودة للسجل' : 'Back to register'}
+          </Button>
+          <Button variant="ghost" onClick={() => void downloadPlanPdf(plan.id, plan.planCode)}>
+            <Download size={14} /> {isAr ? 'تنزيل PDF' : 'Download PDF'}
           </Button>
           {(plan.status === 'APPROVED' || plan.status === 'UNDER_REVIEW') && (
             <Button variant="ghost" onClick={() => void handleReopen()}>

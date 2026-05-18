@@ -3,6 +3,7 @@ package com.tss.grc.module.bcm.cycle.controller;
 import com.tss.grc.module.bcm.cycle.entity.BcpPlan;
 import com.tss.grc.module.bcm.cycle.entity.BcpSection;
 import com.tss.grc.module.bcm.cycle.entity.BcpVersion;
+import com.tss.grc.module.bcm.cycle.service.BcpPlanPdfExporter;
 import com.tss.grc.module.bcm.cycle.service.BcpPlanService;
 import com.tss.grc.module.bcm.cycle.service.BcpPlanService.SectionDef;
 import com.tss.grc.module.bcm.cycle.service.BcpPlanService.VersionDiff;
@@ -10,6 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -50,7 +53,8 @@ public class BcpPlanController {
     public record GenerateFromBiaBody(Long biaId, String planType, String titleEn, String titleAr) {}
     public record SectionPatchBody(String bodyEn, String bodyAr) {}
 
-    private final BcpPlanService service;
+    private final BcpPlanService     service;
+    private final BcpPlanPdfExporter pdfExporter;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -69,6 +73,23 @@ public class BcpPlanController {
     @GetMapping("/stats")
     @PreAuthorize("isAuthenticated()")
     public Map<String, Long> stats() { return service.stats(); }
+
+    /**
+     * Tier-2 #12 — PDF export of an approved/published plan. Returns the
+     * bytes as a download with a filename matching the plan code so the
+     * browser saves "BCP-2026-000001.pdf" rather than "export".
+     */
+    @GetMapping("/{id}/export.pdf")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
+        BcpPlan p = service.get(id);
+        byte[] pdf = pdfExporter.export(id);
+        String filename = (p.getPlanCode() == null ? "plan-" + id : p.getPlanCode()) + ".pdf";
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .body(pdf);
+    }
 
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
