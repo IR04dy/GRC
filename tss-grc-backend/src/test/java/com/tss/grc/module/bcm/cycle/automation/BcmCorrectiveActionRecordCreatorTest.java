@@ -14,6 +14,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.time.LocalDate;
 import java.util.Map;
@@ -37,6 +39,14 @@ import static org.mockito.Mockito.when;
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
+// LENIENT: the @BeforeEach stub for createCapa is shared across most tests
+// (default-title, template substitution, due-date, tenant-restore) but
+// entityType_isCorrect doesn't call createCapa at all, and
+// create_setsTenantFromEvent overrides the stub with its own thenAnswer to
+// assert TenantContext is set mid-call. Strict mode flags both as
+// UnnecessaryStubbing. LENIENT is the right knob here per the audit's
+// preference for shared fixtures over per-test stub duplication.
+@MockitoSettings(strictness = Strictness.LENIENT)
 class BcmCorrectiveActionRecordCreatorTest {
 
     private static final Long ORG_ID = 77L;
