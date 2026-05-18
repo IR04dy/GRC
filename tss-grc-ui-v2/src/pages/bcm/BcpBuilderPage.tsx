@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Wrench, FileText, ChevronLeft, ChevronRight, History, GitCompare, Plus, ListOrdered } from 'lucide-react';
+import { Wrench, FileText, ChevronLeft, ChevronRight, History, GitCompare, Plus, ListOrdered, Send } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -20,6 +20,11 @@ import {
   planStatusTone,
   type BcpPlan, type BcpPlanType, type BcpPlanStatus, type BcpSection, type BcpVersion,
 } from '../../lib/bcpPlans';
+import {
+  listDistribution, distributionStats, distribute, acknowledge, decline,
+  ackStatusTone,
+  type PlanAcknowledgement, type DistributionStats,
+} from '../../lib/planDistribution';
 
 /**
  * BCP / DRP Builder page — audit T1.4b.
@@ -43,7 +48,7 @@ import {
  * SUPERSEDED / CANCELLED — the backend enforces; the UI greys out controls.
  */
 type Mode = 'register' | 'builder';
-type BuilderTab = 'sections' | 'versions' | 'diff';
+type BuilderTab = 'sections' | 'versions' | 'diff' | 'distribution';
 
 const NEXT_STATUS: Record<BcpPlanStatus, BcpPlanStatus[]> = {
   DRAFT:        ['UNDER_REVIEW', 'CANCELLED'],
@@ -80,6 +85,13 @@ export function BcpBuilderPage() {
   const [diffFrom, setDiffFrom] = useState<number | null>(null);
   const [diffTo, setDiffTo] = useState<number | null>(null);
   const [diffPayload, setDiffPayload] = useState<{ fromJson: string; toJson: string } | null>(null);
+
+  // Distribution (Tier-2 #11) — recipients + ack stats for the currently
+  // open plan. Loaded lazily on first switch to the Distribution tab so
+  // the section-editor flow doesn't pay a 2nd network round trip.
+  const [acks, setAcks] = useState<PlanAcknowledgement[]>([]);
+  const [distStats, setDistStats] = useState<DistributionStats | null>(null);
+  const [distOpen, setDistOpen] = useState(false);  // distribute-modal
 
   // ── Register loaders ──
   async function reload() {
@@ -211,6 +223,62 @@ export function BcpBuilderPage() {
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
   }
 
+  // ── Distribution (Tier-2 #11) ──
+  async function reloadDistribution() {
+    if (!plan) return;
+    try {
+      const [list, s] = await Promise.all([
+        listDistribution(plan.id),
+        distributionStats(plan.id),
+      ]);
+      setAcks(Array.isArray(list) ? list : []);
+      setDistStats(s);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحميل التوزيع' : 'Distribution load failed'));
+    }
+  }
+  // Auto-load when the user switches to the Distribution tab the first time.
+  useEffect(() => {
+    if (builderTab === 'distribution' && plan && distStats === null) {
+      void reloadDistribution();
+    }
+  }, [builderTab, plan]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function submitDistribute(form: DistributeForm) {
+    if (!plan) return;
+    // Parse "Name <email> :: Role" lines into Recipient[].
+    const recipients = (form.recipientsText ?? '').split('\n')
+      .map(l => l.trim()).filter(Boolean)
+      .map(parseRecipient);
+    if (recipients.length === 0) {
+      toast.warning(isAr ? 'أدخل مستلماً واحداً على الأقل' : 'Enter at least one recipient');
+      return;
+    }
+    try {
+      await distribute(plan.id, recipients,
+        (form.channel || 'EMAIL') as 'EMAIL'|'PORTAL'|'IN_PERSON'|'PRINT'|'OTHER',
+        form.notes);
+      toast.success(isAr ? `تم التوزيع لـ ${recipients.length} مستلم` : `Distributed to ${recipients.length} recipients`);
+      setDistOpen(false);
+      await reloadDistribution();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التوزيع' : 'Distribute failed'));
+    }
+  }
+
+  async function ackRow(row: PlanAcknowledgement, action: 'ack' | 'decline') {
+    try {
+      if (action === 'ack')      await acknowledge(row.id);
+      else                       await decline(row.id);
+      toast.success(action === 'ack'
+        ? (isAr ? 'تم التأكيد' : 'Acknowledged')
+        : (isAr ? 'تم الرفض' : 'Declined'));
+      await reloadDistribution();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed');
+    }
+  }
+
   const isLocked = plan != null && (plan.status === 'APPROVED' || plan.status === 'PUBLISHED'
     || plan.status === 'ARCHIVED' || plan.status === 'SUPERSEDED' || plan.status === 'CANCELLED');
 
@@ -298,9 +366,10 @@ export function BcpBuilderPage() {
   // ── Builder mode ──
   if (!plan) return null;
   const tabs: TabItem<BuilderTab>[] = [
-    { id: 'sections', label: isAr ? `أقسام (${sections.length})`  : `Sections (${sections.length})`,  Icon: ListOrdered },
-    { id: 'versions', label: isAr ? `النسخ (${versions.length})`   : `Versions (${versions.length})`,   Icon: History },
-    { id: 'diff',     label: isAr ? 'المقارنة'                     : 'Diff',                            Icon: GitCompare },
+    { id: 'sections',     label: isAr ? `أقسام (${sections.length})`  : `Sections (${sections.length})`,  Icon: ListOrdered },
+    { id: 'versions',     label: isAr ? `النسخ (${versions.length})`   : `Versions (${versions.length})`,   Icon: History },
+    { id: 'diff',         label: isAr ? 'المقارنة'                     : 'Diff',                            Icon: GitCompare },
+    { id: 'distribution', label: isAr ? `التوزيع (${acks.length})`     : `Distribution (${acks.length})`,   Icon: Send },
   ];
 
   return (
@@ -417,7 +486,74 @@ export function BcpBuilderPage() {
                 </div>}
           </Card>
         )}
+
+        {builderTab === 'distribution' && (
+          <Card title={isAr ? 'توزيع الخطة والإقرارات' : 'Plan distribution & acknowledgement'}
+                action={<Button variant="primary" onClick={() => setDistOpen(true)}>
+                  <Send size={14} /> {isAr ? 'توزيع جديد' : 'Distribute'}
+                </Button>}>
+            {distStats && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))',
+                            gap: 8, marginBottom: 12 }}>
+                <Kpi Icon={Send}    label={isAr ? 'إجمالي'    : 'Total'}        value={distStats.total}                          tone="info" />
+                <Kpi Icon={History} label={isAr ? 'بالانتظار' : 'Pending'}      value={distStats.pending}                        tone="warning" />
+                <Kpi Icon={History} label={isAr ? 'مُقَر'      : 'Acknowledged'} value={distStats.acknowledged}                   tone="success" />
+                <Kpi Icon={History} label={isAr ? 'مرفوضة'   : 'Declined'}     value={distStats.declined}                       tone="danger" />
+                <Kpi Icon={History} label={isAr ? 'متقادمة'   : 'Stale'}        value={distStats.stale}                          tone="neutral" />
+                <Kpi Icon={History} label={isAr ? 'نسبة الإقرار' : 'Ack %'}     value={`${distStats.acknowledgedPercent.toFixed(1)}%`} tone={distStats.acknowledgedPercent >= 80 ? 'success' : distStats.acknowledgedPercent >= 50 ? 'warning' : 'danger'} />
+              </div>
+            )}
+            {acks.length === 0
+              ? <InlineEmpty text={isAr ? 'لم تُوزَّع الخطة بعد.' : 'Plan has not been distributed yet.'} />
+              : <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
+                    <thead><tr>
+                      <th style={{ textAlign: 'start' }}>{isAr ? 'النسخة' : 'Version'}</th>
+                      <th style={{ textAlign: 'start' }}>{isAr ? 'المستلم' : 'Recipient'}</th>
+                      <th style={{ textAlign: 'start' }}>{isAr ? 'الدور' : 'Role'}</th>
+                      <th style={{ textAlign: 'start' }}>{isAr ? 'القناة' : 'Channel'}</th>
+                      <th style={{ textAlign: 'start' }}>{isAr ? 'وُزِّعت' : 'Distributed'}</th>
+                      <th style={{ textAlign: 'start' }}>{isAr ? 'الحالة' : 'Status'}</th>
+                      <th style={{ textAlign: 'start' }}>{isAr ? 'أُقِرَّت' : 'Acked at'}</th>
+                      <th style={{ textAlign: 'end' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
+                    </tr></thead>
+                    <tbody>
+                      {acks.map(a => (
+                        <tr key={a.id}>
+                          <td className="mono">v{a.planVersion}</td>
+                          <td>{a.recipientName}{a.recipientEmail ? <span className="text-muted" style={{ fontSize: 11 }}> &lt;{a.recipientEmail}&gt;</span> : null}</td>
+                          <td className="text-muted">{a.recipientRole ?? '—'}</td>
+                          <td className="mono" style={{ fontSize: 11 }}>{a.distributionChannel}</td>
+                          <td className="mono" style={{ fontSize: 11 }}>{a.distributedAt?.slice(0, 16) ?? '—'}</td>
+                          <td><Badge tone={ackStatusTone(a.status)}>{a.status}</Badge></td>
+                          <td className="mono" style={{ fontSize: 11 }}>{a.acknowledgedAt?.slice(0, 16) ?? '—'}</td>
+                          <td style={{ textAlign: 'end' }}>
+                            {a.status === 'PENDING' && (
+                              <>
+                                <Button variant="ghost" onClick={() => void ackRow(a, 'ack')}>{isAr ? 'تأكيد' : 'Acknowledge'}</Button>
+                                <Button variant="ghost" onClick={() => void ackRow(a, 'decline')}>{isAr ? 'رفض' : 'Decline'}</Button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>}
+          </Card>
+        )}
       </div>
+
+      <FormModal<DistributeForm>
+        open={distOpen}
+        title={isAr ? 'توزيع الخطة' : 'Distribute plan'}
+        size="md"
+        submitLabel={isAr ? 'توزيع' : 'Distribute'}
+        fields={distributeFields(isAr)}
+        initial={emptyDistribute()}
+        onClose={() => setDistOpen(false)}
+        onSubmit={submitDistribute}
+      />
     </Shell>
   );
 }
@@ -493,6 +629,65 @@ function emptyNewPlan(): NewPlanForm {
   return { planType: 'BCP', titleEn: '', titleAr: '',
            rtoHours: '', rpoHours: '', mtpdHours: '',
            responseTeamRole: '' };
+}
+
+// ─── Distribute form (Tier-2 #11) ────────────────────────────────
+//
+// One textarea where the author types one recipient per line.
+// Accepted line shapes:
+//   "Name <email@x.com>"
+//   "Name <email@x.com> :: Role"
+//   "Name :: Role"
+//   "email@x.com"
+// We parse each line into a Recipient on submit. A free-text textarea
+// is the right shape until we have a real user picker — copy-paste
+// from existing contact lists is the demo flow.
+
+interface DistributeForm {
+  channel:         string;
+  notes:           string;
+  recipientsText:  string;
+}
+
+function emptyDistribute(): DistributeForm {
+  return { channel: 'EMAIL', notes: '', recipientsText: '' };
+}
+
+function distributeFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'select', key: 'channel', label: isAr ? 'القناة' : 'Channel', span: 6, required: true,
+      options: [
+        { value: 'EMAIL',     label: isAr ? 'بريد إلكتروني' : 'Email' },
+        { value: 'PORTAL',    label: isAr ? 'بوابة'         : 'Portal' },
+        { value: 'IN_PERSON', label: isAr ? 'لقاء مباشر'    : 'In person' },
+        { value: 'PRINT',     label: isAr ? 'نسخة مطبوعة'   : 'Print' },
+        { value: 'OTHER',     label: isAr ? 'أخرى'          : 'Other' },
+      ] },
+    { kind: 'text', key: 'notes', label: isAr ? 'ملاحظات (اختياري)' : 'Notes (optional)',
+      span: 6, placeholder: isAr ? 'مثلاً: التوزيع بعد تمرين Q1' : 'e.g. Distributed after Q1 exercise' },
+    { kind: 'textarea', key: 'recipientsText', rows: 8, span: 12,
+      label: isAr
+        ? 'المستلمون (سطر لكل مستلم) — التنسيق: الاسم <البريد> :: الدور'
+        : 'Recipients (one per line) — format: Name <email> :: Role' },
+  ];
+}
+
+function parseRecipient(line: string): { name: string; email?: string; role?: string } {
+  // Split off the "::Role" suffix first.
+  let role: string | undefined;
+  const roleIdx = line.indexOf('::');
+  let head = line;
+  if (roleIdx >= 0) {
+    role = line.slice(roleIdx + 2).trim() || undefined;
+    head = line.slice(0, roleIdx).trim();
+  }
+  // Extract "<email>" if present.
+  const m = head.match(/^(.*?)\s*<\s*([^>]+)\s*>\s*$/);
+  if (m) return { name: m[1].trim() || m[2].trim(), email: m[2].trim(), role };
+  // No angle brackets — if the whole head looks like an email, use it as both.
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(head)) return { name: head, email: head, role };
+  // Otherwise treat the line as a plain name.
+  return { name: head, role };
 }
 
 function newPlanFields(isAr: boolean): FieldDef[] {

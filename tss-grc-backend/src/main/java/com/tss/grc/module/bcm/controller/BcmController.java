@@ -51,32 +51,32 @@ public class BcmController {
 
     // ── BCM Plans ─────────────────────────────────────────────────────────────
 
-    @GetMapping("/plans")
+    @GetMapping("/legacy-plans")
     @PreAuthorize("hasPermission('BCM', 'READ')")
     public Page<BcmPlan> listPlans(@PageableDefault(size = 20) Pageable pageable) {
         return bcmService.listPlans(pageable);
     }
 
-    @GetMapping("/plans/{id}")
+    @GetMapping("/legacy-plans/{id}")
     @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmPlan getPlan(@PathVariable Long id) {
         return bcmService.getPlan(id);
     }
 
-    @PostMapping("/plans")
+    @PostMapping("/legacy-plans")
     @PreAuthorize("hasPermission('BCM', 'WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
     public BcmPlan createPlan(@RequestBody BcmPlan req) {
         return bcmService.createPlan(req);
     }
 
-    @PutMapping("/plans/{id}")
+    @PutMapping("/legacy-plans/{id}")
     @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmPlan updatePlan(@PathVariable Long id, @RequestBody BcmPlan req) {
         return bcmService.updatePlan(id, req);
     }
 
-    @DeleteMapping("/plans/{id}")
+    @DeleteMapping("/legacy-plans/{id}")
     @PreAuthorize("hasPermission('BCM', 'DELETE')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePlan(@PathVariable Long id) {
@@ -84,25 +84,25 @@ public class BcmController {
     }
 
     // ── Plan workflow actions (ISO 22301 lifecycle) ──────────────────────────
-    @PostMapping("/plans/{id}/submit-for-review")
+    @PostMapping("/legacy-plans/{id}/submit-for-review")
     @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmPlan submitPlanForReview(@PathVariable Long id) {
         return bcmService.submitForReview(id);
     }
 
-    @PostMapping("/plans/{id}/approve")
+    @PostMapping("/legacy-plans/{id}/approve")
     @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmPlan approvePlan(@PathVariable Long id) {
         return bcmService.approvePlan(id);
     }
 
-    @PostMapping("/plans/{id}/invoke")
+    @PostMapping("/legacy-plans/{id}/invoke")
     @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmPlan invokePlan(@PathVariable Long id) {
         return bcmService.invokePlan(id);
     }
 
-    @PostMapping("/plans/{id}/restore")
+    @PostMapping("/legacy-plans/{id}/restore")
     @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmPlan restorePlan(@PathVariable Long id) {
         return bcmService.restorePlan(id);

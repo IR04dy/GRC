@@ -116,6 +116,7 @@ public class BcpPlanService {
     private final BcpSectionRepository sections;
     private final BcpVersionRepository versions;
     private final BcmBiaAssessmentRepository bias;
+    private final BcpPlanAcknowledgementRepository acks;
     private final AuditLogService audit;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -464,6 +465,12 @@ public class BcpPlanService {
         v.setApprovedAt(LocalDateTime.now());
         v.setChangeSummary(changeSummary);
         versions.save(v);
+
+        // Tier-2 #11: bumping the version invalidates older distribution acks.
+        // Recipients who acknowledged v1 must re-acknowledge v2 — so we flip
+        // PENDING/ACKNOWLEDGED/DECLINED rows for prior versions to STALE here.
+        // No-op when the plan has no distribution history yet.
+        acks.markStaleBelow(org, plan.getId(), next);
     }
 
     private static Map<String, Object> planSnapshotMap(BcpPlan p) {
