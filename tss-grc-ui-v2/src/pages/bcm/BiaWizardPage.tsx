@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardCheck, ChevronLeft, ChevronRight, FileCheck2, Cog, AlertOctagon, Wrench } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -17,7 +17,7 @@ import {
   calculateBiaCriticality,
   CRITICALITY_LABELS, DIMENSION_LABELS, criticalityTone, biaStatusTone,
   parseTimeBandMatrix, stringifyTimeBandMatrix,
-  type BcmBiaAssessment, type BiaStatus, type BiaCriticality,
+  type BcmBiaAssessment,
 } from '../../lib/biaAssessments';
 import { generatePlanFromBia } from '../../lib/bcpPlans';
 

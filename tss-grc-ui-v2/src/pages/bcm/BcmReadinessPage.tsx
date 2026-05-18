@@ -380,10 +380,17 @@ function LoadingRow() {
 
 function CycleActions({ c, onMove, isAr }: { c: BcmAssessmentCycle; onMove: (c: BcmAssessmentCycle, to: CycleStatus) => void; isAr: boolean }) {
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
   async function pack() {
     setBusy(true);
     try { await downloadEvidencePackage(c.id); }
-    catch (e) { console.error('evidence pack failed', e); }
+    catch (e) {
+      // Don't fail silently — without this the download button just appears
+      // to do nothing if the backend returns 404/500.
+      console.error('evidence pack failed', e);
+      toast.danger(isAr ? 'فشل توليد حزمة الأدلة' : 'Evidence package failed: '
+        + (e instanceof Error ? e.message : 'unknown error'));
+    }
     finally { setBusy(false); }
   }
   return (

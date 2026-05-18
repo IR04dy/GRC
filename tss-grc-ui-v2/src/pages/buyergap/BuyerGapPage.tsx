@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Activity, AlertTriangle, CheckCheck, Database, FileCheck2,
   ShieldCheck, Sparkles, Timer, Wrench,
@@ -7,7 +7,7 @@ import { Shell } from '../../components/layout/Shell';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { EmptyState } from '../../components/ui/EmptyState';
+import { LoadableSection } from '../../components/ui/LoadableSection';
 import {
   ermGap, evidenceGap, privacyGap,
   type AppetiteVariance, type AtRiskTransfer, type EvidenceConnector,
@@ -15,6 +15,7 @@ import {
 import { ai, type AiSuggestion } from '../../lib/ai';
 import { aar, type CrisisAar } from '../../lib/aar';
 import { useToast } from '../../lib/toast';
+import { useLoadable } from '../../lib/useLoadable';
 
 /**
  * Buyer-Assessment Completion Center.
@@ -27,44 +28,20 @@ import { useToast } from '../../lib/toast';
 export function BuyerGapPage() {
   const toast = useToast();
 
-  // §5.1 ERM
-  const [variance, setVariance] = useState<AppetiteVariance | null>(null);
+  // Resource-per-card model: each Loadable is independent so one failing
+  // endpoint doesn't blank the whole page.
+  const varianceL  = useLoadable<AppetiteVariance>(() => ermGap.appetiteVariance());
+  const connectorL = useLoadable<EvidenceConnector[]>(() => evidenceGap.listConnectors());
+  const transferL  = useLoadable<AtRiskTransfer[]>(() => privacyGap.atRiskTransfers());
+  const aarL       = useLoadable<CrisisAar[]>(() => aar.list());
+
+  // Sweep buttons + AI demo carry transient UI state, not page state.
   const [attestSweepBusy, setAttestSweepBusy] = useState(false);
-
-  // §5.9 Evidence
-  const [connectors, setConnectors] = useState<EvidenceConnector[]>([]);
-  const [freshSweepBusy, setFreshSweepBusy] = useState(false);
-
-  // §5.4 Privacy
-  const [transfers, setTransfers] = useState<AtRiskTransfer[]>([]);
-  const [dsrSweepBusy, setDsrSweepBusy] = useState(false);
-  const [pdplSweepBusy, setPdplSweepBusy] = useState(false);
-
-  // §27 AI
-  const [aiOutput, setAiOutput] = useState<AiSuggestion | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
-
-  // Tier-4 AAR
-  const [aars, setAars] = useState<CrisisAar[]>([]);
-
-  async function loadAll() {
-    try {
-      const [v, cs, ts, as] = await Promise.all([
-        ermGap.appetiteVariance().catch(() => null),
-        evidenceGap.listConnectors().catch(() => []),
-        privacyGap.atRiskTransfers().catch(() => []),
-        aar.list().catch(() => []),
-      ]);
-      setVariance(v);
-      setConnectors(cs);
-      setTransfers(ts);
-      setAars(as);
-    } catch (e) {
-      console.warn('Buyer-gap load failed', e);
-    }
-  }
-
-  useEffect(() => { void loadAll(); }, []);
+  const [freshSweepBusy,  setFreshSweepBusy]  = useState(false);
+  const [dsrSweepBusy,    setDsrSweepBusy]    = useState(false);
+  const [pdplSweepBusy,   setPdplSweepBusy]   = useState(false);
+  const [aiOutput,        setAiOutput]        = useState<AiSuggestion | null>(null);
+  const [aiBusy,          setAiBusy]          = useState(false);
 
   const STATUS_TONE: Record<string, BadgeTone> = {
     AVAILABLE: 'info', ENABLED: 'success', DISABLED: 'neutral',
@@ -98,7 +75,7 @@ export function BuyerGapPage() {
     const next = c.status === 'ENABLED' ? 'DISABLED' : 'ENABLED';
     try {
       const updated = await evidenceGap.updateConnector(c.code, { status: next });
-      setConnectors(cs => cs.map(x => x.code === c.code ? updated : x));
+      connectorL.replace(prev => (prev ?? []).map(x => x.code === c.code ? updated : x));
     } catch (e) {
       toast.danger('Update failed: ' + (e as Error).message);
     }
@@ -129,7 +106,7 @@ export function BuyerGapPage() {
     setAiBusy(true);
     try {
       const s = await ai.boardSummary({
-        openHighRisks: variance?.risksAboveAppetite ?? 0,
+        openHighRisks: varianceL.data?.risksAboveAppetite ?? 0,
         overdueCapa: 3,
         ncaCompliancePct: 82,
         pdplCompliancePct: 76,
@@ -154,18 +131,28 @@ export function BuyerGapPage() {
 
         {/* §5.1 ERM — appetite variance */}
         <Card title="§5.1 ERM — Appetite vs Exposure" Icon={Activity}>
-          {variance ? (
-            <div>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                <Badge tone="neutral">Total: {variance.totalRisks}</Badge>
-                <Badge tone="danger">Above appetite: {variance.risksAboveAppetite}</Badge>
-                <Badge tone="success">Within: {variance.risksWithinAppetite}</Badge>
+          <LoadableSection
+            loading={varianceL.loading}
+            error={varianceL.error}
+            onRetry={varianceL.reload}
+            data={varianceL.data}
+            emptyTitle="No risks registered yet"
+            emptySub="Add an enterprise risk to see appetite vs exposure."
+            empty={(v) => v.totalRisks === 0}
+          >
+            {(variance) => (
+              <div>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <Badge tone="neutral">Total: {variance.totalRisks}</Badge>
+                  <Badge tone="danger">Above appetite: {variance.risksAboveAppetite}</Badge>
+                  <Badge tone="success">Within: {variance.risksWithinAppetite}</Badge>
+                </div>
+                <div className="text-xs" style={{ color: 'var(--ink-3)' }}>
+                  Categories tracked: {Object.keys(variance.byCategory).length}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                Categories tracked: {Object.keys(variance.byCategory).length}
-              </div>
-            </div>
-          ) : <EmptyState title="Loading…" />}
+            )}
+          </LoadableSection>
         </Card>
 
         {/* §5.1 ERM — attestation sweep */}
@@ -195,9 +182,15 @@ export function BuyerGapPage() {
 
         {/* §5.9 Evidence — connectors */}
         <Card title="§5.9 Evidence — Connector Library" Icon={Database}>
-          {connectors.length === 0
-            ? <EmptyState title="No connectors registered" />
-            : (
+          <LoadableSection
+            loading={connectorL.loading}
+            error={connectorL.error}
+            onRetry={connectorL.reload}
+            data={connectorL.data}
+            emptyTitle="No connectors registered"
+            emptySub="Connector catalog seeds on tenant provisioning."
+          >
+            {(connectors) => (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {connectors.map(c => (
                   <div key={c.code} style={{
@@ -207,7 +200,7 @@ export function BuyerGapPage() {
                   }}>
                     <div>
                       <div style={{ fontWeight: 500 }}>{c.nameEn}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                      <div className="text-2xs" style={{ color: 'var(--ink-3)' }}>
                         {c.vendor} · {c.category}
                       </div>
                     </div>
@@ -221,6 +214,7 @@ export function BuyerGapPage() {
                 ))}
               </div>
             )}
+          </LoadableSection>
         </Card>
 
         {/* §5.4 Privacy — DSR sweep */}
@@ -250,22 +244,28 @@ export function BuyerGapPage() {
 
         {/* §5.4 Privacy — at-risk transfers */}
         <Card title="§5.4 Privacy — At-Risk Cross-Border" Icon={ShieldCheck}>
-          {transfers.length === 0
-            ? <EmptyState title="No flagged transfers" />
-            : (
+          <LoadableSection
+            loading={transferL.loading}
+            error={transferL.error}
+            onRetry={transferL.reload}
+            data={transferL.data}
+            emptyTitle="No flagged transfers"
+            emptySub="No cross-border transfers are missing adequacy or mechanism details."
+          >
+            {(transfers) => (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {transfers.slice(0, 4).map(t => (
-                  <div key={t.id} style={{
+                  <div key={t.id} className="text-xs" style={{
                     padding: 8, borderRadius: 6,
-                    background: 'var(--surface-2)',
-                    fontSize: 12,
+                    background: 'var(--surface-2, var(--surface))',
                   }}>
                     <div style={{ fontWeight: 500 }}>{t.activityName} → {t.receivingCountry}</div>
-                    <div style={{ color: 'var(--text-2)', marginTop: 2 }}>{t.riskNote}</div>
+                    <div style={{ color: 'var(--ink-3)', marginTop: 2 }}>{t.riskNote}</div>
                   </div>
                 ))}
               </div>
             )}
+          </LoadableSection>
         </Card>
 
         {/* §27 AI — board summary */}
@@ -297,26 +297,31 @@ export function BuyerGapPage() {
 
         {/* Tier-4 #23 — NCEMA AAR */}
         <Card title="Tier-4 — NCEMA After-Action Reports" Icon={FileCheck2}>
-          {aars.length === 0
-            ? <EmptyState title="No AARs yet"
-                sub="Generate one from any closed crisis event." />
-            : (
+          <LoadableSection
+            loading={aarL.loading}
+            error={aarL.error}
+            onRetry={aarL.reload}
+            data={aarL.data}
+            emptyTitle="No AARs yet"
+            emptySub="Generate one from any closed crisis event."
+          >
+            {(aars) => (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {aars.slice(0, 5).map(a => (
-                  <div key={a.id} style={{
+                  <div key={a.id} className="text-xs" style={{
                     display: 'flex', justifyContent: 'space-between',
                     padding: '6px 0', borderBottom: '1px solid var(--border)',
-                    fontSize: 12,
                   }}>
                     <div>
                       <div style={{ fontWeight: 500 }}>{a.reportCode}</div>
-                      <div style={{ color: 'var(--text-2)' }}>{a.titleEn}</div>
+                      <div style={{ color: 'var(--ink-3)' }}>{a.titleEn}</div>
                     </div>
                     <Badge tone={STATUS_TONE[a.status] ?? 'neutral'}>{a.status}</Badge>
                   </div>
                 ))}
               </div>
             )}
+          </LoadableSection>
         </Card>
 
       </div>

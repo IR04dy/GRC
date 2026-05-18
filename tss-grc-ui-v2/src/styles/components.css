@@ -749,6 +749,70 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .empty-inline-compact { padding: var(--sp-5); }   /* even denser for sidebars / KPI cells */
 
+/* ─── ErrorState (inline error card) ─────────────────
+ * Replaces the ad-hoc red <div>Failed to load</div> across pages. Two
+ * variants: full-card (default) and `error-state-compact` for inside
+ * narrow columns. Pairs with the `useLoadable` hook so every fetched
+ * section has a consistent error UI. */
+.error-state {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--danger-200, #fecaca);
+  background: var(--danger-50, #fef2f2);
+  border-radius: var(--radius-md, 8px);
+  color: var(--ink-1);
+}
+[data-theme="dark"] .error-state {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+}
+.error-state-compact {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-xs);
+}
+.error-state-icon { color: var(--danger, #ef4444); flex-shrink: 0; }
+.error-state-body { flex: 1; min-width: 0; }
+.error-state-title { font: 600 var(--text-sm) var(--font-sans); color: var(--ink-1); margin: 0 0 2px; }
+.error-state-sub { font: 500 var(--text-xs) var(--font-sans); color: var(--ink-3); }
+
+/* ─── LoadableSection skeleton stack ─────────────── */
+.loadable-section-skeleton {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3) 0;
+}
+.loadable-section-skeleton-row {
+  width: 100%;
+}
+
+/* ─── ErrorBoundary (last-resort crash card) ──────── */
+.error-boundary-card {
+  max-width: 520px;
+  margin: 80px auto;
+  padding: var(--sp-6);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  color: var(--ink-1);
+}
+.error-boundary-card svg { color: var(--danger, #ef4444); margin-bottom: var(--sp-3); }
+.error-boundary-card h2 { font: 700 18px var(--font-sans); margin: 0 0 var(--sp-2); }
+.error-boundary-card p { font: 500 13px var(--font-sans); color: var(--ink-3); margin: 0 0 var(--sp-4); }
+.error-boundary-detail {
+  font: 500 11.5px var(--font-mono);
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: var(--sp-3);
+  margin: var(--sp-3) 0;
+  color: var(--ink-2);
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+}
+
 /* ─── Text utility classes ───────────────────────
  * Use these instead of inline `style={{ fontSize: 11, color: 'var(--ink-3)' }}`.
  * 1300+ inline fontSize props were measured across pages/ — utility classes

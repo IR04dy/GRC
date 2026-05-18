@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ShieldCheck, LayoutDashboard, Activity, ClipboardCheck, Server, Siren,
-  AlertOctagon, Stamp, BarChart3, Settings, GitBranch, RefreshCw,
+  LayoutDashboard, Activity, ClipboardCheck, Server, Siren,
+  AlertOctagon, Stamp, BarChart3, Settings, RefreshCw,
   Network, Megaphone, ArrowRight,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -59,7 +59,7 @@ export function BcmWorkspacePage() {
         const [bias, crises, remediation, compliance, score] = await Promise.all([
           biaStats().catch(() => ({})),
           crisisEventStats().catch(() => ({})),
-          remediationStats().then(r => r.data).catch(() => undefined),
+          remediationStats().catch(() => undefined),
           complianceStats().catch(() => ({})),
           tenantReadiness().catch(() => null),
         ]);

@@ -3,7 +3,7 @@ import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Link } from 'react-router-dom';
 
-type KpiTone = 'primary' | 'danger' | 'success' | 'warning' | 'info' | 'accent';
+type KpiTone = 'primary' | 'danger' | 'success' | 'warning' | 'info' | 'accent' | 'neutral';
 
 interface KpiProps {
   Icon: LucideIcon;
@@ -41,6 +41,7 @@ const TONES: Record<KpiTone, { bg: string; fg: string; line: string }> = {
   warning: { bg: 'var(--warning-bg)', fg: 'var(--warning-fg)',  line: 'var(--warning)' },
   info:    { bg: 'var(--info-bg)',    fg: 'var(--info-fg)',     line: 'var(--info)'    },
   accent:  { bg: 'var(--accent-50)',  fg: 'var(--accent-700)',  line: 'var(--accent-500)' },
+  neutral: { bg: 'var(--surface-2, var(--surface))', fg: 'var(--ink-2)', line: 'var(--ink-4)' },
 };
 
 function autoTrend(spark?: number[]): { dir: 'up' | 'down'; value: string } | undefined {

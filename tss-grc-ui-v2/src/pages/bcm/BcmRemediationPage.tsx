@@ -14,7 +14,7 @@ import { ApiError } from '../../lib/api';
 import {
   listLessons, createLesson, transitionLesson,
   listGaps, createGap, transitionGap,
-  listCapas, createCapa, updateCapa, transitionCapa, flagOverdueCapas, remediationStats,
+  listCapas, createCapa, transitionCapa, flagOverdueCapas, remediationStats,
   gapStatusTone, severityTone, capaStatusTone,
   type BcmLessonLearned, type BcmGap, type BcmCorrectiveAction,
   type LessonStatus, type GapStatus, type CapaStatus, type LessonSource,

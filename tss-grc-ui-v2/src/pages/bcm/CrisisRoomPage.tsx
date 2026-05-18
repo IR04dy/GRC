@@ -258,9 +258,11 @@ export function CrisisRoomPage() {
     }
   }
 
-  const closureBlocked = selected
+  // `selected && ...` could yield null when selected is null; coerce to
+  // a plain boolean so consumers (Button.disabled) don't get a null prop.
+  const closureBlocked: boolean = !!(selected
     && (selected.status === 'RECOVERED' || selected.status === 'ASSESSING')
-    && (!selected.rootCause || !selected.lessonsLearnedId);
+    && (!selected.rootCause || !selected.lessonsLearnedId));
 
   return (
     <Shell>

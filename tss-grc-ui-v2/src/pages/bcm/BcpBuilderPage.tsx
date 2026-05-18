@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Wrench, FileText, ChevronLeft, ChevronRight, History, GitCompare, Plus, ListOrdered, Send, Download } from 'lucide-react';
+import { Wrench, FileText, ChevronLeft, History, GitCompare, Plus, ListOrdered, Send, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';

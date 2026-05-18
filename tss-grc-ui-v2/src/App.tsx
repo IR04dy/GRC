@@ -116,9 +116,11 @@ import { DataSharingPage } from './pages/data-sharing/DataSharingPage';
 import { ProcessorAssessmentsPage } from './pages/processor-assessments/ProcessorAssessmentsPage';
 import { ThirdPartyCyberPage } from './pages/third-party-cyber/ThirdPartyCyberPage';
 import { ResilienceTestsPage } from './pages/resilience-tests/ResilienceTestsPage';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 export function App() {
   return (
+    <ErrorBoundary>
     <ThemeProvider>
       <I18nProvider>
         <ToastProvider>
@@ -335,5 +337,6 @@ export function App() {
         </ToastProvider>
       </I18nProvider>
     </ThemeProvider>
+    </ErrorBoundary>
   );
 }
