@@ -784,6 +784,226 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   width: 100%;
 }
 
+/* ─── WizardShell (Saudi-GRC §22 workflow wizards) ──
+ * 2-column layout: a step rail on the start side + a content pane.
+ * Below the md breakpoint the rail collapses to a horizontal stepper. */
+.wizard-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}
+@media (max-width: 768px) {
+  .wizard-shell { grid-template-columns: 1fr; }
+  .wizard-rail { flex-direction: row; overflow-x: auto; }
+}
+
+.wizard-rail {
+  list-style: none; margin: 0; padding: var(--sp-5);
+  background: var(--surface-2, var(--surface));
+  border-inline-end: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.wizard-rail-step { margin: 0; }
+.wizard-rail-button {
+  width: 100%;
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  padding: var(--sp-3); border-radius: var(--radius-md, 8px);
+  background: transparent; border: 1px solid transparent;
+  color: var(--ink-2); cursor: pointer; text-align: start;
+  font: 500 var(--text-sm) var(--font-sans);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.wizard-rail-button:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.wizard-rail-button:disabled {
+  cursor: not-allowed; opacity: 0.55;
+}
+.wizard-rail-step.is-active .wizard-rail-button {
+  background: var(--primary-50, var(--surface));
+  border-color: var(--primary-200, var(--border));
+  color: var(--primary-700, var(--ink-1));
+}
+.wizard-rail-step.is-done .wizard-rail-button {
+  color: var(--ink-1);
+}
+.wizard-rail-marker {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--ink-3);
+  font: 700 12px var(--font-sans);
+}
+.wizard-rail-step.is-active .wizard-rail-marker {
+  background: var(--primary, var(--ink-1));
+  color: var(--on-primary, #fff);
+  border-color: var(--primary, var(--ink-1));
+}
+.wizard-rail-step.is-done .wizard-rail-marker {
+  background: var(--success, #16a34a);
+  color: #fff; border-color: var(--success, #16a34a);
+}
+.wizard-rail-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wizard-rail-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.wizard-rail-sub { font: 500 11.5px var(--font-sans); color: var(--ink-3); }
+
+.wizard-body {
+  display: flex; flex-direction: column;
+  min-height: 480px;
+}
+.wizard-content {
+  padding: var(--sp-6);
+  flex: 1; min-width: 0;
+}
+.wizard-step-pane[hidden] { display: none; }
+.wizard-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-6);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2, var(--surface));
+}
+.wizard-footer-left,
+.wizard-footer-right {
+  display: flex; align-items: center; gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.wizard-hint {
+  font: 500 var(--text-xs) var(--font-sans);
+  color: var(--danger, #ef4444);
+}
+
+/* ─── Workflow Hub catalog page ──────────────────── */
+.wf-hub-filters {
+  display: flex; gap: var(--sp-3); margin: var(--sp-4) 0;
+  flex-wrap: wrap;
+}
+.wf-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--sp-3);
+}
+.wf-hub-card-wrap {
+  text-decoration: none; color: inherit;
+  display: block;
+}
+.wf-hub-card-wrap[aria-disabled="true"] { cursor: not-allowed; }
+.wf-hub-card {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  min-height: 180px;
+}
+.wf-hub-card-wrap:not([aria-disabled]):hover .wf-hub-card {
+  border-color: var(--primary, var(--ink-3));
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  transform: translateY(-1px);
+}
+.wf-hub-card.is-disabled { opacity: 0.65; }
+.wf-hub-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--primary, var(--ink-2));
+}
+.wf-hub-card-title {
+  font: 700 var(--text-md, 14px) var(--font-sans);
+  color: var(--ink-1);
+  margin: 0;
+}
+.wf-hub-card-desc {
+  font: 500 var(--text-xs) var(--font-sans);
+  color: var(--ink-3);
+  margin: 0;
+  flex: 1;
+}
+.wf-hub-card-meta {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.wf-hub-card-cta {
+  margin-top: var(--sp-2);
+}
+
+/* ─── Wizard form primitives (shared across wizards) ── */
+.wf-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-4);
+}
+.wf-field {
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 0;
+}
+.wf-field-full { grid-column: 1 / -1; }
+.wf-label {
+  font: 600 var(--text-xs) var(--font-sans);
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wf-required { color: var(--danger, #ef4444); }
+
+.wf-score-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.wf-score-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.wf-score-chip:hover { border-color: var(--ink-3); }
+.wf-score-chip.is-active {
+  background: var(--primary-50, var(--surface));
+  border-color: var(--primary, var(--ink-1));
+  color: var(--primary-700, var(--ink-1));
+}
+.wf-score-num { font: 700 16px var(--font-sans); }
+.wf-score-label { font: 500 10px var(--font-sans); color: var(--ink-3); }
+.wf-score-chip.is-active .wf-score-label { color: var(--primary-700, var(--ink-1)); }
+
+.wf-summary {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  font: 500 var(--text-sm) var(--font-sans);
+}
+
+.wf-review {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.wf-review-row {
+  display: flex; justify-content: space-between;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+  font: 500 var(--text-sm) var(--font-sans);
+}
+.wf-review-row:last-child { border-bottom: 0; }
+.wf-review-k { color: var(--ink-3); }
+.wf-review-v { color: var(--ink-1); font-weight: 600; text-align: end; }
+
+.wf-toggle {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  cursor: pointer;
+  font: 500 var(--text-sm) var(--font-sans);
+  color: var(--ink-1);
+}
+.wf-toggle input { width: 16px; height: 16px; accent-color: var(--primary, var(--ink-1)); }
+
 /* ─── ErrorBoundary (last-resort crash card) ──────── */
 .error-boundary-card {
   max-width: 520px;

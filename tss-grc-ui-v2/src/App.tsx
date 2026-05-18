@@ -37,6 +37,12 @@ import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
 import { BuyerGapPage } from './pages/buyergap/BuyerGapPage';
+import { WorkflowHubPage } from './pages/workflow/WorkflowHubPage';
+import { RiskIdentificationWizard } from './pages/workflow/erm/RiskIdentificationWizard';
+import { DsrFulfilmentWizard } from './pages/workflow/pdpl/DsrFulfilmentWizard';
+import { BreachNotificationWizard } from './pages/workflow/pdpl/BreachNotificationWizard';
+import { CyberIncidentWizard } from './pages/workflow/nca/CyberIncidentWizard';
+import { SupplierOnboardingWizard } from './pages/workflow/scm/SupplierOnboardingWizard';
 import { AdminPage } from './pages/admin/AdminPage';
 import { LicensingPage } from './pages/admin/LicensingPage';
 import { ScmPage } from './pages/scm/ScmPage';
@@ -185,6 +191,14 @@ export function App() {
               <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/buyer-gap"  element={<BuyerGapPage />} />
+
+              {/* Workflow Hub + per-module wizards (Saudi-GRC §7) */}
+              <Route path="/workflows"                              element={<WorkflowHubPage />} />
+              <Route path="/workflows/erm/risk-identification"       element={<RiskIdentificationWizard />} />
+              <Route path="/workflows/pdpl/dsr-fulfilment"           element={<DsrFulfilmentWizard />} />
+              <Route path="/workflows/pdpl/breach-notification"      element={<BreachNotificationWizard />} />
+              <Route path="/workflows/nca/cyber-incident"            element={<CyberIncidentWizard />} />
+              <Route path="/workflows/scm/supplier-onboarding"       element={<SupplierOnboardingWizard />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />
