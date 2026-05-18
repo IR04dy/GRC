@@ -3280,6 +3280,8 @@ export const ar = {
   bcmReportsSidebar: 'تقارير الاستمرارية',
   crisisRoomSidebar: 'غرفة الأزمات',
   biaWizardSidebar: 'معالج تحليل الأثر',
+  bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
+  bcmSettingsSidebar: 'إعدادات BCM',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',
   adminKpiUsers: 'إجمالي المستخدمين',
   adminKpiActive: 'النشطون',

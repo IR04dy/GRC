@@ -3295,6 +3295,8 @@ export const en = {
   bcmReportsSidebar: 'BCM reports',
   crisisRoomSidebar: 'Crisis Room',
   biaWizardSidebar: 'BIA wizard',
+  bcmRemediationSidebar: 'BCM remediation',
+  bcmSettingsSidebar: 'BCM settings',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',
