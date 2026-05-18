@@ -36,6 +36,7 @@ import { PdplDashboardPage } from './pages/dashboards/PdplDashboardPage';
 import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
+import { BuyerGapPage } from './pages/buyergap/BuyerGapPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { LicensingPage } from './pages/admin/LicensingPage';
 import { ScmPage } from './pages/scm/ScmPage';
@@ -181,6 +182,7 @@ export function App() {
               <Route path="/third-party-cyber"      element={<ThirdPartyCyberPage />} />
               <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
+              <Route path="/buyer-gap"  element={<BuyerGapPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />
