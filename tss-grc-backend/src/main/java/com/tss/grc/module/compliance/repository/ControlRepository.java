@@ -1,5 +1,6 @@
 package com.tss.grc.module.compliance.repository;
 
+import org.springframework.stereotype.Repository;
 import com.tss.grc.module.compliance.entity.Control;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -7,12 +8,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+@Repository("complianceControlRepository")
 public interface ControlRepository extends JpaRepository<Control, Long> {
 
     Page<Control> findByOrganisationId(Long organisationId, Pageable pageable);
 
     @Query("""
-        SELECT c FROM Control c
+        SELECT c FROM ComplianceControl c
         WHERE c.organisationId = :orgId
           AND (:framework IS NULL OR c.framework = :framework)
           AND (:status    IS NULL OR c.status    = :status)

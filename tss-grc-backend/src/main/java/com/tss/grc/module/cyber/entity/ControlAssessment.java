@@ -6,7 +6,7 @@ import org.hibernate.annotations.Where;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Entity
+@Entity(name = "CyberControlAssessment")
 @Table(schema = "cyber", name = "control_assessments")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor

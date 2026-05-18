@@ -15,7 +15,7 @@ import java.util.UUID;
  *   PLANNED → ENGAGED → OPENING_MEETING → FIELDWORK → REPORTING
  *           → MGMT_RESPONSE → CLOSED → FOLLOW_UP
  */
-@Entity
+@Entity(name = "ComplianceAuditEngagement")
 @Table(schema = "compliance", name = "audit_engagements")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor

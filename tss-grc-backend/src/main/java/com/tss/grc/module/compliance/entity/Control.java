@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
 
-@Entity
+@Entity(name = "ComplianceControl")
 @Table(schema = "compliance", name = "controls")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor

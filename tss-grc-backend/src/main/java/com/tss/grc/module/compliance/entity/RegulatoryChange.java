@@ -14,7 +14,7 @@ import java.util.UUID;
  * State machine: NEW → APPLICABILITY_ASSESSED → IMPACT_ASSESSED → CONTROLS_UPDATED → CLOSED
  *                NEW → NOT_APPLICABLE (terminal)
  */
-@Entity
+@Entity(name = "ComplianceRegulatoryChange")
 @Table(schema = "compliance", name = "regulatory_changes")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor

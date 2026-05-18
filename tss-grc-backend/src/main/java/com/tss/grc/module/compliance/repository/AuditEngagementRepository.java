@@ -1,5 +1,6 @@
 package com.tss.grc.module.compliance.repository;
 
+import org.springframework.stereotype.Repository;
 import com.tss.grc.module.compliance.entity.AuditEngagement;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
+@Repository("complianceAuditEngagementRepository")
 public interface AuditEngagementRepository extends JpaRepository<AuditEngagement, Long> {
 
     Page<AuditEngagement> findByOrganisationIdOrderByEngagementLetterDateDesc(Long organisationId, Pageable pageable);
@@ -16,7 +18,7 @@ public interface AuditEngagementRepository extends JpaRepository<AuditEngagement
     List<AuditEngagement> findByOrganisationIdAndStatusOrderByEngagementLetterDateDesc(Long organisationId, String status);
 
     @Query("""
-        SELECT a FROM AuditEngagement a
+        SELECT a FROM ComplianceAuditEngagement a
         WHERE a.organisationId = :orgId
           AND (:auditType IS NULL OR a.auditType = :auditType)
           AND (:status    IS NULL OR a.status    = :status)
