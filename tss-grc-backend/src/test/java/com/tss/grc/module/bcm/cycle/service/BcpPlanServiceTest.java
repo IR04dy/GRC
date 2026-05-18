@@ -56,6 +56,13 @@ class BcpPlanServiceTest {
     @Mock private BcpSectionRepository sections;
     @Mock private BcpVersionRepository versions;
     @Mock private BcmBiaAssessmentRepository bias;
+    /**
+     * Added with Tier-2 #11 (plan distribution + acknowledgement). snapshot()
+     * calls acks.markStaleBelow on every version bump; without this @Mock
+     * the field would stay null and any test that flips a plan to APPROVED
+     * NPEs at the auto-mark-stale hook.
+     */
+    @Mock private BcpPlanAcknowledgementRepository acks;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private BcpPlanService service;
