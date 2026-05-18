@@ -153,6 +153,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'bia-wizard',    to: '/bcm/bia',         Icon: ClipboardCheck, labelKey: 'biaWizardSidebar' },
       { id: 'bcm-remediation', to: '/bcm/remediation', Icon: AlertOctagon,  labelKey: 'bcmRemediationSidebar' },
       { id: 'bcm-settings',  to: '/bcm/settings',    Icon: Settings,       labelKey: 'bcmSettingsSidebar' },
+      { id: 'bcm-compliance',to: '/bcm/compliance',  Icon: Stamp,          labelKey: 'bcmComplianceSidebar' },
       { id: 'bcm',      to: '/bcm',               Icon: RefreshCw,    labelKey: 'modBcm' },
       { id: 'bcm-lc',   to: '/bcm-lifecycle',     Icon: Activity,     labelKey: 'bclSidebar' },
       { id: 'bcm-deps', to: '/bcm-dependency',    Icon: GitBranch,    labelKey: 'bdSidebar' },

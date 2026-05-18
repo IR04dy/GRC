@@ -3297,6 +3297,7 @@ export const en = {
   biaWizardSidebar: 'BIA wizard',
   bcmRemediationSidebar: 'BCM remediation',
   bcmSettingsSidebar: 'BCM settings',
+  bcmComplianceSidebar: 'BCM compliance mapping',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',

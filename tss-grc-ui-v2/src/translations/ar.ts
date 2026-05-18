@@ -3282,6 +3282,7 @@ export const ar = {
   biaWizardSidebar: 'معالج تحليل الأثر',
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
+  bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',
   adminKpiUsers: 'إجمالي المستخدمين',
   adminKpiActive: 'النشطون',
