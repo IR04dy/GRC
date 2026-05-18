@@ -4,7 +4,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole, RefreshCw,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
          Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
-         Network, Share2, Bug, BarChart3, KeyRound, Siren, ClipboardCheck, AlertOctagon,
+         Network, Share2, Bug, BarChart3, KeyRound, Siren,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
