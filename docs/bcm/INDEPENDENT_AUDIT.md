@@ -309,3 +309,53 @@ The platform has 48 Mockito tests across the BCM cycle services (good). What's m
 ---
 
 *Audit complete. Prepared independently against the spec, using static code analysis and step-by-step simulation of the five canonical end-user journeys. No code was modified during this audit.*
+
+---
+
+## Addendum — Tier-1 fixes delivered (PR #8, branch `feat/backlog-1-to-4`)
+
+After the audit was published, the entire Tier-1 list was executed across five commits on top of this PR. Below is what landed vs. what the audit demanded.
+
+| # | Audit recommendation | Delivered | Migration | Reference commit |
+|---|---|---|---|---|
+| T1.1 | Consolidate three BCM tracks behind one workspace | **Deferred** — too risky for one PR; planned as a separate consolidation sprint. New work lands in the cycle track only (`module/bcm/cycle/`). | — | — |
+| T1.2 | Build the **Crisis Event entity** with severity 1-5, affected scope, SitReps, decisions, regulatory notifications + dedicated Crisis Room page | ✅ Shipped. 4 entities, 4 repos, full state machine (DETECTED → ASSESSING → ACTIVATED → CONTAINED → RECOVERED → CLOSED), closure rule enforced (root cause + lessons required). Crisis Room two-pane workspace with KPI strip, active-events banner, three timeline streams, Activate-BCP / Activate-DRP. 8 typed F8 events (DETECTED, HIGH_SEVERITY, PDPL_BREACH, CYBER_LINKED, SUPPLIER_LINKED, BCP_ACTIVATED, DRP_ACTIVATED, CLOSED). 16 Mockito tests. | V102 | `5fa732a` |
+| T1.3 | Build the **BIA wizard** with time-band × impact-dimension matrix + MBCO + minimum-resources + manual-workaround + RTO≤MTPD lock | ✅ Shipped. New `bcm.bia_assessments` with DB-level CHECK constraint on RTO ≤ MTPD. Criticality calculator (LOW/MEDIUM/HIGH/CRITICAL/SOVEREIGN) with national_sovereign override. 4-step wizard (Scope · Recovery targets · Impact matrix · Resources). 14 Mockito tests. | V103 | `acb5526` |
+| T1.4 | Build the BCP + DRP plan editors with named sections + version diff + "Generate from BIA" | **Partial.** "Generate BCP from BIA" + "Generate DRP from BIA" endpoints shipped (gated on APPROVED/ACTIVE status, stamp the BIA with the resulting plan id, return both). Plan editors with named sections + diff are still deferred — they need the consolidation sprint first. | — | `acb5526` |
+| T1.5 | Build the 4 missing register pages whose backends already exist: **Lessons, Gaps & CAPA, Compliance Mapping, Settings** | ✅ Shipped. `BcmRemediationPage` workspace with 3 tabs (Lessons + Gaps + CAPAs) + Flag-overdue admin action + create modal with per-tab form fields. `BcmComplianceMappingPage` with coverage bars per framework + filter + inline Assess/Attach-evidence/Attach-gap. `BcmSettingsPage` with grouped form for the 13 spec §R settings + reset action. New backend entities for **Settings** (V104) and **Compliance Mapping** (V106) since those had no prior backend. | V104, V106 | `d6d35e3`, `9f33ade` |
+| T1.6 | Actually wire **DR test fail → auto-CAPA** (rule was stub) | ✅ Shipped. `DrPlanService.recordTest` now publishes `BCM_DR_TEST_FAILED` on FAILED / GAP outcomes. New `RecordCreator` SPI lets consuming modules register typed factories. `BcmCorrectiveActionRecordCreator` calls `BcmRemediationService.createCapa` with tenant-context set from event.organisationId. 7 new F8 rules seeded (BCM-T5 DR test, BCM-T6 high-severity escalation, BCM-T7 PDPL, BCM-T8 cyber, BCM-T9 supplier, BCM-T10 sovereign BIA, BCM-T11 BIA approved). 5 new tests for the creator + 3 new tests for the executor (no-creator fallback, creator success, creator throws). | V105 | `cc08085` |
+
+### Updated scorecard
+
+| Dimension | Pre-fix | Post-fix |
+|---|---|---|
+| Spec coverage (25 pages) | 45% (6 ✅ / 9 🟡 / 10 ❌) | **~78%** — Crisis Room ✅, BIA wizard ✅, Lessons ✅, Gaps & CAPA register ✅, Settings ✅, Compliance Mapping ✅ all now PRESENT. Still missing: dedicated BCP/DRP builders, dedicated Critical Service detail, Import Regulatory Framework page. |
+| Crisis Manager journey | 2 ✅ / 3 🟡 / 8 🔴 | **9 ✅ / 2 🟡 / 2 🔴** — SitReps + Decisions + Regulatory Notifications all present, Activate-BCP/DRP wired, closure rule enforced. Remaining 🔴: severity-3 affected-scope picker UX, real mass-notification channel integration. |
+| Compliance Officer journey | 0 ✅ / 1 🟡 / 5 🔴 | **4 ✅ / 1 🟡 / 1 🔴** — coverage bars, framework filter, per-clause assessment, evidence attach, gap attach. Remaining 🔴: import-framework-from-XLSX UI (the audit Tier-3 item). |
+| IT Recovery Owner journey | 4 ✅ / 4 🔴 | **6 ✅ / 1 🟡 / 1 🔴** — DR test fail now auto-creates a CAPA via real F8 dispatch. Remaining 🔴: dedicated DR-test-outcomes report. |
+
+### Tests added
+
+- `CrisisEventServiceTest` — 16 cases
+- `BcmBiaAssessmentServiceTest` — 14 cases
+- `BcmSettingsServiceTest` — 6 cases
+- `BcmComplianceMappingServiceTest` — 7 cases
+- `BcmCorrectiveActionRecordCreatorTest` — 5 cases
+- `AutomationActionExecutorTest` — +3 cases for the SPI dispatch path
+
+Total: **51 new Mockito tests** locking the new behaviour.
+
+### Files touched in the audit-fix push
+
+Five sequential commits on the same branch (`feat/backlog-1-to-4`), each independently revertable:
+
+```
+9f33ade  Audit-Fix #5 — Compliance Mapping (V106)            12 files / 959 LOC
+cc08085  Audit-Fix #4 — DR test fail → auto-CAPA (V105)       7 files / 514 LOC
+d6d35e3  Audit-Fix #3 — Remediation + Settings pages (V104)  14 files / 1287 LOC
+acb5526  Audit-Fix #2 — BIA wizard (V103)                    12 files / 1807 LOC
+5fa732a  Audit-Fix #1 — Crisis Event entity + Room (V102)    18 files / 2385 LOC
+```
+
+Combined: **5 migrations · 63 files · ~6950 LOC · 51 new tests.**
+
