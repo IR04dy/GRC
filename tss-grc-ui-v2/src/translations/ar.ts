@@ -3284,6 +3284,7 @@ export const ar = {
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',
   bcmWorkspaceSidebar: 'مساحة عمل BCM',
+  bcpBuilderSidebar: 'محرر خطط BCP / DRP',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',
   adminKpiUsers: 'إجمالي المستخدمين',
   adminKpiActive: 'النشطون',

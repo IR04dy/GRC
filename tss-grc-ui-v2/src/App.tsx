@@ -25,6 +25,7 @@ import { BcmReportsPage } from './pages/bcm/BcmReportsPage';
 import { CrisisRoomPage } from './pages/bcm/CrisisRoomPage';
 import { BiaWizardPage } from './pages/bcm/BiaWizardPage';
 import { BcmRemediationPage } from './pages/bcm/BcmRemediationPage';
+import { BcpBuilderPage } from './pages/bcm/BcpBuilderPage';
 import { BcmSettingsPage } from './pages/bcm/BcmSettingsPage';
 import { BcmComplianceMappingPage } from './pages/bcm/BcmComplianceMappingPage';
 import { ScmDashboardPage } from './pages/dashboards/ScmDashboardPage';
@@ -153,6 +154,7 @@ export function App() {
               <Route path="/bcm/crisis-room"    element={<CrisisRoomPage />} />
               <Route path="/bcm/bia"            element={<BiaWizardPage />} />
               <Route path="/bcm/remediation"    element={<BcmRemediationPage />} />
+              <Route path="/bcm/plans"          element={<BcpBuilderPage />} />
               <Route path="/bcm/settings"       element={<BcmSettingsPage />} />
               <Route path="/bcm/compliance"     element={<BcmComplianceMappingPage />} />
               <Route path="/scm/dashboard"      element={<ScmDashboardPage />} />

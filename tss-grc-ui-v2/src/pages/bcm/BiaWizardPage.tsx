@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ClipboardCheck, ChevronLeft, ChevronRight, FileCheck2, Cog, AlertOctagon, Wrench } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -13,11 +14,12 @@ import { ApiError } from '../../lib/api';
 import {
   listBiaCatalog, listBiaAssessments, biaStats,
   getBiaAssessment, createBiaAssessment, patchBiaAssessment, transitionBiaAssessment,
-  calculateBiaCriticality, generateBcpFromBia, generateDrpFromBia,
+  calculateBiaCriticality,
   CRITICALITY_LABELS, DIMENSION_LABELS, criticalityTone, biaStatusTone,
   parseTimeBandMatrix, stringifyTimeBandMatrix,
   type BcmBiaAssessment, type BiaStatus, type BiaCriticality,
 } from '../../lib/biaAssessments';
+import { generatePlanFromBia } from '../../lib/bcpPlans';
 
 /**
  * BIA Wizard + Register — independent audit Tier-1 #3.
@@ -47,6 +49,7 @@ export function BiaWizardPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [mode, setMode] = useState<Mode>('register');
   const [items, setItems] = useState<BcmBiaAssessment[]>([]);
@@ -188,9 +191,15 @@ export function BiaWizardPage() {
       `BCP from ${editing.biaCode}`);
     if (!name) return;
     try {
-      const out = await generateBcpFromBia(editing.id, { planNameEn: name });
-      setEditing(out.bia);
-      toast.success(isAr ? `تم إنشاء BCP #${out.bcp?.id}` : `BCP #${out.bcp?.id} generated`);
+      // Use the new structured-plan endpoint (T1.4b) instead of the legacy
+      // 6-field BcmPlan stub. Creates a multi-section plan + section catalogue.
+      const created = await generatePlanFromBia(editing.id, 'BCP', name);
+      toast.success(isAr ? `تم إنشاء ${created.planCode}` : `${created.planCode} created`);
+      // Refresh the BIA so the linked-BCP indicator updates
+      const refreshed = await getBiaAssessment(editing.id);
+      setEditing(refreshed);
+      // Open the builder so the author can immediately fill sections
+      navigate(`/bcm/plans?openPlan=${created.id}`);
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed');
     }
@@ -202,9 +211,11 @@ export function BiaWizardPage() {
       `DRP from ${editing.biaCode}`);
     if (!name) return;
     try {
-      const out = await generateDrpFromBia(editing.id, { planNameEn: name });
-      setEditing(out.bia);
-      toast.success(isAr ? `تم إنشاء DRP #${out.drp?.id}` : `DRP #${out.drp?.id} generated`);
+      const created = await generatePlanFromBia(editing.id, 'DRP', name);
+      toast.success(isAr ? `تم إنشاء ${created.planCode}` : `${created.planCode} created`);
+      const refreshed = await getBiaAssessment(editing.id);
+      setEditing(refreshed);
+      navigate(`/bcm/plans?openPlan=${created.id}`);
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed');
     }

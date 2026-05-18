@@ -3299,6 +3299,7 @@ export const en = {
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',
   bcmWorkspaceSidebar: 'BCM workspace',
+  bcpBuilderSidebar: 'BCP / DRP builder',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',

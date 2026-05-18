@@ -158,6 +158,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'bcm-dash',        to: '/bcm/dashboard',     Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
       { id: 'bcm-readiness',   to: '/bcm/readiness',     Icon: Activity,       labelKey: 'bcmReadinessSidebar' },
       { id: 'bia-wizard',      to: '/bcm/bia',           Icon: ClipboardCheck, labelKey: 'biaWizardSidebar' },
+      { id: 'bcp-builder',     to: '/bcm/plans',         Icon: FileText,       labelKey: 'bcpBuilderSidebar' },
       { id: 'dr-plans',        to: '/dr-plans',          Icon: Server,         labelKey: 'drpSidebar' },
       { id: 'crisis-room',     to: '/bcm/crisis-room',   Icon: Siren,          labelKey: 'crisisRoomSidebar' },
       { id: 'bcm-remediation', to: '/bcm/remediation',   Icon: AlertOctagon,   labelKey: 'bcmRemediationSidebar' },
