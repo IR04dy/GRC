@@ -6,10 +6,12 @@ import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.platform.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import java.util.Map;
 
@@ -42,7 +44,14 @@ class AutomationActionExecutorTest {
 
     @Mock private AuditLogService audit;
     @Mock private NotificationService notify;
-    @InjectMocks private AutomationActionExecutor executor;
+    @Mock private RecordCreator capaCreator;
+    private AutomationActionExecutor executor;
+
+    @BeforeEach void setUpExecutor() {
+        // No record creators registered by default — handleCreateRecord falls
+        // back to audit-only. Individual tests can register a mocked creator.
+        executor = new AutomationActionExecutor(audit, notify, List.of());
+    }
 
     private static AutomationRule rule(String code, String actionJson) {
         AutomationRule r = new AutomationRule();
@@ -128,14 +137,46 @@ class AutomationActionExecutorTest {
 
     // ─── CREATE_RECORD ─────────────────────────────────────────────
 
-    @Test void createRecord_writesCreateAudit() throws Exception {
+    @Test void createRecord_noCreatorRegistered_fallsBackToAuditOnly() throws Exception {
+        // Default executor (no creators) — message should call out the missing creator.
         AutomationRule r = rule("AR-CR",
             "{\"type\":\"CREATE_RECORD\",\"entity\":\"BcmCorrectiveAction\","
             + "\"fields\":{\"source\":\"CALL_TREE_TEST\"}}");
 
         String summary = executor.execute(r, ev("BCM_CALL_TREE_FAILED"));
 
-        assertThat(summary).isEqualTo("CREATE_RECORD BcmCorrectiveAction audited");
+        assertThat(summary).contains("no creator registered");
+        verify(audit).recordEvent(any());
+    }
+
+    @Test void createRecord_creatorRegistered_invokesCreator() throws Exception {
+        // Wire a mocked RecordCreator for BcmCorrectiveAction
+        when(capaCreator.entityType()).thenReturn("BcmCorrectiveAction");
+        when(capaCreator.create(any(), any())).thenReturn("Created BcmCorrectiveAction#42");
+        AutomationActionExecutor withCreator = new AutomationActionExecutor(audit, notify, List.of(capaCreator));
+
+        AutomationRule r = rule("AR-CR",
+            "{\"type\":\"CREATE_RECORD\",\"entity\":\"BcmCorrectiveAction\","
+            + "\"fields\":{\"priority\":\"HIGH\"}}");
+
+        String summary = withCreator.execute(r, ev("BCM_DR_TEST_FAILED"));
+
+        assertThat(summary).contains("Created BcmCorrectiveAction#42");
+        verify(capaCreator).create(any(), any());
+        verify(audit).recordEvent(any());
+    }
+
+    @Test void createRecord_creatorThrows_recordsErrorAudit() throws Exception {
+        when(capaCreator.entityType()).thenReturn("BcmCorrectiveAction");
+        when(capaCreator.create(any(), any())).thenThrow(new RuntimeException("DB timeout"));
+        AutomationActionExecutor withCreator = new AutomationActionExecutor(audit, notify, List.of(capaCreator));
+
+        AutomationRule r = rule("AR-CR",
+            "{\"type\":\"CREATE_RECORD\",\"entity\":\"BcmCorrectiveAction\"}");
+
+        String summary = withCreator.execute(r, ev("BCM_DR_TEST_FAILED"));
+
+        assertThat(summary).contains("FAILED").contains("DB timeout");
         verify(audit).recordEvent(any());
     }
 

@@ -6,13 +6,15 @@ import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.entity.AutomationRule;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.platform.service.NotificationService;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Executes the {@code action_json} of an {@link AutomationRule}.
@@ -44,7 +46,6 @@ import java.util.Map;
  * without joining back to the notification table.
  */
 @Service
-@RequiredArgsConstructor
 public class AutomationActionExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(AutomationActionExecutor.class);
@@ -52,6 +53,26 @@ public class AutomationActionExecutor {
 
     private final AuditLogService audit;
     private final NotificationService notify;
+
+    /**
+     * All {@link RecordCreator} beans on the classpath, keyed by their declared
+     * {@link RecordCreator#entityType()}. Wired by Spring via the list constructor —
+     * each consuming module ships its own creator(s) and they self-register at boot.
+     * Empty (legacy audit-only) if no module has wired one for a given entity.
+     */
+    private final Map<String, RecordCreator> creatorsByType;
+
+    @Autowired
+    public AutomationActionExecutor(AuditLogService audit,
+                                    NotificationService notify,
+                                    List<RecordCreator> creators) {
+        this.audit = audit;
+        this.notify = notify;
+        this.creatorsByType = creators.stream()
+            .collect(Collectors.toMap(RecordCreator::entityType, c -> c, (a, b) -> a));
+        log.info("[automation] AutomationActionExecutor ready with {} record creators: {}",
+            creatorsByType.size(), creatorsByType.keySet());
+    }
 
     public String execute(AutomationRule rule, DomainEvent event) throws Exception {
         JsonNode action = M.readTree(rule.getActionJson());
@@ -164,21 +185,59 @@ public class AutomationActionExecutor {
 
     // ─── CREATE_RECORD ───────────────────────────────────────────────
 
+    /**
+     * Look up a registered {@link RecordCreator} for {@code action.entity} and
+     * delegate. If no creator is wired (i.e. the consuming module hasn't
+     * provided one yet), fall back to the original audit-only behaviour so
+     * the rule fire is still inspectable.
+     *
+     * <p>Failures inside a creator are caught and recorded as an ERROR audit
+     * row — they do not throw out of this method because that would mark the
+     * whole rule run FAILED and miss the audit trail of what was attempted.
+     */
     private String handleCreateRecord(AutomationRule rule, DomainEvent event, JsonNode action) {
         String entity = action.path("entity").asText("?");
         JsonNode fields = action.path("fields");
         String fieldsRepr = fields.isMissingNode() || fields.isNull()
             ? "{}"
             : fields.toString();
-        audit.recordEvent(new AuditLogService.AuditEventBuilder()
-            .actionType("CREATE_RECORD")
-            .severity("INFO")
-            .entityType(entity)
-            .entityCode(rule.getRuleCode())
-            .sourceModule("automation")
-            .correlationId(event.correlationId())
-            .message("CREATE_RECORD " + entity + " fields=" + fieldsRepr));
-        return "CREATE_RECORD " + entity + " audited";
+
+        RecordCreator creator = creatorsByType.get(entity);
+        if (creator == null) {
+            audit.recordEvent(new AuditLogService.AuditEventBuilder()
+                .actionType("CREATE_RECORD")
+                .severity("INFO")
+                .entityType(entity)
+                .entityCode(rule.getRuleCode())
+                .sourceModule("automation")
+                .correlationId(event.correlationId())
+                .message("CREATE_RECORD " + entity + " — no creator registered (audit-only). fields=" + fieldsRepr));
+            return "CREATE_RECORD " + entity + " (no creator registered — audit-only)";
+        }
+
+        try {
+            String summary = creator.create(action, event);
+            audit.recordEvent(new AuditLogService.AuditEventBuilder()
+                .actionType("CREATE_RECORD")
+                .severity("INFO")
+                .entityType(entity)
+                .entityCode(rule.getRuleCode())
+                .sourceModule("automation")
+                .correlationId(event.correlationId())
+                .message("CREATE_RECORD " + entity + " — " + summary));
+            return "CREATE_RECORD " + entity + " — " + summary;
+        } catch (Exception ex) {
+            log.error("[automation] CREATE_RECORD {} creator failed: {}", entity, ex.getMessage(), ex);
+            audit.recordEvent(new AuditLogService.AuditEventBuilder()
+                .actionType("CREATE_RECORD")
+                .severity("ERROR")
+                .entityType(entity)
+                .entityCode(rule.getRuleCode())
+                .sourceModule("automation")
+                .correlationId(event.correlationId())
+                .message("CREATE_RECORD " + entity + " FAILED: " + ex.getMessage()));
+            return "CREATE_RECORD " + entity + " FAILED: " + ex.getMessage();
+        }
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────
