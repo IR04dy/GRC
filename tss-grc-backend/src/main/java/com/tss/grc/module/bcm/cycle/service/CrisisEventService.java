@@ -1,0 +1,481 @@
+package com.tss.grc.module.bcm.cycle.service;
+
+import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.bcm.cycle.entity.*;
+import com.tss.grc.module.bcm.cycle.repository.*;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.*;
+
+/**
+ * Crisis Event service — independent audit Tier-1 fix.
+ *
+ * <h3>State machine</h3>
+ * <pre>
+ *   DETECTED ─┬─> ASSESSING ─> ACTIVATED ─> CONTAINED ─> RECOVERED ─> CLOSED
+ *             └─> CANCELLED                                              ↑
+ *                                                                       │
+ *                                              from ASSESSING ──────────┘
+ *                                              (if it turned out to be small)
+ * </pre>
+ * <ul>
+ *   <li>{@code DETECTED}     — event logged, severity not yet confirmed</li>
+ *   <li>{@code ASSESSING}    — crisis team triaging</li>
+ *   <li>{@code ACTIVATED}    — crisis team activated, BCP/DRP being run</li>
+ *   <li>{@code CONTAINED}    — disruption stopped spreading, recovery underway</li>
+ *   <li>{@code RECOVERED}    — services restored, monitoring ongoing</li>
+ *   <li>{@code CLOSED}       — terminal: root cause identified + lessons learned linked</li>
+ *   <li>{@code CANCELLED}    — terminal: false alarm</li>
+ * </ul>
+ *
+ * <h3>F8 events emitted</h3>
+ * <ul>
+ *   <li>{@code BCM_CRISIS_DETECTED}                 — every new event</li>
+ *   <li>{@code BCM_CRISIS_HIGH_SEVERITY}            — severity ≥ 4 (CRISIS / NATIONAL_EMERGENCY) — for exec notification (spec §7.16)</li>
+ *   <li>{@code BCM_CRISIS_PDPL_BREACH}              — when {@code personalDataAffected = true} (spec §7.15)</li>
+ *   <li>{@code BCM_CRISIS_CYBER_LINKED}             — when {@code cyberRelated = true}</li>
+ *   <li>{@code BCM_CRISIS_SUPPLIER_LINKED}          — when {@code supplierInvolved = true}</li>
+ *   <li>{@code BCM_CRISIS_BCP_ACTIVATED}            — every BCP activation</li>
+ *   <li>{@code BCM_CRISIS_DRP_ACTIVATED}            — every DRP activation</li>
+ *   <li>{@code BCM_CRISIS_CLOSED}                   — closure (closure requires root cause + lessons per spec §J.13)</li>
+ * </ul>
+ *
+ * <h3>Closure rule</h3>
+ * <p>{@link #transition} blocks the move to CLOSED unless {@code rootCause} is
+ * populated AND {@code lessonsLearnedId} is set. This enforces spec §J rule
+ * "Closure requires root cause + lessons learned".
+ */
+@Service
+@RequiredArgsConstructor
+public class CrisisEventService {
+
+    private static final Set<String> STATUSES = Set.of(
+        "DETECTED", "ASSESSING", "ACTIVATED", "CONTAINED", "RECOVERED", "CLOSED", "CANCELLED");
+    private static final Set<String> TRIGGER_SOURCES = Set.of(
+        "MANUAL", "INCIDENT", "EXERCISE", "THREAT_INTEL", "SUPPLIER", "CYBER", "EXTERNAL_ALERT");
+    private static final Set<String> REGULATORS = Set.of(
+        "NCEMA", "SAMA", "NCA", "CMA", "PDPL", "CIVIL_DEFENCE", "MOH", "MOE", "OTHER");
+    private static final Set<String> NOTIFICATION_METHODS = Set.of(
+        "EMAIL", "PORTAL", "PHONE", "LETTER", "API");
+    private static final Set<String> SITREP_STATUSES = Set.of(
+        "WORSENING", "STABILISING", "RECOVERING", "NORMAL");
+
+    private final CrisisEventRepository events;
+    private final CrisisSituationReportRepository sitreps;
+    private final CrisisDecisionRepository decisions;
+    private final CrisisRegulatoryNotificationRepository regulatoryNotifications;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher eventPublisher;
+
+    // ─── Event CRUD ──────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<CrisisEvent> list(int page, int size) {
+        return events.findByOrganisationIdOrderByIdDesc(
+            TenantContext.getCurrentTenant(), PageRequest.of(page, size));
+    }
+
+    @Transactional(readOnly = true)
+    public List<CrisisEvent> listActive() {
+        // Active = anything that's not terminal
+        return events.findByOrganisationIdAndStatusNotInOrderByIdDesc(
+            TenantContext.getCurrentTenant(), List.of("CLOSED", "CANCELLED"));
+    }
+
+    @Transactional(readOnly = true)
+    public CrisisEvent get(Long id) {
+        return events.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())
+            .orElseThrow(() -> new EntityNotFoundException("Crisis event not found: " + id));
+    }
+
+    @Transactional
+    public CrisisEvent create(CrisisEvent body) {
+        validateBase(body);
+        body.setId(null);
+        Long org = TenantContext.getCurrentTenant();
+        body.setOrganisationId(org);
+        if (body.getStatus() == null) body.setStatus("DETECTED");
+        if (body.getEventCode() == null || body.getEventCode().isBlank()) {
+            body.setEventCode(nextCode());
+        }
+        if (body.getDetectionTime() == null) body.setDetectionTime(LocalDateTime.now());
+        if (body.getStartTime() == null)     body.setStartTime(body.getDetectionTime());
+
+        CrisisEvent saved = events.save(body);
+        audit.log("CREATE", "CrisisEvent", saved.getId(),
+            "Crisis event detected: " + saved.getEventCode() + " — sev=" + saved.getSeverity());
+
+        // Always emit the DETECTED event so dashboards and downstream rules can react.
+        publish("BCM_CRISIS_DETECTED", saved, Map.of(
+            "severity",          saved.getSeverity(),
+            "trigger_source",    nullSafe(saved.getTriggerSource()),
+            "event_code",        saved.getEventCode()
+        ));
+
+        fanOutTriggerEvents(saved);
+        return saved;
+    }
+
+    @Transactional
+    public CrisisEvent update(Long id, CrisisEvent patch) {
+        CrisisEvent existing = get(id);
+        if ("CLOSED".equals(existing.getStatus()) || "CANCELLED".equals(existing.getStatus()))
+            throw new IllegalArgumentException("Cannot edit a " + existing.getStatus() + " crisis event");
+        if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus()))
+            throw new IllegalArgumentException("Use transition() to change status");
+
+        if (patch.getTitleEn()              != null) existing.setTitleEn(patch.getTitleEn());
+        if (patch.getTitleAr()              != null) existing.setTitleAr(patch.getTitleAr());
+        if (patch.getDescription()          != null) existing.setDescription(patch.getDescription());
+        if (patch.getSeverity()             != null) {
+            validateSeverity(patch.getSeverity());
+            existing.setSeverity(patch.getSeverity());
+        }
+        if (patch.getTriggerSource()        != null) {
+            validateTrigger(patch.getTriggerSource());
+            existing.setTriggerSource(patch.getTriggerSource());
+        }
+        if (patch.getAffectedServicesJson()  != null) existing.setAffectedServicesJson(patch.getAffectedServicesJson());
+        if (patch.getAffectedProcessesJson() != null) existing.setAffectedProcessesJson(patch.getAffectedProcessesJson());
+        if (patch.getAffectedSitesJson()     != null) existing.setAffectedSitesJson(patch.getAffectedSitesJson());
+        if (patch.getAffectedSuppliersJson() != null) existing.setAffectedSuppliersJson(patch.getAffectedSuppliersJson());
+        if (patch.getAffectedSystemsJson()   != null) existing.setAffectedSystemsJson(patch.getAffectedSystemsJson());
+        if (patch.getCrisisManagerId()       != null) existing.setCrisisManagerId(patch.getCrisisManagerId());
+        if (patch.getCrisisTeamJson()        != null) existing.setCrisisTeamJson(patch.getCrisisTeamJson());
+        if (patch.getRootCause()             != null) existing.setRootCause(patch.getRootCause());
+        if (patch.getPersonalDataAffected()  != null) existing.setPersonalDataAffected(patch.getPersonalDataAffected());
+        if (patch.getCyberRelated()          != null) existing.setCyberRelated(patch.getCyberRelated());
+        if (patch.getSupplierInvolved()      != null) existing.setSupplierInvolved(patch.getSupplierInvolved());
+        if (patch.getLessonsLearnedId()      != null) existing.setLessonsLearnedId(patch.getLessonsLearnedId());
+
+        existing.setUpdatedAt(LocalDateTime.now());
+        CrisisEvent saved = events.save(existing);
+        audit.log("UPDATE", "CrisisEvent", saved.getId(),
+            "Crisis event updated: " + saved.getEventCode());
+        return saved;
+    }
+
+    /**
+     * State transition with closure rule enforcement. Stamps activation /
+     * closure timestamps automatically.
+     */
+    @Transactional
+    public CrisisEvent transition(Long id, String toStatus) {
+        CrisisEvent e = get(id);
+        if (toStatus == null || !STATUSES.contains(toStatus))
+            throw new IllegalArgumentException("status must be one of " + STATUSES);
+
+        String from = e.getStatus();
+        boolean legal = switch (from) {
+            case "DETECTED"  -> Set.of("ASSESSING", "ACTIVATED", "CANCELLED").contains(toStatus);
+            case "ASSESSING" -> Set.of("ACTIVATED", "CLOSED", "CANCELLED").contains(toStatus);
+            case "ACTIVATED" -> Set.of("CONTAINED", "RECOVERED").contains(toStatus);
+            case "CONTAINED" -> Set.of("RECOVERED", "ACTIVATED").contains(toStatus);  // re-escalation allowed
+            case "RECOVERED" -> Set.of("CLOSED").contains(toStatus);
+            case "CLOSED"    -> false;
+            case "CANCELLED" -> false;
+            default          -> false;
+        };
+        if (!legal)
+            throw new IllegalArgumentException("Illegal transition: " + from + " → " + toStatus);
+
+        // Closure rule per spec §J.13: root cause + lessons learned required.
+        if ("CLOSED".equals(toStatus)) {
+            if (e.getRootCause() == null || e.getRootCause().isBlank())
+                throw new IllegalArgumentException("rootCause is required before closing a crisis event");
+            if (e.getLessonsLearnedId() == null)
+                throw new IllegalArgumentException("lessonsLearnedId must be set before closing a crisis event");
+        }
+
+        e.setStatus(toStatus);
+        LocalDateTime now = LocalDateTime.now();
+        if ("ACTIVATED".equals(toStatus) && e.getActivationTime() == null) {
+            e.setActivationTime(now);
+        }
+        if ("CLOSED".equals(toStatus) || "CANCELLED".equals(toStatus)) {
+            e.setClosureTime(now);
+        }
+        e.setUpdatedAt(now);
+        CrisisEvent saved = events.save(e);
+        audit.log("TRANSITION", "CrisisEvent", saved.getId(),
+            "Crisis event " + saved.getEventCode() + " " + from + " → " + toStatus);
+
+        if ("CLOSED".equals(toStatus)) {
+            publish("BCM_CRISIS_CLOSED", saved, Map.of(
+                "severity",  saved.getSeverity(),
+                "event_code", saved.getEventCode()
+            ));
+        }
+        return saved;
+    }
+
+    // ─── Activation actions ──────────────────────────────────────
+
+    @Transactional
+    public CrisisEvent activateBcp(Long eventId, Long bcpId) {
+        CrisisEvent e = get(eventId);
+        e.setRelatedBcpIdsJson(appendToJsonArray(e.getRelatedBcpIdsJson(), bcpId));
+        e.setUpdatedAt(LocalDateTime.now());
+        CrisisEvent saved = events.save(e);
+        audit.log("CUSTOM", "CrisisEvent", saved.getId(),
+            "BCP activated: bcpId=" + bcpId + " on crisis " + saved.getEventCode());
+        publish("BCM_CRISIS_BCP_ACTIVATED", saved, Map.of(
+            "bcp_id",     bcpId,
+            "event_code", saved.getEventCode(),
+            "severity",   saved.getSeverity()
+        ));
+        return saved;
+    }
+
+    @Transactional
+    public CrisisEvent activateDrp(Long eventId, Long drpId) {
+        CrisisEvent e = get(eventId);
+        e.setRelatedDrpIdsJson(appendToJsonArray(e.getRelatedDrpIdsJson(), drpId));
+        e.setUpdatedAt(LocalDateTime.now());
+        CrisisEvent saved = events.save(e);
+        audit.log("CUSTOM", "CrisisEvent", saved.getId(),
+            "DRP activated: drpId=" + drpId + " on crisis " + saved.getEventCode());
+        publish("BCM_CRISIS_DRP_ACTIVATED", saved, Map.of(
+            "drp_id",     drpId,
+            "event_code", saved.getEventCode(),
+            "severity",   saved.getSeverity()
+        ));
+        return saved;
+    }
+
+    // ─── Situation reports ───────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CrisisSituationReport> listSitReps(Long eventId) {
+        get(eventId);  // tenant guard
+        return sitreps.findByOrganisationIdAndCrisisEventIdOrderByReportedAtAsc(
+            TenantContext.getCurrentTenant(), eventId);
+    }
+
+    @Transactional
+    public CrisisSituationReport addSitRep(Long eventId, CrisisSituationReport body) {
+        CrisisEvent event = get(eventId);
+        if (body.getSummary() == null || body.getSummary().isBlank())
+            throw new IllegalArgumentException("summary is required");
+        if (body.getStatusUpdate() != null && !SITREP_STATUSES.contains(body.getStatusUpdate()))
+            throw new IllegalArgumentException("statusUpdate must be one of " + SITREP_STATUSES);
+        if (body.getSeverityChange() != null) validateSeverity(body.getSeverityChange());
+
+        body.setId(null);
+        body.setOrganisationId(event.getOrganisationId());
+        body.setCrisisEventId(eventId);
+        if (body.getReportedAt() == null) body.setReportedAt(LocalDateTime.now());
+
+        CrisisSituationReport saved = sitreps.save(body);
+
+        // If the SitRep escalates / de-escalates severity, propagate it onto the event.
+        if (body.getSeverityChange() != null && !body.getSeverityChange().equals(event.getSeverity())) {
+            event.setSeverity(body.getSeverityChange());
+            event.setUpdatedAt(LocalDateTime.now());
+            events.save(event);
+            audit.log("UPDATE", "CrisisEvent", event.getId(),
+                "Severity changed via SitRep: " + event.getEventCode() + " → sev=" + body.getSeverityChange());
+            if (body.getSeverityChange() >= 4) {
+                publish("BCM_CRISIS_HIGH_SEVERITY", event, Map.of(
+                    "severity", body.getSeverityChange(),
+                    "event_code", event.getEventCode(),
+                    "via", "sitrep"
+                ));
+            }
+        }
+        audit.log("CREATE", "CrisisSituationReport", saved.getId(),
+            "SitRep logged on " + event.getEventCode());
+        return saved;
+    }
+
+    // ─── Decisions ───────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CrisisDecision> listDecisions(Long eventId) {
+        get(eventId);
+        return decisions.findByOrganisationIdAndCrisisEventIdOrderByDecidedAtAsc(
+            TenantContext.getCurrentTenant(), eventId);
+    }
+
+    @Transactional
+    public CrisisDecision addDecision(Long eventId, CrisisDecision body) {
+        CrisisEvent event = get(eventId);
+        if (body.getDecisionText() == null || body.getDecisionText().isBlank())
+            throw new IllegalArgumentException("decisionText is required");
+
+        body.setId(null);
+        body.setOrganisationId(event.getOrganisationId());
+        body.setCrisisEventId(eventId);
+        if (body.getDecidedAt() == null) body.setDecidedAt(LocalDateTime.now());
+
+        CrisisDecision saved = decisions.save(body);
+        audit.log("CREATE", "CrisisDecision", saved.getId(),
+            "Decision logged on " + event.getEventCode() + ": " + truncate(saved.getDecisionText(), 80));
+        return saved;
+    }
+
+    // ─── Regulatory notifications ────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CrisisRegulatoryNotification> listRegulatoryNotifications(Long eventId) {
+        get(eventId);
+        return regulatoryNotifications.findByOrganisationIdAndCrisisEventIdOrderByNotifiedAtAsc(
+            TenantContext.getCurrentTenant(), eventId);
+    }
+
+    @Transactional
+    public CrisisRegulatoryNotification logRegulatoryNotification(Long eventId,
+                                                                  CrisisRegulatoryNotification body) {
+        CrisisEvent event = get(eventId);
+        if (body.getRegulator() == null || !REGULATORS.contains(body.getRegulator()))
+            throw new IllegalArgumentException("regulator must be one of " + REGULATORS);
+        if (body.getNotificationMethod() != null && !NOTIFICATION_METHODS.contains(body.getNotificationMethod()))
+            throw new IllegalArgumentException("notificationMethod must be one of " + NOTIFICATION_METHODS);
+
+        body.setId(null);
+        body.setOrganisationId(event.getOrganisationId());
+        body.setCrisisEventId(eventId);
+        if (body.getNotifiedAt() == null) body.setNotifiedAt(LocalDateTime.now());
+
+        CrisisRegulatoryNotification saved = regulatoryNotifications.save(body);
+        audit.log("CUSTOM", "CrisisRegulatoryNotification", saved.getId(),
+            "Regulator notified: " + saved.getRegulator() + " on " + event.getEventCode());
+        return saved;
+    }
+
+    @Transactional
+    public CrisisRegulatoryNotification recordAcknowledgement(Long eventId, Long notificationId,
+                                                              String reference) {
+        get(eventId);
+        CrisisRegulatoryNotification n = regulatoryNotifications.findByIdAndOrganisationId(
+                notificationId, TenantContext.getCurrentTenant())
+            .orElseThrow(() -> new EntityNotFoundException("Notification not found: " + notificationId));
+        if (!n.getCrisisEventId().equals(eventId))
+            throw new IllegalArgumentException("Notification does not belong to this event");
+        n.setAcknowledgementReceived(true);
+        n.setAcknowledgementAt(LocalDateTime.now());
+        n.setAcknowledgementReference(reference);
+        CrisisRegulatoryNotification saved = regulatoryNotifications.save(n);
+        audit.log("CUSTOM", "CrisisRegulatoryNotification", saved.getId(),
+            "Ack received from " + saved.getRegulator() + " ref=" + (reference == null ? "(blank)" : reference));
+        return saved;
+    }
+
+    // ─── Stats ──────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> stats() {
+        Long org = TenantContext.getCurrentTenant();
+        Map<String, Long> out = new HashMap<>();
+        for (String s : STATUSES) out.put(s.toLowerCase(), events.countByOrganisationIdAndStatus(org, s));
+        out.put("active",        out.getOrDefault("detected", 0L)
+                               + out.getOrDefault("assessing", 0L)
+                               + out.getOrDefault("activated", 0L)
+                               + out.getOrDefault("contained", 0L)
+                               + out.getOrDefault("recovered", 0L));
+        out.put("high_severity", events.countByOrganisationIdAndSeverityGreaterThanEqual(org, 4));
+        return out;
+    }
+
+    // ─── Helpers ────────────────────────────────────────────────
+
+    private void validateBase(CrisisEvent e) {
+        if (e.getTitleEn() == null || e.getTitleEn().isBlank())
+            throw new IllegalArgumentException("titleEn is required");
+        if (e.getSeverity() == null)
+            throw new IllegalArgumentException("severity is required (1..5)");
+        validateSeverity(e.getSeverity());
+        if (e.getTriggerSource() != null) validateTrigger(e.getTriggerSource());
+    }
+
+    private static void validateSeverity(Integer sev) {
+        if (sev == null || sev < 1 || sev > 5)
+            throw new IllegalArgumentException("severity must be 1..5");
+    }
+
+    private static void validateTrigger(String t) {
+        if (!TRIGGER_SOURCES.contains(t))
+            throw new IllegalArgumentException("triggerSource must be one of " + TRIGGER_SOURCES);
+    }
+
+    /**
+     * Fan out the cross-module trigger events (PDPL / cyber / supplier / high severity).
+     * Called once at create time. Each downstream module (PDPL, cyber, SCM) subscribes
+     * to its own event and creates the breach / incident / supplier record.
+     */
+    private void fanOutTriggerEvents(CrisisEvent e) {
+        if (e.getSeverity() != null && e.getSeverity() >= 4) {
+            publish("BCM_CRISIS_HIGH_SEVERITY", e, Map.of(
+                "severity", e.getSeverity(),
+                "event_code", e.getEventCode()
+            ));
+        }
+        if (Boolean.TRUE.equals(e.getPersonalDataAffected())) {
+            publish("BCM_CRISIS_PDPL_BREACH", e, Map.of(
+                "event_code", e.getEventCode(),
+                "severity",   e.getSeverity()
+            ));
+        }
+        if (Boolean.TRUE.equals(e.getCyberRelated())) {
+            publish("BCM_CRISIS_CYBER_LINKED", e, Map.of(
+                "event_code", e.getEventCode(),
+                "severity",   e.getSeverity()
+            ));
+        }
+        if (Boolean.TRUE.equals(e.getSupplierInvolved())) {
+            publish("BCM_CRISIS_SUPPLIER_LINKED", e, Map.of(
+                "event_code", e.getEventCode(),
+                "severity",   e.getSeverity()
+            ));
+        }
+    }
+
+    private void publish(String triggerEvent, CrisisEvent e, Map<String, Object> extra) {
+        Map<String, Object> payload = new HashMap<>(extra);
+        eventPublisher.publishEvent(DomainEvent.of(
+            e.getOrganisationId(), triggerEvent, "CrisisEvent", e.getId(), payload));
+    }
+
+    /** Generates an event code in the form CRIS-YYYY-NNNNNN. */
+    private String nextCode() {
+        Long org = TenantContext.getCurrentTenant();
+        int year = Year.now().getValue();
+        long count = events.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1)).getTotalElements();
+        return String.format("CRIS-%d-%06d", year, count + 1);
+    }
+
+    /**
+     * Append a Long to a JSON array string. Empty / null input becomes a fresh array.
+     * Trivial concatenation — we don't parse / re-serialise to keep this fast and
+     * dependency-free; callers can always re-parse the column on read.
+     */
+    private static String appendToJsonArray(String existingJson, Long value) {
+        if (value == null) return existingJson;
+        if (existingJson == null || existingJson.isBlank() || "[]".equals(existingJson.trim())) {
+            return "[" + value + "]";
+        }
+        // Insert before the trailing ']'
+        String trimmed = existingJson.trim();
+        if (!trimmed.endsWith("]")) {
+            // Malformed input — start fresh
+            return "[" + value + "]";
+        }
+        return trimmed.substring(0, trimmed.length() - 1) + "," + value + "]";
+    }
+
+    private static String nullSafe(String s) { return s == null ? "" : s; }
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        return s.length() <= max ? s : s.substring(0, max) + "…";
+    }
+}

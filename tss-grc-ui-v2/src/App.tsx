@@ -21,6 +21,7 @@ import { PosturePage } from './pages/compliance/PosturePage';
 import { BcmDashboardPage } from './pages/dashboards/BcmDashboardPage';
 import { BcmReadinessPage } from './pages/bcm/BcmReadinessPage';
 import { BcmReportsPage } from './pages/bcm/BcmReportsPage';
+import { CrisisRoomPage } from './pages/bcm/CrisisRoomPage';
 import { ScmDashboardPage } from './pages/dashboards/ScmDashboardPage';
 import { ErmDashboardPage } from './pages/dashboards/ErmDashboardPage';
 import { CyberDashboardPage } from './pages/dashboards/CyberDashboardPage';
@@ -143,6 +144,7 @@ export function App() {
               <Route path="/bcm/dashboard"      element={<BcmDashboardPage />} />
               <Route path="/bcm/readiness"      element={<BcmReadinessPage />} />
               <Route path="/bcm/reports"        element={<BcmReportsPage />} />
+              <Route path="/bcm/crisis-room"    element={<CrisisRoomPage />} />
               <Route path="/scm/dashboard"      element={<ScmDashboardPage />} />
               <Route path="/risk/dashboard"     element={<ErmDashboardPage />} />
               <Route path="/cyber/dashboard"    element={<CyberDashboardPage />} />

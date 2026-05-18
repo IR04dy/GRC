@@ -3293,6 +3293,7 @@ export const en = {
   adminTitle: 'Users & Access',
   licensingSidebar: 'Module licensing',
   bcmReportsSidebar: 'BCM reports',
+  crisisRoomSidebar: 'Crisis Room',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',

@@ -3278,6 +3278,7 @@ export const ar = {
   adminTitle: 'المستخدمون والصلاحيات',
   licensingSidebar: 'تراخيص الوحدات',
   bcmReportsSidebar: 'تقارير الاستمرارية',
+  crisisRoomSidebar: 'غرفة الأزمات',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',
   adminKpiUsers: 'إجمالي المستخدمين',
   adminKpiActive: 'النشطون',
