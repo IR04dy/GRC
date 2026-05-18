@@ -13,6 +13,7 @@ import { KbHomePage } from './pages/knowledge-base/KbHomePage';
 import { KbArticlePage } from './pages/knowledge-base/KbArticlePage';
 import { KbEditorPage } from './pages/knowledge-base/KbEditorPage';
 import { BcmPage } from './pages/bcm/BcmPage';
+import { BcmWorkspacePage } from './pages/bcm/BcmWorkspacePage';
 import { PrivacyPage } from './pages/privacy/PrivacyPage';
 import { CompliancePage } from './pages/compliance/CompliancePage';
 import { RegulatoryLibraryPage } from './pages/regulatory/RegulatoryLibraryPage';
@@ -135,7 +136,8 @@ export function App() {
               <Route path="/knowledge-base/new"         element={<KbEditorPage />} />
               <Route path="/knowledge-base/:slug/edit"  element={<KbEditorPage />} />
               <Route path="/knowledge-base/:slug"       element={<KbArticlePage />} />
-              <Route path="/bcm"        element={<BcmPage />} />
+              <Route path="/bcm"        element={<BcmWorkspacePage />} />
+              <Route path="/bcm/legacy" element={<BcmPage />} />
               <Route path="/privacy"    element={<PrivacyPage />} />
               <Route path="/pdpl"       element={<Navigate to="/privacy" replace />} />
               <Route path="/data-lifecycle"  element={<PdplExtensionsPage />} />

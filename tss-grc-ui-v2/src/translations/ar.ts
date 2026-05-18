@@ -3283,6 +3283,7 @@ export const ar = {
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',
+  bcmWorkspaceSidebar: 'مساحة عمل BCM',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',
   adminKpiUsers: 'إجمالي المستخدمين',
   adminKpiActive: 'النشطون',

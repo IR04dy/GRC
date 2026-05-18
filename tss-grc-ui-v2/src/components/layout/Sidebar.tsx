@@ -141,24 +141,28 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 7. Business Continuity ─────────────────────────────────────────
-  // Standalone vertical per industry convention (Business Continuity Management).
-  // BIA → Plans → Invocations → Crisis is a coherent operational arc.
+  // Consolidated per audit T1.1: 13 → 9 entries, ordered along the
+  // ISO 22301 / SAMA OPRES operational arc:
+  //   Workspace overview → Dashboard → Readiness cycles → BIA → DR plans
+  //   → Crisis Room → Remediation → Compliance → Reports
+  //
+  // Removed from sidebar (still reachable from /bcm workspace hub):
+  //   /crisis-management — NCEMA-tier invocation page (superseded by Crisis Room)
+  //   /bcm-lifecycle     — legacy SAMA OPRES lifecycle (links from workspace)
+  //   /bcm-dependency    — process dependency tree (links from workspace)
+  //   /bcm/settings      — kept under workspace settings menu, not top-level
   {
     id: 'bcm', titleKey: 'navBcm',
     items: [
-      { id: 'bcm-dash', to: '/bcm/dashboard',     Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
-      { id: 'bcm-readiness', to: '/bcm/readiness', Icon: ShieldCheck,    labelKey: 'bcmReadinessSidebar' },
-      { id: 'bcm-reports',   to: '/bcm/reports',   Icon: BarChart3,      labelKey: 'bcmReportsSidebar' },
-      { id: 'crisis-room',   to: '/bcm/crisis-room', Icon: Siren,        labelKey: 'crisisRoomSidebar' },
-      { id: 'bia-wizard',    to: '/bcm/bia',         Icon: ClipboardCheck, labelKey: 'biaWizardSidebar' },
-      { id: 'bcm-remediation', to: '/bcm/remediation', Icon: AlertOctagon,  labelKey: 'bcmRemediationSidebar' },
-      { id: 'bcm-settings',  to: '/bcm/settings',    Icon: Settings,       labelKey: 'bcmSettingsSidebar' },
-      { id: 'bcm-compliance',to: '/bcm/compliance',  Icon: Stamp,          labelKey: 'bcmComplianceSidebar' },
-      { id: 'bcm',      to: '/bcm',               Icon: RefreshCw,    labelKey: 'modBcm' },
-      { id: 'bcm-lc',   to: '/bcm-lifecycle',     Icon: Activity,     labelKey: 'bclSidebar' },
-      { id: 'bcm-deps', to: '/bcm-dependency',    Icon: GitBranch,    labelKey: 'bdSidebar' },
-      { id: 'dr-plans', to: '/dr-plans',          Icon: Server,       labelKey: 'drpSidebar' },
-      { id: 'crisis',   to: '/crisis-management', Icon: AlertOctagon, labelKey: 'crisisSidebar' },
+      { id: 'bcm',             to: '/bcm',               Icon: ShieldCheck,    labelKey: 'bcmWorkspaceSidebar' },
+      { id: 'bcm-dash',        to: '/bcm/dashboard',     Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
+      { id: 'bcm-readiness',   to: '/bcm/readiness',     Icon: Activity,       labelKey: 'bcmReadinessSidebar' },
+      { id: 'bia-wizard',      to: '/bcm/bia',           Icon: ClipboardCheck, labelKey: 'biaWizardSidebar' },
+      { id: 'dr-plans',        to: '/dr-plans',          Icon: Server,         labelKey: 'drpSidebar' },
+      { id: 'crisis-room',     to: '/bcm/crisis-room',   Icon: Siren,          labelKey: 'crisisRoomSidebar' },
+      { id: 'bcm-remediation', to: '/bcm/remediation',   Icon: AlertOctagon,   labelKey: 'bcmRemediationSidebar' },
+      { id: 'bcm-compliance',  to: '/bcm/compliance',    Icon: Stamp,          labelKey: 'bcmComplianceSidebar' },
+      { id: 'bcm-reports',     to: '/bcm/reports',       Icon: BarChart3,      labelKey: 'bcmReportsSidebar' },
     ],
   },
 

@@ -21,6 +21,30 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Legacy BCM operational service — audit T1.1.
+ *
+ * <p>Pre-cycle implementation (DRAFT → UNDER_REVIEW → APPROVED → INVOKED
+ * state machine on {@link BcmPlan}). Retained to keep the legacy
+ * {@code /bcm/legacy} page functional and to back the "Generate BCP from
+ * BIA" stub in {@link com.tss.grc.module.bcm.cycle.controller.BcmBiaAssessmentController},
+ * which materialises new plans into this table.
+ *
+ * <p><b>New work should use the cycle services under
+ * {@code com.tss.grc.module.bcm.cycle}:</b>
+ * <ul>
+ *   <li>{@code BcmCycleService}             for assessment cycles + governance</li>
+ *   <li>{@code BcmBiaAssessmentService}     for BIA (richer than {@link BiaRecord})</li>
+ *   <li>{@code BcmRiskService}              for the BCM risk register</li>
+ *   <li>{@code ContinuityStrategyService}   for strategies</li>
+ *   <li>{@code CrisisEventService}          for crisis events with SitReps + decisions</li>
+ *   <li>{@code BcmRemediationService}       for lessons + gaps + CAPAs</li>
+ *   <li>{@code BcmComplianceMappingService} for regulator clause × evidence</li>
+ * </ul>
+ * Cycle services carry the F7 audit log + F8 event publication that this
+ * legacy service lacks.
+ */
+@Deprecated(since = "BCM consolidation T1.1", forRemoval = false)
 @Service
 @RequiredArgsConstructor
 public class BcmService {

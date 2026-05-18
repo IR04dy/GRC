@@ -3298,6 +3298,7 @@ export const en = {
   bcmRemediationSidebar: 'BCM remediation',
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',
+  bcmWorkspaceSidebar: 'BCM workspace',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',
