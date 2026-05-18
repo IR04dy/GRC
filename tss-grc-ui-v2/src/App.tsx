@@ -28,6 +28,7 @@ import { BcmRemediationPage } from './pages/bcm/BcmRemediationPage';
 import { BcpBuilderPage } from './pages/bcm/BcpBuilderPage';
 import { BcmSettingsPage } from './pages/bcm/BcmSettingsPage';
 import { BcmComplianceMappingPage } from './pages/bcm/BcmComplianceMappingPage';
+import { BcmLibraryPage } from './pages/bcm/BcmLibraryPage';
 import { ScmDashboardPage } from './pages/dashboards/ScmDashboardPage';
 import { ErmDashboardPage } from './pages/dashboards/ErmDashboardPage';
 import { CyberDashboardPage } from './pages/dashboards/CyberDashboardPage';
@@ -158,6 +159,7 @@ export function App() {
               <Route path="/bcm/plans"          element={<BcpBuilderPage />} />
               <Route path="/bcm/settings"       element={<BcmSettingsPage />} />
               <Route path="/bcm/compliance"     element={<BcmComplianceMappingPage />} />
+              <Route path="/bcm/library"        element={<BcmLibraryPage />} />
               <Route path="/scm/dashboard"      element={<ScmDashboardPage />} />
               <Route path="/risk/dashboard"     element={<ErmDashboardPage />} />
               <Route path="/cyber/dashboard"    element={<CyberDashboardPage />} />
