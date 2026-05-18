@@ -5,8 +5,10 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.drp.dto.DrPlanDtos.*;
 import com.tss.grc.module.bcm.drp.entity.DisasterRecoveryPlan;
 import com.tss.grc.module.bcm.drp.repository.DisasterRecoveryPlanRepository;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -25,6 +28,7 @@ public class DrPlanService {
     private static final Set<String> TEST_OUTCOMES = Set.of("PASSED", "GAP", "FAILED");
 
     private final DisasterRecoveryPlanRepository repo;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public Page<DisasterRecoveryPlan> list(String status, Pageable pageable) {
@@ -165,6 +169,26 @@ public class DrPlanService {
         p.setLastTestedOutcome(req.outcome());
         if (req.notesEn() != null) p.setLastTestNotesEn(req.notesEn());
         p.setNextTestDue(req.nextTestDue() != null ? req.nextTestDue() : LocalDate.now().plusMonths(6));
+
+        // Spec §7 rule 9: DR test fails → create corrective action. Emit an F8
+        // event so the automation engine can fan out to the seeded BCM_DR_TEST_FAILED
+        // rule (which now actually creates a CAPA, not just an audit row).
+        // GAP outcome also escalates because the audit treats "GAP" as a non-passing
+        // result — a Tier-3 / Tier-4 system needs at least a follow-up tracked.
+        if ("FAILED".equals(req.outcome()) || "GAP".equals(req.outcome())) {
+            eventPublisher.publishEvent(DomainEvent.of(
+                p.getOrganisationId(),
+                "BCM_DR_TEST_FAILED",
+                "DisasterRecoveryPlan",
+                p.getId(),
+                Map.of(
+                    "plan_code",  p.getPlanCode(),
+                    "title_en",   p.getTitleEn() == null ? "" : p.getTitleEn(),
+                    "outcome",    req.outcome(),
+                    "notes",      req.notesEn() == null ? "" : req.notesEn(),
+                    "actor_id",   actorId == null ? -1 : actorId
+                )));
+        }
         return p;
     }
 

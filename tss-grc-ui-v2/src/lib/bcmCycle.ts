@@ -272,3 +272,107 @@ export function residualToTone(score?: number): 'success' | 'warning' | 'danger'
   if (score >= 8)  return 'warning';
   return 'success';
 }
+
+// ─── Lessons / Gaps / CAPA — audit Tier-1 #4 ──────────────────────
+//
+// Backend (BcmRemediationService + BcmRemediationController) was shipped in
+// BCM-3 but never had frontend wiring. These wrappers + register page
+// (BcmRemediationPage) close that loop.
+
+export type LessonStatus = 'DRAFT' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+export type LessonSource = 'INCIDENT' | 'CRISIS' | 'EXERCISE' | 'AUDIT' | 'MANUAL';
+export type GapStatus  = BcmGap['status'];
+export type CapaStatus = BcmCorrectiveAction['status'];
+
+export interface BcmLessonLearned {
+  id: number;
+  cycleId?: number;
+  sourceType: LessonSource;
+  sourceId?: number;
+  titleEn: string;
+  titleAr?: string;
+  description?: string;
+  rootCause?: string;
+  recommendation?: string;
+  relatedPlanId?: number;
+  relatedRiskId?: number;
+  correctiveActionId?: number;
+  ownerId?: number;
+  status: LessonStatus;
+}
+
+// Lessons
+export function listLessons(status?: LessonStatus) {
+  const q = status ? `?status=${status}` : '';
+  return api.get<BcmLessonLearned[]>(`${BASE}/lessons${q}`);
+}
+export function createLesson(b: Partial<BcmLessonLearned>)         { return api.post<BcmLessonLearned>(`${BASE}/lessons`, b); }
+export function transitionLesson(id: number, to: LessonStatus)     { return api.post<BcmLessonLearned>(`${BASE}/lessons/${id}/transition`, { to }); }
+
+// Gaps
+export function listGaps(opts: { status?: GapStatus; severity?: BcmGap['severity']; cycleId?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (opts.status)   qs.set('status',   opts.status);
+  if (opts.severity) qs.set('severity', opts.severity);
+  if (opts.cycleId)  qs.set('cycleId',  String(opts.cycleId));
+  const q = qs.toString();
+  return api.get<BcmGap[]>(`${BASE}/gaps${q ? `?${q}` : ''}`);
+}
+export function createGap(b: Partial<BcmGap>)                  { return api.post<BcmGap>(`${BASE}/gaps`, b); }
+export function transitionGap(id: number, to: GapStatus)       { return api.post<BcmGap>(`${BASE}/gaps/${id}/transition`, { to }); }
+
+// CAPAs
+export function listCapas(opts: { status?: CapaStatus; gapId?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (opts.status) qs.set('status', opts.status);
+  if (opts.gapId)  qs.set('gapId',  String(opts.gapId));
+  const q = qs.toString();
+  return api.get<BcmCorrectiveAction[]>(`${BASE}/capas${q ? `?${q}` : ''}`);
+}
+export function createCapa(b: Partial<BcmCorrectiveAction>)               { return api.post<BcmCorrectiveAction>(`${BASE}/capas`, b); }
+export function updateCapa(id: number, b: Partial<BcmCorrectiveAction>)   { return api.put<BcmCorrectiveAction>(`${BASE}/capas/${id}`, b); }
+export function transitionCapa(id: number, to: CapaStatus, evidenceId?: number) {
+  return api.post<BcmCorrectiveAction>(`${BASE}/capas/${id}/transition`, { to, evidenceId });
+}
+export function flagOverdueCapas() { return api.post<{ flagged: number }>(`${BASE}/capas/flag-overdue`, {}); }
+export function remediationStats() {
+  return api.get<{
+    openGaps: number; criticalGaps: number;
+    openCapas: number; overdueCapas: number; closedCapas: number;
+  }>(`${BASE}/remediation/stats`);
+}
+
+// ── Tone helpers
+export function gapStatusTone(s: GapStatus): 'neutral' | 'info' | 'warning' | 'success' | 'danger' {
+  switch (s) {
+    case 'OPEN':          return 'warning';
+    case 'ASSIGNED':      return 'info';
+    case 'IN_PROGRESS':   return 'info';
+    case 'UNDER_REVIEW':  return 'info';
+    case 'CLOSED':        return 'success';
+    case 'ACCEPTED_RISK': return 'warning';
+    case 'REOPENED':      return 'danger';
+  }
+}
+
+export function severityTone(s: BcmGap['severity']): 'success' | 'info' | 'warning' | 'danger' {
+  switch (s) {
+    case 'LOW':      return 'success';
+    case 'MEDIUM':   return 'info';
+    case 'HIGH':     return 'warning';
+    case 'CRITICAL': return 'danger';
+  }
+}
+
+export function capaStatusTone(s: CapaStatus): 'neutral' | 'info' | 'warning' | 'success' | 'danger' {
+  switch (s) {
+    case 'OPEN':                return 'warning';
+    case 'ASSIGNED':            return 'info';
+    case 'IN_PROGRESS':         return 'info';
+    case 'EVIDENCE_SUBMITTED':  return 'info';
+    case 'UNDER_REVIEW':        return 'info';
+    case 'CLOSED':              return 'success';
+    case 'OVERDUE':             return 'danger';
+    case 'REOPENED':            return 'danger';
+  }
+}

@@ -4,7 +4,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole, RefreshCw,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
          Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
-         Network, Share2, Bug, BarChart3,
+         Network, Share2, Bug, BarChart3, KeyRound, Siren, ClipboardCheck, AlertOctagon,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -141,18 +141,28 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // ─── 7. Business Continuity ─────────────────────────────────────────
-  // Standalone vertical per industry convention (Business Continuity Management).
-  // BIA → Plans → Invocations → Crisis is a coherent operational arc.
+  // Consolidated per audit T1.1: 13 → 9 entries, ordered along the
+  // ISO 22301 / SAMA OPRES operational arc:
+  //   Workspace overview → Dashboard → Readiness cycles → BIA → DR plans
+  //   → Crisis Room → Remediation → Compliance → Reports
+  //
+  // Removed from sidebar (still reachable from /bcm workspace hub):
+  //   /crisis-management — NCEMA-tier invocation page (superseded by Crisis Room)
+  //   /bcm-lifecycle     — legacy SAMA OPRES lifecycle (links from workspace)
+  //   /bcm-dependency    — process dependency tree (links from workspace)
+  //   /bcm/settings      — kept under workspace settings menu, not top-level
   {
     id: 'bcm', titleKey: 'navBcm',
     items: [
-      { id: 'bcm-dash', to: '/bcm/dashboard',     Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
-      { id: 'bcm-readiness', to: '/bcm/readiness', Icon: ShieldCheck,    labelKey: 'bcmReadinessSidebar' },
-      { id: 'bcm',      to: '/bcm',               Icon: RefreshCw,    labelKey: 'modBcm' },
-      { id: 'bcm-lc',   to: '/bcm-lifecycle',     Icon: Activity,     labelKey: 'bclSidebar' },
-      { id: 'bcm-deps', to: '/bcm-dependency',    Icon: GitBranch,    labelKey: 'bdSidebar' },
-      { id: 'dr-plans', to: '/dr-plans',          Icon: Server,       labelKey: 'drpSidebar' },
-      { id: 'crisis',   to: '/crisis-management', Icon: AlertOctagon, labelKey: 'crisisSidebar' },
+      { id: 'bcm',             to: '/bcm',               Icon: ShieldCheck,    labelKey: 'bcmWorkspaceSidebar' },
+      { id: 'bcm-dash',        to: '/bcm/dashboard',     Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
+      { id: 'bcm-readiness',   to: '/bcm/readiness',     Icon: Activity,       labelKey: 'bcmReadinessSidebar' },
+      { id: 'bia-wizard',      to: '/bcm/bia',           Icon: ClipboardCheck, labelKey: 'biaWizardSidebar' },
+      { id: 'dr-plans',        to: '/dr-plans',          Icon: Server,         labelKey: 'drpSidebar' },
+      { id: 'crisis-room',     to: '/bcm/crisis-room',   Icon: Siren,          labelKey: 'crisisRoomSidebar' },
+      { id: 'bcm-remediation', to: '/bcm/remediation',   Icon: AlertOctagon,   labelKey: 'bcmRemediationSidebar' },
+      { id: 'bcm-compliance',  to: '/bcm/compliance',    Icon: Stamp,          labelKey: 'bcmComplianceSidebar' },
+      { id: 'bcm-reports',     to: '/bcm/reports',       Icon: BarChart3,      labelKey: 'bcmReportsSidebar' },
     ],
   },
 
@@ -211,6 +221,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'administration', titleKey: 'navAdministration',
     items: [
       { id: 'admin',         to: '/admin',                  Icon: UserCog,       labelKey: 'adminTitle' },
+      { id: 'licensing',     to: '/admin/licensing',        Icon: KeyRound,      labelKey: 'licensingSidebar' },
       { id: 'committees',    to: '/committees',             Icon: LandmarkIcon,  labelKey: 'comSidebar' },
       { id: 'sso',           to: '/sso',                    Icon: LockKeyhole,   labelKey: 'ssoSidebar' },
       { id: 'wf-versions',   to: '/workflow-versions',      Icon: Layers,      labelKey: 'wvSidebar' },

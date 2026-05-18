@@ -13,6 +13,7 @@ import { KbHomePage } from './pages/knowledge-base/KbHomePage';
 import { KbArticlePage } from './pages/knowledge-base/KbArticlePage';
 import { KbEditorPage } from './pages/knowledge-base/KbEditorPage';
 import { BcmPage } from './pages/bcm/BcmPage';
+import { BcmWorkspacePage } from './pages/bcm/BcmWorkspacePage';
 import { PrivacyPage } from './pages/privacy/PrivacyPage';
 import { CompliancePage } from './pages/compliance/CompliancePage';
 import { RegulatoryLibraryPage } from './pages/regulatory/RegulatoryLibraryPage';
@@ -20,6 +21,12 @@ import { ControlLibraryPage } from './pages/controls/ControlLibraryPage';
 import { PosturePage } from './pages/compliance/PosturePage';
 import { BcmDashboardPage } from './pages/dashboards/BcmDashboardPage';
 import { BcmReadinessPage } from './pages/bcm/BcmReadinessPage';
+import { BcmReportsPage } from './pages/bcm/BcmReportsPage';
+import { CrisisRoomPage } from './pages/bcm/CrisisRoomPage';
+import { BiaWizardPage } from './pages/bcm/BiaWizardPage';
+import { BcmRemediationPage } from './pages/bcm/BcmRemediationPage';
+import { BcmSettingsPage } from './pages/bcm/BcmSettingsPage';
+import { BcmComplianceMappingPage } from './pages/bcm/BcmComplianceMappingPage';
 import { ScmDashboardPage } from './pages/dashboards/ScmDashboardPage';
 import { ErmDashboardPage } from './pages/dashboards/ErmDashboardPage';
 import { CyberDashboardPage } from './pages/dashboards/CyberDashboardPage';
@@ -28,6 +35,7 @@ import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
 import { AdminPage } from './pages/admin/AdminPage';
+import { LicensingPage } from './pages/admin/LicensingPage';
 import { ScmPage } from './pages/scm/ScmPage';
 import { WorkflowsPage } from './pages/workflow/WorkflowsPage';
 import { ChangesPage } from './pages/changes/ChangesPage';
@@ -128,7 +136,8 @@ export function App() {
               <Route path="/knowledge-base/new"         element={<KbEditorPage />} />
               <Route path="/knowledge-base/:slug/edit"  element={<KbEditorPage />} />
               <Route path="/knowledge-base/:slug"       element={<KbArticlePage />} />
-              <Route path="/bcm"        element={<BcmPage />} />
+              <Route path="/bcm"        element={<BcmWorkspacePage />} />
+              <Route path="/bcm/legacy" element={<BcmPage />} />
               <Route path="/privacy"    element={<PrivacyPage />} />
               <Route path="/pdpl"       element={<Navigate to="/privacy" replace />} />
               <Route path="/data-lifecycle"  element={<PdplExtensionsPage />} />
@@ -140,6 +149,12 @@ export function App() {
               <Route path="/compliance/posture" element={<PosturePage />} />
               <Route path="/bcm/dashboard"      element={<BcmDashboardPage />} />
               <Route path="/bcm/readiness"      element={<BcmReadinessPage />} />
+              <Route path="/bcm/reports"        element={<BcmReportsPage />} />
+              <Route path="/bcm/crisis-room"    element={<CrisisRoomPage />} />
+              <Route path="/bcm/bia"            element={<BiaWizardPage />} />
+              <Route path="/bcm/remediation"    element={<BcmRemediationPage />} />
+              <Route path="/bcm/settings"       element={<BcmSettingsPage />} />
+              <Route path="/bcm/compliance"     element={<BcmComplianceMappingPage />} />
               <Route path="/scm/dashboard"      element={<ScmDashboardPage />} />
               <Route path="/risk/dashboard"     element={<ErmDashboardPage />} />
               <Route path="/cyber/dashboard"    element={<CyberDashboardPage />} />
@@ -162,6 +177,7 @@ export function App() {
               <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
               <Route path="/admin"      element={<AdminPage />} />
+              <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />
               <Route path="/supplier-resilience" element={<SupplierResiliencePage />} />
               <Route path="/workflows"  element={<WorkflowsPage />} />

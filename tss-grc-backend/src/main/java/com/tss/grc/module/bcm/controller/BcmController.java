@@ -18,10 +18,32 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Legacy BCM REST controller — audit T1.1.
+ *
+ * <p>Surfaces the operational CRUD endpoints used by the {@code /bcm/legacy}
+ * UI page. New work should call the cycle controllers under
+ * {@code module/bcm/cycle/controller/}:
+ * <ul>
+ *   <li>{@code /api/v1/bcm/cycles}           — assessment cycles + governance</li>
+ *   <li>{@code /api/v1/bcm/bia-assessments}  — BIA wizard</li>
+ *   <li>{@code /api/v1/bcm/risks}            — BCM risk register</li>
+ *   <li>{@code /api/v1/bcm/strategies}       — continuity strategies</li>
+ *   <li>{@code /api/v1/bcm/crisis-events}    — crisis events with SitReps</li>
+ *   <li>{@code /api/v1/bcm/{lessons,gaps,capas}}  — remediation</li>
+ *   <li>{@code /api/v1/bcm/compliance}       — regulator mapping</li>
+ *   <li>{@code /api/v1/bcm/settings}         — tenant configuration</li>
+ *   <li>{@code /api/v1/bcm/reports}          — 15-report generator</li>
+ * </ul>
+ * Cycle controllers carry F7 audit + F8 event publication that this
+ * legacy surface lacks. The two coexist by design until a future migration
+ * sprint moves {@code BcmPlan} rows into the cycle BCP entity.
+ */
+@Deprecated(since = "BCM consolidation T1.1", forRemoval = false)
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
-@Tag(name = "BCM")
+@Tag(name = "BCM (legacy)")
 @SecurityRequirement(name = "bearerAuth")
 public class BcmController {
 

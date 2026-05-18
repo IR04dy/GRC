@@ -68,6 +68,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
+        <!--
+            AOP — needed for @Aspect classes (F9 LicenseGuard). Spring AutoConfig wires
+            an AspectJ proxy creator automatically once this starter is present.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
 
         <!-- ── JWT Authentication (JJWT) ──────────────────────────────── -->
         <!--
