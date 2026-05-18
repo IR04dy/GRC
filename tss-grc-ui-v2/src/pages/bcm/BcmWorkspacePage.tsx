@@ -17,6 +17,7 @@ import { crisisEventStats } from '../../lib/crisisEvents';
 import { biaStats } from '../../lib/biaAssessments';
 import { remediationStats } from '../../lib/bcmCycle';
 import { overallStats as complianceStats } from '../../lib/bcmCompliance';
+import { tenantReadiness, scoreTone, type TenantScore } from '../../lib/bcmReadinessScore';
 import type { LucideIcon } from 'lucide-react';
 
 /**
@@ -50,17 +51,20 @@ export function BcmWorkspacePage() {
     remediation?: { openGaps: number; criticalGaps: number; openCapas: number; overdueCapas: number; closedCapas: number };
     compliance?: Record<string, number>;
   }>({});
+  const [readiness, setReadiness] = useState<TenantScore | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [bias, crises, remediation, compliance] = await Promise.all([
+        const [bias, crises, remediation, compliance, score] = await Promise.all([
           biaStats().catch(() => ({})),
           crisisEventStats().catch(() => ({})),
           remediationStats().then(r => r.data).catch(() => undefined),
           complianceStats().catch(() => ({})),
+          tenantReadiness().catch(() => null),
         ]);
         setStats({ bias, crises, remediation, compliance });
+        setReadiness(score);
       } catch (e) {
         toast.danger(e instanceof ApiError ? e.message
           : (isAr ? 'تعذّر تحميل البيانات' : 'Failed to load workspace stats'));
@@ -89,6 +93,10 @@ export function BcmWorkspacePage() {
         <Kpi Icon={Stamp}          label={isAr ? 'بنود غير ممتثلة' : 'Non-compliant clauses'}
              value={stats.compliance?.non_compliant ?? 0} tone="danger" to="/bcm/compliance" />
       </div>
+
+      {readiness && readiness.biaCount > 0 && (
+        <ReadinessTile readiness={readiness} isAr={isAr} />
+      )}
 
       {/* Feature grid grouped by ISO 22301 operational phase. */}
       <PhaseGroup
@@ -173,6 +181,64 @@ interface CardDef {
   desc: string;
   descAr: string;
   tag?: 'legacy' | 'new';
+}
+
+/**
+ * Headline metric card: tenant readiness score (0..100) + per-criticality
+ * histogram. Sits between the KPI strip and the feature grid because every
+ * exec on this page wants to see the number first.
+ */
+function ReadinessTile({ readiness, isAr }: { readiness: TenantScore; isAr: boolean }) {
+  const tone = scoreTone(readiness.averageScore);
+  const colour = tone === 'success' ? 'var(--success, #2e9c5e)'
+              : tone === 'info'    ? 'var(--info, #3a80c8)'
+              : tone === 'warning' ? 'var(--warning, #c47e00)'
+                                   : 'var(--danger, #c8362c)';
+  return (
+    <Card title={isAr ? 'مؤشر جاهزية الاستمرارية' : 'Continuity readiness score'}>
+      <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ fontSize: 48, fontWeight: 700, color: colour, lineHeight: 1 }}>
+            {readiness.averageScore.toFixed(1)}
+            <span style={{ fontSize: 18, color: 'var(--text-muted)', fontWeight: 400 }}> / 100</span>
+          </div>
+          <div className="text-muted" style={{ fontSize: 11 }}>
+            {isAr
+              ? `استناداً إلى ${readiness.biaCount} تحليل أثر معتمد`
+              : `Across ${readiness.biaCount} approved BIA${readiness.biaCount === 1 ? '' : 's'}`}
+          </div>
+        </div>
+        <div style={{ height: 12, flex: 1, minWidth: 240, background: 'var(--surface-2)', borderRadius: 6, overflow: 'hidden' }}>
+          <div style={{ width: `${readiness.averageScore}%`, height: '100%', background: colour }} />
+        </div>
+        <Link to="/bcm/readiness" style={{ textDecoration: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--primary)' }}>
+            {isAr ? 'فتح لوحة الجاهزية' : 'Open readiness workspace'} <ArrowRight size={12} />
+          </div>
+        </Link>
+      </div>
+      {Object.keys(readiness.biasByCriticality).length > 0 && (
+        <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
+          <span className="text-muted">
+            {isAr ? 'التوزيع حسب الأهمية:' : 'By criticality:'}
+          </span>
+          {Object.entries(readiness.biasByCriticality).map(([crit, count]) => (
+            <span key={crit} style={{
+              padding: '2px 8px', borderRadius: 4,
+              border: '1px solid var(--border)', background: 'var(--surface-2)',
+            }}>
+              <span className="mono">{crit}</span>: {count}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="text-muted" style={{ fontSize: 11, marginTop: 10 }}>
+        {isAr
+          ? 'النتيجة 0–100 لكل BIA معتمد، خمسة أبعاد ثنائية (BIA · BCP · DRP · اختبار التعافي · بديل يدوي).'
+          : '0–100 per approved BIA across five binary dimensions (BIA · BCP · DRP · DR test · manual workaround).'}
+      </div>
+    </Card>
+  );
 }
 
 function PhaseGroup({ title, sub, cards, isAr }: { title: string; sub: string; cards: CardDef[]; isAr: boolean }) {
