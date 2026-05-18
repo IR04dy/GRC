@@ -126,7 +126,7 @@ export function BcmRemediationPage() {
   async function runFlagOverdue() {
     try {
       const out = await flagOverdueCapas();
-      const n = (out as { flagged?: number })?.flagged ?? 0;
+      const n = out?.flippedToOverdue ?? 0;
       toast.success(isAr ? `تم تحديث ${n} إجراءً متأخراً` : `Flagged ${n} CAPAs as overdue`);
       await reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }

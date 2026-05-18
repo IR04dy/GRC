@@ -853,15 +853,20 @@ export interface BcmExerciseRequest {
   facilitator?: string;
 }
 export const bcmApi = {
-  plans:        (page = 0, size = 50) => api.get<PageResponse<BcmPlanDto>>(`/api/v1/bcm/plans${pageQ(page, size)}`),
-  createPlan:   (body: BcmPlanRequest) => api.post<BcmPlanDto>('/api/v1/bcm/plans', body),
-  updatePlan:   (id: number, body: BcmPlanRequest) => api.put<BcmPlanDto>(`/api/v1/bcm/plans/${id}`, body),
-  deletePlan:   (id: number) => api.delete<void>(`/api/v1/bcm/plans/${id}`),
+  // Legacy BcmController moved to /legacy-plans/* after audit T1.1 carve-out:
+  // the canonical /api/v1/bcm/plans now serves the new BcpPlanController shape
+  // (planCode + sections + versions). The legacy /bcm/legacy page on the UI
+  // still wants the older BcmPlan shape (planNameEn + INVOKED status etc.),
+  // so it stays on the renamed legacy path.
+  plans:        (page = 0, size = 50) => api.get<PageResponse<BcmPlanDto>>(`/api/v1/bcm/legacy-plans${pageQ(page, size)}`),
+  createPlan:   (body: BcmPlanRequest) => api.post<BcmPlanDto>('/api/v1/bcm/legacy-plans', body),
+  updatePlan:   (id: number, body: BcmPlanRequest) => api.put<BcmPlanDto>(`/api/v1/bcm/legacy-plans/${id}`, body),
+  deletePlan:   (id: number) => api.delete<void>(`/api/v1/bcm/legacy-plans/${id}`),
   // Plan ISO-22301 lifecycle workflow
-  submitPlanForReview: (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/submit-for-review`),
-  approvePlan:  (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/approve`),
-  invokePlan:   (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/invoke`),
-  restorePlan:  (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/plans/${id}/restore`),
+  submitPlanForReview: (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/legacy-plans/${id}/submit-for-review`),
+  approvePlan:  (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/legacy-plans/${id}/approve`),
+  invokePlan:   (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/legacy-plans/${id}/invoke`),
+  restorePlan:  (id: number) => api.post<BcmPlanDto>(`/api/v1/bcm/legacy-plans/${id}/restore`),
   processes:      (page = 0, size = 50) => api.get<PageResponse<BcmProcessDto>>(`/api/v1/bcm/processes${pageQ(page, size)}`),
   createProcess:  (body: BcmProcessRequest) => api.post<BcmProcessDto>('/api/v1/bcm/processes', body),
   updateProcess:  (id: number, body: BcmProcessRequest) => api.put<BcmProcessDto>(`/api/v1/bcm/processes/${id}`, body),
@@ -878,11 +883,14 @@ export const bcmApi = {
   deleteExercise:   (id: number) => api.delete<void>(`/api/v1/bcm/exercises/${id}`),
   completeExercise: (id: number, score: number, findings: string) =>
     api.post<BcmExerciseDto>(`/api/v1/bcm/exercises/${id}/complete`, { score, findings }),
-  // BIA dependency graph (M3)
+  // BIA dependency graph (M3) — legacy process-only shape kept on the renamed
+  // path. The canonical /api/v1/bcm/dependency-graph now serves the richer
+  // multi-type graph (BIA + service + BCP + DRP + strategy + cloud) from
+  // BcmDependencyGraphController and is consumed by lib/bcmDependencyGraph.ts.
   dependencyGraph: () => api.get<{
     nodes: Array<{ id: number; nameEn: string; nameAr?: string; criticality?: string }>;
     edges: Array<{ id: number; from: number; to: number; dependencyType: string; criticalityImpact?: string; notes?: string }>;
-  }>('/api/v1/bcm/dependency-graph'),
+  }>('/api/v1/bcm/dependency-graph-processes'),
   listDependencies:  () => api.get<Array<{ id: number; processId: number; dependsOnProcessId: number; dependencyType: string; criticalityImpact?: string; notes?: string }>>('/api/v1/bcm/dependencies'),
   createDependency:  (body: { processId: number; dependsOnProcessId: number; dependencyType?: string; criticalityImpact?: string; notes?: string }) =>
                        api.post<unknown>('/api/v1/bcm/dependencies', body),
