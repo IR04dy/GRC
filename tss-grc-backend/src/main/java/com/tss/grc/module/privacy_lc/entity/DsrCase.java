@@ -59,5 +59,11 @@ public class DsrCase {
     /** Comma-separated ROPA external_ids the data lives in. */
     @Column(name = "ropa_ids", columnDefinition = "NVARCHAR(MAX)") private String ropaIds;
 
+    // ── §5.4 #1 — DSR SLA breach tracking (V115) ──────────────────────
+    /** Stamp set when the sweep detects an unmet SLA (PDPL Art. 4 — 30 days). */
+    @Column(name = "sla_breached_at") private LocalDateTime slaBreachedAt;
+    /** Idempotency flag so the F8 PDPL_DSR_SLA_BREACH event fires once per case. */
+    @Column(name = "sla_breach_notified", nullable = false) private Boolean slaBreachNotified = false;
+
     @Column(name = "is_deleted", nullable = false) private Short isDeleted = 0;
 }

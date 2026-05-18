@@ -1,10 +1,17 @@
 package com.tss.grc.module.platform.completion;
 
+import com.tss.grc.module.evidence.entity.EvidenceConnector;
 import com.tss.grc.module.evidence.entity.EvidenceItem;
 import com.tss.grc.module.platform.completion.BuyerGapService.AppetiteVariance;
 import com.tss.grc.module.platform.completion.BuyerGapService.AtRiskTransfer;
+import com.tss.grc.module.platform.completion.BuyerGapService.AttestBody;
+import com.tss.grc.module.platform.completion.BuyerGapService.AttestationSweepResult;
+import com.tss.grc.module.platform.completion.BuyerGapService.ConnectorPatch;
+import com.tss.grc.module.platform.completion.BuyerGapService.DsrSlaSweepResult;
 import com.tss.grc.module.platform.completion.BuyerGapService.FreshnessSweepResult;
+import com.tss.grc.module.platform.completion.BuyerGapService.Pdpl72hSweepResult;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
+import com.tss.grc.module.risk.entity.RiskAttestation;
 import com.tss.grc.module.risk.entity.RiskControl;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -83,4 +90,55 @@ public class BuyerGapController {
     @GetMapping("/api/v1/privacy/processing-activities/special-category")
     @PreAuthorize("isAuthenticated()")
     public List<ProcessingActivity> specialCategory() { return service.specialCategoryActivities(); }
+
+    // ── §5.1 #6 — Risk owner attestation cycle (V115) ─────────────────
+
+    @PostMapping("/api/v1/risk/risks/{id}/attestations")
+    @PreAuthorize("isAuthenticated()")
+    public RiskAttestation attestRisk(@PathVariable Long id, @RequestBody AttestBody body) {
+        return service.attestRisk(id, body);
+    }
+
+    @GetMapping("/api/v1/risk/risks/{id}/attestations")
+    @PreAuthorize("isAuthenticated()")
+    public List<RiskAttestation> listRiskAttestations(@PathVariable Long id) {
+        return service.listRiskAttestations(id);
+    }
+
+    @PostMapping("/api/v1/risk/attestations/sweep")
+    @PreAuthorize("isAuthenticated()")
+    public AttestationSweepResult riskAttestationSweep() {
+        return service.riskAttestationSweep();
+    }
+
+    // ── §5.4 #1 — DSR 30-day SLA sweep (V115) ─────────────────────────
+
+    @PostMapping("/api/v1/privacy/dsr/sla/sweep")
+    @PreAuthorize("isAuthenticated()")
+    public DsrSlaSweepResult dsrSlaSweep() {
+        return service.dsrSlaSweep();
+    }
+
+    // ── §5.4 #2 — PDPL 72-hour breach deadline sweep (V115) ───────────
+
+    @PostMapping("/api/v1/privacy/breach/pdpl-72h/sweep")
+    @PreAuthorize("isAuthenticated()")
+    public Pdpl72hSweepResult pdpl72hSweep() {
+        return service.pdpl72hSweep();
+    }
+
+    // ── §5.9 #2 — Evidence connector registry (V115) ──────────────────
+
+    @GetMapping("/api/v1/evidence/connectors")
+    @PreAuthorize("isAuthenticated()")
+    public List<EvidenceConnector> listConnectors() {
+        return service.listConnectors();
+    }
+
+    @PatchMapping("/api/v1/evidence/connectors/{code}")
+    @PreAuthorize("isAuthenticated()")
+    public EvidenceConnector updateConnector(@PathVariable String code,
+                                             @RequestBody ConnectorPatch body) {
+        return service.updateConnectorStatus(code, body);
+    }
 }

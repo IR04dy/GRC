@@ -1,14 +1,24 @@
 package com.tss.grc.module.platform.completion;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.bcm.cycle.entity.CrisisEvent;
+import com.tss.grc.module.bcm.cycle.repository.CrisisEventRepository;
+import com.tss.grc.module.evidence.entity.EvidenceConnector;
 import com.tss.grc.module.evidence.entity.EvidenceItem;
+import com.tss.grc.module.evidence.repository.EvidenceConnectorRepository;
 import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
 import com.tss.grc.module.privacy.repository.ProcessingActivityRepository;
+import com.tss.grc.module.privacy_lc.entity.DsrCase;
+import com.tss.grc.module.privacy_lc.repository.DsrCaseRepository;
+import com.tss.grc.module.risk.entity.Risk;
+import com.tss.grc.module.risk.entity.RiskAttestation;
 import com.tss.grc.module.risk.entity.RiskControl;
+import com.tss.grc.module.risk.repository.RiskAttestationRepository;
 import com.tss.grc.module.risk.repository.RiskControlRepository;
+import com.tss.grc.module.risk.repository.RiskRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
@@ -48,8 +58,13 @@ public class BuyerGapService {
     private static final Logger log = LoggerFactory.getLogger(BuyerGapService.class);
 
     private final RiskControlRepository         riskControls;
+    private final RiskRepository                risks;
+    private final RiskAttestationRepository     riskAttestations;
     private final EvidenceItemRepository        evidence;
+    private final EvidenceConnectorRepository   connectors;
     private final ProcessingActivityRepository  ropa;
+    private final DsrCaseRepository             dsrCases;
+    private final CrisisEventRepository         crises;
     private final AuditLogService               audit;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
@@ -265,5 +280,203 @@ public class BuyerGapService {
     @Transactional(readOnly = true)
     public List<ProcessingActivity> specialCategoryActivities() {
         return ropa.findByOrganisationIdAndSpecialCategoryFlagTrue(org());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // §5.1 #6 — Risk owner attestation cycle (V115)
+    //
+    // SAMA expectation + NCA ECC §1-3: the risk owner re-confirms each
+    // active risk on a regular cadence (default 90 days = quarterly).
+    // Each attestation snapshots the residual posture for an audit-defensible
+    // trail even if the risk drifts later.
+    // ══════════════════════════════════════════════════════════════
+
+    public record AttestBody(String decision, String statementEn,
+                             String statementAr, String attestedByName) {}
+
+    @Transactional
+    public RiskAttestation attestRisk(Long riskId, AttestBody body) {
+        Long o = org();
+        Risk risk = risks.findById(riskId)
+            .filter(r -> Objects.equals(r.getOrganisationId(), o))
+            .orElseThrow(() -> new EntityNotFoundException(
+                "Risk " + riskId + " not found for tenant " + o));
+
+        String decision = (body.decision() == null || body.decision().isBlank())
+            ? "CONFIRMED" : body.decision();
+
+        int cadence = risk.getAttestationCadenceDays() != null
+            ? risk.getAttestationCadenceDays() : 90;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate nextDue = LocalDate.now().plusDays(cadence);
+
+        RiskAttestation att = new RiskAttestation();
+        att.setOrganisationId(o);
+        att.setRiskId(riskId);
+        att.setAttestedAt(now);
+        att.setAttestedByName(body.attestedByName());
+        att.setDecision(decision);
+        att.setStatementEn(body.statementEn());
+        att.setStatementAr(body.statementAr());
+        att.setResidualScoreSnapshot(risk.getResidualScore());
+        att.setRiskLevelSnapshot(risk.getRiskLevel());
+        att.setNextDueDate(nextDue);
+        RiskAttestation saved = riskAttestations.save(att);
+
+        risk.setLastAttestedAt(now);
+        risk.setNextAttestationDate(nextDue);
+        risks.save(risk);
+
+        audit.log("ATTEST", "Risk", riskId,
+            "Risk attested with decision=" + decision + ", next due " + nextDue);
+        eventPublisher.publishEvent(new DomainEvent(
+            o, "RISK_ATTESTED", "Risk", riskId, null,
+            Map.of("decision", decision, "nextDueDate", String.valueOf(nextDue))));
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RiskAttestation> listRiskAttestations(Long riskId) {
+        return riskAttestations.findByOrganisationIdAndRiskIdOrderByAttestedAtDesc(org(), riskId);
+    }
+
+    public record AttestationSweepResult(long overdue, long firedEvents) {}
+
+    /**
+     * Walks tenant risks past their attestation due date and emits a
+     * RISK_ATTESTATION_OVERDUE event per risk so F8 rules can notify the
+     * owner. Idempotency: this sweep is safe to re-run; it does not change
+     * any state on the risk itself — the F8 rule chain is expected to
+     * suppress duplicate notifications within its own dedup window.
+     */
+    @Transactional
+    public AttestationSweepResult riskAttestationSweep() {
+        Long o = org();
+        List<Risk> overdue = risks.findAttestationOverdue(o, LocalDate.now());
+        long fired = 0;
+        for (Risk r : overdue) {
+            eventPublisher.publishEvent(new DomainEvent(
+                o, "RISK_ATTESTATION_OVERDUE", "Risk", r.getId(), null,
+                Map.of("title", String.valueOf(r.getTitleEn()),
+                       "nextAttestationDate", String.valueOf(r.getNextAttestationDate()),
+                       "ownerId", String.valueOf(r.getOwnerId()))));
+            fired++;
+        }
+        if (fired > 0) {
+            audit.log("SWEEP", "RiskAttestation", null,
+                "Found " + fired + " risk(s) past attestation due date");
+        }
+        return new AttestationSweepResult(overdue.size(), fired);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // §5.4 #1 — DSR fulfilment SLA sweep (PDPL Article 4 — 30 days)
+    // ══════════════════════════════════════════════════════════════
+
+    public record DsrSlaSweepResult(long openOverdue, long firedEvents) {}
+
+    @Transactional
+    public DsrSlaSweepResult dsrSlaSweep() {
+        Long o = org();
+        List<String> closedStatuses = List.of("DELIVERED","REJECTED","EXTENDED");
+        List<DsrCase> overdue = dsrCases.findByOrganisationIdAndStatusNotInAndSlaDeadlineBefore(
+            o, closedStatuses, LocalDate.now());
+
+        long fired = 0;
+        LocalDateTime now = LocalDateTime.now();
+        for (DsrCase c : overdue) {
+            if (c.getSlaBreachedAt() == null) c.setSlaBreachedAt(now);
+            // Only fire the F8 event once per case — idempotency flag.
+            if (Boolean.FALSE.equals(c.getSlaBreachNotified())) {
+                eventPublisher.publishEvent(new DomainEvent(
+                    o, "PDPL_DSR_SLA_BREACH", "DsrCase", c.getId(), null,
+                    Map.of("externalId", String.valueOf(c.getExternalId()),
+                           "type", String.valueOf(c.getType()),
+                           "slaDeadline", String.valueOf(c.getSlaDeadline()),
+                           "status", String.valueOf(c.getStatus()))));
+                c.setSlaBreachNotified(true);
+                fired++;
+            }
+            dsrCases.save(c);
+            audit.log("SLA_BREACH", "DsrCase", c.getId(),
+                "DSR " + c.getExternalId() + " missed PDPL 30-day SLA (deadline "
+                + c.getSlaDeadline() + ")");
+        }
+        return new DsrSlaSweepResult(overdue.size(), fired);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // §5.4 #2 — PDPL Article 23 72-hour breach deadline maintenance
+    // ══════════════════════════════════════════════════════════════
+
+    public record Pdpl72hSweepResult(
+        long personalDataCrises, long deadlinesSet, long newlyBreached) {}
+
+    /**
+     * For every crisis with personal_data_affected=true:
+     *   - if pdpl_72h_deadline_at is null and detection_time is set,
+     *     compute it = detection_time + 72h
+     *   - if the deadline has passed and notification hasn't been drafted,
+     *     flip pdpl_72h_breached=true and emit PDPL_72H_BREACH
+     */
+    @Transactional
+    public Pdpl72hSweepResult pdpl72hSweep() {
+        Long o = org();
+        // Use a permissive page to walk all rows; in practice these counts are tiny.
+        List<CrisisEvent> all = crises.findByOrganisationIdOrderByIdDesc(o,
+            org.springframework.data.domain.PageRequest.of(0, 500)).getContent();
+
+        long pd = 0, set = 0, breached = 0;
+        LocalDateTime now = LocalDateTime.now();
+        for (CrisisEvent ce : all) {
+            if (!Boolean.TRUE.equals(ce.getPersonalDataAffected())) continue;
+            pd++;
+            if (ce.getPdpl72hDeadlineAt() == null && ce.getDetectionTime() != null) {
+                ce.setPdpl72hDeadlineAt(ce.getDetectionTime().plusHours(72));
+                set++;
+            }
+            if (ce.getPdpl72hDeadlineAt() != null
+                && ce.getPdplNotificationDraftedAt() == null
+                && ce.getPdpl72hDeadlineAt().isBefore(now)
+                && !Boolean.TRUE.equals(ce.getPdpl72hBreached())) {
+                ce.setPdpl72hBreached(true);
+                breached++;
+                eventPublisher.publishEvent(new DomainEvent(
+                    o, "PDPL_72H_BREACH", "CrisisEvent", ce.getId(), null,
+                    Map.of("eventCode", String.valueOf(ce.getEventCode()),
+                           "title", String.valueOf(ce.getTitleEn()),
+                           "deadline", String.valueOf(ce.getPdpl72hDeadlineAt()))));
+                audit.log("PDPL_72H_BREACH", "CrisisEvent", ce.getId(),
+                    "Crisis " + ce.getEventCode() + " missed PDPL 72-hour window");
+            }
+            crises.save(ce);
+        }
+        return new Pdpl72hSweepResult(pd, set, breached);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // §5.9 #2 — Evidence connector registry
+    // ══════════════════════════════════════════════════════════════
+
+    public record ConnectorPatch(String status, String configJson) {}
+
+    @Transactional(readOnly = true)
+    public List<EvidenceConnector> listConnectors() {
+        return connectors.findByOrganisationIdOrderByCategoryAscNameEnAsc(org());
+    }
+
+    @Transactional
+    public EvidenceConnector updateConnectorStatus(String code, ConnectorPatch patch) {
+        Long o = org();
+        EvidenceConnector c = connectors.findByOrganisationIdAndCode(o, code)
+            .orElseThrow(() -> new EntityNotFoundException(
+                "Connector " + code + " not found for tenant " + o));
+        if (patch.status() != null && !patch.status().isBlank()) c.setStatus(patch.status());
+        if (patch.configJson() != null)                          c.setConfigJson(patch.configJson());
+        c.setUpdatedAt(LocalDateTime.now());
+        EvidenceConnector saved = connectors.save(c);
+        audit.log("UPDATE", "EvidenceConnector", saved.getId(),
+            "Connector " + code + " → status=" + saved.getStatus());
+        return saved;
     }
 }
