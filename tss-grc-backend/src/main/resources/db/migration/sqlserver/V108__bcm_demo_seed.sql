@@ -1,5 +1,17 @@
 -- V108: BCM demo seed — rich sample data so no page / table is blank on first login.
 --
+-- IMPORTANT — UTF-8 ENCODING:
+-- This file contains Arabic (NVARCHAR N'…') literals. The file is saved as
+-- UTF-8 without BOM. On Windows sqlcmd defaults to ANSI (CP-1252) which
+-- corrupts Arabic into mojibake (Ø§Ø¬ …). Always apply this file with the
+-- UTF-8 input codepage flag:
+--
+--   sqlcmd -S localhost -U sa -P tss.123 -d TSS_GRC -I -f 65001 \
+--          -i tss-grc-backend/src/main/resources/db/migration/sqlserver/V108__bcm_demo_seed.sql
+--
+-- If you already ran without -f 65001 and see mojibake, DELETE the
+-- organisation-1 demo rows in the BCM tables and re-run with the flag.
+--
 -- Why: the new "BCM cycle" track (V98-V107) ships with the schema but only
 -- thin seeds: one assessment cycle, one governance policy, three communication
 -- contacts, four compliance-mapping placeholders. Every other table is empty,

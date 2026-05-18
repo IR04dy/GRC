@@ -80,13 +80,20 @@ export function BcmRemediationPage() {
 
   async function reload() {
     try {
+      // The shared `api` helper already resolves to the parsed JSON body
+      // (it is NOT axios-style), so callers must NOT chain `.data` — the
+      // earlier `.then(r => r.data)` made every list `undefined` and blanked
+      // the page on first render (same class of bug fixed across other BCM libs).
       const [l, g, c, s] = await Promise.all([
-        listLessons().then(r => r.data),
-        listGaps().then(r => r.data),
-        listCapas().then(r => r.data),
-        remediationStats().then(r => r.data),
+        listLessons(),
+        listGaps(),
+        listCapas(),
+        remediationStats(),
       ]);
-      setLessons(l); setGaps(g); setCapas(c); setStats(s);
+      setLessons(Array.isArray(l) ? l : []);
+      setGaps(Array.isArray(g) ? g : []);
+      setCapas(Array.isArray(c) ? c : []);
+      setStats(s ?? null);
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التحميل' : 'Load failed'));
     }
@@ -119,7 +126,8 @@ export function BcmRemediationPage() {
   async function runFlagOverdue() {
     try {
       const out = await flagOverdueCapas();
-      toast.success(isAr ? `تم تحديث ${out.data.flagged} إجراءً متأخراً` : `Flagged ${out.data.flagged} CAPAs as overdue`);
+      const n = (out as { flagged?: number })?.flagged ?? 0;
+      toast.success(isAr ? `تم تحديث ${n} إجراءً متأخراً` : `Flagged ${n} CAPAs as overdue`);
       await reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
   }
