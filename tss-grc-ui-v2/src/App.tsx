@@ -76,6 +76,7 @@ import { ControlCrosswalkPage } from './pages/control-crosswalk/ControlCrosswalk
 //    process-mining · ai-governance · production-readiness · mfa · monitoring ·
 //    backup-dr · white-label · csv-import.
 import { BcmDependencyPage } from './pages/bcm-dependency/BcmDependencyPage';
+import { BcmDependencyGraphPage } from './pages/bcm/BcmDependencyGraphPage';
 import { RopaPage } from './pages/ropa/RopaPage';
 import { EsgPage } from './pages/esg/EsgPage';
 import { NdiPage } from './pages/ndi/NdiPage';
@@ -234,7 +235,9 @@ export function App() {
                   physical delete. */}
 
               {/* BCM dependency map — B4 */}
-              <Route path="/bcm-dependency"     element={<BcmDependencyPage />} />
+              <Route path="/bcm-dependency"     element={<BcmDependencyGraphPage />} />
+              <Route path="/bcm/dependency"     element={<BcmDependencyGraphPage />} />
+              <Route path="/bcm-dependency/legacy" element={<BcmDependencyPage />} />
 
               {/* ROPA + consent management — B2 */}
               <Route path="/ropa"               element={<RopaPage />} />
