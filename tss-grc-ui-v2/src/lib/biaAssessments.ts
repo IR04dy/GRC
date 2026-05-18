@@ -129,35 +129,35 @@ export function stringifyTimeBandMatrix(matrix: Record<string, TimeBandScores>):
 // ─── API calls ────────────────────────────────────────────────────
 
 export async function listBiaCatalog(): Promise<BiaCatalogResponse> {
-  return (await api.get<BiaCatalogResponse>('/api/v1/bcm/bia-assessments/catalog')).data;
+  return api.get<BiaCatalogResponse>('/api/v1/bcm/bia-assessments/catalog');
 }
 
 export async function listBiaAssessments(page = 0, size = 100): Promise<{ content: BcmBiaAssessment[]; totalElements: number }> {
-  return (await api.get(`/api/v1/bcm/bia-assessments?page=${page}&size=${size}`)).data;
+  return api.get<{ content: BcmBiaAssessment[]; totalElements: number }>(`/api/v1/bcm/bia-assessments?page=${page}&size=${size}`);
 }
 
 export async function biaStats(): Promise<Record<string, number>> {
-  return (await api.get<Record<string, number>>('/api/v1/bcm/bia-assessments/stats')).data;
+  return api.get<Record<string, number>>('/api/v1/bcm/bia-assessments/stats');
 }
 
 export async function getBiaAssessment(id: number): Promise<BcmBiaAssessment> {
-  return (await api.get<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}`)).data;
+  return api.get<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}`);
 }
 
 export async function createBiaAssessment(body: Partial<BcmBiaAssessment>): Promise<BcmBiaAssessment> {
-  return (await api.post<BcmBiaAssessment>('/api/v1/bcm/bia-assessments', body)).data;
+  return api.post<BcmBiaAssessment>('/api/v1/bcm/bia-assessments', body);
 }
 
 export async function patchBiaAssessment(id: number, body: Partial<BcmBiaAssessment>): Promise<BcmBiaAssessment> {
-  return (await api.patch<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}`, body)).data;
+  return api.patch<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}`, body);
 }
 
 export async function transitionBiaAssessment(id: number, to: BiaStatus): Promise<BcmBiaAssessment> {
-  return (await api.post<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}/transition`, { to })).data;
+  return api.post<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}/transition`, { to });
 }
 
 export async function calculateBiaCriticality(id: number): Promise<BcmBiaAssessment> {
-  return (await api.post<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}/calculate-criticality`)).data;
+  return api.post<BcmBiaAssessment>(`/api/v1/bcm/bia-assessments/${id}/calculate-criticality`);
 }
 
 export interface GeneratedPlanResponse {
@@ -169,11 +169,11 @@ export interface GeneratedPlanResponse {
 export async function generateBcpFromBia(id: number, body: {
   planNameEn?: string; planNameAr?: string; planType?: string; version?: string;
 }): Promise<GeneratedPlanResponse> {
-  return (await api.post<GeneratedPlanResponse>(`/api/v1/bcm/bia-assessments/${id}/generate-bcp`, body)).data;
+  return api.post<GeneratedPlanResponse>(`/api/v1/bcm/bia-assessments/${id}/generate-bcp`, body);
 }
 
 export async function generateDrpFromBia(id: number, body: {
   planNameEn?: string; planNameAr?: string; planType?: string; version?: string;
 }): Promise<GeneratedPlanResponse> {
-  return (await api.post<GeneratedPlanResponse>(`/api/v1/bcm/bia-assessments/${id}/generate-drp`, body)).data;
+  return api.post<GeneratedPlanResponse>(`/api/v1/bcm/bia-assessments/${id}/generate-drp`, body);
 }

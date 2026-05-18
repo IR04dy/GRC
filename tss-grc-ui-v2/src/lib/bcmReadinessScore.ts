@@ -34,16 +34,16 @@ export interface TenantScore {
 }
 
 export async function scoreForBia(biaId: number): Promise<ScoreBreakdown> {
-  return (await api.get<ScoreBreakdown>(`/api/v1/bcm/readiness-score/bia/${biaId}`)).data;
+  return api.get<ScoreBreakdown>(`/api/v1/bcm/readiness-score/bia/${biaId}`);
 }
 export async function scoreForCycle(cycleId: number): Promise<CycleScore> {
-  return (await api.get<CycleScore>(`/api/v1/bcm/readiness-score/cycle/${cycleId}`)).data;
+  return api.get<CycleScore>(`/api/v1/bcm/readiness-score/cycle/${cycleId}`);
 }
 export async function readinessLeaderboard(): Promise<ScoreBreakdown[]> {
-  return (await api.get<ScoreBreakdown[]>(`/api/v1/bcm/readiness-score/leaderboard`)).data;
+  return api.get<ScoreBreakdown[]>(`/api/v1/bcm/readiness-score/leaderboard`);
 }
 export async function tenantReadiness(): Promise<TenantScore> {
-  return (await api.get<TenantScore>(`/api/v1/bcm/readiness-score/tenant`)).data;
+  return api.get<TenantScore>(`/api/v1/bcm/readiness-score/tenant`);
 }
 
 /** Map a 0..100 score to a tone for badge / progress rendering. */

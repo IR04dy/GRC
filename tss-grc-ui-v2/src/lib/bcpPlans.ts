@@ -76,45 +76,45 @@ export async function listPlans(planType?: BcpPlanType, page = 0, size = 100): P
   const q = new URLSearchParams();
   if (planType) q.set('planType', planType);
   q.set('page', String(page)); q.set('size', String(size));
-  return (await api.get(`${BASE}?${q.toString()}`)).data;
+  return api.get<{ content: BcpPlan[]; totalElements: number }>(`${BASE}?${q.toString()}`);
 }
 export async function planStats(): Promise<Record<string, number>> {
-  return (await api.get<Record<string, number>>(`${BASE}/stats`)).data;
+  return api.get<Record<string, number>>(`${BASE}/stats`);
 }
 export async function sectionCatalogue(type: BcpPlanType): Promise<SectionDef[]> {
-  return (await api.get<SectionDef[]>(`${BASE}/section-catalogue/${type}`)).data;
+  return api.get<SectionDef[]>(`${BASE}/section-catalogue/${type}`);
 }
 export async function getPlan(id: number): Promise<BcpPlan> {
-  return (await api.get<BcpPlan>(`${BASE}/${id}`)).data;
+  return api.get<BcpPlan>(`${BASE}/${id}`);
 }
 export async function createPlan(body: Partial<BcpPlan>): Promise<BcpPlan> {
-  return (await api.post<BcpPlan>(BASE, body)).data;
+  return api.post<BcpPlan>(BASE, body);
 }
 export async function patchPlan(id: number, body: Partial<BcpPlan>): Promise<BcpPlan> {
-  return (await api.patch<BcpPlan>(`${BASE}/${id}`, body)).data;
+  return api.patch<BcpPlan>(`${BASE}/${id}`, body);
 }
 export async function transitionPlan(id: number, to: BcpPlanStatus): Promise<BcpPlan> {
-  return (await api.post<BcpPlan>(`${BASE}/${id}/transition`, { to })).data;
+  return api.post<BcpPlan>(`${BASE}/${id}/transition`, { to });
 }
 export async function reopenPlan(id: number): Promise<BcpPlan> {
-  return (await api.post<BcpPlan>(`${BASE}/${id}/reopen`, {})).data;
+  return api.post<BcpPlan>(`${BASE}/${id}/reopen`, {});
 }
 export async function generatePlanFromBia(biaId: number, planType: BcpPlanType,
                                           titleEn?: string, titleAr?: string): Promise<BcpPlan> {
-  return (await api.post<BcpPlan>(`${BASE}/generate-from-bia`, { biaId, planType, titleEn, titleAr })).data;
+  return api.post<BcpPlan>(`${BASE}/generate-from-bia`, { biaId, planType, titleEn, titleAr });
 }
 export async function listSections(planId: number): Promise<BcpSection[]> {
-  return (await api.get<BcpSection[]>(`${BASE}/${planId}/sections`)).data;
+  return api.get<BcpSection[]>(`${BASE}/${planId}/sections`);
 }
 export async function addSection(planId: number, body: Partial<BcpSection>): Promise<BcpSection> {
-  return (await api.post<BcpSection>(`${BASE}/${planId}/sections`, body)).data;
+  return api.post<BcpSection>(`${BASE}/${planId}/sections`, body);
 }
 export async function editSection(sectionId: number, bodyEn?: string, bodyAr?: string): Promise<BcpSection> {
-  return (await api.patch<BcpSection>(`${BASE}/sections/${sectionId}`, { bodyEn, bodyAr })).data;
+  return api.patch<BcpSection>(`${BASE}/sections/${sectionId}`, { bodyEn, bodyAr });
 }
 export async function listVersions(planId: number): Promise<BcpVersion[]> {
-  return (await api.get<BcpVersion[]>(`${BASE}/${planId}/versions`)).data;
+  return api.get<BcpVersion[]>(`${BASE}/${planId}/versions`);
 }
 export async function diffVersions(planId: number, from: number, to: number): Promise<VersionDiff> {
-  return (await api.get<VersionDiff>(`${BASE}/${planId}/versions/diff?from=${from}&to=${to}`)).data;
+  return api.get<VersionDiff>(`${BASE}/${planId}/versions/diff?from=${from}&to=${to}`);
 }

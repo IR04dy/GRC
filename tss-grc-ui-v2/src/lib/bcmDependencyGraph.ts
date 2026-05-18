@@ -33,7 +33,7 @@ export interface GraphPayload {
 }
 
 export async function fetchDependencyGraph(): Promise<GraphPayload> {
-  return (await api.get<GraphPayload>('/api/v1/bcm/dependency-graph')).data;
+  return api.get<GraphPayload>('/api/v1/bcm/dependency-graph');
 }
 
 /** Stable column ordering for layered layout — left to right by type. */

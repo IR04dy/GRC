@@ -15,7 +15,7 @@ export interface BcmReportDef {
 
 /** Fetch the stable catalogue of 15 reports. */
 export async function listReportCatalog(): Promise<BcmReportDef[]> {
-  return (await api.get<BcmReportDef[]>('/api/v1/bcm/reports/catalog')).data;
+  return api.get<BcmReportDef[]>('/api/v1/bcm/reports/catalog');
 }
 
 /**
@@ -24,6 +24,6 @@ export async function listReportCatalog(): Promise<BcmReportDef[]> {
  * vary per report (see {@code BcmReportService} catalogue docs).
  */
 export async function generateReport(code: string): Promise<Record<string, unknown>> {
-  return (await api.get<Record<string, unknown>>(
-    `/api/v1/bcm/reports/${encodeURIComponent(code)}`)).data;
+  return api.get<Record<string, unknown>>(
+    `/api/v1/bcm/reports/${encodeURIComponent(code)}`);
 }

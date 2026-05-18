@@ -117,72 +117,72 @@ export function statusTone(s: CrisisStatus): 'success' | 'info' | 'warning' | 'd
 // ─── Event CRUD ───────────────────────────────────────────────────
 
 export async function listCrisisEvents(page = 0, size = 50): Promise<{ content: CrisisEvent[]; totalElements: number }> {
-  return (await api.get(`/api/v1/bcm/crisis-events?page=${page}&size=${size}`)).data;
+  return api.get<{ content: CrisisEvent[]; totalElements: number }>(`/api/v1/bcm/crisis-events?page=${page}&size=${size}`);
 }
 
 export async function listActiveCrisisEvents(): Promise<CrisisEvent[]> {
-  return (await api.get<CrisisEvent[]>('/api/v1/bcm/crisis-events/active')).data;
+  return api.get<CrisisEvent[]>('/api/v1/bcm/crisis-events/active');
 }
 
 export async function crisisEventStats(): Promise<Record<string, number>> {
-  return (await api.get<Record<string, number>>('/api/v1/bcm/crisis-events/stats')).data;
+  return api.get<Record<string, number>>('/api/v1/bcm/crisis-events/stats');
 }
 
 export async function getCrisisEvent(id: number): Promise<CrisisEvent> {
-  return (await api.get<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}`)).data;
+  return api.get<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}`);
 }
 
 export async function createCrisisEvent(body: Partial<CrisisEvent>): Promise<CrisisEvent> {
-  return (await api.post<CrisisEvent>('/api/v1/bcm/crisis-events', body)).data;
+  return api.post<CrisisEvent>('/api/v1/bcm/crisis-events', body);
 }
 
 export async function patchCrisisEvent(id: number, body: Partial<CrisisEvent>): Promise<CrisisEvent> {
-  return (await api.patch<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}`, body)).data;
+  return api.patch<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}`, body);
 }
 
 export async function transitionCrisisEvent(id: number, to: CrisisStatus): Promise<CrisisEvent> {
-  return (await api.post<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}/transition`, { to })).data;
+  return api.post<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}/transition`, { to });
 }
 
 export async function activateBcp(id: number, bcpId: number): Promise<CrisisEvent> {
-  return (await api.post<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}/activate-bcp`, { bcpId })).data;
+  return api.post<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}/activate-bcp`, { bcpId });
 }
 
 export async function activateDrp(id: number, drpId: number): Promise<CrisisEvent> {
-  return (await api.post<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}/activate-drp`, { drpId })).data;
+  return api.post<CrisisEvent>(`/api/v1/bcm/crisis-events/${id}/activate-drp`, { drpId });
 }
 
 // ─── Timeline sub-resources ────────────────────────────────────────
 
 export async function listSitReps(eventId: number): Promise<CrisisSituationReport[]> {
-  return (await api.get<CrisisSituationReport[]>(`/api/v1/bcm/crisis-events/${eventId}/sitreps`)).data;
+  return api.get<CrisisSituationReport[]>(`/api/v1/bcm/crisis-events/${eventId}/sitreps`);
 }
 
 export async function addSitRep(eventId: number, body: Partial<CrisisSituationReport>): Promise<CrisisSituationReport> {
-  return (await api.post<CrisisSituationReport>(`/api/v1/bcm/crisis-events/${eventId}/sitreps`, body)).data;
+  return api.post<CrisisSituationReport>(`/api/v1/bcm/crisis-events/${eventId}/sitreps`, body);
 }
 
 export async function listDecisions(eventId: number): Promise<CrisisDecision[]> {
-  return (await api.get<CrisisDecision[]>(`/api/v1/bcm/crisis-events/${eventId}/decisions`)).data;
+  return api.get<CrisisDecision[]>(`/api/v1/bcm/crisis-events/${eventId}/decisions`);
 }
 
 export async function addDecision(eventId: number, body: Partial<CrisisDecision>): Promise<CrisisDecision> {
-  return (await api.post<CrisisDecision>(`/api/v1/bcm/crisis-events/${eventId}/decisions`, body)).data;
+  return api.post<CrisisDecision>(`/api/v1/bcm/crisis-events/${eventId}/decisions`, body);
 }
 
 export async function listRegulatoryNotifications(eventId: number): Promise<CrisisRegulatoryNotification[]> {
-  return (await api.get<CrisisRegulatoryNotification[]>(`/api/v1/bcm/crisis-events/${eventId}/regulatory-notifications`)).data;
+  return api.get<CrisisRegulatoryNotification[]>(`/api/v1/bcm/crisis-events/${eventId}/regulatory-notifications`);
 }
 
 export async function logRegulatoryNotification(eventId: number,
                                                 body: Partial<CrisisRegulatoryNotification>): Promise<CrisisRegulatoryNotification> {
-  return (await api.post<CrisisRegulatoryNotification>(
-    `/api/v1/bcm/crisis-events/${eventId}/regulatory-notifications`, body)).data;
+  return api.post<CrisisRegulatoryNotification>(
+    `/api/v1/bcm/crisis-events/${eventId}/regulatory-notifications`, body);
 }
 
 export async function ackRegulatoryNotification(eventId: number, notifId: number,
                                                 reference: string): Promise<CrisisRegulatoryNotification> {
-  return (await api.post<CrisisRegulatoryNotification>(
+  return api.post<CrisisRegulatoryNotification>(
     `/api/v1/bcm/crisis-events/${eventId}/regulatory-notifications/${notifId}/acknowledge`,
-    { reference })).data;
+    { reference });
 }
