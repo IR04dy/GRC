@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
@@ -64,6 +65,11 @@ export function BcpBuilderPage() {
   const [items, setItems] = useState<BcpPlan[]>([]);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
+
+  // "New plan" modal — replaces the native window.prompt flow so the
+  // user gets a proper in-app form (planType + bilingual title + optional
+  // recovery targets) rather than the browser's pop-up.
+  const [newOpen, setNewOpen] = useState(false);
 
   // Builder state
   const [plan, setPlan] = useState<BcpPlan | null>(null);
@@ -136,18 +142,32 @@ export function BcpBuilderPage() {
   }
 
   // ── Plan-level actions ──
-  async function newPlan() {
-    const type = (window.prompt(isAr ? 'النوع (BCP أو DRP)' : 'Type (BCP or DRP)', 'BCP') ?? '').toUpperCase();
-    if (type !== 'BCP' && type !== 'DRP') {
-      toast.warning(isAr ? 'النوع يجب أن يكون BCP أو DRP' : 'Type must be BCP or DRP'); return;
+  // The "+ New plan" button now opens an in-app modal (see <FormModal/> at
+  // the bottom of register mode). This handler runs on submit.
+  async function submitNewPlan(v: NewPlanForm) {
+    const planType = (v.planType || 'BCP') as BcpPlanType;
+    const titleEn = (v.titleEn ?? '').trim();
+    if (!titleEn) {
+      toast.warning(isAr ? 'العنوان الإنجليزي مطلوب' : 'English title is required');
+      return;
     }
-    const title = window.prompt(isAr ? 'العنوان' : 'Title');
-    if (!title) return;
     try {
-      const created = await createPlan({ titleEn: title, planType: type as BcpPlanType });
+      const payload: Partial<BcpPlan> = {
+        planType,
+        titleEn,
+        titleAr: v.titleAr?.trim() || undefined,
+        rtoHours:  v.rtoHours  ? Number(v.rtoHours)  : undefined,
+        rpoHours:  v.rpoHours  ? Number(v.rpoHours)  : undefined,
+        mtpdHours: v.mtpdHours ? Number(v.mtpdHours) : undefined,
+        responseTeamRole: v.responseTeamRole?.trim() || undefined,
+      };
+      const created = await createPlan(payload);
       toast.success(isAr ? `تم إنشاء ${created.planCode}` : `${created.planCode} created`);
+      setNewOpen(false);
       await openPlan(created.id);
-    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إنشاء الخطة' : 'Plan create failed'));
+    }
   }
 
   async function moveStatus(to: BcpPlanStatus) {
@@ -204,7 +224,7 @@ export function BcpBuilderPage() {
             ? 'خطط متعددة الأقسام وفق ISO 22301 §8.4.2 مع نسخ موَّقع ومقارنة بين النسخ.'
             : 'Multi-section plans per ISO 22301 §8.4.2 with versioned snapshots and version diff.'}
           eyebrow={isAr ? 'استمرارية الأعمال' : 'Business Continuity'}
-          actions={<Button variant="primary" onClick={() => void newPlan()}>
+          actions={<Button variant="primary" onClick={() => setNewOpen(true)}>
             <Plus size={14} /> {isAr ? 'خطة جديدة' : 'New plan'}
           </Button>}
         />
@@ -260,6 +280,17 @@ export function BcpBuilderPage() {
             </div>
           )}
         </Card>
+
+        <FormModal<NewPlanForm>
+          open={newOpen}
+          title={isAr ? 'خطة جديدة' : 'New plan'}
+          size="md"
+          submitLabel={isAr ? 'إنشاء' : 'Create'}
+          fields={newPlanFields(isAr)}
+          initial={emptyNewPlan()}
+          onClose={() => setNewOpen(false)}
+          onSubmit={submitNewPlan}
+        />
       </Shell>
     );
   }
@@ -441,3 +472,46 @@ const preStyle: React.CSSProperties = {
   fontSize: 11, lineHeight: 1.5, overflow: 'auto', maxHeight: 600,
   fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
 };
+
+// ─── New-plan form definition ────────────────────────────────────
+//
+// Shape kept simple (string-typed for number fields) so it plugs straight
+// into the generic FormModal without per-field type gymnastics. The submit
+// handler coerces numeric fields with `Number(...)` before the API call.
+
+interface NewPlanForm {
+  planType:           string;
+  titleEn:            string;
+  titleAr:            string;
+  rtoHours:           string;
+  rpoHours:           string;
+  mtpdHours:          string;
+  responseTeamRole:   string;
+}
+
+function emptyNewPlan(): NewPlanForm {
+  return { planType: 'BCP', titleEn: '', titleAr: '',
+           rtoHours: '', rpoHours: '', mtpdHours: '',
+           responseTeamRole: '' };
+}
+
+function newPlanFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'select', key: 'planType', label: isAr ? 'النوع' : 'Plan type', span: 6, required: true,
+      options: [
+        { value: 'BCP', label: isAr ? 'BCP — استمرارية الأعمال' : 'BCP — Business Continuity' },
+        { value: 'DRP', label: isAr ? 'DRP — التعافي من الكوارث' : 'DRP — Disaster Recovery' },
+      ] },
+    { kind: 'text', key: 'responseTeamRole', label: isAr ? 'دور فريق الاستجابة' : 'Response team role',
+      span: 6, placeholder: isAr ? 'مثلاً: مدير عمليات الخدمات المصرفية' : 'e.g. Core Banking Lead' },
+
+    { kind: 'text', key: 'titleEn', label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)', span: 12, required: true,
+      placeholder: isAr ? 'مثلاً: Core Banking BCP' : 'e.g. Core Banking BCP' },
+    { kind: 'text', key: 'titleAr', label: isAr ? 'العنوان (عربي)' : 'Title (AR)', span: 12,
+      placeholder: isAr ? 'مثلاً: خطة استمرارية الخدمات المصرفية الأساسية' : 'e.g. خطة استمرارية الخدمات المصرفية الأساسية' },
+
+    { kind: 'number', key: 'rtoHours',  label: 'RTO (h)',  span: 4, min: 0 },
+    { kind: 'number', key: 'rpoHours',  label: 'RPO (h)',  span: 4, min: 0 },
+    { kind: 'number', key: 'mtpdHours', label: 'MTPD (h)', span: 4, min: 0 },
+  ];
+}
