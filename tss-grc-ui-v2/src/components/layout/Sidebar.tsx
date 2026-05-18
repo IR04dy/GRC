@@ -4,7 +4,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole, RefreshCw,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
          Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
-         Network, Share2, Bug, BarChart3, KeyRound, Siren,
+         Network, Share2, Bug, BarChart3, KeyRound, Siren, ClipboardCheck,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -150,6 +150,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'bcm-readiness', to: '/bcm/readiness', Icon: ShieldCheck,    labelKey: 'bcmReadinessSidebar' },
       { id: 'bcm-reports',   to: '/bcm/reports',   Icon: BarChart3,      labelKey: 'bcmReportsSidebar' },
       { id: 'crisis-room',   to: '/bcm/crisis-room', Icon: Siren,        labelKey: 'crisisRoomSidebar' },
+      { id: 'bia-wizard',    to: '/bcm/bia',         Icon: ClipboardCheck, labelKey: 'biaWizardSidebar' },
       { id: 'bcm',      to: '/bcm',               Icon: RefreshCw,    labelKey: 'modBcm' },
       { id: 'bcm-lc',   to: '/bcm-lifecycle',     Icon: Activity,     labelKey: 'bclSidebar' },
       { id: 'bcm-deps', to: '/bcm-dependency',    Icon: GitBranch,    labelKey: 'bdSidebar' },

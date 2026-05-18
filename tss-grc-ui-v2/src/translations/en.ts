@@ -3294,6 +3294,7 @@ export const en = {
   licensingSidebar: 'Module licensing',
   bcmReportsSidebar: 'BCM reports',
   crisisRoomSidebar: 'Crisis Room',
+  biaWizardSidebar: 'BIA wizard',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',

@@ -3279,6 +3279,7 @@ export const ar = {
   licensingSidebar: 'تراخيص الوحدات',
   bcmReportsSidebar: 'تقارير الاستمرارية',
   crisisRoomSidebar: 'غرفة الأزمات',
+  biaWizardSidebar: 'معالج تحليل الأثر',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',
   adminKpiUsers: 'إجمالي المستخدمين',
   adminKpiActive: 'النشطون',
