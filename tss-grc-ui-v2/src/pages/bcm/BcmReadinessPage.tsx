@@ -22,6 +22,7 @@ import {
   type BcmAssessmentCycle, type BcmGovernanceRecord, type BcmRisk,
   type ContinuityStrategy, type BcmCommunicationContact, type CycleStatus, type GovernanceStatus,
 } from '../../lib/bcmCycle';
+import { downloadEvidencePackage } from '../../lib/bcmEvidencePackage';
 
 /**
  * BCM Readiness page — single workspace for BCM-1, BCM-2 and BCM-3
@@ -378,6 +379,13 @@ function LoadingRow() {
 }
 
 function CycleActions({ c, onMove, isAr }: { c: BcmAssessmentCycle; onMove: (c: BcmAssessmentCycle, to: CycleStatus) => void; isAr: boolean }) {
+  const [busy, setBusy] = useState(false);
+  async function pack() {
+    setBusy(true);
+    try { await downloadEvidencePackage(c.id); }
+    catch (e) { console.error('evidence pack failed', e); }
+    finally { setBusy(false); }
+  }
   return (
     <div style={{ display: 'inline-flex', gap: 4 }}>
       {c.status === 'DRAFT' && (
@@ -405,6 +413,13 @@ function CycleActions({ c, onMove, isAr }: { c: BcmAssessmentCycle; onMove: (c: 
           {isAr ? 'أرشفة' : 'Archive'}
         </Button>
       )}
+      {/* Evidence package available at any stage — auditors may request it
+          mid-cycle for an in-flight review. */}
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => void pack()}>
+        {busy
+          ? (isAr ? '…' : '…')
+          : (isAr ? 'حزمة الأدلة' : 'Evidence pack')}
+      </Button>
     </div>
   );
 }
