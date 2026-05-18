@@ -104,13 +104,17 @@ class BcmReadinessScoreServiceTest {
         assertThat(sb.lowestDimension()).isEqualTo("BCP not approved");
     }
 
-    @Test void scoreForBia_missingDrp_costs20() {
+    @Test void scoreForBia_missingDrp_costs40() {
+        // Missing DRP costs both the 20-pt "DRP approved" dimension AND the
+        // 20-pt "DR test passed" dimension (the test can't pass on a plan
+        // that doesn't exist) — so 40 pts lost in total.
         BcmBiaAssessment b = bia("APPROVED", 10L, null, true, "Long enough workaround description here.");
         when(bias.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(b));
         when(plans.findById(10L)).thenReturn(Optional.of(bcp("APPROVED")));
 
         var sb = service.scoreForBia(1L);
-        assertThat(sb.totalScore()).isEqualTo(70);  // 25 BIA + 25 BCP + 10 WA — DRP 20 + DR-test 20 lost
+        // 25 BIA + 25 BCP + 0 DRP + 0 DR-test + 10 workaround = 60
+        assertThat(sb.totalScore()).isEqualTo(60);
         assertThat(sb.drpApproved()).isFalse();
         assertThat(sb.drTestPassed()).isFalse();
     }
