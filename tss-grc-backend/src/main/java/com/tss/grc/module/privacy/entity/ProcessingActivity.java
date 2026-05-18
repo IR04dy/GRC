@@ -39,6 +39,31 @@ public class ProcessingActivity {
     @Column(name = "cross_border_transfer", nullable = false)
     private Boolean crossBorderTransfer = false;
 
+    // §5.4 #6 cross-border transfer detail ─────────────────────────
+    /** Destination jurisdiction — populated when crossBorderTransfer=true. */
+    @Column(name = "receiving_country", length = 100)
+    private String receivingCountry;
+
+    /** ADEQUATE | PARTIAL | NONE — derived from a Saudi Data Office adequacy list. */
+    @Column(name = "adequacy_decision", length = 20)
+    private String adequacyDecision;
+
+    /** SCC | BCR | EXPLICIT_CONSENT | DATA_OFFICE_APPROVAL | INTRA_GROUP */
+    @Column(name = "transfer_mechanism", length = 40)
+    private String transferMechanism;
+
+    /** Saudi Data Office case / decision reference for non-adequate transfers. */
+    @Column(name = "data_office_reference", length = 100)
+    private String dataOfficeReference;
+
+    // §5.4 #7 special-category data tagging ────────────────────────
+    @Column(name = "special_category_flag", nullable = false)
+    private Boolean specialCategoryFlag = false;
+
+    /** JSON array, e.g. ["HEALTH","BIOMETRIC","CHILDREN_UNDER_18","FINANCIAL","GENETIC"]. */
+    @Column(name = "data_categories_json", columnDefinition = "NVARCHAR(MAX)")
+    private String dataCategoriesJson;
+
     @Column(name = "status", nullable = false, length = 50)
     private String status = "ACTIVE";
 
