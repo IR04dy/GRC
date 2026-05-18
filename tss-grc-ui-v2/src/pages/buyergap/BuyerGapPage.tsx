@@ -127,7 +127,7 @@ export function BuyerGapPage() {
     <Shell title="Buyer-Assessment Completion Center"
            sub="V113 + V115 + V116 — §5.1 ERM, §5.4 Privacy, §5.9 Evidence, §27 AI, Tier-4 NCEMA AAR">
 
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
+      <div className="buyer-gap-grid">
 
         {/* §5.1 ERM — appetite variance */}
         <Card title="§5.1 ERM — Appetite vs Exposure" Icon={Activity}>
@@ -157,7 +157,7 @@ export function BuyerGapPage() {
 
         {/* §5.1 ERM — attestation sweep */}
         <Card title="§5.1 ERM — Risk Owner Attestation" Icon={CheckCheck}>
-          <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-2)' }}>
+          <p className="text-sm" style={{ marginBottom: 12, color: 'var(--ink-3)' }}>
             Quarterly (90-day) cadence — SAMA + NCA ECC §1-3 expectation.
             Sweep flags risks past their <code>next_attestation_date</code> and emits
             <code> RISK_ATTESTATION_OVERDUE</code>.
@@ -170,7 +170,7 @@ export function BuyerGapPage() {
 
         {/* §5.9 Evidence — freshness */}
         <Card title="§5.9 Evidence — Freshness Sweep" Icon={FileCheck2}>
-          <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-2)' }}>
+          <p className="text-sm" style={{ marginBottom: 12, color: 'var(--ink-3)' }}>
             Walks evidence past <code>review_due_date</code>, flips status to
             <code> STALE</code>, and emits <code>EVIDENCE_REVIEW_OVERDUE</code>.
           </p>
@@ -219,7 +219,7 @@ export function BuyerGapPage() {
 
         {/* §5.4 Privacy — DSR sweep */}
         <Card title="§5.4 Privacy — DSR 30-day SLA" Icon={Timer}>
-          <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-2)' }}>
+          <p className="text-sm" style={{ marginBottom: 12, color: 'var(--ink-3)' }}>
             PDPL Article 4 — 30-day fulfilment deadline. Sweep flips
             overdue cases and emits <code>PDPL_DSR_SLA_BREACH</code> once per case.
           </p>
@@ -231,7 +231,7 @@ export function BuyerGapPage() {
 
         {/* §5.4 Privacy — PDPL 72-hour */}
         <Card title="§5.4 Privacy — PDPL Article 23 (72h)" Icon={AlertTriangle}>
-          <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-2)' }}>
+          <p className="text-sm" style={{ marginBottom: 12, color: 'var(--ink-3)' }}>
             Personal-data breach notification window. Sweep computes
             <code> detection_time + 72h</code> for every personal-data crisis and
             flips <code>pdpl_72h_breached</code> when the window passes.
@@ -270,7 +270,7 @@ export function BuyerGapPage() {
 
         {/* §27 AI — board summary */}
         <Card title="§27 AI — Board Summary Draft" Icon={Sparkles}>
-          <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-2)' }}>
+          <p className="text-sm" style={{ marginBottom: 12, color: 'var(--ink-3)' }}>
             Heuristic generator (LLM gateway pending). Persisted as DRAFT;
             human reviewer accepts/rejects before it lands on a board pack.
           </p>

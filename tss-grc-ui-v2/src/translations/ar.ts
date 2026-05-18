@@ -2803,6 +2803,9 @@ export const ar = {
   cycPentestClose:        'إغلاق',
   cycPentestFindingsRecordedToast: 'تم تسجيل النتائج.',
 
+  // Workflow Hub — catalog of every Saudi-GRC §7 wizard
+  wfHubSidebar:           'مركز المعالجات',
+
   // Executive lifecycle overview — all 5 pipelines on one screen
   loSidebar:              'نظرة عامة على دورات الحياة',
   loEyebrow:              'تنفيذي · جميع دورات الحياة',

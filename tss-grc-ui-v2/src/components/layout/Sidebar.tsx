@@ -46,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'my-work', titleKey: 'navMyWork',
     items: [
       { id: 'dashboard',     to: '/dashboard',            Icon: LayoutDashboard, labelKey: 'itemDashboard' },
+      { id: 'workflow-hub',  to: '/workflows',            Icon: Workflow,        labelKey: 'wfHubSidebar' },
       { id: 'lc-overview',   to: '/lifecycle-overview',   Icon: Activity,        labelKey: 'loSidebar' },
       { id: 'inbox',         to: '/intake-inbox',         Icon: Inbox,           labelKey: 'inboxTitle' },
       { id: 'approvals',     to: '/approvals',            Icon: CheckCheck,      labelKey: 'approvalsSidebar' },
