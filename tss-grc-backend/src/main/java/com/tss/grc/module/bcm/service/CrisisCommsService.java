@@ -4,17 +4,18 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.entity.CrisisCommsAudience;
 import com.tss.grc.module.bcm.entity.CrisisCommsDistribution;
 import com.tss.grc.module.bcm.entity.CrisisCommsTemplate;
+import com.tss.grc.module.bcm.notify.NotificationChannel;
 import com.tss.grc.module.bcm.repository.CrisisCommsAudienceRepository;
 import com.tss.grc.module.bcm.repository.CrisisCommsDistributionRepository;
 import com.tss.grc.module.bcm.repository.CrisisCommsTemplateRepository;
 import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * BCM Crisis Communication module — assessment §5.5 #5.
@@ -24,12 +25,32 @@ import java.util.Map;
  * audit trail can be exercised end-to-end.
  */
 @Service
-@RequiredArgsConstructor
 public class CrisisCommsService {
 
     private final CrisisCommsTemplateRepository     templateRepo;
     private final CrisisCommsAudienceRepository     audienceRepo;
     private final CrisisCommsDistributionRepository distributionRepo;
+
+    /**
+     * Registered notification channels, keyed by {@link NotificationChannel#channelType()}.
+     * Wired by Spring from any {@link NotificationChannel} bean on the classpath.
+     * Empty (legacy SIMULATED behaviour) when no channel implementation is enabled
+     * — e.g. mail starter present but {@code bcm.notify.email.enabled=false} keeps
+     * {@link com.tss.grc.module.bcm.notify.EmailNotificationChannel} dormant.
+     */
+    private final Map<String, NotificationChannel> channelsByType;
+
+    @Autowired
+    public CrisisCommsService(CrisisCommsTemplateRepository templateRepo,
+                              CrisisCommsAudienceRepository audienceRepo,
+                              CrisisCommsDistributionRepository distributionRepo,
+                              List<NotificationChannel> channels) {
+        this.templateRepo = templateRepo;
+        this.audienceRepo = audienceRepo;
+        this.distributionRepo = distributionRepo;
+        this.channelsByType = channels.stream()
+            .collect(Collectors.toMap(NotificationChannel::channelType, c -> c, (a, b) -> a));
+    }
 
     // ── Templates ────────────────────────────────────────────────────────────
 
@@ -145,10 +166,39 @@ public class CrisisCommsService {
         d.setRecipientCount(a.getRecipientCount());
         d.setSentAt(LocalDateTime.now());
         d.setSentById(sentById);
-        d.setDeliveryStatus("SIMULATED");
-        d.setDeliverySummary(
-            "MVP send: " + a.getRecipientCount() + " recipients via " + t.getChannel()
-            + ". Production runtime integrates SMTP / SMS gateway (STC, Mobily) / Tawakkalna Business push as follow-up.");
+
+        // Dispatch via a registered NotificationChannel if one matches the
+        // template's channel column. Otherwise fall back to SIMULATED so
+        // workflows still record a row (audit trail integrity).
+        NotificationChannel channel = channelsByType.get(t.getChannel());
+        if (channel == null || !channel.isHealthy()) {
+            d.setDeliveryStatus("SIMULATED");
+            d.setDeliverySummary("No live " + t.getChannel() + " channel configured — recorded "
+                + a.getRecipientCount() + " recipients in simulation. Configure "
+                + "bcm.notify.<channel>.enabled to wire a real channel.");
+            return distributionRepo.save(d);
+        }
+
+        // Recipients: parse the audience CSV. Spaces and stray empties are tolerated.
+        List<String> recipients = (a.getContactsCsv() == null ? "" : a.getContactsCsv())
+            .lines()
+            .flatMap(line -> Arrays.stream(line.split(",")))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .toList();
+
+        String correlationId = "crisis-comms-" + d.getId() + "-" + System.currentTimeMillis();
+        List<NotificationChannel.DeliveryResult> results =
+            channel.send(recipients, subject, body, correlationId);
+        long ok = results.stream().filter(NotificationChannel.DeliveryResult::delivered).count();
+        long fail = results.size() - ok;
+
+        d.setDeliveryStatus(fail == 0 ? "DELIVERED" : (ok == 0 ? "FAILED" : "PARTIAL"));
+        d.setDeliverySummary(String.format("%s channel: %d delivered, %d failed (of %d).%s",
+            t.getChannel(), ok, fail, results.size(),
+            fail > 0 ? " First error: " + results.stream()
+                .filter(r -> !r.delivered()).findFirst().map(NotificationChannel.DeliveryResult::error).orElse("?")
+              : ""));
         return distributionRepo.save(d);
     }
 
