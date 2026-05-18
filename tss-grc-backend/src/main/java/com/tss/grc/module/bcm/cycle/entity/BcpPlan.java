@@ -81,6 +81,16 @@ public class BcpPlan {
     @Column(name = "last_exercised_at")         private LocalDateTime lastExercisedAt;
     @Column(name = "next_review_date")          private LocalDate     nextReviewDate;
 
+    // Tier-2 #10: attestation linkage. Bumped by BcpPlanService.attest() so
+    // the UI can render "Last reviewed by X on Y". reviewState is denormalised
+    // off next_review_date so list-pages can filter without recomputing.
+    @Column(name = "last_attested_at")             private LocalDateTime lastAttestedAt;
+    @Column(name = "last_attested_by_name", length = 255) private String  lastAttestedByName;
+    @Column(name = "last_attested_by_id")          private Long          lastAttestedById;
+    /** CURRENT | DUE_SOON | OVERDUE — recomputed on attest + on read-sweep. */
+    @Column(name = "review_state", length = 20)
+    private String reviewState = "CURRENT";
+
     @Column(name = "created_at", updatable = false) private LocalDateTime createdAt = LocalDateTime.now();
     @Column(name = "updated_at")                    private LocalDateTime updatedAt;
     @Column(name = "created_by")                    private Long createdBy;

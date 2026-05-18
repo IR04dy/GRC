@@ -29,6 +29,10 @@ export interface BcpPlan {
   publishedAt?: string;
   lastExercisedAt?: string;
   nextReviewDate?: string;
+  /** Tier-2 #10 attestation linkage. */
+  lastAttestedAt?:     string;
+  lastAttestedByName?: string;
+  reviewState?:        'CURRENT' | 'DUE_SOON' | 'OVERDUE';
 }
 
 export interface BcpSection {

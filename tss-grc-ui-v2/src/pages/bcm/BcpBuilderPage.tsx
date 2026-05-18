@@ -25,6 +25,9 @@ import {
   ackStatusTone,
   type PlanAcknowledgement, type DistributionStats,
 } from '../../lib/planDistribution';
+import {
+  attestPlan, reviewStateTone, sweepReview,
+} from '../../lib/planReview';
 
 /**
  * BCP / DRP Builder page — audit T1.4b.
@@ -266,6 +269,32 @@ export function BcpBuilderPage() {
     }
   }
 
+  // ── Plan review attestation (Tier-2 #10) ──
+  async function attestRow(p: BcpPlan) {
+    try {
+      const a = await attestPlan(p.id, 'STILL_CURRENT',
+        isAr ? 'تأكيد دوري — لا تغييرات جوهرية' : 'Periodic attestation — no material change');
+      toast.success(isAr
+        ? `تم تأكيد ${p.planCode} — المراجعة القادمة ${a.newNextReviewDate ?? '—'}`
+        : `${p.planCode} attested — next review ${a.newNextReviewDate ?? '—'}`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التأكيد' : 'Attest failed'));
+    }
+  }
+
+  async function runReviewSweep() {
+    try {
+      const r = await sweepReview();
+      toast.success(isAr
+        ? `جارية: ${r.current} · قريبة: ${r.dueSoon} · متأخرة: ${r.overdue} (تم تصعيد ${r.flippedToOverdue})`
+        : `Current: ${r.current} · Due soon: ${r.dueSoon} · Overdue: ${r.overdue} (escalated ${r.flippedToOverdue})`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed');
+    }
+  }
+
   async function ackRow(row: PlanAcknowledgement, action: 'ack' | 'decline') {
     try {
       if (action === 'ack')      await acknowledge(row.id);
@@ -302,15 +331,27 @@ export function BcpBuilderPage() {
           <Kpi Icon={FileText} label={isAr ? 'DRP'      : 'DRP plans'}   value={items.filter(p => p.planType === 'DRP').length} tone="info" />
           <Kpi Icon={Wrench}   label={isAr ? 'منشورة'   : 'Published'}   value={stats.status_published ?? 0}                   tone="success" />
           <Kpi Icon={History}  label={isAr ? 'في التحرير' : 'Draft'}     value={stats.status_draft ?? 0}                       tone="warning" />
+          {/* Tier-2 #10 review-state KPIs sit alongside the lifecycle KPIs so
+              the page tells the owner both "what's still in flight" and
+              "what's about to need re-attestation" in one glance. */}
+          <Kpi Icon={History}  label={isAr ? 'مراجعة قريبة' : 'Review due ≤30d'}
+               value={items.filter(p => p.reviewState === 'DUE_SOON').length} tone="warning" />
+          <Kpi Icon={History}  label={isAr ? 'مراجعة متأخرة' : 'Review overdue'}
+               value={items.filter(p => p.reviewState === 'OVERDUE').length} tone="danger" />
         </div>
 
         <Card title={isAr ? 'الخطط' : 'Plans'} action={
-          <select value={planTypeFilter} onChange={e => setPlanTypeFilter(e.target.value as BcpPlanType | '')}
-                  style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)' }}>
-            <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
-            <option value="BCP">BCP</option>
-            <option value="DRP">DRP</option>
-          </select>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <Button variant="ghost" onClick={() => void runReviewSweep()}>
+              {isAr ? 'تحديث حالات المراجعة' : 'Refresh review states'}
+            </Button>
+            <select value={planTypeFilter} onChange={e => setPlanTypeFilter(e.target.value as BcpPlanType | '')}
+                    style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)' }}>
+              <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
+              <option value="BCP">BCP</option>
+              <option value="DRP">DRP</option>
+            </select>
+          </div>
         }>
           {loading && <div className="text-muted" style={{ fontSize: 11 }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>}
           {items.length === 0 ? (
@@ -326,6 +367,7 @@ export function BcpBuilderPage() {
                   <th style={{ textAlign: 'start' }}>{isAr ? 'النسخة' : 'Version'}</th>
                   <th style={{ textAlign: 'start' }}>RTO</th>
                   <th style={{ textAlign: 'start' }}>RPO</th>
+                  <th style={{ textAlign: 'start' }}>{isAr ? 'المراجعة' : 'Review'}</th>
                   <th style={{ textAlign: 'end' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
                 </tr></thead>
                 <tbody>
@@ -338,7 +380,18 @@ export function BcpBuilderPage() {
                       <td className="mono">v{p.currentVersion}</td>
                       <td className="mono">{p.rtoHours ?? '—'}h</td>
                       <td className="mono">{p.rpoHours ?? '—'}h</td>
+                      <td>
+                        <Badge tone={reviewStateTone(p.reviewState)}>{p.reviewState ?? 'CURRENT'}</Badge>
+                        {p.nextReviewDate && (
+                          <div className="text-muted mono" style={{ fontSize: 10, marginTop: 2 }}>
+                            {isAr ? 'القادمة' : 'next'}: {p.nextReviewDate}
+                          </div>
+                        )}
+                      </td>
                       <td style={{ textAlign: 'end' }}>
+                        <Button variant="ghost" onClick={() => void attestRow(p)}>
+                          {isAr ? 'تأكيد المراجعة' : 'Attest'}
+                        </Button>
                         <Button variant="ghost" onClick={() => void openPlan(p.id)}>{isAr ? 'فتح' : 'Open'}</Button>
                       </td>
                     </tr>
