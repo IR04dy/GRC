@@ -1,12 +1,12 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PR #11 — `feat/bcp-builder-graph-mail`)
+**Last update:** 21 May 2026 (PR #11 — `feat/bcp-builder-graph-mail`, post-wizard-sweep)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions (PR #11 — 30 commits)
+## 🟢 Recent additions (PR #11 — 33 commits)
 
 ### Saudi-GRC buyer-assessment engines
 | Migration | Tables / columns |
@@ -24,11 +24,18 @@
 
 ### New frontend
 - **Workflow Hub** at `/workflows` — 35-workflow catalog grouped by module, filterable by status / search
-- **10 wizards** ready to walk end-to-end (ERM Risk ID / Treatment / Acceptance; BCM Exercise; PDPL DSR / Breach; NCA Cyber Incident / ECC; SCM Onboarding / Vendor Risk)
+- **24 wizards** AVAILABLE out of the 35-entry §7 catalog (69%). Every PARTIAL/PLANNED entry that has a regulator-facing output is now a real wizard:
+  - **ERM** (4/4 ✓) — Risk Identification, Treatment, Acceptance, Attestation
+  - **BCM** (7/7 ✓) — BIA, BCP, DRP, Crisis, Exercise, AAR, Management Review
+  - **SCM** (3/3 ✓) — Supplier Onboarding, Vendor Risk, Exit Plan
+  - **NCA** (4/4 ✓) — Cyber Incident, ECC Assessment, Vuln Triage, Cloud CCC
+  - **PDPL** (6/6 ✓) — DPIA, DSR, Breach, Cross-Border, Consent, RoPA
+  - **Cross-module** (4/x) — Incident RCA, Management Review (generic), Digital Signature, Board Pack, Control Test
+  - Remaining 11 entries are register-page-only (e.g. `/capa`, `/policy-management`, `/connectors`) — not wizard-shaped
 - `/buyer-gap` — live demo of every V115/V116 endpoint
 - `/bcm/aars/:id` — bilingual AAR editor with state-machine actions
 - `/ai/suggestions` — accept/reject AI drafts with reviewer note
-- **Design-system primitives**: `useLoadable<T>()`, `<ErrorState>`, `<LoadableSection>`, `<ErrorBoundary>`, `<WizardShell>`
+- **Design-system primitives**: `useLoadable<T>()`, `<ErrorState>`, `<LoadableSection>`, `<ErrorBoundary>`, `<WizardShell>` (used by every wizard above)
 
 ### Verification
 | Check | Result |
