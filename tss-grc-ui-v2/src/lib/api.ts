@@ -2045,16 +2045,48 @@ export const automationApi = {
 };
 
 // ── CAPA tasks ─────────────────────────────────────────────────────────
-//    Today we surface only the sidebar counter — the rest of the CAPA
-//    fetch path still goes through the local useCapas hook because the
-//    listed rows include a seed-data overlay layer. When that overlay is
-//    retired this api object grows list/get/transition helpers.
+//    PR #59 expanded this from a sidebar-counter-only client to the full
+//    GET /api/capa/tasks list. useCapas now merges these rows with the
+//    static seed + localStorage overlay so backend-created CAPAs show up
+//    in /capa and /capa/:id alongside demo seed entries. Each backend
+//    row carries `numericId` (Long PK) — the v2 Capa interface maps
+//    this to `backendId` so EntityActivityTimeline + EntityAutomationRuns
+//    light up on the detail page.
 export interface CapaCountsDto {
   /** Non-terminal CAPAs (everything except CLOSED + CANCELLED). */
   open:    number;
   /** Open AND past target date. Always ≤ open. */
   overdue: number;
 }
+/** Mirrors {@code module/capa/dto/CapaTaskDto.java}. */
+export interface CapaTaskDto {
+  /** Human-readable externalId (e.g. "CAPA-2026-001"). */
+  id:        string;
+  /** Internal Long PK used by audit-log + automation lookups. */
+  numericId?: number;
+  originType: string;
+  originId:   string;
+  titleEn:    string;
+  titleAr:    string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  capaType:   string;   // 'CORRECTIVE' | 'PREVENTIVE'
+  severity?:  string;   // 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  owner:      string;
+  targetDate: string;   // ISO date
+  status?:    string;   // 'OPEN' | 'IN_PROGRESS' | 'AWAITING_VERIFICATION' | 'CLOSED' | 'CANCELLED'
+  startedAt?:                   string | null;
+  submittedForVerificationAt?:  string | null;
+  verifiedAt?:                  string | null;
+  verifiedBy?:                  string | null;
+  closedAt?:                    string | null;
+  cancelledAt?:                 string | null;
+  cancellationReasonEn?:        string | null;
+  progressNotesEn?:             string | null;
+  progressNotesAr?:             string | null;
+  evidenceRefs?:                string | null;
+}
 export const capaTaskApi = {
-  counts: () => api.get<CapaCountsDto>('/api/capa/tasks/counts'),
+  counts:   () => api.get<CapaCountsDto>('/api/capa/tasks/counts'),
+  list:     () => api.get<CapaTaskDto[]>('/api/capa/tasks'),
 };

@@ -9,6 +9,10 @@ import java.time.LocalDateTime;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CapaTaskDto {
     private String id;
+    /** Internal Long PK — used by frontend audit-log + automation lookups
+     *  (EntityActivityTimeline / EntityAutomationRuns key off this).
+     *  Mirrors the FindingDto pattern from PR #45. */
+    private Long numericId;
     @NotBlank private String originType;
     @NotBlank private String originId;
     @NotBlank private String titleEn;
@@ -34,7 +38,7 @@ public class CapaTaskDto {
 
     public static CapaTaskDto from(CapaTask e) {
         return CapaTaskDto.builder()
-            .id(e.getExternalId())
+            .id(e.getExternalId()).numericId(e.getId())
             .originType(e.getOriginType()).originId(e.getOriginId())
             .titleEn(e.getTitleEn()).titleAr(e.getTitleAr())
             .descriptionEn(e.getDescriptionEn()).descriptionAr(e.getDescriptionAr())
