@@ -2,6 +2,8 @@ package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk.dto.RiskRequest;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
@@ -12,15 +14,20 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +57,8 @@ class RiskServiceTest {
     @Mock private RiskRepository riskRepository;
     @Mock private RiskCategoryRepository riskCategoryRepository;
     @Mock private UserRepository userRepository;
+    @Mock private AuditLogService audit;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private RiskService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -255,5 +264,148 @@ class RiskServiceTest {
         Risk saved = captor.getValue();
         assertThat(saved.getOrganisationId()).isEqualTo(ORG_ID);
         assertThat(saved.getIdentifiedDate()).isNotNull();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // F8 automation events
+    //
+    // RiskService publishes:
+    //   RISK_CREATED      — on create() with riskLevel, residualScore, owner
+    //   RISK_TRANSITIONED — on every state-machine step with previousStatus
+    //
+    // Mirrors the FindingService / CrisisAarService pattern (PRs #50, #53).
+    // All five transition methods route through doTransition(), so we only
+    // need to test one (approve) to lock the event payload + one to confirm
+    // the centralised emit covers a different start state (accept).
+    // ══════════════════════════════════════════════════════════════════
+
+    @Test
+    void create_publishesRiskCreatedEvent_withCanonicalPayload() {
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> {
+            Risk saved = inv.getArgument(0);
+            saved.setId(RISK_ID);
+            return saved;
+        });
+
+        service.create(req());
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("RISK_CREATED");
+        assertThat(ev.entityType()).isEqualTo("Risk");
+        assertThat(ev.entityId()).isEqualTo(RISK_ID);
+        assertThat(ev.organisationId()).isEqualTo(ORG_ID);
+        // correlationId threads downstream rule_runs to the human-readable
+        // RISK-NNNN code rather than the surrogate id — uniform with the
+        // FindingService externalId / CrisisAarService reportCode pattern.
+        assertThat(ev.correlationId()).isEqualTo("RISK-0017");
+        assertThat(ev.payload()).containsEntry("riskCode", "RISK-0017");
+        assertThat(ev.payload()).containsEntry("status", "OPEN");
+        assertThat(ev.payload()).containsEntry("titleEn", "Title EN");
+    }
+
+    @Test
+    void transition_publishesRiskTransitionedEvent_withPreviousStatusInPayload() {
+        Risk r = risk("UNDER_REVIEW");
+        r.setTitleEn("PDPL personal data exposure risk");
+        r.setComplianceFrameworkClause("PDPL-2.3.1");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve(RISK_ID);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("RISK_TRANSITIONED");
+        assertThat(ev.entityId()).isEqualTo(RISK_ID);
+        // Single TRANSITIONED event — rules target the step via
+        // condition_json {"status":"MITIGATING"} rather than us emitting
+        // five distinct per-target event names. Matches FINDING_TRANSITIONED.
+        assertThat(ev.payload()).containsEntry("status", "MITIGATING");
+        assertThat(ev.payload()).containsEntry("previousStatus", "UNDER_REVIEW");
+        // complianceFrameworkClause enables regulator-anchored routing
+        // (e.g. PDPL-tagged risks auto-route to the DPO).
+        assertThat(ev.payload()).containsEntry("complianceFrameworkClause", "PDPL-2.3.1");
+    }
+
+    @Test
+    void accept_from_OPEN_carriesPreviousStatus_OPEN() {
+        // The 'OPEN → ACCEPTED' path skips formal review — SAMA §10.4
+        // flags this as a governance concern. A seed rule will match
+        // ONLY on previousStatus=OPEN + status=ACCEPTED (and skip the
+        // legitimate UNDER_REVIEW → ACCEPTED path). Confirm the payload
+        // carries the field that makes that distinction possible.
+        Risk r = risk("OPEN");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.accept(RISK_ID);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.payload()).containsEntry("status", "ACCEPTED");
+        assertThat(ev.payload()).containsEntry("previousStatus", "OPEN");
+    }
+
+    @Test
+    void transition_illegalState_doesNotEmitEvent() {
+        // require() throws BEFORE audit.log + publishEvent — bad-state
+        // guard must NOT fire an F8 event (otherwise a rule would react
+        // to a state change that never happened — info leak + spurious
+        // side-effects). Mirrors CrisisAarService PR #53 pattern.
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(risk("CLOSED")));
+
+        assertThatThrownBy(() -> service.submitForReview(RISK_ID))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+        verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
+    }
+
+    @Test
+    void approve_otherTenant_doesNotEmitEvent() {
+        // Cross-tenant 404 must NOT fire an F8 event under the requesting
+        // tenant (info leak — a rule reacting to an entity the requester
+        // never had access to). Standardised across all audit-logged
+        // services (FindingService PR #50).
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(risk("UNDER_REVIEW", OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.approve(RISK_ID))
+            .isInstanceOf(EntityNotFoundException.class);
+
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    @Test
+    void update_auditsButDoesNotEmit() {
+        // No F8 on UPDATE — same policy as FindingService / CapaTaskService.
+        // Status moves go through the dedicated transition methods which
+        // DO emit. Field edits don't change rule-routing-relevant state,
+        // so an UPDATE event would just spam the audit log with no
+        // matching rules.
+        Risk r = risk("OPEN");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.update(RISK_ID, req());
+
+        verify(audit).log(eq("UPDATE"), eq("Risk"), eq(RISK_ID), anyString());
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    @Test
+    void delete_auditsButDoesNotEmit() {
+        // No F8 on DELETE — admin-only policy matches FindingService.
+        Risk r = risk("OPEN");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.delete(RISK_ID);
+
+        verify(audit).log(eq("DELETE"), eq("Risk"), eq(RISK_ID), anyString());
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
     }
 }
