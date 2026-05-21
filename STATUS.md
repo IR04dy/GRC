@@ -1,14 +1,14 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PRs #11-21 wizard arc + F8 automation merged)
+**Last update:** 21 May 2026 (PRs #11-27 wizard arc + F8 + AI + analytics + audit timelines merged)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — eleven-PR wizard arc on master (21 May 2026)
+## 🟢 Recent additions — seventeen-PR wizard arc on master (21 May 2026)
 
-After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, ten follow-up PRs closed the persistence + UX + automation loop:
+After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, sixteen follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end:
 
 | PR | Merge | What |
 |---|---|---|
@@ -23,12 +23,48 @@ After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle 
 | #19 | `7b7a0f4` | Filter-aware CSV export from the register (UTF-8 BOM, RFC-4180 quoting, filter-stamped filename) |
 | #20 | `c3a01b7` | `AuditLogService` integration — every CREATE / APPROVE / REJECT / CLOSE / UNDER_REVIEW writes to `platform.audit_log` with cross-tenant defense |
 | #21 | `f3af7f7` | F8 automation rules on submission events — V127 seeds AR-21..AR-25 (PDPL breach → NOTIFY DPO, NCA cyber-incident → NOTIFY CISO, risk acceptance → ESCALATE risk committee, cross-border → FLAG DPO review, board pack APPROVED → AUDIT milestone) |
+| #22 | `afa5d98` | `/approvals` → `/workflows/submissions` cross-link in the page header + STATUS.md table refresh |
+| #23 | `a4a8cb2` | AI review hints — 6th heuristic generator in `module/ai/`; per-wizard bilingual checklist + suggested decision; `AiReviewHintCard` on detail page |
+| #24 | `e492cec` | Activity timeline on detail page — every audit-log row inline (CREATE / APPROVED / REJECTED / CLOSED / UNDER_REVIEW) with color-coded badges + actor (username · role) |
+| #25 | `3036957` | `SubmissionAnalyticsCard` on the register — 3 KPIs (avg time-to-review, open count, active modules) + 3 lazy-loaded recharts (per-module bar, per-status donut, 30-day line); recomputes against current filter |
+| #26 | `91feb05` | Per-wizard live submission counts on Hub cards — "3 submitted · 1 open" badges replace the static catalog |
+| #27 | `5ffe91c` | F8 rule-run history on detail page — `AutomationRunsCard` shows which automation rules fired (paired with PR #24 timeline = humans + machines side-by-side) |
 
-**Wizard persistence state: 20 of 24 catalog wizards POST to a real backend on submit, audit-log every transition, and fan out to the F8 automation engine. The 4 remaining (`evidence-request`, `capa-workflow`, `evidence-connectors`, `incident-triage`) are catalog entries that route to existing register pages.**
+### Wizard persistence state
 
-**Backend test count: 22 cases on `WorkflowSubmissionServiceTest`** — covers validation, state machine, cross-tenant 404 + cross-tenant audit defense + cross-tenant event-publisher defense, audit-log entry shape, F8 event payload shape, null-coercion guard.
+**20 of 24 catalog wizards POST to a real backend on submit, audit-log every transition, fan out to the F8 automation engine, and offer AI-generated reviewer guidance on demand.** The 4 remaining (`evidence-request`, `capa-workflow`, `evidence-connectors`, `incident-triage`) are catalog entries that route to existing register pages.
 
-**Bundle: main chunk 1,531 kB raw / 468 kB gzip (−53% from pre-split baseline). 95+ on-demand route chunks.**
+### End-to-end surface visible to a buyer
+
+| Surface | What appears |
+|---|---|
+| `/dashboard` | `DashboardSubmissionsCard` — status counts + top-8 rows + "View all (N)" |
+| `/workflows` (Hub) | 24 wizard cards with **live** "N submitted · M open" badges per wizard |
+| `/<module>` (×7) | `WorkflowQuickLaunch` chip strip + `ModuleSubmissionsPanel` (latest 5) |
+| `/workflows/submissions` | Register + analytics card (3 KPIs + 3 charts) + filter + CSV export |
+| `/workflows/submissions/:id` | Hero envelope → AI review hint → Activity timeline (audit log) → Automation runs (F8) → Review actions → Full payload |
+| `/approvals` | Existing inbox + "Workflow submissions" header CTA |
+| `/ai/suggestions` | Filter by 6 features (added `WORKFLOW_SUBMISSION_REVIEW`); accept/reject DRAFT rows |
+| Sidebar | "Workflow Hub" + "Workflow Submissions" entries under My Work |
+
+### Backend characteristics
+
+- **22 service tests** on `WorkflowSubmissionServiceTest` — validation, state machine, cross-tenant 404 + cross-tenant audit defense + cross-tenant event-publisher defense, audit-log entry shape, F8 event payload shape, null-coercion guard, decision-mapping
+- **Cross-tenant guarantees**: every read/write goes through `TenantContext.getCurrentTenant()`; a 404 from another tenant writes **no audit row AND publishes no F8 event** under the requesting tenant (both verified)
+- **F8 integration**: 5 seed rules (AR-21..AR-25) routed by `workflowId` / `status` / `regulatoryAnchor`; engine evaluates equality + contains against the payload Map; payload values null-coerced to `""` to prevent NPEs
+- **AI module**: 6 heuristic generators in `module/ai/`, all persisting DRAFT `AiSuggestion` rows for human review; LLM-gateway swap is a single private-method substitution per heuristic, no schema or API change
+
+### Bundle performance
+
+| Metric | Value |
+|---|---|
+| Main bundle | 1,537 kB raw / 470 kB gzip (−53% from pre-split baseline of 1,002 kB gzip) |
+| Wizard chunks | 18 × ~5-9 kB raw each, fetched on demand |
+| Route chunks | 95+ total |
+| Detail-page chunk | 10.43 kB raw / 3.87 kB gzip (absorbs hero + AI hint + audit timeline + automation runs + review controls + payload) |
+| Submissions register chunk | 11.32 kB raw / 4.51 kB gzip (includes analytics card; recharts lazy-loaded as shared 397 kB bundle) |
+
+Recharts already split as own 397 kB / 116 kB gzip bundle — shared with other chart-bearing pages, not a new cost.
 
 ## 🟢 Recent additions (PR #11 — 39 commits)
 
