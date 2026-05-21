@@ -87,6 +87,17 @@ public class AutomationRuleController {
         return runs.findByOrganisationIdOrderByFiredAtDesc(org(), PageRequest.of(page, Math.min(size, 200)));
     }
 
+    /** Per-entity rule-run feed. Used by the submission detail page to
+     *  show "which F8 rules fired for this submission" inline, paired
+     *  with the audit-log activity timeline that shows human actions. */
+    @GetMapping("/runs/for-entity")
+    @PreAuthorize("isAuthenticated()")
+    public List<AutomationRuleRun> runsForEntity(@RequestParam String entityType,
+                                                 @RequestParam Long entityId) {
+        return runs.findTop50ByOrganisationIdAndEntityTypeAndEntityIdOrderByFiredAtDesc(
+            org(), entityType, entityId);
+    }
+
     @GetMapping("/stats")
     @PreAuthorize("isAuthenticated()")
     public Map<String, Long> stats() {

@@ -13,5 +13,11 @@ public interface AutomationRuleRunRepository extends JpaRepository<AutomationRul
 
     List<AutomationRuleRun> findTop50ByOrganisationIdAndRuleIdOrderByFiredAtDesc(Long organisationId, Long ruleId);
 
+    /** Inline forensic feed for a single entity — e.g. one WorkflowSubmission.
+     *  Used by the submission detail page to show which F8 rules fired,
+     *  newest first. Tenant-scoped to prevent cross-tenant leakage. */
+    List<AutomationRuleRun> findTop50ByOrganisationIdAndEntityTypeAndEntityIdOrderByFiredAtDesc(
+        Long organisationId, String entityType, Long entityId);
+
     long countByOrganisationIdAndOutcome(Long organisationId, String outcome);
 }
