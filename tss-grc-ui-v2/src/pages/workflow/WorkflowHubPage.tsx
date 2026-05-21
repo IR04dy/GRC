@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Workflow, ChevronRight, ClipboardList } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
+import { workflowSubmissionApi } from '../../lib/api';
 import {
   WORKFLOWS, MODULE_LABEL, STATUS_LABEL,
   type WorkflowModule, type WorkflowStatus,
@@ -25,12 +26,44 @@ const STATUS_TONE: Record<WorkflowStatus, BadgeTone> = {
   PLANNED:   'neutral',
 };
 
+/** Aggregated counts per workflowId, computed once on mount. */
+interface PerWizardCounts {
+  total: number;
+  open: number;       // SUBMITTED + UNDER_REVIEW
+  approved: number;
+}
+
 export function WorkflowHubPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const [moduleFilter, setModuleFilter] = useState<WorkflowModule | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<WorkflowStatus | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
+
+  // Per-wizard submission counts. Single network call; aggregated client-
+  // side so the Hub can show live activity ("3 submitted · 2 approved")
+  // on each card without N+1 round-trips.
+  const [submissionCounts, setSubmissionCounts] = useState<Record<string, PerWizardCounts>>({});
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await workflowSubmissionApi.list();
+        if (cancelled) return;
+        const acc: Record<string, PerWizardCounts> = {};
+        rows.forEach(s => {
+          const c = acc[s.workflowId] ?? { total: 0, open: 0, approved: 0 };
+          c.total++;
+          if (s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW') c.open++;
+          if (s.status === 'APPROVED') c.approved++;
+          acc[s.workflowId] = c;
+        });
+        setSubmissionCounts(acc);
+      } catch { /* keep counts empty — falls back to "—" badge */ }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -140,6 +173,18 @@ export function WorkflowHubPage() {
                       <Badge tone="info">{w.steps} {isAr ? 'خطوات' : 'steps'}</Badge>
                     )}
                     {w.anchor && <Badge tone="neutral">{w.anchor}</Badge>}
+                    {(() => {
+                      const c = submissionCounts[w.id];
+                      if (!c || c.total === 0) return null;
+                      // Compact "3 · 1 open" / "٣ · ١ قيد المراجعة" — wide
+                      // enough to convey activity without crowding the card.
+                      return (
+                        <Badge tone={c.open > 0 ? 'warning' : 'success'}>
+                          {c.total} {isAr ? 'سجل' : 'submitted'}
+                          {c.open > 0 ? ` · ${c.open} ${isAr ? 'مفتوحة' : 'open'}` : ''}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   {!disabled && (
                     <div className="wf-hub-card-cta">
