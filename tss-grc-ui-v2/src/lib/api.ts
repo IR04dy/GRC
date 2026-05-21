@@ -2006,3 +2006,24 @@ export const auditLogApi = {
     api.get<AuditLogEntryDto[]>(
       `/api/v1/audit-log/history?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
 };
+
+// ── Automation rule runs — F8 ─────────────────────────────────────────
+//    PR #21 wired wizard submissions into the F8 engine + V127 seeded
+//    AR-21..AR-25. The submission detail page reads runs/for-entity to
+//    show "which automation rules fired for this submission".
+export interface AutomationRuleRunDto {
+  id: number;
+  ruleId: number;
+  firedAt: string;
+  triggerEvent: string;
+  entityType?: string | null;
+  entityId?: number | null;
+  outcome: string;          // SUCCESS | FAILED | SKIPPED
+  errorMessage?: string | null;
+  resultSummary?: string | null;
+}
+export const automationApi = {
+  runsForEntity: (entityType: string, entityId: number) =>
+    api.get<AutomationRuleRunDto[]>(
+      `/api/v1/automation/runs/for-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
+};

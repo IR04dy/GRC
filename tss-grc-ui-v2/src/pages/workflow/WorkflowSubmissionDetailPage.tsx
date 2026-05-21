@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import {
   Activity, CheckCheck, ChevronLeft, ClipboardCheck, ClipboardList, Copy, ExternalLink,
-  FileText, PauseCircle, Sparkles, X as XIcon,
+  FileText, PauseCircle, Sparkles, X as XIcon, Zap,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -15,8 +15,8 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useLoadable } from '../../lib/useLoadable';
 import {
-  auditLogApi, workflowSubmissionApi,
-  type AuditLogEntryDto, type WorkflowSubmissionDto,
+  auditLogApi, automationApi, workflowSubmissionApi,
+  type AuditLogEntryDto, type AutomationRuleRunDto, type WorkflowSubmissionDto,
 } from '../../lib/api';
 import { ai, type AiSuggestion } from '../../lib/ai';
 import { WORKFLOWS, MODULE_LABEL } from '../../lib/workflowCatalog';
@@ -190,6 +190,13 @@ function SubmissionBody({
        *  this card surfaces them inline so reviewers don't need to
        *  detour through /admin/audit-log to see "who decided what". */}
       <ActivityTimelineCard submissionId={s.id} isAr={isAr} />
+
+      {/* F8 automation rule runs — which rules fired for this submission.
+       *  Joins the human-action timeline above (PR #24) with the auto-
+       *  matic reactions (PR #21 created the rules + V127 seeded them).
+       *  Hides on empty so submissions that didn't trigger any rule
+       *  don't show a phantom card. */}
+      <AutomationRunsCard submissionId={s.id} isAr={isAr} />
 
       {/* Review controls */}
       {isOpen && (
@@ -436,6 +443,80 @@ const ACTION_TONE: Record<string, BadgeTone> = {
   REJECTED:     'danger',
   CLOSED:       'neutral',
   UNDER_REVIEW: 'warning',
+};
+
+/**
+ * Automation rule-runs card — pairs with ActivityTimelineCard.
+ *
+ * <p>Activity timeline (PR #24) = what humans did.
+ * This card                    = what the platform did automatically.
+ *
+ * <p>Pulls {@code GET /api/v1/automation/runs/for-entity} on mount —
+ * tenant-scoped, newest first. Each row shows the trigger event,
+ * outcome badge (SUCCESS/SKIPPED/FAILED), and the resultSummary that
+ * the F8 handler wrote (e.g. "AR-21 NOTIFY DPO → 1 recipient").
+ * Hides on empty so a no-fire submission renders cleanly.
+ */
+function AutomationRunsCard({ submissionId, isAr }: { submissionId: number; isAr: boolean }) {
+  const [runs, setRuns] = useState<AutomationRuleRunDto[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await automationApi.runsForEntity('WorkflowSubmission', submissionId);
+        if (!cancelled) setRuns(rows);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [submissionId]);
+
+  if (error || runs === null) return null;
+  if (runs.length === 0) return null;
+
+  return (
+    <Card title={isAr ? 'إجراءات الأتمتة (F8)' : 'Automation actions (F8)'}
+          Icon={Zap}
+          action={<Badge tone="neutral">{runs.length}</Badge>}>
+      <ol style={{ listStyle: 'none', margin: 0, padding: 0,
+                   display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {runs.map(r => (
+          <li key={r.id} style={{
+            display: 'grid',
+            gridTemplateColumns: '160px 110px 1fr',
+            gap: 12,
+            padding: '8px 0',
+            borderBottom: '1px dashed var(--border)',
+            alignItems: 'baseline',
+          }}>
+            <span style={{ font: '500 12px var(--font-mono, var(--font-sans))',
+                           color: 'var(--ink-3)' }}>
+              {formatDate(r.firedAt)}
+            </span>
+            <Badge tone={OUTCOME_TONE[r.outcome] ?? 'neutral'}>{r.outcome}</Badge>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ font: '500 13px var(--font-sans)', color: 'var(--ink-1)' }}>
+                {r.resultSummary ?? r.errorMessage ?? r.triggerEvent}
+              </span>
+              <span style={{ font: '500 11px var(--font-sans)', color: 'var(--ink-3)' }}>
+                {r.triggerEvent} · rule #{r.ruleId}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
+const OUTCOME_TONE: Record<string, BadgeTone> = {
+  SUCCESS: 'success',
+  SKIPPED: 'neutral',
+  FAILED:  'danger',
 };
 
 function prettyJson(raw: string): string {
