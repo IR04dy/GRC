@@ -3,6 +3,8 @@ package com.tss.grc.module.risk.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk.dto.RiskRequest;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
@@ -13,12 +15,15 @@ import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,8 @@ public class RiskService {
     private final RiskRepository riskRepository;
     private final RiskCategoryRepository riskCategoryRepository;
     private final UserRepository userRepository;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Optional — null in unit tests, autowired by Spring at runtime. */
     @Autowired(required = false)
@@ -61,6 +68,19 @@ public class RiskService {
         applyRequest(risk, req);
         risk.setIdentifiedDate(LocalDate.now());
         risk = riskRepository.save(risk);
+        audit.log("CREATE", "Risk", risk.getId(),
+            "Risk " + riskCodeFor(risk.getId())
+            + " raised · " + safe(risk.getTitleEn())
+            + " · residual=" + safeNum(risk.getResidualScore()));
+        // Fan out to F8 — the engine listens for RISK_CREATED and matches
+        // enabled rules against the payload (riskLevel, residualScore,
+        // ownerId, complianceFrameworkClause). Seed rules can route
+        // CRITICAL risks to the CRO, PDPL-anchored risks to the DPO, etc.
+        // Same shape as FindingService (PR #50).
+        eventPublisher.publishEvent(new DomainEvent(
+            orgId, "RISK_CREATED",
+            "Risk", risk.getId(), riskCodeFor(risk.getId()),
+            payloadFor(risk, null)));
         RiskResponse out = toResponse(risk);
         emit(orgId, risk.getId(), out);
         return out;
@@ -72,8 +92,15 @@ public class RiskService {
         Risk risk = riskRepository.findById(id)
             .filter(r -> r.getOrganisationId().equals(orgId))
             .orElseThrow(() -> new EntityNotFoundException("Risk not found: " + id));
+        Integer prevResidual = risk.getResidualScore();
         applyRequest(risk, req);
         risk = riskRepository.save(risk);
+        audit.log("UPDATE", "Risk", id,
+            "Risk " + riskCodeFor(id)
+            + " updated · residual " + safeNum(prevResidual) + " → " + safeNum(risk.getResidualScore()));
+        // No F8 event on UPDATE — same policy as FindingService /
+        // CapaTaskService (PRs #46/#50). Status moves go through the
+        // dedicated transition methods which DO emit.
         RiskResponse out = toResponse(risk);
         emit(orgId, id, out);
         return out;
@@ -87,6 +114,9 @@ public class RiskService {
             .orElseThrow(() -> new EntityNotFoundException("Risk not found: " + id));
         risk.setIsDeleted(true);
         riskRepository.save(risk);
+        audit.log("DELETE", "Risk", id,
+            "Risk " + riskCodeFor(id) + " soft-deleted (status=" + risk.getStatus() + ")");
+        // No F8 on delete — admin-only policy matches FindingService.
         emit(orgId, id, java.util.Map.of("id", id, "deleted", true));
     }
 
@@ -97,52 +127,48 @@ public class RiskService {
     //   CLOSED → OPEN (reopen on recurrence)
 
     @Transactional
-    public RiskResponse submitForReview(Long id) {
-        Risk r = mustGet(id);
-        require(r, "OPEN");
-        r.setStatus("UNDER_REVIEW");
-        RiskResponse out = toResponse(riskRepository.save(r));
-        emit(r.getOrganisationId(), id, out);
-        return out;
-    }
+    public RiskResponse submitForReview(Long id) { return doTransition(id, "UNDER_REVIEW", new String[]{"OPEN"}); }
 
     @Transactional
-    public RiskResponse approve(Long id) {
-        Risk r = mustGet(id);
-        require(r, "UNDER_REVIEW");
-        r.setStatus("MITIGATING");
-        RiskResponse out = toResponse(riskRepository.save(r));
-        emit(r.getOrganisationId(), id, out);
-        return out;
-    }
+    public RiskResponse approve(Long id) { return doTransition(id, "MITIGATING", new String[]{"UNDER_REVIEW"}); }
 
     @Transactional
-    public RiskResponse accept(Long id) {
-        Risk r = mustGet(id);
-        require(r, "OPEN", "UNDER_REVIEW");
-        r.setStatus("ACCEPTED");
-        RiskResponse out = toResponse(riskRepository.save(r));
-        emit(r.getOrganisationId(), id, out);
-        return out;
-    }
+    public RiskResponse accept(Long id) { return doTransition(id, "ACCEPTED", new String[]{"OPEN", "UNDER_REVIEW"}); }
 
     @Transactional
-    public RiskResponse close(Long id) {
-        Risk r = mustGet(id);
-        require(r, "MITIGATING", "ACCEPTED");
-        r.setStatus("CLOSED");
-        RiskResponse out = toResponse(riskRepository.save(r));
-        emit(r.getOrganisationId(), id, out);
-        return out;
-    }
+    public RiskResponse close(Long id) { return doTransition(id, "CLOSED", new String[]{"MITIGATING", "ACCEPTED"}); }
 
     @Transactional
-    public RiskResponse reopen(Long id) {
+    public RiskResponse reopen(Long id) { return doTransition(id, "OPEN", new String[]{"CLOSED"}); }
+
+    /**
+     * Shared transition path — five state-machine methods used to repeat
+     * the same 5 lines each. Centralising lets us audit + emit F8 once
+     * (so a new transition can't accidentally skip either) and keeps the
+     * tenant-scope + state-guard checks bolted together.
+     */
+    private RiskResponse doTransition(Long id, String target, String[] allowedFrom) {
         Risk r = mustGet(id);
-        require(r, "CLOSED");
-        r.setStatus("OPEN");
-        RiskResponse out = toResponse(riskRepository.save(r));
-        emit(r.getOrganisationId(), id, out);
+        require(r, allowedFrom);
+        String previousStatus = r.getStatus();
+        r.setStatus(target);
+        Risk saved = riskRepository.save(r);
+        audit.log("TRANSITION", "Risk", id,
+            "Risk " + riskCodeFor(id) + " " + previousStatus + " → " + target);
+        // Fan out to F8 — single RISK_TRANSITIONED event matches the
+        // FINDING_TRANSITIONED / CRISIS_AAR_TRANSITIONED shape (PRs #50,
+        // #53). Rules target a specific step via condition_json
+        // {"status":"ACCEPTED"} rather than us emitting five distinct
+        // event names. previousStatus is carried so a rule can match
+        // 'OPEN → ACCEPTED' (formal acceptance without review — SAMA
+        // §10.4 governance flag) separately from 'UNDER_REVIEW →
+        // ACCEPTED' (review-completed acceptance, normal path).
+        eventPublisher.publishEvent(new DomainEvent(
+            saved.getOrganisationId(), "RISK_TRANSITIONED",
+            "Risk", id, riskCodeFor(id),
+            payloadFor(saved, previousStatus)));
+        RiskResponse out = toResponse(saved);
+        emit(saved.getOrganisationId(), id, out);
         return out;
     }
 
@@ -226,4 +252,39 @@ public class RiskService {
             r.getCreatedAt(), r.getUpdatedAt()
         );
     }
+
+    /** Canonical payload Map for F8 rule-condition matching on Risk
+     *  events. Engine evaluates equality + contains on these string
+     *  keys; values are coerced to "" so the matcher never NPEs on a
+     *  null. {@code previousStatus} only carries on TRANSITIONED.
+     *
+     *  <p>{@code riskLevel} (LOW/MEDIUM/HIGH/CRITICAL) is the most useful
+     *  rule key — it lets seed rules route CRITICAL risks to the CRO
+     *  without each rule re-computing severity from likelihood × impact.
+     *  {@code complianceFrameworkClause} enables regulator-anchored
+     *  routing (a PDPL-tagged risk auto-routes to the DPO). */
+    private static Map<String, Object> payloadFor(Risk r, String previousStatus) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("riskCode",           riskCodeFor(r.getId()));
+        m.put("externalId",         r.getExternalId() == null ? "" : r.getExternalId().toString());
+        m.put("titleEn",            nullSafe(r.getTitleEn()));
+        m.put("status",             nullSafe(r.getStatus()));
+        m.put("riskLevel",          nullSafe(r.getRiskLevel()));
+        m.put("residualScore",      r.getResidualScore() == null ? "" : String.valueOf(r.getResidualScore()));
+        m.put("inherentScore",      r.getInherentScore() == null ? "" : String.valueOf(r.getInherentScore()));
+        m.put("ownerId",            r.getOwnerId() == null ? "" : String.valueOf(r.getOwnerId()));
+        m.put("categoryId",         r.getCategoryId() == null ? "" : String.valueOf(r.getCategoryId()));
+        m.put("complianceFrameworkClause", nullSafe(r.getComplianceFrameworkClause()));
+        if (previousStatus != null) m.put("previousStatus", previousStatus);
+        return m;
+    }
+
+    /** Match the human-readable code shape used in {@link #toResponse}. */
+    private static String riskCodeFor(Long id) {
+        return id == null ? "RISK-0000" : "RISK-" + String.format("%04d", id);
+    }
+
+    private static String nullSafe(String v) { return v == null ? "" : v; }
+    private static String safe(String v) { return v == null ? "" : v; }
+    private static String safeNum(Integer v) { return v == null ? "-" : v.toString(); }
 }
