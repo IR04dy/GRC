@@ -24,11 +24,12 @@ import { ai, type AiFeature, type AiStatus, type AiSuggestion } from '../../lib/
  *   POST /api/v1/ai/suggestions/{id}/review  {decision, reviewerNote}
  */
 const FEATURES: { code: AiFeature; en: string; ar: string }[] = [
-  { code: 'RISK_DESCRIPTION',    en: 'Risk description',     ar: 'وصف الخطر' },
-  { code: 'BIA_RTO_RPO',         en: 'BIA RTO/RPO',          ar: 'أهداف التعافي' },
-  { code: 'EVIDENCE_QUALITY',    en: 'Evidence quality',     ar: 'جودة الأدلة' },
-  { code: 'INCIDENT_ROOT_CAUSE', en: 'Incident RCA',         ar: 'تحليل السبب الجذري' },
-  { code: 'BOARD_SUMMARY',       en: 'Board summary',        ar: 'ملخص المجلس' },
+  { code: 'RISK_DESCRIPTION',           en: 'Risk description',     ar: 'وصف الخطر' },
+  { code: 'BIA_RTO_RPO',                en: 'BIA RTO/RPO',          ar: 'أهداف التعافي' },
+  { code: 'EVIDENCE_QUALITY',           en: 'Evidence quality',     ar: 'جودة الأدلة' },
+  { code: 'INCIDENT_ROOT_CAUSE',        en: 'Incident RCA',         ar: 'تحليل السبب الجذري' },
+  { code: 'BOARD_SUMMARY',              en: 'Board summary',        ar: 'ملخص المجلس' },
+  { code: 'WORKFLOW_SUBMISSION_REVIEW', en: 'Workflow submission review', ar: 'إرشاد مراجعة السجل' },
 ];
 
 const STATUS_TONE: Record<AiStatus, BadgeTone> = {
