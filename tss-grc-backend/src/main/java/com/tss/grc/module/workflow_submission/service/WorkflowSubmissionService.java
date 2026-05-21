@@ -171,4 +171,23 @@ public class WorkflowSubmissionService {
             .orElseThrow(() -> new EntityNotFoundException(
                 "WorkflowSubmission %d not found for this tenant".formatted(id)));
     }
+
+    /** Per-wizard aggregate counts for the Workflow Hub.
+     *
+     *  <p>Returns a list of {@link WorkflowCount}s — one entry per
+     *  {@code workflowId} the tenant has at least one submission for.
+     *  Single SQL query under the hood; replaces the client-side
+     *  aggregation that scaled O(rows) per Hub visit. */
+    public List<WorkflowCount> countsByWorkflowId() {
+        Long o = org();
+        return repo.countsByWorkflowId(o).stream()
+            .map(row -> new WorkflowCount(
+                (String) row[0],
+                ((Number) row[1]).longValue(),
+                ((Number) row[2]).longValue(),
+                ((Number) row[3]).longValue()))
+            .toList();
+    }
+
+    public record WorkflowCount(String workflowId, long total, long open, long approved) {}
 }
