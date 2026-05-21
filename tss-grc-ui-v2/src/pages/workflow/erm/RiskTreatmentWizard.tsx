@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * Saudi-GRC §7.3 #5 — Risk Treatment Plan wizard (ISO 31000 §6.5).
@@ -51,11 +52,23 @@ export function RiskTreatmentWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      // POST /api/v1/risk-lc/treatment-plans wired in a future round; for
-      // now the wizard records the draft locally and the buyer demo can
-      // walk it without backend round-trip.
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم تسجيل خطة المعالجة' : 'Treatment plan recorded');
+      const created = await submitWizard({
+        workflowId: 'erm-risk-treatment',
+        workflowModule: 'ERM',
+        titleEn: draft.rationaleEn?.slice(0, 80)
+              || `${draft.strategy} treatment plan`,
+        regulatoryAnchor: 'ISO 31000 §6.5',
+        summaryEn: `${draft.strategy}`
+                 + (draft.expectedResidualScore != null
+                    ? ` · residual=${draft.expectedResidualScore}` : '')
+                 + (draft.costSarK != null
+                    ? ` · cost SAR ${draft.costSarK}k` : '')
+                 + (draft.ownerRole ? ` · owner=${draft.ownerRole}` : ''),
+        draft: { ...draft, riskId: riskId ?? null },
+      });
+      toast.success(isAr
+        ? `تم تسجيل خطة المعالجة (#${created.id})`
+        : `Treatment plan #${created.id} recorded`);
       navigate('/risk');
     } catch (e) {
       toast.danger((e as Error).message);

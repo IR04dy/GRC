@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * NCA §7.5 #3 — NCA ECC Self-Assessment wizard.
@@ -67,8 +68,20 @@ export function NcaEccAssessmentWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 400));
-      toast.success(isAr ? 'تم تسجيل التقييم الذاتي للهيئة' : 'NCA ECC self-assessment recorded');
+      const created = await submitWizard({
+        workflowId: 'nca-ecc-assessment',
+        workflowModule: 'NCA',
+        titleEn: `NCA ECC ${draft.frameworkVersion} — FY${draft.fiscalYear}`,
+        regulatoryAnchor: `NCA ${draft.frameworkVersion}`,
+        summaryEn: `${draft.applicability} · avg maturity ${avgMaturity}/5`
+                 + ` · ${draft.evidenceCount} evidence items`
+                 + (draft.cisoApproverName ? ` · CISO=${draft.cisoApproverName}` : ''),
+        status: draft.cisoApproverName ? 'APPROVED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم تسجيل التقييم الذاتي للهيئة (#${created.id})`
+        : `NCA ECC self-assessment #${created.id} recorded`);
       navigate('/compliance');
     } catch (e) {
       toast.danger((e as Error).message);

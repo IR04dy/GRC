@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * §7.6 Cross-module — Management Review wizard.
@@ -83,8 +84,20 @@ export function ManagementReviewWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم اعتماد محضر المراجعة' : 'Management review minutes locked');
+      const clause = SCOPE_LABELS[draft.scope].clause;
+      const created = await submitWizard({
+        workflowId: 'governance-management-review',
+        workflowModule: 'GOVERNANCE',
+        titleEn: `${draft.scope} review — ${draft.period}`,
+        regulatoryAnchor: clause,
+        summaryEn: `${draft.scope} · ${draft.period} · chair=${draft.chairRole}`
+                 + (draft.signedByChair ? ' · CHAIR-SIGNED' : ''),
+        status: draft.signedByChair ? 'APPROVED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم اعتماد محضر المراجعة (#${created.id})`
+        : `Management review #${created.id} recorded`);
       navigate('/dashboard');
     } catch (e) {
       toast.danger((e as Error).message);

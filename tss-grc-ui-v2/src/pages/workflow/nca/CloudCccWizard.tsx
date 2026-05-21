@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * NCA §7.5 #10 — Cloud Cybersecurity Controls (CCC) Assessment.
@@ -78,8 +79,21 @@ export function CloudCccWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 400));
-      toast.success(isAr ? 'تم تسجيل تقييم CCC' : 'Cloud CCC assessment recorded');
+      const created = await submitWizard({
+        workflowId: 'nca-cloud-ccc',
+        workflowModule: 'NCA',
+        titleEn: `CCC: ${draft.serviceName} (${draft.provider})`.slice(0, 280),
+        regulatoryAnchor: 'NCA CCC',
+        summaryEn: `${draft.serviceModel}/${draft.deploymentModel} · ${draft.cscctier}`
+                 + ` · avg maturity ${avgMaturity}/5`
+                 + (draft.kingdomDataResident ? ' · Kingdom-resident' : ' · OFF-KINGDOM')
+                 + (draft.crossBorderTransfer ? ' · cross-border' : ''),
+        status: draft.cisoApproverName && draft.dpoApproverName ? 'APPROVED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم تسجيل تقييم CCC (#${created.id})`
+        : `Cloud CCC #${created.id} recorded`);
       navigate('/cyber');
     } catch (e) {
       toast.danger((e as Error).message);

@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * Saudi-GRC §7.3 #6 — Risk Acceptance wizard (time-boxed, exec sign-off).
@@ -49,8 +50,22 @@ export function RiskAcceptanceWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم تسجيل قبول الخطر' : 'Risk acceptance recorded');
+      const aboveAppetite = draft.residualScore != null && draft.appetiteUpper != null
+        && draft.residualScore > draft.appetiteUpper;
+      const created = await submitWizard({
+        workflowId: 'erm-risk-acceptance',
+        workflowModule: 'ERM',
+        titleEn: draft.rationaleEn?.slice(0, 80) || 'Risk acceptance',
+        summaryEn: `Residual=${draft.residualScore ?? '?'} appetite=${draft.appetiteUpper ?? '?'}`
+                 + (aboveAppetite ? ' · BOARD-required (above appetite)' : '')
+                 + (draft.expiresAt ? ` · expires ${draft.expiresAt}` : '')
+                 + (draft.croSignedByName ? ` · CRO=${draft.croSignedByName}` : ''),
+        status: draft.croSignedByName && draft.boardSignedByName ? 'APPROVED' : 'SUBMITTED',
+        draft: { ...draft, riskId: riskId ?? null, aboveAppetite },
+      });
+      toast.success(isAr
+        ? `تم تسجيل قبول الخطر (#${created.id})`
+        : `Risk acceptance #${created.id} recorded`);
       navigate('/risk');
     } catch (e) {
       toast.danger((e as Error).message);

@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge, type BadgeTone } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * §7.6 Cross-module — Control Test wizard.
@@ -76,11 +77,25 @@ export function ControlTestWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم اعتماد اختبار الضابط'
-                          : draft.capaRequired
-                            ? 'Control test recorded — CAPA opened'
-                            : 'Control test recorded');
+      const created = await submitWizard({
+        workflowId: 'compliance-control-test',
+        workflowModule: 'COMPLIANCE',
+        titleEn: `Test: ${draft.controlRef} — ${draft.controlTitle}`.slice(0, 280),
+        regulatoryAnchor: draft.framework,
+        summaryEn: `${draft.result} · method=${draft.method}`
+                 + (draft.sampleSize ? ` · sample=${draft.sampleSize}/${draft.populationSize ?? '?'}` : '')
+                 + (draft.capaRequired ? ' · CAPA-OPENED' : '')
+                 + ` · retest=${draft.retestMonths}m`,
+        status: draft.result === 'EFFECTIVE' ? 'APPROVED'
+              : draft.result === 'INEFFECTIVE' ? 'REJECTED'
+              : 'UNDER_REVIEW',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم اعتماد اختبار الضابط (#${created.id})`
+        : draft.capaRequired
+          ? `Control test #${created.id} recorded — CAPA opened`
+          : `Control test #${created.id} recorded`);
       navigate('/compliance');
     } catch (e) {
       toast.danger((e as Error).message);

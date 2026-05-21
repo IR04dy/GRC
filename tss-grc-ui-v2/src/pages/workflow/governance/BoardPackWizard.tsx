@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * §7.6 Cross-module — Board Pack generator wizard.
@@ -102,8 +103,25 @@ export function BoardPackWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم توزيع ملف المجلس' : 'Board pack distributed');
+      const approvers = [
+        draft.approverCro && 'CRO',
+        draft.approverCiso && 'CISO',
+        draft.approverDpo && 'DPO',
+        draft.approverCeo && 'CEO',
+      ].filter(Boolean).join('+');
+      const created = await submitWizard({
+        workflowId: 'governance-board-pack',
+        workflowModule: 'GOVERNANCE',
+        titleEn: `Board pack ${draft.quarter} (${draft.audience})`,
+        summaryEn: `${draft.sections.length} sections · approvals: ${approvers}`
+                 + (draft.watermark ? ' · watermarked' : ''),
+        status: draft.approverCro && draft.approverCiso && draft.approverCeo
+          ? 'APPROVED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم توزيع ملف المجلس (#${created.id})`
+        : `Board pack #${created.id} distributed`);
       navigate('/board-pack');
     } catch (e) {
       toast.danger((e as Error).message);
