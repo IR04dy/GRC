@@ -10,7 +10,8 @@ export type AiFeature =
   | 'BIA_RTO_RPO'
   | 'EVIDENCE_QUALITY'
   | 'INCIDENT_ROOT_CAUSE'
-  | 'BOARD_SUMMARY';
+  | 'BOARD_SUMMARY'
+  | 'WORKFLOW_SUBMISSION_REVIEW';
 
 export type AiStatus = 'DRAFT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 
@@ -57,6 +58,14 @@ export const ai = {
     ncaCompliancePct?: number; pdplCompliancePct?: number;
     bcmReadinessScore?: number; activeIncidents?: number;
   }) => api.post<AiSuggestion>('/api/v1/ai/board-summary', body),
+
+  /** PR #23 — per-submission reviewer guidance. Called by
+   *  WorkflowSubmissionDetailPage on demand. */
+  workflowSubmissionReview: (body: {
+    submissionId?: number; workflowId: string; workflowModule?: string;
+    status?: string; regulatoryAnchor?: string;
+    titleEn?: string; summaryEn?: string;
+  }) => api.post<AiSuggestion>('/api/v1/ai/workflow-submission-review', body),
 
   listByFeature: (feature: AiFeature) =>
     api.get<AiSuggestion[]>(`/api/v1/ai/suggestions?feature=${feature}`),

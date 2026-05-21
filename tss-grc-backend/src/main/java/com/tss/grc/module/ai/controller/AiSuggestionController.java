@@ -68,6 +68,12 @@ public class AiSuggestionController {
         return service.draftBoardSummary(body);
     }
 
+    @PostMapping("/workflow-submission-review")
+    @PreAuthorize("isAuthenticated()")
+    public AiSuggestion workflowSubmissionReview(@RequestBody WorkflowSubmissionReviewInput body) {
+        return service.suggestWorkflowSubmissionReview(body);
+    }
+
     @GetMapping("/suggestions")
     @PreAuthorize("isAuthenticated()")
     public List<AiSuggestion> listByFeature(@RequestParam String feature) {

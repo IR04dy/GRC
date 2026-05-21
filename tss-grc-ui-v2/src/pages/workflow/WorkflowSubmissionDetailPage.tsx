@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   CheckCheck, ChevronLeft, ClipboardCheck, ClipboardList, Copy, ExternalLink,
-  FileText, PauseCircle, X as XIcon,
+  FileText, PauseCircle, Sparkles, X as XIcon,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -16,6 +16,7 @@ import { useLoadable } from '../../lib/useLoadable';
 import {
   workflowSubmissionApi, type WorkflowSubmissionDto,
 } from '../../lib/api';
+import { ai, type AiSuggestion } from '../../lib/ai';
 import { WORKFLOWS, MODULE_LABEL } from '../../lib/workflowCatalog';
 
 /**
@@ -179,6 +180,9 @@ function SubmissionBody({
         </div>
       </Card>
 
+      {/* AI review hint — heuristic checklist + suggested decision. */}
+      <AiReviewHintCard s={s} isAr={isAr} />
+
       {/* Review controls */}
       {isOpen && (
         <Card title={isAr ? 'إجراءات المراجعة' : 'Review actions'} Icon={CheckCheck}>
@@ -242,6 +246,111 @@ function Row({ k, v, wrap }: { k: string; v: React.ReactNode; wrap?: boolean }) 
         textOverflow: wrap ? 'clip' : 'ellipsis',
       }}>{v}</span>
     </div>
+  );
+}
+
+/**
+ * AI hint card — calls the per-submission heuristic endpoint on demand.
+ *
+ * <p>Click "Generate review hint" → POSTs the submission envelope to
+ * /api/v1/ai/workflow-submission-review → renders the headline +
+ * bilingual checklist + suggested decision. Persists as a DRAFT
+ * AiSuggestion so the admin /ai/suggestions page can audit the
+ * generation history.
+ */
+function AiReviewHintCard({ s, isAr }: { s: WorkflowSubmissionDto; isAr: boolean }) {
+  const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function generate() {
+    setLoading(true); setError(null);
+    try {
+      const r = await ai.workflowSubmissionReview({
+        submissionId: s.id,
+        workflowId: s.workflowId,
+        workflowModule: s.workflowModule,
+        status: s.status,
+        regulatoryAnchor: s.regulatoryAnchor,
+        titleEn: s.titleEn,
+        summaryEn: s.summaryEn,
+      });
+      setSuggestion(r);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally { setLoading(false); }
+  }
+
+  const parsed = useMemo(() => {
+    if (!suggestion) return null;
+    try { return JSON.parse(suggestion.outputJson) as {
+      headlineEn: string; headlineAr: string;
+      checklistEn: string[]; checklistAr: string[];
+      regulatorCitation?: string;
+      suggestedDecision: string;
+    }; } catch { return null; }
+  }, [suggestion]);
+
+  return (
+    <Card title={isAr ? 'إرشادات المراجعة بالذكاء الاصطناعي' : 'AI review hints'}
+          Icon={Sparkles}
+          action={
+            suggestion && suggestion.confidence != null
+              ? <Badge tone="info">{Number(suggestion.confidence).toFixed(0)}%</Badge>
+              : undefined
+          }>
+      {!suggestion && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+            {isAr
+              ? 'احصل على قائمة مرجعية موجّهة لهذا المعالج + قرار مقترح.'
+              : 'Get a wizard-specific reviewer checklist + a suggested decision.'}
+          </span>
+          <Button variant="secondary" size="sm" Icon={Sparkles}
+                  disabled={loading} onClick={generate}>
+            {loading
+              ? (isAr ? 'جارٍ التوليد…' : 'Generating…')
+              : (isAr ? 'توليد الإرشاد' : 'Generate review hint')}
+          </Button>
+          {error && (
+            <span style={{ color: 'var(--danger, #ef4444)', fontSize: 12 }}>{error}</span>
+          )}
+        </div>
+      )}
+      {suggestion && parsed && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ font: '600 14px var(--font-sans)', color: 'var(--ink-1)' }}>
+            {isAr ? parsed.headlineAr : parsed.headlineEn}
+          </div>
+          <ul style={{ margin: 0, paddingInlineStart: 20, color: 'var(--ink-2)', fontSize: 13 }}>
+            {(isAr ? parsed.checklistAr : parsed.checklistEn).map((item, i) => (
+              <li key={i} style={{ marginBottom: 4 }}>{item}</li>
+            ))}
+          </ul>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
+            {parsed.regulatorCitation && (
+              <Badge tone="info">{parsed.regulatorCitation}</Badge>
+            )}
+            <Badge tone={
+              parsed.suggestedDecision === 'APPROVE' ? 'success'
+            : parsed.suggestedDecision === 'REJECT'  ? 'danger'
+            : parsed.suggestedDecision === 'CLOSE'   ? 'neutral'
+            : 'warning'
+            }>
+              {isAr ? 'القرار المقترح' : 'Suggested decision'}: {parsed.suggestedDecision}
+            </Badge>
+            <Button variant="ghost" size="sm" onClick={() => { setSuggestion(null); }}>
+              {isAr ? 'إعادة التوليد' : 'Regenerate'}
+            </Button>
+          </div>
+          {suggestion.rationale && (
+            <div className="text-xs" style={{ color: 'var(--ink-3)', marginTop: 6 }}>
+              <strong>{isAr ? 'المنطق:' : 'Heuristic rationale:'}</strong> {suggestion.rationale}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
