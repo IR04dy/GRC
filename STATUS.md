@@ -1,14 +1,14 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PRs #11-30 wizard arc + reusable audit-timeline rollout)
+**Last update:** 21 May 2026 (PRs #11-38 — wizard arc + reusable audit-timeline + reviewer-journey polish)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — twenty-PR wizard + audit arc on master (21 May 2026)
+## 🟢 Recent additions — twenty-eight-PR wizard arc + reviewer-journey polish (21 May 2026)
 
-After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, nineteen follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end, then extracted the forensic-timeline pattern into reusable cards that drop into any detail page:
+After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, twenty follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end, then extracted the forensic-timeline pattern into reusable cards that drop into any detail page. The most recent seven PRs (#32-38) polish the reviewer journey itself — server-side aggregation, Hub→register drill-down, sidebar inbox badge, bulk-review actions, stale-row signal, free-text search:
 
 | PR | Merge | What |
 |---|---|---|
@@ -32,6 +32,14 @@ After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle 
 | #28 | `a529ab3` | STATUS.md refresh — captured PRs #22-27 + first end-to-end summary tables |
 | #29 | `239d6d9` | Extracted timelines into reusable `components/audit/EntityActivityTimeline.tsx` + `EntityAutomationRuns.tsx`; dropped them onto `/bcm/aars/:id` (lights up the existing CrisisAarService audit-log calls automatically); WorkflowSubmissionDetailPage chunk shrunk 10.43→7.85 kB raw via the extraction |
 | #30 | `a773a10` | Rolled the reusable cards into `RiskDetailPage` history tab — real audit_log rows + F8 rule fires + legacy mock history side-by-side; pattern now lives on 3 detail pages with 5+ more one-line-away once their services start audit-logging |
+| #31 | `b623ca4` | STATUS.md refresh — captured PRs #28-30 + the reusable audit-timeline pattern subsection |
+| #32 | `951e605` | FindingService audit-logging — every CREATE / TRANSITION / DELETE writes to `platform.audit_log`; FindingDto exposes numeric PK so the timeline card is one-line drop-in once an audit_lc Finding detail page lands |
+| #33 | `e8e1fc3` | Server-side aggregation for Hub counts — new `GET /api/v1/workflow-submissions/counts/by-workflow`; single tenant-scoped JPQL `GROUP BY` replaces the client-side O(rows) aggregation; `WorkflowCount(workflowId,total,open,approved)` typed projection |
+| #34 | `9f6ee26` | Hub count badges drill into pre-filtered Submissions register — `?module`, `?workflowId`, `?status` URL params (shareable, back-button-friendly); new status filter with `OPEN = SUBMITTED+UNDER_REVIEW`; Hub badge becomes a `role="link"` span that opens the register pre-scoped (+`&status=OPEN` when warning tone); "Clear all" pill |
+| #35 | `848d09d` | Sidebar pending-reviews badge — accent-300 pill on "Workflow Submissions" entry shows `OPEN` count from the aggregate endpoint; refreshes on tab focus (`visibilitychange`); threaded through `NavRow` as optional `badge?` prop so adding CAPA/approvals badges later is one line |
+| #36 | `dbd5b3c` | Bulk approve / reject / close — checkbox per OPEN row + sticky action bar; tri-state header checkbox (all/partial/none); `window.confirm` second-thought beat; `Promise.allSettled` so a single 409 doesn't abandon the rest; selection drops on reload + filter change |
+| #37 | `279ea2f` | Stale-row highlighting — every OPEN row gains an age chip in the card header ("4d" info-blue → "12d · stale" danger-red past `STALE_DAYS = 7`); stats row gains a "Stale (7d+): N" pill; threshold centralised at top of file |
+| #38 | `3d68bae` | Free-text search on the register — URL-backed `?q=...` substring across `titleEn/Ar`, `summaryEn/Ar`, `regulatoryAnchor`, `workflowId`, `workflowModule`, `reviewerNote`, **and** `payloadJson` so "breach" hits a payload field even when titleEn doesn't say it; plays with existing filters; selection drops on query change |
 
 ### Wizard persistence state
 
@@ -51,18 +59,33 @@ After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle 
 
 The cards re-use the existing `GET /api/v1/audit-log/history` + `GET /api/v1/automation/runs/for-entity` endpoints — no schema or backend work needed per page. Adding the same pattern to a new module is two lines of JSX + (if missing) one constructor field + one `audit.log()` call in the service.
 
+### Reviewer-journey polish (PRs #33-38)
+
+Six PRs in three days collapsed the reviewer's path from "navigate around to find pending work" to "see the inbox, click, clear it":
+
+| Before | After |
+|---|---|
+| Log in. No signal anywhere of pending work. Navigate to Submissions. Scroll. | Sidebar shows **"Workflow Submissions · 4"**. Click. |
+| Submissions register loads every row to compute Hub badge counts (O(rows) per page-load). | Hub badges fed by a single tenant-scoped SQL `GROUP BY` aggregate. Register stays row-level for the list itself. |
+| Hub badge says "1 open RoPA" — dead-end data; user must scroll the unfiltered register to find it. | Click the badge → register opens at `?workflowId=privacy-ropa&status=OPEN` already scoped to the row. URL is shareable + back-button-friendly. |
+| 5 open submissions = 5 clicks, 5 modal beats. | Tick header checkbox → "Approve (5)" → confirm. `Promise.allSettled` reports per-row results. |
+| Date strings ("Submitted 2026-05-09") — reviewer mentally subtracts to find oldest. | Age chip on every OPEN row turns danger-red after 7d (matches PDPL §18 / ECC SLA). Stats row counts the stale. |
+| No way to find a remembered submission by keyword. | URL-backed `?q=...` substrings across title/summary/anchor/workflowId/payload. Pastes work. |
+
+The wizard-submission surface is now production-feel for the day-to-day reviewer.
+
 ### End-to-end surface visible to a buyer
 
 | Surface | What appears |
 |---|---|
 | `/dashboard` | `DashboardSubmissionsCard` — status counts + top-8 rows + "View all (N)" |
-| `/workflows` (Hub) | 24 wizard cards with **live** "N submitted · M open" badges per wizard |
+| `/workflows` (Hub) | 24 wizard cards with **live** "N submitted · M open" badges (server-side aggregate) — **click badge → drill into pre-filtered register** |
 | `/<module>` (×7) | `WorkflowQuickLaunch` chip strip + `ModuleSubmissionsPanel` (latest 5) |
-| `/workflows/submissions` | Register + analytics card (3 KPIs + 3 charts) + filter + CSV export |
+| `/workflows/submissions` | Register + analytics card (3 KPIs + 3 charts) + free-text search + module/wizard/status filters (URL-backed) + stale-row age chips + bulk approve/reject/close + CSV export |
 | `/workflows/submissions/:id` | Hero envelope → AI review hint → Activity timeline (audit log) → Automation runs (F8) → Review actions → Full payload |
 | `/approvals` | Existing inbox + "Workflow submissions" header CTA |
 | `/ai/suggestions` | Filter by 6 features (added `WORKFLOW_SUBMISSION_REVIEW`); accept/reject DRAFT rows |
-| Sidebar | "Workflow Hub" + "Workflow Submissions" entries under My Work |
+| Sidebar | "Workflow Hub" + **"Workflow Submissions · N"** (live pending-reviews badge) entries under My Work |
 
 ### Backend characteristics
 
