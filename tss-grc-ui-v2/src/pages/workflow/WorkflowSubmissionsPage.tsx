@@ -111,6 +111,9 @@ export function WorkflowSubmissionsPage() {
         workflowFilter === 'ALL' && moduleFilter !== 'ALL' ? moduleFilter : undefined,
       );
       setItems(rows);
+      // Reset selection so we never point at stale row IDs after a
+      // server-side state change.
+      setSelectedIds(new Set());
     } catch (e) {
       setError((e as Error).message);
     } finally { setLoading(false); }
@@ -124,6 +127,9 @@ export function WorkflowSubmissionsPage() {
   const visibleItems = useMemo(
     () => (items ?? []).filter(s => matchesStatus(s.status, statusFilter)),
     [items, statusFilter]);
+  // Drop selection when the status filter changes so we never bulk-act
+  // on rows the user can't see right now.
+  useEffect(() => { setSelectedIds(new Set()); }, [statusFilter]);
 
   async function review(id: number, decision: 'APPROVE' | 'REJECT' | 'CLOSE') {
     setBusyId(id);
@@ -139,6 +145,65 @@ export function WorkflowSubmissionsPage() {
     } catch (e) {
       toast.danger((e as Error).message);
     } finally { setBusyId(null); }
+  }
+
+  // ── Bulk review ──────────────────────────────────────────────────────
+  // Selection is a Set<number> of submission PKs. We only let OPEN rows
+  // (SUBMITTED + UNDER_REVIEW) be selected — anything else is terminal
+  // from the state-machine perspective and would just fail server-side.
+  // Selection is dropped on reload so it never points at stale rows.
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  function isOpen(s: WorkflowSubmissionDto): boolean {
+    return s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW';
+  }
+  const openVisibleItems = useMemo(() => visibleItems.filter(isOpen), [visibleItems]);
+  function toggleSelected(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function selectAllOpen() {
+    setSelectedIds(new Set(openVisibleItems.map(s => s.id)));
+  }
+  function clearSelection() { setSelectedIds(new Set()); }
+
+  async function bulkReview(decision: 'APPROVE' | 'REJECT' | 'CLOSE') {
+    if (selectedIds.size === 0) return;
+    // Quick confirm — bulk reject/close is irreversible from a workflow
+    // perspective even though the row stays in place.
+    const verb = isAr
+      ? (decision === 'APPROVE' ? 'اعتماد' : decision === 'REJECT' ? 'رفض' : 'إغلاق')
+      : decision.toLowerCase();
+    const ok = window.confirm(isAr
+      ? `${verb} ${selectedIds.size} سجل دفعةً واحدة؟`
+      : `${verb[0].toUpperCase() + verb.slice(1)} ${selectedIds.size} submission${selectedIds.size === 1 ? '' : 's'} in bulk?`);
+    if (!ok) return;
+    setBulkBusy(true);
+    // Promise.allSettled so one failure doesn't abandon the rest. We
+    // surface the worst-case status in the toast at the end.
+    const results = await Promise.allSettled(
+      [...selectedIds].map(id => workflowSubmissionApi.review(id, { decision })));
+    const ok_ = results.filter(r => r.status === 'fulfilled').length;
+    const fail = results.length - ok_;
+    if (fail === 0) {
+      toast.success(isAr
+        ? `تم ${verb} ${ok_} سجل`
+        : `${ok_} submission${ok_ === 1 ? '' : 's'} ${decision.toLowerCase()}d`);
+    } else if (ok_ === 0) {
+      toast.danger(isAr
+        ? `فشل ${fail} سجل`
+        : `${fail} submission${fail === 1 ? '' : 's'} failed`);
+    } else {
+      toast.danger(isAr
+        ? `نجح ${ok_} وفشل ${fail}`
+        : `${ok_} succeeded, ${fail} failed`);
+    }
+    clearSelection();
+    setBulkBusy(false);
+    void reload();
   }
 
   const counts = useMemo(() => {
@@ -275,6 +340,62 @@ export function WorkflowSubmissionsPage() {
         </div>
       )}
 
+      {/* Bulk action bar — appears only when there are reviewable rows
+       *  in view. A reviewer narrows the register to "OPEN · RoPA" (4
+       *  rows), ticks the boxes, hits Approve, and clears the queue in
+       *  one click rather than four. Selection drops on filter change
+       *  or reload so we never act on stale rows. */}
+      {openVisibleItems.length > 0 && (
+        <div className="wf-bulkbar" style={{
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          padding: '10px 14px', marginBottom: 14,
+          background: 'var(--surface-2, #f5f6f8)',
+          border: '1px solid var(--border)', borderRadius: 8,
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <input type="checkbox"
+                   checked={selectedIds.size > 0 && selectedIds.size === openVisibleItems.length}
+                   ref={el => {
+                     // Tri-state visual: partial → indeterminate, all → checked
+                     if (el) el.indeterminate = selectedIds.size > 0
+                                            && selectedIds.size < openVisibleItems.length;
+                   }}
+                   onChange={() => {
+                     if (selectedIds.size === openVisibleItems.length) clearSelection();
+                     else selectAllOpen();
+                   }}/>
+            <span style={{ color: 'var(--ink-2)' }}>
+              {selectedIds.size === 0
+                ? (isAr
+                    ? `اختر من ${openVisibleItems.length} سجل قابل للمراجعة`
+                    : `Select up to ${openVisibleItems.length} reviewable submission${openVisibleItems.length === 1 ? '' : 's'}`)
+                : (isAr
+                    ? `${selectedIds.size} / ${openVisibleItems.length} محدد`
+                    : `${selectedIds.size} of ${openVisibleItems.length} selected`)}
+            </span>
+          </label>
+          {selectedIds.size > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginInlineStart: 'auto', flexWrap: 'wrap' }}>
+              <Button variant="primary" size="sm" Icon={CheckCheck}
+                      disabled={bulkBusy} onClick={() => void bulkReview('APPROVE')}>
+                {isAr ? 'اعتماد المحدد' : 'Approve selected'} ({selectedIds.size})
+              </Button>
+              <Button variant="danger" size="sm" Icon={XIcon}
+                      disabled={bulkBusy} onClick={() => void bulkReview('REJECT')}>
+                {isAr ? 'رفض' : 'Reject'}
+              </Button>
+              <Button variant="ghost" size="sm" Icon={PauseCircle}
+                      disabled={bulkBusy} onClick={() => void bulkReview('CLOSE')}>
+                {isAr ? 'إغلاق' : 'Close'}
+              </Button>
+              <Button variant="ghost" size="sm" disabled={bulkBusy} onClick={clearSelection}>
+                {isAr ? 'إلغاء التحديد' : 'Clear'}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       <LoadableSection
         loading={loading}
         error={error}
@@ -298,14 +419,23 @@ export function WorkflowSubmissionsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {rows.map(s => {
               const cat = WORKFLOWS.find(w => w.id === s.workflowId);
-              const isOpen = s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW';
+              const rowOpen = isOpen(s);
+              const checked = selectedIds.has(s.id);
               return (
                 <Card key={s.id}
                       title={`#${s.id} · ${isAr ? (cat?.titleAr ?? s.workflowId)
                                                 : (cat?.titleEn ?? s.workflowId)}`}
                       Icon={cat?.Icon ?? ClipboardCheck}
                       action={(
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {rowOpen && (
+                            <label title={isAr ? 'تحديد للمراجعة الجماعية' : 'Select for bulk review'}
+                                   style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={checked} disabled={bulkBusy}
+                                     onChange={() => toggleSelected(s.id)}
+                                     aria-label={`Select submission ${s.id}`}/>
+                            </label>
+                          )}
                           <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{s.status}</Badge>
                           <Badge tone="neutral">{s.workflowModule}</Badge>
                         </div>
@@ -339,7 +469,7 @@ export function WorkflowSubmissionsPage() {
                     <pre className="ai-json-pre">{prettyJson(s.payloadJson)}</pre>
                   </details>
 
-                  {isOpen ? (
+                  {rowOpen ? (
                     <div className="wf-form-grid" style={{ marginTop: 12 }}>
                       <Field label={isAr ? 'ملاحظة المراجع (اختيارية)' : 'Reviewer note (optional)'} full>
                         <input className="input" value={reviewNote[s.id] ?? ''}
