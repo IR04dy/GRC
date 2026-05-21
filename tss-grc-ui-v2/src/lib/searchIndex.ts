@@ -7,7 +7,7 @@ import {
   AlertTriangle, ClipboardCheck, BookCopy, FileCheck2, Truck,
   Fingerprint, Activity, Briefcase, Landmark, Flame, AlertOctagon,
   LockKeyhole, RefreshCw, Workflow, ShieldAlert, Files, GitBranch,
-  Stamp, LayoutDashboard,
+  Stamp, LayoutDashboard, Calendar, Bell, ListChecks,
 } from 'lucide-react';
 
 import { MOCK_RISKS, KRIS } from '../pages/risk/mockRisks';
@@ -55,6 +55,13 @@ const PAGE_ITEMS: SearchItem[] = [
   { id: 'page-evidence',   kind: 'PAGE', title: 'Evidence Management', href: '/evidence',        Icon: Files,           keywords: ['attestation', 'capa'] },
   { id: 'page-changes',    kind: 'PAGE', title: 'Change Management',   href: '/changes',         Icon: GitBranch,       keywords: ['itil', 'cab'] },
   { id: 'page-workflows',  kind: 'PAGE', title: 'Workflow Definitions',href: '/workflows',       Icon: Workflow },
+  { id: 'page-wf-subs',    kind: 'PAGE', title: 'Workflow Submissions',href: '/workflows/submissions', Icon: ListChecks, keywords: ['submissions', 'register'] },
+  { id: 'page-calendar',   kind: 'PAGE', title: 'Compliance Calendar', href: '/calendar',        Icon: Calendar,        keywords: ['outlook', 'deadlines', 'reminders', 'capa due', 'report deadline', 'hijri', 'saudi workdays'] },
+  { id: 'page-inbox-notif',kind: 'PAGE', title: 'Notifications Inbox', href: '/notifications',   Icon: Bell,            keywords: ['inbox', 'notify', 'escalation', 'f8', 'automation'] },
+  { id: 'page-capa',       kind: 'PAGE', title: 'CAPA Register',       href: '/capa',            Icon: ClipboardCheck,  keywords: ['corrective', 'preventive', 'remediation', 'actions'] },
+  { id: 'page-findings',   kind: 'PAGE', title: 'Findings',            href: '/findings',        Icon: AlertTriangle,   keywords: ['audit findings', 'observation'] },
+  { id: 'page-ndi',        kind: 'PAGE', title: 'NDI — National Digital Index', href: '/ndi',    Icon: Activity,        keywords: ['dga', 'national digital index', 'maturity', 'compliance', 'kpi'] },
+  { id: 'page-licensing',  kind: 'PAGE', title: 'Module Licensing',    href: '/admin/licensing', Icon: ShieldAlert,     keywords: ['license', 'enabled modules', 'features', 'admin'] },
 ];
 
 function buildEntityItems(): SearchItem[] {
