@@ -2807,6 +2807,15 @@ export const ar = {
   // Workflow Hub — catalog of every Saudi-GRC §7 wizard
   wfHubSidebar:           'مركز المعالجات',
   wfSubmissionsSidebar:   'سجلات المعالجات',
+  calendarSidebar:        'التقويم',
+  calendarEyebrow:        'تقويم الالتزام',
+  calendarTitle:          'التقويم',
+  calendarSub:            'عرض يراعي أيام العمل السعودية للتدقيقات والاستحقاقات والتوكيدات والتذكيرات.',
+  calendarSwitchAgenda:   'عرض الجدول',
+  calendarSwitchMonth:    'عرض الشهر',
+  calendarNewEvent:       'حدث جديد',
+  calendarLoading:        'جارٍ التحميل…',
+  calendarEventCreated:   'تم إنشاء الحدث',
 
   // Executive lifecycle overview — all 5 pipelines on one screen
   loSidebar:              'نظرة عامة على دورات الحياة',

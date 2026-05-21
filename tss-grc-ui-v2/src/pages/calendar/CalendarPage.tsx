@@ -1,0 +1,633 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, X,
+  ListChecks, LayoutGrid, AlertTriangle, Sparkles, RefreshCw,
+} from 'lucide-react';
+import { Shell } from '../../components/layout/Shell';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
+import { calendarApi, type CalendarEventDto, type CalendarEventCreateRequest } from '../../lib/api';
+import {
+  buildMonthGrid, dowShort, hijriDate, hijriDayOnly,
+  monthYearLabel, toIsoDate, isSameDay, isSaudiWeekend,
+  EVENT_TYPE_LABEL, EVENT_TYPE_TONE, type CalendarEventType,
+} from '../../lib/saudiCalendar';
+
+type ViewMode = 'month' | 'agenda';
+
+/**
+ * Compliance Calendar — Outlook-equivalent. Saudi-workdays-aware
+ * (Sun-Thu working, Fri-Sat tinted in the grid, public holidays as
+ * full-row pills). One feed of every dated thing across the platform
+ * — audit days, CAPA dues, finding remediations, risk attestations,
+ * AAR reviews, public holidays, plus user-created reminders.
+ *
+ * <p>Data flows through {@code /api/v1/calendar/events?from&to&types}
+ * (PR #60). Each event carries a server-computed {@code onWorkday}
+ * flag so the "Falls on weekend" warning chip is consistent with the
+ * F8 reminder scheduler.
+ *
+ * <p>Routes via {@code entityType+entityId} on event click — a CAPA
+ * deadline opens {@code /capa/<id>}; a finding opens
+ * {@code /findings/<id>}; etc.
+ */
+export function CalendarPage() {
+  const { t, lang } = useI18n();
+  const isAr = lang === 'ar';
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [search, setSearch] = useSearchParams();
+
+  // URL-backed state — month/year + view mode + active type filters.
+  // Pasteable links: someone shares /calendar?y=2026&m=5&v=agenda
+  // and the recipient sees the same view.
+  const now = new Date();
+  const year  = parseInt(search.get('y') ?? String(now.getFullYear()), 10);
+  const month = parseInt(search.get('m') ?? String(now.getMonth()),    10);
+  const view  = (search.get('v') ?? 'month') as ViewMode;
+  const activeTypes = useMemo(() =>
+    (search.get('types') ?? '').split(',').filter(Boolean) as CalendarEventType[],
+    [search]);
+  const includeHolidays = search.get('hol') !== '0';
+  const showHijri       = search.get('hijri') !== '0';
+
+  const [events, setEvents] = useState<CalendarEventDto[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [reload, setReload] = useState(0);
+
+  // Compute window [from, to). For month view: 1st of month → 1st
+  // of next month + a few days of overflow so the 42-cell grid
+  // shows neighbouring days. For agenda view: today → 60 days out.
+  const { fromIso, toIso, gridCells } = useMemo(() => {
+    if (view === 'agenda') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60);
+      return {
+        fromIso: toIsoDate(start),
+        toIso:   toIsoDate(end),
+        gridCells: [] as Date[],
+      };
+    }
+    const cells = buildMonthGrid(year, month);
+    return {
+      fromIso: toIsoDate(cells[0]),
+      toIso:   toIsoDate(new Date(cells[41].getFullYear(), cells[41].getMonth(), cells[41].getDate() + 1)),
+      gridCells: cells,
+    };
+  }, [year, month, view, now]);
+
+  // Load events whenever the window or type filter changes.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const typesParam = activeTypes.length ? activeTypes.join(',') : undefined;
+    calendarApi.list(fromIso, toIso, typesParam)
+      .then(rows => {
+        if (cancelled) return;
+        // Apply holiday include/exclude on the client — server still
+        // returns them so the workday helper has the holiday set.
+        const filtered = includeHolidays
+          ? rows
+          : rows.filter(r => r.eventType !== 'PUBLIC_HOLIDAY');
+        setEvents(filtered);
+      })
+      .catch(e => { if (!cancelled) setError((e as Error).message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [fromIso, toIso, activeTypes, includeHolidays, reload]);
+
+  function setParam(key: string, value: string | undefined) {
+    const next = new URLSearchParams(search);
+    if (value == null || value === '') next.delete(key);
+    else next.set(key, value);
+    setSearch(next, { replace: true });
+  }
+
+  function goPrev() {
+    const d = new Date(year, month - 1, 1);
+    setSearch({
+      ...Object.fromEntries(search),
+      y: String(d.getFullYear()),
+      m: String(d.getMonth()),
+    }, { replace: true });
+  }
+  function goNext() {
+    const d = new Date(year, month + 1, 1);
+    setSearch({
+      ...Object.fromEntries(search),
+      y: String(d.getFullYear()),
+      m: String(d.getMonth()),
+    }, { replace: true });
+  }
+  function goToday() {
+    setSearch({
+      ...Object.fromEntries(search),
+      y: String(now.getFullYear()),
+      m: String(now.getMonth()),
+    }, { replace: true });
+  }
+
+  function toggleType(t: CalendarEventType) {
+    const next = activeTypes.includes(t)
+      ? activeTypes.filter(x => x !== t)
+      : [...activeTypes, t];
+    setParam('types', next.length ? next.join(',') : undefined);
+  }
+
+  function clickEvent(e: CalendarEventDto) {
+    // Aggregated rows navigate to the source entity detail page.
+    if (e.source === 'AGGREGATED' && e.entityType && e.entityId) {
+      const route = entityRoute(e.entityType, e.entityId);
+      if (route) { navigate(route); return; }
+    }
+    // User events — navigate to a future detail editor; for v1
+    // just toast the metadata so the click is visible.
+    toast.info(`${e.titleEn} — ${e.startsAt.slice(0, 10)}`);
+  }
+
+  function refreshNow() {
+    setReload(reload + 1);
+  }
+
+  const heading = view === 'month'
+    ? monthYearLabel(year, month, isAr)
+    : isAr ? 'الجدول القادم (٦٠ يوماً)' : 'Upcoming (60 days)';
+
+  return (
+    <Shell title={t('calendarTitle')} sub={t('calendarSub')}>
+      <PageHeader
+        eyebrow={t('calendarEyebrow')}
+        title={t('calendarTitle')}
+        sub={t('calendarSub')}
+        actions={<>
+          <Button variant="ghost" Icon={RefreshCw} onClick={refreshNow}>
+            {t('actionRefresh')}
+          </Button>
+          <Button variant="ghost" Icon={LayoutGrid}
+            onClick={() => setParam('v', view === 'month' ? 'agenda' : 'month')}>
+            {view === 'month' ? t('calendarSwitchAgenda') : t('calendarSwitchMonth')}
+          </Button>
+          <Button variant="primary" Icon={Plus} onClick={() => setAddOpen(true)}>
+            {t('calendarNewEvent')}
+          </Button>
+        </>}
+      />
+
+      {/* Filter bar */}
+      <Card title={isAr ? 'تصفية' : 'Filters'} Icon={Sparkles}
+        action={activeTypes.length > 0 && (
+          <Button variant="ghost" size="sm"
+            onClick={() => setParam('types', undefined)}>
+            {isAr ? 'مسح الكل' : 'Clear all'}
+          </Button>
+        )}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 4 }}>
+          {(Object.keys(EVENT_TYPE_LABEL) as CalendarEventType[]).map(et => {
+            const active = activeTypes.includes(et);
+            const lbl = EVENT_TYPE_LABEL[et];
+            return (
+              <button key={et} onClick={() => toggleType(et)}
+                style={{
+                  padding: '4px 10px', fontSize: 12,
+                  borderRadius: 'var(--r-sm)',
+                  border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  background: active ? 'var(--primary-50)' : 'var(--surface-2)',
+                  color: active ? 'var(--primary)' : 'var(--ink-2)',
+                  cursor: 'pointer',
+                  fontWeight: active ? 600 : 500,
+                }}>
+                {isAr ? lbl.ar : lbl.en}
+              </button>
+            );
+          })}
+          <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--ink-2)' }}>
+              <input type="checkbox" checked={includeHolidays}
+                onChange={e => setParam('hol', e.target.checked ? undefined : '0')} />
+              {isAr ? 'إظهار العطل' : 'Show holidays'}
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--ink-2)' }}>
+              <input type="checkbox" checked={showHijri}
+                onChange={e => setParam('hijri', e.target.checked ? undefined : '0')} />
+              {isAr ? 'إظهار التاريخ الهجري' : 'Show Hijri date'}
+            </label>
+          </div>
+        </div>
+      </Card>
+
+      {/* Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBlock: 12 }}>
+        <Button variant="ghost" Icon={ChevronLeft} onClick={goPrev} aria-label="Previous">
+          {isAr ? 'التالي' : 'Previous'}
+        </Button>
+        <Button variant="ghost" onClick={goToday}>{isAr ? 'اليوم' : 'Today'}</Button>
+        <Button variant="ghost" Icon={ChevronRight} onClick={goNext} aria-label="Next">
+          {isAr ? 'السابق' : 'Next'}
+        </Button>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--ink-1)', marginInlineStart: 8 }}>
+          {heading}
+        </h2>
+        {loading && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{t('calendarLoading')}</span>}
+      </div>
+
+      {/* Body */}
+      {error
+        ? <Card title={isAr ? 'تعذّر التحميل' : 'Failed to load'} Icon={AlertTriangle}>
+            <InlineEmpty>{error}</InlineEmpty>
+          </Card>
+        : view === 'month'
+          ? <MonthGrid cells={gridCells} year={year} month={month}
+                       events={events ?? []} showHijri={showHijri}
+                       isAr={isAr} onEventClick={clickEvent} />
+          : <AgendaList events={events ?? []} isAr={isAr}
+                        showHijri={showHijri} onEventClick={clickEvent} />
+      }
+
+      {addOpen && <AddEventModal
+        isAr={isAr}
+        onClose={() => setAddOpen(false)}
+        onCreated={(e) => {
+          toast.success(t('calendarEventCreated'));
+          setAddOpen(false);
+          setReload(reload + 1);
+          // Surfaces the new event in the current view if it lands
+          // in the window — no need to navigate.
+          void e;
+        }} />}
+    </Shell>
+  );
+}
+
+// ─── Month grid ──────────────────────────────────────────────────────
+
+function MonthGrid({ cells, year, month, events, showHijri, isAr, onEventClick }: {
+  cells: Date[]; year: number; month: number;
+  events: CalendarEventDto[]; showHijri: boolean; isAr: boolean;
+  onEventClick: (e: CalendarEventDto) => void;
+}) {
+  const today = new Date();
+  return (
+    <Card title="" Icon={CalendarIcon}>
+      {/* Day-of-week header */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+        gap: 1, fontSize: 11, fontWeight: 700, color: 'var(--ink-3)',
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+        paddingBlock: 8, borderBottom: '1px solid var(--border)',
+      }}>
+        {[0, 1, 2, 3, 4, 5, 6].map(d => (
+          <div key={d} style={{
+            padding: '4px 8px', textAlign: isAr ? 'right' : 'left',
+            // Saudi weekend headers subtly muted.
+            color: (d === 5 || d === 6) ? 'var(--ink-4)' : 'var(--ink-3)',
+          }}>
+            {dowShort(d, isAr)}
+          </div>
+        ))}
+      </div>
+
+      {/* 6×7 grid */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+        gap: 1, background: 'var(--border)',
+      }}>
+        {cells.map(d => {
+          const dayEvents = events.filter(e => isSameDay(new Date(e.startsAt), d));
+          const inMonth = d.getMonth() === month && d.getFullYear() === year;
+          const isToday = isSameDay(d, today);
+          const weekend = isSaudiWeekend(d);
+          const hasHoliday = dayEvents.some(e => e.eventType === 'PUBLIC_HOLIDAY');
+          return (
+            <div key={`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`}
+              style={{
+                background: hasHoliday ? 'var(--accent-50)'
+                          : weekend ? 'var(--surface-2)'
+                          : 'var(--surface-1)',
+                minHeight: 110,
+                padding: 6,
+                opacity: inMonth ? 1 : 0.5,
+                borderInlineStart: isToday ? '3px solid var(--primary)' : undefined,
+              }}>
+              {/* Date number + Hijri */}
+              <div style={{ display: 'flex', justifyContent: 'space-between',
+                            alignItems: 'baseline', marginBottom: 4 }}>
+                <span style={{
+                  fontSize: 13, fontWeight: isToday ? 700 : 500,
+                  color: isToday ? 'var(--primary)' : 'var(--ink-1)',
+                }}>{d.getDate()}</span>
+                {showHijri && (
+                  <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+                    {hijriDayOnly(d)}
+                  </span>
+                )}
+              </div>
+              {/* Events */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {dayEvents.slice(0, 3).map(e => (
+                  <EventChip key={e.externalId} event={e} isAr={isAr}
+                             onClick={() => onEventClick(e)} />
+                ))}
+                {dayEvents.length > 3 && (
+                  <span style={{ fontSize: 10, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                    {isAr ? `+${dayEvents.length - 3} المزيد` : `+${dayEvents.length - 3} more`}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Agenda list ──────────────────────────────────────────────────────
+
+function AgendaList({ events, isAr, showHijri, onEventClick }: {
+  events: CalendarEventDto[]; isAr: boolean; showHijri: boolean;
+  onEventClick: (e: CalendarEventDto) => void;
+}) {
+  if (events.length === 0) {
+    return (
+      <Card title={isAr ? 'لا توجد أحداث' : 'No events'} Icon={CalendarIcon}>
+        <InlineEmpty>
+          {isAr ? 'الجدول فارغ خلال الستين يوماً القادمة.'
+                : 'Nothing scheduled in the next 60 days.'}
+        </InlineEmpty>
+      </Card>
+    );
+  }
+  // Group events by ISO date.
+  const byDate = new Map<string, CalendarEventDto[]>();
+  for (const e of events) {
+    const key = e.startsAt.slice(0, 10);
+    if (!byDate.has(key)) byDate.set(key, []);
+    byDate.get(key)!.push(e);
+  }
+  const sortedDays = Array.from(byDate.keys()).sort();
+  return (
+    <Card title={isAr ? 'الجدول القادم' : 'Upcoming events'} Icon={ListChecks}
+      action={<Badge tone="primary">{events.length}</Badge>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {sortedDays.map(iso => {
+          const d = new Date(iso + 'T00:00:00');
+          const dayEvents = byDate.get(iso)!;
+          const weekend = isSaudiWeekend(d);
+          return (
+            <div key={iso} style={{
+              display: 'grid', gridTemplateColumns: '120px 1fr',
+              gap: 12, padding: '8px 0',
+              borderBottom: '1px dashed var(--border)',
+            }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600,
+                              color: weekend ? 'var(--ink-3)' : 'var(--ink-1)' }}>
+                  {d.toLocaleDateString(isAr ? 'ar-SA' : 'en-US', {
+                    weekday: 'short', month: 'short', day: 'numeric',
+                  })}
+                </div>
+                {showHijri && (
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                    {hijriDate(d, isAr)}
+                  </div>
+                )}
+                {weekend && (
+                  <Badge tone="neutral">{isAr ? 'عطلة نهاية الأسبوع' : 'Weekend'}</Badge>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {dayEvents.map(e => (
+                  <AgendaRow key={e.externalId} event={e} isAr={isAr}
+                             onClick={() => onEventClick(e)} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function AgendaRow({ event, isAr, onClick }: {
+  event: CalendarEventDto; isAr: boolean; onClick: () => void;
+}) {
+  const tone = EVENT_TYPE_TONE[event.eventType as CalendarEventType] ?? 'neutral';
+  const typeLbl = EVENT_TYPE_LABEL[event.eventType as CalendarEventType];
+  const title = isAr && event.titleAr ? event.titleAr : event.titleEn;
+  const onWeekend = event.onWorkday === false;
+  return (
+    <button onClick={onClick} style={{
+      display: 'grid', gridTemplateColumns: '140px 1fr 100px',
+      gap: 10, padding: '8px 10px', textAlign: isAr ? 'right' : 'left',
+      background: 'var(--surface-2)', border: '1px solid var(--border)',
+      borderRadius: 'var(--r-sm)', cursor: 'pointer',
+      fontFamily: 'inherit',
+    }}>
+      <Badge tone={tone}>{typeLbl ? (isAr ? typeLbl.ar : typeLbl.en) : event.eventType}</Badge>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {title}
+        </div>
+        {event.ownerLabel && (
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+            {isAr ? 'صاحب' : 'Owner'}: {event.ownerLabel}
+          </div>
+        )}
+        {onWeekend && (
+          <Badge tone="warning">
+            {isAr ? 'يقع في عطلة نهاية الأسبوع' : 'Falls on weekend'}
+          </Badge>
+        )}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'end' }}>
+        {event.source === 'AGGREGATED'
+          ? <Badge tone="info">{isAr ? 'مُجمَّع' : 'Auto'}</Badge>
+          : <Badge tone="neutral">{isAr ? 'مستخدم' : 'User'}</Badge>}
+      </div>
+    </button>
+  );
+}
+
+function EventChip({ event, isAr, onClick }: {
+  event: CalendarEventDto; isAr: boolean; onClick: () => void;
+}) {
+  const tone = EVENT_TYPE_TONE[event.eventType as CalendarEventType] ?? 'neutral';
+  const title = isAr && event.titleAr ? event.titleAr : event.titleEn;
+  const titleTruncated = title.length > 28 ? title.slice(0, 28) + '…' : title;
+  // Inline tone color map — keeps the chip dense (no Badge wrapper padding).
+  const toneFg = ({
+    primary: 'var(--primary)',     info: 'var(--info-fg)',
+    warning: 'var(--warning-fg)',  danger:  'var(--danger-fg)',
+    success: 'var(--success-fg)',  accent:  'var(--accent-700)',
+    neutral: 'var(--ink-2)',
+  } as const)[tone];
+  return (
+    <button onClick={onClick}
+      title={title}
+      style={{
+        display: 'block', width: '100%',
+        padding: '2px 6px', fontSize: 11,
+        textAlign: isAr ? 'right' : 'left',
+        background: 'var(--surface-1)',
+        border: `1px solid var(--border)`,
+        borderInlineStart: `3px solid ${toneFg}`,
+        borderRadius: 'var(--r-sm)',
+        cursor: 'pointer',
+        color: 'var(--ink-1)', fontFamily: 'inherit',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+      {titleTruncated}
+    </button>
+  );
+}
+
+// ─── Add-event modal (minimal v1) ─────────────────────────────────────
+
+function AddEventModal({ isAr, onClose, onCreated }: {
+  isAr: boolean; onClose: () => void;
+  onCreated: (e: CalendarEventDto) => void;
+}) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const [titleEn, setTitleEn] = useState('');
+  const [titleAr, setTitleAr] = useState('');
+  const [eventType, setEventType] = useState<CalendarEventType>('MEETING');
+  const [startsAt, setStartsAt] = useState(() => {
+    const d = new Date(); d.setMinutes(0); d.setSeconds(0);
+    return d.toISOString().slice(0, 16);
+  });
+  const [allDay, setAllDay] = useState(true);
+  const [location, setLocation] = useState('');
+  const [reminderDays, setReminderDays] = useState('7,1');
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!titleEn.trim()) {
+      toast.danger(isAr ? 'العنوان مطلوب' : 'Title is required');
+      return;
+    }
+    setSaving(true);
+    const req: CalendarEventCreateRequest = {
+      titleEn: titleEn.trim(),
+      titleAr: titleAr.trim() || undefined,
+      eventType,
+      startsAt: startsAt.length === 16 ? startsAt + ':00' : startsAt,
+      allDay,
+      location: location.trim() || undefined,
+      reminderDays,
+    };
+    try {
+      const out = await calendarApi.create(req);
+      onCreated(out);
+    } catch (e) {
+      toast.danger((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t('calendarNewEvent')} size="md"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
+        <Button variant="primary" Icon={Plus} onClick={submit} disabled={saving}>
+          {saving ? (isAr ? 'يحفظ…' : 'Saving…') : t('actionSave')}
+        </Button>
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Field label={isAr ? 'العنوان (إنجليزي)' : 'Title (English)'}>
+          <input value={titleEn} onChange={e => setTitleEn(e.target.value)}
+            placeholder={isAr ? 'مثال: مراجعة ربعية لإطار النضج' : 'e.g. Quarterly maturity review'}
+            style={inputStyle} />
+        </Field>
+        <Field label={isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}>
+          <input value={titleAr} onChange={e => setTitleAr(e.target.value)}
+            placeholder={isAr ? 'مثال: مراجعة الإطار' : 'مثال: مراجعة الإطار'}
+            style={inputStyle} dir="rtl" />
+        </Field>
+        <Field label={isAr ? 'النوع' : 'Type'}>
+          <select value={eventType}
+            onChange={e => setEventType(e.target.value as CalendarEventType)}
+            style={inputStyle}>
+            {(['MEETING', 'REMINDER', 'TRAINING', 'AUDIT_DAY',
+               'REPORT_DEADLINE', 'CUSTOM'] as CalendarEventType[]).map(t =>
+              <option key={t} value={t}>
+                {(isAr ? EVENT_TYPE_LABEL[t].ar : EVENT_TYPE_LABEL[t].en)}
+              </option>)}
+          </select>
+        </Field>
+        <Field label={isAr ? 'التاريخ والوقت' : 'Date and time'}>
+          <input type="datetime-local" value={startsAt}
+            onChange={e => setStartsAt(e.target.value)} style={inputStyle} />
+        </Field>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+          <input type="checkbox" checked={allDay}
+            onChange={e => setAllDay(e.target.checked)} />
+          {isAr ? 'يوم كامل' : 'All day'}
+        </label>
+        <Field label={isAr ? 'الموقع' : 'Location'}>
+          <input value={location} onChange={e => setLocation(e.target.value)}
+            placeholder={isAr ? 'اختياري' : 'Optional'} style={inputStyle} />
+        </Field>
+        <Field label={isAr ? 'تذكير (أيام قبل)' : 'Reminders (days before)'}>
+          <input value={reminderDays} onChange={e => setReminderDays(e.target.value)}
+            placeholder="7,1" style={inputStyle} />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: '6px 8px', fontSize: 13, width: '100%',
+  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+  background: 'var(--surface-2)', color: 'var(--ink-1)',
+  fontFamily: 'inherit',
+};
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)',
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                    marginBottom: 4 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+/** Map an entityType to its v2 detail-page route. Returns undefined
+ *  when no route is wired yet (the calendar still lists the row;
+ *  click-through just no-ops with a toast). */
+function entityRoute(entityType: string, entityId: number): string | undefined {
+  switch (entityType) {
+    case 'CapaTask':           return `/capa/${entityId}`;
+    case 'Finding':
+    case 'AuditFinding':       return `/findings/${entityId}`;
+    case 'Risk':               return `/risk/${entityId}`;
+    case 'CrisisAar':          return `/bcm/aars/${entityId}`;
+    case 'WorkflowSubmission': return `/workflows/submissions/${entityId}`;
+    default: return undefined;
+  }
+}
+
+// Suppress unused warnings on Link + X — kept available for future
+// affordances (entity link, dismiss icon in agenda rows).
+const _unused: ReadonlyArray<unknown> = [Link, X];
+void _unused;

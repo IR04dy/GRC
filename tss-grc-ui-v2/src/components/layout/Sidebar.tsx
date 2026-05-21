@@ -50,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'dashboard',     to: '/dashboard',            Icon: LayoutDashboard, labelKey: 'itemDashboard' },
       { id: 'workflow-hub',  to: '/workflows',            Icon: Workflow,        labelKey: 'wfHubSidebar' },
       { id: 'wf-submissions',to: '/workflows/submissions', Icon: ClipboardCheck, labelKey: 'wfSubmissionsSidebar' },
+      { id: 'calendar',      to: '/calendar',             Icon: Calendar,        labelKey: 'calendarSidebar' },
       { id: 'lc-overview',   to: '/lifecycle-overview',   Icon: Activity,        labelKey: 'loSidebar' },
       { id: 'inbox',         to: '/intake-inbox',         Icon: Inbox,           labelKey: 'inboxTitle' },
       { id: 'approvals',     to: '/approvals',            Icon: CheckCheck,      labelKey: 'approvalsSidebar' },

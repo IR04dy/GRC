@@ -2090,3 +2090,81 @@ export const capaTaskApi = {
   counts:   () => api.get<CapaCountsDto>('/api/capa/tasks/counts'),
   list:     () => api.get<CapaTaskDto[]>('/api/capa/tasks'),
 };
+
+// ── Compliance Calendar (PR #60 backend) ──────────────────────────────
+//    Saudi-workdays-aware unified calendar feed: stitched from persisted
+//    user events + Saudi public holidays + auto-aggregated rows from
+//    dated GRC entities. See module/platform/calendar/.
+export interface CalendarEventDto {
+  /** Persisted PK for USER rows; null for AGGREGATED rows. */
+  id?:        number | null;
+  /** Stable identifier — synthetic-but-deterministic for AGGREGATED rows. */
+  externalId: string;
+  /** USER (persisted) | AGGREGATED (synthesised). */
+  source:     'USER' | 'AGGREGATED';
+  titleEn:    string;
+  titleAr?:   string | null;
+  descriptionEn?: string | null;
+  descriptionAr?: string | null;
+  /** Matches V133 CHECK constraint set — see EVENT_TYPE_LABEL in
+   *  lib/saudiCalendar.ts for the 14 categories. */
+  eventType:  string;
+  /** ISO date-time (UTC). */
+  startsAt:   string;
+  endsAt?:    string | null;
+  allDay?:    boolean;
+  location?:  string | null;
+  ownerId?:   number | null;
+  /** Pre-resolved label for UI display (saves a second roundtrip). */
+  ownerLabel?: string | null;
+  severity?:  string | null;
+  /** Linked GRC entity — drives navigate-on-click. */
+  entityType?: string | null;
+  entityId?:   number | null;
+  reminderDays?: string | null;
+  recurrence?:  string | null;
+  recurrenceUntil?: string | null;
+  isHoliday?:  boolean;
+  status?:     string | null;
+  /** Server-computed Saudi workday flag — UI uses for the
+   *  "Falls on weekend" warning chip. */
+  onWorkday?:  boolean;
+}
+export interface CalendarEventCreateRequest {
+  titleEn:        string;
+  titleAr?:       string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  eventType:      string;
+  startsAt:       string;
+  endsAt?:        string;
+  allDay?:        boolean;
+  location?:      string;
+  ownerId?:       number;
+  severity?:      string;
+  entityType?:    string;
+  entityId?:      number;
+  reminderDays?:  string;
+  recurrence?:    string;
+  recurrenceUntil?: string;
+}
+export const calendarApi = {
+  /** Outlook-equivalent feed for [from, to). {@code types} is an
+   *  optional comma-separated event-type filter (e.g.
+   *  "CAPA_DUE,FINDING_DEADLINE,PUBLIC_HOLIDAY"). */
+  list:  (from: string, to: string, types?: string) =>
+    api.get<CalendarEventDto[]>(
+      `/api/v1/calendar/events?from=${from}&to=${to}${types ? `&types=${encodeURIComponent(types)}` : ''}`),
+  /** "On the calendar" panel — persisted events linked to entity. */
+  forEntity: (entityType: string, entityId: number) =>
+    api.get<CalendarEventDto[]>(
+      `/api/v1/calendar/events/for-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
+  get:    (externalId: string) =>
+    api.get<CalendarEventDto>(`/api/v1/calendar/events/${externalId}`),
+  create: (req: CalendarEventCreateRequest) =>
+    api.post<CalendarEventDto>('/api/v1/calendar/events', req),
+  update: (externalId: string, req: CalendarEventCreateRequest) =>
+    api.put<CalendarEventDto>(`/api/v1/calendar/events/${externalId}`, req),
+  remove: (externalId: string) =>
+    api.delete<void>(`/api/v1/calendar/events/${externalId}`),
+};
