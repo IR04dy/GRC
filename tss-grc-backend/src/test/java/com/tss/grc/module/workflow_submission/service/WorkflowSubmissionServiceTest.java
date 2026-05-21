@@ -2,8 +2,10 @@ package com.tss.grc.module.workflow_submission.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.workflow_submission.entity.WorkflowSubmission;
 import com.tss.grc.module.workflow_submission.repository.WorkflowSubmissionRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +55,7 @@ class WorkflowSubmissionServiceTest {
 
     @Mock private WorkflowSubmissionRepository repo;
     @Mock private AuditLogService audit;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private WorkflowSubmissionService service;
 
     @BeforeEach void setUp() {
@@ -302,6 +305,63 @@ class WorkflowSubmissionServiceTest {
 
         // Cross-tenant attempt must NOT leave an audit trail under our tenant
         verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
+        // … and must NOT fire an F8 event under our tenant either
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    // ── F8 automation events ──────────────────────────────────────────
+
+    @Test void create_publishesWorkflowSubmissionCreatedEvent() {
+        var body = new WorkflowSubmissionService.CreateBody(
+            "pdpl-breach", "PDPL",
+            "Personal data breach — STC partner", null, null, null,
+            "PDPL Art. 23", null,
+            "{\"discoveredAt\":\"2026-05-20T08:00:00Z\"}");
+
+        service.create(body);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("WORKFLOW_SUBMISSION_CREATED");
+        assertThat(ev.entityType()).isEqualTo("WorkflowSubmission");
+        assertThat(ev.organisationId()).isEqualTo(ORG_ID);
+        // Payload carries the fields F8 rule conditions match against.
+        assertThat(ev.payload()).containsEntry("workflowId", "pdpl-breach");
+        assertThat(ev.payload()).containsEntry("workflowModule", "PDPL");
+        assertThat(ev.payload()).containsEntry("status", "SUBMITTED");
+        assertThat(ev.payload()).containsEntry("regulatoryAnchor", "PDPL Art. 23");
+    }
+
+    @Test void review_publishesWorkflowSubmissionReviewedEvent() {
+        var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
+
+        service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", null));
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("WORKFLOW_SUBMISSION_REVIEWED");
+        assertThat(ev.payload()).containsEntry("status", "APPROVED");
+        assertThat(ev.payload()).containsEntry("previousStatus", "SUBMITTED");
+        // Rule conditions can route on the wizard id too.
+        assertThat(ev.payload()).containsEntry("workflowId", "erm-risk-treatment");
+    }
+
+    @Test void create_payloadNeverHasNullValues() {
+        // The F8 engine's equality check would NPE on null payload values.
+        // Confirm nulls are coerced to "" before they hit the event bus.
+        var body = new WorkflowSubmissionService.CreateBody(
+            "erm-risk-treatment", "ERM", "x", null, null, null,
+            null /* no anchor */, null,
+            "{}");
+
+        service.create(body);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().payload().get("regulatoryAnchor")).isEqualTo("");
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
