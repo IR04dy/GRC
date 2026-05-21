@@ -1,14 +1,14 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PRs #11-15 + module-submissions widget merged)
+**Last update:** 21 May 2026 (PRs #11-21 wizard arc + F8 automation merged)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — five-PR wizard arc on master (21 May 2026)
+## 🟢 Recent additions — eleven-PR wizard arc on master (21 May 2026)
 
-After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, four follow-up PRs closed the persistence loop:
+After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, ten follow-up PRs closed the persistence + UX + automation loop:
 
 | PR | Merge | What |
 |---|---|---|
@@ -17,8 +17,18 @@ After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle 
 | #13 | `a422f59` | V125 generic `workflow_submissions` ledger + new `module/workflow_submission/` backend + 12 remaining wizards wired (Risk Treatment/Acceptance, RCA, Mgmt Review, Signature, Control Test, Cloud CCC, NCA ECC, Consent, Cross-Border, Exit Plan, Board Pack) |
 | #14 | `ca2f363` | `/workflows/submissions` register UI — filter by module + workflow id, status counts, JSON inspect, inline Approve/Reject/Close |
 | #15 | `85a94f4` | 15-case `WorkflowSubmissionServiceTest` + V126 demo seed (25 representative rows) + sidebar entry "Workflow Submissions" |
+| #16 | `cfdb564` | `ModuleSubmissionsPanel` — latest-5 panel on Privacy / BCM / SCM / Cyber / Risk / Compliance / Incidents pages |
+| #17 | `62aeeec` | `DashboardSubmissionsCard` — status-counts strip + top-8 rows on `/dashboard` (first-login visibility) |
+| #18 | `06eca6e` | `/workflows/submissions/:id` detail page — URL-shareable, full payload, review actions, copy-link, "open new" CTA |
+| #19 | `7b7a0f4` | Filter-aware CSV export from the register (UTF-8 BOM, RFC-4180 quoting, filter-stamped filename) |
+| #20 | `c3a01b7` | `AuditLogService` integration — every CREATE / APPROVE / REJECT / CLOSE / UNDER_REVIEW writes to `platform.audit_log` with cross-tenant defense |
+| #21 | `f3af7f7` | F8 automation rules on submission events — V127 seeds AR-21..AR-25 (PDPL breach → NOTIFY DPO, NCA cyber-incident → NOTIFY CISO, risk acceptance → ESCALATE risk committee, cross-border → FLAG DPO review, board pack APPROVED → AUDIT milestone) |
 
-**Wizard persistence state: 20 of 24 catalog wizards POST to a real backend on submit. The 4 remaining (`evidence-request`, `capa-workflow`, `evidence-connectors`, `incident-triage`) are catalog entries that route to existing register pages.**
+**Wizard persistence state: 20 of 24 catalog wizards POST to a real backend on submit, audit-log every transition, and fan out to the F8 automation engine. The 4 remaining (`evidence-request`, `capa-workflow`, `evidence-connectors`, `incident-triage`) are catalog entries that route to existing register pages.**
+
+**Backend test count: 22 cases on `WorkflowSubmissionServiceTest`** — covers validation, state machine, cross-tenant 404 + cross-tenant audit defense + cross-tenant event-publisher defense, audit-log entry shape, F8 event payload shape, null-coercion guard.
+
+**Bundle: main chunk 1,531 kB raw / 468 kB gzip (−53% from pre-split baseline). 95+ on-demand route chunks.**
 
 ## 🟢 Recent additions (PR #11 — 39 commits)
 

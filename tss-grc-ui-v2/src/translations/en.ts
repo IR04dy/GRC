@@ -829,6 +829,7 @@ export const en = {
   approvalsSub:            'Cross-module approval queue · single inbox for every domain',
   approvalsEyebrow:        'Approval Engine',
   approvalsPageSub:        'Single queue for every parallel, sequential, or conditional approval the platform raises. Each request carries a Saudi regulator citation and a live SLA countdown driven by the Sprint 4 SLA engine.',
+  approvalsWorkflowSubmissionsLink: 'Workflow submissions',
   approvalsKpiPending:     'Pending',
   approvalsKpiDueSoon:     'Due ≤ 5 days',
   approvalsKpiOverdue:     'Overdue',

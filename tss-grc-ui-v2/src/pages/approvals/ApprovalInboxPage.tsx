@@ -3,7 +3,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Link } from 'react-router-dom';
 import {
   Inbox, ShieldCheck, Clock, AlertTriangle, Flame, Landmark,
-  Check, X as XIcon, UserPlus, ArrowRight,
+  Check, X as XIcon, UserPlus, ArrowRight, ClipboardList,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -145,6 +145,18 @@ export function ApprovalInboxPage() {
         eyebrow={t('approvalsEyebrow')}
         title={t('approvalsTitle')}
         sub={t('approvalsPageSub')}
+        actions={
+          // Wizards (PRs #11-21) go through their own register, but a
+          // reviewer landing here also wants the SUBMITTED / UNDER_REVIEW
+          // workflow submissions queue. Cross-link rather than duplicate
+          // the rows — different schema (approval_requests vs
+          // workflow_submissions), same reviewer mindset.
+          <Link to="/workflows/submissions">
+            <Button variant="secondary" size="sm" Icon={ClipboardList}>
+              {t('approvalsWorkflowSubmissionsLink')}
+            </Button>
+          </Link>
+        }
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
