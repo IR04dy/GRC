@@ -1,12 +1,14 @@
 package com.tss.grc.module.workflow_submission.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.workflow_submission.entity.WorkflowSubmission;
 import com.tss.grc.module.workflow_submission.repository.WorkflowSubmissionRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,6 +21,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -45,6 +52,7 @@ class WorkflowSubmissionServiceTest {
     private static final Long OTHER_ORG = 99L;
 
     @Mock private WorkflowSubmissionRepository repo;
+    @Mock private AuditLogService audit;
     @InjectMocks private WorkflowSubmissionService service;
 
     @BeforeEach void setUp() {
@@ -233,6 +241,67 @@ class WorkflowSubmissionServiceTest {
         assertThatThrownBy(() -> service.create(body))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("tenant");
+    }
+
+    // ── Audit trail ────────────────────────────────────────────────────
+
+    @Test void create_writesAuditLogEntry() {
+        var body = new WorkflowSubmissionService.CreateBody(
+            "governance-board-pack", "GOVERNANCE",
+            "Board pack Q2 2026", null, null, null,
+            "PDPL Art. 23", null,
+            "{\"q\":\"Q2 2026\"}");
+
+        service.create(body);
+
+        ArgumentCaptor<String> action  = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(audit).log(action.capture(), eq("WorkflowSubmission"),
+                          anyLong(), message.capture());
+        assertThat(action.getValue()).isEqualTo("CREATE");
+        assertThat(message.getValue()).contains("workflow=governance-board-pack");
+        assertThat(message.getValue()).contains("module=GOVERNANCE");
+        assertThat(message.getValue()).contains("status=SUBMITTED");
+        assertThat(message.getValue()).contains("anchor=PDPL Art. 23");
+    }
+
+    @Test void review_writesAuditLogEntryWithStatusTransition() {
+        var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
+
+        service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", "Looks good"));
+
+        ArgumentCaptor<String> action  = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(audit).log(action.capture(), eq("WorkflowSubmission"),
+                          eq(555L), message.capture());
+        assertThat(action.getValue()).isEqualTo("APPROVED");
+        assertThat(message.getValue()).contains("SUBMITTED → APPROVED");
+        assertThat(message.getValue()).contains("workflow=erm-risk-treatment");
+        assertThat(message.getValue()).contains("note=Looks good");
+    }
+
+    @Test void review_blankNoteOmittedFromAuditMessage() {
+        var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
+
+        service.review(555L, new WorkflowSubmissionService.ReviewBody("REJECT", null));
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(audit).log(eq("REJECTED"), eq("WorkflowSubmission"),
+                          eq(555L), message.capture());
+        assertThat(message.getValue()).doesNotContain("note=");
+    }
+
+    @Test void review_otherTenant_notFound_noAuditLogged() {
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.review(555L,
+                new WorkflowSubmissionService.ReviewBody("APPROVE", null)))
+            .isInstanceOf(EntityNotFoundException.class);
+
+        // Cross-tenant attempt must NOT leave an audit trail under our tenant
+        verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

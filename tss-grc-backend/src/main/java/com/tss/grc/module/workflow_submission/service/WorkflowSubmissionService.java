@@ -1,6 +1,7 @@
 package com.tss.grc.module.workflow_submission.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.workflow_submission.entity.WorkflowSubmission;
 import com.tss.grc.module.workflow_submission.repository.WorkflowSubmissionRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -15,14 +16,18 @@ import java.util.List;
  * CRUD + state-machine for {@link WorkflowSubmission}.
  *
  * <p>Every read/write is tenant-scoped via {@link TenantContext}.
- * The state machine is intentionally permissive — the wizard owns the
- * transitions (SUBMITTED → UNDER_REVIEW → APPROVED/REJECTED → CLOSED).
+ * Every state change writes to {@code platform.audit_log} via
+ * {@link AuditLogService} so a GRC reviewer can prove who submitted /
+ * reviewed / closed a record. The state machine is intentionally
+ * permissive — the wizard owns the transitions (SUBMITTED →
+ * UNDER_REVIEW → APPROVED/REJECTED → CLOSED).
  */
 @Service
 @RequiredArgsConstructor
 public class WorkflowSubmissionService {
 
     private final WorkflowSubmissionRepository repo;
+    private final AuditLogService              audit;
 
     private Long org() {
         Long o = TenantContext.getCurrentTenant();
@@ -71,7 +76,15 @@ public class WorkflowSubmissionService {
         s.setStatus(body.status() == null || body.status().isBlank() ? "SUBMITTED" : body.status());
         s.setPayloadJson(body.payloadJson());
         s.setSubmittedAt(LocalDateTime.now());
-        return repo.save(s);
+
+        WorkflowSubmission saved = repo.save(s);
+        audit.log("CREATE", "WorkflowSubmission", saved.getId(),
+            "Workflow submission created: workflow=" + saved.getWorkflowId()
+            + ", module=" + saved.getWorkflowModule()
+            + ", status=" + saved.getStatus()
+            + (saved.getRegulatoryAnchor() != null
+                ? ", anchor=" + saved.getRegulatoryAnchor() : ""));
+        return saved;
     }
 
     @Transactional
@@ -80,6 +93,7 @@ public class WorkflowSubmissionService {
             .orElseThrow(() -> new EntityNotFoundException(
                 "WorkflowSubmission %d not found for this tenant".formatted(id)));
         String decision = body.decision() == null ? "" : body.decision().toUpperCase();
+        String previousStatus = s.getStatus();
         switch (decision) {
             case "APPROVE", "APPROVED" -> s.setStatus("APPROVED");
             case "REJECT", "REJECTED" -> s.setStatus("REJECTED");
@@ -90,7 +104,13 @@ public class WorkflowSubmissionService {
         }
         s.setReviewerNote(body.reviewerNote());
         s.setReviewedAt(LocalDateTime.now());
-        return repo.save(s);
+        WorkflowSubmission saved = repo.save(s);
+        audit.log(s.getStatus(), "WorkflowSubmission", saved.getId(),
+            "Workflow submission " + previousStatus + " → " + s.getStatus()
+            + " for workflow=" + saved.getWorkflowId()
+            + (body.reviewerNote() != null && !body.reviewerNote().isBlank()
+                ? ", note=" + body.reviewerNote() : ""));
+        return saved;
     }
 
     // ── Queries ───────────────────────────────────────────────────────
