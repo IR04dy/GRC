@@ -94,6 +94,7 @@ const AuditWorkspacePage     = lazy(() => import('./pages/audit/AuditWorkspacePa
 const EngagementDetailPage   = lazy(() => import('./pages/audit/EngagementDetailPage').then(m => ({ default: m.EngagementDetailPage })));
 const CommunicationsPage     = lazy(() => import('./pages/comms/CommunicationsPage').then(m => ({ default: m.CommunicationsPage })));
 const CapaPage               = lazy(() => import('./pages/capa/CapaPage').then(m => ({ default: m.CapaPage })));
+const CapaDetailPage         = lazy(() => import('./pages/detail/CapaDetailPage').then(m => ({ default: m.CapaDetailPage })));
 const DsrPortalPage          = lazy(() => import('./pages/portal/DsrPortalPage').then(m => ({ default: m.DsrPortalPage })));
 const SpeakUpPortalPage      = lazy(() => import('./pages/portal/SpeakUpPortalPage').then(m => ({ default: m.SpeakUpPortalPage })));
 const CaseTrackerPage        = lazy(() => import('./pages/portal/CaseTrackerPage').then(m => ({ default: m.CaseTrackerPage })));
@@ -284,8 +285,9 @@ export function App() {
               {/* Communications + Stakeholder workspace (DD-22..26) */}
               <Route path="/communications"     element={<CommunicationsPage />} />
 
-              {/* CAPA register (DD-42) */}
+              {/* CAPA register (DD-42) + detail page */}
               <Route path="/capa"               element={<CapaPage />} />
+              <Route path="/capa/:id"           element={<CapaDetailPage />} />
 
               {/* Public-facing intake portals (DD-55..57) — no auth */}
               <Route path="/portal/dsr"         element={<DsrPortalPage />} />

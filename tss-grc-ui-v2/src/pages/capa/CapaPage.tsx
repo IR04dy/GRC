@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   ListChecks, Hourglass, BarChart3, Network, Workflow, Zap,
   Plus, Search, Send, CheckCheck, Repeat, AlertTriangle,
@@ -312,7 +312,16 @@ function CapaRow({ c, onAdvance, onRca }: { c: Capa; onAdvance: () => void; onRc
       </div>
 
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        <Link to={`/capa/${c.id}`}
+              title={t('capaDetailOpenLink')}
+              style={{
+                display: 'block',
+                fontSize: 13, fontWeight: 600, color: 'var(--ink-1)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                textDecoration: 'none',
+              }}>
+          {title}
+        </Link>
         {c.sourceRecordTitle && (
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
             {t('capaSourceLabel')}: <span style={{ color: 'var(--ink-2)' }}>{c.sourceRecordTitle}</span>

@@ -98,6 +98,16 @@ export interface CapaEvent {
 
 export interface Capa {
   id: string;
+  /**
+   * Backend `CapaTask.id` (Long) when this CAPA came from the API.
+   * Undefined for seed/localStorage-only items. Used to thread the
+   * detail page's `EntityActivityTimeline` + `EntityAutomationRuns`
+   * cards to `platform.audit_log` / F8 `rule_run` rows — those
+   * endpoints key off Long ids, not the string `id` we use locally.
+   * Will be populated when the register switches from useCapas
+   * (static + localStorage) to the real `/api/capa/tasks` endpoint.
+   */
+  backendId?: number;
   code: string;                     // CAPA-2026-001
   titleEn: string;
   titleAr?: string;
