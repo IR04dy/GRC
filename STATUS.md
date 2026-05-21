@@ -1,12 +1,45 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PRs #11-56 — wizard arc + audit + F8 parity across all 6 audit-logged services + submissions UX polish)
+**Last update:** 22 May 2026 (PRs #11-62 — added Compliance Calendar module + NDI calendar integration)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — audit + automation parity arc complete + UX polish (22 May 2026)
+## 🟢 Recent additions — Compliance Calendar + NDI integration (22 May 2026)
+
+A Saudi-workdays-aware compliance calendar — Outlook-equivalent. Three PRs (#60-62) build the new module + connect it to NDI:
+
+| PR | What |
+|---|---|
+| **#60** | Backend — V133 `platform.calendar_events` schema, V134 Saudi-holiday seed (2026: Founding Day, Eid Al-Fitr x4, Day of Arafah, Eid Al-Adha x3, National Day), `SaudiWorkdayCalendar` helper (Sun-Thu workweek, `isWorkday()`, `addBusinessDays()`, `nextWorkday()`), `CalendarService` aggregator that stitches user events + holidays + dated GRC entities (CapaTask, Finding, Risk attestation, Risk review), `/api/v1/calendar/events` REST surface, 9 unit tests on the workday math |
+| **#61** | Frontend — `/calendar` page with Month grid + Agenda views, URL-backed state (`?y&m&v&types&hol&hijri`), Saudi weekend cell tinting, Hijri (Umm Al-Qura) dual-date via `Intl.DateTimeFormat`, public-holiday cell-spanning, color-coded chips (14 event types), click-through to source entity detail page, "Falls on weekend" warning chip, new-event modal, sidebar entry under My Work, code-split chunk 15.6 kB |
+| **#62** | NDI integration — `NdiAssessmentCycle.periodEnd` added as the 5th aggregation source (REPORT_DEADLINE), click-through routes to `/ndi?tab=cycles&id=<x>`, accent-tinted callout strip on the NDI page header linking to `/calendar?types=REPORT_DEADLINE&v=agenda` |
+
+### Calendar feature highlights
+
+- **Saudi workdays everywhere** — server's `SaudiWorkdayCalendar` is the source of truth for workday math, used both by `/calendar` UI and the F8 reminder scheduler. A deadline on Friday triggers the reminder on the following Sunday — no 6 am weekend pages.
+- **Aggregator never goes stale** — synthetic rows are stitched on each query from live entity tables. No duplicate calendar snapshot to maintain.
+- **5 aggregation sources** — persisted `calendar_events` (user + holidays), CapaTask target dates, Finding remediation dates, Risk attestation + review dates, NDI cycle submission deadlines.
+- **14 event types** with semantic color tones (red deadlines, amber attestations, blue meetings, purple audits/holidays, cyan reviews/DR tests, green training).
+- **Hijri dual-display** via `Intl.DateTimeFormat` with `calendar=islamic-umalqura` — no library, no offset table.
+- **URL-backed state** — every filter combination shareable as a link.
+
+### Public holidays seeded (V134, 10 rows for 2026)
+
+| Holiday | Date | Notes |
+|---|---|---|
+| Founding Day | 22 Feb 2026 | Fixed Gregorian |
+| Eid Al-Fitr (Days 1-4) | 20-23 Mar 2026 | **Provisional** — moon sighting |
+| Day of Arafah | 26 May 2026 | Provisional |
+| Eid Al-Adha (Days 1-3) | 27-29 May 2026 | Provisional |
+| Saudi National Day | 23 Sep 2026 | Fixed Gregorian |
+
+Eid dates marked PROVISIONAL — Council of Senior Scholars announces final dates ~24h before based on moon sighting. Year-of-event refresh required before each new Gregorian year.
+
+---
+
+## 🟢 Earlier additions — audit + automation parity arc complete + UX polish (22 May 2026)
 
 After PR #42 closed the CapaTaskService audit trail, **fourteen consecutive PRs (#43-56)** drove the platform from "some services emit forensic events" to **every audit-logged service emits canonical F8 events with seed rules consuming them**. Six services, twelve PRs in pairs (audit/F8 event emission → seed rules), plus one UX polish (#52) and one STATUS refresh (#43). Result: 50 seed rules (AR-1..AR-50) wired across 6 services. Every state change a buyer might care about now wakes up the right actor without manual chasing.
 

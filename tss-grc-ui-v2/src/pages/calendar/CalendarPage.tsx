@@ -623,6 +623,11 @@ function entityRoute(entityType: string, entityId: number): string | undefined {
     case 'Risk':               return `/risk/${entityId}`;
     case 'CrisisAar':          return `/bcm/aars/${entityId}`;
     case 'WorkflowSubmission': return `/workflows/submissions/${entityId}`;
+    // NDI assessment cycles surface as REPORT_DEADLINE rows. Open
+    // the Cycles tab — the page handles cycle selection client-side
+    // via the cycle dropdown on each tab, so passing the id is
+    // best-effort and ignored if no `?id` listener is wired yet.
+    case 'NdiAssessmentCycle': return `/ndi?tab=cycles&id=${entityId}`;
     default: return undefined;
   }
 }

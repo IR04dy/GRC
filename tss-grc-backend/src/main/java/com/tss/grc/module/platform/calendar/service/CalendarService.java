@@ -5,6 +5,8 @@ import com.tss.grc.module.audit_lc.entity.Finding;
 import com.tss.grc.module.audit_lc.repository.FindingRepository;
 import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
+import com.tss.grc.module.ndi.cycle.entity.NdiAssessmentCycle;
+import com.tss.grc.module.ndi.cycle.repository.NdiAssessmentCycleRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.calendar.dto.CalendarEventDto;
 import com.tss.grc.module.platform.calendar.entity.CalendarEvent;
@@ -55,6 +57,7 @@ public class CalendarService {
     private final CapaTaskRepository            capas;
     private final FindingRepository             findings;
     private final RiskRepository                risks;
+    private final NdiAssessmentCycleRepository  ndiCycles;
     private final SaudiWorkdayCalendar          workdays;
     private final AuditLogService               audit;
 
@@ -109,6 +112,19 @@ public class CalendarService {
                 && !isOutOfWindow(r.getReviewDate(), from, to)) {
                 out.add(stamp(synthFromRiskReview(r), orgId));
             }
+        }
+
+        // 5. NDI assessment cycles — periodEnd is the natural
+        //    submission deadline. Status filter excludes DRAFT (not
+        //    yet planned), CLOSED (already filed), and CANCELLED. Each
+        //    cycle surfaces as a REPORT_DEADLINE so it groups with the
+        //    other regulatory filings on the calendar.
+        for (NdiAssessmentCycle c : ndiCycles.findByOrganisationIdOrderByReportingYearDescIdDesc(orgId, org.springframework.data.domain.Pageable.unpaged())) {
+            if (c.getPeriodEnd() == null) continue;
+            String s = c.getStatus();
+            if ("DRAFT".equals(s) || "CLOSED".equals(s) || "CANCELLED".equals(s)) continue;
+            if (isOutOfWindow(c.getPeriodEnd(), from, to)) continue;
+            out.add(stamp(synthFromNdiCycle(c), orgId));
         }
 
         // Filter by eventType if requested.
@@ -237,6 +253,21 @@ public class CalendarService {
             .entityType("Risk")
             .entityId(r.getId())
             .status(r.getStatus())
+            .build();
+    }
+
+    private CalendarEventDto synthFromNdiCycle(NdiAssessmentCycle c) {
+        return CalendarEventDto.builder()
+            .source("AGGREGATED")
+            .externalId(synthId("NdiAssessmentCycle", c.getId()))
+            .titleEn("NDI submission: " + safe(c.getCycleNameEn()))
+            .titleAr("استحقاق رفع نضيء: " + safe(c.getCycleNameAr()))
+            .eventType("REPORT_DEADLINE")
+            .startsAt(c.getPeriodEnd().atStartOfDay())
+            .allDay(true)
+            .entityType("NdiAssessmentCycle")
+            .entityId(c.getId())
+            .status(c.getStatus())
             .build();
     }
 

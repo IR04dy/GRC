@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Database, FileText, Target, Wrench, AlertCircle, CheckCircle2,
   Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check, Paperclip,
+  Calendar,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -147,6 +149,34 @@ export function NdiPage() {
           ? 'إدارة دورات التقييم والإطار والنضج والامتثال والتميز التشغيلي والأدلة والفجوات وحزمة الرفع.'
           : 'Manage assessment cycles, framework, maturity, compliance, operational excellence, evidence, gaps, and submission package.'}
       />
+
+      {/* Cross-link to the Compliance Calendar — NDI cycle submission
+          deadlines (periodEnd) surface there as REPORT_DEADLINE rows
+          via the aggregator added in PR #62. Useful for a buyer who's
+          looking at the cycles tab and wants to see the whole quarter's
+          regulatory cadence at a glance. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '8px 12px', marginBottom: 12,
+        background: 'var(--accent-50)',
+        border: '1px solid var(--accent-300, var(--border))',
+        borderRadius: 'var(--r-sm)',
+        fontSize: 12,
+      }}>
+        <Calendar size={14} color="var(--accent-700)" />
+        <span style={{ color: 'var(--ink-2)' }}>
+          {isAr
+            ? 'استحقاقات دورات نضيء تظهر تلقائياً في تقويم الالتزام مع تنبيهات يوم العمل السعودي.'
+            : 'NDI cycle deadlines surface on the Compliance Calendar with Saudi-workday-aware reminders.'}
+        </span>
+        <Link to="/calendar?types=REPORT_DEADLINE&v=agenda"
+          style={{
+            marginInlineStart: 'auto', fontSize: 12, fontWeight: 600,
+            color: 'var(--accent-700)', textDecoration: 'none',
+          }}>
+          {isAr ? 'افتح التقويم →' : 'Open the calendar →'}
+        </Link>
+      </div>
 
       {/* Tab strip — 15 tabs matching the spec's menu order */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
