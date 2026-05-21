@@ -978,6 +978,86 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   .wizard-chunk-spinner { animation: none; }
 }
 
+/* ─── ModuleSubmissionsPanel (per-module recent rows) ─── */
+.wf-submissions-panel {
+  margin: var(--sp-3) 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+}
+.wf-submissions-panel-head {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 8px;
+  font: 600 var(--text-xs) var(--font-sans);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wf-submissions-panel-more {
+  margin-inline-start: auto;
+  display: inline-flex; align-items: center; gap: 2px;
+  text-decoration: none;
+  color: var(--primary, var(--ink-2));
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  transition: color 120ms ease;
+}
+.wf-submissions-panel-more:hover { color: var(--ink-1); }
+.wf-submissions-panel-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column;
+  gap: 2px;
+}
+.wf-submissions-panel-row { border-radius: var(--r-sm); }
+.wf-submissions-panel-row-link {
+  display: grid;
+  grid-template-columns: 48px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  text-decoration: none;
+  color: var(--ink-1);
+  border-radius: var(--r-sm);
+  transition: background 120ms ease;
+}
+.wf-submissions-panel-row-link:hover { background: var(--surface-2, var(--surface)); }
+.wf-submissions-panel-row-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring, 0 0 0 3px rgba(14, 94, 94, 0.22));
+}
+.wf-submissions-panel-id {
+  font: 600 11px var(--font-mono, var(--font-sans));
+  color: var(--ink-3);
+}
+.wf-submissions-panel-title {
+  display: flex; flex-direction: column; gap: 1px;
+  min-width: 0;
+}
+.wf-submissions-panel-wizard {
+  font: 600 11px var(--font-sans);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.wf-submissions-panel-headline {
+  font: 500 13px var(--font-sans);
+  color: var(--ink-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wf-submissions-panel-date {
+  font: 500 11px var(--font-sans);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .wf-submissions-panel-row-link { grid-template-columns: 1fr auto; }
+  .wf-submissions-panel-id, .wf-submissions-panel-date { display: none; }
+}
+
 /* ─── WorkflowQuickLaunch chip strip (module pages) ─── */
 .wf-quick-launch {
   display: flex; flex-direction: column; gap: 6px;

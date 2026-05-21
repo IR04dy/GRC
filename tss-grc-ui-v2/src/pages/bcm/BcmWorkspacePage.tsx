@@ -14,6 +14,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
+import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { crisisEventStats } from '../../lib/crisisEvents';
 import { biaStats } from '../../lib/biaAssessments';
 import { remediationStats } from '../../lib/bcmCycle';
@@ -83,6 +84,7 @@ export function BcmWorkspacePage() {
         eyebrow={isAr ? 'استمرارية الأعمال' : 'BCM workspace'}
       />
       <WorkflowQuickLaunch modules="BCM" />
+      <ModuleSubmissionsPanel module="BCM" />
 
       {/* KPI strip — pulls live data from the four new BCM-cycle services. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>

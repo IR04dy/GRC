@@ -9,6 +9,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
+import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -749,6 +750,7 @@ export function CompliancePage() {
         }
       />
       <WorkflowQuickLaunch modules={['COMPLIANCE', 'GOVERNANCE']} />
+      <ModuleSubmissionsPanel module={['COMPLIANCE', 'GOVERNANCE']} />
       <div className="kpi-grid">
         <Kpi Icon={BookOpenCheck}  label={t('complianceKpiFrameworks')} value={new Set(controls.data.map(c => c.framework)).size} tone="primary" onClick={() => setTab('frameworks')} />
         <Kpi Icon={ClipboardCheck} label={t('complianceKpiControls')}   value={controls.data.length} tone="success" onClick={() => setTab('controls')} />

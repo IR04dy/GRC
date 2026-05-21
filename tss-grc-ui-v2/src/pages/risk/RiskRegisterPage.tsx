@@ -5,6 +5,7 @@ import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
+import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { Tabs } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -339,6 +340,7 @@ export function RiskRegisterPage() {
         }
       />
       <WorkflowQuickLaunch modules="ERM" />
+      <ModuleSubmissionsPanel module="ERM" />
 
       <div className="kpi-grid">
         <Kpi Icon={AlertTriangle}   label={t('kpiTotalRisks')}    value={risks.length} tone="primary" onClick={() => setFilters(() => ({}))} />
