@@ -19,6 +19,8 @@ import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPane
 import { FINDING_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 import { COMPLIANCE_FINDINGS, FINDING_EVIDENCE_BY_ID, FINDING_HISTORY_BY_ID } from '../compliance/mockCompliance';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
+import { EntityAutomationRuns } from '../../components/audit/EntityAutomationRuns';
 
 type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history' | 'comms';
 
@@ -173,23 +175,40 @@ export function FindingDetailPage() {
         </Card>
       )}
       {tab === 'history' && (
-        <Card title={t('detailTabHistory')} Icon={ListChecks}
-          action={<Badge tone="primary">{(FINDING_HISTORY_BY_ID[item.id] ?? []).length}</Badge>}>
-          {(FINDING_HISTORY_BY_ID[item.id] ?? []).length === 0
-            ? <InlineEmpty compact>{t('detailHistoryHint')}</InlineEmpty>
-            : <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {(FINDING_HISTORY_BY_ID[item.id] ?? []).map(h => (
-                  <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 130px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.at.replace('T', ' ').slice(0, 16)}</span>
-                    <Badge tone={h.type === 'CREATED' ? 'primary' : h.type === 'STATUS_CHANGE' ? 'info' : h.type === 'CAPA_PROGRESS' ? 'success' : h.type === 'TEST_RESULT' ? 'accent' : h.type === 'SIGNOFF' ? 'success' : 'neutral'}>{h.type.replace(/_/g, ' ')}</Badge>
-                    <div>
-                      <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{h.message}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {h.actor}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Real forensic history from platform.audit_log — populated by
+              CapaWorkflowService (PR #44) on every CAPA-stage transition.
+              Self-hides on empty so a fresh finding without audit rows
+              doesn't show a phantom card; the legacy mock below takes
+              the visible primacy in that case. As real audit data
+              accumulates, this card becomes the source of truth. */}
+          <EntityActivityTimeline entityType="AuditFinding" entityId={item.id} />
+
+          {/* Sibling card — F8 automation rule fires keyed to the same
+              entity. Same self-hiding behaviour. */}
+          <EntityAutomationRuns entityType="AuditFinding" entityId={item.id} />
+
+          {/* Legacy static history kept for seed-data findings that
+              predate the audit-log integration. Will be retired when
+              the seed migrates over. */}
+          <Card title={t('detailTabHistory')} Icon={ListChecks}
+            action={<Badge tone="primary">{(FINDING_HISTORY_BY_ID[item.id] ?? []).length}</Badge>}>
+            {(FINDING_HISTORY_BY_ID[item.id] ?? []).length === 0
+              ? <InlineEmpty compact>{t('detailHistoryHint')}</InlineEmpty>
+              : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {(FINDING_HISTORY_BY_ID[item.id] ?? []).map(h => (
+                    <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 130px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.at.replace('T', ' ').slice(0, 16)}</span>
+                      <Badge tone={h.type === 'CREATED' ? 'primary' : h.type === 'STATUS_CHANGE' ? 'info' : h.type === 'CAPA_PROGRESS' ? 'success' : h.type === 'TEST_RESULT' ? 'accent' : h.type === 'SIGNOFF' ? 'success' : 'neutral'}>{h.type.replace(/_/g, ' ')}</Badge>
+                      <div>
+                        <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{h.message}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {h.actor}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>}
-        </Card>
+                  ))}
+                </div>}
+          </Card>
+        </div>
       )}
 
       {tab === 'comms' && (

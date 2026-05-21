@@ -42,9 +42,25 @@ const ACTION_TONE: Record<string, BadgeTone> = {
   RESCIND:      'danger',
   CLOSED:       'neutral',
   CLOSE:        'neutral',
+  CANCELLED:    'neutral',
+  DELETE:       'danger',
   TRANSITION:   'warning',
   UNDER_REVIEW: 'warning',
   SUBMIT:       'warning',
+  // CAPA-stage transitions on AuditFinding (PR #44). actionType encodes
+  // the test result, not just the stage, so PASS rows render green and
+  // FAIL rows render red — without these the rework loop would be
+  // invisible (owner FAIL keeps stage at IMPLEMENTING).
+  IMPLEMENTING:           'info',
+  OWNER_TESTED:           'info',
+  INDEPENDENT_TESTED:     'info',
+  AUDIT_SIGNED_OFF:       'warning',
+  OWNER_TEST_PASS:        'success',
+  OWNER_TEST_PARTIAL:     'warning',
+  OWNER_TEST_FAIL:        'danger',
+  INDEPENDENT_TEST_PASS:  'success',
+  INDEPENDENT_TEST_PARTIAL: 'warning',
+  INDEPENDENT_TEST_FAIL:  'danger',
 };
 
 export function EntityActivityTimeline({
