@@ -2,15 +2,19 @@ package com.tss.grc.module.workflow_submission.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.workflow_submission.entity.WorkflowSubmission;
 import com.tss.grc.module.workflow_submission.repository.WorkflowSubmissionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * CRUD + state-machine for {@link WorkflowSubmission}.
@@ -28,6 +32,7 @@ public class WorkflowSubmissionService {
 
     private final WorkflowSubmissionRepository repo;
     private final AuditLogService              audit;
+    private final ApplicationEventPublisher    eventPublisher;
 
     private Long org() {
         Long o = TenantContext.getCurrentTenant();
@@ -84,6 +89,16 @@ public class WorkflowSubmissionService {
             + ", status=" + saved.getStatus()
             + (saved.getRegulatoryAnchor() != null
                 ? ", anchor=" + saved.getRegulatoryAnchor() : ""));
+
+        // Fan out to F8 — the engine listens for WORKFLOW_SUBMISSION_CREATED
+        // and matches enabled rules against the payload (workflowId,
+        // workflowModule, status, regulatoryAnchor). Seed rules in V127
+        // route PDPL breaches to the DPO, NCA cyber incidents to the CISO,
+        // above-appetite risk acceptances to the Risk Committee, etc.
+        eventPublisher.publishEvent(new DomainEvent(
+            saved.getOrganisationId(), "WORKFLOW_SUBMISSION_CREATED",
+            "WorkflowSubmission", saved.getId(), null,
+            payloadFor(saved)));
         return saved;
     }
 
@@ -110,8 +125,32 @@ public class WorkflowSubmissionService {
             + " for workflow=" + saved.getWorkflowId()
             + (body.reviewerNote() != null && !body.reviewerNote().isBlank()
                 ? ", note=" + body.reviewerNote() : ""));
+
+        // Fan out to F8 — separate event from CREATED so rules can target
+        // status transitions specifically (e.g. "approved a board pack →
+        // CREATE_RECORD a regulatory-filing reminder").
+        Map<String, Object> payload = payloadFor(saved);
+        payload.put("previousStatus", previousStatus);
+        eventPublisher.publishEvent(new DomainEvent(
+            saved.getOrganisationId(), "WORKFLOW_SUBMISSION_REVIEWED",
+            "WorkflowSubmission", saved.getId(), null,
+            payload));
         return saved;
     }
+
+    /** Build the canonical payload Map for F8 rule-condition matching.
+     *  Engine evaluates equality + contains on these string keys. */
+    private static Map<String, Object> payloadFor(WorkflowSubmission s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("workflowId",       nullSafe(s.getWorkflowId()));
+        m.put("workflowModule",   nullSafe(s.getWorkflowModule()));
+        m.put("status",           nullSafe(s.getStatus()));
+        m.put("regulatoryAnchor", nullSafe(s.getRegulatoryAnchor()));
+        m.put("titleEn",          nullSafe(s.getTitleEn()));
+        return m;
+    }
+
+    private static String nullSafe(String v) { return v == null ? "" : v; }
 
     // ── Queries ───────────────────────────────────────────────────────
 
