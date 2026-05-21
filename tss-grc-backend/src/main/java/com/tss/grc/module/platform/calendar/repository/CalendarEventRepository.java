@@ -46,4 +46,26 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, Lo
     /** Reverse lookup — "On the calendar" panel on entity detail pages. */
     List<CalendarEvent> findByOrganisationIdAndEntityTypeAndEntityIdOrderByStartsAtAsc(
         Long organisationId, String entityType, Long entityId);
+
+    /** Upcoming events (window starts ≥ from, < to) that have a
+     *  non-empty reminder_days ladder. Used by the F8 reminder
+     *  scheduler so it doesn't scan the whole table every tick. */
+    @Query("""
+        SELECT e FROM CalendarEvent e
+        WHERE e.organisationId = :orgId
+          AND e.startsAt >= :from
+          AND e.startsAt <  :to
+          AND e.reminderDays IS NOT NULL
+          AND e.reminderDays <> ''
+          AND (e.status IS NULL OR e.status <> 'CANCELLED')
+        ORDER BY e.startsAt ASC
+        """)
+    List<CalendarEvent> findUpcomingWithReminders(@Param("orgId") Long orgId,
+                                                  @Param("from")  LocalDateTime from,
+                                                  @Param("to")    LocalDateTime to);
+
+    /** Distinct tenants that own at least one calendar event — used
+     *  by the cross-tenant reminder sweep to scope itself. */
+    @Query("SELECT DISTINCT e.organisationId FROM CalendarEvent e")
+    List<Long> findDistinctOrganisationIds();
 }
