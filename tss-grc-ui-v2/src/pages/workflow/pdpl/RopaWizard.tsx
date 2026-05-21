@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { privacyApi } from '../../../lib/api';
 
 /**
  * PDPL §7.4 #8 — Record of Processing Activities (RoPA) wizard.
@@ -84,8 +85,38 @@ export function RopaWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم نشر نشاط المعالجة في السجل' : 'Activity published to RoPA');
+      // Composite data categories blob includes special categories + recipients
+      // + retention rule + transfer context — the backend RoPA row uses
+      // single text fields so we squash the rich wizard state into them.
+      const dataCategoriesBlob = [
+        draft.dataCategories,
+        draft.specialCategories?.trim() ? `Special: ${draft.specialCategories}` : null,
+        draft.subjectCategories?.trim() ? `Subjects: ${draft.subjectCategories}` : null,
+        draft.systemNames?.trim() ? `Systems: ${draft.systemNames}` : null,
+        draft.recipients?.trim() ? `Recipients: ${draft.recipients}` : null,
+        draft.internationalTransfer && draft.transferDetails?.trim()
+          ? `Transfer: ${draft.transferDetails}`
+          : null,
+        draft.lawfulBasisJustification?.trim() ? `Basis note: ${draft.lawfulBasisJustification}` : null,
+      ].filter(Boolean).join(' · ');
+
+      const retentionPeriod = draft.retentionRule?.trim()
+        ? `${draft.retentionMonths} months — ${draft.retentionRule}`
+        : `${draft.retentionMonths} months`;
+
+      const created = await privacyApi.createRopa({
+        processNameEn: draft.activityName,
+        processNameAr: undefined,
+        legalBasis: draft.lawfulBasis,
+        dataCategories: dataCategoriesBlob,
+        retentionPeriod,
+        status: draft.isPublished ? 'PUBLISHED'
+              : draft.dpoReviewed ? 'REVIEWED'
+              : 'DRAFT',
+      });
+      toast.success(isAr
+        ? `تم نشر نشاط المعالجة في السجل (#${created.id})`
+        : `Activity #${created.id} published to RoPA`);
       navigate('/ropa');
     } catch (e) {
       toast.danger((e as Error).message);

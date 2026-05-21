@@ -10,6 +10,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { scmApi } from '../../../lib/api';
 
 /**
  * SCM §7.2 — Supplier Onboarding wizard.
@@ -78,8 +79,55 @@ export function SupplierOnboardingWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 400));
-      toast.success(isAr ? 'تم إدراج المورد' : 'Supplier onboarded');
+      // The vendor record is the primary artefact; the rest of the onboarding
+      // captures into description so a downstream lookup keeps the wizard
+      // context (DD checks, evidence flags, approvals) on the saved row.
+      const description = [
+        draft.servicesSupported?.trim() ? `Services: ${draft.servicesSupported}` : null,
+        draft.commercialRegistrationNo?.trim() ? `CR: ${draft.commercialRegistrationNo}` : null,
+        draft.contractStart || draft.contractEnd
+          ? `Contract: ${draft.contractStart ?? '?'} → ${draft.contractEnd ?? '?'}`
+          : null,
+        draft.contractValue?.trim() ? `Value: ${draft.contractValue}` : null,
+        draft.renewalType ? `Renewal: ${draft.renewalType}` : null,
+        `DD: financial=${draft.financialCheckPassed ? '✓' : '✗'},`
+          + ` sanctions=${draft.sanctionsCheckPassed ? '✓' : '✗'},`
+          + ` references=${draft.referencesPassed ? '✓' : '✗'}`,
+        draft.ddNotes?.trim() ? `DD notes: ${draft.ddNotes}` : null,
+        `Evidence: BCP=${draft.hasBcp ? '✓' : '✗'},`
+          + ` cyber-attest=${draft.hasCyberAttestation ? '✓' : '✗'},`
+          + ` privacy-addendum=${draft.hasPrivacyAddendum ? '✓' : '✗'}`,
+        draft.evidenceNotes?.trim() ? `Evidence notes: ${draft.evidenceNotes}` : null,
+        draft.isProcessor ? 'Personal-data processor: yes' : null,
+        draft.isCriticalSupplier ? 'Critical supplier: yes' : null,
+        `Approvals: procurement=${draft.procurementApproved ? '✓' : '✗'},`
+          + ` risk=${draft.riskApproved ? '✓' : '✗'}`
+          + (draft.isProcessor ? `, dpo=${draft.dpoApproved ? '✓' : '✗'}` : ''),
+      ].filter(Boolean).join(' · ');
+
+      // Inherent risk band from criticality + processor status drives the
+      // initial riskLevel column for the SCM heatmap.
+      const riskLevel = (draft.tier === 'TIER_1' || (draft.isProcessor && draft.isCriticalSupplier))
+        ? 'HIGH'
+        : draft.tier === 'TIER_2' ? 'MEDIUM'
+        : 'LOW';
+
+      const created = await scmApi.createVendor({
+        nameEn: draft.legalName,
+        nameAr: draft.legalNameAr,
+        category: draft.vendorType,
+        criticality: draft.tier,
+        serviceType: draft.vendorType,
+        riskLevel,
+        status: draft.procurementApproved && draft.riskApproved
+          ? 'ONBOARDED'
+          : 'IN_REVIEW',
+        registrationNumber: draft.commercialRegistrationNo,
+        description,
+      });
+      toast.success(isAr
+        ? `تم إدراج المورد (#${created.id})`
+        : `Supplier #${created.id} onboarded`);
       navigate('/scm');
     } catch (e) { toast.danger((e as Error).message); }
     finally { setSubmitting(false); }

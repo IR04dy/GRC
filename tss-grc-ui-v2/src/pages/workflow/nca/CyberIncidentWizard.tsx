@@ -12,6 +12,7 @@ import { Button } from '../../../components/ui/Button';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
 import { ai } from '../../../lib/ai';
+import { cyberApi } from '../../../lib/api';
 
 /**
  * NCA §7.5 — Cyber Incident Response wizard (NIST 800-61).
@@ -103,8 +104,32 @@ export function CyberIncidentWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 400));
-      toast.success(isAr ? 'تم إغلاق الحادث' : 'Incident closed and recorded');
+      // CyberIncident is a 9-step lifecycle — stitch the wizard fields into
+      // the lessons + workflow status that the backend tracks.
+      const lessons = [
+        draft.rcaEn?.trim() ? `RCA: ${draft.rcaEn}` : null,
+        draft.lessonsEn?.trim() ? `Lessons: ${draft.lessonsEn}` : null,
+        draft.ncaReportable ? 'NCA-reportable: yes' : null,
+        draft.pdplReportable ? 'PDPL-reportable: yes' : null,
+        draft.samaReportable ? 'SAMA-reportable: yes' : null,
+        draft.notificationLog?.trim() ? `Notifications: ${draft.notificationLog}` : null,
+      ].filter(Boolean).join(' · ');
+
+      const created = await cyberApi.createIncident({
+        titleEn: draft.titleEn,
+        incidentType: draft.detectionSource || 'OTHER',
+        severity: draft.severity >= 5 ? 'CRITICAL'
+              : draft.severity >= 4 ? 'HIGH'
+              : draft.severity >= 3 ? 'MEDIUM'
+              : 'LOW',
+        impact: draft.scopeEn,
+        workflowStatus: draft.signedOffByCiso ? 'CLOSED' : 'LESSONS_LEARNED',
+        bcmHandoff: draft.samaReportable || draft.ncaReportable,
+        lessonsLearned: lessons || undefined,
+      });
+      toast.success(isAr
+        ? `تم تسجيل الحادث (#${created.id})`
+        : `Incident #${created.id} recorded`);
       navigate('/incidents');
     } catch (e) { toast.danger((e as Error).message); }
     finally { setSubmitting(false); }
