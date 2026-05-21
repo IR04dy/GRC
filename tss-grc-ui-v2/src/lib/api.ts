@@ -2168,3 +2168,47 @@ export const calendarApi = {
   remove: (externalId: string) =>
     api.delete<void>(`/api/v1/calendar/events/${externalId}`),
 };
+
+// ─── Notifications ───────────────────────────────────────────────────
+
+/**
+ * One row from the notification inbox. Backend produces these via the
+ * F8 NOTIFY/ESCALATE action handlers — each notification represents a
+ * single user-addressed message generated when an automation rule fires
+ * for a role the user holds.
+ */
+export interface NotificationDto {
+  id: number;
+  titleEn: string;
+  titleAr: string | null;
+  messageEn: string;
+  messageAr: string | null;
+  notificationType: string | null;
+  link: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationPage {
+  content: NotificationDto[];
+  totalElements: number;
+  totalPages: number;
+  number: number;          // 0-indexed page
+  size: number;
+}
+
+export const notificationApi = {
+  /** Current user's notifications, newest first. Spring Page format. */
+  list: (page = 0, size = 20) =>
+    api.get<NotificationPage>(`/api/v1/notifications?page=${page}&size=${size}`),
+  /** Unread badge count for the sidebar / shell. */
+  unreadCount: () =>
+    api.get<{ count: number }>('/api/v1/notifications/unread-count'),
+  /** Mark a single notification as read. */
+  markRead: (id: number) =>
+    api.patch<void>(`/api/v1/notifications/${id}/read`, {}),
+  /** Mark every notification owned by the current user as read. */
+  markAllRead: () =>
+    api.patch<void>('/api/v1/notifications/read-all', {}),
+};

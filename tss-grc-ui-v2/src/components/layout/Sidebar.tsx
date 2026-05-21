@@ -5,12 +5,12 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Inbox, Plug, FileCheck2, Users, Building2, CheckCheck, Server, FileText,
          Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
-         Network, Share2, Bug, BarChart3, KeyRound, Siren,
+         Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
-import { capaTaskApi, workflowSubmissionApi } from '../../lib/api';
+import { capaTaskApi, notificationApi, workflowSubmissionApi } from '../../lib/api';
 
 interface NavItem {
   id: string;
@@ -53,6 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'calendar',      to: '/calendar',             Icon: Calendar,        labelKey: 'calendarSidebar' },
       { id: 'lc-overview',   to: '/lifecycle-overview',   Icon: Activity,        labelKey: 'loSidebar' },
       { id: 'inbox',         to: '/intake-inbox',         Icon: Inbox,           labelKey: 'inboxTitle' },
+      { id: 'notifications', to: '/notifications',        Icon: Bell,            labelKey: 'inboxNotifSidebar' },
       { id: 'approvals',     to: '/approvals',            Icon: CheckCheck,      labelKey: 'approvalsSidebar' },
       { id: 'signatures',    to: '/signatures',           Icon: PenLine,         labelKey: 'sigSidebar' },
       { id: 'notif-outbox',  to: '/notifications/outbox', Icon: Inbox,           labelKey: 'noxSidebar' },
@@ -265,24 +266,29 @@ interface InboxCounts {
   capaOpen: number | null;
   /** Open AND past-target-date CAPAs. */
   capaOverdue: number | null;
+  /** Unread notifications addressed to the current user. */
+  unreadNotifications: number | null;
 }
 function useInboxCounts(): InboxCounts {
   const [counts, setCounts] = useState<InboxCounts>({
     pendingReviews: null, capaOpen: null, capaOverdue: null,
+    unreadNotifications: null,
   });
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [subs, capa] = await Promise.all([
+        const [subs, capa, notif] = await Promise.all([
           workflowSubmissionApi.countsByWorkflow().catch(() => null),
           capaTaskApi.counts().catch(() => null),
+          notificationApi.unreadCount().catch(() => null),
         ]);
         if (cancelled) return;
         setCounts({
           pendingReviews: subs ? subs.reduce((s, r) => s + r.open, 0) : null,
           capaOpen:       capa ? capa.open    : null,
           capaOverdue:    capa ? capa.overdue : null,
+          unreadNotifications: notif ? notif.count : null,
         });
       } catch { /* unauthenticated or backend down — leave as nulls */ }
     }
@@ -306,6 +312,14 @@ export function Sidebar({ open = false }: { open?: boolean }) {
       return {
         value: counts.pendingReviews,
         title: `${counts.pendingReviews} pending review${counts.pendingReviews === 1 ? '' : 's'}`,
+      };
+    }
+    if (id === 'notifications' && counts.unreadNotifications && counts.unreadNotifications > 0) {
+      return {
+        value: counts.unreadNotifications,
+        title: counts.unreadNotifications === 1
+          ? '1 unread notification'
+          : `${counts.unreadNotifications} unread notifications`,
       };
     }
     if (id === 'capa' && counts.capaOpen && counts.capaOpen > 0) {

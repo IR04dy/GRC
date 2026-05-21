@@ -44,6 +44,7 @@ const BuyerGapPage           = lazy(() => import('./pages/buyergap/BuyerGapPage'
 const WorkflowHubPage        = lazy(() => import('./pages/workflow/WorkflowHubPage').then(m => ({ default: m.WorkflowHubPage })));
 const WorkflowSubmissionsPage = lazy(() => import('./pages/workflow/WorkflowSubmissionsPage').then(m => ({ default: m.WorkflowSubmissionsPage })));
 const CalendarPage           = lazy(() => import('./pages/calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
+const NotificationInboxPage  = lazy(() => import('./pages/inbox/InboxPage').then(m => ({ default: m.InboxPage })));
 const WorkflowSubmissionDetailPage = lazy(() => import('./pages/workflow/WorkflowSubmissionDetailPage').then(m => ({ default: m.WorkflowSubmissionDetailPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
 //    Each wizard is its own chunk; the first time a user navigates to
@@ -234,6 +235,7 @@ export function App() {
 
               {/* Compliance Calendar (PR #61) — Saudi-workdays-aware */}
               <Route path="/calendar"                                 element={<CalendarPage />} />
+              <Route path="/notifications"                            element={<NotificationInboxPage />} />
               <Route path="/workflows/erm/risk-identification"       element={<RiskIdentificationWizard />} />
               <Route path="/workflows/pdpl/dsr-fulfilment"           element={<DsrFulfilmentWizard />} />
               <Route path="/workflows/pdpl/breach-notification"      element={<BreachNotificationWizard />} />
