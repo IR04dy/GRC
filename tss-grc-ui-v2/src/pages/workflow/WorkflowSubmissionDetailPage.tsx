@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
 import {
-  CheckCheck, ChevronLeft, ClipboardCheck, ClipboardList, Copy, ExternalLink,
+  Activity, CheckCheck, ChevronLeft, ClipboardCheck, ClipboardList, Copy, ExternalLink,
   FileText, PauseCircle, Sparkles, X as XIcon,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -14,7 +15,8 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useLoadable } from '../../lib/useLoadable';
 import {
-  workflowSubmissionApi, type WorkflowSubmissionDto,
+  auditLogApi, workflowSubmissionApi,
+  type AuditLogEntryDto, type WorkflowSubmissionDto,
 } from '../../lib/api';
 import { ai, type AiSuggestion } from '../../lib/ai';
 import { WORKFLOWS, MODULE_LABEL } from '../../lib/workflowCatalog';
@@ -182,6 +184,12 @@ function SubmissionBody({
 
       {/* AI review hint — heuristic checklist + suggested decision. */}
       <AiReviewHintCard s={s} isAr={isAr} />
+
+      {/* Activity timeline — every audit-log row for this submission.
+       *  PR #20 writes one row per CREATE / APPROVE / REJECT / CLOSE;
+       *  this card surfaces them inline so reviewers don't need to
+       *  detour through /admin/audit-log to see "who decided what". */}
+      <ActivityTimelineCard submissionId={s.id} isAr={isAr} />
 
       {/* Review controls */}
       {isOpen && (
@@ -353,6 +361,82 @@ function AiReviewHintCard({ s, isAr }: { s: WorkflowSubmissionDto; isAr: boolean
     </Card>
   );
 }
+
+/**
+ * Activity timeline card — renders every audit-log row for this submission.
+ *
+ * <p>Pulls from {@code GET /api/v1/audit-log/history?entityType=WorkflowSubmission&entityId=:id}
+ * on mount. Hides on empty (a brand-new submission with no review actions
+ * yet has just the CREATE row, which is still worth showing).
+ *
+ * <p>Each entry: timestamp + actionType badge (color-coded to the
+ * submission status palette) + actor (username + role) + message.
+ */
+function ActivityTimelineCard({ submissionId, isAr }: { submissionId: number; isAr: boolean }) {
+  const [entries, setEntries] = useState<AuditLogEntryDto[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await auditLogApi.historyFor('WorkflowSubmission', submissionId);
+        if (!cancelled) setEntries(rows);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [submissionId]);
+
+  if (error || entries === null) return null;
+  if (entries.length === 0) return null;
+
+  return (
+    <Card title={isAr ? 'سجل النشاط' : 'Activity timeline'}
+          Icon={Activity}
+          action={<Badge tone="neutral">{entries.length}</Badge>}>
+      <ol style={{ listStyle: 'none', margin: 0, padding: 0,
+                   display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {entries.map(e => (
+          <li key={e.id} style={{
+            display: 'grid',
+            gridTemplateColumns: '160px 110px 1fr',
+            gap: 12,
+            padding: '8px 0',
+            borderBottom: '1px dashed var(--border)',
+            alignItems: 'baseline',
+          }}>
+            <span style={{ font: '500 12px var(--font-mono, var(--font-sans))',
+                           color: 'var(--ink-3)' }}>
+              {formatDate(e.createdAt)}
+            </span>
+            <Badge tone={ACTION_TONE[e.actionType] ?? 'neutral'}>{e.actionType}</Badge>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ font: '500 13px var(--font-sans)', color: 'var(--ink-1)' }}>
+                {e.message ?? '—'}
+              </span>
+              {(e.userUsername || e.userRole) && (
+                <span style={{ font: '500 11px var(--font-sans)', color: 'var(--ink-3)' }}>
+                  {[e.userUsername, e.userRole].filter(Boolean).join(' · ')}
+                </span>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
+const ACTION_TONE: Record<string, BadgeTone> = {
+  CREATE:       'info',
+  APPROVED:     'success',
+  REJECTED:     'danger',
+  CLOSED:       'neutral',
+  UNDER_REVIEW: 'warning',
+};
 
 function prettyJson(raw: string): string {
   try { return JSON.stringify(JSON.parse(raw), null, 2); }
