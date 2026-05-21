@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -435,6 +436,7 @@ export function IncidentsPage() {
           </>
         }
       />
+      <WorkflowQuickLaunch modules="INCIDENT" />
       <div className="kpi-grid">
         <Kpi Icon={AlertOctagon} label={t('incidentsKpiOpen')}     value={open_count} tone="warning" />
         <Kpi Icon={Flame}        label={t('incidentsKpiCritical')} value={critical}    tone="danger" />

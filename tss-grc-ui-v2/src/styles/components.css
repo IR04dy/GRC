@@ -965,6 +965,59 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   margin-top: var(--sp-2);
 }
 
+/* ─── WorkflowQuickLaunch chip strip (module pages) ─── */
+.wf-quick-launch {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: var(--sp-3) 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+}
+.wf-quick-launch-head {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 600 var(--text-xs) var(--font-sans);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wf-quick-launch-strip {
+  display: flex; gap: 8px;
+  flex-wrap: wrap;
+}
+.wf-quick-launch-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px 6px 8px;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--ink-1);
+  text-decoration: none;
+  font: 600 var(--text-xs) var(--font-sans);
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+.wf-quick-launch-chip:hover {
+  border-color: var(--primary-300, var(--ink-3));
+  background: var(--surface);
+  transform: translateY(-1px);
+}
+.wf-quick-launch-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring, 0 0 0 3px rgba(14, 94, 94, 0.22));
+}
+.wf-quick-launch-steps {
+  font-weight: 500; color: var(--ink-3);
+  padding: 0 4px;
+  font-size: 10px;
+}
+.wf-quick-launch-arrow { opacity: 0.5; }
+.wf-quick-launch-chip:hover .wf-quick-launch-arrow { opacity: 1; }
+.wf-quick-launch-empty {
+  font: 500 var(--text-xs) var(--font-sans);
+  color: var(--ink-3);
+  font-style: italic;
+}
+
 /* ─── Wizard form primitives (shared across wizards) ── */
 .wf-form-grid {
   display: grid;

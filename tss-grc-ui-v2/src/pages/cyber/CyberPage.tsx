@@ -47,6 +47,7 @@ import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflows
 import { CYBER_WORKFLOWS } from '../../lib/mockWorkflows';
 import { CYBER_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
+import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { CYBER_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
@@ -981,6 +982,7 @@ export function CyberPage() {
           </>
         }
       />
+      <WorkflowQuickLaunch modules="NCA" />
       <div className="kpi-grid">
         <Kpi Icon={ShieldCheck}    label={t('cyberKpiControls')}   value={controls.data.length} tone="primary" />
         <Kpi Icon={Bug}            label={t('cyberKpiVuln')}       value={vulns.data.filter(v => v.workflowStatus !== 'CLOSED').length} tone="warning" />
