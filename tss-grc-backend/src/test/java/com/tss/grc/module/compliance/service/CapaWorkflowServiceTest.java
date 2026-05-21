@@ -4,7 +4,9 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,8 +60,9 @@ class CapaWorkflowServiceTest {
     private static final Long OTHER_ORG = 99L;
     private static final Long FID       = 555L;
 
-    @Mock private AuditFindingRepository findingRepo;
-    @Mock private AuditLogService        audit;
+    @Mock private AuditFindingRepository   findingRepo;
+    @Mock private AuditLogService          audit;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private CapaWorkflowService service;
 
     @BeforeEach void setUp() {
@@ -180,6 +183,9 @@ class CapaWorkflowServiceTest {
             .isInstanceOf(IllegalArgumentException.class);
 
         verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
+        // F8 must also stay silent — a guard-rejected transition has no
+        // semantic content for downstream automation.
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
     }
 
     // ── Cross-tenant guarantees ────────────────────────────────────────
@@ -197,6 +203,62 @@ class CapaWorkflowServiceTest {
             .isInstanceOf(EntityNotFoundException.class);
 
         verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
+        // Belt-and-braces: F8 must also stay silent on a cross-tenant 404.
+        // Otherwise the engine would let a rule fire under the requesting
+        // tenant for a finding the requester never had access to.
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    // ── F8 automation events ──────────────────────────────────────────
+    // CapaWorkflowService publishes FINDING_CAPA_STAGE_CHANGED on every
+    // transition. Single event type with rich payload (newStage,
+    // previousStage, result, byUserId, notes) keeps engine matchers
+    // simple — rules can target closure via {newStage:"CLOSED"}, rework
+    // via {result:"OWNER_TEST_FAIL"}, etc.
+
+    @Test void close_publishesStageChangedEvent_withClosedNewStage() {
+        AuditFinding f = finding("AUDIT_SIGNED_OFF");
+        f.setSeverity("CRITICAL");
+        when(findingRepo.findById(FID)).thenReturn(Optional.of(f));
+
+        service.close(FID);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("FINDING_CAPA_STAGE_CHANGED");
+        assertThat(ev.entityType()).isEqualTo("AuditFinding");
+        assertThat(ev.entityId()).isEqualTo(FID);
+        assertThat(ev.organisationId()).isEqualTo(ORG_ID);
+        // Payload carries the fields F8 rules match against. The "filing
+        // milestone on CLOSED" rule (analogous to AR-29 from V128) needs
+        // newStage to be exactly "CLOSED", not "CAPA_CLOSED" or "Closed".
+        assertThat(ev.payload()).containsEntry("newStage", "CLOSED");
+        assertThat(ev.payload()).containsEntry("previousStage", "AUDIT_SIGNED_OFF");
+        assertThat(ev.payload()).containsEntry("status", "CLOSED");
+        assertThat(ev.payload()).containsEntry("severity", "CRITICAL");
+        // result is "" (not null) on stage-only transitions — no NPE in
+        // the F8 engine's equality check on rules that don't care.
+        assertThat(ev.payload()).containsEntry("result", "");
+    }
+
+    @Test void ownerTest_fail_publishesEvent_carryingResultForReworkRules() {
+        // Owner FAIL keeps stage at IMPLEMENTING. A rule that wants to
+        // escalate rework loops must match on the result, not the
+        // newStage (which equals previousStage on FAIL). Pin that the
+        // event payload actually carries the result.
+        AuditFinding f = finding("IMPLEMENTING");
+        when(findingRepo.findById(FID)).thenReturn(Optional.of(f));
+
+        service.ownerTest(FID, Map.of("result", "FAIL", "notes", "rollback failed"));
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.payload()).containsEntry("result", "OWNER_TEST_FAIL");
+        assertThat(ev.payload()).containsEntry("newStage", "IMPLEMENTING");
+        assertThat(ev.payload()).containsEntry("previousStage", "IMPLEMENTING");
+        assertThat(ev.payload()).containsEntry("notes", "rollback failed");
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
