@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * SCM §7.2 #11 — Supplier Exit Plan wizard.
@@ -91,8 +92,23 @@ export function SupplierExitPlanWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم اعتماد خطة الخروج' : 'Exit plan locked in');
+      const created = await submitWizard({
+        workflowId: 'scm-exit-plan',
+        workflowModule: 'SCM',
+        titleEn: `Exit: ${draft.vendorName}`.slice(0, 280),
+        summaryEn: `${draft.triggers.length} triggers · ${draft.alternateOption}`
+                 + ` · notice=${draft.noticeDays}d`
+                 + ` · destruction=${draft.destructionDeadlineDays}d`
+                 + (draft.isProcessor ? ' · PROCESSOR' : ''),
+        regulatoryAnchor: draft.isProcessor ? 'PDPL §18' : undefined,
+        status: draft.procurementApproved && draft.riskApproved
+          && (!draft.isProcessor || draft.dpoApproved)
+            ? 'APPROVED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم اعتماد خطة الخروج (#${created.id})`
+        : `Exit plan #${created.id} locked in`);
       navigate('/scm');
     } catch (e) {
       toast.danger((e as Error).message);

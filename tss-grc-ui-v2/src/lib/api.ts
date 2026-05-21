@@ -1932,3 +1932,50 @@ export const adminApi = {
   deleteUser:    (id: number) => api.delete<void>(`/api/v1/admin/users/${id}`),
   roles:         () => api.get<AdminRoleDto[]>('/api/v1/admin/roles'),
 };
+
+// ── Workflow submissions — generic ledger for the 12 wizards without ─────
+//    dedicated tables (Risk Treatment, Risk Acceptance, Incident RCA,
+//    Management Review, Digital Signature, Control Test, Cloud CCC, NCA
+//    ECC Self-Assessment, Consent Management, Cross-Border Transfer,
+//    Supplier Exit Plan, Board Pack). Backed by V125 workflow.workflow_submissions.
+export interface WorkflowSubmissionDto {
+  id: number;
+  externalId?: string;
+  workflowId: string;
+  workflowModule: string;
+  titleEn: string;
+  titleAr?: string;
+  status: string;
+  summaryEn?: string;
+  summaryAr?: string;
+  regulatoryAnchor?: string;
+  payloadJson: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewerNote?: string;
+}
+export interface WorkflowSubmissionRequest {
+  workflowId: string;
+  workflowModule: string;
+  titleEn: string;
+  titleAr?: string;
+  summaryEn?: string;
+  summaryAr?: string;
+  regulatoryAnchor?: string;
+  status?: string;
+  payloadJson: string;
+}
+export const workflowSubmissionApi = {
+  create:  (body: WorkflowSubmissionRequest) =>
+    api.post<WorkflowSubmissionDto>('/api/v1/workflow-submissions', body),
+  list:    (workflowId?: string, module?: string) => {
+    const qs = workflowId ? `?workflowId=${encodeURIComponent(workflowId)}`
+            : module      ? `?module=${encodeURIComponent(module)}`
+            : '';
+    return api.get<WorkflowSubmissionDto[]>(`/api/v1/workflow-submissions${qs}`);
+  },
+  get:     (id: number) =>
+    api.get<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}`),
+  review:  (id: number, body: { decision: string; reviewerNote?: string }) =>
+    api.post<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}/review`, body),
+};

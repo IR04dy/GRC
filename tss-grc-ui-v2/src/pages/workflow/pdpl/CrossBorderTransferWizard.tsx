@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge, type BadgeTone } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * PDPL §7.4 #6 — Cross-Border Personal Data Transfer wizard.
@@ -90,8 +91,20 @@ export function CrossBorderTransferWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم اعتماد النقل عبر الحدود' : 'Cross-border transfer authorised');
+      const created = await submitWizard({
+        workflowId: 'pdpl-cross-border',
+        workflowModule: 'PDPL',
+        titleEn: `Transfer: ${draft.recipientName} (${draft.recipientCountry})`.slice(0, 280),
+        regulatoryAnchor: 'PDPL Art. 29',
+        summaryEn: `${draft.mechanism} · ${draft.sensitivity} · ${draft.volumeBand}`
+                 + (draft.sdoReference ? ` · SDO=${draft.sdoReference}` : '')
+                 + ` · review every ${draft.reviewPeriodMonths}m`,
+        status: draft.dpoApproved ? 'APPROVED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم اعتماد النقل عبر الحدود (#${created.id})`
+        : `Cross-border transfer #${created.id} authorised`);
       navigate('/privacy');
     } catch (e) {
       toast.danger((e as Error).message);

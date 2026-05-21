@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * PDPL §7.4 #7 — Consent management wizard.
@@ -91,8 +92,22 @@ export function ConsentManagementWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم اعتماد نموذج الموافقة' : 'Consent template published');
+      const created = await submitWizard({
+        workflowId: 'pdpl-consent',
+        workflowModule: 'PDPL',
+        titleEn: `Consent: ${draft.activityName}`.slice(0, 280),
+        regulatoryAnchor: 'PDPL Art. 7',
+        summaryEn: `${draft.purposes.length} purposes · ${draft.channel}`
+                 + ` · ${draft.policyVersion}`
+                 + (draft.granularConsent ? ' · granular' : ' · BUNDLED')
+                 + (draft.ageGate ? ` · age-gate` : '')
+                 + (draft.parentalRequired ? ' · parental' : ''),
+        status: draft.dpoApproved ? 'APPROVED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم اعتماد نموذج الموافقة (#${created.id})`
+        : `Consent template #${created.id} published`);
       navigate('/privacy');
     } catch (e) {
       toast.danger((e as Error).message);

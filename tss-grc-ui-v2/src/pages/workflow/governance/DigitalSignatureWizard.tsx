@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * §7.6 Cross-module — Digital Signature wizard.
@@ -84,9 +85,22 @@ export function DigitalSignatureWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم توقيع السجل وحفظ سلسلة الأدلة'
-                          : 'Record signed — audit trail captured');
+      // Real Nafath / Adobe Sign / DocuSign adapter is vendor-blocked. For
+      // now the signature transaction is captured as a workflow submission
+      // (immutable audit ledger) — swapping in a provider later only needs
+      // the redirect/callback path, not a schema change.
+      const created = await submitWizard({
+        workflowId: 'governance-digital-signature',
+        workflowModule: 'GOVERNANCE',
+        titleEn: `${draft.intent}: ${draft.recordRef} (${draft.recordKind})`,
+        summaryEn: `${draft.signerName} (${draft.signerRole}) via ${draft.method}`
+                 + (draft.intent === 'REJECT' ? ' · REJECTED' : ''),
+        status: draft.intent === 'REJECT' ? 'REJECTED' : 'APPROVED',
+        draft: { ...draft, otpEntered: draft.otpEntered ? '***' : undefined },
+      });
+      toast.success(isAr
+        ? `تم توقيع السجل (#${created.id})`
+        : `Signature #${created.id} captured — audit trail saved`);
       navigate('/signatures');
     } catch (e) {
       toast.danger((e as Error).message);

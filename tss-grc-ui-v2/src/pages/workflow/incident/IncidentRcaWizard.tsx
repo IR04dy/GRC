@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { submitWizard } from '../../../lib/submitWizard';
 
 /**
  * §7.6 Cross-module — Root-Cause Analysis wizard.
@@ -71,8 +72,20 @@ export function IncidentRcaWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم اعتماد تحليل السبب الجذري' : 'RCA approved and closed');
+      const created = await submitWizard({
+        workflowId: 'incident-rca',
+        workflowModule: 'INCIDENT',
+        titleEn: `RCA: ${draft.incidentRef}`,
+        summaryEn: `${draft.framework} · root cause: `
+                 + draft.rootCause.slice(0, 100)
+                 + (draft.rootCause.length > 100 ? '…' : '')
+                 + (draft.ownerRole ? ` · owner=${draft.ownerRole}` : ''),
+        status: draft.closed ? 'CLOSED' : 'SUBMITTED',
+        draft,
+      });
+      toast.success(isAr
+        ? `تم اعتماد تحليل السبب الجذري (#${created.id})`
+        : `RCA #${created.id} recorded`);
       navigate('/rca');
     } catch (e) {
       toast.danger((e as Error).message);
