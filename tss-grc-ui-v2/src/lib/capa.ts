@@ -32,6 +32,7 @@
 // its own row, RCA artefacts, verification log, and recurrence link.
 
 import { useCallback, useEffect, useState } from 'react';
+import { capaTaskApi, type CapaTaskDto } from './api';
 
 // ── Domain types ────────────────────────────────────────────────────
 
@@ -828,13 +829,123 @@ function save(o: CapaOverlay) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(o)); } catch { /* ignore */ }
 }
 
-/** React hook: merged static seed + localStorage overlay for CAPAs. */
+/** Project a backend {@link CapaTaskDto} into the local {@link Capa}
+ *  shape used by CapaPage + CapaDetailPage. The backend covers a smaller
+ *  set of fields than the static seed (no RCA / Pareto / customer-
+ *  disclosure / parent-CAPA — those will land as the backend grows),
+ *  so anything missing falls back to a safe default. The {@code
+ *  backendId} carries the Long PK so EntityActivityTimeline +
+ *  EntityAutomationRuns on the detail page can fetch the right
+ *  audit_log + rule_run rows. */
+function fromCapaTaskDto(dto: CapaTaskDto): Capa {
+  // Backend uses OPEN/IN_PROGRESS/AWAITING_VERIFICATION/CLOSED/CANCELLED.
+  // Local Capa uses IDENTIFIED/IMPLEMENTING/OWNER_TESTED/INDEPENDENT_TESTED
+  // /AUDIT_SIGNED_OFF/CLOSED/CANCELLED/VERIFICATION_FAILED. Map carefully:
+  const STATUS_MAP: Record<string, CapaStatus> = {
+    'OPEN':                   'IDENTIFIED',
+    'IN_PROGRESS':            'IMPLEMENTING',
+    'AWAITING_VERIFICATION':  'INDEPENDENT_TESTED',
+    'CLOSED':                 'CLOSED',
+    'CANCELLED':              'CANCELLED',
+  };
+  const status: CapaStatus = STATUS_MAP[dto.status ?? 'OPEN'] ?? 'IDENTIFIED';
+  const sev: CapaSeverity = (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const)
+    .includes((dto.severity ?? '') as CapaSeverity)
+    ? (dto.severity as CapaSeverity)
+    : 'MEDIUM';
+  // History from the backend's lifecycle timestamps. The richer
+  // audit_log timeline is rendered separately on the detail page via
+  // EntityActivityTimeline (keyed on backendId); this local history
+  // is the fallback for register-row "last activity" displays.
+  const history: CapaEvent[] = [];
+  history.push({ at: dto.startedAt ?? dto.targetDate ?? new Date().toISOString(),
+                 status: 'IDENTIFIED', actor: dto.owner });
+  if (dto.startedAt)                  history.push({ at: dto.startedAt,                 status: 'IMPLEMENTING',       actor: dto.owner });
+  if (dto.submittedForVerificationAt) history.push({ at: dto.submittedForVerificationAt, status: 'INDEPENDENT_TESTED', actor: dto.owner });
+  if (dto.verifiedAt)                 history.push({ at: dto.verifiedAt,                status: 'AUDIT_SIGNED_OFF',   actor: dto.verifiedBy ?? dto.owner });
+  if (dto.closedAt)                   history.push({ at: dto.closedAt,                  status: 'CLOSED',             actor: dto.verifiedBy ?? dto.owner });
+  if (dto.cancelledAt)                history.push({ at: dto.cancelledAt,               status: 'CANCELLED',          actor: dto.owner, note: dto.cancellationReasonEn ?? undefined });
+  // Map backend originType to the v2 CapaSource enum. The backend
+  // originType uses the entity class name (Finding / Risk / Incident /
+  // BcmExercise / KRI); v2 has its own narrower enum tuned to register
+  // grouping. Unknown origins fall back to OTHER rather than crashing.
+  const SOURCE_MAP: Record<string, CapaSource> = {
+    'Finding':       'AUDIT_FINDING',
+    'AuditFinding':  'AUDIT_FINDING',
+    'Risk':          'RISK_TREATMENT',
+    'Incident':      'INCIDENT_LL',
+    'CyberIncident': 'INCIDENT_LL',
+    'BcmExercise':   'CONTROL_GAP',
+    'DR_TEST':       'CONTROL_GAP',
+    'KRI':           'KRI_BREACH',
+    'Vendor':        'VENDOR_FINDING',
+    'Dpia':          'DPIA_MITIGATION',
+  };
+  const source: CapaSource = SOURCE_MAP[dto.originType] ?? 'OTHER';
+
+  return {
+    id: dto.id,
+    backendId: dto.numericId,
+    code: dto.id,
+    titleEn: dto.titleEn,
+    titleAr: dto.titleAr,
+    descriptionEn: dto.descriptionEn ?? '',
+    descriptionAr: dto.descriptionAr ?? undefined,
+    type: dto.capaType === 'PREVENTIVE' ? 'PREVENTIVE' : 'CORRECTIVE',
+    source,
+    sourceRecordKey: `${dto.originType}:${dto.originId}`,
+    severity: sev,
+    owner: dto.owner,
+    status,
+    openedAt: (dto.startedAt ?? dto.targetDate ?? '').slice(0, 10),
+    dueDate:  dto.targetDate,
+    closedAt: dto.closedAt?.slice(0, 10),
+    cancelledAt: dto.cancelledAt?.slice(0, 10),
+    cancellationReason: dto.cancellationReasonEn ?? undefined,
+    progressPct: status === 'CLOSED' ? 100
+               : status === 'AUDIT_SIGNED_OFF' ? 85
+               : status === 'INDEPENDENT_TESTED' ? 70
+               : status === 'OWNER_TESTED' ? 55
+               : status === 'IMPLEMENTING' ? 30
+               : 0,
+    ownerTestAt:        dto.startedAt ?? undefined,
+    independentTestAt:  dto.submittedForVerificationAt ?? undefined,
+    auditSignoffAt:     dto.verifiedAt ?? undefined,
+    auditSignedOffBy:   dto.verifiedBy ?? undefined,
+    rcaMethod: 'NONE',
+    rcaSteps:  [],
+    history,
+  };
+}
+
+/** React hook: merged backend list + static seed + localStorage overlay
+ *  for CAPAs. Backend items take precedence when their externalId
+ *  collides with a seed row (so a fresh backend row overrides a stale
+ *  seed entry on the demo tenant). Backend fetch errors are swallowed
+ *  silently — the page stays usable on offline / pre-auth even if the
+ *  API isn't reachable. */
 export function useCapas() {
   const [overlay, setOverlay] = useState<CapaOverlay>(() => load());
+  const [apiRows, setApiRows] = useState<Capa[]>([]);
+
   useEffect(() => save(overlay), [overlay]);
 
+  useEffect(() => {
+    let cancelled = false;
+    capaTaskApi.list()
+      .then(dtos => { if (!cancelled) setApiRows(dtos.map(fromCapaTaskDto)); })
+      .catch(() => { /* offline / pre-auth — keep static + overlay */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const items: Capa[] = (() => {
-    const merged = CAPAS.map(c => overlay.patches[c.id] ? { ...c, ...overlay.patches[c.id] } : c);
+    // Backend rows win over seed rows with the same externalId/code.
+    // Patches still apply on top so a localStorage advance() carries
+    // forward even after the backend round-trip lands.
+    const apiIds = new Set(apiRows.map(r => r.id));
+    const seedNotInApi = CAPAS.filter(c => !apiIds.has(c.id));
+    const merged = [...apiRows, ...seedNotInApi]
+      .map(c => overlay.patches[c.id] ? { ...c, ...overlay.patches[c.id] } : c);
     return [...merged, ...overlay.added];
   })();
 
