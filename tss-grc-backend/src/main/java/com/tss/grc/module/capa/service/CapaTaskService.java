@@ -5,6 +5,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.capa.dto.CapaTaskDto;
 import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +25,13 @@ import java.util.stream.Collectors;
  *   AWAITING_VERIFICATION → CLOSED, IN_REMEDIATION (failed verify reopens), CANCELLED
  *   CLOSED, CANCELLED → terminal
  *
- * Note: failed-verify path uses IN_PROGRESS (not a separate IN_REMEDIATION state)
+ * <p>Note: failed-verify path uses IN_PROGRESS (not a separate IN_REMEDIATION state)
  * to keep the state set tight. Verifier records the rejection in progress_notes.
+ *
+ * <p>Every mutation writes to {@code platform.audit_log} via {@link AuditLogService}
+ * so the reusable {@code EntityActivityTimeline} card (PRs #29-30) lights up on any
+ * CAPA detail page automatically — the same forensic story buyers see for
+ * workflow submissions, AAR, Risk, and Finding.
  */
 @Service
 @RequiredArgsConstructor
@@ -40,6 +46,7 @@ public class CapaTaskService {
     private static final List<String> TERMINAL = List.of("CLOSED", "CANCELLED");
 
     private final CapaTaskRepository repo;
+    private final AuditLogService    audit;
 
     @Autowired(required = false)
     private RealtimeBroadcaster broadcaster;
@@ -105,8 +112,19 @@ public class CapaTaskService {
         t.setOwner(req.getOwner());
         t.setTargetDate(req.getTargetDate());
         t.setStatus("OPEN");
-        CapaTaskDto out = CapaTaskDto.from(repo.save(t));
-        if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "capa", t.getExternalId(), out);
+        CapaTask saved = repo.save(t);
+        CapaTaskDto out = CapaTaskDto.from(saved);
+        // Forensic trail — every CAPA mutation lands in platform.audit_log
+        // so the reusable EntityActivityTimeline card lights up on any CAPA
+        // detail page (pattern from PRs #29-30, mirrors FindingService).
+        audit.log("CREATE", "CapaTask", saved.getId(),
+            "CAPA " + saved.getExternalId() + " opened"
+            + (saved.getOriginType() != null
+                ? " from " + saved.getOriginType() + " " + saved.getOriginId() : "")
+            + " · owner=" + (saved.getOwner() != null ? saved.getOwner() : "—")
+            + " · severity=" + (saved.getSeverity() != null ? saved.getSeverity() : "—")
+            + " · target=" + (saved.getTargetDate() != null ? saved.getTargetDate() : "—"));
+        if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "capa", saved.getExternalId(), out);
         return out;
     }
 
@@ -119,6 +137,7 @@ public class CapaTaskService {
         if (!allowed.contains(req.getStatus())) {
             throw new IllegalTransitionException(t.getStatus(), req.getStatus(), allowed);
         }
+        String previousStatus = t.getStatus();
         LocalDateTime now = LocalDateTime.now();
         t.setStatus(req.getStatus());
 
@@ -141,7 +160,21 @@ public class CapaTaskService {
         if (req.getProgressNotesAr() != null) t.setProgressNotesAr(req.getProgressNotesAr());
         if (req.getEvidenceRefs() != null)    t.setEvidenceRefs(req.getEvidenceRefs());
 
-        CapaTaskDto out = CapaTaskDto.from(repo.save(t));
+        CapaTask saved = repo.save(t);
+        CapaTaskDto out = CapaTaskDto.from(saved);
+        // Status transition lands as its own audit row — actionType is the
+        // target state so the timeline card colours it correctly (CLOSED
+        // → success badge, CANCELLED → neutral, etc.). The verifier
+        // (when CLOSED) is captured in the message for forensic traceability.
+        audit.log(saved.getStatus(), "CapaTask", saved.getId(),
+            "CAPA " + saved.getExternalId()
+            + " " + previousStatus + " → " + saved.getStatus()
+            + (req.getVerifiedBy() != null && "CLOSED".equals(saved.getStatus())
+                ? " · verified by " + req.getVerifiedBy() : "")
+            + (req.getCancellationReasonEn() != null && "CANCELLED".equals(saved.getStatus())
+                ? " · reason: " + req.getCancellationReasonEn() : "")
+            + (req.getProgressNotesEn() != null && !req.getProgressNotesEn().isBlank()
+                ? " · note: " + req.getProgressNotesEn() : ""));
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "capa", externalId, out);
         return out;
     }
@@ -153,6 +186,10 @@ public class CapaTaskService {
             .orElseThrow(() -> new EntityNotFoundException("CAPA task not found: " + externalId));
         t.setIsDeleted((short) 1);
         repo.save(t);
+        // PLATFORM_ADMIN-only delete (see controller) — still audit it so a
+        // reviewer who later finds the CAPA missing can trace the actor.
+        audit.log("DELETE", "CapaTask", t.getId(),
+            "CAPA " + t.getExternalId() + " soft-deleted (status=" + t.getStatus() + ")");
     }
 
     private String generateExternalId() {
