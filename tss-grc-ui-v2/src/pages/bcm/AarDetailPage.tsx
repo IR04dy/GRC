@@ -13,6 +13,8 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useLoadable } from '../../lib/useLoadable';
 import { aar, type CrisisAar, type AarStatus } from '../../lib/aar';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
+import { EntityAutomationRuns } from '../../components/audit/EntityAutomationRuns';
 
 /**
  * NCEMA After-Action Report detail page.
@@ -207,6 +209,18 @@ export function AarDetailPage() {
                 <Section title={isAr ? 'الإشعارات التنظيمية' : 'Regulatory notifications'}
                   editable={editing} valueEn={current.regulatoryNotificationsMd} singleLang rows={6}
                   onChange={(en) => setField('regulatoryNotificationsMd', en)} />
+              </div>
+
+              {/* Forensic timelines — same reusable cards used on
+               *  /workflows/submissions/:id (PRs #24, #27). The AAR
+               *  service writes audit_log rows with entity_type=
+               *  'CrisisAar' on every GENERATE / UPDATE / TRANSITION,
+               *  so the activity card lights up automatically.
+               *  Automation runs card hides itself if no F8 rule
+               *  references CrisisAar yet (future seed addition). */}
+              <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+                <EntityActivityTimeline entityType="CrisisAar" entityId={a.id} />
+                <EntityAutomationRuns   entityType="CrisisAar" entityId={a.id} />
               </div>
             </>
           );
