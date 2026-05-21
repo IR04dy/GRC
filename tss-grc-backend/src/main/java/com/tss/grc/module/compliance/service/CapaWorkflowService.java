@@ -3,6 +3,7 @@ package com.tss.grc.module.compliance.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,9 +17,17 @@ import java.util.Set;
 /**
  * CAPA closure verification workflow — assessment §5.3 recommendation #6.
  *
- * Stage flow on AuditFinding:
+ * <p>Stage flow on AuditFinding:
  *   IDENTIFIED → IMPLEMENTING → OWNER_TESTED → INDEPENDENT_TESTED
  *              → AUDIT_SIGNED_OFF → CLOSED
+ *
+ * <p>Every stage transition writes to {@code platform.audit_log} via
+ * {@link AuditLogService} so the reusable {@code EntityActivityTimeline}
+ * card (PRs #29-30) lights up on {@code FindingDetailPage}. The forensic
+ * story already extends to workflow submissions, AAR, Risk, audit_lc
+ * Finding, and CAPA — this PR adds the highest-traffic state machine
+ * in the platform (the per-finding remediation lifecycle that every
+ * reviewer walks every day).
  */
 @Service
 @RequiredArgsConstructor
@@ -32,13 +41,20 @@ public class CapaWorkflowService {
     private static final Set<String> RESULT_VALUES = Set.of("PASS", "FAIL", "PARTIAL");
 
     private final AuditFindingRepository findingRepo;
+    private final AuditLogService        audit;
 
     @Transactional
     public AuditFinding markImplementing(Long findingId) {
         AuditFinding f = require(findingId);
         requireStage(f, "IDENTIFIED");
+        String previousStage = stageOf(f);
         f.setCapaStage("IMPLEMENTING");
-        return findingRepo.save(f);
+        AuditFinding saved = findingRepo.save(f);
+        // Stage transition = its own audit row. actionType is the new stage
+        // so the timeline card colours rows correctly (IMPLEMENTING → info).
+        audit.log("IMPLEMENTING", "AuditFinding", saved.getId(),
+            "Finding #" + saved.getId() + " CAPA " + previousStage + " → IMPLEMENTING");
+        return saved;
     }
 
     @Transactional
@@ -48,17 +64,29 @@ public class CapaWorkflowService {
         String result = str(body.get("result"));
         if (result == null || !RESULT_VALUES.contains(result))
             throw new IllegalArgumentException("result must be one of: PASS, FAIL, PARTIAL");
+        String previousStage = stageOf(f);
         f.setOwnerTestAt(LocalDateTime.now());
         f.setOwnerTestResult(result);
         if (body.get("evidenceId") instanceof Number n) f.setOwnerTestEvidenceId(n.longValue());
-        f.setOwnerTestNotes(str(body.get("notes")));
+        String notes = str(body.get("notes"));
+        f.setOwnerTestNotes(notes);
         // FAIL keeps stage at IMPLEMENTING for rework; PASS/PARTIAL advances
         if ("FAIL".equals(result)) {
             f.setCapaStage("IMPLEMENTING");
         } else {
             f.setCapaStage("OWNER_TESTED");
         }
-        return findingRepo.save(f);
+        AuditFinding saved = findingRepo.save(f);
+        // Action type carries the result, not the stage — buyer reading
+        // the timeline sees "OWNER_TEST_FAIL" pop in red against the
+        // remediation row, even though the stage stayed at IMPLEMENTING.
+        // This matches the "owner FAIL forces rework" semantics from the
+        // CAPA workflow doc (§5.3 #6).
+        audit.log("OWNER_TEST_" + result, "AuditFinding", saved.getId(),
+            "Finding #" + saved.getId() + " owner test " + result
+            + " · stage " + previousStage + " → " + saved.getCapaStage()
+            + (notes != null && !notes.isBlank() ? " · note: " + notes : ""));
+        return saved;
     }
 
     @Transactional
@@ -68,37 +96,61 @@ public class CapaWorkflowService {
         String result = str(body.get("result"));
         if (result == null || !RESULT_VALUES.contains(result))
             throw new IllegalArgumentException("result must be one of: PASS, FAIL, PARTIAL");
+        String previousStage = stageOf(f);
         f.setIndependentTestAt(LocalDateTime.now());
         f.setIndependentTestResult(result);
-        if (body.get("byUserId") instanceof Number n) f.setIndependentTestById(n.longValue());
-        f.setIndependentTestNotes(str(body.get("notes")));
+        Long byUserId = (body.get("byUserId") instanceof Number n) ? n.longValue() : null;
+        if (byUserId != null) f.setIndependentTestById(byUserId);
+        String notes = str(body.get("notes"));
+        f.setIndependentTestNotes(notes);
         if ("FAIL".equals(result)) {
             // Send back to owner re-testing
             f.setCapaStage("IMPLEMENTING");
         } else {
             f.setCapaStage("INDEPENDENT_TESTED");
         }
-        return findingRepo.save(f);
+        AuditFinding saved = findingRepo.save(f);
+        audit.log("INDEPENDENT_TEST_" + result, "AuditFinding", saved.getId(),
+            "Finding #" + saved.getId() + " independent test " + result
+            + " · stage " + previousStage + " → " + saved.getCapaStage()
+            + (byUserId != null ? " · by user " + byUserId : "")
+            + (notes != null && !notes.isBlank() ? " · note: " + notes : ""));
+        return saved;
     }
 
     @Transactional
     public AuditFinding auditSignoff(Long findingId, Map<String, Object> body) {
         AuditFinding f = require(findingId);
         requireStage(f, "INDEPENDENT_TESTED");
+        String previousStage = stageOf(f);
         f.setAuditSignoffAt(LocalDateTime.now());
-        if (body.get("byUserId") instanceof Number n) f.setAuditSignoffById(n.longValue());
-        f.setAuditSignoffNotes(str(body.get("notes")));
+        Long byUserId = (body.get("byUserId") instanceof Number n) ? n.longValue() : null;
+        if (byUserId != null) f.setAuditSignoffById(byUserId);
+        String notes = str(body.get("notes"));
+        f.setAuditSignoffNotes(notes);
         f.setCapaStage("AUDIT_SIGNED_OFF");
-        return findingRepo.save(f);
+        AuditFinding saved = findingRepo.save(f);
+        audit.log("AUDIT_SIGNED_OFF", "AuditFinding", saved.getId(),
+            "Finding #" + saved.getId() + " CAPA " + previousStage + " → AUDIT_SIGNED_OFF"
+            + (byUserId != null ? " · signed off by user " + byUserId : "")
+            + (notes != null && !notes.isBlank() ? " · note: " + notes : ""));
+        return saved;
     }
 
     @Transactional
     public AuditFinding close(Long findingId) {
         AuditFinding f = require(findingId);
         requireStage(f, "AUDIT_SIGNED_OFF");
+        String previousStage = stageOf(f);
         f.setCapaStage("CLOSED");
         f.setStatus("CLOSED");
-        return findingRepo.save(f);
+        AuditFinding saved = findingRepo.save(f);
+        // CLOSED is the canonical terminal — also flips Finding.status to
+        // CLOSED, so the timeline shows both "stage advanced" and "finding
+        // resolved" semantics in a single line.
+        audit.log("CLOSED", "AuditFinding", saved.getId(),
+            "Finding #" + saved.getId() + " CAPA " + previousStage + " → CLOSED · finding closed");
+        return saved;
     }
 
     private AuditFinding require(Long id) {
@@ -119,5 +171,12 @@ public class CapaWorkflowService {
 
     private static String str(Object o) {
         return o != null ? o.toString() : null;
+    }
+
+    /** Default {@code IDENTIFIED} if the row has no stage yet — keeps the
+     *  audit message readable even for findings created before CAPA
+     *  staging existed. */
+    private static String stageOf(AuditFinding f) {
+        return f.getCapaStage() != null ? f.getCapaStage() : "IDENTIFIED";
     }
 }
