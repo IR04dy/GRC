@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Workflow, ChevronRight } from 'lucide-react';
+import { Workflow, ChevronRight, ClipboardList } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -70,6 +70,13 @@ export function WorkflowHubPage() {
           ? `${counts.available} معالج جاهز للاستخدام من إجمالي ${counts.total} عملية`
           : `${counts.available} of ${counts.total} workflows shipped — ${counts.partial} partial, ${counts.planned} on backlog`}
         eyebrow={isAr ? 'كتالوج المعالجات' : 'Wizards catalog'}
+        actions={
+          <Link to="/workflows/submissions">
+            <Button variant="secondary" size="sm" Icon={ClipboardList}>
+              {isAr ? 'سجلات المعالجات' : 'Submissions register'}
+            </Button>
+          </Link>
+        }
       />
 
       {/* Filters */}
