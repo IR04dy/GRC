@@ -6,7 +6,9 @@ import com.tss.grc.module.capa.dto.CapaTaskDto;
 import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,8 +44,9 @@ class CapaTaskServiceTest {
     private static final Long ORG_ID = 1L;
     private static final String EXT_ID = "CAPA-2026-001";
 
-    @Mock private CapaTaskRepository repo;
-    @Mock private AuditLogService    audit;
+    @Mock private CapaTaskRepository       repo;
+    @Mock private AuditLogService          audit;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private CapaTaskService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -189,5 +192,69 @@ class CapaTaskServiceTest {
             .isInstanceOf(EntityNotFoundException.class);
 
         verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
+        // Belt-and-braces: F8 must also stay silent on a cross-tenant 404.
+        // The engine would otherwise let a rule fire under the requesting
+        // tenant for an entity the requester never had access to.
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    // ── F8 automation events ──────────────────────────────────────────
+    // CapaTaskService publishes CAPA_TASK_REVIEWED on every transition with
+    // the new state in the payload, so F8 rules can target closure /
+    // cancellation specifically (mirrors the WorkflowSubmissionService
+    // CAPA_TASK_REVIEWED / WORKFLOW_SUBMISSION_REVIEWED pattern from PR #21).
+
+    @Test
+    void transition_publishesCapaTaskReviewedEvent_withPreviousStatusInPayload() {
+        CapaTask seed = task("AWAITING_VERIFICATION");
+        seed.setId(77L);
+        seed.setSeverity("HIGH");
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(seed));
+        when(repo.save(any(CapaTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CapaTaskDto.TransitionRequest t = tx("CLOSED");
+        t.setVerifiedBy("auditor");
+        service.transition(EXT_ID, t);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("CAPA_TASK_REVIEWED");
+        assertThat(ev.entityType()).isEqualTo("CapaTask");
+        assertThat(ev.entityId()).isEqualTo(77L);
+        assertThat(ev.organisationId()).isEqualTo(ORG_ID);
+        assertThat(ev.correlationId()).isEqualTo(EXT_ID);
+        // Payload carries the fields F8 rules match against — newest state
+        // (status), the prior state for transition-specific rules, plus
+        // routing fields (originType, severity, capaType).
+        assertThat(ev.payload()).containsEntry("status", "CLOSED");
+        assertThat(ev.payload()).containsEntry("previousStatus", "AWAITING_VERIFICATION");
+        assertThat(ev.payload()).containsEntry("severity", "HIGH");
+        assertThat(ev.payload()).containsEntry("originType", "audit.finding");
+        assertThat(ev.payload()).containsEntry("originId", "FIN-2026-001");
+    }
+
+    @Test
+    void transition_payloadValues_nullCoercedToEmptyString() {
+        // The F8 engine's equality check would NPE on null payload values.
+        // Confirm severity/origin/etc. are coerced to "" when the CAPA
+        // didn't carry them at construction.
+        CapaTask seed = task("OPEN");
+        seed.setId(33L);
+        seed.setSeverity(null);
+        seed.setOriginType(null);
+        seed.setOriginId(null);
+        seed.setCapaType(null);
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(seed));
+        when(repo.save(any(CapaTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.transition(EXT_ID, tx("IN_PROGRESS"));
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().payload().get("severity")).isEqualTo("");
+        assertThat(captor.getValue().payload().get("originType")).isEqualTo("");
+        assertThat(captor.getValue().payload().get("originId")).isEqualTo("");
+        assertThat(captor.getValue().payload().get("capaType")).isEqualTo("");
     }
 }

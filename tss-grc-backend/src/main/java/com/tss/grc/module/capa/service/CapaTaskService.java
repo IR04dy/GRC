@@ -6,10 +6,12 @@ import com.tss.grc.module.capa.dto.CapaTaskDto;
 import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,8 +47,9 @@ public class CapaTaskService {
 
     private static final List<String> TERMINAL = List.of("CLOSED", "CANCELLED");
 
-    private final CapaTaskRepository repo;
-    private final AuditLogService    audit;
+    private final CapaTaskRepository       repo;
+    private final AuditLogService          audit;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired(required = false)
     private RealtimeBroadcaster broadcaster;
@@ -124,6 +127,16 @@ public class CapaTaskService {
             + " · owner=" + (saved.getOwner() != null ? saved.getOwner() : "—")
             + " · severity=" + (saved.getSeverity() != null ? saved.getSeverity() : "—")
             + " · target=" + (saved.getTargetDate() != null ? saved.getTargetDate() : "—"));
+        // Fan out to F8 — engine listens for CAPA_TASK_CREATED and matches
+        // enabled rules against the payload (originType, originId,
+        // severity, capaType). Seed rules can route a high-severity
+        // CAPA on an NCA finding to the CISO, a low-severity privacy
+        // CAPA to the DPO, etc. Same shape as WorkflowSubmissionService
+        // PR #21 — no schema or engine change required.
+        eventPublisher.publishEvent(new DomainEvent(
+            saved.getOrganisationId(), "CAPA_TASK_CREATED",
+            "CapaTask", saved.getId(), saved.getExternalId(),
+            payloadFor(saved, null)));
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "capa", saved.getExternalId(), out);
         return out;
     }
@@ -175,9 +188,35 @@ public class CapaTaskService {
                 ? " · reason: " + req.getCancellationReasonEn() : "")
             + (req.getProgressNotesEn() != null && !req.getProgressNotesEn().isBlank()
                 ? " · note: " + req.getProgressNotesEn() : ""));
+        // Fan out to F8 — separate event from CREATED so rules can target
+        // status transitions specifically. The payload carries
+        // previousStatus alongside status so a rule can match "closed
+        // an NCA-related CAPA" (status=CLOSED + originType=audit.finding).
+        eventPublisher.publishEvent(new DomainEvent(
+            saved.getOrganisationId(), "CAPA_TASK_REVIEWED",
+            "CapaTask", saved.getId(), saved.getExternalId(),
+            payloadFor(saved, previousStatus)));
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "capa", externalId, out);
         return out;
     }
+
+    /** Canonical payload Map for F8 rule-condition matching on CAPA events.
+     *  Engine evaluates equality + contains on these string keys; values
+     *  are coerced to "" so the matcher never NPEs on a null. */
+    private static Map<String, Object> payloadFor(CapaTask t, String previousStatus) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("externalId",  nullSafe(t.getExternalId()));
+        m.put("originType",  nullSafe(t.getOriginType()));
+        m.put("originId",    nullSafe(t.getOriginId()));
+        m.put("status",      nullSafe(t.getStatus()));
+        m.put("severity",    nullSafe(t.getSeverity()));
+        m.put("capaType",    nullSafe(t.getCapaType()));
+        m.put("owner",       nullSafe(t.getOwner()));
+        if (previousStatus != null) m.put("previousStatus", previousStatus);
+        return m;
+    }
+
+    private static String nullSafe(String v) { return v == null ? "" : v; }
 
     @Transactional
     public void softDelete(String externalId) {
