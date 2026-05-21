@@ -26,6 +26,15 @@ public class CapaTaskController {
         return service.listForOrg();
     }
 
+    /** Sidebar pending-counter shorthand — two longs ({@code open},
+     *  {@code overdue}) for one cheap COUNT each. Avoids pulling N rows
+     *  just to render "CAPA · 12" in the nav. */
+    @GetMapping("/counts")
+    @PreAuthorize("isAuthenticated()")
+    public CapaTaskService.CapaCounts counts() {
+        return service.counts();
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public CapaTaskDto get(@PathVariable String id) { return service.get(id); }

@@ -2043,3 +2043,18 @@ export const automationApi = {
     api.get<AutomationRuleRunDto[]>(
       `/api/v1/automation/runs/for-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
 };
+
+// ── CAPA tasks ─────────────────────────────────────────────────────────
+//    Today we surface only the sidebar counter — the rest of the CAPA
+//    fetch path still goes through the local useCapas hook because the
+//    listed rows include a seed-data overlay layer. When that overlay is
+//    retired this api object grows list/get/transition helpers.
+export interface CapaCountsDto {
+  /** Non-terminal CAPAs (everything except CLOSED + CANCELLED). */
+  open:    number;
+  /** Open AND past target date. Always ≤ open. */
+  overdue: number;
+}
+export const capaTaskApi = {
+  counts: () => api.get<CapaCountsDto>('/api/capa/tasks/counts'),
+};

@@ -76,6 +76,17 @@
   background: #fff;
   color: var(--sb-active-bg);
 }
+/* Danger variant — used today for the "CAPA · 12" badge when any of
+ * those 12 are overdue. Signals "stale remediation work" right in
+ * the nav so reviewers don't have to click in to discover it. */
+.sb-badge-danger {
+  background: var(--danger, #d92d20) !important;
+  color: #fff !important;
+}
+.sb-item.active .sb-badge-danger {
+  background: #fff !important;
+  color: var(--danger, #d92d20) !important;
+}
 
 /* ─── Topbar ─────────────────────────────────────── */
 .topbar {

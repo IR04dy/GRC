@@ -10,7 +10,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
-import { workflowSubmissionApi } from '../../lib/api';
+import { capaTaskApi, workflowSubmissionApi } from '../../lib/api';
 
 interface NavItem {
   id: string;
@@ -243,40 +243,85 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Pending-review counts surfaced as sidebar badges.
+/** Sidebar inbox counters — one place to declare every "what's waiting
+ *  on me?" number the nav can render.
  *
- *  <p>Right now we surface only one number: the total <strong>OPEN</strong>
- *  workflow submissions (SUBMITTED + UNDER_REVIEW). A reviewer logging in
- *  sees "Submissions · 4" in the sidebar and knows immediately there's an
- *  inbox waiting — without having to click through.
+ *  <p>Each counter is backed by a cheap server-side aggregate (no row
+ *  payload) so this stays a few-millisecond network cost per Sidebar
+ *  mount regardless of tenant size. Counters refresh when the tab
+ *  regains focus, so an approval/close done in another tab clears the
+ *  badge here without a manual reload.
  *
- *  <p>Backed by the {@code countsByWorkflow} aggregate query (PR #33) so
- *  this costs one tenant-scoped GROUP BY per Sidebar mount, not one row
- *  per submission. Refreshes when the tab regains focus so an approval
- *  made in another tab clears the badge.
+ *  <p>Adding a new counter is three lines:
+ *    1. add a CapaCountsDto-style endpoint + api helper
+ *    2. add the field to {@link InboxCounts} and the {@code load()} fetch
+ *    3. pass {@code counts.foo} to the right {@code NavRow}
  */
-function usePendingReviewsCount(): number | null {
-  const [count, setCount] = useState<number | null>(null);
+interface InboxCounts {
+  /** OPEN workflow submissions (SUBMITTED + UNDER_REVIEW). */
+  pendingReviews: number | null;
+  /** Non-terminal CAPAs (excludes CLOSED + CANCELLED). */
+  capaOpen: number | null;
+  /** Open AND past-target-date CAPAs. */
+  capaOverdue: number | null;
+}
+function useInboxCounts(): InboxCounts {
+  const [counts, setCounts] = useState<InboxCounts>({
+    pendingReviews: null, capaOpen: null, capaOverdue: null,
+  });
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const rows = await workflowSubmissionApi.countsByWorkflow();
+        const [subs, capa] = await Promise.all([
+          workflowSubmissionApi.countsByWorkflow().catch(() => null),
+          capaTaskApi.counts().catch(() => null),
+        ]);
         if (cancelled) return;
-        setCount(rows.reduce((sum, r) => sum + r.open, 0));
-      } catch { /* unauthenticated or backend down — leave as null */ }
+        setCounts({
+          pendingReviews: subs ? subs.reduce((s, r) => s + r.open, 0) : null,
+          capaOpen:       capa ? capa.open    : null,
+          capaOverdue:    capa ? capa.overdue : null,
+        });
+      } catch { /* unauthenticated or backend down — leave as nulls */ }
     }
     void load();
     function onFocus() { if (document.visibilityState === 'visible') void load(); }
     document.addEventListener('visibilitychange', onFocus);
     return () => { cancelled = true; document.removeEventListener('visibilitychange', onFocus); };
   }, []);
-  return count;
+  return counts;
 }
 
 export function Sidebar({ open = false }: { open?: boolean }) {
   const { t } = useI18n();
-  const pendingReviews = usePendingReviewsCount();
+  const counts = useInboxCounts();
+
+  /** Map a nav item id to the (badge value, tooltip, tone) it should
+   *  render. Returning {@code null} hides the badge entirely (no zero
+   *  badges, no API-error noise). */
+  function badgeFor(id: string): { value: number; title: string; tone?: 'danger' } | null {
+    if (id === 'wf-submissions' && counts.pendingReviews && counts.pendingReviews > 0) {
+      return {
+        value: counts.pendingReviews,
+        title: `${counts.pendingReviews} pending review${counts.pendingReviews === 1 ? '' : 's'}`,
+      };
+    }
+    if (id === 'capa' && counts.capaOpen && counts.capaOpen > 0) {
+      const overdue = counts.capaOverdue ?? 0;
+      // Overdue ratio drives a danger tone — surfaces "you have stale
+      // remediation work" right in the nav without needing a tooltip.
+      return {
+        value: counts.capaOpen,
+        title: overdue > 0
+          ? `${counts.capaOpen} open · ${overdue} overdue`
+          : `${counts.capaOpen} open CAPA${counts.capaOpen === 1 ? '' : 's'}`,
+        tone: overdue > 0 ? 'danger' : undefined,
+      };
+    }
+    return null;
+  }
+
   return (
     <aside className={open ? 'sb sb-open' : 'sb'}>
       <div className="sb-brand">
@@ -290,25 +335,24 @@ export function Sidebar({ open = false }: { open?: boolean }) {
       {NAV_GROUPS.map(group => (
         <div key={group.id}>
           <div className="sb-section">{t(group.titleKey)}</div>
-          {group.items.map(it => (
-            <NavRow key={it.id} item={it} t={t}
-                    badge={it.id === 'wf-submissions' && pendingReviews && pendingReviews > 0
-                      ? pendingReviews : undefined}/>
-          ))}
+          {group.items.map(it => <NavRow key={it.id} item={it} t={t} badge={badgeFor(it.id)} />)}
         </div>
       ))}
     </aside>
   );
 }
 
-function NavRow({ item, t, badge }: { item: NavItem; t: (k: string) => string; badge?: number }) {
+interface NavBadge { value: number; title: string; tone?: 'danger'; }
+
+function NavRow({ item, t, badge }: { item: NavItem; t: (k: string) => string; badge: NavBadge | null }) {
   return (
     <NavLink to={item.to} className={({ isActive }) => cn('sb-item', isActive && 'active')}>
       <item.Icon size={18} strokeWidth={1.8} />
       <span>{t(item.labelKey)}</span>
-      {typeof badge === 'number' && (
-        <span className="sb-badge" title={`${badge} pending review${badge === 1 ? '' : 's'}`}>
-          {badge}
+      {badge && (
+        <span className={cn('sb-badge', badge.tone === 'danger' && 'sb-badge-danger')}
+              title={badge.title}>
+          {badge.value}
         </span>
       )}
     </NavLink>
