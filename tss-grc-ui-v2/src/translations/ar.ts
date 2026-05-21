@@ -2805,6 +2805,7 @@ export const ar = {
 
   // Workflow Hub — catalog of every Saudi-GRC §7 wizard
   wfHubSidebar:           'مركز المعالجات',
+  wfSubmissionsSidebar:   'سجلات المعالجات',
 
   // Executive lifecycle overview — all 5 pipelines on one screen
   loSidebar:              'نظرة عامة على دورات الحياة',

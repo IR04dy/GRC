@@ -2820,6 +2820,7 @@ export const en = {
 
   // Workflow Hub — catalog of every Saudi-GRC §7 wizard
   wfHubSidebar:           'Workflow Hub',
+  wfSubmissionsSidebar:   'Workflow Submissions',
 
   // Executive lifecycle overview — all 5 pipelines on one screen
   loSidebar:              'Lifecycle overview',
