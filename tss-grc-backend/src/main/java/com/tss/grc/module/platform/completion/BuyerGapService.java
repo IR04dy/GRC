@@ -200,39 +200,62 @@ public class BuyerGapService {
         long stillCurrent
     ) {}
 
+    /** Page size for the freshness sweep. Chosen to keep peak memory low
+     *  even on tenants with tens of thousands of stale items. */
+    private static final int SWEEP_PAGE_SIZE = 500;
+
     /**
      * Walks tenant evidence and flips items past their {@code reviewDueDate}
      * into {@code STALE} status. Emits a {@code EVIDENCE_REVIEW_OVERDUE}
      * domain event per flipped item so F8 rules can chase the owner.
+     *
+     * <p>PERFORMANCE: paginated in {@link #SWEEP_PAGE_SIZE}-row windows so
+     * a tenant with 100k stale items doesn't OOM the JVM. The query
+     * predicate ORDER BY id ASC + skipping previously-flipped rows (status
+     * filter) guarantees forward progress between pages even though we
+     * mutate the rows we read.
      */
     @Transactional
     public FreshnessSweepResult evidenceFreshnessSweep() {
         Long o = org();
         LocalDate today = LocalDate.now();
-
-        @SuppressWarnings("unchecked")
-        List<EvidenceItem> due = em.createQuery(
-            "select e from EvidenceItem e "
-          + " where e.organisationId = :org "
-          + "   and e.reviewDueDate is not null "
-          + "   and e.reviewDueDate < :today "
-          + "   and e.status not in ('STALE','EXPIRED','ARCHIVED','REJECTED')")
-            .setParameter("org", o)
-            .setParameter("today", today)
-            .getResultList();
-
         long flipped = 0;
-        for (EvidenceItem e : due) {
-            e.setStatus("STALE");
-            evidence.save(e);
-            flipped++;
-            audit.log("STALE", "EvidenceItem", e.getId(),
-                "Evidence " + e.getTitleEn() + " went stale (review_due_date "
-                + e.getReviewDueDate() + ")");
-            eventPublisher.publishEvent(new DomainEvent(
-                o, "EVIDENCE_REVIEW_OVERDUE", "EvidenceItem", e.getId(), null,
-                Map.of("titleEn", String.valueOf(e.getTitleEn()),
-                       "reviewDueDate", String.valueOf(e.getReviewDueDate()))));
+
+        while (true) {
+            @SuppressWarnings("unchecked")
+            List<EvidenceItem> due = em.createQuery(
+                "select e from EvidenceItem e "
+              + " where e.organisationId = :org "
+              + "   and e.reviewDueDate is not null "
+              + "   and e.reviewDueDate < :today "
+              + "   and e.status not in ('STALE','EXPIRED','ARCHIVED','REJECTED') "
+              + " order by e.id asc")
+                .setParameter("org", o)
+                .setParameter("today", today)
+                .setMaxResults(SWEEP_PAGE_SIZE)
+                .getResultList();
+
+            if (due.isEmpty()) break;
+
+            for (EvidenceItem e : due) {
+                e.setStatus("STALE");
+                evidence.save(e);
+                flipped++;
+                audit.log("STALE", "EvidenceItem", e.getId(),
+                    "Evidence " + e.getTitleEn() + " went stale (review_due_date "
+                    + e.getReviewDueDate() + ")");
+                eventPublisher.publishEvent(new DomainEvent(
+                    o, "EVIDENCE_REVIEW_OVERDUE", "EvidenceItem", e.getId(), null,
+                    Map.of("titleEn", String.valueOf(e.getTitleEn()),
+                           "reviewDueDate", String.valueOf(e.getReviewDueDate()))));
+            }
+            // Flush + clear the persistence context so the next page starts
+            // with no managed entities — keeps the JVM heap flat across
+            // very long sweeps.
+            em.flush();
+            em.clear();
+            // If this page was a short read, we're done.
+            if (due.size() < SWEEP_PAGE_SIZE) break;
         }
 
         // count of currently-current rows (cheap separate query)
@@ -243,7 +266,7 @@ public class BuyerGapService {
             .setParameter("org", o)
             .getSingleResult()).longValue();
 
-        return new FreshnessSweepResult(due.size() + current, flipped, current);
+        return new FreshnessSweepResult(flipped + current, flipped, current);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -263,23 +286,32 @@ public class BuyerGapService {
     /**
      * Lists processing activities flagged as cross-border that look risky:
      * either no adequacy decision recorded, or NONE/PARTIAL with no
-     * transfer mechanism documented. The "riskNote" surfaces the reason.
+     * transfer mechanism documented. The {@code riskNote} surfaces the
+     * reason for each row.
+     *
+     * <p>PERFORMANCE: the at-risk predicate is pushed into JPQL via
+     * {@link ProcessingActivityRepository#findAtRiskCrossBorder} so we
+     * only hydrate the rows that will actually be returned to the client.
+     * The previous version pulled every cross-border RoPA into memory
+     * and filtered in Java, which made the response O(all-cross-border-rows)
+     * even if the result was a single row.
      */
     @Transactional(readOnly = true)
     public List<AtRiskTransfer> atRiskTransfers() {
         Long o = org();
-        List<ProcessingActivity> all = ropa.findByOrganisationIdAndCrossBorderTransferTrue(o);
-        List<AtRiskTransfer> out = new ArrayList<>();
-        for (ProcessingActivity p : all) {
-            String adequacy   = p.getAdequacyDecision();
-            String mechanism  = p.getTransferMechanism();
-            String reason = null;
-            if (adequacy == null)                                              reason = "Adequacy decision missing";
-            else if ("NONE".equals(adequacy) && (mechanism == null || mechanism.isBlank()))
-                                                                              reason = "Non-adequate destination with no transfer mechanism";
-            else if ("PARTIAL".equals(adequacy) && (mechanism == null || mechanism.isBlank()))
-                                                                              reason = "Partial-adequacy destination needs an explicit mechanism";
-            if (reason == null) continue;
+        List<ProcessingActivity> hits = ropa.findAtRiskCrossBorder(o);
+        List<AtRiskTransfer> out = new ArrayList<>(hits.size());
+        for (ProcessingActivity p : hits) {
+            String adequacy  = p.getAdequacyDecision();
+            String mechanism = p.getTransferMechanism();
+            String reason;
+            if (adequacy == null) {
+                reason = "Adequacy decision missing";
+            } else if ("NONE".equals(adequacy)) {
+                reason = "Non-adequate destination with no transfer mechanism";
+            } else { // PARTIAL is the only remaining case the SQL filter returns
+                reason = "Partial-adequacy destination needs an explicit mechanism";
+            }
             out.add(new AtRiskTransfer(
                 p.getId(), p.getActivityNameEn(), p.getReceivingCountry(),
                 adequacy, mechanism, p.getDataOfficeReference(), reason));
