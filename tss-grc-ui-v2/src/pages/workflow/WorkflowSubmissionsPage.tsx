@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   CheckCheck, ChevronRight, ClipboardCheck, Download, FileText, Filter,
-  PauseCircle, Workflow as WorkflowIcon, X as XIcon,
+  PauseCircle, Search, Workflow as WorkflowIcon, X as XIcon,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -101,6 +101,16 @@ export function WorkflowSubmissionsPage() {
     if (s === 'ALL') next.delete('status'); else next.set('status', s);
     setSearchParams(next, { replace: true });
   }
+  /** Free-text search across title (EN+AR), summary (EN+AR), regulatory
+   *  anchor, workflowId, and the JSON payload body. URL-backed so a
+   *  reviewer can paste "/workflows/submissions?q=PDPL+breach" in chat. */
+  const query = searchParams.get('q') ?? '';
+  function setQuery(q: string) {
+    const next = new URLSearchParams(searchParams);
+    const trimmed = q.trim();
+    if (!trimmed) next.delete('q'); else next.set('q', trimmed);
+    setSearchParams(next, { replace: true });
+  }
   function clearFilters() { setSearchParams(new URLSearchParams(), { replace: true }); }
 
   const [items, setItems] = useState<WorkflowSubmissionDto[] | null>(null);
@@ -134,16 +144,31 @@ export function WorkflowSubmissionsPage() {
   }
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, [moduleFilter, workflowFilter]);
 
-  // Status is filtered client-side. The backend endpoint takes workflowId
-  // and module but not status — adding a server filter would only save a
-  // few KB per page-load and the bigger win was the per-wizard aggregate
-  // query (PR #33). Keep the surface area small.
-  const visibleItems = useMemo(
-    () => (items ?? []).filter(s => matchesStatus(s.status, statusFilter)),
-    [items, statusFilter]);
-  // Drop selection when the status filter changes so we never bulk-act
-  // on rows the user can't see right now.
-  useEffect(() => { setSelectedIds(new Set()); }, [statusFilter]);
+  // Status + free-text search are filtered client-side. The backend
+  // endpoint takes workflowId and module but not status or text —
+  // adding server filters would save a few KB per page-load at the
+  // cost of more API surface area; the bigger win was the per-wizard
+  // aggregate query (PR #33). Keep this small.
+  const visibleItems = useMemo(() => {
+    const q = query.toLowerCase();
+    return (items ?? []).filter(s => {
+      if (!matchesStatus(s.status, statusFilter)) return false;
+      if (!q) return true;
+      // Substring match against everything a reviewer might remember:
+      // bilingual title + summary, regulatory anchor, the catalog
+      // workflowId itself, and the payload JSON body (so "breach" matches
+      // a payload incident_type field even if titleEn doesn't say it).
+      const hay = [
+        s.titleEn, s.titleAr, s.summaryEn, s.summaryAr,
+        s.regulatoryAnchor, s.workflowId, s.workflowModule,
+        s.reviewerNote, s.payloadJson,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, statusFilter, query]);
+  // Drop selection when the status filter or query changes so we never
+  // bulk-act on rows the user can't see right now.
+  useEffect(() => { setSelectedIds(new Set()); }, [statusFilter, query]);
 
   async function review(id: number, decision: 'APPROVE' | 'REJECT' | 'CLOSE') {
     setBusyId(id);
@@ -305,6 +330,23 @@ export function WorkflowSubmissionsPage() {
           <Filter size={12} style={{ display: 'inline-block', marginInlineEnd: 4 }}/>
           {isAr ? 'تصفية:' : 'Filter:'}
         </span>
+        {/* Free-text search — substrings across title/summary/anchor/
+            workflowId/payload. The crossed-out X clears just the query
+            so reviewers can keep their module+status filters. */}
+        <div style={{ position: 'relative', minWidth: 220 }}>
+          <Search size={14} style={{
+            position: 'absolute', insetInlineStart: 8, top: '50%',
+            transform: 'translateY(-50%)', color: 'var(--ink-3)', pointerEvents: 'none',
+          }}/>
+          <input
+            className="input"
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={isAr ? 'بحث في العنوان / الملخص / المرساة…' : 'Search title / summary / anchor…'}
+            aria-label={isAr ? 'بحث' : 'Search submissions'}
+            style={{ paddingInlineStart: 28, width: '100%' }}/>
+        </div>
         <select className="input"
                 value={moduleFilter}
                 onChange={e => { setModuleFilter(e.target.value as ModuleFilter); setWorkflowFilter('ALL'); }}>
@@ -334,7 +376,7 @@ export function WorkflowSubmissionsPage() {
           <option value="REJECTED">{isAr ? 'مرفوض' : 'Rejected'}</option>
           <option value="CLOSED">{isAr ? 'مغلق' : 'Closed'}</option>
         </select>
-        {(moduleFilter !== 'ALL' || workflowFilter !== 'ALL' || statusFilter !== 'ALL') && (
+        {(moduleFilter !== 'ALL' || workflowFilter !== 'ALL' || statusFilter !== 'ALL' || query !== '') && (
           <Button variant="ghost" size="sm" Icon={XIcon} onClick={clearFilters}>
             {isAr ? 'مسح الكل' : 'Clear all'}
           </Button>
