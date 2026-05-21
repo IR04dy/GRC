@@ -62,6 +62,25 @@ public class CapaTaskService {
             .map(CapaTaskDto::from).collect(Collectors.toList());
     }
 
+    /** Per-tenant CAPA inbox counters used by the sidebar badge.
+     *
+     *  <p>{@code open} excludes terminal statuses (CLOSED + CANCELLED).
+     *  {@code overdue} is the subset of open whose target date is in the
+     *  past — exposed alongside open so the sidebar tooltip can render
+     *  "12 open · 3 overdue" without a second round-trip.
+     *
+     *  <p>Two cheap COUNTs, no row payload. Mirrors the aggregate pattern
+     *  shipped in {@code WorkflowSubmissionService#countsByWorkflowId}. */
+    public CapaCounts counts() {
+        Long orgId = TenantContext.requireOrganisationId();
+        long open    = repo.countByOrganisationIdAndStatusNotIn(orgId, TERMINAL);
+        long overdue = repo.countByOrganisationIdAndStatusNotInAndTargetDateBefore(
+                          orgId, TERMINAL, LocalDate.now());
+        return new CapaCounts(open, overdue);
+    }
+
+    public record CapaCounts(long open, long overdue) {}
+
     public CapaTaskDto get(String externalId) {
         Long orgId = TenantContext.requireOrganisationId();
         return repo.findByOrganisationIdAndExternalId(orgId, externalId)
