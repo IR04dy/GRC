@@ -3,9 +3,11 @@ package com.tss.grc.module.audit_lc.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import com.tss.grc.module.audit_lc.dto.FindingDto;
 import com.tss.grc.module.audit_lc.entity.Finding;
 import com.tss.grc.module.audit_lc.repository.FindingRepository;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,8 +42,9 @@ public class FindingService {
         "AWAITING_VERIFICATION", Set.of("CLOSED")
     );
 
-    private final FindingRepository repo;
-    private final AuditLogService   audit;
+    private final FindingRepository       repo;
+    private final AuditLogService         audit;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Sprint 4 §2.7 — optional realtime broadcaster (null in unit tests). */
     @Autowired(required = false)
@@ -88,6 +92,16 @@ public class FindingService {
             "Finding " + saved.getRefNumber()
             + " raised on engagement " + saved.getEngagementCode()
             + " · severity=" + saved.getSeverity());
+        // Fan out to F8 — the engine listens for FINDING_CREATED and
+        // matches enabled rules against the payload (engagementCode,
+        // severity, ownerRole). Seed rules can route CRITICAL findings
+        // to the audit lead, PDPL-anchored findings to the DPO, etc.
+        // Same shape as CapaTaskService (PR #46) — no schema or engine
+        // change required.
+        eventPublisher.publishEvent(new DomainEvent(
+            saved.getOrganisationId(), "FINDING_CREATED",
+            "Finding", saved.getId(), saved.getExternalId(),
+            payloadFor(saved, null)));
         return FindingDto.from(saved);
     }
 
@@ -111,6 +125,14 @@ public class FindingService {
             + " " + previousStatus + " → " + saved.getStatus()
             + (req.getMgmtResponseAuthor() != null
                 ? " · response by " + req.getMgmtResponseAuthor() : ""));
+        // Fan out to F8 — separate event from CREATED so rules can target
+        // status transitions specifically. Payload carries previousStatus
+        // so a rule can match "Finding closed on a CRITICAL engagement"
+        // (status=CLOSED + severity=CRITICAL + previousStatus=AWAITING_VERIFICATION).
+        eventPublisher.publishEvent(new DomainEvent(
+            saved.getOrganisationId(), "FINDING_TRANSITIONED",
+            "Finding", saved.getId(), saved.getExternalId(),
+            payloadFor(saved, previousStatus)));
         FindingDto out = FindingDto.from(saved);
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "audit_finding", externalId, out);
         return out;
@@ -132,4 +154,22 @@ public class FindingService {
             LocalDateTime.now().getYear(),
             Long.toHexString(System.currentTimeMillis()).toUpperCase().substring(0, 6));
     }
+
+    /** Canonical payload Map for F8 rule-condition matching on Finding
+     *  events. Engine evaluates equality + contains on these string
+     *  keys; values are coerced to "" so the matcher never NPEs on a
+     *  null. {@code previousStatus} only carries on TRANSITIONED. */
+    private static Map<String, Object> payloadFor(Finding f, String previousStatus) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("externalId",     nullSafe(f.getExternalId()));
+        m.put("refNumber",      nullSafe(f.getRefNumber()));
+        m.put("engagementCode", nullSafe(f.getEngagementCode()));
+        m.put("severity",       nullSafe(f.getSeverity()));
+        m.put("status",         nullSafe(f.getStatus()));
+        m.put("ownerRole",      nullSafe(f.getOwnerRole()));
+        if (previousStatus != null) m.put("previousStatus", previousStatus);
+        return m;
+    }
+
+    private static String nullSafe(String v) { return v == null ? "" : v; }
 }
