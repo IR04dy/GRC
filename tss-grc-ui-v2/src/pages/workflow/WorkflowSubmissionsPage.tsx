@@ -194,7 +194,10 @@ export function WorkflowSubmissionsPage() {
                   </div>
 
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>
-                    {s.titleEn}
+                    <Link to={`/workflows/submissions/${s.id}`}
+                          style={{ color: 'inherit', textDecoration: 'none' }}>
+                      {s.titleEn}
+                    </Link>
                   </div>
                   {s.summaryEn && (
                     <div className="wf-summary" style={{ marginBottom: 12 }}>

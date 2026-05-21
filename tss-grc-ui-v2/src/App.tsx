@@ -43,6 +43,7 @@ const PdplDashboardPage      = lazy(() => import('./pages/dashboards/PdplDashboa
 const BuyerGapPage           = lazy(() => import('./pages/buyergap/BuyerGapPage').then(m => ({ default: m.BuyerGapPage })));
 const WorkflowHubPage        = lazy(() => import('./pages/workflow/WorkflowHubPage').then(m => ({ default: m.WorkflowHubPage })));
 const WorkflowSubmissionsPage = lazy(() => import('./pages/workflow/WorkflowSubmissionsPage').then(m => ({ default: m.WorkflowSubmissionsPage })));
+const WorkflowSubmissionDetailPage = lazy(() => import('./pages/workflow/WorkflowSubmissionDetailPage').then(m => ({ default: m.WorkflowSubmissionDetailPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
 //    Each wizard is its own chunk; the first time a user navigates to
 //    /workflows/* the relevant ~30 kB chunk is fetched. Reduces initial
@@ -227,6 +228,7 @@ export function App() {
               {/* Workflow Hub + per-module wizards (Saudi-GRC §7) */}
               <Route path="/workflows"                              element={<WorkflowHubPage />} />
               <Route path="/workflows/submissions"                   element={<WorkflowSubmissionsPage />} />
+              <Route path="/workflows/submissions/:id"               element={<WorkflowSubmissionDetailPage />} />
               <Route path="/workflows/erm/risk-identification"       element={<RiskIdentificationWizard />} />
               <Route path="/workflows/pdpl/dsr-fulfilment"           element={<DsrFulfilmentWizard />} />
               <Route path="/workflows/pdpl/breach-notification"      element={<BreachNotificationWizard />} />
