@@ -334,7 +334,13 @@ export function updateCapa(id: number, b: Partial<BcmCorrectiveAction>)   { retu
 export function transitionCapa(id: number, to: CapaStatus, evidenceId?: number) {
   return api.post<BcmCorrectiveAction>(`${BASE}/capas/${id}/transition`, { to, evidenceId });
 }
-export function flagOverdueCapas() { return api.post<{ flagged: number }>(`${BASE}/capas/flag-overdue`, {}); }
+/**
+ * Backend returns `{flippedToOverdue: n}` per BcmRemediationController;
+ * the earlier client typed it as `flagged` and the page consumer read
+ * `out.flagged`, leaving the user with "Flagged undefined CAPAs as overdue".
+ * Type now matches the wire format.
+ */
+export function flagOverdueCapas() { return api.post<{ flippedToOverdue: number }>(`${BASE}/capas/flag-overdue`, {}); }
 export function remediationStats() {
   return api.get<{
     openGaps: number; criticalGaps: number;

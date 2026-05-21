@@ -26,6 +26,7 @@ import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -316,6 +317,7 @@ export function PrivacyPage() {
           </>
         }
       />
+      <WorkflowQuickLaunch modules="PDPL" />
       <div className="kpi-grid">
         <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length || 142} tone="primary" />
         <Kpi Icon={Inbox}       label={t('privacyKpiDsr')}        value={openDsrs} tone="warning" />

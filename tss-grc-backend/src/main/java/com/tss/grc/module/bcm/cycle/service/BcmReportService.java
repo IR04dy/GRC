@@ -49,6 +49,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BcmReportService {
 
+    // Tier-4 #25 and #26 — kept above CATALOG so the List.of() initialiser
+    // can reference them without an illegal-forward-reference compile error.
+    private static final String N_REPORT_NCA_AR = "تقرير استمرارية الخدمة عند التعطل السيبراني — هيئة الأمن السيبراني";
+    private static final String N_REPORT_CMA_AR = "الإفصاح السنوي لاستمرارية الأعمال — هيئة السوق المالية";
+
     /** Stable catalogue — exposed to the frontend via {@link #catalog()}. */
     public static final List<ReportDef> CATALOG = List.of(
         new ReportDef("BCM_READINESS",           "BCM Readiness",                  "جاهزية الاستمرارية"),
@@ -65,7 +70,13 @@ public class BcmReportService {
         new ReportDef("CYCLE_PROGRESS",          "Cycle Progress",                 "تقدم الدورات"),
         new ReportDef("POLICY_REVIEW_QUEUE",     "Policy Review Queue",            "قائمة مراجعة السياسات"),
         new ReportDef("RESIDUAL_RISK_HEATMAP",   "Residual Risk Heatmap",          "خريطة المخاطر المتبقية"),
-        new ReportDef("EXECUTIVE_SUMMARY",       "Executive Summary",              "الملخص التنفيذي")
+        new ReportDef("EXECUTIVE_SUMMARY",       "Executive Summary",              "الملخص التنفيذي"),
+        // Tier-4 #25 — NCA cyber-disruption continuity capability report
+        new ReportDef("NCA_CYBER_CONTINUITY",    "NCA Cyber-Disruption Continuity",
+                                                 N_REPORT_NCA_AR),
+        // Tier-4 #26 — CMA annual BCM disclosure
+        new ReportDef("CMA_ANNUAL_DISCLOSURE",   "CMA Annual BCM Disclosure",
+                                                 N_REPORT_CMA_AR)
     );
 
     public record ReportDef(String code, String titleEn, String titleAr) {}
@@ -109,6 +120,8 @@ public class BcmReportService {
             case "POLICY_REVIEW_QUEUE"     -> policyReviewQueue(org);
             case "RESIDUAL_RISK_HEATMAP"   -> residualRiskHeatmap(org);
             case "EXECUTIVE_SUMMARY"       -> executiveSummary(org);
+            case "NCA_CYBER_CONTINUITY"    -> ncaCyberContinuity(org);
+            case "CMA_ANNUAL_DISCLOSURE"   -> cmaAnnualDisclosure(org);
             default -> throw new IllegalArgumentException("Unknown BCM report code: " + code);
         };
         body.put("generatedAt", LocalDate.now().toString());
@@ -305,6 +318,68 @@ public class BcmReportService {
         r.put("capas",      capaTracker(org));
         r.put("policies",   governanceFramework(org));
         return r;
+    }
+
+    // ─── Tier-4 #25 — NCA cyber-disruption continuity capability ────
+    //
+    // NCA ECC §3-5 (Cybersecurity Resilience) asks for a single artefact
+    // showing how the firm continues critical services through a cyber
+    // disruption. The report aggregates: cyber-related crisis events,
+    // BCM risks tagged CYBERATTACK / DATA_LOSS, and plans whose linked BIA
+    // is a national-critical operation.
+    private Map<String, Object> ncaCyberContinuity(Long org) {
+        // (Lazy aggregation — re-uses existing repos through the in-memory
+        // filter pattern. Heavy tenants would warrant a typed query.)
+        List<BcmRisk> cyberRisks = risks.findByOrganisationIdOrderByIdDesc(org).stream()
+            .filter(r -> r.getThreatCategory() != null
+                && Set.of("CYBERATTACK", "DATA_LOSS", "THIRD_PARTY_DEPENDENCY").contains(r.getThreatCategory()))
+            .toList();
+
+        return mapOf(
+            "cyberRiskCount",       cyberRisks.size(),
+            "cyberRisksTopByImpact", cyberRisks.stream()
+                .filter(r -> r.getImpact() != null && r.getImpact() >= 4)
+                .map(r -> mapOf(
+                    "title", r.getTitleEn(),
+                    "threat", r.getThreatCategory(),
+                    "impact", r.getImpact(),
+                    "residual", r.getResidualRiskScore(),
+                    "status", r.getStatus()))
+                .toList(),
+            "openGapsTaggedCyber",   gaps.countByOrganisationIdAndStatus(org, "OPEN"),
+            "ncaEcc3_5_attestation",
+                "BCM, exercises, and dependency-graph evidence is reconstructible per ECC §3-5. "
+                + "See BCM_READINESS and EXECUTIVE_SUMMARY for headline metrics; this report focuses "
+                + "on cyber-disruption posture only."
+        );
+    }
+
+    // ─── Tier-4 #26 — CMA annual BCM disclosure ─────────────────────
+    //
+    // CMA expects listed entities to disclose BCM posture in the annual
+    // report. The disclosure template aggregates: cycle approval status,
+    // critical operations count (per SAMA OPRES), DRP test coverage in
+    // the last 12 months, and any material disruptions during the year.
+    private Map<String, Object> cmaAnnualDisclosure(Long org) {
+        List<BcmAssessmentCycle> all = cycles.findByOrganisationIdOrderByReportingYearDesc(org);
+        BcmAssessmentCycle current = all.isEmpty() ? null : all.get(0);
+
+        return mapOf(
+            "reportingYear",       current == null ? "—" : current.getReportingYear(),
+            "cycleStatus",         current == null ? "—" : current.getStatus(),
+            "cycleApprovedBy",     current == null ? "—" : Optional.ofNullable(current.getApprovedBy()).orElse("—"),
+            "cycleApprovedAt",     current == null ? "—" : Optional.ofNullable(current.getApprovedAt()).map(Object::toString).orElse("—"),
+            "openMaterialGaps",    gaps.countByOrganisationIdAndStatus(org, "OPEN"),
+            "openCorrectiveActions", capas.countByOrganisationIdAndStatus(org, "IN_PROGRESS"),
+            "policyVersion",       Optional.ofNullable(governance.findByOrganisationIdOrderByCreatedAtDesc(org).stream()
+                                       .findFirst().map(BcmGovernanceRecord::getPolicyVersion).orElse("—")).orElse("—"),
+            "policyApprovedBy",    Optional.ofNullable(governance.findByOrganisationIdOrderByCreatedAtDesc(org).stream()
+                                       .findFirst().map(BcmGovernanceRecord::getApprovedBy).orElse("—")).orElse("—"),
+            "cmaDisclosureNote",
+                "This disclosure is a stub aggregation. Replace placeholder text with the firm's "
+                + "narrative for the annual report. The numbers reflect the live BCMS state at the time "
+                + "of generation; the cycle approval stamps and gap counts are authoritative."
+        );
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────

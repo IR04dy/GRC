@@ -12,7 +12,7 @@ import { currentMode, MODE_LABEL, MODE_TONE, subscribeMode, type Mode } from '..
 import { unreadInApp, subscribeNotifs, markRead } from '../../lib/notificationOutbox';
 import { getUser as getDirUser } from '../../lib/userDirectory';
 
-export function Topbar({ title, sub, onOpenPalette, onToggleSidebar }: { title: string; sub?: string; onOpenPalette?: () => void; onToggleSidebar?: () => void }) {
+export function Topbar({ title, sub, onOpenPalette, onToggleSidebar }: { title?: string; sub?: string; onOpenPalette?: () => void; onToggleSidebar?: () => void }) {
   const { t, lang, toggleLang } = useI18n();
   const navigate = useNavigate();
   const user = getUser();

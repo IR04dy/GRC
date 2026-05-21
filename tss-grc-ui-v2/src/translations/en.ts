@@ -2818,6 +2818,9 @@ export const en = {
   cycPentestClose:        'Close',
   cycPentestFindingsRecordedToast: 'Findings recorded.',
 
+  // Workflow Hub — catalog of every Saudi-GRC §7 wizard
+  wfHubSidebar:           'Workflow Hub',
+
   // Executive lifecycle overview — all 5 pipelines on one screen
   loSidebar:              'Lifecycle overview',
   loEyebrow:              'Executive · All lifecycles',
@@ -3299,6 +3302,7 @@ export const en = {
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',
   bcmWorkspaceSidebar: 'BCM workspace',
+  bcpBuilderSidebar: 'BCP / DRP builder',
   adminSub: 'Manage users, roles, organisations and audit trails.',
   adminKpiUsers: 'Total Users',
   adminKpiActive: 'Active',

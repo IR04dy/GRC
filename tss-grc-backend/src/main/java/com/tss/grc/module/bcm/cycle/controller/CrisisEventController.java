@@ -1,11 +1,14 @@
 package com.tss.grc.module.bcm.cycle.controller;
 
 import com.tss.grc.module.bcm.cycle.entity.*;
+import com.tss.grc.module.bcm.cycle.service.CrisisEventPdfExporter;
 import com.tss.grc.module.bcm.cycle.service.CrisisEventService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -48,7 +51,8 @@ public class CrisisEventController {
     public record ActivateDrpBody(Long drpId) {}
     public record AckBody(String reference) {}
 
-    private final CrisisEventService service;
+    private final CrisisEventService     service;
+    private final CrisisEventPdfExporter pdfExporter;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -68,6 +72,22 @@ public class CrisisEventController {
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public CrisisEvent get(@PathVariable Long id) { return service.get(id); }
+
+    /**
+     * Tier-2 #12 — PDF export of the crisis event as an after-action report.
+     * Includes the SitReps timeline, decisions log, and regulator notifications.
+     */
+    @GetMapping("/{id}/export.pdf")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
+        CrisisEvent e = service.get(id);
+        byte[] pdf = pdfExporter.export(id);
+        String filename = (e.getEventCode() == null ? "crisis-" + id : e.getEventCode()) + ".pdf";
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .body(pdf);
+    }
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")

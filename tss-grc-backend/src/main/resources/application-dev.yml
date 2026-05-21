@@ -68,3 +68,28 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BCM mass-notification channels (audit Tier-2)
+#
+# Each channel is gated by its `.enabled` flag and stays dormant otherwise,
+# so the CrisisCommsService falls back to its SIMULATED behaviour until
+# a real channel is configured. Point spring.mail.* at a real SMTP relay
+# (or local MailHog/Mailpit during dev) before flipping enabled to true.
+#
+#   bcm:
+#     notify:
+#       email:
+#         enabled: true
+#         from:    bcm-noreply@grc-dev.local
+#
+#   spring:
+#     mail:
+#       host: localhost
+#       port: 1025
+# ─────────────────────────────────────────────────────────────────────────────
+bcm:
+  notify:
+    email:
+      enabled: false
+      from:    bcm-noreply@example.com

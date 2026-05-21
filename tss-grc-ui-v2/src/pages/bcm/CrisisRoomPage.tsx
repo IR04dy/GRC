@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Siren, AlertTriangle, MessageSquare, Gavel, ShieldAlert, Plus, ChevronRight } from 'lucide-react';
+import { Siren, AlertTriangle, MessageSquare, Gavel, ShieldAlert, Plus, ChevronRight, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -17,6 +17,7 @@ import {
   listSitReps, addSitRep,
   listDecisions, addDecision,
   listRegulatoryNotifications, logRegulatoryNotification, ackRegulatoryNotification,
+  downloadCrisisEventPdf,
   SEVERITY_LABELS, severityTone, statusTone,
   type CrisisEvent, type CrisisStatus, type CrisisSituationReport, type CrisisDecision,
   type CrisisRegulatoryNotification, type Regulator,
@@ -257,9 +258,11 @@ export function CrisisRoomPage() {
     }
   }
 
-  const closureBlocked = selected
+  // `selected && ...` could yield null when selected is null; coerce to
+  // a plain boolean so consumers (Button.disabled) don't get a null prop.
+  const closureBlocked: boolean = !!(selected
     && (selected.status === 'RECOVERED' || selected.status === 'ASSESSING')
-    && (!selected.rootCause || !selected.lessonsLearnedId);
+    && (!selected.rootCause || !selected.lessonsLearnedId));
 
   return (
     <Shell>
@@ -341,7 +344,12 @@ export function CrisisRoomPage() {
           ) : (
             <>
               {/* Header card */}
-              <Card title={`${selected.eventCode} — ${selected.titleEn}`}>
+              <Card title={`${selected.eventCode} — ${selected.titleEn}`}
+                    action={
+                      <Button variant="ghost" onClick={() => void downloadCrisisEventPdf(selected.id, selected.eventCode)}>
+                        <Download size={14} /> {isAr ? 'تقرير PDF' : 'After-action PDF'}
+                      </Button>
+                    }>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, fontSize: 12 }}>
                   <div><span className="text-muted">{isAr ? 'الشدة' : 'Severity'}: </span>
                     <Badge tone={severityTone(selected.severity)}>

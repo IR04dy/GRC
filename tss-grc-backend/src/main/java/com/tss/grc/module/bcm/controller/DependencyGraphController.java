@@ -31,9 +31,15 @@ public class DependencyGraphController {
     private final CriticalProcessRepository processRepo;
     private final ProcessDependencyRepository depRepo;
 
-    @GetMapping("/dependency-graph")
+    // Renamed from "/dependency-graph" to "/dependency-graph-processes" to
+    // resolve a startup-time ambiguous-mapping collision with the newer
+    // BcmDependencyGraphController (audit Tier-2 #8) which serves a richer
+    // multi-type graph (BIA + service + process + BCP/DRP + strategy + cloud)
+    // at the canonical "/dependency-graph" path. The legacy process-only
+    // shape stays available here for any consumer that still wants it.
+    @GetMapping("/dependency-graph-processes")
     @PreAuthorize("hasPermission('BCM','READ')")
-    @Operation(summary = "Nodes (processes) + edges (dependencies) for the BIA dependency graph")
+    @Operation(summary = "Legacy: nodes (processes) + edges (dependencies). New consumers use /dependency-graph.")
     public Map<String, Object> graph() {
         Long org = TenantContext.getCurrentTenant();
         List<CriticalProcess> processes = processRepo.findByOrganisationId(org);

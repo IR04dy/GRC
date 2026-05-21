@@ -435,8 +435,34 @@ export function BcmPage() {
     enabled: !isDemo,
   });
 
+  // T1.1 (BCM consolidation, audit headline finding): this page surfaces the
+  // legacy BcmPlan / CriticalProcess / BcmExercise tables. New work has moved
+  // to the cycle workspace (/bcm/readiness · /bcm/plans · /bcm/bia ·
+  // /bcm/crisis-room · /bcm/remediation · /bcm/library). The deprecation
+  // banner below points users at the new workspace; the page itself stays
+  // accessible until legacy rows are migrated in a follow-up sprint.
   return (
     <Shell title={t('modBcm')} sub="ISO 22301:2019">
+      <div style={{
+        marginBottom: 12, padding: '10px 14px',
+        border: '1px solid var(--warning-border, #c47e00)',
+        background: 'var(--warning-bg, #fff4e0)',
+        borderRadius: 4, fontSize: 13,
+      }}>
+        <strong>{lang === 'ar' ? 'صفحة قديمة — تم نقل الميزات' : 'Legacy page — features have moved'}</strong>
+        <div className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>
+          {lang === 'ar'
+            ? 'تم نقل العمل الجديد إلى مساحة عمل BCM الموحّدة. هذه الصفحة تبقى متاحة لقراءة البيانات القديمة فقط.'
+            : 'New work has moved to the unified BCM workspace. This legacy page stays available read-only for the existing BcmPlan / CriticalProcess / BcmExercise data.'}
+          {' '}
+          <a href="/bcm/readiness">{lang === 'ar' ? 'الجاهزية' : 'Readiness'}</a>{' · '}
+          <a href="/bcm/plans">{lang === 'ar' ? 'الخطط' : 'Plans'}</a>{' · '}
+          <a href="/bcm/bia">{lang === 'ar' ? 'تحليل الأثر' : 'BIA wizard'}</a>{' · '}
+          <a href="/bcm/crisis-room">{lang === 'ar' ? 'غرفة الأزمات' : 'Crisis Room'}</a>{' · '}
+          <a href="/bcm/remediation">{lang === 'ar' ? 'الإصلاحات' : 'Remediation'}</a>{' · '}
+          <a href="/bcm/library">{lang === 'ar' ? 'المكتبة' : 'Library'}</a>
+        </div>
+      </div>
       <PageHeader
         eyebrow={t('bcmEyebrow')} title={t('bcmTitle')} sub={t('bcmSub')}
         actions={

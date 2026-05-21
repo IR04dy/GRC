@@ -55,29 +55,29 @@ const BASE = '/api/v1/bcm/compliance';
 
 export async function listCompliance(framework?: Framework): Promise<BcmComplianceMapping[]> {
   const q = framework ? `?framework=${framework}` : '';
-  return (await api.get<BcmComplianceMapping[]>(`${BASE}${q}`)).data;
+  return api.get<BcmComplianceMapping[]>(`${BASE}${q}`);
 }
 
 export async function coverageByFramework(): Promise<Record<string, Record<string, number>>> {
-  return (await api.get<Record<string, Record<string, number>>>(`${BASE}/coverage`)).data;
+  return api.get<Record<string, Record<string, number>>>(`${BASE}/coverage`);
 }
 
 export async function overallStats(): Promise<Record<string, number>> {
-  return (await api.get<Record<string, number>>(`${BASE}/stats`)).data;
+  return api.get<Record<string, number>>(`${BASE}/stats`);
 }
 
 export async function getMapping(id: number): Promise<BcmComplianceMapping> {
-  return (await api.get<BcmComplianceMapping>(`${BASE}/${id}`)).data;
+  return api.get<BcmComplianceMapping>(`${BASE}/${id}`);
 }
 
 export async function assess(id: number, status: ComplianceStatus, assessedBy: string, notes: string): Promise<BcmComplianceMapping> {
-  return (await api.post<BcmComplianceMapping>(`${BASE}/${id}/assess`, { status, assessedBy, notes })).data;
+  return api.post<BcmComplianceMapping>(`${BASE}/${id}/assess`, { status, assessedBy, notes });
 }
 
 export async function attachEvidence(id: number, evidenceId: number): Promise<BcmComplianceMapping> {
-  return (await api.post<BcmComplianceMapping>(`${BASE}/${id}/attach-evidence`, { evidenceId })).data;
+  return api.post<BcmComplianceMapping>(`${BASE}/${id}/attach-evidence`, { evidenceId });
 }
 
 export async function attachGap(id: number, gapId: number): Promise<BcmComplianceMapping> {
-  return (await api.post<BcmComplianceMapping>(`${BASE}/${id}/attach-gap`, { gapId })).data;
+  return api.post<BcmComplianceMapping>(`${BASE}/${id}/attach-gap`, { gapId });
 }

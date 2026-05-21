@@ -27,6 +27,15 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
     @Query("SELECT rc.nameEn, COUNT(r) FROM Risk r JOIN RiskCategory rc ON r.categoryId = rc.id WHERE r.organisationId = :orgId GROUP BY rc.nameEn ORDER BY COUNT(r) DESC")
     List<Object[]> countByCategory(@Param("orgId") Long orgId);
 
+    /** §5.1 #6 (V115) — risks past their attestation due date and still open. */
+    @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId "
+         + "AND r.status NOT IN ('CLOSED','CANCELLED') "
+         + "AND r.nextAttestationDate IS NOT NULL "
+         + "AND r.nextAttestationDate < :today "
+         + "ORDER BY r.nextAttestationDate ASC")
+    List<Risk> findAttestationOverdue(@Param("orgId") Long orgId,
+                                      @Param("today") java.time.LocalDate today);
+
     // Framework anchor (IA-5)
     List<Risk> findByOrganisationIdAndRiskFrameworkId(Long organisationId, Long riskFrameworkId);
     List<Risk> findByOrganisationIdAndComplianceFrameworkId(Long organisationId, Long complianceFrameworkId);

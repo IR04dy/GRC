@@ -1,0 +1,510 @@
+package com.tss.grc.module.bcm.cycle.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.bcm.cycle.entity.*;
+import com.tss.grc.module.bcm.cycle.repository.*;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.*;
+
+/**
+ * BCP / DRP plan builder service — audit T1.4b.
+ *
+ * <h3>Plan lifecycle</h3>
+ * <pre>
+ *   DRAFT ──> UNDER_REVIEW ──> APPROVED ──> PUBLISHED ──> ARCHIVED
+ *     │            │                                          ↑
+ *     ↓            ↓                                          │
+ *   CANCELLED   DRAFT (reopen)         PUBLISHED ──> SUPERSEDED (newer wins)
+ * </pre>
+ *
+ * <h3>Section catalogue (ISO 22301 §8.4.2)</h3>
+ * <p>Each plan is created with a stable set of named sections; the user fills
+ * the bodies. Adding ad-hoc sections is supported by POSTing a section with
+ * a new {@code sectionKey}. Section order is fixed at creation but
+ * configurable later via {@link #reorderSections} (not yet implemented).
+ *
+ * <h3>Versions</h3>
+ * <p>{@link #approve} writes a snapshot of all sections to
+ * {@link BcpVersion} as JSON, bumps {@code currentVersion}, and stamps
+ * {@code approvedAt}. {@link #publish} can only fire on APPROVED; this is
+ * deliberate — publishing without a recorded approval would skip the audit
+ * trail every regulator wants.
+ *
+ * <h3>"Generate from BIA"</h3>
+ * <p>{@link #generateFromBia} creates a new plan pre-populated with the
+ * BIA's RTO/RPO/MTPD and a section catalogue. The MBCO narrative from the
+ * BIA seeds the {@code overview} section so the plan author starts with
+ * context rather than a blank page.
+ *
+ * <h3>F8 events emitted</h3>
+ * <ul>
+ *   <li>{@code BCM_PLAN_APPROVED}    — every approval</li>
+ *   <li>{@code BCM_PLAN_PUBLISHED}   — every publication</li>
+ *   <li>{@code BCM_PLAN_ARCHIVED}    — every archive (manual or supersede)</li>
+ * </ul>
+ */
+@Service
+@RequiredArgsConstructor
+public class BcpPlanService {
+
+    private static final ObjectMapper M = new ObjectMapper()
+        .enable(SerializationFeature.INDENT_OUTPUT);
+
+    private static final Set<String> STATUSES = Set.of(
+        "DRAFT", "UNDER_REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED", "SUPERSEDED", "CANCELLED");
+    private static final Set<String> PLAN_TYPES = Set.of("BCP", "DRP");
+
+    /**
+     * Default BCP section catalogue per ISO 22301 §8.4.2 / spec §H. Order is
+     * the conventional reading order an auditor expects in a plan document.
+     */
+    public static final List<SectionDef> BCP_SECTIONS = List.of(
+        new SectionDef("overview",            "Plan overview",            "نظرة عامة"),
+        new SectionDef("scope",               "Scope & objectives",       "النطاق والأهداف"),
+        new SectionDef("roles",               "Roles & responsibilities", "الأدوار والمسؤوليات"),
+        new SectionDef("activation_criteria", "Activation criteria",      "معايير التفعيل"),
+        new SectionDef("recovery_priorities", "Recovery priorities",      "أولويات التعافي"),
+        new SectionDef("recovery_steps",      "Recovery procedures",      "إجراءات التعافي"),
+        new SectionDef("comms_plan",          "Communication plan",       "خطة الاتصالات"),
+        new SectionDef("manual_workaround",   "Manual workaround",        "البديل اليدوي"),
+        new SectionDef("resources",           "Resource requirements",    "متطلبات الموارد"),
+        new SectionDef("supplier_escalation", "Supplier escalation",      "تصعيد المورّدين"),
+        new SectionDef("return_to_normal",    "Return-to-normal steps",   "خطوات العودة للوضع الطبيعي"),
+        new SectionDef("appendices",          "Appendices & evidence",    "الملاحق والأدلة")
+    );
+
+    /**
+     * DRP catalogue per spec §I. Different shape — emphasis on technical
+     * sequencing (failover / validation / rollback) rather than business
+     * comms / workaround. Some sections overlap with BCP intentionally.
+     */
+    public static final List<SectionDef> DRP_SECTIONS = List.of(
+        new SectionDef("overview",            "System overview",          "نظرة عامة على النظام"),
+        new SectionDef("business_linkage",    "Business service linkage", "ربط بالخدمات التجارية"),
+        new SectionDef("recovery_objectives", "Recovery objectives",      "أهداف التعافي"),
+        new SectionDef("dependencies",        "Dependencies",             "التبعيات"),
+        new SectionDef("backup_replication",  "Backup & replication",     "النسخ الاحتياطي والنسخ المتماثل"),
+        new SectionDef("recovery_sequence",   "Recovery sequence",        "تسلسل التعافي"),
+        new SectionDef("failover",            "Failover procedure",       "إجراء التحويل"),
+        new SectionDef("validation",          "Validation checklist",     "قائمة التحقق"),
+        new SectionDef("rollback",            "Rollback procedure",       "إجراء التراجع"),
+        new SectionDef("contacts",            "Contacts & escalation",    "جهات الاتصال والتصعيد"),
+        new SectionDef("test_results",        "Test results",             "نتائج الاختبار"),
+        new SectionDef("evidence",            "Evidence",                 "الأدلة")
+    );
+
+    public record SectionDef(String key, String titleEn, String titleAr) {}
+
+    /** Returned by {@link #diff} — JSON snapshot of two versions side by side. */
+    public record VersionDiff(int from, int to, String fromJson, String toJson) {}
+
+    private final BcpPlanRepository plans;
+    private final BcpSectionRepository sections;
+    private final BcpVersionRepository versions;
+    private final BcmBiaAssessmentRepository bias;
+    private final BcpPlanAcknowledgementRepository acks;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher eventPublisher;
+
+    // ─── CRUD ────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<BcpPlan> list(String planType, int page, int size) {
+        Long org = TenantContext.getCurrentTenant();
+        if (planType != null) {
+            // Filter via the repo + manual paging slice (no pageable for this finder)
+            List<BcpPlan> all = plans.findByOrganisationIdAndPlanTypeOrderByIdDesc(org, planType);
+            int from = Math.min(page * size, all.size());
+            int to   = Math.min(from + size, all.size());
+            return new org.springframework.data.domain.PageImpl<>(
+                all.subList(from, to), PageRequest.of(page, size), all.size());
+        }
+        return plans.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(page, size));
+    }
+
+    @Transactional(readOnly = true)
+    public BcpPlan get(Long id) {
+        return plans.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())
+            .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<BcpSection> sectionsFor(Long planId) {
+        Long org = TenantContext.getCurrentTenant();
+        get(planId);                             // tenant guard
+        return sections.findByOrganisationIdAndPlanIdOrderBySectionOrderAsc(org, planId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BcpVersion> versionsFor(Long planId) {
+        Long org = TenantContext.getCurrentTenant();
+        get(planId);
+        return versions.findByOrganisationIdAndPlanIdOrderByVersionNumberDesc(org, planId);
+    }
+
+    @Transactional
+    public BcpPlan create(BcpPlan body) {
+        validateOnCreate(body);
+        body.setId(null);
+        Long org = TenantContext.getCurrentTenant();
+        body.setOrganisationId(org);
+        if (body.getStatus() == null) body.setStatus("DRAFT");
+        if (body.getCurrentVersion() == null) body.setCurrentVersion(1);
+        if (body.getPlanCode() == null || body.getPlanCode().isBlank()) {
+            body.setPlanCode(nextCode(body.getPlanType()));
+        }
+        BcpPlan saved = plans.save(body);
+        createDefaultSections(saved);
+        audit.log("CREATE", "BcpPlan", saved.getId(),
+            "Plan created: " + saved.getPlanCode() + " (" + saved.getPlanType() + ")");
+        return saved;
+    }
+
+    @Transactional
+    public BcpPlan update(Long id, BcpPlan patch) {
+        BcpPlan existing = get(id);
+        if (isLocked(existing.getStatus()))
+            throw new IllegalArgumentException(
+                "Cannot edit a " + existing.getStatus() + " plan — reopen via transition first");
+        if (patch.getStatus() != null && !patch.getStatus().equals(existing.getStatus()))
+            throw new IllegalArgumentException("Use transition() to change status");
+
+        if (patch.getTitleEn()           != null) existing.setTitleEn(patch.getTitleEn());
+        if (patch.getTitleAr()           != null) existing.setTitleAr(patch.getTitleAr());
+        if (patch.getServiceId()         != null) existing.setServiceId(patch.getServiceId());
+        if (patch.getProcessId()         != null) existing.setProcessId(patch.getProcessId());
+        if (patch.getRtoHours()          != null) existing.setRtoHours(patch.getRtoHours());
+        if (patch.getRpoHours()          != null) existing.setRpoHours(patch.getRpoHours());
+        if (patch.getMtpdHours()         != null) existing.setMtpdHours(patch.getMtpdHours());
+        if (patch.getPlanOwnerId()       != null) existing.setPlanOwnerId(patch.getPlanOwnerId());
+        if (patch.getResponseTeamRole()  != null) existing.setResponseTeamRole(patch.getResponseTeamRole());
+        if (patch.getNextReviewDate()    != null) existing.setNextReviewDate(patch.getNextReviewDate());
+        existing.setUpdatedAt(LocalDateTime.now());
+        BcpPlan saved = plans.save(existing);
+        audit.log("UPDATE", "BcpPlan", saved.getId(),
+            "Plan updated: " + saved.getPlanCode());
+        return saved;
+    }
+
+    // ─── Section editing ─────────────────────────────────────────
+
+    @Transactional
+    public BcpSection updateSection(Long sectionId, String bodyEn, String bodyAr, String editor) {
+        Long org = TenantContext.getCurrentTenant();
+        BcpSection s = sections.findByIdAndOrganisationId(sectionId, org)
+            .orElseThrow(() -> new EntityNotFoundException("Section not found: " + sectionId));
+        BcpPlan plan = get(s.getPlanId());
+        if (isLocked(plan.getStatus()))
+            throw new IllegalArgumentException(
+                "Cannot edit sections of a " + plan.getStatus() + " plan — reopen the plan first");
+
+        if (bodyEn != null) s.setBodyEn(bodyEn);
+        if (bodyAr != null) s.setBodyAr(bodyAr);
+        s.setLastEditedBy(editor);
+        s.setLastEditedAt(LocalDateTime.now());
+        s.setUpdatedAt(s.getLastEditedAt());
+        BcpSection saved = sections.save(s);
+        audit.log("UPDATE", "BcpSection", saved.getId(),
+            "Section edited: " + plan.getPlanCode() + " / " + saved.getSectionKey());
+        return saved;
+    }
+
+    @Transactional
+    public BcpSection addSection(Long planId, BcpSection body) {
+        Long org = TenantContext.getCurrentTenant();
+        BcpPlan plan = get(planId);
+        if (isLocked(plan.getStatus()))
+            throw new IllegalArgumentException("Cannot add sections to a " + plan.getStatus() + " plan");
+        if (body.getSectionKey() == null || body.getSectionKey().isBlank())
+            throw new IllegalArgumentException("sectionKey is required");
+        if (body.getSectionTitleEn() == null || body.getSectionTitleEn().isBlank())
+            throw new IllegalArgumentException("sectionTitleEn is required");
+
+        sections.findByOrganisationIdAndPlanIdAndSectionKey(org, planId, body.getSectionKey())
+            .ifPresent(s -> { throw new IllegalArgumentException(
+                "Section key already exists on this plan: " + s.getSectionKey()); });
+
+        if (body.getSectionOrder() == null) {
+            int max = sections.findByOrganisationIdAndPlanIdOrderBySectionOrderAsc(org, planId).stream()
+                .mapToInt(BcpSection::getSectionOrder).max().orElse(0);
+            body.setSectionOrder(max + 1);
+        }
+        body.setId(null);
+        body.setOrganisationId(org);
+        body.setPlanId(planId);
+        BcpSection saved = sections.save(body);
+        audit.log("CREATE", "BcpSection", saved.getId(),
+            "Section added: " + plan.getPlanCode() + " / " + saved.getSectionKey());
+        return saved;
+    }
+
+    // ─── State machine ───────────────────────────────────────────
+
+    @Transactional
+    public BcpPlan transition(Long id, String toStatus, String actor) {
+        BcpPlan p = get(id);
+        if (toStatus == null || !STATUSES.contains(toStatus))
+            throw new IllegalArgumentException("status must be one of " + STATUSES);
+
+        String from = p.getStatus();
+        boolean legal = switch (from) {
+            case "DRAFT"        -> Set.of("UNDER_REVIEW", "CANCELLED").contains(toStatus);
+            case "UNDER_REVIEW" -> Set.of("APPROVED", "DRAFT").contains(toStatus);
+            case "APPROVED"     -> Set.of("PUBLISHED", "DRAFT").contains(toStatus);
+            case "PUBLISHED"    -> Set.of("ARCHIVED", "SUPERSEDED").contains(toStatus);
+            case "ARCHIVED"     -> false;
+            case "SUPERSEDED"   -> false;
+            case "CANCELLED"    -> false;
+            default             -> false;
+        };
+        if (!legal)
+            throw new IllegalArgumentException("Illegal transition: " + from + " → " + toStatus);
+
+        LocalDateTime now = LocalDateTime.now();
+        p.setStatus(toStatus);
+
+        if ("APPROVED".equals(toStatus)) {
+            // Snapshot all sections into a new BcpVersion row
+            snapshot(p, actor, "Approved");
+            p.setApprovedBy(actor);
+            p.setApprovedAt(now);
+            eventPublisher.publishEvent(DomainEvent.of(
+                p.getOrganisationId(), "BCM_PLAN_APPROVED", "BcpPlan", p.getId(),
+                Map.of("plan_code", p.getPlanCode(),
+                       "plan_type", p.getPlanType(),
+                       "version",   p.getCurrentVersion())));
+        }
+        if ("PUBLISHED".equals(toStatus)) {
+            p.setPublishedAt(now);
+            eventPublisher.publishEvent(DomainEvent.of(
+                p.getOrganisationId(), "BCM_PLAN_PUBLISHED", "BcpPlan", p.getId(),
+                Map.of("plan_code", p.getPlanCode(),
+                       "plan_type", p.getPlanType(),
+                       "version",   p.getCurrentVersion())));
+        }
+        if ("ARCHIVED".equals(toStatus) || "SUPERSEDED".equals(toStatus)) {
+            eventPublisher.publishEvent(DomainEvent.of(
+                p.getOrganisationId(), "BCM_PLAN_ARCHIVED", "BcpPlan", p.getId(),
+                Map.of("plan_code", p.getPlanCode(),
+                       "plan_type", p.getPlanType(),
+                       "reason",    toStatus)));
+        }
+        if ("DRAFT".equals(toStatus) && ("UNDER_REVIEW".equals(from) || "APPROVED".equals(from))) {
+            // Reopen — bump the version pointer so the next approval is a fresh snapshot
+            p.setCurrentVersion(p.getCurrentVersion() + 1);
+        }
+        p.setUpdatedAt(now);
+        BcpPlan saved = plans.save(p);
+        audit.log("TRANSITION", "BcpPlan", saved.getId(),
+            "Plan " + saved.getPlanCode() + " " + from + " → " + toStatus);
+        return saved;
+    }
+
+    /** Convenience wrapper used by reports/UX: same as {@code transition(id, "DRAFT")}. */
+    @Transactional
+    public BcpPlan reopen(Long id, String actor) {
+        return transition(id, "DRAFT", actor);
+    }
+
+    // ─── Generate from BIA ───────────────────────────────────────
+
+    /**
+     * Spawn a new BCP or DRP from an APPROVED / ACTIVE BIA.
+     * Copies RTO/RPO/MTPD onto the plan, creates the section catalogue, and
+     * seeds the {@code overview} section with the BIA's MBCO narrative so
+     * the author starts with context.
+     */
+    @Transactional
+    public BcpPlan generateFromBia(Long biaId, String planType, String titleEn, String titleAr) {
+        if (planType == null || !PLAN_TYPES.contains(planType))
+            throw new IllegalArgumentException("planType must be BCP or DRP");
+        BcmBiaAssessment bia = bias.findByIdAndOrganisationId(biaId, TenantContext.getCurrentTenant())
+            .orElseThrow(() -> new EntityNotFoundException("BIA not found: " + biaId));
+        String bs = bia.getApprovalStatus();
+        if (!"APPROVED".equals(bs) && !"ACTIVE".equals(bs))
+            throw new IllegalArgumentException(
+                "BIA must be APPROVED or ACTIVE to generate a plan (current=" + bs + ")");
+
+        BcpPlan plan = new BcpPlan();
+        plan.setPlanType(planType);
+        plan.setSourceBiaId(bia.getId());
+        plan.setServiceId(bia.getServiceId());
+        plan.setProcessId(bia.getProcessId());
+        plan.setRtoHours(bia.getRtoHours());
+        plan.setRpoHours(bia.getRpoHours());
+        plan.setMtpdHours(bia.getMtpdHours());
+        plan.setTitleEn(titleEn != null && !titleEn.isBlank()
+            ? titleEn : (planType + " from " + bia.getBiaCode()));
+        plan.setTitleAr(titleAr);
+        BcpPlan saved = create(plan);
+
+        // Seed the overview section with the BIA's MBCO narrative
+        if (bia.getMbcoDescription() != null && !bia.getMbcoDescription().isBlank()) {
+            sections.findByOrganisationIdAndPlanIdAndSectionKey(
+                    saved.getOrganisationId(), saved.getId(), "overview")
+                .ifPresent(sec -> {
+                    sec.setBodyEn("MBCO (from BIA " + bia.getBiaCode() + "):\n\n"
+                        + bia.getMbcoDescription());
+                    sections.save(sec);
+                });
+        }
+        // Also update the BIA's generatedBcpId / generatedDrpId so the BIA register reflects linkage
+        if ("BCP".equals(planType)) bia.setGeneratedBcpId(saved.getId());
+        else                        bia.setGeneratedDrpId(saved.getId());
+        bias.save(bia);
+
+        audit.log("CUSTOM", "BcpPlan", saved.getId(),
+            "Plan generated from BIA " + bia.getBiaCode() + " → " + saved.getPlanCode());
+        return saved;
+    }
+
+    // ─── Versions + diff ─────────────────────────────────────────
+
+    /**
+     * Side-by-side JSON diff between two versions of the same plan. Returns
+     * the two payloads pretty-printed so a UI can render them in twin
+     * &lt;pre&gt; blocks. Real diff colouring is a frontend concern.
+     */
+    @Transactional(readOnly = true)
+    public VersionDiff diff(Long planId, int fromVersion, int toVersion) {
+        Long org = TenantContext.getCurrentTenant();
+        get(planId);
+        BcpVersion from = versions.findByOrganisationIdAndPlanIdAndVersionNumber(org, planId, fromVersion)
+            .orElseThrow(() -> new EntityNotFoundException("Version " + fromVersion + " not found"));
+        BcpVersion to = versions.findByOrganisationIdAndPlanIdAndVersionNumber(org, planId, toVersion)
+            .orElseThrow(() -> new EntityNotFoundException("Version " + toVersion + " not found"));
+        return new VersionDiff(fromVersion, toVersion, from.getBodyJson(), to.getBodyJson());
+    }
+
+    // ─── Stats ───────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> stats() {
+        Long org = TenantContext.getCurrentTenant();
+        Map<String, Long> out = new LinkedHashMap<>();
+        for (String s : STATUSES) {
+            out.put("status_" + s.toLowerCase(),     plans.countByOrganisationIdAndStatus(org, s));
+            out.put("bcp_"    + s.toLowerCase(),     plans.countByOrganisationIdAndPlanTypeAndStatus(org, "BCP", s));
+            out.put("drp_"    + s.toLowerCase(),     plans.countByOrganisationIdAndPlanTypeAndStatus(org, "DRP", s));
+        }
+        return out;
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────
+
+    private void validateOnCreate(BcpPlan p) {
+        if (p.getTitleEn() == null || p.getTitleEn().isBlank())
+            throw new IllegalArgumentException("titleEn is required");
+        if (p.getPlanType() == null || !PLAN_TYPES.contains(p.getPlanType()))
+            throw new IllegalArgumentException("planType must be BCP or DRP");
+    }
+
+    private boolean isLocked(String status) {
+        return "APPROVED".equals(status) || "PUBLISHED".equals(status)
+            || "ARCHIVED".equals(status) || "SUPERSEDED".equals(status)
+            || "CANCELLED".equals(status);
+    }
+
+    private void createDefaultSections(BcpPlan plan) {
+        List<SectionDef> catalogue = "DRP".equals(plan.getPlanType()) ? DRP_SECTIONS : BCP_SECTIONS;
+        int order = 1;
+        for (SectionDef def : catalogue) {
+            BcpSection s = new BcpSection();
+            s.setOrganisationId(plan.getOrganisationId());
+            s.setPlanId(plan.getId());
+            s.setSectionKey(def.key());
+            s.setSectionTitleEn(def.titleEn());
+            s.setSectionTitleAr(def.titleAr());
+            s.setSectionOrder(order++);
+            sections.save(s);
+        }
+    }
+
+    /**
+     * Build a snapshot JSON payload and persist as a new {@link BcpVersion}.
+     * Bumps {@code plan.currentVersion} based on the existing latest version
+     * (defensive against gaps from skipped reopens).
+     */
+    private void snapshot(BcpPlan plan, String actor, String changeSummary) {
+        Long org = plan.getOrganisationId();
+        int latest = versions
+            .findByOrganisationIdAndPlanIdOrderByVersionNumberDesc(org, plan.getId())
+            .stream().findFirst().map(BcpVersion::getVersionNumber).orElse(0);
+        int next = latest + 1;
+        plan.setCurrentVersion(next);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("plan", planSnapshotMap(plan));
+        body.put("sections", sections
+            .findByOrganisationIdAndPlanIdOrderBySectionOrderAsc(org, plan.getId())
+            .stream().map(BcpPlanService::sectionSnapshotMap).toList());
+        String json;
+        try { json = M.writeValueAsString(body); }
+        catch (JsonProcessingException e) { throw new RuntimeException("Snapshot serialisation failed", e); }
+
+        BcpVersion v = new BcpVersion();
+        v.setOrganisationId(org);
+        v.setPlanId(plan.getId());
+        v.setVersionNumber(next);
+        v.setBodyJson(json);
+        v.setApprovedBy(actor);
+        v.setApprovedAt(LocalDateTime.now());
+        v.setChangeSummary(changeSummary);
+        versions.save(v);
+
+        // Tier-2 #11: bumping the version invalidates older distribution acks.
+        // Recipients who acknowledged v1 must re-acknowledge v2 — so we flip
+        // PENDING/ACKNOWLEDGED/DECLINED rows for prior versions to STALE here.
+        // No-op when the plan has no distribution history yet.
+        acks.markStaleBelow(org, plan.getId(), next);
+    }
+
+    private static Map<String, Object> planSnapshotMap(BcpPlan p) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("planCode",        p.getPlanCode());
+        m.put("titleEn",         p.getTitleEn());
+        m.put("titleAr",         p.getTitleAr());
+        m.put("planType",        p.getPlanType());
+        m.put("rtoHours",        p.getRtoHours());
+        m.put("rpoHours",        p.getRpoHours());
+        m.put("mtpdHours",       p.getMtpdHours());
+        m.put("planOwnerId",     p.getPlanOwnerId());
+        m.put("responseTeamRole", p.getResponseTeamRole());
+        m.put("nextReviewDate",  p.getNextReviewDate() == null ? null : p.getNextReviewDate().toString());
+        return m;
+    }
+
+    private static Map<String, Object> sectionSnapshotMap(BcpSection s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("sectionKey",      s.getSectionKey());
+        m.put("sectionTitleEn",  s.getSectionTitleEn());
+        m.put("sectionTitleAr",  s.getSectionTitleAr());
+        m.put("sectionOrder",    s.getSectionOrder());
+        m.put("bodyEn",          s.getBodyEn());
+        m.put("bodyAr",          s.getBodyAr());
+        return m;
+    }
+
+    private String nextCode(String planType) {
+        Long org = TenantContext.getCurrentTenant();
+        int year = Year.now().getValue();
+        String prefix = "BCP".equals(planType) ? "BCP" : "DRP";
+        // Cheap deterministic counter via current page-1 total
+        long count = plans.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1)).getTotalElements();
+        return String.format("%s-%d-%06d", prefix, year, count + 1);
+    }
+}

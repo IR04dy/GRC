@@ -38,8 +38,12 @@ export function BcmReportsPage() {
       setLoading(true);
       try {
         const cat = await listReportCatalog();
-        setCatalog(cat);
-        if (cat.length) setSelected(cat[0]);
+        // Defensive: backend should always return an array, but if a proxy
+        // or refresh-flow ever hands us undefined/null, fall back to [] so
+        // the render path below never blows up on `.length`/`.map`.
+        const safe = Array.isArray(cat) ? cat : [];
+        setCatalog(safe);
+        if (safe.length) setSelected(safe[0]);
       } catch (e) {
         toast.danger(e instanceof ApiError ? e.message
           : (isAr ? 'تعذر تحميل التقارير' : 'Failed to load report catalog'));

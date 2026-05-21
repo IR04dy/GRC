@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { CommandPalette } from '../search/CommandPalette';
 
-export function Shell({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+export function Shell({ title, sub, children }: { title?: string; sub?: string; children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Sprint 4 §2.8 — mobile sidebar drawer state.
   // Above 768px CSS pins the sidebar open; below, it slides in via .sb-open.

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ShieldCheck, LayoutDashboard, Activity, ClipboardCheck, Server, Siren,
-  AlertOctagon, Stamp, BarChart3, Settings, GitBranch, RefreshCw,
+  LayoutDashboard, Activity, ClipboardCheck, Server, Siren,
+  AlertOctagon, Stamp, BarChart3, Settings, RefreshCw,
   Network, Megaphone, ArrowRight,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -13,6 +13,7 @@ import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
+import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { crisisEventStats } from '../../lib/crisisEvents';
 import { biaStats } from '../../lib/biaAssessments';
 import { remediationStats } from '../../lib/bcmCycle';
@@ -59,7 +60,7 @@ export function BcmWorkspacePage() {
         const [bias, crises, remediation, compliance, score] = await Promise.all([
           biaStats().catch(() => ({})),
           crisisEventStats().catch(() => ({})),
-          remediationStats().then(r => r.data).catch(() => undefined),
+          remediationStats().catch(() => undefined),
           complianceStats().catch(() => ({})),
           tenantReadiness().catch(() => null),
         ]);
@@ -81,6 +82,7 @@ export function BcmWorkspacePage() {
           : 'ISO 22301 / SAMA OPRES / NCEMA framework — all the tools in one workspace.'}
         eyebrow={isAr ? 'استمرارية الأعمال' : 'BCM workspace'}
       />
+      <WorkflowQuickLaunch modules="BCM" />
 
       {/* KPI strip — pulls live data from the four new BCM-cycle services. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>

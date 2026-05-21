@@ -28,17 +28,17 @@ export interface MyEnabledModulesResponse {
 
 /** Every module the platform knows about (the seed list from V97). */
 export async function listCatalog(): Promise<string[]> {
-  return (await api.get<string[]>('/api/v1/licensing/catalog')).data;
+  return api.get<string[]>('/api/v1/licensing/catalog');
 }
 
 /** All licence rows for the current tenant, ordered by module code. */
 export async function listLicenses(): Promise<OrganisationLicense[]> {
-  return (await api.get<OrganisationLicense[]>('/api/v1/licensing/modules')).data;
+  return api.get<OrganisationLicense[]>('/api/v1/licensing/modules');
 }
 
 /** Enabled module codes for the current tenant (cheap, cached server-side). */
 export async function myEnabled(): Promise<MyEnabledModulesResponse> {
-  return (await api.get<MyEnabledModulesResponse>('/api/v1/licensing/me/enabled')).data;
+  return api.get<MyEnabledModulesResponse>('/api/v1/licensing/me/enabled');
 }
 
 /**
@@ -47,7 +47,7 @@ export async function myEnabled(): Promise<MyEnabledModulesResponse> {
  * for type-checking only.
  */
 export async function upsertLicense(body: Partial<OrganisationLicense>): Promise<OrganisationLicense> {
-  return (await api.post<OrganisationLicense>('/api/v1/licensing/modules', body)).data;
+  return api.post<OrganisationLicense>('/api/v1/licensing/modules', body);
 }
 
 /** Flip the enabled flag to false. Cheaper round-trip than upsert. */

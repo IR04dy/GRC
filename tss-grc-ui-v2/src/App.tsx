@@ -1,125 +1,168 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { I18nProvider } from './lib/i18n';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
 import { DialogProvider } from './lib/dialog';
+// ─── Critical-path pages (sidebar landings + login + dashboard) stay eager. ───
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { RiskRegisterPage } from './pages/risk/RiskRegisterPage';
 import { CyberPage } from './pages/cyber/CyberPage';
-import { VulnerabilitiesV2Page } from './pages/cyber/VulnerabilitiesV2Page';
-import { KbHomePage } from './pages/knowledge-base/KbHomePage';
-import { KbArticlePage } from './pages/knowledge-base/KbArticlePage';
-import { KbEditorPage } from './pages/knowledge-base/KbEditorPage';
-import { BcmPage } from './pages/bcm/BcmPage';
 import { BcmWorkspacePage } from './pages/bcm/BcmWorkspacePage';
 import { PrivacyPage } from './pages/privacy/PrivacyPage';
 import { CompliancePage } from './pages/compliance/CompliancePage';
-import { RegulatoryLibraryPage } from './pages/regulatory/RegulatoryLibraryPage';
-import { ControlLibraryPage } from './pages/controls/ControlLibraryPage';
-import { PosturePage } from './pages/compliance/PosturePage';
-import { BcmDashboardPage } from './pages/dashboards/BcmDashboardPage';
-import { BcmReadinessPage } from './pages/bcm/BcmReadinessPage';
-import { BcmReportsPage } from './pages/bcm/BcmReportsPage';
-import { CrisisRoomPage } from './pages/bcm/CrisisRoomPage';
-import { BiaWizardPage } from './pages/bcm/BiaWizardPage';
-import { BcmRemediationPage } from './pages/bcm/BcmRemediationPage';
-import { BcmSettingsPage } from './pages/bcm/BcmSettingsPage';
-import { BcmComplianceMappingPage } from './pages/bcm/BcmComplianceMappingPage';
-import { ScmDashboardPage } from './pages/dashboards/ScmDashboardPage';
-import { ErmDashboardPage } from './pages/dashboards/ErmDashboardPage';
-import { CyberDashboardPage } from './pages/dashboards/CyberDashboardPage';
-import { PdplDashboardPage } from './pages/dashboards/PdplDashboardPage';
 import { TprmPage } from './pages/tprm/TprmPage';
 import { IncidentsPage } from './pages/incidents/IncidentsPage';
 import { EvidencePage } from './pages/evidence/EvidencePage';
-import { AdminPage } from './pages/admin/AdminPage';
-import { LicensingPage } from './pages/admin/LicensingPage';
+
+// ─── Secondary pages — lazy-loaded; each becomes its own chunk. ───
+const VulnerabilitiesV2Page  = lazy(() => import('./pages/cyber/VulnerabilitiesV2Page').then(m => ({ default: m.VulnerabilitiesV2Page })));
+const KbHomePage             = lazy(() => import('./pages/knowledge-base/KbHomePage').then(m => ({ default: m.KbHomePage })));
+const KbArticlePage          = lazy(() => import('./pages/knowledge-base/KbArticlePage').then(m => ({ default: m.KbArticlePage })));
+const KbEditorPage           = lazy(() => import('./pages/knowledge-base/KbEditorPage').then(m => ({ default: m.KbEditorPage })));
+const BcmPage                = lazy(() => import('./pages/bcm/BcmPage').then(m => ({ default: m.BcmPage })));
+const RegulatoryLibraryPage  = lazy(() => import('./pages/regulatory/RegulatoryLibraryPage').then(m => ({ default: m.RegulatoryLibraryPage })));
+const ControlLibraryPage     = lazy(() => import('./pages/controls/ControlLibraryPage').then(m => ({ default: m.ControlLibraryPage })));
+const PosturePage            = lazy(() => import('./pages/compliance/PosturePage').then(m => ({ default: m.PosturePage })));
+const BcmDashboardPage       = lazy(() => import('./pages/dashboards/BcmDashboardPage').then(m => ({ default: m.BcmDashboardPage })));
+const BcmReadinessPage       = lazy(() => import('./pages/bcm/BcmReadinessPage').then(m => ({ default: m.BcmReadinessPage })));
+const BcmReportsPage         = lazy(() => import('./pages/bcm/BcmReportsPage').then(m => ({ default: m.BcmReportsPage })));
+const CrisisRoomPage         = lazy(() => import('./pages/bcm/CrisisRoomPage').then(m => ({ default: m.CrisisRoomPage })));
+const BiaWizardPage          = lazy(() => import('./pages/bcm/BiaWizardPage').then(m => ({ default: m.BiaWizardPage })));
+const BcmRemediationPage     = lazy(() => import('./pages/bcm/BcmRemediationPage').then(m => ({ default: m.BcmRemediationPage })));
+const BcpBuilderPage         = lazy(() => import('./pages/bcm/BcpBuilderPage').then(m => ({ default: m.BcpBuilderPage })));
+const BcmSettingsPage        = lazy(() => import('./pages/bcm/BcmSettingsPage').then(m => ({ default: m.BcmSettingsPage })));
+const BcmComplianceMappingPage = lazy(() => import('./pages/bcm/BcmComplianceMappingPage').then(m => ({ default: m.BcmComplianceMappingPage })));
+const BcmLibraryPage         = lazy(() => import('./pages/bcm/BcmLibraryPage').then(m => ({ default: m.BcmLibraryPage })));
+const ScmDashboardPage       = lazy(() => import('./pages/dashboards/ScmDashboardPage').then(m => ({ default: m.ScmDashboardPage })));
+const ErmDashboardPage       = lazy(() => import('./pages/dashboards/ErmDashboardPage').then(m => ({ default: m.ErmDashboardPage })));
+const CyberDashboardPage     = lazy(() => import('./pages/dashboards/CyberDashboardPage').then(m => ({ default: m.CyberDashboardPage })));
+const PdplDashboardPage      = lazy(() => import('./pages/dashboards/PdplDashboardPage').then(m => ({ default: m.PdplDashboardPage })));
+const BuyerGapPage           = lazy(() => import('./pages/buyergap/BuyerGapPage').then(m => ({ default: m.BuyerGapPage })));
+const WorkflowHubPage        = lazy(() => import('./pages/workflow/WorkflowHubPage').then(m => ({ default: m.WorkflowHubPage })));
+// ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
+//    Each wizard is its own chunk; the first time a user navigates to
+//    /workflows/* the relevant ~30 kB chunk is fetched. Reduces initial
+//    main bundle by ~280 kB (gzipped) and silences Vite's "chunks > 500 kB"
+//    warning that fired on every build.
+const RiskIdentificationWizard  = lazy(() => import('./pages/workflow/erm/RiskIdentificationWizard').then(m => ({ default: m.RiskIdentificationWizard })));
+const DsrFulfilmentWizard       = lazy(() => import('./pages/workflow/pdpl/DsrFulfilmentWizard').then(m => ({ default: m.DsrFulfilmentWizard })));
+const BreachNotificationWizard  = lazy(() => import('./pages/workflow/pdpl/BreachNotificationWizard').then(m => ({ default: m.BreachNotificationWizard })));
+const CyberIncidentWizard       = lazy(() => import('./pages/workflow/nca/CyberIncidentWizard').then(m => ({ default: m.CyberIncidentWizard })));
+const SupplierOnboardingWizard  = lazy(() => import('./pages/workflow/scm/SupplierOnboardingWizard').then(m => ({ default: m.SupplierOnboardingWizard })));
+const RiskTreatmentWizard       = lazy(() => import('./pages/workflow/erm/RiskTreatmentWizard').then(m => ({ default: m.RiskTreatmentWizard })));
+const RiskAcceptanceWizard      = lazy(() => import('./pages/workflow/erm/RiskAcceptanceWizard').then(m => ({ default: m.RiskAcceptanceWizard })));
+const BcmExerciseWizard         = lazy(() => import('./pages/workflow/bcm/BcmExerciseWizard').then(m => ({ default: m.BcmExerciseWizard })));
+const NcaEccAssessmentWizard    = lazy(() => import('./pages/workflow/nca/NcaEccAssessmentWizard').then(m => ({ default: m.NcaEccAssessmentWizard })));
+const VendorRiskAssessmentWizard = lazy(() => import('./pages/workflow/scm/VendorRiskAssessmentWizard').then(m => ({ default: m.VendorRiskAssessmentWizard })));
+const CloudCccWizard            = lazy(() => import('./pages/workflow/nca/CloudCccWizard').then(m => ({ default: m.CloudCccWizard })));
+const VulnerabilityTriageWizard = lazy(() => import('./pages/workflow/nca/VulnerabilityTriageWizard').then(m => ({ default: m.VulnerabilityTriageWizard })));
+const SupplierExitPlanWizard    = lazy(() => import('./pages/workflow/scm/SupplierExitPlanWizard').then(m => ({ default: m.SupplierExitPlanWizard })));
+const CrossBorderTransferWizard = lazy(() => import('./pages/workflow/pdpl/CrossBorderTransferWizard').then(m => ({ default: m.CrossBorderTransferWizard })));
+const ConsentManagementWizard   = lazy(() => import('./pages/workflow/pdpl/ConsentManagementWizard').then(m => ({ default: m.ConsentManagementWizard })));
+const RopaWizard                = lazy(() => import('./pages/workflow/pdpl/RopaWizard').then(m => ({ default: m.RopaWizard })));
+const IncidentRcaWizard         = lazy(() => import('./pages/workflow/incident/IncidentRcaWizard').then(m => ({ default: m.IncidentRcaWizard })));
+const ManagementReviewWizard    = lazy(() => import('./pages/workflow/governance/ManagementReviewWizard').then(m => ({ default: m.ManagementReviewWizard })));
+const DigitalSignatureWizard    = lazy(() => import('./pages/workflow/governance/DigitalSignatureWizard').then(m => ({ default: m.DigitalSignatureWizard })));
+const ControlTestWizard         = lazy(() => import('./pages/workflow/compliance/ControlTestWizard').then(m => ({ default: m.ControlTestWizard })));
+const BoardPackWizard           = lazy(() => import('./pages/workflow/governance/BoardPackWizard').then(m => ({ default: m.BoardPackWizard })));
+const AarDetailPage             = lazy(() => import('./pages/bcm/AarDetailPage').then(m => ({ default: m.AarDetailPage })));
+const AiSuggestionsPage         = lazy(() => import('./pages/ai/AiSuggestionsPage').then(m => ({ default: m.AiSuggestionsPage })));
+// ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
-import { WorkflowsPage } from './pages/workflow/WorkflowsPage';
-import { ChangesPage } from './pages/changes/ChangesPage';
-import { EthicsPage } from './pages/ethics/EthicsPage';
-import { ReportSchedulesPage } from './pages/reporting/ReportSchedulesPage';
-import { RiskDetailPage } from './pages/risk/RiskDetailPage';
-import { FindingDetailPage } from './pages/detail/FindingDetailPage';
-import { ControlDetailPage } from './pages/detail/ControlDetailPage';
-import { PolicyDetailPage } from './pages/detail/PolicyDetailPage';
-import { VendorDetailPage } from './pages/detail/VendorDetailPage';
-import { DpiaDetailPage } from './pages/detail/DpiaDetailPage';
-import { AuthorityWorkspacePage } from './pages/authority/AuthorityWorkspacePage';
-import { AuthoritiesIndexPage } from './pages/authority/AuthoritiesIndexPage';
-import { AuditWorkspacePage } from './pages/audit/AuditWorkspacePage';
-import { EngagementDetailPage } from './pages/audit/EngagementDetailPage';
-import { CommunicationsPage } from './pages/comms/CommunicationsPage';
-import { CapaPage } from './pages/capa/CapaPage';
-import { DsrPortalPage } from './pages/portal/DsrPortalPage';
-import { SpeakUpPortalPage } from './pages/portal/SpeakUpPortalPage';
-import { CaseTrackerPage } from './pages/portal/CaseTrackerPage';
-import { TrustCenterPage } from './pages/portal/TrustCenterPage';
-import { IntakeInboxPage } from './pages/intake/IntakeInboxPage';
-import { IntakeCatalogPage } from './pages/intake/IntakeCatalogPage';
-import { IntakeFormPage } from './pages/intake/IntakeFormPage';
-import { ConnectorsPage } from './pages/intake/ConnectorsPage';
-import { ApprovalInboxPage } from './pages/approvals/ApprovalInboxPage';
-import { SignaturesPage } from './pages/signatures/SignaturesPage';
-import { AssetRegisterPage } from './pages/assets/AssetRegisterPage';
-import { BoardPackPage } from './pages/board-pack/BoardPackPage';
-import { RegulatoryChangePage } from './pages/regulatory-change/RegulatoryChangePage';
-import { VendorPortalPage } from './pages/portal/VendorPortalPage';
-import { NcaEccExportPage } from './pages/nca-ecc/NcaEccExportPage';
-import { NotificationDispatchPage } from './pages/notifications/NotificationDispatchPage';
-import { ControlCrosswalkPage } from './pages/control-crosswalk/ControlCrosswalkPage';
+
+// ─── Off-critical-path admin/detail/portal/lifecycle pages — lazy. ───
+const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
+const LicensingPage          = lazy(() => import('./pages/admin/LicensingPage').then(m => ({ default: m.LicensingPage })));
+const WorkflowsPage          = lazy(() => import('./pages/workflow/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })));
+const ChangesPage            = lazy(() => import('./pages/changes/ChangesPage').then(m => ({ default: m.ChangesPage })));
+const EthicsPage             = lazy(() => import('./pages/ethics/EthicsPage').then(m => ({ default: m.EthicsPage })));
+const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
+const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
+const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
+const ControlDetailPage      = lazy(() => import('./pages/detail/ControlDetailPage').then(m => ({ default: m.ControlDetailPage })));
+const PolicyDetailPage       = lazy(() => import('./pages/detail/PolicyDetailPage').then(m => ({ default: m.PolicyDetailPage })));
+const VendorDetailPage       = lazy(() => import('./pages/detail/VendorDetailPage').then(m => ({ default: m.VendorDetailPage })));
+const DpiaDetailPage         = lazy(() => import('./pages/detail/DpiaDetailPage').then(m => ({ default: m.DpiaDetailPage })));
+const AuthorityWorkspacePage = lazy(() => import('./pages/authority/AuthorityWorkspacePage').then(m => ({ default: m.AuthorityWorkspacePage })));
+const AuthoritiesIndexPage   = lazy(() => import('./pages/authority/AuthoritiesIndexPage').then(m => ({ default: m.AuthoritiesIndexPage })));
+const AuditWorkspacePage     = lazy(() => import('./pages/audit/AuditWorkspacePage').then(m => ({ default: m.AuditWorkspacePage })));
+const EngagementDetailPage   = lazy(() => import('./pages/audit/EngagementDetailPage').then(m => ({ default: m.EngagementDetailPage })));
+const CommunicationsPage     = lazy(() => import('./pages/comms/CommunicationsPage').then(m => ({ default: m.CommunicationsPage })));
+const CapaPage               = lazy(() => import('./pages/capa/CapaPage').then(m => ({ default: m.CapaPage })));
+const DsrPortalPage          = lazy(() => import('./pages/portal/DsrPortalPage').then(m => ({ default: m.DsrPortalPage })));
+const SpeakUpPortalPage      = lazy(() => import('./pages/portal/SpeakUpPortalPage').then(m => ({ default: m.SpeakUpPortalPage })));
+const CaseTrackerPage        = lazy(() => import('./pages/portal/CaseTrackerPage').then(m => ({ default: m.CaseTrackerPage })));
+const TrustCenterPage        = lazy(() => import('./pages/portal/TrustCenterPage').then(m => ({ default: m.TrustCenterPage })));
+const IntakeInboxPage        = lazy(() => import('./pages/intake/IntakeInboxPage').then(m => ({ default: m.IntakeInboxPage })));
+const IntakeCatalogPage      = lazy(() => import('./pages/intake/IntakeCatalogPage').then(m => ({ default: m.IntakeCatalogPage })));
+const IntakeFormPage         = lazy(() => import('./pages/intake/IntakeFormPage').then(m => ({ default: m.IntakeFormPage })));
+const ConnectorsPage         = lazy(() => import('./pages/intake/ConnectorsPage').then(m => ({ default: m.ConnectorsPage })));
+const ApprovalInboxPage      = lazy(() => import('./pages/approvals/ApprovalInboxPage').then(m => ({ default: m.ApprovalInboxPage })));
+const SignaturesPage         = lazy(() => import('./pages/signatures/SignaturesPage').then(m => ({ default: m.SignaturesPage })));
+const AssetRegisterPage      = lazy(() => import('./pages/assets/AssetRegisterPage').then(m => ({ default: m.AssetRegisterPage })));
+const BoardPackPage          = lazy(() => import('./pages/board-pack/BoardPackPage').then(m => ({ default: m.BoardPackPage })));
+const RegulatoryChangePage   = lazy(() => import('./pages/regulatory-change/RegulatoryChangePage').then(m => ({ default: m.RegulatoryChangePage })));
+const VendorPortalPage       = lazy(() => import('./pages/portal/VendorPortalPage').then(m => ({ default: m.VendorPortalPage })));
+const NcaEccExportPage       = lazy(() => import('./pages/nca-ecc/NcaEccExportPage').then(m => ({ default: m.NcaEccExportPage })));
+const NotificationDispatchPage = lazy(() => import('./pages/notifications/NotificationDispatchPage').then(m => ({ default: m.NotificationDispatchPage })));
+const ControlCrosswalkPage   = lazy(() => import('./pages/control-crosswalk/ControlCrosswalkPage').then(m => ({ default: m.ControlCrosswalkPage })));
 // ─── Sprint 4 §3.3 — Culled pages (imports removed; folders kept on disk
 //    for one cycle so cherry-picks can be reviewed before physical delete):
 //    process-mining · ai-governance · production-readiness · mfa · monitoring ·
 //    backup-dr · white-label · csv-import.
-import { BcmDependencyPage } from './pages/bcm-dependency/BcmDependencyPage';
-import { RopaPage } from './pages/ropa/RopaPage';
-import { EsgPage } from './pages/esg/EsgPage';
-import { NdiPage } from './pages/ndi/NdiPage';
-import { WorkflowVersionsPage } from './pages/workflow-versions/WorkflowVersionsPage';
-import { CrisisManagementPage } from './pages/crisis/CrisisManagementPage';
-import { FileUploadDemoPage } from './pages/file-upload/FileUploadDemoPage';
-import { NotificationChannelsPage } from './pages/notifications-channels/NotificationChannelsPage';
-import { SsoConfigPage } from './pages/sso/SsoConfigPage';
-import { NafathLoginPage } from './pages/sso/NafathLoginPage';
-import { AttestationCampaignsPage } from './pages/intake/AttestationCampaignsPage';
-import { OnboardingPage } from './pages/onboarding/OnboardingPage';
-import { FrameworkPacksPage } from './pages/framework-packs/FrameworkPacksPage';
-import { PolicyTemplatesPage } from './pages/policy-templates/PolicyTemplatesPage';
-import { PolicyManagementPage } from './pages/policy/PolicyManagementPage';
-import { RiskLifecyclePage } from './pages/risk-lifecycle/RiskLifecyclePage';
-import { AuditLifecyclePage } from './pages/audit-lifecycle/AuditLifecyclePage';
-import { PrivacyLifecyclePage } from './pages/privacy-lifecycle/PrivacyLifecyclePage';
-import { BcmLifecyclePage } from './pages/bcm-lifecycle/BcmLifecyclePage';
-import { CyberLifecyclePage } from './pages/cyber-lifecycle/CyberLifecyclePage';
-import { LifecycleOverviewPage } from './pages/lifecycle-overview/LifecycleOverviewPage';
-import { NotificationOutboxPage } from './pages/notification-outbox/NotificationOutboxPage';
-import { PdplExtensionsPage } from './pages/pdpl-extensions/PdplExtensionsPage';
-import { RcaPage } from './pages/rca/RcaPage';
-import { RiskScenariosPage } from './pages/risk-scenarios/RiskScenariosPage';
-import { SupplierResiliencePage } from './pages/supplier-resilience/SupplierResiliencePage';
-import { EmergingRiskPage } from './pages/emerging-risk/EmergingRiskPage';
-import { CommitteesPage } from './pages/committees/CommitteesPage';
-import { DrPlansPage } from './pages/dr-plans/DrPlansPage';
-import { FrameworkControlsPage } from './pages/framework-controls/FrameworkControlsPage';
-import { ContractClausesPage } from './pages/contract-clauses/ContractClausesPage';
-import { CyberPdplBridgePage } from './pages/cyber-pdpl-bridge/CyberPdplBridgePage';
-import { EvidenceChainPage } from './pages/evidence-chain/EvidenceChainPage';
-import { FourthPartyPage } from './pages/fourth-party/FourthPartyPage';
-import { DataSharingPage } from './pages/data-sharing/DataSharingPage';
-import { ProcessorAssessmentsPage } from './pages/processor-assessments/ProcessorAssessmentsPage';
-import { ThirdPartyCyberPage } from './pages/third-party-cyber/ThirdPartyCyberPage';
-import { ResilienceTestsPage } from './pages/resilience-tests/ResilienceTestsPage';
+const BcmDependencyPage      = lazy(() => import('./pages/bcm-dependency/BcmDependencyPage').then(m => ({ default: m.BcmDependencyPage })));
+const BcmDependencyGraphPage = lazy(() => import('./pages/bcm/BcmDependencyGraphPage').then(m => ({ default: m.BcmDependencyGraphPage })));
+const RopaPage               = lazy(() => import('./pages/ropa/RopaPage').then(m => ({ default: m.RopaPage })));
+const EsgPage                = lazy(() => import('./pages/esg/EsgPage').then(m => ({ default: m.EsgPage })));
+const NdiPage                = lazy(() => import('./pages/ndi/NdiPage').then(m => ({ default: m.NdiPage })));
+const WorkflowVersionsPage   = lazy(() => import('./pages/workflow-versions/WorkflowVersionsPage').then(m => ({ default: m.WorkflowVersionsPage })));
+const CrisisManagementPage   = lazy(() => import('./pages/crisis/CrisisManagementPage').then(m => ({ default: m.CrisisManagementPage })));
+const FileUploadDemoPage     = lazy(() => import('./pages/file-upload/FileUploadDemoPage').then(m => ({ default: m.FileUploadDemoPage })));
+const NotificationChannelsPage = lazy(() => import('./pages/notifications-channels/NotificationChannelsPage').then(m => ({ default: m.NotificationChannelsPage })));
+const SsoConfigPage          = lazy(() => import('./pages/sso/SsoConfigPage').then(m => ({ default: m.SsoConfigPage })));
+const NafathLoginPage        = lazy(() => import('./pages/sso/NafathLoginPage').then(m => ({ default: m.NafathLoginPage })));
+const AttestationCampaignsPage = lazy(() => import('./pages/intake/AttestationCampaignsPage').then(m => ({ default: m.AttestationCampaignsPage })));
+const OnboardingPage         = lazy(() => import('./pages/onboarding/OnboardingPage').then(m => ({ default: m.OnboardingPage })));
+const FrameworkPacksPage     = lazy(() => import('./pages/framework-packs/FrameworkPacksPage').then(m => ({ default: m.FrameworkPacksPage })));
+const PolicyTemplatesPage    = lazy(() => import('./pages/policy-templates/PolicyTemplatesPage').then(m => ({ default: m.PolicyTemplatesPage })));
+const PolicyManagementPage   = lazy(() => import('./pages/policy/PolicyManagementPage').then(m => ({ default: m.PolicyManagementPage })));
+const RiskLifecyclePage      = lazy(() => import('./pages/risk-lifecycle/RiskLifecyclePage').then(m => ({ default: m.RiskLifecyclePage })));
+const AuditLifecyclePage     = lazy(() => import('./pages/audit-lifecycle/AuditLifecyclePage').then(m => ({ default: m.AuditLifecyclePage })));
+const PrivacyLifecyclePage   = lazy(() => import('./pages/privacy-lifecycle/PrivacyLifecyclePage').then(m => ({ default: m.PrivacyLifecyclePage })));
+const BcmLifecyclePage       = lazy(() => import('./pages/bcm-lifecycle/BcmLifecyclePage').then(m => ({ default: m.BcmLifecyclePage })));
+const CyberLifecyclePage     = lazy(() => import('./pages/cyber-lifecycle/CyberLifecyclePage').then(m => ({ default: m.CyberLifecyclePage })));
+const LifecycleOverviewPage  = lazy(() => import('./pages/lifecycle-overview/LifecycleOverviewPage').then(m => ({ default: m.LifecycleOverviewPage })));
+const NotificationOutboxPage = lazy(() => import('./pages/notification-outbox/NotificationOutboxPage').then(m => ({ default: m.NotificationOutboxPage })));
+const PdplExtensionsPage     = lazy(() => import('./pages/pdpl-extensions/PdplExtensionsPage').then(m => ({ default: m.PdplExtensionsPage })));
+const RcaPage                = lazy(() => import('./pages/rca/RcaPage').then(m => ({ default: m.RcaPage })));
+const RiskScenariosPage      = lazy(() => import('./pages/risk-scenarios/RiskScenariosPage').then(m => ({ default: m.RiskScenariosPage })));
+const SupplierResiliencePage = lazy(() => import('./pages/supplier-resilience/SupplierResiliencePage').then(m => ({ default: m.SupplierResiliencePage })));
+const EmergingRiskPage       = lazy(() => import('./pages/emerging-risk/EmergingRiskPage').then(m => ({ default: m.EmergingRiskPage })));
+const CommitteesPage         = lazy(() => import('./pages/committees/CommitteesPage').then(m => ({ default: m.CommitteesPage })));
+const DrPlansPage            = lazy(() => import('./pages/dr-plans/DrPlansPage').then(m => ({ default: m.DrPlansPage })));
+const FrameworkControlsPage  = lazy(() => import('./pages/framework-controls/FrameworkControlsPage').then(m => ({ default: m.FrameworkControlsPage })));
+const ContractClausesPage    = lazy(() => import('./pages/contract-clauses/ContractClausesPage').then(m => ({ default: m.ContractClausesPage })));
+const CyberPdplBridgePage    = lazy(() => import('./pages/cyber-pdpl-bridge/CyberPdplBridgePage').then(m => ({ default: m.CyberPdplBridgePage })));
+const EvidenceChainPage      = lazy(() => import('./pages/evidence-chain/EvidenceChainPage').then(m => ({ default: m.EvidenceChainPage })));
+const FourthPartyPage        = lazy(() => import('./pages/fourth-party/FourthPartyPage').then(m => ({ default: m.FourthPartyPage })));
+const DataSharingPage        = lazy(() => import('./pages/data-sharing/DataSharingPage').then(m => ({ default: m.DataSharingPage })));
+const ProcessorAssessmentsPage = lazy(() => import('./pages/processor-assessments/ProcessorAssessmentsPage').then(m => ({ default: m.ProcessorAssessmentsPage })));
+const ThirdPartyCyberPage    = lazy(() => import('./pages/third-party-cyber/ThirdPartyCyberPage').then(m => ({ default: m.ThirdPartyCyberPage })));
+const ResilienceTestsPage    = lazy(() => import('./pages/resilience-tests/ResilienceTestsPage').then(m => ({ default: m.ResilienceTestsPage })));
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 export function App() {
   return (
+    <ErrorBoundary>
     <ThemeProvider>
       <I18nProvider>
         <ToastProvider>
           <DialogProvider>
             <BrowserRouter>
+            <Suspense fallback={<WizardChunkFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<LoginPage />} />
@@ -153,8 +196,10 @@ export function App() {
               <Route path="/bcm/crisis-room"    element={<CrisisRoomPage />} />
               <Route path="/bcm/bia"            element={<BiaWizardPage />} />
               <Route path="/bcm/remediation"    element={<BcmRemediationPage />} />
+              <Route path="/bcm/plans"          element={<BcpBuilderPage />} />
               <Route path="/bcm/settings"       element={<BcmSettingsPage />} />
               <Route path="/bcm/compliance"     element={<BcmComplianceMappingPage />} />
+              <Route path="/bcm/library"        element={<BcmLibraryPage />} />
               <Route path="/scm/dashboard"      element={<ScmDashboardPage />} />
               <Route path="/risk/dashboard"     element={<ErmDashboardPage />} />
               <Route path="/cyber/dashboard"    element={<CyberDashboardPage />} />
@@ -176,6 +221,37 @@ export function App() {
               <Route path="/third-party-cyber"      element={<ThirdPartyCyberPage />} />
               <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
+              <Route path="/buyer-gap"  element={<BuyerGapPage />} />
+
+              {/* Workflow Hub + per-module wizards (Saudi-GRC §7) */}
+              <Route path="/workflows"                              element={<WorkflowHubPage />} />
+              <Route path="/workflows/erm/risk-identification"       element={<RiskIdentificationWizard />} />
+              <Route path="/workflows/pdpl/dsr-fulfilment"           element={<DsrFulfilmentWizard />} />
+              <Route path="/workflows/pdpl/breach-notification"      element={<BreachNotificationWizard />} />
+              <Route path="/workflows/nca/cyber-incident"            element={<CyberIncidentWizard />} />
+              <Route path="/workflows/scm/supplier-onboarding"       element={<SupplierOnboardingWizard />} />
+              <Route path="/workflows/erm/risk-treatment"            element={<RiskTreatmentWizard />} />
+              <Route path="/workflows/erm/risk-treatment/:riskId"    element={<RiskTreatmentWizard />} />
+              <Route path="/workflows/erm/risk-acceptance"           element={<RiskAcceptanceWizard />} />
+              <Route path="/workflows/erm/risk-acceptance/:riskId"   element={<RiskAcceptanceWizard />} />
+              <Route path="/workflows/bcm/exercise"                  element={<BcmExerciseWizard />} />
+              <Route path="/workflows/nca/ecc-assessment"            element={<NcaEccAssessmentWizard />} />
+              <Route path="/workflows/scm/vendor-risk-assessment"    element={<VendorRiskAssessmentWizard />} />
+              <Route path="/workflows/nca/cloud-ccc"                 element={<CloudCccWizard />} />
+              <Route path="/workflows/nca/vulnerability-triage"      element={<VulnerabilityTriageWizard />} />
+              <Route path="/workflows/scm/exit-plan"                 element={<SupplierExitPlanWizard />} />
+              <Route path="/workflows/pdpl/cross-border"             element={<CrossBorderTransferWizard />} />
+              <Route path="/workflows/pdpl/consent"                  element={<ConsentManagementWizard />} />
+              <Route path="/workflows/pdpl/ropa"                     element={<RopaWizard />} />
+              <Route path="/workflows/incident/rca"                  element={<IncidentRcaWizard />} />
+              <Route path="/workflows/governance/management-review"  element={<ManagementReviewWizard />} />
+              <Route path="/workflows/governance/digital-signature"  element={<DigitalSignatureWizard />} />
+              <Route path="/workflows/governance/board-pack"         element={<BoardPackWizard />} />
+              <Route path="/workflows/compliance/control-test"       element={<ControlTestWizard />} />
+
+              {/* Detail + admin pages for V115/V116 modules */}
+              <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />
+              <Route path="/ai/suggestions"                          element={<AiSuggestionsPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />
@@ -232,7 +308,9 @@ export function App() {
                   physical delete. */}
 
               {/* BCM dependency map — B4 */}
-              <Route path="/bcm-dependency"     element={<BcmDependencyPage />} />
+              <Route path="/bcm-dependency"     element={<BcmDependencyGraphPage />} />
+              <Route path="/bcm/dependency"     element={<BcmDependencyGraphPage />} />
+              <Route path="/bcm-dependency/legacy" element={<BcmDependencyPage />} />
 
               {/* ROPA + consent management — B2 */}
               <Route path="/ropa"               element={<RopaPage />} />
@@ -321,10 +399,38 @@ export function App() {
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
+            </Suspense>
             </BrowserRouter>
           </DialogProvider>
         </ToastProvider>
       </I18nProvider>
     </ThemeProvider>
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * Tiny placeholder shown while a lazy chunk loads — keeps the route area
+ * visually anchored so navigation feels instant. Most chunks are 20-40 kB
+ * gzipped so this is rarely on screen for more than ~100 ms on a warm cache.
+ */
+function WizardChunkFallback() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '40vh', color: 'var(--ink-3)',
+      font: '500 14px var(--font-sans)',
+    }} aria-live="polite" aria-busy="true">
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 10,
+        padding: '8px 14px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 999,
+      }}>
+        <span className="wizard-chunk-spinner" aria-hidden="true"/>
+        <span>Loading…</span>
+      </div>
+    </div>
   );
 }

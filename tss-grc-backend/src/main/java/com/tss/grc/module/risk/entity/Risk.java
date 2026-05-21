@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -88,4 +89,15 @@ public class Risk extends BaseEntity {
 
     @Column(name = "compliance_framework_clause", length = 100)
     private String complianceFrameworkClause;
+
+    // ── §5.1 #6 — Periodic risk owner attestation cycle (V115) ────────
+    /** Days between attestations. 90 = quarterly (SAMA default). */
+    @Column(name = "attestation_cadence_days", nullable = false)
+    private Integer attestationCadenceDays = 90;
+
+    @Column(name = "last_attested_at")
+    private LocalDateTime lastAttestedAt;
+
+    @Column(name = "next_attestation_date")
+    private LocalDate nextAttestationDate;
 }

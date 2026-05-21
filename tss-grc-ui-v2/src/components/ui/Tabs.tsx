@@ -1,3 +1,4 @@
+import { type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/cn';
 
 export interface TabItem<T extends string = string> {
@@ -15,6 +16,8 @@ export interface TabItem<T extends string = string> {
    * flag or role (e.g. "Approvals" tab only visible to approvers).
    */
   hidden?: boolean;
+  /** Optional icon shown before the label (Lucide). */
+  Icon?: LucideIcon;
 }
 
 export function Tabs<T extends string>({
@@ -42,6 +45,7 @@ export function Tabs<T extends string>({
           onClick={() => onChange(it.id)}
           type="button"
         >
+          {it.Icon && <it.Icon size={14} strokeWidth={2} className="tab-icon" />}
           {it.label}
           {typeof it.count === 'number' && it.count > 0 && (
             <span className="tab-count" aria-label={`${it.count} items`}>{it.count}</span>

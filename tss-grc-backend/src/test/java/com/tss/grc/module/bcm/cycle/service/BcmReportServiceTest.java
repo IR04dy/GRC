@@ -56,11 +56,17 @@ class BcmReportServiceTest {
     @BeforeEach void setUp() { TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
 
-    @Test void catalog_hasExactly15Reports() {
-        assertThat(service.catalog()).hasSize(15);
+    @Test void catalog_containsAllExpectedReports() {
+        // The original BCM-7 catalog was 15; Tier-4 #25 + #26 added the NCA
+        // cyber-disruption and CMA annual-disclosure reports for KSA regulator
+        // coverage. Assert membership of the canonical set rather than a hard
+        // size so future additions don't keep flipping this test red.
         assertThat(service.catalog())
             .extracting(BcmReportService.ReportDef::code)
-            .contains("BCM_READINESS", "EXECUTIVE_SUMMARY", "RESIDUAL_RISK_HEATMAP");
+            .contains(
+                "BCM_READINESS", "EXECUTIVE_SUMMARY", "RESIDUAL_RISK_HEATMAP",
+                "NCA_CYBER_CONTINUITY", "CMA_ANNUAL_DISCLOSURE");
+        assertThat(service.catalog().size()).isGreaterThanOrEqualTo(15);
     }
 
     @Test void generate_unknownCode_throws() {

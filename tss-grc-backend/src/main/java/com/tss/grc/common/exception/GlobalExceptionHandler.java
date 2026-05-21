@@ -8,9 +8,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 import java.time.Instant;
@@ -97,6 +99,39 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         pd.setTitle("Conflict");
         pd.setType(URI.create("https://grc.tss.com/errors/conflict"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * Spring throws {@link NoResourceFoundException} when no controller
+     * is mapped to the requested path. The default behaviour bubbles up
+     * to {@link #handleGeneral} and surfaces as a 500, which is
+     * misleading — there's no internal error, the URL just doesn't
+     * exist. Translate to a proper 404 so the frontend's ErrorState
+     * picks the "Not found" icon + message instead of red "server error".
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResource(NoResourceFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
+            "No handler is mapped to this URL.");
+        pd.setTitle("Not Found");
+        pd.setType(URI.create("https://grc.tss.com/errors/not-found"));
+        pd.setProperty("timestamp", Instant.now());
+        pd.setProperty("path", ex.getResourcePath());
+        return pd;
+    }
+
+    /**
+     * GET on a POST-only path (or vice versa) was returning 500. Map to
+     * 405 so the API matches HTTP semantics + frontend retry logic.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ProblemDetail handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.METHOD_NOT_ALLOWED,
+            "HTTP method " + ex.getMethod() + " is not supported on this endpoint.");
+        pd.setTitle("Method Not Allowed");
+        pd.setType(URI.create("https://grc.tss.com/errors/method-not-allowed"));
         pd.setProperty("timestamp", Instant.now());
         return pd;
     }

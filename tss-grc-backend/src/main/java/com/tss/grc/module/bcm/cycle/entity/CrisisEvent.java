@@ -108,6 +108,32 @@ public class CrisisEvent {
     @Column(name = "lessons_learned_id")
     private Long lessonsLearnedId;
 
+    // Tier-4 #29 (PDPL Article 23 breach linkage) ─────────────────
+    /**
+     * Stamp set when the crisis service drafts the PDPL Article 23
+     * notification (72-hour window for personal-data breaches). NULL
+     * means: not drafted yet OR not required (personalDataAffected=false).
+     */
+    @Column(name = "pdpl_notification_drafted_at")
+    private LocalDateTime pdplNotificationDraftedAt;
+
+    /** Reference number once the notification is filed with the regulator. */
+    @Column(name = "pdpl_notification_reference", length = 100)
+    private String pdplNotificationReference;
+
+    // ── PDPL Article 23 72-hour deadline (V115 — §5.4 #2) ────────────
+    /**
+     * detection_time + 72 hours when personal_data_affected=true. Null
+     * when personal data is not affected. Maintained by the crisis service
+     * on create + by the §5.4 sweep on demand.
+     */
+    @Column(name = "pdpl_72h_deadline_at")
+    private LocalDateTime pdpl72hDeadlineAt;
+
+    /** True once the deadline has elapsed without notification being drafted. */
+    @Column(name = "pdpl_72h_breached", nullable = false)
+    private Boolean pdpl72hBreached = false;
+
     @Column(name = "created_at", updatable = false) private LocalDateTime createdAt = LocalDateTime.now();
     @Column(name = "updated_at")                    private LocalDateTime updatedAt;
     @Column(name = "created_by")                    private Long createdBy;

@@ -35,13 +35,13 @@ export interface BcmSettings {
 }
 
 export async function getBcmSettings(): Promise<BcmSettings> {
-  return (await api.get<BcmSettings>('/api/v1/bcm/settings')).data;
+  return api.get<BcmSettings>('/api/v1/bcm/settings');
 }
 
 export async function updateBcmSettings(patch: Partial<BcmSettings>): Promise<BcmSettings> {
-  return (await api.patch<BcmSettings>('/api/v1/bcm/settings', patch)).data;
+  return api.patch<BcmSettings>('/api/v1/bcm/settings', patch);
 }
 
 export async function resetBcmSettings(): Promise<BcmSettings> {
-  return (await api.post<BcmSettings>('/api/v1/bcm/settings/reset', {})).data;
+  return api.post<BcmSettings>('/api/v1/bcm/settings/reset', {});
 }
