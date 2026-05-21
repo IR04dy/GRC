@@ -15,6 +15,7 @@ import { useLiveRefresh } from '../lib/useLiveRefresh';
 import { WIDGETS, WIDGETS_BY_ID, type WidgetSize } from './dashboard/widgets';
 import { useDashboardLayout } from './dashboard/useDashboardLayout';
 import { ExecutiveDashboard } from './dashboard/ExecutiveDashboard';
+import { DashboardSubmissionsCard } from '../components/workflows/DashboardSubmissionsCard';
 
 // All entity-change topics broadcast by lifecycle services that move values
 // inside the dashboard's stats response. Subscribing to all of them keeps
@@ -138,6 +139,12 @@ export function DashboardPage() {
        * is the canonical first-impression view; same for every user, no
        * setup. */}
       <ExecutiveDashboard stats={stats} heat={heat} />
+
+      {/* Workflow submissions glance — surfaces the §7 wizard surface
+       * straight onto the dashboard so first-login users see real
+       * activity from every module. Hides itself on empty / error so
+       * a freshly-bootstrapped tenant doesn't show a sad placeholder. */}
+      <DashboardSubmissionsCard />
 
       {/* Optional customizable widget grid — collapsed by default so it
        * doesn't compete with the executive section. Power users expand it
