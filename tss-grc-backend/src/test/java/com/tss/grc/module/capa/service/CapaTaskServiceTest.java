@@ -5,11 +5,13 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.capa.dto.CapaTaskDto;
 import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -20,6 +22,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -36,6 +43,7 @@ class CapaTaskServiceTest {
     private static final String EXT_ID = "CAPA-2026-001";
 
     @Mock private CapaTaskRepository repo;
+    @Mock private AuditLogService    audit;
     @InjectMocks private CapaTaskService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -128,5 +136,58 @@ class CapaTaskServiceTest {
 
         assertThatThrownBy(() -> service.transition("CAPA-X", tx("IN_PROGRESS")))
             .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // ── Audit trail ────────────────────────────────────────────────────
+    // CapaTaskService writes to platform.audit_log on every mutation so the
+    // reusable EntityActivityTimeline card lights up automatically on any
+    // CAPA detail page (pattern from PRs #29-30 / FindingService PR #32).
+
+    @Test
+    void transition_writesAuditLogEntryWithStatusTransition() {
+        CapaTask seed = task("OPEN");
+        seed.setId(99L);
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(seed));
+        when(repo.save(any(CapaTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CapaTaskDto.TransitionRequest t = tx("IN_PROGRESS");
+        t.setProgressNotesEn("Patched the gateway, awaiting verification by IT-Ops");
+        service.transition(EXT_ID, t);
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(audit).log(eq("IN_PROGRESS"), eq("CapaTask"), eq(99L), message.capture());
+        assertThat(message.getValue()).contains("CAPA " + EXT_ID);
+        assertThat(message.getValue()).contains("OPEN → IN_PROGRESS");
+        assertThat(message.getValue()).contains("note: Patched the gateway");
+    }
+
+    @Test
+    void transition_closed_recordsVerifierInAuditMessage() {
+        CapaTask seed = task("AWAITING_VERIFICATION");
+        seed.setId(77L);
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(seed));
+        when(repo.save(any(CapaTask.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CapaTaskDto.TransitionRequest t = tx("CLOSED");
+        t.setVerifiedBy("auditor");
+        service.transition(EXT_ID, t);
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(audit).log(eq("CLOSED"), eq("CapaTask"), eq(77L), message.capture());
+        assertThat(message.getValue()).contains("AWAITING_VERIFICATION → CLOSED");
+        assertThat(message.getValue()).contains("verified by auditor");
+    }
+
+    @Test
+    void transition_otherTenantsRow_doesNotAuditUnderOurTenant() {
+        // Repository must not return rows from other tenants — and a 404
+        // for a foreign-tenant CAPA must NOT leave an audit trail under
+        // OUR tenant, which would otherwise be a cross-tenant info leak.
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.transition(EXT_ID, tx("IN_PROGRESS")))
+            .isInstanceOf(EntityNotFoundException.class);
+
+        verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
     }
 }
