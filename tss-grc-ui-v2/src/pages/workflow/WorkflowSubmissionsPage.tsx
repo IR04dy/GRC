@@ -19,6 +19,7 @@ import {
   WORKFLOWS, MODULE_LABEL, type WorkflowModule,
 } from '../../lib/workflowCatalog';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
+import { SubmissionAnalyticsCard } from '../../components/workflows/SubmissionAnalyticsCard';
 
 /**
  * Workflow Submissions register.
@@ -200,6 +201,16 @@ export function WorkflowSubmissionsPage() {
           <Badge tone="success">{isAr ? 'مُعتمد' : 'Approved'}: {counts.approved}</Badge>
           <Badge tone="danger">{isAr ? 'مرفوض' : 'Rejected'}: {counts.rejected}</Badge>
           <Badge tone="neutral">{isAr ? 'مغلق' : 'Closed'}: {counts.closed}</Badge>
+        </div>
+      )}
+
+      {/* Analytics card — visible-at-a-glance KPIs + 3 charts.
+       *  Computed entirely from the already-fetched items, so the
+       *  filter selection drives what the charts show (e.g. picking
+       *  PDPL narrows the bar chart to only PDPL wizards). */}
+      {items && items.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <SubmissionAnalyticsCard items={items} />
         </div>
       )}
 
