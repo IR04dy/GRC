@@ -1,9 +1,64 @@
 # TSS GRC Platform — Version 2 Status
-**Snapshot Date:** 22 April 2026  
-**Branch Source:** `claude/quirky-borg` (commit `726cd1e`)  
-**Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / Bootstrap 5 RTL / Chart.js 4
+**Last update:** 21 May 2026 (PR #11 — `feat/bcp-builder-graph-mail`)
+**Snapshot Date:** 22 April 2026 (initial), updated continuously
+**Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
+**Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
+
+## 🟢 Recent additions (PR #11 — 30 commits)
+
+### Saudi-GRC buyer-assessment engines
+| Migration | Tables / columns |
+|---|---|
+| **V113** | Cross-border + special-category fields on `processing_activities`; `risk.risk_controls` bridge; index on `evidence_items.review_due_date` |
+| **V115** | `risk.risk_attestations` (quarterly cadence); `evidence.evidence_connectors`; `crisis_events.pdpl_72h_*`; `dsr_cases.sla_breached_at`; `risks.attestation_cadence_days` |
+| **V116** | `ai.ai_suggestions`; `bcm.crisis_aar`; full 28-role Saudi-GRC catalog in `iam.roles` |
+| **V117–V123** | ~1,100 demo rows across 33 tables (Saudi-context vendors, KSA threat intel, bilingual data) |
+| **V124** | UNIQUE INDEX on `bcm.crisis_aar(organisation_id, report_code)` |
+
+### New backend modules
+- `module/ai/` — 5 heuristic generators with persisted DRAFT ledger + human review workflow (LLM gateway is a private-method swap away). Endpoints under `/api/v1/ai/*`.
+- `module/bcm/cycle/CrisisAar*` — NCEMA After-Action Reports with auto-stitched narrative + state machine `DRAFT → UNDER_REVIEW → APPROVED → PUBLISHED → RESCINDED`. Endpoints under `/api/v1/bcm/aars/*`.
+- `module/platform/completion/BuyerGap*` — wraps the V115 sweep endpoints (DSR SLA, PDPL 72h, risk attestation, evidence freshness) + connector registry.
+
+### New frontend
+- **Workflow Hub** at `/workflows` — 35-workflow catalog grouped by module, filterable by status / search
+- **10 wizards** ready to walk end-to-end (ERM Risk ID / Treatment / Acceptance; BCM Exercise; PDPL DSR / Breach; NCA Cyber Incident / ECC; SCM Onboarding / Vendor Risk)
+- `/buyer-gap` — live demo of every V115/V116 endpoint
+- `/bcm/aars/:id` — bilingual AAR editor with state-machine actions
+- `/ai/suggestions` — accept/reject AI drafts with reviewer note
+- **Design-system primitives**: `useLoadable<T>()`, `<ErrorState>`, `<LoadableSection>`, `<ErrorBoundary>`, `<WizardShell>`
+
+### Verification
+| Check | Result |
+|---|---|
+| `mvn test` | **673 / 673 pass** (+31 from this branch) |
+| `tsc --noEmit` | **0 errors** |
+| `vite build` | clean, ~8s |
+| `/actuator/health` | UP |
+| All 56 page-level endpoints | 200 |
+| Backend startup warnings | All silenced |
+
+### Notable bug fixes this PR
+- **🔴 Cross-tenant FK leak** in `linkRiskControl` (would let A persist a bridge row pointing at B's risk_id)
+- **🔴 Backend startup crash** — ambiguous `/api/v1/evidence/connectors` mapping between EvidenceMatrixController and the new BuyerGapController; resolved by routing V115 endpoints under `/connector-registry/*`
+- DSR sweep dedup bug (`Boolean.FALSE.equals(null)` returned false → first-time overdue cases never fired the event)
+- AAR sequence race + missing year scoping + `.size()` doing O(n) row hydration
+- 47 pre-existing TS errors across BCM / Licensing / CrisisRoom / Bcp pages
+- `Cannot find cache named 'licenses'` WARN loop on every login
+- Evidence freshness sweep loaded everything in one batch (OOM risk at scale)
+- `NoResourceFoundException` and `HttpRequestMethodNotSupportedException` mapped to 500 instead of 404 / 405
+
+### Vendor / product-decision blocked
+- Real digital-signature provider adapter (Nafath / Adobe Sign / DocuSign)
+- AI module LLM gateway (heuristic generators ship today)
+- Tier-3 #14 threat-intel live feed
+- Tier-3 #17 supplier portal
+- `PageImpl → VIA_DTO` migration (would break frontend response shape)
+
+---
+
 ## Final Code Path
 the final code in path : C:\AYMAN\Github\Claude-GRC\.claude\worktrees\quirky-borg
 
