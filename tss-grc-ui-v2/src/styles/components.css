@@ -1173,6 +1173,128 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   border-color: var(--border);
 }
 
+/* ── Active-filter chips ────────────────────────────────────────────
+ *  Below the filter form on /workflows/submissions. Each active filter
+ *  renders as a chip with an inline × — one click drops just that
+ *  filter, keeping the rest. "Clear all" remains as a flat text button
+ *  at the end. */
+.wf-active-filters {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 6px;
+}
+.wf-active-filters-label {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.wf-filter-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 4px 4px 10px;
+  background: var(--primary-50, var(--surface-2));
+  border: 1px solid var(--primary-200, var(--border));
+  border-radius: 999px;
+  font: 500 12px var(--font-sans);
+  color: var(--primary-700, var(--ink-1));
+  line-height: 1.2;
+}
+.wf-filter-chip-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px;
+  border: none; background: transparent; cursor: pointer; padding: 0;
+  color: var(--primary-700, var(--ink-2));
+  border-radius: 999px;
+  margin-inline-start: 2px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.wf-filter-chip-remove:hover {
+  background: var(--primary-100, var(--surface-3));
+  color: var(--danger, var(--ink-1));
+}
+.wf-active-filters-clear {
+  border: none; background: transparent; cursor: pointer;
+  padding: 4px 8px;
+  font: 500 12px var(--font-sans);
+  color: var(--ink-3);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.wf-active-filters-clear:hover { color: var(--ink-1); }
+[data-theme="dark"] .wf-filter-chip {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--ink-1);
+}
+
+/* ── Bulk action bar ────────────────────────────────────────────────
+ *  Sticky-top so it stays in reach when the user scrolls a long list
+ *  to find rows to tick. Gets a subtle shadow + brighter background
+ *  once any rows are selected so the call-to-action stands out. */
+.wf-bulkbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--surface-2, #f5f6f8);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  position: sticky;
+  top: var(--header-h, 56px);
+  z-index: 5;
+  transition: box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.wf-bulkbar.is-active {
+  background: var(--surface, #fff);
+  border-color: var(--primary-300, var(--primary, var(--border)));
+  box-shadow: 0 6px 18px -10px rgba(15, 23, 42, 0.22),
+              0 2px 4px -2px rgba(15, 23, 42, 0.10);
+}
+[data-theme="dark"] .wf-bulkbar.is-active {
+  background: var(--surface);
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.55),
+              0 2px 4px -2px rgba(0, 0, 0, 0.40);
+}
+
+/* ── Row title affordance ───────────────────────────────────────────
+ *  Submission title in each card on /workflows/submissions links to
+ *  the detail page. Chevron + hover underline make the link target
+ *  explicit instead of relying on bold-text-as-link cargo cult. */
+.wf-row-title {
+  font: 600 14px var(--font-sans);
+  margin-bottom: 6px;
+}
+.wf-row-title-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: inherit;
+  text-decoration: none;
+  transition: color 120ms ease;
+}
+.wf-row-title-link:hover,
+.wf-row-title-link:focus-visible {
+  color: var(--primary, var(--ink-1));
+}
+.wf-row-title-link:hover span,
+.wf-row-title-link:focus-visible span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.wf-row-title-chevron {
+  color: var(--ink-3);
+  transition: transform 160ms ease, color 120ms ease;
+}
+.wf-row-title-link:hover .wf-row-title-chevron,
+.wf-row-title-link:focus-visible .wf-row-title-chevron {
+  color: var(--primary, var(--ink-1));
+  transform: translateX(2px);
+}
+[dir="rtl"] .wf-row-title-link:hover .wf-row-title-chevron,
+[dir="rtl"] .wf-row-title-link:focus-visible .wf-row-title-chevron {
+  /* Chevron points the other way in RTL so animation mirrors too. */
+  transform: translateX(-2px) scaleX(-1);
+}
+[dir="rtl"] .wf-row-title-chevron { transform: scaleX(-1); }
+
 .wf-review {
   display: flex; flex-direction: column; gap: 4px;
 }

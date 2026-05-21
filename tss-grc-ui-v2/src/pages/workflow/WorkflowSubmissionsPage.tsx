@@ -376,12 +376,51 @@ export function WorkflowSubmissionsPage() {
           <option value="REJECTED">{isAr ? 'مرفوض' : 'Rejected'}</option>
           <option value="CLOSED">{isAr ? 'مغلق' : 'Closed'}</option>
         </select>
-        {(moduleFilter !== 'ALL' || workflowFilter !== 'ALL' || statusFilter !== 'ALL' || query !== '') && (
-          <Button variant="ghost" size="sm" Icon={XIcon} onClick={clearFilters}>
-            {isAr ? 'مسح الكل' : 'Clear all'}
-          </Button>
-        )}
       </div>
+
+      {/* Active-filter chip cluster — replaces the single "Clear all"
+       *  pill from PR #34. Each active filter shows up as its own chip
+       *  with an inline × so the reviewer can see exactly what's
+       *  scoping the list AND drop one constraint without clearing
+       *  everything. Hidden when nothing is active. */}
+      {(moduleFilter !== 'ALL' || workflowFilter !== 'ALL' || statusFilter !== 'ALL' || query !== '') && (
+        <div className="wf-active-filters">
+          <span className="wf-active-filters-label">
+            {isAr ? 'مرشحات نشطة:' : 'Active filters:'}
+          </span>
+          {moduleFilter !== 'ALL' && (
+            <FilterChip
+              label={`${isAr ? 'الوحدة' : 'Module'}: ${isAr ? MODULE_LABEL[moduleFilter].ar : MODULE_LABEL[moduleFilter].en}`}
+              onRemove={() => setModuleFilter('ALL')}/>
+          )}
+          {workflowFilter !== 'ALL' && (
+            <FilterChip
+              label={`${isAr ? 'المعالج' : 'Wizard'}: ${
+                isAr
+                  ? (WORKFLOWS.find(w => w.id === workflowFilter)?.titleAr ?? workflowFilter)
+                  : (WORKFLOWS.find(w => w.id === workflowFilter)?.titleEn ?? workflowFilter)
+              }`}
+              onRemove={() => setWorkflowFilter('ALL')}/>
+          )}
+          {statusFilter !== 'ALL' && (
+            <FilterChip
+              label={`${isAr ? 'الحالة' : 'Status'}: ${statusFilter === 'OPEN'
+                ? (isAr ? 'مفتوحة' : 'Open')
+                : statusFilter.replace('_', ' ').toLowerCase()}`}
+              onRemove={() => setStatusFilter('ALL')}/>
+          )}
+          {query !== '' && (
+            <FilterChip
+              label={`${isAr ? 'بحث' : 'Search'}: "${query}"`}
+              onRemove={() => setQuery('')}/>
+          )}
+          <button className="wf-active-filters-clear"
+                  onClick={clearFilters}
+                  title={isAr ? 'مسح جميع المرشحات' : 'Clear all filters'}>
+            {isAr ? 'مسح الكل' : 'Clear all'}
+          </button>
+        </div>
+      )}
 
       {/* Stats row */}
       {visibleItems.length > 0 && (
@@ -418,12 +457,7 @@ export function WorkflowSubmissionsPage() {
        *  one click rather than four. Selection drops on filter change
        *  or reload so we never act on stale rows. */}
       {openVisibleItems.length > 0 && (
-        <div className="wf-bulkbar" style={{
-          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-          padding: '10px 14px', marginBottom: 14,
-          background: 'var(--surface-2, #f5f6f8)',
-          border: '1px solid var(--border)', borderRadius: 8,
-        }}>
+        <div className={`wf-bulkbar ${selectedIds.size > 0 ? 'is-active' : ''}`}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             <input type="checkbox"
                    checked={selectedIds.size > 0 && selectedIds.size === openVisibleItems.length}
@@ -540,10 +574,13 @@ export function WorkflowSubmissionsPage() {
                     )}
                   </div>
 
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>
+                  <div className="wf-row-title">
                     <Link to={`/workflows/submissions/${s.id}`}
-                          style={{ color: 'inherit', textDecoration: 'none' }}>
-                      {s.titleEn}
+                          className="wf-row-title-link"
+                          title={isAr ? 'فتح التفاصيل' : 'Open detail page'}>
+                      <span>{isAr ? (s.titleAr ?? s.titleEn) : s.titleEn}</span>
+                      <ChevronRight size={14} strokeWidth={2}
+                                    className="wf-row-title-chevron"/>
                     </Link>
                   </div>
                   {s.summaryEn && (
@@ -633,5 +670,21 @@ function Field({ label, full, children }: {
       <span className="wf-label">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** A single chip in the "Active filters" cluster — shows the active value
+ *  and a × that removes JUST this filter, leaving the others in place. */
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="wf-filter-chip">
+      {label}
+      <button type="button"
+              className="wf-filter-chip-remove"
+              onClick={onRemove}
+              aria-label={`Remove filter: ${label}`}>
+        <XIcon size={12} strokeWidth={2.4}/>
+      </button>
+    </span>
   );
 }
