@@ -1,12 +1,79 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PRs #11-42 — wizard arc + audit-timeline + reviewer-journey polish + sidebar inbox pattern + CAPA audit trail)
+**Last update:** 22 May 2026 (PRs #11-56 — wizard arc + audit + F8 parity across all 6 audit-logged services + submissions UX polish)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — thirty-two-PR wizard arc + reviewer-journey polish + sidebar inbox pattern (21 May 2026)
+## 🟢 Recent additions — audit + automation parity arc complete + UX polish (22 May 2026)
+
+After PR #42 closed the CapaTaskService audit trail, **fourteen consecutive PRs (#43-56)** drove the platform from "some services emit forensic events" to **every audit-logged service emits canonical F8 events with seed rules consuming them**. Six services, twelve PRs in pairs (audit/F8 event emission → seed rules), plus one UX polish (#52) and one STATUS refresh (#43). Result: 50 seed rules (AR-1..AR-50) wired across 6 services. Every state change a buyer might care about now wakes up the right actor without manual chasing.
+
+| PR | Merge | What |
+|---|---|---|
+| #43 | `b6e241f` | STATUS.md refresh — captured PRs #40-42 (sidebar CAPA badge + backend regression + CAPA audit trail) |
+| #44 | `42a2ec3` | `CapaWorkflowService` audit-log (compliance CAPA stage machine: OPEN → IMPLEMENTING → OWNER_TESTED → INDEPENDENT_VERIFIED → SIGNED_OFF → CLOSED); transition rows use **result** as actionType (`OWNER_TEST_FAIL`) so a FAIL keeps stage=IMPLEMENTING but the timeline still colours rework distinctly from re-entry |
+| #45 | `2207883` | `FindingDetailPage` History tab now wraps `EntityActivityTimeline` + `EntityAutomationRuns` above the legacy mock — first audit_lc detail page lit up, drop-in identical to AAR/Risk |
+| #46 | `5dd08d8` | **F8 events from CapaTaskService** — `CAPA_TASK_CREATED` + `CAPA_TASK_REVIEWED` with `previousStatus` in payload; `nullSafe()` coercion guards against engine NPE on null fields |
+| #47 | `2c9c108` | **V128 seed rules** — 5 rules (AR-26..AR-30) consuming CAPA events (CRITICAL CAPA → escalate, owner change → notify, overdue → re-route, CLOSED → milestone) |
+| #48 | `9e01b58` | **F8 events from CapaWorkflowService** — single `FINDING_CAPA_STAGE_CHANGED` event from all 5 methods (vs. WorkflowSubmissionService's two-event split); `result` carried in payload so a FAIL rule matches separately from a PASS |
+| #49 | `f372c6c` | **V129 seed rules** — 5 rules (AR-31..AR-35) consuming `FINDING_CAPA_STAGE_CHANGED` (PDPL stage transitions → DPO, owner FAIL → CAPA reopen, independent VERIFY → audit committee, CLOSED → ISO 19011 milestone) |
+| #50 | `5f77c93` | **F8 events from FindingService (audit_lc)** — `FINDING_CREATED` + `FINDING_TRANSITIONED` with `previousStatus`; payload carries `engagementCode`, `severity`, `ownerRole`, `refNumber` so rules can match on any combination |
+| #51 | `519a363` | **V130 seed rules** — 5 rules (AR-36..AR-40) consuming Finding events (CRITICAL → audit lead, MGMT_RESPONSE → engagement partner, IN_REMEDIATION → owner role, AWAITING_VERIFICATION → independent reviewer, CLOSED → IIA Standard 2330 milestone) |
+| #52 | `b7c99e9` | **Submissions register polish** — active-filter chip cluster replaces "Clear all" pill, sticky bulk-action bar with `.is-active` brighten, title-link `chevron-right` affordance with RTL-safe `transform: scaleX(-1)` + `titleAr ?? titleEn` latent-bug fix |
+| #53 | `ab4b894` | **F8 events from CrisisAarService** — normalized 4 distinct `CRISIS_AAR_<status>` events into single `CRISIS_AAR_TRANSITIONED` + condition_json; severity pulled lazily from parent CrisisEvent so rules like "AAR approved for SEV-1" can match |
+| #54 | `e2c22cf` | **V131 seed rules** — 5 rules (AR-41..AR-45) consuming AAR events (SEV-1 → executive sponsor, DRAFT→UNDER_REVIEW → BCM champion, APPROVED → ISO 22301 §10 milestone, PUBLISHED → crisis manager handoff, RESCINDED → escalate audit lead + sponsor) |
+| #55 | `a466e20` | **F8 events + explicit audit from RiskService** — last service to gain canonical audit + F8; 5 transition methods centralised through single `doTransition()` so future transitions can't accidentally skip either; payload carries `riskLevel`, `complianceFrameworkClause` for regulator-anchored routing |
+| #56 | `ac42b06` | **V132 seed rules** — 5 rules (AR-46..AR-50) consuming Risk events (CRITICAL → escalate CRO + sponsor, PDPL-anchored → DPO, OPEN→ACCEPTED without review → SAMA §10.4 governance flag, MITIGATING → owner kickoff, CLOSED → ISO 31000 §6.5 milestone). **Closes the parity arc.** |
+
+### Audit + F8 parity table — final state
+
+| Service | Audit log | F8 events | Seed rules | Test count |
+|---|---|---|---|---|
+| WorkflowSubmissionService | ✓ #20 | ✓ #21 | V127 (AR-21..25) | 22 tests |
+| CapaTaskService | ✓ #42 | ✓ #46 | V128 (AR-26..30) | 6+ tests |
+| CapaWorkflowService | ✓ #44 | ✓ #48 | V129 (AR-31..35) | 4+ tests |
+| FindingService | ✓ #32 | ✓ #50 | V130 (AR-36..40) | 6 tests |
+| CrisisAarService | ✓ pre-existing | ✓ #53 | V131 (AR-41..45) | 14 tests |
+| RiskService | ✓ #55 | ✓ #55 | V132 (AR-46..50) | 18+ tests |
+
+**50 seed rules** total across 6 services. Every state change writes an `audit_log` row AND publishes a canonical `DomainEvent` that the F8 engine evaluates against active rules — buyers see both the **forensic timeline** (humans) and the **automation runs** (machines) on every detail page.
+
+### Reusable forensic-timeline pattern — fully lit
+
+`components/audit/EntityActivityTimeline.tsx` + `components/audit/EntityAutomationRuns.tsx` are a two-line drop-in on any detail page. After PR #45 the pattern hits its full set:
+
+| Detail page | Entity type | Status |
+|---|---|---|
+| `/workflows/submissions/:id` | `WorkflowSubmission` | ✅ #24, #27 |
+| `/bcm/aars/:id` | `CrisisAar` | ✅ #29 |
+| `/risk/:id` (History tab) | `Risk` | ✅ #30 |
+| `/findings/:id` (History tab) | `Finding` | ✅ **#45** |
+| `/capa/:id` | `CapaTask` | service audit-logs + emits F8; detail page = next UX PR |
+
+### Closure-milestone uniformity (AR-29 + AR-40 + AR-43 + AR-50)
+
+Four closure-milestone audit rules now write a uniform shape to `platform.audit_log`. The quarterly NCEMA / SAMA / NCA-ECC filing template can build its "closed this quarter" sections from `audit_log` alone, with no per-service report queries:
+
+| Rule | When | Milestone |
+|---|---|---|
+| AR-29 | CapaTask CLOSED | "CAPA closed" |
+| AR-40 | Finding CLOSED | IIA Standard 2330 closure |
+| AR-43 | AAR APPROVED | ISO 22301 §10 lessons learned |
+| AR-50 | Risk CLOSED | ISO 31000 §6.5 closure |
+
+### Submissions register polish (PR #52)
+
+Three buyer-visible improvements on `/workflows/submissions`:
+
+1. **Active-filter chips** — every applied filter renders as `[Module: PRIVACY ×] [Status: Open ×] [Search: "breach" ×]   Clear all`. Replaces the single "Clear all" pill from #34. Each chip's inline × clears just that filter; URL stays in sync.
+2. **Sticky bulk-action bar** — `position: sticky; top: var(--header-h)`; an `.is-active` modifier (lighter background + soft shadow + primary border) brightens when any rows are selected so the action affordance never scrolls out of view.
+3. **Title-link affordance** — chevron-right after every title nudges right on hover with underline; RTL flips the chevron via `transform: scaleX(-1)` and reverses the nudge direction. Also fixed a latent bug where `titleEn` was rendered unconditionally regardless of UI language — now `isAr ? (s.titleAr ?? s.titleEn) : s.titleEn`.
+
+---
+
+## 🟢 Earlier additions — thirty-two-PR wizard arc + reviewer-journey polish + sidebar inbox pattern (21 May 2026)
 
 After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, twenty follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end, then extracted the forensic-timeline pattern into reusable cards that drop into any detail page. The next seven PRs (#32-38) polished the reviewer journey itself — server-side aggregation, Hub→register drill-down, sidebar inbox badge, bulk-review actions, stale-row signal, free-text search. The final three PRs (#40-42) consolidate: a backend regression test for the new aggregate, the sidebar inbox surface generalised to a pattern (workflow submissions + CAPA today, more in 3-line additions), and CAPA mutations now write to the forensic audit log so the reusable timeline card extends to corrective-action surfaces:
 
