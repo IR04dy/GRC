@@ -1,0 +1,126 @@
+package com.tss.grc.module.platform.calendar.dto;
+
+import com.tss.grc.module.platform.calendar.entity.CalendarEvent;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.*;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+/**
+ * Unified calendar-event DTO. Two flavours:
+ *
+ *   - {@code source = "USER"}    — round-trips from {@link CalendarEvent}
+ *     (the persisted user-created + public-holiday rows).
+ *   - {@code source = "AGGREGATED"} — synthetic rows the
+ *     {@code CalendarService} builds on the fly from dated GRC
+ *     entities (workflow submissions, CAPA tasks, risk attestations,
+ *     finding remediations, AAR reviews, DR tests, DSR cases, report
+ *     schedules). These have no persisted PK; they carry the source
+ *     entity's {@code entityType + entityId} so the UI can navigate
+ *     straight to its detail page.
+ *
+ * The frontend doesn't care which flavour a row is — both render
+ * identically in the month grid + agenda. The {@code source} field
+ * just lets the UI offer a "delete" affordance on USER rows and a
+ * read-only chip on AGGREGATED rows.
+ */
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class CalendarEventDto {
+
+    /** Persisted PK for USER rows; null for AGGREGATED rows. */
+    private Long id;
+
+    /** Stable identifier for client-side keying. AGGREGATED rows use
+     *  a deterministic synthetic UUID from {@code entityType+entityId}. */
+    private UUID externalId;
+
+    /** USER (persisted) | AGGREGATED (synthesised from a GRC entity). */
+    @NotBlank private String source;
+
+    @NotBlank private String titleEn;
+    private String titleAr;
+    private String descriptionEn;
+    private String descriptionAr;
+
+    @NotBlank private String eventType;
+
+    @NotNull   private LocalDateTime startsAt;
+    private LocalDateTime endsAt;
+    private Boolean allDay;
+
+    private String location;
+    private Long   ownerId;
+    private String ownerLabel;   // resolved by the service for UI display
+
+    private String severity;
+    private String entityType;
+    private Long   entityId;
+
+    private String reminderDays;
+
+    @Pattern(regexp = "NONE|DAILY|WEEKLY|MONTHLY|QUARTERLY|ANNUAL")
+    private String recurrence;
+
+    private LocalDate recurrenceUntil;
+
+    private Boolean isHoliday;
+    private String  status;
+
+    /** Workday hint for the frontend — true if the date is a Saudi
+     *  business day (Sun-Thu and not a public holiday). The
+     *  CalendarService stamps this server-side so the workday
+     *  awareness is consistent with the F8 reminder scheduler. */
+    private Boolean onWorkday;
+
+    public static CalendarEventDto fromEntity(CalendarEvent e) {
+        return CalendarEventDto.builder()
+            .id(e.getId())
+            .externalId(e.getExternalId())
+            .source("USER")
+            .titleEn(e.getTitleEn())
+            .titleAr(e.getTitleAr())
+            .descriptionEn(e.getDescriptionEn())
+            .descriptionAr(e.getDescriptionAr())
+            .eventType(e.getEventType())
+            .startsAt(e.getStartsAt())
+            .endsAt(e.getEndsAt())
+            .allDay(e.getAllDay())
+            .location(e.getLocation())
+            .ownerId(e.getOwnerId())
+            .severity(e.getSeverity())
+            .entityType(e.getEntityType())
+            .entityId(e.getEntityId())
+            .reminderDays(e.getReminderDays())
+            .recurrence(e.getRecurrence())
+            .recurrenceUntil(e.getRecurrenceUntil())
+            .isHoliday(e.getIsHoliday())
+            .status(e.getStatus())
+            .build();
+    }
+
+    /** Inbound payload from the create / update endpoints. */
+    @Getter @Setter @NoArgsConstructor
+    public static class CreateRequest {
+        @NotBlank private String titleEn;
+        private String titleAr;
+        private String descriptionEn;
+        private String descriptionAr;
+        @NotBlank @Pattern(regexp = "AUDIT_DAY|REPORT_DEADLINE|WORKFLOW_DEADLINE|CAPA_DUE|RISK_ATTESTATION|FINDING_DEADLINE|AAR_REVIEW|DR_TEST|DSR_DEADLINE|MEETING|REMINDER|TRAINING|CUSTOM")
+        private String eventType;
+        @NotNull private LocalDateTime startsAt;
+        private LocalDateTime endsAt;
+        private Boolean allDay;
+        private String location;
+        private Long   ownerId;
+        private String severity;
+        private String entityType;
+        private Long   entityId;
+        private String reminderDays;
+        private String recurrence;
+        private LocalDate recurrenceUntil;
+    }
+}
