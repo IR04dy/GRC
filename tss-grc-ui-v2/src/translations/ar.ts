@@ -832,6 +832,7 @@ export const ar = {
   approvalsSub:            'طابور موافقات موحّد عبر جميع الوحدات — صندوق واحد لكل اعتماد',
   approvalsEyebrow:        'محرّك الموافقات',
   approvalsPageSub:        'طابور موحّد لكل موافقة متوازية أو تسلسلية أو شرطية تُرفعها المنصة. كل طلب يحمل مرجعاً تنظيمياً سعودياً وعدّاد SLA حيّ يُديره محرّك السبرنت الرابع.',
+  approvalsWorkflowSubmissionsLink: 'سجلات المعالجات',
   approvalsKpiPending:     'قيد الانتظار',
   approvalsKpiDueSoon:     'مستحقّ خلال 5 أيام',
   approvalsKpiOverdue:     'متأخّر',
