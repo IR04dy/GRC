@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   CheckCheck, ChevronRight, ClipboardCheck, Download, FileText, Filter,
   PauseCircle, Workflow as WorkflowIcon, X as XIcon,
@@ -35,6 +35,7 @@ import { SubmissionAnalyticsCard } from '../../components/workflows/SubmissionAn
  * rows are invisible to the user once the wizard's toast clears.
  */
 type ModuleFilter = WorkflowModule | 'ALL';
+type StatusFilter = 'ALL' | 'OPEN' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'CLOSED';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT:        'neutral',
@@ -45,13 +46,49 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   CLOSED:       'neutral',
 };
 
+/** Whether a row matches the status filter. {@code OPEN} is the union
+ *  shown on the Hub's "1 open" badge: SUBMITTED + UNDER_REVIEW. */
+function matchesStatus(rowStatus: string, filter: StatusFilter): boolean {
+  if (filter === 'ALL')  return true;
+  if (filter === 'OPEN') return rowStatus === 'SUBMITTED' || rowStatus === 'UNDER_REVIEW';
+  return rowStatus === filter;
+}
+
 export function WorkflowSubmissionsPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const toast = useToast();
 
-  const [moduleFilter, setModuleFilter] = useState<ModuleFilter>('ALL');
-  const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
+  // Filters survive page reloads + Hub drill-downs via URL search params.
+  // Hub badges link here as ?workflowId=<id>&status=OPEN, so the register
+  // opens already scoped to "the 1 open RoPA submission" instead of
+  // "all 380 submissions, find your needle." Updating a filter rewrites
+  // the URL so the back-button and shared links both behave.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const moduleFilter   = (searchParams.get('module')     as ModuleFilter) ?? 'ALL';
+  const workflowFilter =  searchParams.get('workflowId') ?? 'ALL';
+  const statusFilter   = (searchParams.get('status')     as StatusFilter) ?? 'ALL';
+
+  function setModuleFilter(m: ModuleFilter) {
+    const next = new URLSearchParams(searchParams);
+    if (m === 'ALL') next.delete('module'); else next.set('module', m);
+    // Clear workflowId when module changes — the old workflowId may not
+    // belong to the new module (catalog UX rule).
+    next.delete('workflowId');
+    setSearchParams(next, { replace: true });
+  }
+  function setWorkflowFilter(w: string) {
+    const next = new URLSearchParams(searchParams);
+    if (w === 'ALL') next.delete('workflowId'); else next.set('workflowId', w);
+    setSearchParams(next, { replace: true });
+  }
+  function setStatusFilter(s: StatusFilter) {
+    const next = new URLSearchParams(searchParams);
+    if (s === 'ALL') next.delete('status'); else next.set('status', s);
+    setSearchParams(next, { replace: true });
+  }
+  function clearFilters() { setSearchParams(new URLSearchParams(), { replace: true }); }
+
   const [items, setItems] = useState<WorkflowSubmissionDto[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +117,14 @@ export function WorkflowSubmissionsPage() {
   }
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, [moduleFilter, workflowFilter]);
 
+  // Status is filtered client-side. The backend endpoint takes workflowId
+  // and module but not status — adding a server filter would only save a
+  // few KB per page-load and the bigger win was the per-wizard aggregate
+  // query (PR #33). Keep the surface area small.
+  const visibleItems = useMemo(
+    () => (items ?? []).filter(s => matchesStatus(s.status, statusFilter)),
+    [items, statusFilter]);
+
   async function review(id: number, decision: 'APPROVE' | 'REJECT' | 'CLOSE') {
     setBusyId(id);
     try {
@@ -97,22 +142,21 @@ export function WorkflowSubmissionsPage() {
   }
 
   const counts = useMemo(() => {
-    if (!items) return { submitted: 0, underReview: 0, approved: 0, rejected: 0, closed: 0 };
     return {
-      submitted:   items.filter(s => s.status === 'SUBMITTED').length,
-      underReview: items.filter(s => s.status === 'UNDER_REVIEW').length,
-      approved:    items.filter(s => s.status === 'APPROVED').length,
-      rejected:    items.filter(s => s.status === 'REJECTED').length,
-      closed:      items.filter(s => s.status === 'CLOSED').length,
+      submitted:   visibleItems.filter(s => s.status === 'SUBMITTED').length,
+      underReview: visibleItems.filter(s => s.status === 'UNDER_REVIEW').length,
+      approved:    visibleItems.filter(s => s.status === 'APPROVED').length,
+      rejected:    visibleItems.filter(s => s.status === 'REJECTED').length,
+      closed:      visibleItems.filter(s => s.status === 'CLOSED').length,
     };
-  }, [items]);
+  }, [visibleItems]);
 
   /** Export the currently-filtered rows as CSV. Regulator-visible columns
    *  only; the full JSON payload is intentionally excluded (export is for
    *  offline review + audit retention, not data re-import). */
   function exportCsv() {
-    if (!items || items.length === 0) return;
-    const rows: ExportRow[] = items.map(s => {
+    if (visibleItems.length === 0) return;
+    const rows: ExportRow[] = visibleItems.map(s => {
       const cat = WORKFLOWS.find(w => w.id === s.workflowId);
       return {
         id:                 s.id,
@@ -136,10 +180,11 @@ export function WorkflowSubmissionsPage() {
     const suffix = workflowFilter !== 'ALL' ? `-${workflowFilter}`
                  : moduleFilter   !== 'ALL' ? `-${moduleFilter.toLowerCase()}`
                  : '';
-    downloadCsv(rows, stampFilename(`workflow-submissions${suffix}`, 'csv'));
+    const statusSuffix = statusFilter !== 'ALL' ? `-${statusFilter.toLowerCase()}` : '';
+    downloadCsv(rows, stampFilename(`workflow-submissions${suffix}${statusSuffix}`, 'csv'));
     toast.success(isAr
-      ? `تم تصدير ${items.length} سجل بصيغة CSV`
-      : `Exported ${items.length} submissions to CSV`);
+      ? `تم تصدير ${visibleItems.length} سجل بصيغة CSV`
+      : `Exported ${visibleItems.length} submissions to CSV`);
   }
 
   return (
@@ -153,10 +198,10 @@ export function WorkflowSubmissionsPage() {
         actions={
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <Button variant="secondary" size="sm" Icon={Download}
-                    disabled={!items || items.length === 0}
+                    disabled={visibleItems.length === 0}
                     onClick={exportCsv}>
               {isAr ? 'تصدير CSV' : 'Export CSV'}
-              {items && items.length > 0 ? ` (${items.length})` : ''}
+              {visibleItems.length > 0 ? ` (${visibleItems.length})` : ''}
             </Button>
             <Link to="/workflows">
               <Button variant="ghost" size="sm" Icon={WorkflowIcon}>
@@ -191,10 +236,26 @@ export function WorkflowSubmissionsPage() {
             </option>
           ))}
         </select>
+        <select className="input"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value as StatusFilter)}>
+          <option value="ALL">{isAr ? 'كل الحالات' : 'All statuses'}</option>
+          <option value="OPEN">{isAr ? 'مفتوحة (مُرسل + قيد المراجعة)' : 'Open (Submitted + Under review)'}</option>
+          <option value="SUBMITTED">{isAr ? 'مُرسل' : 'Submitted'}</option>
+          <option value="UNDER_REVIEW">{isAr ? 'قيد المراجعة' : 'Under review'}</option>
+          <option value="APPROVED">{isAr ? 'مُعتمد' : 'Approved'}</option>
+          <option value="REJECTED">{isAr ? 'مرفوض' : 'Rejected'}</option>
+          <option value="CLOSED">{isAr ? 'مغلق' : 'Closed'}</option>
+        </select>
+        {(moduleFilter !== 'ALL' || workflowFilter !== 'ALL' || statusFilter !== 'ALL') && (
+          <Button variant="ghost" size="sm" Icon={XIcon} onClick={clearFilters}>
+            {isAr ? 'مسح الكل' : 'Clear all'}
+          </Button>
+        )}
       </div>
 
       {/* Stats row */}
-      {items && items.length > 0 && (
+      {visibleItems.length > 0 && (
         <div style={{ display: 'flex', gap: 12, margin: '16px 0', flexWrap: 'wrap' }}>
           <Badge tone="info">{isAr ? 'مُرسل' : 'Submitted'}: {counts.submitted}</Badge>
           <Badge tone="warning">{isAr ? 'قيد المراجعة' : 'Under review'}: {counts.underReview}</Badge>
@@ -205,12 +266,12 @@ export function WorkflowSubmissionsPage() {
       )}
 
       {/* Analytics card — visible-at-a-glance KPIs + 3 charts.
-       *  Computed entirely from the already-fetched items, so the
-       *  filter selection drives what the charts show (e.g. picking
-       *  PDPL narrows the bar chart to only PDPL wizards). */}
-      {items && items.length > 0 && (
+       *  Computed from the already-filtered visibleItems, so picking
+       *  PDPL narrows the bar chart to only PDPL wizards and picking
+       *  status=OPEN narrows to only in-flight rows. */}
+      {visibleItems.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <SubmissionAnalyticsCard items={items} />
+          <SubmissionAnalyticsCard items={visibleItems} />
         </div>
       )}
 
@@ -218,11 +279,21 @@ export function WorkflowSubmissionsPage() {
         loading={loading}
         error={error}
         onRetry={reload}
-        data={items}
-        emptyTitle={isAr ? 'لا سجلات بعد' : 'No submissions yet'}
-        emptySub={isAr
-          ? 'ابدأ من كتالوج المعالجات لإنشاء أول سجل.'
-          : 'Walk a wizard from the catalog to create the first submission.'}>
+        data={visibleItems}
+        emptyTitle={
+          // When filters narrow to zero rows, show a filter-specific
+          // empty state so the user understands *why* it's empty.
+          (items?.length ?? 0) > 0 && visibleItems.length === 0
+            ? (isAr ? 'لا سجلات تطابق المرشحات' : 'No submissions match the filters')
+            : (isAr ? 'لا سجلات بعد' : 'No submissions yet')}
+        emptySub={
+          (items?.length ?? 0) > 0 && visibleItems.length === 0
+            ? (isAr
+                ? `إزالة المرشحات تكشف ${items?.length ?? 0} سجل.`
+                : `Clearing filters reveals ${items?.length ?? 0} submission${(items?.length ?? 0) === 1 ? '' : 's'}.`)
+            : (isAr
+                ? 'ابدأ من كتالوج المعالجات لإنشاء أول سجل.'
+                : 'Walk a wizard from the catalog to create the first submission.')}>
         {(rows) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {rows.map(s => {

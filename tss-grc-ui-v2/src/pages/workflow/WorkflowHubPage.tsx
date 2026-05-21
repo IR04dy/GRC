@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Workflow, ChevronRight, ClipboardList } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -36,6 +36,7 @@ interface PerWizardCounts {
 export function WorkflowHubPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
+  const navigate = useNavigate();
   const [moduleFilter, setModuleFilter] = useState<WorkflowModule | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<WorkflowStatus | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
@@ -174,13 +175,33 @@ export function WorkflowHubPage() {
                     {(() => {
                       const c = submissionCounts[w.id];
                       if (!c || c.total === 0) return null;
-                      // Compact "3 · 1 open" / "٣ · ١ قيد المراجعة" — wide
-                      // enough to convey activity without crowding the card.
+                      // Click → drill into Submissions register pre-filtered
+                      // for this wizard (and to OPEN if any are in-flight,
+                      // matching the warning tone). Stop propagation so the
+                      // outer card link to the wizard route doesn't also fire.
+                      const target = `/workflows/submissions?workflowId=${encodeURIComponent(w.id)}`
+                                   + (c.open > 0 ? '&status=OPEN' : '');
+                      const drillTitle = isAr
+                        ? `عرض ${c.total} سجل في السجل`
+                        : `View ${c.total} submission${c.total === 1 ? '' : 's'} in the register`;
                       return (
-                        <Badge tone={c.open > 0 ? 'warning' : 'success'}>
-                          {c.total} {isAr ? 'سجل' : 'submitted'}
-                          {c.open > 0 ? ` · ${c.open} ${isAr ? 'مفتوحة' : 'open'}` : ''}
-                        </Badge>
+                        <span
+                          role="link"
+                          tabIndex={0}
+                          title={drillTitle}
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate(target); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.stopPropagation(); e.preventDefault(); navigate(target);
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <Badge tone={c.open > 0 ? 'warning' : 'success'}>
+                            {c.total} {isAr ? 'سجل' : 'submitted'}
+                            {c.open > 0 ? ` · ${c.open} ${isAr ? 'مفتوحة' : 'open'}` : ''}
+                          </Badge>
+                        </span>
                       );
                     })()}
                   </div>
