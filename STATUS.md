@@ -1,12 +1,12 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PR #11 — `feat/bcp-builder-graph-mail`, post-wizard-sweep)
+**Last update:** 21 May 2026 (PR #11 — `feat/bcp-builder-graph-mail`, post-bundle-split)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions (PR #11 — 33 commits)
+## 🟢 Recent additions (PR #11 — 39 commits)
 
 ### Saudi-GRC buyer-assessment engines
 | Migration | Tables / columns |
@@ -42,10 +42,22 @@
 |---|---|
 | `mvn test` | **673 / 673 pass** (+31 from this branch) |
 | `tsc --noEmit` | **0 errors** |
-| `vite build` | clean, ~8s |
+| `vite build` | clean, ~6.5s, 95+ route chunks |
 | `/actuator/health` | UP |
 | All 56 page-level endpoints | 200 |
 | Backend startup warnings | All silenced |
+
+### Bundle performance (cumulative across both code-split commits)
+| Metric | Pre-split | After wizards | After full split | Total Δ |
+|---|---|---|---|---|
+| Main bundle raw | 3,588 kB | 3,430 kB | **1,530 kB** | **−2,058 kB (−57%)** |
+| Main bundle gzip | 1,002 kB | 964 kB | **468 kB** | **−534 kB (−53%)** |
+| Off-route chunks | 0 | 20 | 95+ | each 5-40 kB |
+
+Initial JS now under 500 kB gzipped — meaningful TTI gain on low-bandwidth Saudi data networks. Every off-route page (wizards, lifecycle, detail, portal, intake forms, admin, KB, framework packs, dependency graph, etc.) fetched on demand via React.lazy + Suspense.
+
+### Module-page wizard chips (PR #11 D-side)
+Every module landing page (`/privacy`, `/bcm`, `/scm`, `/cyber`, `/risk`, `/compliance`, `/incidents`) now surfaces a horizontal chip strip of all AVAILABLE wizards for that module — auto-synced to the catalog so future wizards appear without per-page edits. See `WorkflowQuickLaunch.tsx`.
 
 ### Notable bug fixes this PR
 - **🔴 Cross-tenant FK leak** in `linkRiskControl` (would let A persist a bridge row pointing at B's risk_id)
