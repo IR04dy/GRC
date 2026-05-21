@@ -56,8 +56,8 @@ END
 -- Saudi public sector observes 4 consecutive days (29 Ramadan / Day-1
 -- of Eid Al-Fitr + 3 days). Final dates confirmed ~24h before by
 -- the Council of Senior Scholars based on moon sighting.
-DECLARE @eid_fitr DATE;
-SET @eid_fitr = '2026-03-20';  -- Provisional — refresh before Feb 2026.
+DECLARE @eid_fitr DATETIME2;
+SET @eid_fitr = '2026-03-20T00:00:00';  -- Provisional — refresh before Feb 2026.
 
 IF NOT EXISTS (SELECT 1 FROM platform.calendar_events
                WHERE organisation_id = @org AND is_holiday = 1
@@ -90,8 +90,8 @@ END
 
 -- Eid Al-Adha 1447 AH — 10 Dhul-Hijjah ≈ 27 May 2026. Saudi public
 -- sector observes 4 consecutive days (Day of Arafah + 3 Eid days).
-DECLARE @eid_adha DATE;
-SET @eid_adha = '2026-05-26';  -- Day of Arafah; Eid Day 1 = 27 May.
+DECLARE @eid_adha DATETIME2;
+SET @eid_adha = '2026-05-26T00:00:00';  -- Day of Arafah; Eid Day 1 = 27 May.
 
 IF NOT EXISTS (SELECT 1 FROM platform.calendar_events
                WHERE organisation_id = @org AND is_holiday = 1

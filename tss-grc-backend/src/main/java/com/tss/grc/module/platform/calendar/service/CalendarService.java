@@ -138,6 +138,22 @@ public class CalendarService {
         return out;
     }
 
+    /**
+     * iCalendar (.ics) export of the same window. Buyers wire this
+     * into Outlook / Google as a read-only subscription so calendar
+     * deadlines never leave the GRC system unsynced.
+     *
+     * <p>Returns the .ics body as a string; the controller adds the
+     * {@code text/calendar} headers. The export is read-only by
+     * design — the .ics is a snapshot, not a write-back channel.
+     */
+    @Transactional(readOnly = true)
+    public String exportIcs(LocalDate from, LocalDate to, List<String> types) {
+        List<CalendarEventDto> rows = listInWindow(from, to, types);
+        String name = "TSS GRC — " + from + " → " + to;
+        return IcsBuilder.build(rows, name);
+    }
+
     /** Quick "What's on the calendar" panel for an entity detail
      *  page — lists every persisted event linked to that entity. */
     @Transactional(readOnly = true)

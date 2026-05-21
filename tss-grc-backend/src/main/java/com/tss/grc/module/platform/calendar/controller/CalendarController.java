@@ -5,9 +5,13 @@ import com.tss.grc.module.platform.calendar.service.CalendarService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -39,6 +43,33 @@ public class CalendarController {
             ? null
             : Arrays.asList(types.split(","));
         return service.listInWindow(from, to, typeFilter);
+    }
+
+    /**
+     * iCalendar (.ics) feed for the same window. Buyers point Outlook
+     * (File → Account Settings → Internet Calendars) or Google
+     * (Settings → Add calendar → From URL) at this URL to subscribe.
+     *
+     * <p>The response is plain {@code text/calendar; charset=utf-8}
+     * with a {@code Content-Disposition: attachment} hint so a
+     * browser download saves a sensibly-named .ics file too.
+     */
+    @GetMapping(value = "/events.ics", produces = "text/calendar; charset=UTF-8")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> exportIcs(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String types) {
+        List<String> typeFilter = types == null || types.isBlank()
+            ? null
+            : Arrays.asList(types.split(","));
+        String body = service.exportIcs(from, to, typeFilter);
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/calendar; charset=UTF-8"));
+        headers.setContentDispositionFormData(
+            "attachment", "tss-grc-calendar-" + from + "-to-" + to + ".ics");
+        return new ResponseEntity<>(bytes, headers, org.springframework.http.HttpStatus.OK);
     }
 
     /** "On the calendar" panel — every persisted event linked to
