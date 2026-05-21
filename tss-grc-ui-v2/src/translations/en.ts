@@ -2822,6 +2822,15 @@ export const en = {
   // Workflow Hub — catalog of every Saudi-GRC §7 wizard
   wfHubSidebar:           'Workflow Hub',
   wfSubmissionsSidebar:   'Workflow Submissions',
+  calendarSidebar:        'Calendar',
+  calendarEyebrow:        'Compliance Calendar',
+  calendarTitle:          'Calendar',
+  calendarSub:            'Saudi-workdays-aware view of audit days, deadlines, attestations, and reminders.',
+  calendarSwitchAgenda:   'Agenda view',
+  calendarSwitchMonth:    'Month view',
+  calendarNewEvent:       'New event',
+  calendarLoading:        'Loading…',
+  calendarEventCreated:   'Event created',
 
   // Executive lifecycle overview — all 5 pipelines on one screen
   loSidebar:              'Lifecycle overview',
