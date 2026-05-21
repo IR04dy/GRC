@@ -94,6 +94,16 @@ public class BuyerGapService {
                                        String effectiveness, BigDecimal contributionPct,
                                        String notes) {
         Long o = org();
+        // SECURITY: verify the risk belongs to the caller's tenant BEFORE
+        // creating the bridge row. Without this check a caller from org A
+        // could pass a riskId belonging to org B and we'd happily create a
+        // risk_controls row stamping `organisation_id = A` but
+        // `risk_id = (a row in B)` — a cross-tenant FK leak.
+        risks.findById(riskId)
+            .filter(r -> Objects.equals(r.getOrganisationId(), o))
+            .orElseThrow(() -> new EntityNotFoundException(
+                "Risk " + riskId + " not found for tenant " + o));
+
         RiskControl row = riskControls.findByOrganisationIdAndRiskIdAndControlId(o, riskId, controlId)
             .orElseGet(RiskControl::new);
         row.setOrganisationId(o);
@@ -385,9 +395,17 @@ public class BuyerGapService {
         long fired = 0;
         LocalDateTime now = LocalDateTime.now();
         for (DsrCase c : overdue) {
-            if (c.getSlaBreachedAt() == null) c.setSlaBreachedAt(now);
-            // Only fire the F8 event once per case — idempotency flag.
-            if (Boolean.FALSE.equals(c.getSlaBreachNotified())) {
+            boolean stampedNow = false;
+            if (c.getSlaBreachedAt() == null) {
+                c.setSlaBreachedAt(now);
+                stampedNow = true;
+            }
+            // CORRECTNESS: dedup against `!Boolean.TRUE.equals(...)` not
+            // `Boolean.FALSE.equals(...)` — the latter returns false when
+            // the flag is null, which is the OPPOSITE of what we want
+            // (a null flag means "never notified" and SHOULD fire).
+            boolean shouldFire = !Boolean.TRUE.equals(c.getSlaBreachNotified());
+            if (shouldFire) {
                 eventPublisher.publishEvent(new DomainEvent(
                     o, "PDPL_DSR_SLA_BREACH", "DsrCase", c.getId(), null,
                     Map.of("externalId", String.valueOf(c.getExternalId()),
@@ -396,11 +414,18 @@ public class BuyerGapService {
                            "status", String.valueOf(c.getStatus()))));
                 c.setSlaBreachNotified(true);
                 fired++;
+                // Only write the audit row on the first detection. Prior
+                // code logged on every sweep run → tens of duplicate rows
+                // per overdue case once a daily sweep was wired.
+                audit.log("SLA_BREACH", "DsrCase", c.getId(),
+                    "DSR " + c.getExternalId() + " missed PDPL 30-day SLA (deadline "
+                    + c.getSlaDeadline() + ")");
             }
-            dsrCases.save(c);
-            audit.log("SLA_BREACH", "DsrCase", c.getId(),
-                "DSR " + c.getExternalId() + " missed PDPL 30-day SLA (deadline "
-                + c.getSlaDeadline() + ")");
+            // Only save when something actually changed — avoids
+            // gratuitous UPDATEs + audit-interceptor noise.
+            if (stampedNow || shouldFire) {
+                dsrCases.save(c);
+            }
         }
         return new DsrSlaSweepResult(overdue.size(), fired);
     }
@@ -431,9 +456,11 @@ public class BuyerGapService {
         for (CrisisEvent ce : all) {
             if (!Boolean.TRUE.equals(ce.getPersonalDataAffected())) continue;
             pd++;
+            boolean changed = false;
             if (ce.getPdpl72hDeadlineAt() == null && ce.getDetectionTime() != null) {
                 ce.setPdpl72hDeadlineAt(ce.getDetectionTime().plusHours(72));
                 set++;
+                changed = true;
             }
             if (ce.getPdpl72hDeadlineAt() != null
                 && ce.getPdplNotificationDraftedAt() == null
@@ -441,6 +468,7 @@ public class BuyerGapService {
                 && !Boolean.TRUE.equals(ce.getPdpl72hBreached())) {
                 ce.setPdpl72hBreached(true);
                 breached++;
+                changed = true;
                 eventPublisher.publishEvent(new DomainEvent(
                     o, "PDPL_72H_BREACH", "CrisisEvent", ce.getId(), null,
                     Map.of("eventCode", String.valueOf(ce.getEventCode()),
@@ -449,7 +477,13 @@ public class BuyerGapService {
                 audit.log("PDPL_72H_BREACH", "CrisisEvent", ce.getId(),
                     "Crisis " + ce.getEventCode() + " missed PDPL 72-hour window");
             }
-            crises.save(ce);
+            // PERFORMANCE: only persist when we actually mutated the row.
+            // The prior unconditional save() fired Hibernate UPDATEs +
+            // F7 audit-interceptor rows for every event scanned, even
+            // ones that weren't touched.
+            if (changed) {
+                crises.save(ce);
+            }
         }
         return new Pdpl72hSweepResult(pd, set, breached);
     }

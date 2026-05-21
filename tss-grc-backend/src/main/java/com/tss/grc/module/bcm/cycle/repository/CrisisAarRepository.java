@@ -12,4 +12,7 @@ public interface CrisisAarRepository extends JpaRepository<CrisisAar, Long> {
         Long organisationId, Long crisisEventId);
     Optional<CrisisAar> findByOrganisationIdAndReportCode(Long organisationId, String reportCode);
     long countByOrganisationIdAndStatus(Long organisationId, String status);
+
+    /** Used by the report-code sequencer — count rows per year cheaply. */
+    long countByOrganisationIdAndReportCodeStartingWith(Long organisationId, String prefix);
 }

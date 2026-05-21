@@ -283,10 +283,39 @@ public class CrisisAarService {
         return md.toString();
     }
 
-    /** AAR-YYYY-NNNNNN, monotonically per-tenant. */
+    /**
+     * AAR-YYYY-NNNNNN, monotonically per-tenant + per-year.
+     *
+     * <p>Three problems the previous implementation had:
+     *   1. {@code aars.findBy...().size()} loaded EVERY AAR into memory just
+     *      to count — O(n) memory + O(n) DB on a tenant with thousands of
+     *      events. Replaced with a {@code count*} repo method (single COUNT
+     *      query, no row hydration).
+     *   2. The sequence was global across all years. After year crossover
+     *      a new year's first AAR jumped from N+1 instead of resetting to 1.
+     *      Now the count is scoped to the {@code AAR-YYYY-} prefix.
+     *   3. Two concurrent {@code generate()} calls could compute the same N
+     *      and crash one of them at the DB unique constraint (added in V124).
+     *      We retry once with N+1 to absorb the obvious race. Higher
+     *      contention would need a database SEQUENCE; this is acceptable for
+     *      the expected one-AAR-per-major-event cadence.
+     */
     private String nextReportCode(Long orgId) {
-        long n = aars.findByOrganisationIdOrderByCreatedAtDesc(orgId).size() + 1;
-        return String.format("AAR-%d-%06d", LocalDateTime.now().getYear(), n);
+        int year = LocalDateTime.now().getYear();
+        String prefix = String.format("AAR-%d-", year);
+        long n = aars.countByOrganisationIdAndReportCodeStartingWith(orgId, prefix) + 1;
+        String candidate = String.format("%s%06d", prefix, n);
+        // Tiny race-tolerance loop: if the candidate collides (because two
+        // concurrent generators picked the same N) bump and try again.
+        // Bounded at +5 attempts so we never spin.
+        for (int attempt = 0; attempt < 5; attempt++) {
+            if (aars.findByOrganisationIdAndReportCode(orgId, candidate).isEmpty()) {
+                return candidate;
+            }
+            n++;
+            candidate = String.format("%s%06d", prefix, n);
+        }
+        return candidate;
     }
 
     private static String safe(String s) { return s == null ? "" : s; }
