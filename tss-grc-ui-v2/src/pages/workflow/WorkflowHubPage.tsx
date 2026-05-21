@@ -40,23 +40,21 @@ export function WorkflowHubPage() {
   const [statusFilter, setStatusFilter] = useState<WorkflowStatus | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
 
-  // Per-wizard submission counts. Single network call; aggregated client-
-  // side so the Hub can show live activity ("3 submitted · 2 approved")
-  // on each card without N+1 round-trips.
+  // Per-wizard submission counts via a single tenant-scoped aggregate
+  // query — the engine groups by workflowId in SQL so the Hub no longer
+  // pays an O(rows) cost on every visit. The previous client-side
+  // aggregation pulled every submission row even though the page only
+  // renders one badge per wizard.
   const [submissionCounts, setSubmissionCounts] = useState<Record<string, PerWizardCounts>>({});
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const rows = await workflowSubmissionApi.list();
+        const rows = await workflowSubmissionApi.countsByWorkflow();
         if (cancelled) return;
         const acc: Record<string, PerWizardCounts> = {};
-        rows.forEach(s => {
-          const c = acc[s.workflowId] ?? { total: 0, open: 0, approved: 0 };
-          c.total++;
-          if (s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW') c.open++;
-          if (s.status === 'APPROVED') c.approved++;
-          acc[s.workflowId] = c;
+        rows.forEach(r => {
+          acc[r.workflowId] = { total: r.total, open: r.open, approved: r.approved };
         });
         setSubmissionCounts(acc);
       } catch { /* keep counts empty — falls back to "—" badge */ }

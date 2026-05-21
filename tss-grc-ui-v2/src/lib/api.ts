@@ -1965,6 +1965,20 @@ export interface WorkflowSubmissionRequest {
   status?: string;
   payloadJson: string;
 }
+/**
+ * Per-wizard aggregate counts for the Workflow Hub.
+ *
+ * One entry per catalog workflowId the tenant has at least one submission for.
+ * Backed by a single tenant-scoped JPQL aggregate — replaces the client-side
+ * aggregation in `WorkflowHubPage` that loaded every submission row on every
+ * Hub visit.
+ */
+export interface WorkflowSubmissionCountDto {
+  workflowId: string;
+  total:      number;   // all statuses
+  open:       number;   // SUBMITTED + UNDER_REVIEW
+  approved:   number;   // APPROVED
+}
 export const workflowSubmissionApi = {
   create:  (body: WorkflowSubmissionRequest) =>
     api.post<WorkflowSubmissionDto>('/api/v1/workflow-submissions', body),
@@ -1978,6 +1992,8 @@ export const workflowSubmissionApi = {
     api.get<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}`),
   review:  (id: number, body: { decision: string; reviewerNote?: string }) =>
     api.post<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}/review`, body),
+  countsByWorkflow: () =>
+    api.get<WorkflowSubmissionCountDto[]>('/api/v1/workflow-submissions/counts/by-workflow'),
 };
 
 // ── Audit log — F7 ─────────────────────────────────────────────────────
