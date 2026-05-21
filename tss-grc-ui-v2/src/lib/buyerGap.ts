@@ -132,11 +132,13 @@ export const evidenceGap = {
   freshnessSweep: () =>
     api.post<FreshnessSweepResult>('/api/v1/evidence/items/freshness/sweep'),
 
+  // /connector-registry (V115) — distinct from the older /connectors path
+  // owned by EvidenceMatrixController which returns ConnectorDefinition.
   listConnectors: () =>
-    api.get<EvidenceConnector[]>('/api/v1/evidence/connectors'),
+    api.get<EvidenceConnector[]>('/api/v1/evidence/connector-registry'),
 
   updateConnector: (code: string, body: { status?: string; configJson?: string }) =>
-    api.patch<EvidenceConnector>(`/api/v1/evidence/connectors/${code}`, body),
+    api.patch<EvidenceConnector>(`/api/v1/evidence/connector-registry/${code}`, body),
 };
 
 // ── §5.4 Privacy ───────────────────────────────────────────────────────

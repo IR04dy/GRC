@@ -128,14 +128,17 @@ public class BuyerGapController {
     }
 
     // ── §5.9 #2 — Evidence connector registry (V115) ──────────────────
-
-    @GetMapping("/api/v1/evidence/connectors")
+    // Path is /api/v1/evidence/connector-registry to avoid colliding
+    // with the older EvidenceMatrixController#listConnectors() which
+    // owns /api/v1/evidence/connectors and returns a different shape
+    // (ConnectorDefinition mock vs. our V115 EvidenceConnector entity).
+    @GetMapping("/api/v1/evidence/connector-registry")
     @PreAuthorize("isAuthenticated()")
     public List<EvidenceConnector> listConnectors() {
         return service.listConnectors();
     }
 
-    @PatchMapping("/api/v1/evidence/connectors/{code}")
+    @PatchMapping("/api/v1/evidence/connector-registry/{code}")
     @PreAuthorize("isAuthenticated()")
     public EvidenceConnector updateConnector(@PathVariable String code,
                                              @RequestBody ConnectorPatch body) {
