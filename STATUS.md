@@ -1,14 +1,14 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PRs #11-27 wizard arc + F8 + AI + analytics + audit timelines merged)
+**Last update:** 21 May 2026 (PRs #11-30 wizard arc + reusable audit-timeline rollout)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — seventeen-PR wizard arc on master (21 May 2026)
+## 🟢 Recent additions — twenty-PR wizard + audit arc on master (21 May 2026)
 
-After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, sixteen follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end:
+After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, nineteen follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end, then extracted the forensic-timeline pattern into reusable cards that drop into any detail page:
 
 | PR | Merge | What |
 |---|---|---|
@@ -29,10 +29,27 @@ After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle 
 | #25 | `3036957` | `SubmissionAnalyticsCard` on the register — 3 KPIs (avg time-to-review, open count, active modules) + 3 lazy-loaded recharts (per-module bar, per-status donut, 30-day line); recomputes against current filter |
 | #26 | `91feb05` | Per-wizard live submission counts on Hub cards — "3 submitted · 1 open" badges replace the static catalog |
 | #27 | `5ffe91c` | F8 rule-run history on detail page — `AutomationRunsCard` shows which automation rules fired (paired with PR #24 timeline = humans + machines side-by-side) |
+| #28 | `a529ab3` | STATUS.md refresh — captured PRs #22-27 + first end-to-end summary tables |
+| #29 | `239d6d9` | Extracted timelines into reusable `components/audit/EntityActivityTimeline.tsx` + `EntityAutomationRuns.tsx`; dropped them onto `/bcm/aars/:id` (lights up the existing CrisisAarService audit-log calls automatically); WorkflowSubmissionDetailPage chunk shrunk 10.43→7.85 kB raw via the extraction |
+| #30 | `a773a10` | Rolled the reusable cards into `RiskDetailPage` history tab — real audit_log rows + F8 rule fires + legacy mock history side-by-side; pattern now lives on 3 detail pages with 5+ more one-line-away once their services start audit-logging |
 
 ### Wizard persistence state
 
 **20 of 24 catalog wizards POST to a real backend on submit, audit-log every transition, fan out to the F8 automation engine, and offer AI-generated reviewer guidance on demand.** The 4 remaining (`evidence-request`, `capa-workflow`, `evidence-connectors`, `incident-triage`) are catalog entries that route to existing register pages.
+
+### Reusable forensic-timeline pattern (PRs #29-30)
+
+`components/audit/EntityActivityTimeline.tsx` + `components/audit/EntityAutomationRuns.tsx` are now a two-line drop-in on any detail page. Both take `{entityType, entityId}` and hide silently when empty, so a fresh entity with no audit history renders no phantom cards.
+
+| Detail page | Entity type | Status |
+|---|---|---|
+| `/workflows/submissions/:id` | `WorkflowSubmission` | ✅ lit up (#24, #27) |
+| `/bcm/aars/:id` | `CrisisAar` | ✅ lit up (#29) — CrisisAarService already audit-logs |
+| `/risk/:id` (History tab) | `Risk` | ✅ lit up (#30) |
+| `/findings/:id` | `Finding` (string ext id, not numeric) | one-line away if DTO exposes numeric id |
+| `/controls/:id`, `/policies/:id`, `/vendors/:id`, `/dpias/:id` | (services don't audit-log yet) | one-line away once they do |
+
+The cards re-use the existing `GET /api/v1/audit-log/history` + `GET /api/v1/automation/runs/for-entity` endpoints — no schema or backend work needed per page. Adding the same pattern to a new module is two lines of JSX + (if missing) one constructor field + one `audit.log()` call in the service.
 
 ### End-to-end surface visible to a buyer
 
