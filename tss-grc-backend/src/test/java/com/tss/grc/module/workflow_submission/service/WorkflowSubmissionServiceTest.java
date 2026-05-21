@@ -364,6 +364,107 @@ class WorkflowSubmissionServiceTest {
         assertThat(captor.getValue().payload().get("regulatoryAnchor")).isEqualTo("");
     }
 
+    // ── countsByWorkflowId() — Hub per-wizard aggregate ────────────────
+    //
+    // Locks the JPQL projection wiring so the (workflowId, total, open,
+    // approved) tuple ordering stays exactly as the Hub badge expects.
+    // Subtle: the repo method returns List<Object[]> with the SUM(CASE WHEN)
+    // values as java.lang.Number; SQL Server can hand back either Long or
+    // Integer depending on the column type the driver picked, so the
+    // service must accept both. The Hub badge fails silently (shows wrong
+    // counts, no exception) if any of this drifts.
+
+    @Test void countsByWorkflowId_mapsRepoRowsToTypedRecord() {
+        // Two wizards have submissions; per-bucket SUMs come straight from
+        // the JPQL projection. Service must preserve order and types.
+        when(repo.countsByWorkflowId(ORG_ID)).thenReturn(java.util.List.<Object[]>of(
+            new Object[] { "pdpl-breach",          5L, 2L, 3L },
+            new Object[] { "governance-board-pack", 1L, 0L, 1L }
+        ));
+
+        var counts = service.countsByWorkflowId();
+
+        assertThat(counts).hasSize(2);
+        var byId = counts.stream().collect(
+            java.util.stream.Collectors.toMap(
+                WorkflowSubmissionService.WorkflowCount::workflowId, c -> c));
+        assertThat(byId.get("pdpl-breach").total()).isEqualTo(5L);
+        assertThat(byId.get("pdpl-breach").open()).isEqualTo(2L);
+        assertThat(byId.get("pdpl-breach").approved()).isEqualTo(3L);
+        assertThat(byId.get("governance-board-pack").total()).isEqualTo(1L);
+        assertThat(byId.get("governance-board-pack").open()).isEqualTo(0L);
+        assertThat(byId.get("governance-board-pack").approved()).isEqualTo(1L);
+    }
+
+    @Test void countsByWorkflowId_acceptsIntegerNumbersFromDriver() {
+        // SQL Server's JDBC driver can hand SUM(CASE WHEN ...) back as
+        // Integer rather than Long for small magnitudes. The service maps
+        // via ((Number) row[i]).longValue() so both shapes must work — if
+        // someone "simplifies" the cast to (Long) the badge breaks for
+        // every tenant under a few hundred rows.
+        when(repo.countsByWorkflowId(ORG_ID)).thenReturn(java.util.List.<Object[]>of(
+            new Object[] { "erm-risk-treatment", Integer.valueOf(7), Integer.valueOf(2), Integer.valueOf(4) }
+        ));
+
+        var counts = service.countsByWorkflowId();
+
+        assertThat(counts).hasSize(1);
+        assertThat(counts.get(0).total()).isEqualTo(7L);
+        assertThat(counts.get(0).open()).isEqualTo(2L);
+        assertThat(counts.get(0).approved()).isEqualTo(4L);
+    }
+
+    @Test void countsByWorkflowId_emptyResult_returnsEmptyList() {
+        // A tenant that has never created a submission must get an empty
+        // list, not null and not an exception — the Hub renders no badges.
+        when(repo.countsByWorkflowId(ORG_ID)).thenReturn(java.util.List.<Object[]>of());
+
+        var counts = service.countsByWorkflowId();
+
+        assertThat(counts).isEmpty();
+    }
+
+    @Test void countsByWorkflowId_isTenantScoped() {
+        // Same JVM, two tenants asking in sequence. Each must see only
+        // their own aggregates — the JPQL filters on :orgId, and the
+        // service must pass the current TenantContext's id (not the
+        // process-wide default, not the previously-queried tenant).
+        when(repo.countsByWorkflowId(ORG_ID)).thenReturn(java.util.List.<Object[]>of(
+            new Object[] { "pdpl-breach", 3L, 1L, 2L }
+        ));
+        when(repo.countsByWorkflowId(OTHER_ORG)).thenReturn(java.util.List.<Object[]>of(
+            new Object[] { "erm-risk-treatment", 9L, 4L, 5L }
+        ));
+
+        var ours = service.countsByWorkflowId();
+        TenantContext.setCurrentTenant(OTHER_ORG);
+        var theirs = service.countsByWorkflowId();
+
+        assertThat(ours).hasSize(1);
+        assertThat(ours.get(0).workflowId()).isEqualTo("pdpl-breach");
+        assertThat(theirs).hasSize(1);
+        assertThat(theirs.get(0).workflowId()).isEqualTo("erm-risk-treatment");
+
+        // Belt-and-braces: each invocation must have hit the repo with
+        // the right orgId — otherwise a regression where the service
+        // caches one tenant's response under a class field would slip
+        // through the "results look right" check above.
+        verify(repo).countsByWorkflowId(ORG_ID);
+        verify(repo).countsByWorkflowId(OTHER_ORG);
+    }
+
+    @Test void countsByWorkflowId_noTenant_throwsIllegalState() {
+        // Same tenant-required posture as create/review: every read
+        // (including this aggregate) must refuse to run without an
+        // explicit TenantContext. Prevents accidental "global counts"
+        // in a poorly-written cron or admin script.
+        TenantContext.clear();
+
+        assertThatThrownBy(() -> service.countsByWorkflowId())
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("tenant");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     private WorkflowSubmission sampleSaved(Long org, Long id, String status) {
