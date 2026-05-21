@@ -5,6 +5,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.audit_lc.dto.FindingDto;
 import com.tss.grc.module.audit_lc.entity.Finding;
 import com.tss.grc.module.audit_lc.repository.FindingRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,7 @@ class FindingServiceTest {
     private static final String EXT_ID = "FIN-2026-001";
 
     @Mock private FindingRepository repo;
+    @Mock private AuditLogService audit;
     @InjectMocks private FindingService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
