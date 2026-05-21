@@ -54,6 +54,20 @@ function matchesStatus(rowStatus: string, filter: StatusFilter): boolean {
   return rowStatus === filter;
 }
 
+/** Threshold above which an OPEN submission counts as stale and gets
+ *  a warning chip. Seven days matches the typical SLA reviewers commit
+ *  to in the Saudi-GRC governance frameworks (PDPL §18 review cadence,
+ *  ECC monthly close, etc.). Tunable in one place. */
+const STALE_DAYS = 7;
+
+/** Days elapsed since {@code submittedAt}, or {@code null} if the
+ *  timestamp can't be parsed (don't render a bogus "NaNd"). */
+function daysSince(iso: string): number | null {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return Math.floor((Date.now() - t) / 86_400_000);
+}
+
 export function WorkflowSubmissionsPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
@@ -207,11 +221,19 @@ export function WorkflowSubmissionsPage() {
   }
 
   const counts = useMemo(() => {
+    // Stale = OPEN row submitted ≥ STALE_DAYS ago. Computed once per
+    // visibleItems change rather than per row at render time.
+    const staleN = visibleItems.filter(s => {
+      if (!isOpen(s)) return false;
+      const d = daysSince(s.submittedAt);
+      return d !== null && d >= STALE_DAYS;
+    }).length;
     return {
       submitted:   visibleItems.filter(s => s.status === 'SUBMITTED').length,
       underReview: visibleItems.filter(s => s.status === 'UNDER_REVIEW').length,
       approved:    visibleItems.filter(s => s.status === 'APPROVED').length,
       rejected:    visibleItems.filter(s => s.status === 'REJECTED').length,
+      stale:       staleN,
       closed:      visibleItems.filter(s => s.status === 'CLOSED').length,
     };
   }, [visibleItems]);
@@ -327,6 +349,14 @@ export function WorkflowSubmissionsPage() {
           <Badge tone="success">{isAr ? 'مُعتمد' : 'Approved'}: {counts.approved}</Badge>
           <Badge tone="danger">{isAr ? 'مرفوض' : 'Rejected'}: {counts.rejected}</Badge>
           <Badge tone="neutral">{isAr ? 'مغلق' : 'Closed'}: {counts.closed}</Badge>
+          {counts.stale > 0 && (
+            <Badge tone="danger"
+                   title={isAr
+                     ? `سجلات مفتوحة منذ ${STALE_DAYS} يوم على الأقل`
+                     : `OPEN for ${STALE_DAYS}+ days`}>
+              {isAr ? `قديم: ${counts.stale}` : `Stale (${STALE_DAYS}d+): ${counts.stale}`}
+            </Badge>
+          )}
         </div>
       )}
 
@@ -421,6 +451,12 @@ export function WorkflowSubmissionsPage() {
               const cat = WORKFLOWS.find(w => w.id === s.workflowId);
               const rowOpen = isOpen(s);
               const checked = selectedIds.has(s.id);
+              // Age chip: only on OPEN rows (terminal rows being "old" is
+              // not actionable). Stale crosses STALE_DAYS — turns the
+              // info-blue "Pending Nd" pill into a warning. Drives the
+              // reviewer to clear the oldest backlog first.
+              const ageDays = rowOpen ? daysSince(s.submittedAt) : null;
+              const stale = ageDays !== null && ageDays >= STALE_DAYS;
               return (
                 <Card key={s.id}
                       title={`#${s.id} · ${isAr ? (cat?.titleAr ?? s.workflowId)
@@ -435,6 +471,19 @@ export function WorkflowSubmissionsPage() {
                                      onChange={() => toggleSelected(s.id)}
                                      aria-label={`Select submission ${s.id}`}/>
                             </label>
+                          )}
+                          {ageDays !== null && (
+                            <Badge tone={stale ? 'danger' : 'info'}
+                                   title={isAr
+                                     ? (stale
+                                         ? `قديم — مفتوح منذ ${ageDays} يوم (الحد ${STALE_DAYS})`
+                                         : `مفتوح منذ ${ageDays} يوم`)
+                                     : (stale
+                                         ? `Stale — open ${ageDays}d (threshold ${STALE_DAYS}d)`
+                                         : `Open ${ageDays}d`)}>
+                              {isAr ? `منذ ${ageDays}ي` : `${ageDays}d`}
+                              {stale ? (isAr ? ' · قديم' : ' · stale') : ''}
+                            </Badge>
                           )}
                           <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{s.status}</Badge>
                           <Badge tone="neutral">{s.workflowModule}</Badge>
