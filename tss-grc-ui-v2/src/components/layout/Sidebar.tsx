@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
@@ -9,6 +10,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
+import { workflowSubmissionApi } from '../../lib/api';
 
 interface NavItem {
   id: string;
@@ -241,8 +243,40 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+/** Pending-review counts surfaced as sidebar badges.
+ *
+ *  <p>Right now we surface only one number: the total <strong>OPEN</strong>
+ *  workflow submissions (SUBMITTED + UNDER_REVIEW). A reviewer logging in
+ *  sees "Submissions · 4" in the sidebar and knows immediately there's an
+ *  inbox waiting — without having to click through.
+ *
+ *  <p>Backed by the {@code countsByWorkflow} aggregate query (PR #33) so
+ *  this costs one tenant-scoped GROUP BY per Sidebar mount, not one row
+ *  per submission. Refreshes when the tab regains focus so an approval
+ *  made in another tab clears the badge.
+ */
+function usePendingReviewsCount(): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await workflowSubmissionApi.countsByWorkflow();
+        if (cancelled) return;
+        setCount(rows.reduce((sum, r) => sum + r.open, 0));
+      } catch { /* unauthenticated or backend down — leave as null */ }
+    }
+    void load();
+    function onFocus() { if (document.visibilityState === 'visible') void load(); }
+    document.addEventListener('visibilitychange', onFocus);
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onFocus); };
+  }, []);
+  return count;
+}
+
 export function Sidebar({ open = false }: { open?: boolean }) {
   const { t } = useI18n();
+  const pendingReviews = usePendingReviewsCount();
   return (
     <aside className={open ? 'sb sb-open' : 'sb'}>
       <div className="sb-brand">
@@ -256,18 +290,27 @@ export function Sidebar({ open = false }: { open?: boolean }) {
       {NAV_GROUPS.map(group => (
         <div key={group.id}>
           <div className="sb-section">{t(group.titleKey)}</div>
-          {group.items.map(it => <NavRow key={it.id} item={it} t={t} />)}
+          {group.items.map(it => (
+            <NavRow key={it.id} item={it} t={t}
+                    badge={it.id === 'wf-submissions' && pendingReviews && pendingReviews > 0
+                      ? pendingReviews : undefined}/>
+          ))}
         </div>
       ))}
     </aside>
   );
 }
 
-function NavRow({ item, t }: { item: NavItem; t: (k: string) => string }) {
+function NavRow({ item, t, badge }: { item: NavItem; t: (k: string) => string; badge?: number }) {
   return (
     <NavLink to={item.to} className={({ isActive }) => cn('sb-item', isActive && 'active')}>
       <item.Icon size={18} strokeWidth={1.8} />
       <span>{t(item.labelKey)}</span>
+      {typeof badge === 'number' && (
+        <span className="sb-badge" title={`${badge} pending review${badge === 1 ? '' : 's'}`}>
+          {badge}
+        </span>
+      )}
     </NavLink>
   );
 }
