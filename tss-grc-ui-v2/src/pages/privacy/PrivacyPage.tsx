@@ -27,6 +27,7 @@ import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExpo
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
+import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
 import { PRIVACY_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -318,6 +319,7 @@ export function PrivacyPage() {
         }
       />
       <WorkflowQuickLaunch modules="PDPL" />
+      <ModuleSubmissionsPanel module="PDPL" />
       <div className="kpi-grid">
         <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length || 142} tone="primary" />
         <Kpi Icon={Inbox}       label={t('privacyKpiDsr')}        value={openDsrs} tone="warning" />

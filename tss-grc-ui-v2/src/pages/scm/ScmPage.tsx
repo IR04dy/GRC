@@ -43,6 +43,7 @@ import { SUPPLY_CHAIN_TIERS } from './tierMap';
 import { Layers } from 'lucide-react';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
+import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { SCM_ANCHORS } from '../../lib/moduleAnchors';
 
 type TabId = 'overview' | 'suppliers' | 'onboarding' | 'workflow' | 'assessments' | 'dependencies' | 'contracts' | 'disruptions';
@@ -785,6 +786,7 @@ export function ScmPage() {
         }
       />
       <WorkflowQuickLaunch modules="SCM" />
+      <ModuleSubmissionsPanel module="SCM" />
       <div className="kpi-grid">
         <Kpi Icon={Truck}         label={t('scmKpiSuppliers')}        value={stats?.totalVendors ?? vendors.data.length} tone="primary" />
         <Kpi Icon={AlertTriangle} label={t('scmKpiHighRisk')}         value={stats?.criticalVendors ?? high} tone="danger" />

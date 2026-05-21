@@ -1,10 +1,24 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PR #11 — `feat/bcp-builder-graph-mail`, post-bundle-split)
+**Last update:** 21 May 2026 (PRs #11-15 + module-submissions widget merged)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
+
+## 🟢 Recent additions — five-PR wizard arc on master (21 May 2026)
+
+After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, four follow-up PRs closed the persistence loop:
+
+| PR | Merge | What |
+|---|---|---|
+| #11 | `9c141e1` | 24 wizards + Workflow Hub + WorkflowQuickLaunch chip strips + −53% gzip bundle code-split |
+| #12 | `77b1b02` | 7 wizards wired to dedicated tables (BcmExercise, CyberIncident, VulnTriage, DSR, Breach, RoPA, SupplierOnboarding) |
+| #13 | `a422f59` | V125 generic `workflow_submissions` ledger + new `module/workflow_submission/` backend + 12 remaining wizards wired (Risk Treatment/Acceptance, RCA, Mgmt Review, Signature, Control Test, Cloud CCC, NCA ECC, Consent, Cross-Border, Exit Plan, Board Pack) |
+| #14 | `ca2f363` | `/workflows/submissions` register UI — filter by module + workflow id, status counts, JSON inspect, inline Approve/Reject/Close |
+| #15 | `85a94f4` | 15-case `WorkflowSubmissionServiceTest` + V126 demo seed (25 representative rows) + sidebar entry "Workflow Submissions" |
+
+**Wizard persistence state: 20 of 24 catalog wizards POST to a real backend on submit. The 4 remaining (`evidence-request`, `capa-workflow`, `evidence-connectors`, `incident-triage`) are catalog entries that route to existing register pages.**
 
 ## 🟢 Recent additions (PR #11 — 39 commits)
 
