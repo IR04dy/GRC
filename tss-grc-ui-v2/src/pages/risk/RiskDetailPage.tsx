@@ -16,6 +16,8 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
+import { EntityAutomationRuns } from '../../components/audit/EntityAutomationRuns';
 import { RISK_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 import {
   MOCK_RISKS,
@@ -460,23 +462,35 @@ export function RiskDetailPage() {
       )}
 
       {tab === 'history' && (
-        <Card title={t('detailTabHistory')} Icon={MessageSquare}
-          action={<Badge tone="primary">{(RISK_HISTORY_BY_ID[risk.id] ?? []).length}</Badge>}>
-          {(RISK_HISTORY_BY_ID[risk.id] ?? []).length === 0
-            ? <EmptyState Icon={MessageSquare} title="No history yet" sub={t('detailHistoryHint')} />
-            : <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {(RISK_HISTORY_BY_ID[risk.id] ?? []).map(h => (
-                  <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 100px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.at.replace('T', ' ').slice(0, 16)}</span>
-                    <Badge tone={h.type === 'CREATED' ? 'primary' : h.type === 'STATUS_CHANGE' ? 'info' : h.type === 'SCORE_CHANGE' ? 'accent' : h.type === 'TREATMENT_ADDED' ? 'success' : h.type === 'REVIEW' ? 'warning' : 'neutral'}>{h.type.replace(/_/g, ' ')}</Badge>
-                    <div>
-                      <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{h.message}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {h.actor}</div>
+        <div style={{ display: 'grid', gap: 12 }}>
+          {/* Real audit log + F8 rule runs — same reusable cards as
+           *  /workflows/submissions/:id and /bcm/aars/:id (PR #29).
+           *  Renders silently when there are no rows so a fresh risk
+           *  without history shows just the legacy mock history below. */}
+          <EntityActivityTimeline entityType="Risk" entityId={risk.id} />
+          <EntityAutomationRuns   entityType="Risk" entityId={risk.id} />
+
+          {/* Legacy mock history — kept while the audit log is backfilled
+           *  with old transitions. Will be removed once Risk activity
+           *  pre-dates the audit-log retention window. */}
+          <Card title={t('detailTabHistory')} Icon={MessageSquare}
+            action={<Badge tone="primary">{(RISK_HISTORY_BY_ID[risk.id] ?? []).length}</Badge>}>
+            {(RISK_HISTORY_BY_ID[risk.id] ?? []).length === 0
+              ? <EmptyState Icon={MessageSquare} title="No history yet" sub={t('detailHistoryHint')} />
+              : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {(RISK_HISTORY_BY_ID[risk.id] ?? []).map(h => (
+                    <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 100px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.at.replace('T', ' ').slice(0, 16)}</span>
+                      <Badge tone={h.type === 'CREATED' ? 'primary' : h.type === 'STATUS_CHANGE' ? 'info' : h.type === 'SCORE_CHANGE' ? 'accent' : h.type === 'TREATMENT_ADDED' ? 'success' : h.type === 'REVIEW' ? 'warning' : 'neutral'}>{h.type.replace(/_/g, ' ')}</Badge>
+                      <div>
+                        <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{h.message}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {h.actor}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>}
-        </Card>
+                  ))}
+                </div>}
+          </Card>
+        </div>
       )}
 
       {tab === 'comms' && (
