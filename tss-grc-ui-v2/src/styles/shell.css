@@ -57,6 +57,26 @@
   border-inline-start-color: var(--accent-300);
 }
 
+/* Pending-counter pill at the right edge of a sidebar entry.
+ * Used today for OPEN workflow-submission reviews — surfaces an inbox
+ * count so a reviewer sees the queue without having to navigate. */
+.sb-badge {
+  margin-inline-start: auto;
+  background: var(--accent-300);
+  color: #0b1626;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+  min-width: 18px;
+  text-align: center;
+}
+.sb-item.active .sb-badge {
+  background: #fff;
+  color: var(--sb-active-bg);
+}
+
 /* ─── Topbar ─────────────────────────────────────── */
 .topbar {
   background: var(--surface);
