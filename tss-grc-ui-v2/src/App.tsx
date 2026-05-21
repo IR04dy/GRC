@@ -54,6 +54,11 @@ import { SupplierExitPlanWizard } from './pages/workflow/scm/SupplierExitPlanWiz
 import { CrossBorderTransferWizard } from './pages/workflow/pdpl/CrossBorderTransferWizard';
 import { ConsentManagementWizard } from './pages/workflow/pdpl/ConsentManagementWizard';
 import { RopaWizard } from './pages/workflow/pdpl/RopaWizard';
+import { IncidentRcaWizard } from './pages/workflow/incident/IncidentRcaWizard';
+import { ManagementReviewWizard } from './pages/workflow/governance/ManagementReviewWizard';
+import { DigitalSignatureWizard } from './pages/workflow/governance/DigitalSignatureWizard';
+import { ControlTestWizard } from './pages/workflow/compliance/ControlTestWizard';
+import { BoardPackWizard } from './pages/workflow/governance/BoardPackWizard';
 import { AarDetailPage } from './pages/bcm/AarDetailPage';
 import { AiSuggestionsPage } from './pages/ai/AiSuggestionsPage';
 import { AdminPage } from './pages/admin/AdminPage';
@@ -225,6 +230,11 @@ export function App() {
               <Route path="/workflows/pdpl/cross-border"             element={<CrossBorderTransferWizard />} />
               <Route path="/workflows/pdpl/consent"                  element={<ConsentManagementWizard />} />
               <Route path="/workflows/pdpl/ropa"                     element={<RopaWizard />} />
+              <Route path="/workflows/incident/rca"                  element={<IncidentRcaWizard />} />
+              <Route path="/workflows/governance/management-review"  element={<ManagementReviewWizard />} />
+              <Route path="/workflows/governance/digital-signature"  element={<DigitalSignatureWizard />} />
+              <Route path="/workflows/governance/board-pack"         element={<BoardPackWizard />} />
+              <Route path="/workflows/compliance/control-test"       element={<ControlTestWizard />} />
 
               {/* Detail + admin pages for V115/V116 modules */}
               <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />
