@@ -2,6 +2,7 @@ package com.tss.grc.module.audit_lc.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ public class FindingService {
     );
 
     private final FindingRepository repo;
+    private final AuditLogService   audit;
 
     /** Sprint 4 §2.7 — optional realtime broadcaster (null in unit tests). */
     @Autowired(required = false)
@@ -81,7 +83,12 @@ public class FindingService {
         f.setRecommendationEn(req.getRecommendationEn()); f.setRecommendationAr(req.getRecommendationAr());
         f.setTargetDate(req.getTargetDate() != null ? req.getTargetDate() : LocalDate.now().plusDays(30));
         f.setOwnerRole(req.getOwnerRole());
-        return FindingDto.from(repo.save(f));
+        Finding saved = repo.save(f);
+        audit.log("CREATE", "Finding", saved.getId(),
+            "Finding " + saved.getRefNumber()
+            + " raised on engagement " + saved.getEngagementCode()
+            + " · severity=" + saved.getSeverity());
+        return FindingDto.from(saved);
     }
 
     @Transactional
@@ -93,11 +100,18 @@ public class FindingService {
         if (!allowed.contains(req.getStatus())) {
             throw new IllegalTransitionException(f.getStatus(), req.getStatus(), allowed);
         }
+        String previousStatus = f.getStatus();
         f.setStatus(req.getStatus());
         if (req.getMgmtResponseEn() != null) f.setMgmtResponseEn(req.getMgmtResponseEn());
         if (req.getMgmtResponseAr() != null) f.setMgmtResponseAr(req.getMgmtResponseAr());
         if (req.getMgmtResponseAuthor() != null) f.setMgmtResponseAuthor(req.getMgmtResponseAuthor());
-        FindingDto out = FindingDto.from(repo.save(f));
+        Finding saved = repo.save(f);
+        audit.log("TRANSITION", "Finding", saved.getId(),
+            "Finding " + saved.getRefNumber()
+            + " " + previousStatus + " → " + saved.getStatus()
+            + (req.getMgmtResponseAuthor() != null
+                ? " · response by " + req.getMgmtResponseAuthor() : ""));
+        FindingDto out = FindingDto.from(saved);
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "audit_finding", externalId, out);
         return out;
     }
@@ -109,6 +123,8 @@ public class FindingService {
             .orElseThrow(() -> new EntityNotFoundException("Finding not found: " + externalId));
         f.setIsDeleted((short) 1);
         repo.save(f);
+        audit.log("DELETE", "Finding", f.getId(),
+            "Finding " + f.getRefNumber() + " soft-deleted (status=" + f.getStatus() + ")");
     }
 
     private String generateExternalId() {

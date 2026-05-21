@@ -8,7 +8,8 @@ import java.time.LocalDateTime;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class FindingDto {
-    private String id;                  // external_id
+    private String id;                  // external_id — used in URLs + API paths
+    private Long   numericId;           // internal PK — used by audit-log + automation lookups
     @NotBlank private String engagementCode;
     private String refNumber;
     @NotBlank private String titleEn;
@@ -36,7 +37,8 @@ public class FindingDto {
 
     public static FindingDto from(Finding e) {
         return FindingDto.builder()
-            .id(e.getExternalId()).engagementCode(e.getEngagementCode()).refNumber(e.getRefNumber())
+            .id(e.getExternalId()).numericId(e.getId())
+            .engagementCode(e.getEngagementCode()).refNumber(e.getRefNumber())
             .titleEn(e.getTitleEn()).titleAr(e.getTitleAr())
             .severity(e.getSeverity()).status(e.getStatus())
             .controlCrosswalk(e.getControlCrosswalk())
