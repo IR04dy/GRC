@@ -1979,3 +1979,30 @@ export const workflowSubmissionApi = {
   review:  (id: number, body: { decision: string; reviewerNote?: string }) =>
     api.post<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}/review`, body),
 };
+
+// ── Audit log — F7 ─────────────────────────────────────────────────────
+//    The unified platform audit-log surface. WorkflowSubmissionService
+//    (and every other state-changing service) writes here on each
+//    CREATE / APPROVE / REJECT / CLOSE. The detail-page Activity card
+//    calls historyFor(...) to render forensic history inline.
+export interface AuditLogEntryDto {
+  id: number;
+  externalId?: string;
+  userId?: number | null;
+  userUsername?: string | null;
+  userRole?: string | null;
+  actionType: string;
+  entityType?: string | null;
+  entityId?: number | null;
+  sourceModule?: string | null;
+  severity: string;
+  message?: string | null;
+  createdAt: string;
+  workflowStatusBefore?: string | null;
+  workflowStatusAfter?: string | null;
+}
+export const auditLogApi = {
+  historyFor: (entityType: string, entityId: number) =>
+    api.get<AuditLogEntryDto[]>(
+      `/api/v1/audit-log/history?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
+};
