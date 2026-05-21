@@ -1,14 +1,14 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 21 May 2026 (PRs #11-38 — wizard arc + reusable audit-timeline + reviewer-journey polish)
+**Last update:** 21 May 2026 (PRs #11-42 — wizard arc + audit-timeline + reviewer-journey polish + sidebar inbox pattern + CAPA audit trail)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — twenty-eight-PR wizard arc + reviewer-journey polish (21 May 2026)
+## 🟢 Recent additions — thirty-two-PR wizard arc + reviewer-journey polish + sidebar inbox pattern (21 May 2026)
 
-After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, twenty follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end, then extracted the forensic-timeline pattern into reusable cards that drop into any detail page. The most recent seven PRs (#32-38) polish the reviewer journey itself — server-side aggregation, Hub→register drill-down, sidebar inbox badge, bulk-review actions, stale-row signal, free-text search:
+After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle code-split, twenty follow-up PRs closed the persistence + UX + automation + AI + audit loop end-to-end, then extracted the forensic-timeline pattern into reusable cards that drop into any detail page. The next seven PRs (#32-38) polished the reviewer journey itself — server-side aggregation, Hub→register drill-down, sidebar inbox badge, bulk-review actions, stale-row signal, free-text search. The final three PRs (#40-42) consolidate: a backend regression test for the new aggregate, the sidebar inbox surface generalised to a pattern (workflow submissions + CAPA today, more in 3-line additions), and CAPA mutations now write to the forensic audit log so the reusable timeline card extends to corrective-action surfaces:
 
 | PR | Merge | What |
 |---|---|---|
@@ -40,6 +40,10 @@ After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle 
 | #36 | `dbd5b3c` | Bulk approve / reject / close — checkbox per OPEN row + sticky action bar; tri-state header checkbox (all/partial/none); `window.confirm` second-thought beat; `Promise.allSettled` so a single 409 doesn't abandon the rest; selection drops on reload + filter change |
 | #37 | `279ea2f` | Stale-row highlighting — every OPEN row gains an age chip in the card header ("4d" info-blue → "12d · stale" danger-red past `STALE_DAYS = 7`); stats row gains a "Stale (7d+): N" pill; threshold centralised at top of file |
 | #38 | `3d68bae` | Free-text search on the register — URL-backed `?q=...` substring across `titleEn/Ar`, `summaryEn/Ar`, `regulatoryAnchor`, `workflowId`, `workflowModule`, `reviewerNote`, **and** `payloadJson` so "breach" hits a payload field even when titleEn doesn't say it; plays with existing filters; selection drops on query change |
+| #39 | `666337a` | STATUS.md refresh — captured PRs #31-38 + the reviewer-journey before/after table |
+| #40 | `a91b6ac` | Backend regression test for `WorkflowSubmissionService#countsByWorkflowId` — five Mockito tests lock the JPQL projection (workflowId, total, open, approved), the `Number → long` cast that survives both SQL Server's `Integer` and `Long` returns, empty-result behaviour, tenant scoping across two tenants in one JVM, and the no-tenant guard; 24 + 5 = 29 tests in the suite |
+| #41 | `150c19f` | Sidebar inbox pattern extends to CAPA — `GET /api/capa/tasks/counts` returns `{open, overdue}` (two cheap COUNTs, no row payload); `useInboxCounts` hook scales to N counters via `Promise.all` + per-counter `.catch`; `NavRow` takes `NavBadge { value, title, tone? }` so each counter carries its own tooltip + tone; overdue CAPAs invert to a danger-red pill with right invert in active-route state |
+| #42 | `78c053b` | `CapaTaskService` audit-log — every create / transition / softDelete writes to `platform.audit_log` with the new state as `actionType` so timeline rows colour correctly (CLOSED→success, CANCELLED→neutral, IN_PROGRESS→info, AWAITING_VERIFICATION→warning); +3 new tests pin transition message shape, verifier capture on CLOSED, and the cross-tenant-404 no-audit guard |
 
 ### Wizard persistence state
 
@@ -54,7 +58,8 @@ After PR #11 (41 commits) merged the §7 wizard catalog + Workflow Hub + bundle 
 | `/workflows/submissions/:id` | `WorkflowSubmission` | ✅ lit up (#24, #27) |
 | `/bcm/aars/:id` | `CrisisAar` | ✅ lit up (#29) — CrisisAarService already audit-logs |
 | `/risk/:id` (History tab) | `Risk` | ✅ lit up (#30) |
-| `/findings/:id` | `Finding` (string ext id, not numeric) | one-line away if DTO exposes numeric id |
+| `/findings/:id` | `Finding` | ✅ service audit-logs (#32); DTO now exposes `numericId` — page drop-in is two lines once a Finding detail page exists in v2 |
+| `/capa/:id` (when built) | `CapaTask` | ✅ service audit-logs (#42); two-line JSX drop-in when v2 grows a CAPA detail surface |
 | `/controls/:id`, `/policies/:id`, `/vendors/:id`, `/dpias/:id` | (services don't audit-log yet) | one-line away once they do |
 
 The cards re-use the existing `GET /api/v1/audit-log/history` + `GET /api/v1/automation/runs/for-entity` endpoints — no schema or backend work needed per page. Adding the same pattern to a new module is two lines of JSX + (if missing) one constructor field + one `audit.log()` call in the service.
@@ -74,6 +79,32 @@ Six PRs in three days collapsed the reviewer's path from "navigate around to fin
 
 The wizard-submission surface is now production-feel for the day-to-day reviewer.
 
+### Sidebar inbox pattern (PRs #35, #41)
+
+The sidebar pending-reviews badge from PR #35 was deliberately threaded through `NavRow` as an optional `badge?` prop so adding more inbox counters later would compose. PR #41 cashed that bet — CAPA counts are now wired the same way, and the hook (`useInboxCounts`) scales to N counters via `Promise.all` + per-counter `.catch(() => null)` so one endpoint failing doesn't blank the rest.
+
+| Sidebar entry | Counter source | Tone rule |
+|---|---|---|
+| Workflow Submissions | `GET /api/v1/workflow-submissions/counts/by-workflow` summed to `open` | Always accent-300 |
+| CAPA | `GET /api/capa/tasks/counts` → `{open, overdue}` | accent-300 by default, **danger-red** if `overdue > 0` |
+
+Adding a third badge (signatures inbox, approvals queue, whatever's next) is a one-PR, three-step pattern:
+1. backend `*Counts` endpoint that returns a typed record (two-three cheap COUNTs)
+2. add the field to `InboxCounts` + a line in `useInboxCounts.load()`
+3. add a clause in `badgeFor(id)` for the target `NavRow.id`
+
+### CAPA audit trail (PR #42)
+
+`CapaTaskService` now writes to `platform.audit_log` on every mutation:
+
+| Action | actionType | Message shape |
+|---|---|---|
+| `create()` | `CREATE` | "CAPA <id> opened from <origin> · owner=… · severity=… · target=…" |
+| `transition()` | `<newStatus>` | "<id> OLD → NEW · verified by … (if CLOSED) · reason: … (if CANCELLED) · note: …" |
+| `softDelete()` | `DELETE` | "<id> soft-deleted (status=<at-delete>)" |
+
+The transition row uses the **new state** as `actionType` so the timeline card colours each transition correctly out of the box (CLOSED→success, CANCELLED→neutral, IN_PROGRESS→info, AWAITING_VERIFICATION→warning). The forensic story buyers see for workflow submissions, AAR, Risk, and Finding now extends to corrective + preventive actions.
+
 ### End-to-end surface visible to a buyer
 
 | Surface | What appears |
@@ -85,7 +116,7 @@ The wizard-submission surface is now production-feel for the day-to-day reviewer
 | `/workflows/submissions/:id` | Hero envelope → AI review hint → Activity timeline (audit log) → Automation runs (F8) → Review actions → Full payload |
 | `/approvals` | Existing inbox + "Workflow submissions" header CTA |
 | `/ai/suggestions` | Filter by 6 features (added `WORKFLOW_SUBMISSION_REVIEW`); accept/reject DRAFT rows |
-| Sidebar | "Workflow Hub" + **"Workflow Submissions · N"** (live pending-reviews badge) entries under My Work |
+| Sidebar | "Workflow Hub" + **"Workflow Submissions · N"** (live pending-reviews badge) + **"CAPA · M"** (live open badge, turns danger-red when any are past target date) under My Work |
 
 ### Backend characteristics
 
