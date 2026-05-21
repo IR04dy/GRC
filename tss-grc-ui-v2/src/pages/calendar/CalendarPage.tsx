@@ -691,7 +691,39 @@ function EventChip({ event, isAr, onClick }: {
   );
 }
 
-// ─── Add-event modal (minimal v1) ─────────────────────────────────────
+// ─── Add-event modal ──────────────────────────────────────────────────
+
+type Recurrence = 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+
+const RECURRENCE_LABEL: Record<Recurrence, { en: string; ar: string }> = {
+  NONE:      { en: 'Does not repeat',         ar: 'لا يتكرر' },
+  DAILY:     { en: 'Every day',               ar: 'يومياً' },
+  WEEKLY:    { en: 'Every week',              ar: 'أسبوعياً' },
+  MONTHLY:   { en: 'Every month',             ar: 'شهرياً' },
+  QUARTERLY: { en: 'Every quarter (3 months)', ar: 'كل ربع (٣ أشهر)' },
+  ANNUAL:    { en: 'Every year',              ar: 'سنوياً' },
+};
+
+/** Reminder-ladder presets buyers actually use. Number = days before
+ *  the event fires. 0 = day-of; -1 = sentinel for "1 hour before" which
+ *  we send as `0` and rely on time-of-day for the actual offset (server
+ *  treats it as same-day notify). */
+const REMINDER_PRESETS: { days: number; en: string; ar: string }[] = [
+  { days: 0,  en: 'Day of',    ar: 'يوم الحدث' },
+  { days: 1,  en: '1 day',     ar: 'يوم واحد' },
+  { days: 3,  en: '3 days',    ar: '٣ أيام' },
+  { days: 7,  en: '1 week',    ar: 'أسبوع' },
+  { days: 14, en: '2 weeks',   ar: 'أسبوعان' },
+  { days: 30, en: '1 month',   ar: 'شهر' },
+];
+
+function parseLadder(raw: string): number[] {
+  return raw.split(',').map(s => s.trim()).filter(Boolean)
+    .map(t => Number(t)).filter(n => Number.isFinite(n));
+}
+function ladderToString(days: number[]): string {
+  return Array.from(new Set(days)).sort((a, b) => b - a).join(',');
+}
 
 function AddEventModal({ isAr, onClose, onCreated }: {
   isAr: boolean; onClose: () => void;
@@ -708,14 +740,30 @@ function AddEventModal({ isAr, onClose, onCreated }: {
   });
   const [allDay, setAllDay] = useState(true);
   const [location, setLocation] = useState('');
-  const [reminderDays, setReminderDays] = useState('7,1');
+  // Reminder ladder is now chip-driven (preset toggle) with a free-text
+  // escape hatch for advanced users.
+  const [ladder, setLadder] = useState<number[]>([7, 1]);
+  const [advanced, setAdvanced] = useState(false);
+  const [advancedText, setAdvancedText] = useState('7,1');
+  // Recurrence drives the new RRULE editor.
+  const [recurrence, setRecurrence] = useState<Recurrence>('NONE');
+  const [recurrenceUntil, setRecurrenceUntil] = useState<string>('');
   const [saving, setSaving] = useState(false);
+
+  function toggleLadder(days: number) {
+    setLadder(prev => prev.includes(days)
+      ? prev.filter(x => x !== days)
+      : [...prev, days].sort((a, b) => b - a));
+  }
 
   async function submit() {
     if (!titleEn.trim()) {
       toast.danger(isAr ? 'العنوان مطلوب' : 'Title is required');
       return;
     }
+    const reminderDays = advanced
+      ? ladderToString(parseLadder(advancedText))
+      : ladderToString(ladder);
     setSaving(true);
     const req: CalendarEventCreateRequest = {
       titleEn: titleEn.trim(),
@@ -724,7 +772,11 @@ function AddEventModal({ isAr, onClose, onCreated }: {
       startsAt: startsAt.length === 16 ? startsAt + ':00' : startsAt,
       allDay,
       location: location.trim() || undefined,
-      reminderDays,
+      reminderDays: reminderDays || undefined,
+      recurrence: recurrence === 'NONE' ? undefined : recurrence,
+      recurrenceUntil: recurrence !== 'NONE' && recurrenceUntil
+        ? recurrenceUntil
+        : undefined,
     };
     try {
       const out = await calendarApi.create(req);
@@ -760,9 +812,9 @@ function AddEventModal({ isAr, onClose, onCreated }: {
             onChange={e => setEventType(e.target.value as CalendarEventType)}
             style={inputStyle}>
             {(['MEETING', 'REMINDER', 'TRAINING', 'AUDIT_DAY',
-               'REPORT_DEADLINE', 'CUSTOM'] as CalendarEventType[]).map(t =>
-              <option key={t} value={t}>
-                {(isAr ? EVENT_TYPE_LABEL[t].ar : EVENT_TYPE_LABEL[t].en)}
+               'REPORT_DEADLINE', 'CUSTOM'] as CalendarEventType[]).map(et =>
+              <option key={et} value={et}>
+                {(isAr ? EVENT_TYPE_LABEL[et].ar : EVENT_TYPE_LABEL[et].en)}
               </option>)}
           </select>
         </Field>
@@ -779,9 +831,83 @@ function AddEventModal({ isAr, onClose, onCreated }: {
           <input value={location} onChange={e => setLocation(e.target.value)}
             placeholder={isAr ? 'اختياري' : 'Optional'} style={inputStyle} />
         </Field>
-        <Field label={isAr ? 'تذكير (أيام قبل)' : 'Reminders (days before)'}>
-          <input value={reminderDays} onChange={e => setReminderDays(e.target.value)}
-            placeholder="7,1" style={inputStyle} />
+
+        {/* Recurrence */}
+        <Field label={isAr ? 'التكرار' : 'Repeat'}>
+          <select value={recurrence}
+            onChange={e => setRecurrence(e.target.value as Recurrence)}
+            style={inputStyle}>
+            {(Object.keys(RECURRENCE_LABEL) as Recurrence[]).map(r =>
+              <option key={r} value={r}>
+                {isAr ? RECURRENCE_LABEL[r].ar : RECURRENCE_LABEL[r].en}
+              </option>)}
+          </select>
+        </Field>
+        {recurrence !== 'NONE' && (
+          <Field label={isAr ? 'ينتهي في (اختياري)' : 'Ends on (optional)'}>
+            <input type="date" value={recurrenceUntil}
+              onChange={e => setRecurrenceUntil(e.target.value)}
+              style={inputStyle} />
+          </Field>
+        )}
+
+        {/* Reminder ladder */}
+        <Field label={isAr ? 'تذكيرات' : 'Reminders'}>
+          {!advanced ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {REMINDER_PRESETS.map(p => {
+                const active = ladder.includes(p.days);
+                return (
+                  <button type="button" key={p.days} onClick={() => toggleLadder(p.days)}
+                    style={{
+                      padding: '4px 10px', fontSize: 12,
+                      borderRadius: 'var(--r-sm)',
+                      border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      background: active ? 'var(--primary-50)' : 'var(--surface-2)',
+                      color:      active ? 'var(--primary)' : 'var(--ink-2)',
+                      cursor: 'pointer',
+                      fontWeight: active ? 600 : 500,
+                      fontFamily: 'inherit',
+                    }}>
+                    {isAr ? p.ar : p.en}
+                  </button>
+                );
+              })}
+              <button type="button"
+                onClick={() => { setAdvanced(true); setAdvancedText(ladderToString(ladder)); }}
+                style={{
+                  padding: '4px 10px', fontSize: 12,
+                  borderRadius: 'var(--r-sm)',
+                  border: '1px dashed var(--border)',
+                  background: 'transparent', color: 'var(--ink-3)',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {isAr ? 'مخصص…' : 'Custom…'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input value={advancedText}
+                onChange={e => setAdvancedText(e.target.value)}
+                placeholder="7,3,1,0" style={inputStyle} />
+              <button type="button"
+                onClick={() => { setAdvanced(false); setLadder(parseLadder(advancedText)); }}
+                style={{
+                  padding: '4px 10px', fontSize: 12,
+                  borderRadius: 'var(--r-sm)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface-2)', color: 'var(--ink-2)',
+                  cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}>
+                {isAr ? 'رجوع' : 'Presets'}
+              </button>
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+            {isAr
+              ? 'أيام قبل تاريخ الحدث. مثال: ٧ يعني تنبيه قبل ٧ أيام.'
+              : 'Days before the event. e.g. 7 = notify 7 days ahead.'}
+          </div>
         </Field>
       </div>
     </Modal>
