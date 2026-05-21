@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  CheckCheck, ChevronRight, ClipboardCheck, FileText, Filter,
+  CheckCheck, ChevronRight, ClipboardCheck, Download, FileText, Filter,
   PauseCircle, Workflow as WorkflowIcon, X as XIcon,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -18,6 +18,7 @@ import {
 import {
   WORKFLOWS, MODULE_LABEL, type WorkflowModule,
 } from '../../lib/workflowCatalog';
+import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 
 /**
  * Workflow Submissions register.
@@ -105,6 +106,41 @@ export function WorkflowSubmissionsPage() {
     };
   }, [items]);
 
+  /** Export the currently-filtered rows as CSV. Regulator-visible columns
+   *  only; the full JSON payload is intentionally excluded (export is for
+   *  offline review + audit retention, not data re-import). */
+  function exportCsv() {
+    if (!items || items.length === 0) return;
+    const rows: ExportRow[] = items.map(s => {
+      const cat = WORKFLOWS.find(w => w.id === s.workflowId);
+      return {
+        id:                 s.id,
+        workflow_id:        s.workflowId,
+        workflow_name:      cat?.titleEn ?? s.workflowId,
+        workflow_name_ar:   cat?.titleAr ?? '',
+        module:             s.workflowModule,
+        title:              s.titleEn,
+        title_ar:           s.titleAr ?? '',
+        status:             s.status,
+        regulatory_anchor:  s.regulatoryAnchor ?? '',
+        summary:            s.summaryEn ?? '',
+        summary_ar:         s.summaryAr ?? '',
+        submitted_at:       s.submittedAt,
+        reviewed_at:        s.reviewedAt ?? '',
+        reviewer_note:      s.reviewerNote ?? '',
+      };
+    });
+    // Stamp the filename so the file name itself records what filter the
+    // export was taken under — auditors expect "I downloaded this slice".
+    const suffix = workflowFilter !== 'ALL' ? `-${workflowFilter}`
+                 : moduleFilter   !== 'ALL' ? `-${moduleFilter.toLowerCase()}`
+                 : '';
+    downloadCsv(rows, stampFilename(`workflow-submissions${suffix}`, 'csv'));
+    toast.success(isAr
+      ? `تم تصدير ${items.length} سجل بصيغة CSV`
+      : `Exported ${items.length} submissions to CSV`);
+  }
+
   return (
     <Shell>
       <PageHeader
@@ -114,11 +150,19 @@ export function WorkflowSubmissionsPage() {
           : 'Every wizard submission across the platform — filter, review, approve, reject, close'}
         eyebrow={isAr ? 'مركز المعالجات' : 'Workflow Hub'}
         actions={
-          <Link to="/workflows">
-            <Button variant="ghost" size="sm" Icon={WorkflowIcon}>
-              {isAr ? 'الكتالوج' : 'Catalog'}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Button variant="secondary" size="sm" Icon={Download}
+                    disabled={!items || items.length === 0}
+                    onClick={exportCsv}>
+              {isAr ? 'تصدير CSV' : 'Export CSV'}
+              {items && items.length > 0 ? ` (${items.length})` : ''}
             </Button>
-          </Link>
+            <Link to="/workflows">
+              <Button variant="ghost" size="sm" Icon={WorkflowIcon}>
+                {isAr ? 'الكتالوج' : 'Catalog'}
+              </Button>
+            </Link>
+          </div>
         }
       />
 
