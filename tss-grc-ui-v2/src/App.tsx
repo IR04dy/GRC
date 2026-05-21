@@ -48,6 +48,9 @@ import { RiskAcceptanceWizard } from './pages/workflow/erm/RiskAcceptanceWizard'
 import { BcmExerciseWizard } from './pages/workflow/bcm/BcmExerciseWizard';
 import { NcaEccAssessmentWizard } from './pages/workflow/nca/NcaEccAssessmentWizard';
 import { VendorRiskAssessmentWizard } from './pages/workflow/scm/VendorRiskAssessmentWizard';
+import { CloudCccWizard } from './pages/workflow/nca/CloudCccWizard';
+import { VulnerabilityTriageWizard } from './pages/workflow/nca/VulnerabilityTriageWizard';
+import { SupplierExitPlanWizard } from './pages/workflow/scm/SupplierExitPlanWizard';
 import { AarDetailPage } from './pages/bcm/AarDetailPage';
 import { AiSuggestionsPage } from './pages/ai/AiSuggestionsPage';
 import { AdminPage } from './pages/admin/AdminPage';
@@ -213,6 +216,9 @@ export function App() {
               <Route path="/workflows/bcm/exercise"                  element={<BcmExerciseWizard />} />
               <Route path="/workflows/nca/ecc-assessment"            element={<NcaEccAssessmentWizard />} />
               <Route path="/workflows/scm/vendor-risk-assessment"    element={<VendorRiskAssessmentWizard />} />
+              <Route path="/workflows/nca/cloud-ccc"                 element={<CloudCccWizard />} />
+              <Route path="/workflows/nca/vulnerability-triage"      element={<VulnerabilityTriageWizard />} />
+              <Route path="/workflows/scm/exit-plan"                 element={<SupplierExitPlanWizard />} />
 
               {/* Detail + admin pages for V115/V116 modules */}
               <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />
