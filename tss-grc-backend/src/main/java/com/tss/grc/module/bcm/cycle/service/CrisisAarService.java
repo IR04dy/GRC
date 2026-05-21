@@ -109,10 +109,16 @@ public class CrisisAarService {
         CrisisAar saved = aars.save(a);
         audit.log("GENERATE", "CrisisAar", saved.getId(),
             "AAR " + saved.getReportCode() + " generated for crisis event " + crisisEventId);
+        // Fan out to F8 — the engine listens for CRISIS_AAR_GENERATED and
+        // matches enabled rules against the payload. Seed rules can route
+        // AARs from SEV-1/SEV-2 events to the executive sponsor, or auto-
+        // notify the BCM champion the moment a draft is created. Same shape
+        // as FindingService (PR #50) — correlationId is the human-readable
+        // reportCode so downstream rule_runs thread cleanly to the AAR.
         eventPublisher.publishEvent(new DomainEvent(
-            o, "CRISIS_AAR_GENERATED", "CrisisAar", saved.getId(), null,
-            Map.of("crisisEventId", String.valueOf(crisisEventId),
-                   "reportCode", saved.getReportCode())));
+            o, "CRISIS_AAR_GENERATED",
+            "CrisisAar", saved.getId(), saved.getReportCode(),
+            payloadFor(saved, ce, null)));
         return saved;
     }
 
@@ -189,9 +195,17 @@ public class CrisisAarService {
         CrisisAar saved = aars.save(a);
         audit.log("TRANSITION", "CrisisAar", id,
             "AAR " + a.getReportCode() + " " + from + " → " + t);
+        // Fan out to F8 — single CRISIS_AAR_TRANSITIONED event matches the
+        // FINDING_TRANSITIONED / CAPA_TASK_REVIEWED shape from PRs #46/#48/
+        // #50. Rules target a specific step by adding {"status":"APPROVED"}
+        // to condition_json rather than us emitting four distinct event
+        // names. previousStatus is carried so a rule can fire only on
+        // UNDER_REVIEW → APPROVED (the sign-off moment) and skip the
+        // APPROVED → RESCINDED rollback path.
         eventPublisher.publishEvent(new DomainEvent(
-            org(), "CRISIS_AAR_" + t, "CrisisAar", id, null,
-            Map.of("reportCode", a.getReportCode(), "from", from)));
+            org(), "CRISIS_AAR_TRANSITIONED",
+            "CrisisAar", id, saved.getReportCode(),
+            payloadFor(saved, null, from)));
         return saved;
     }
 
@@ -323,4 +337,34 @@ public class CrisisAarService {
         if (s == null) return "";
         return s.replace('\n', ' ').replace('\r', ' ').replace('|', '/');
     }
+
+    /**
+     * Canonical payload Map for F8 rule-condition matching on CrisisAar
+     * events. Engine evaluates equality + contains on these string keys;
+     * values are coerced to "" so the matcher never NPEs on a null.
+     *
+     * <p>{@code severity} is carried from the parent {@link CrisisEvent}
+     * when available — for {@code TRANSITIONED} we load it lazily so a
+     * rule like "AAR approved on SEV-1 event → notify executive sponsor"
+     * can match. {@code previousStatus} only carries on TRANSITIONED.
+     */
+    private Map<String, Object> payloadFor(CrisisAar a, CrisisEvent ce, String previousStatus) {
+        Integer severity = null;
+        if (ce != null) {
+            severity = ce.getSeverity();
+        } else if (a.getCrisisEventId() != null) {
+            severity = crises.findByIdAndOrganisationId(a.getCrisisEventId(), a.getOrganisationId())
+                .map(CrisisEvent::getSeverity).orElse(null);
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("reportCode",     nullSafe(a.getReportCode()));
+        m.put("crisisEventId",  a.getCrisisEventId() == null ? "" : String.valueOf(a.getCrisisEventId()));
+        m.put("severity",       severity == null ? "" : String.valueOf(severity));
+        m.put("status",         nullSafe(a.getStatus()));
+        m.put("titleEn",        nullSafe(a.getTitleEn()));
+        if (previousStatus != null) m.put("previousStatus", previousStatus);
+        return m;
+    }
+
+    private static String nullSafe(String v) { return v == null ? "" : v; }
 }

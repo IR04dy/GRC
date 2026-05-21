@@ -9,6 +9,7 @@ import com.tss.grc.module.bcm.cycle.repository.CrisisEventRepository;
 import com.tss.grc.module.bcm.cycle.repository.CrisisRegulatoryNotificationRepository;
 import com.tss.grc.module.bcm.cycle.repository.CrisisSituationReportRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -232,6 +234,108 @@ class CrisisAarServiceTest {
 
         assertThatThrownBy(() -> service.transition(106L, "ZOMBIE", null))
             .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // F8 automation events
+    //
+    // CrisisAarService publishes:
+    //   CRISIS_AAR_GENERATED   — on generate() with crisisEventId, severity
+    //   CRISIS_AAR_TRANSITIONED — on every transition with previousStatus,
+    //                             severity pulled lazily from parent event
+    //
+    // Mirrors the CapaTaskService / FindingService pattern from PRs #46/#50.
+    // ══════════════════════════════════════════════════════════════════
+
+    @Test void generate_publishesGeneratedEvent_withSeverityFromParent() {
+        CrisisEvent ce = newCrisisEvent(60L, "Ransomware on file server",
+            "برنامج فدية على خادم الملفات");
+        when(crises.findByIdAndOrganisationId(60L, ORG_ID)).thenReturn(Optional.of(ce));
+        when(aars.countByOrganisationIdAndReportCodeStartingWith(eq(ORG_ID), anyString()))
+            .thenReturn(0L);
+        when(aars.findByOrganisationIdAndReportCode(eq(ORG_ID), anyString()))
+            .thenReturn(Optional.empty());
+
+        CrisisAar out = service.generate(60L);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("CRISIS_AAR_GENERATED");
+        assertThat(ev.entityType()).isEqualTo("CrisisAar");
+        assertThat(ev.organisationId()).isEqualTo(ORG_ID);
+        // correlationId threads downstream rule_runs to the human-readable
+        // reportCode rather than the surrogate id.
+        assertThat(ev.correlationId()).isEqualTo(out.getReportCode());
+        assertThat(ev.payload()).containsEntry("status", "DRAFT");
+        assertThat(ev.payload()).containsEntry("crisisEventId", "60");
+        // Severity is carried over from the parent CrisisEvent so a rule
+        // like "AAR generated for SEV-4 → notify executive sponsor" can
+        // match without re-loading the crisis event in the action handler.
+        assertThat(ev.payload()).containsEntry("severity", "4");
+        assertThat(ev.payload()).containsEntry("reportCode", out.getReportCode());
+    }
+
+    @Test void transition_publishesTransitionedEvent_withPreviousStatusInPayload() {
+        CrisisAar underReview = newAar(110L, "UNDER_REVIEW");
+        when(aars.findById(110L)).thenReturn(Optional.of(underReview));
+        // The transition path needs severity from the parent — service
+        // loads it lazily from crisisEventId. Stub it so the payload
+        // assertion below is real, not just "".
+        CrisisEvent parent = newCrisisEvent(99L, "Crisis", "أزمة");
+        parent.setSeverity(1);
+        when(crises.findByIdAndOrganisationId(99L, ORG_ID)).thenReturn(Optional.of(parent));
+
+        service.transition(110L, "APPROVED", 700L);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("CRISIS_AAR_TRANSITIONED");
+        assertThat(ev.entityId()).isEqualTo(110L);
+        assertThat(ev.correlationId()).isEqualTo("AAR-2026-000099");
+        // Single TRANSITIONED event (vs four distinct CRISIS_AAR_<status>
+        // events the service emitted before this PR). Rules target the
+        // step via condition_json {"status":"APPROVED"} — same shape as
+        // FINDING_TRANSITIONED.
+        assertThat(ev.payload()).containsEntry("status", "APPROVED");
+        assertThat(ev.payload()).containsEntry("previousStatus", "UNDER_REVIEW");
+        assertThat(ev.payload()).containsEntry("severity", "1");
+    }
+
+    @Test void transition_payloadValues_nullCoercedToEmptyString() {
+        // The F8 engine's equality check NPEs on null payload values.
+        // Confirm absent fields (titleEn, parent crisis event) are coerced
+        // to "" so a rule that doesn't care about them just doesn't match.
+        CrisisAar a = new CrisisAar();
+        a.setId(120L);
+        a.setOrganisationId(ORG_ID);
+        a.setReportCode("AAR-2026-000120");
+        a.setStatus("DRAFT");
+        a.setCrisisEventId(null);
+        a.setTitleEn(null);
+        when(aars.findById(120L)).thenReturn(Optional.of(a));
+
+        service.transition(120L, "UNDER_REVIEW", null);
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().payload().get("titleEn")).isEqualTo("");
+        assertThat(captor.getValue().payload().get("crisisEventId")).isEqualTo("");
+        assertThat(captor.getValue().payload().get("severity")).isEqualTo("");
+    }
+
+    @Test void transition_illegalJump_doesNotEmitEvent() {
+        // Cross-tenant / illegal-state guards must NOT fire an F8 event
+        // — otherwise a rule would react to a state change that never
+        // actually happened (info leak + spurious side-effects).
+        CrisisAar draft = newAar(130L, "DRAFT");
+        when(aars.findById(130L)).thenReturn(Optional.of(draft));
+
+        assertThatThrownBy(() -> service.transition(130L, "PUBLISHED", null))
+            .isInstanceOf(IllegalStateException.class);
+
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
     }
 
     // ── helpers ───────────────────────────────────────────────────────
