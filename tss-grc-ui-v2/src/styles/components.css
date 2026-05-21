@@ -965,6 +965,19 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   margin-top: var(--sp-2);
 }
 
+/* ─── Lazy-chunk Suspense fallback spinner ─── */
+.wizard-chunk-spinner {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary, var(--ink-2));
+  animation: wizard-chunk-spin 600ms linear infinite;
+}
+@keyframes wizard-chunk-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .wizard-chunk-spinner { animation: none; }
+}
+
 /* ─── WorkflowQuickLaunch chip strip (module pages) ─── */
 .wf-quick-launch {
   display: flex; flex-direction: column; gap: 6px;
