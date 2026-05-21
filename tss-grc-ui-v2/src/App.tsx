@@ -43,6 +43,13 @@ import { DsrFulfilmentWizard } from './pages/workflow/pdpl/DsrFulfilmentWizard';
 import { BreachNotificationWizard } from './pages/workflow/pdpl/BreachNotificationWizard';
 import { CyberIncidentWizard } from './pages/workflow/nca/CyberIncidentWizard';
 import { SupplierOnboardingWizard } from './pages/workflow/scm/SupplierOnboardingWizard';
+import { RiskTreatmentWizard } from './pages/workflow/erm/RiskTreatmentWizard';
+import { RiskAcceptanceWizard } from './pages/workflow/erm/RiskAcceptanceWizard';
+import { BcmExerciseWizard } from './pages/workflow/bcm/BcmExerciseWizard';
+import { NcaEccAssessmentWizard } from './pages/workflow/nca/NcaEccAssessmentWizard';
+import { VendorRiskAssessmentWizard } from './pages/workflow/scm/VendorRiskAssessmentWizard';
+import { AarDetailPage } from './pages/bcm/AarDetailPage';
+import { AiSuggestionsPage } from './pages/ai/AiSuggestionsPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { LicensingPage } from './pages/admin/LicensingPage';
 import { ScmPage } from './pages/scm/ScmPage';
@@ -199,6 +206,17 @@ export function App() {
               <Route path="/workflows/pdpl/breach-notification"      element={<BreachNotificationWizard />} />
               <Route path="/workflows/nca/cyber-incident"            element={<CyberIncidentWizard />} />
               <Route path="/workflows/scm/supplier-onboarding"       element={<SupplierOnboardingWizard />} />
+              <Route path="/workflows/erm/risk-treatment"            element={<RiskTreatmentWizard />} />
+              <Route path="/workflows/erm/risk-treatment/:riskId"    element={<RiskTreatmentWizard />} />
+              <Route path="/workflows/erm/risk-acceptance"           element={<RiskAcceptanceWizard />} />
+              <Route path="/workflows/erm/risk-acceptance/:riskId"   element={<RiskAcceptanceWizard />} />
+              <Route path="/workflows/bcm/exercise"                  element={<BcmExerciseWizard />} />
+              <Route path="/workflows/nca/ecc-assessment"            element={<NcaEccAssessmentWizard />} />
+              <Route path="/workflows/scm/vendor-risk-assessment"    element={<VendorRiskAssessmentWizard />} />
+
+              {/* Detail + admin pages for V115/V116 modules */}
+              <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />
+              <Route path="/ai/suggestions"                          element={<AiSuggestionsPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />

@@ -1048,6 +1048,36 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .wf-toggle input { width: 16px; height: 16px; accent-color: var(--primary, var(--ink-1)); }
 
+/* ─── AAR detail markdown body ────────────────────── */
+.aar-md-pre {
+  font: 500 13px var(--font-mono);
+  color: var(--ink-1);
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: var(--sp-4);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow: auto;
+}
+
+/* ─── AI suggestions JSON block ──────────────────── */
+.ai-json-pre {
+  font: 500 11.5px var(--font-mono);
+  color: var(--ink-2);
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: var(--sp-3);
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 280px;
+  overflow: auto;
+}
+
 /* ─── Buyer-gap demo page grid ───────────────────── */
 .buyer-gap-grid {
   display: grid;

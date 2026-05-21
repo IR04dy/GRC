@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Activity, AlertTriangle, CheckCheck, Database, FileCheck2,
   ShieldCheck, Sparkles, Timer, Wrench,
@@ -308,16 +309,18 @@ export function BuyerGapPage() {
             {(aars) => (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {aars.slice(0, 5).map(a => (
-                  <div key={a.id} className="text-xs" style={{
-                    display: 'flex', justifyContent: 'space-between',
-                    padding: '6px 0', borderBottom: '1px solid var(--border)',
-                  }}>
+                  <Link key={a.id} to={`/bcm/aars/${a.id}`} className="text-xs"
+                        style={{
+                          display: 'flex', justifyContent: 'space-between',
+                          padding: '6px 0', borderBottom: '1px solid var(--border)',
+                          textDecoration: 'none', color: 'inherit',
+                        }}>
                     <div>
-                      <div style={{ fontWeight: 500 }}>{a.reportCode}</div>
+                      <div style={{ fontWeight: 500, color: 'var(--ink-1)' }}>{a.reportCode}</div>
                       <div style={{ color: 'var(--ink-3)' }}>{a.titleEn}</div>
                     </div>
                     <Badge tone={STATUS_TONE[a.status] ?? 'neutral'}>{a.status}</Badge>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
