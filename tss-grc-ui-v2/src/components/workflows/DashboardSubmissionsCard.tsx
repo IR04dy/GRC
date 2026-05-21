@@ -107,7 +107,7 @@ export function DashboardSubmissionsCard({ limit = 8 }: { limit?: number }) {
               : (cat?.titleEn ?? s.workflowId);
             return (
               <li key={s.id} className="wf-submissions-panel-row">
-                <Link to={`/workflows/submissions?workflowId=${encodeURIComponent(s.workflowId)}`}
+                <Link to={`/workflows/submissions/${s.id}`}
                       className="wf-submissions-panel-row-link"
                       title={s.summaryEn ?? s.titleEn}>
                   <span className="wf-submissions-panel-id">#{s.id}</span>
