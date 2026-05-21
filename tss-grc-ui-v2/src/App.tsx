@@ -51,6 +51,9 @@ import { VendorRiskAssessmentWizard } from './pages/workflow/scm/VendorRiskAsses
 import { CloudCccWizard } from './pages/workflow/nca/CloudCccWizard';
 import { VulnerabilityTriageWizard } from './pages/workflow/nca/VulnerabilityTriageWizard';
 import { SupplierExitPlanWizard } from './pages/workflow/scm/SupplierExitPlanWizard';
+import { CrossBorderTransferWizard } from './pages/workflow/pdpl/CrossBorderTransferWizard';
+import { ConsentManagementWizard } from './pages/workflow/pdpl/ConsentManagementWizard';
+import { RopaWizard } from './pages/workflow/pdpl/RopaWizard';
 import { AarDetailPage } from './pages/bcm/AarDetailPage';
 import { AiSuggestionsPage } from './pages/ai/AiSuggestionsPage';
 import { AdminPage } from './pages/admin/AdminPage';
@@ -219,6 +222,9 @@ export function App() {
               <Route path="/workflows/nca/cloud-ccc"                 element={<CloudCccWizard />} />
               <Route path="/workflows/nca/vulnerability-triage"      element={<VulnerabilityTriageWizard />} />
               <Route path="/workflows/scm/exit-plan"                 element={<SupplierExitPlanWizard />} />
+              <Route path="/workflows/pdpl/cross-border"             element={<CrossBorderTransferWizard />} />
+              <Route path="/workflows/pdpl/consent"                  element={<ConsentManagementWizard />} />
+              <Route path="/workflows/pdpl/ropa"                     element={<RopaWizard />} />
 
               {/* Detail + admin pages for V115/V116 modules */}
               <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />
