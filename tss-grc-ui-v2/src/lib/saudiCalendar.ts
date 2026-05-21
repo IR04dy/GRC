@@ -144,3 +144,34 @@ export function monthYearLabel(year: number, monthZeroIndexed: number, isAr: boo
     month: 'long', year: 'numeric',
   }).format(d);
 }
+
+// ─── Week view helpers ──────────────────────────────────────────────
+
+/** Anchor a date to the Sunday of its Saudi week. JS getDay() returns
+ *  0=Sun, so subtracting that value gives the week start. */
+export function startOfSaudiWeek(date: Date): Date {
+  const offset = date.getDay();
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - offset);
+}
+
+/** Returns the 7 consecutive dates of the Saudi week starting at
+ *  {@code anchor}'s Sunday (Sun through Sat). */
+export function buildWeekDays(anchor: Date): Date[] {
+  const start = startOfSaudiWeek(anchor);
+  const out: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    out.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  }
+  return out;
+}
+
+/** Bilingual "Week of <date>" header for the week view. Picks the
+ *  Sunday-anchored start day. */
+export function weekRangeLabel(anchor: Date, isAr: boolean): string {
+  const start = startOfSaudiWeek(anchor);
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  const fmt = (d: Date) => new Intl.DateTimeFormat(isAr ? 'ar-SA' : 'en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  }).format(d);
+  return `${fmt(start)} – ${fmt(end)}`;
+}

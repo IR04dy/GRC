@@ -15,12 +15,13 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { calendarApi, type CalendarEventDto, type CalendarEventCreateRequest } from '../../lib/api';
 import {
-  buildMonthGrid, dowShort, hijriDate, hijriDayOnly,
-  monthYearLabel, toIsoDate, isSameDay, isSaudiWeekend,
+  buildMonthGrid, buildWeekDays, dowShort, hijriDate, hijriDayOnly,
+  monthYearLabel, startOfSaudiWeek, toIsoDate, isSameDay, isSaudiWeekend,
+  weekRangeLabel,
   EVENT_TYPE_LABEL, EVENT_TYPE_TONE, type CalendarEventType,
 } from '../../lib/saudiCalendar';
 
-type ViewMode = 'month' | 'agenda';
+type ViewMode = 'month' | 'week' | 'agenda';
 
 /**
  * Compliance Calendar — Outlook-equivalent. Saudi-workdays-aware
@@ -51,6 +52,12 @@ export function CalendarPage() {
   const now = new Date();
   const year  = parseInt(search.get('y') ?? String(now.getFullYear()), 10);
   const month = parseInt(search.get('m') ?? String(now.getMonth()),    10);
+  // Day-of-month anchor for week view. Defaults to today's day if the
+  // URL has y/m matching now, otherwise the 1st of the visible month.
+  const day = parseInt(
+    search.get('d') ?? (year === now.getFullYear() && month === now.getMonth()
+                        ? String(now.getDate()) : '1'),
+    10);
   const view  = (search.get('v') ?? 'month') as ViewMode;
   const activeTypes = useMemo(() =>
     (search.get('types') ?? '').split(',').filter(Boolean) as CalendarEventType[],
@@ -66,8 +73,9 @@ export function CalendarPage() {
 
   // Compute window [from, to). For month view: 1st of month → 1st
   // of next month + a few days of overflow so the 42-cell grid
-  // shows neighbouring days. For agenda view: today → 60 days out.
-  const { fromIso, toIso, gridCells } = useMemo(() => {
+  // shows neighbouring days. For week view: Sun → next Sun (7-day
+  // window). For agenda view: today → 60 days out.
+  const { fromIso, toIso, gridCells, weekDays } = useMemo(() => {
     if (view === 'agenda') {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60);
@@ -75,6 +83,18 @@ export function CalendarPage() {
         fromIso: toIsoDate(start),
         toIso:   toIsoDate(end),
         gridCells: [] as Date[],
+        weekDays: [] as Date[],
+      };
+    }
+    if (view === 'week') {
+      const anchor = new Date(year, month, day);
+      const days = buildWeekDays(anchor);
+      const lastPlus1 = new Date(days[6].getFullYear(), days[6].getMonth(), days[6].getDate() + 1);
+      return {
+        fromIso: toIsoDate(days[0]),
+        toIso:   toIsoDate(lastPlus1),
+        gridCells: [] as Date[],
+        weekDays: days,
       };
     }
     const cells = buildMonthGrid(year, month);
@@ -82,8 +102,9 @@ export function CalendarPage() {
       fromIso: toIsoDate(cells[0]),
       toIso:   toIsoDate(new Date(cells[41].getFullYear(), cells[41].getMonth(), cells[41].getDate() + 1)),
       gridCells: cells,
+      weekDays: [] as Date[],
     };
-  }, [year, month, view, now]);
+  }, [year, month, day, view, now]);
 
   // Load events whenever the window or type filter changes.
   useEffect(() => {
@@ -114,19 +135,42 @@ export function CalendarPage() {
   }
 
   function goPrev() {
-    const d = new Date(year, month - 1, 1);
+    // Week view shifts by 7 days; month/agenda shift by one month.
+    if (view === 'week') {
+      const anchor = startOfSaudiWeek(new Date(year, month, day));
+      const prev = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 7);
+      setSearch({
+        ...Object.fromEntries(search),
+        y: String(prev.getFullYear()),
+        m: String(prev.getMonth()),
+        d: String(prev.getDate()),
+      }, { replace: true });
+      return;
+    }
+    const d2 = new Date(year, month - 1, 1);
     setSearch({
       ...Object.fromEntries(search),
-      y: String(d.getFullYear()),
-      m: String(d.getMonth()),
+      y: String(d2.getFullYear()),
+      m: String(d2.getMonth()),
     }, { replace: true });
   }
   function goNext() {
-    const d = new Date(year, month + 1, 1);
+    if (view === 'week') {
+      const anchor = startOfSaudiWeek(new Date(year, month, day));
+      const next = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 7);
+      setSearch({
+        ...Object.fromEntries(search),
+        y: String(next.getFullYear()),
+        m: String(next.getMonth()),
+        d: String(next.getDate()),
+      }, { replace: true });
+      return;
+    }
+    const d2 = new Date(year, month + 1, 1);
     setSearch({
       ...Object.fromEntries(search),
-      y: String(d.getFullYear()),
-      m: String(d.getMonth()),
+      y: String(d2.getFullYear()),
+      m: String(d2.getMonth()),
     }, { replace: true });
   }
   function goToday() {
@@ -134,7 +178,14 @@ export function CalendarPage() {
       ...Object.fromEntries(search),
       y: String(now.getFullYear()),
       m: String(now.getMonth()),
+      d: String(now.getDate()),
     }, { replace: true });
+  }
+  function cycleView() {
+    const next: ViewMode = view === 'month' ? 'week'
+                         : view === 'week'  ? 'agenda'
+                         : 'month';
+    setParam('v', next === 'month' ? undefined : next);
   }
 
   function toggleType(t: CalendarEventType) {
@@ -161,7 +212,14 @@ export function CalendarPage() {
 
   const heading = view === 'month'
     ? monthYearLabel(year, month, isAr)
-    : isAr ? 'الجدول القادم (٦٠ يوماً)' : 'Upcoming (60 days)';
+    : view === 'week'
+      ? weekRangeLabel(new Date(year, month, day), isAr)
+      : isAr ? 'الجدول القادم (٦٠ يوماً)' : 'Upcoming (60 days)';
+  const switchLabel = view === 'month'
+    ? (isAr ? 'عرض أسبوعي' : 'Week view')
+    : view === 'week'
+      ? t('calendarSwitchAgenda')
+      : t('calendarSwitchMonth');
 
   return (
     <Shell title={t('calendarTitle')} sub={t('calendarSub')}>
@@ -173,9 +231,8 @@ export function CalendarPage() {
           <Button variant="ghost" Icon={RefreshCw} onClick={refreshNow}>
             {t('actionRefresh')}
           </Button>
-          <Button variant="ghost" Icon={LayoutGrid}
-            onClick={() => setParam('v', view === 'month' ? 'agenda' : 'month')}>
-            {view === 'month' ? t('calendarSwitchAgenda') : t('calendarSwitchMonth')}
+          <Button variant="ghost" Icon={LayoutGrid} onClick={cycleView}>
+            {switchLabel}
           </Button>
           <Button variant="primary" Icon={Plus} onClick={() => setAddOpen(true)}>
             {t('calendarNewEvent')}
@@ -249,8 +306,12 @@ export function CalendarPage() {
           ? <MonthGrid cells={gridCells} year={year} month={month}
                        events={events ?? []} showHijri={showHijri}
                        isAr={isAr} onEventClick={clickEvent} />
-          : <AgendaList events={events ?? []} isAr={isAr}
-                        showHijri={showHijri} onEventClick={clickEvent} />
+          : view === 'week'
+            ? <WeekView days={weekDays} events={events ?? []}
+                        showHijri={showHijri} isAr={isAr}
+                        onEventClick={clickEvent} />
+            : <AgendaList events={events ?? []} isAr={isAr}
+                          showHijri={showHijri} onEventClick={clickEvent} />
       }
 
       {addOpen && <AddEventModal
@@ -348,6 +409,143 @@ function MonthGrid({ cells, year, month, events, showHijri, isAr, onEventClick }
         })}
       </div>
     </Card>
+  );
+}
+
+// ─── Week view ────────────────────────────────────────────────────────
+
+/**
+ * Saudi week (Sun-Thu working, Fri-Sat tinted). Seven columns, each
+ * column shows that day's events stacked. No hour grid in v1 — most
+ * GRC events are all-day deadlines; the rare timed meeting gets its
+ * time printed in the chip. Today's column is bordered. Holiday
+ * columns get the same accent tint as the month grid uses.
+ */
+function WeekView({ days, events, showHijri, isAr, onEventClick }: {
+  days: Date[]; events: CalendarEventDto[];
+  showHijri: boolean; isAr: boolean;
+  onEventClick: (e: CalendarEventDto) => void;
+}) {
+  const today = new Date();
+  return (
+    <Card title="" Icon={CalendarIcon}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+        gap: 1, background: 'var(--border)',
+      }}>
+        {days.map(d => {
+          const dayEvents = events.filter(e => isSameDay(new Date(e.startsAt), d));
+          const isToday = isSameDay(d, today);
+          const weekend = isSaudiWeekend(d);
+          const hasHoliday = dayEvents.some(e => e.eventType === 'PUBLIC_HOLIDAY');
+          return (
+            <div key={`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`}
+              style={{
+                background: hasHoliday ? 'var(--accent-50)'
+                          : weekend ? 'var(--surface-2)'
+                          : 'var(--surface-1)',
+                minHeight: 320,
+                padding: 8,
+                borderInlineStart: isToday ? '3px solid var(--primary)' : undefined,
+                display: 'flex', flexDirection: 'column',
+              }}>
+              {/* Header: day-of-week + date + Hijri */}
+              <div style={{ display: 'flex', justifyContent: 'space-between',
+                            alignItems: 'baseline', marginBottom: 8,
+                            borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
+                <div>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700,
+                    color: weekend ? 'var(--ink-4)' : 'var(--ink-3)',
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                  }}>
+                    {dowShort(d.getDay(), isAr)}
+                  </div>
+                  <div style={{
+                    fontSize: 18, fontWeight: isToday ? 700 : 500,
+                    color: isToday ? 'var(--primary)' : 'var(--ink-1)',
+                  }}>
+                    {d.getDate()}
+                  </div>
+                </div>
+                {showHijri && (
+                  <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+                    {hijriDayOnly(d)}
+                  </span>
+                )}
+              </div>
+              {/* Stacked events */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                {dayEvents.length === 0 && (
+                  <span style={{ fontSize: 10, color: 'var(--ink-4)', fontStyle: 'italic' }}>
+                    {isAr ? '—' : '—'}
+                  </span>
+                )}
+                {dayEvents.map(e => (
+                  <WeekChip key={e.externalId} event={e} isAr={isAr}
+                            onClick={() => onEventClick(e)} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Compact chip for the week view — taller than the month chip because
+ * columns are wider, so we can show type + title + (optional) time on
+ * a second line. Tone matches the month-view chip palette.
+ */
+function WeekChip({ event, isAr, onClick }: {
+  event: CalendarEventDto; isAr: boolean; onClick: () => void;
+}) {
+  const tone = EVENT_TYPE_TONE[event.eventType as CalendarEventType] ?? 'neutral';
+  const title = isAr && event.titleAr ? event.titleAr : event.titleEn;
+  const typeLbl = EVENT_TYPE_LABEL[event.eventType as CalendarEventType];
+  const toneFg = ({
+    primary: 'var(--primary)',     info: 'var(--info-fg)',
+    warning: 'var(--warning-fg)',  danger:  'var(--danger-fg)',
+    success: 'var(--success-fg)',  accent:  'var(--accent-700)',
+    neutral: 'var(--ink-2)',
+  } as const)[tone];
+  const timeLabel = event.allDay
+    ? null
+    : new Date(event.startsAt).toLocaleTimeString(isAr ? 'ar-SA' : 'en-US',
+        { hour: '2-digit', minute: '2-digit' });
+  return (
+    <button onClick={onClick}
+      title={title}
+      style={{
+        display: 'block', width: '100%',
+        padding: '4px 6px', fontSize: 11,
+        textAlign: isAr ? 'right' : 'left',
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border)',
+        borderInlineStart: `3px solid ${toneFg}`,
+        borderRadius: 'var(--r-sm)',
+        cursor: 'pointer',
+        color: 'var(--ink-1)', fontFamily: 'inherit',
+      }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, color: toneFg,
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+        marginBottom: 1,
+      }}>
+        {typeLbl ? (isAr ? typeLbl.ar : typeLbl.en) : event.eventType}
+        {timeLabel && <span style={{ color: 'var(--ink-4)', marginInlineStart: 4 }}>{timeLabel}</span>}
+      </div>
+      <div style={{
+        fontSize: 11, fontWeight: 500,
+        overflow: 'hidden', textOverflow: 'ellipsis',
+        display: '-webkit-box', WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+      }}>
+        {title}
+      </div>
+    </button>
   );
 }
 
