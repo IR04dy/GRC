@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { privacyApi } from '../../../lib/api';
 
 /**
  * PDPL §7.4 #4 — Data Subject Request fulfilment wizard.
@@ -63,11 +64,36 @@ export function DsrFulfilmentWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      // Real backend call would land here. The DSR backend already supports
-      // create + SLA tracking (V115); leaving this stubbed keeps the demo path
-      // working without requiring a Saudi National ID format up front.
-      await new Promise(r => setTimeout(r, 400));
-      toast.success(isAr ? 'تم إنشاء طلب صاحب البيانات' : 'DSR case created');
+      const now = new Date();
+      const dueDate = new Date(now);
+      dueDate.setDate(dueDate.getDate() + 30); // PDPL Art. 4 — 30-day SLA
+
+      // Bundle verification + RoPA links + delivery into the description so
+      // the saved case captures the wizard context without needing a
+      // dedicated subschema. (V115 added sla_breached_at to dsr_cases.)
+      const description = [
+        `ID last4: ${draft.nationalIdLast4}`,
+        draft.verificationMethod ? `Verified via ${draft.verificationMethod}` : null,
+        draft.identityNotes?.trim() ? `ID notes: ${draft.identityNotes}` : null,
+        draft.ropaActivities?.trim() ? `RoPA scope: ${draft.ropaActivities}` : null,
+        draft.dataSummary?.trim() ? `Data summary: ${draft.dataSummary}` : null,
+        draft.deliveryMethod ? `Delivery: ${draft.deliveryMethod}` : null,
+        draft.redactionComplete ? 'Redaction complete' : null,
+        draft.dpoApproved ? 'DPO approved' : null,
+      ].filter(Boolean).join(' · ');
+
+      const created = await privacyApi.createDsr({
+        requestType: draft.type,
+        requesterName: draft.subjectName,
+        requesterEmail: draft.contactEmail,
+        receivedAt: now.toISOString(),
+        dueDate: dueDate.toISOString().slice(0, 10),
+        status: draft.dpoApproved && draft.redactionComplete ? 'CLOSED' : 'IN_PROGRESS',
+        description: description || undefined,
+      });
+      toast.success(isAr
+        ? `تم إنشاء طلب صاحب البيانات (#${created.id})`
+        : `DSR case #${created.id} created`);
       navigate('/privacy');
     } catch (e) {
       toast.danger((e as Error).message);

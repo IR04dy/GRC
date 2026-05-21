@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { bcmApi } from '../../../lib/api';
 
 /**
  * BCM §7.1 #10 — BCM Exercise & Test wizard (ISO 22301 §8.5).
@@ -57,8 +58,40 @@ export function BcmExerciseWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      toast.success(isAr ? 'تم تسجيل التمرين' : 'Exercise recorded');
+      // Findings get suffixed with the actual RTO/RPO so the saved record
+      // captures the gap-vs-target that drives an auto-CAPA upstream.
+      const findingsBlob = [
+        draft.findingsEn?.trim(),
+        draft.rtoActualHours != null
+          ? `RTO actual=${draft.rtoActualHours}h (target=${draft.rtoTargetHours ?? '?'}h).`
+          : null,
+        draft.rpoActualHours != null
+          ? `RPO actual=${draft.rpoActualHours}h (target=${draft.rpoTargetHours ?? '?'}h).`
+          : null,
+        draft.peakSeasonLens && draft.peakSeasonLens !== 'NONE'
+          ? `Peak-season lens: ${draft.peakSeasonLens}.`
+          : null,
+      ].filter(Boolean).join(' ');
+
+      const created = await bcmApi.createExercise({
+        exerciseNameEn: draft.titleEn,
+        exerciseNameAr: draft.titleAr,
+        exerciseType: draft.drillType,
+        scenario: draft.scenarioEn,
+        scheduledDate: draft.scheduledAt,
+        executedDate: draft.outcome ? new Date().toISOString().slice(0, 10) : undefined,
+        score: draft.outcome === 'PASS' ? 100
+              : draft.outcome === 'PARTIAL_FAIL' ? 60
+              : draft.outcome === 'FAIL' ? 30
+              : null,
+        status: draft.outcome ? 'COMPLETED' : 'PLANNED',
+        findings: findingsBlob || undefined,
+        capaCount: draft.capaCount,
+        facilitator: draft.participants,
+      });
+      toast.success(isAr
+        ? `تم تسجيل التمرين (#${created.id})`
+        : `Exercise #${created.id} recorded`);
       navigate('/bcm/library');
     } catch (e) {
       toast.danger((e as Error).message);

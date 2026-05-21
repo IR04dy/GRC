@@ -7,6 +7,7 @@ import { WizardShell, type WizardStep } from '../../../components/workflow/Wizar
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
+import { privacyApi } from '../../../lib/api';
 
 /**
  * PDPL §7.4 #8 — Personal Data Breach notification wizard.
@@ -83,12 +84,39 @@ export function BreachNotificationWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      // Real backend wiring: POST /api/v1/bcm/crisis-events with
-      // personalDataAffected=true, then PATCH the pdpl_notification_drafted_at
-      // field. Stubbed here so the flow demos without requiring a fresh
-      // crisis event each time.
-      await new Promise(r => setTimeout(r, 400));
-      toast.success(isAr ? 'تم تسجيل الإشعار' : 'Breach notification recorded');
+      // PDPL Art. 23 — 72-hour breach notification. The privacy/breaches
+      // endpoint is the canonical record (cross-references back to the BCM
+      // crisis event via the wizard's containment summary when applicable).
+      const description = [
+        draft.affectedScopeEn?.trim() ? `Scope: ${draft.affectedScopeEn}` : null,
+        draft.containmentSummaryEn?.trim() ? `Containment: ${draft.containmentSummaryEn}` : null,
+        draft.dataCategories?.trim() ? `Data categories: ${draft.dataCategories}` : null,
+        draft.specialCategory ? 'Special-category data: yes' : null,
+        draft.detectedByName?.trim() ? `Detected by: ${draft.detectedByName}` : null,
+        draft.decision ? `Decision: ${draft.decision}` : null,
+        draft.decisionRationaleEn?.trim() ? `Rationale: ${draft.decisionRationaleEn}` : null,
+        draft.sdaiaDraftEn?.trim() ? `SDAIA draft: ${draft.sdaiaDraftEn}` : null,
+        draft.subjectsDraftEn?.trim() ? `Subject notice draft: ${draft.subjectsDraftEn}` : null,
+        draft.approvedByDpo ? 'DPO approved' : null,
+        draft.approvedByCounsel ? 'Counsel approved' : null,
+      ].filter(Boolean).join(' · ');
+
+      const created = await privacyApi.createBreach({
+        titleEn: draft.titleEn,
+        description: description || undefined,
+        severity: draft.severity,
+        affectedRecords: draft.affectedSubjectCount ?? null,
+        discoveredAt: draft.detectionTime
+          ? new Date(draft.detectionTime).toISOString()
+          : new Date().toISOString(),
+        reportedToAuthority: draft.decision === 'NOTIFY_SDAIA',
+        status: draft.approvedByDpo && draft.approvedByCounsel ? 'NOTIFIED'
+              : draft.decision ? 'IN_REVIEW'
+              : 'NEW',
+      });
+      toast.success(isAr
+        ? `تم تسجيل الإشعار (#${created.id})`
+        : `Breach notification #${created.id} recorded`);
       navigate('/bcm/crisis-room');
     } catch (e) {
       toast.danger((e as Error).message);
