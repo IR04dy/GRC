@@ -1,12 +1,55 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PRs #11-62 — added Compliance Calendar module + NDI calendar integration)
+**Last update:** 22 May 2026 (PRs #11-69 — full sprint: Calendar finishing + Notifications + regulatory libraries + Cmd-K)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Recent additions — Compliance Calendar + NDI integration (22 May 2026)
+## 🟢 Most recent — Calendar finishing + Notifications + Regulatory libraries + Cmd-K (22 May 2026)
+
+After the Calendar foundation landed (PRs #60-62) a seven-PR sprint closed the remaining gaps across four tracks:
+
+| Track | PR | Merge | What |
+|---|---|---|---|
+| **A1** Calendar | **#63** | `3d23ca8` | **iCal (.ics) export** at `GET /api/v1/calendar/events.ics` — buyers subscribe from Outlook (Internet Calendars) or Google (Add from URL). RFC-5545 compliant: VEVENT per row, bilingual SUMMARY (`EN — AR`), VALARM ladder (one per reminder stop), RRULE for recurrence (DAILY/WEEKLY/MONTHLY/QUARTERLY=MONTHLY;INTERVAL=3/YEARLY), severity→PRIORITY, X-TSS-ENTITY private prop. 8 unit tests. V134 holiday-seed DATE→DATETIME2 fix for the Eid blocks. |
+| **A2** Calendar | **#64** | `61dba0a` | **Week view** — third view mode (month → week → agenda). 7 columns Sun→Sat (Saudi anchor), weekend tinting + holiday tint + today-border match the month grid. Chips show eyebrow type + time (if not all-day) + 2-line clamped title. URL state adds `?d` day anchor; prev/next shift 7 days. New `startOfSaudiWeek` / `buildWeekDays` / `weekRangeLabel` helpers. |
+| **A3** Calendar | **#65** | `66b339b` | **Add-event modal — recurrence + reminder ladder editors.** Recurrence select (NONE/DAILY/WEEKLY/MONTHLY/QUARTERLY/ANNUAL) with conditional "Ends on" date picker. Reminder ladder swapped from free-text to 6 preset chips (Day-of/1d/3d/1w/2w/1m) toggleable on/off, with "Custom…" escape hatch for power users. Dedup + sort-desc on submit so `7,1,3` → `7,3,1`. |
+| **A4** Calendar | **#66** | `c269af2` | **F8 reminder scheduler — Saudi-workday aware.** Hourly tick walks upcoming calendar events, parses ladder, computes `startsAt − daysBefore`, shifts BACKWARDS to preceding workday if weekend/holiday (don't swallow prep window), publishes `REMINDER_DUE` DomainEvent if fire date == today AND no prior audit row. **V135 seeds 5 rules** (AR-51..AR-55) per event type: AUDIT_DAY→audit team, REPORT_DEADLINE→compliance+filer, CAPA_DUE→ESCALATE owner+lead, DR_TEST→BCM coord+tech lead, catch-all `{}` →event owner (priority 9). 7 unit tests. |
+| **B** Inbox | **#67** | `2afa0f4` | **Notification inbox** at `/notifications` — closes the other half of the F8 loop. The backend already wrote `platform.notifications` rows via NotificationService.broadcastToRole on every NOTIFY/ESCALATE; this PR is the page that puts them in front of a human. Bilingual title+body, ESCALATION badge with danger-toned unread dot, optimistic mark-read, "Mark all read", relative timestamps. **Sidebar entry under My Work with unread-count badge** wired to `/api/v1/notifications/unread-count`. |
+| **C** Regs | **#68** | `6cb78a2` | **Saudi regulatory libraries** — V136 expands NCA ECC-2 (21 controls: domain headers + operational backbone of domain 2 + resilience/3rd-party/ICS sigs) and SAMA CSF (14 controls across all 4 domains). V137 expands PDPL 2023 (12 articles: 1, 2, 3, 5, 6, 12, 15, 19, 21, 25, 26, 30) and DGA DMM (9 controls across 6 pillars). All 56 rows bilingual EN+AR, `is_placeholder=0`, mandatory=1. `authority_documents.notes` stamped 'CORE_SEEDED 2026-05 — Cross-reference official PDF before audit use.' Per CLAUDE.md we don't claim regulatory completeness — these are paraphrased high-frequency controls, not the full 114/N-article import. |
+| **D** Cmd-K | **#69** | `b512b8b` | **Cmd-K palette content refresh** — added 8 page entries the static index was missing: /calendar, /notifications, /workflows/submissions, /capa, /findings, /ndi, /admin/licensing, /workflow-definitions. Calendar keywords cover "outlook", "deadlines", "reminders", "hijri", "saudi workdays" so users find it however they think of it. |
+
+### Sprint highlights
+
+- **Calendar feature-complete.** Backend foundation, frontend Month/Week/Agenda, .ics export, recurrence + reminder editors, and F8 reminder scheduler all live. Subscribe-from-Outlook works end-to-end.
+- **F8 loop fully closed.** Reminders fire on schedule via `CalendarReminderScheduler`, NOTIFY/ESCALATE actions land in `/notifications` for the right roles, sidebar badge tells the user something's waiting. End-to-end: calendar event with `reminder_days=7,1,0` → hourly tick → REMINDER_DUE → matching rule (AR-51..55) → NOTIFY/ESCALATE → notification row → sidebar badge → inbox page.
+- **Regulatory catalog usable.** 56 real (non-placeholder) citations across the 4 major Saudi frameworks. Compliance Mapping and Control Coverage pages now resolve against canonical NCA/PDPL/SAMA/DGA codes their auditors will recognise.
+- **Discovery covered.** Every new page surfaces via Cmd-K with multiple keyword paths.
+
+### F8 reminder scheduler — V135 seed rules
+
+| Rule | Trigger condition | Action | Priority | Purpose |
+|---|---|---|---|---|
+| AR-51 | `eventType=AUDIT_DAY` | NOTIFY auditor + auditee owner | 3 | Prep materials + evidence |
+| AR-52 | `eventType=REPORT_DEADLINE` | NOTIFY compliance officer + filer | 2 | Regulatory filing lead time |
+| AR-53 | `eventType=CAPA_DUE` | **ESCALATE** action owner + program lead | 1 | Missed CAPA → repeat finding |
+| AR-54 | `eventType=DR_TEST` | NOTIFY BCM coord + tech lead | 3 | ISO 22301 §8.5 |
+| AR-55 | `{}` (catch-all) | NOTIFY event owner | 9 | Fallback for other types |
+
+### Regulatory library citation count (V136 + V137)
+
+| Framework | Authority Doc Code | Real citations | Coverage |
+|---|---|---|---|
+| NCA ECC-2 | `NCA-ECC-V2` | 21 | Domain headers + Domain 2 backbone + 3-5 signatures |
+| SAMA Cyber Security Framework | `SAMA-CYBER-FW` | 14 | All 4 domains + most-audited subdomains |
+| PDPL 2023 | `PDPL-2023` | 12 | Articles 1, 2, 3, 5, 6, 12, 15, 19, 21, 25, 26, 30 |
+| DGA Digital Maturity Model | `DGA-DIGITAL-MATURITY` | 9 | All 6 pillars + signature sub-controls |
+| **Total** | | **56** | |
+
+---
+
+## 🟢 Earlier — Compliance Calendar + NDI integration (22 May 2026)
 
 A Saudi-workdays-aware compliance calendar — Outlook-equivalent. Three PRs (#60-62) build the new module + connect it to NDI:
 
