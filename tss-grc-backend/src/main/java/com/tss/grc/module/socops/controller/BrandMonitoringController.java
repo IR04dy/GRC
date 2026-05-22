@@ -1,0 +1,48 @@
+package com.tss.grc.module.socops.controller;
+
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
+import com.tss.grc.module.socops.entity.BrandMonitoring;
+import com.tss.grc.module.socops.service.BrandMonitoringService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/socops/brand-monitoring")
+@RequiredArgsConstructor
+@RequireModule("SOCOPS")
+@Tag(name = "SOC Operations — Brand / Dark Web Monitoring")
+public class BrandMonitoringController {
+
+    private final BrandMonitoringService svc;
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
+    public Page<BrandMonitoring> list(@RequestParam(defaultValue = "0") int page,
+                                      @RequestParam(defaultValue = "50") int size) {
+        return svc.list(PageRequest.of(page, size));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
+    public BrandMonitoring get(@PathVariable Long id) { return svc.get(id); }
+
+    @PostMapping("/ingest")
+    @PreAuthorize("hasAnyAuthority('BRAND_INGEST','PLATFORM_ADMIN','CISO')")
+    public BrandMonitoring ingest(@RequestBody BrandMonitoring body) { return svc.ingest(body); }
+
+    @PostMapping("/{id}/request-takedown")
+    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    public BrandMonitoring requestTakedown(@PathVariable Long id) { return svc.requestTakedown(id); }
+
+    @PostMapping("/{id}/complete-takedown")
+    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    public BrandMonitoring completeTakedown(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return svc.completeTakedown(id, body.get("notes"));
+    }
+}
