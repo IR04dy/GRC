@@ -15,6 +15,11 @@ export interface SavedView {
   filter?: FilterGroup;
   sort?: { id: string; desc: boolean }[];
   visibleColumns?: string[];
+  /** URL search-params snapshot — used by pages that drive filters from the URL
+   *  (e.g. WorkflowSubmissionsPage). Mutually exclusive with {@code filter}
+   *  in practice but both can coexist for hybrid pages. Sprint-5 will migrate
+   *  these to {@code filter} once TanStack Table lands. */
+  urlQuery?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -58,6 +63,7 @@ export function saveView(view: Omit<SavedView, 'id' | 'createdAt'> & { id?: stri
     filter: view.filter,
     sort: view.sort,
     visibleColumns: view.visibleColumns,
+    urlQuery: view.urlQuery,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

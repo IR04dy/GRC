@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LoadableSection } from '../../components/ui/LoadableSection';
+import { SavedViewSelector } from '../../components/ui/SavedViewSelector';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -21,6 +22,7 @@ import {
 } from '../../lib/workflowCatalog';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { SubmissionAnalyticsCard } from '../../components/workflows/SubmissionAnalyticsCard';
+import { defaultViewForPage, type SavedView } from '../../lib/savedViews';
 
 /**
  * Workflow Submissions register.
@@ -113,6 +115,30 @@ export function WorkflowSubmissionsPage() {
     setSearchParams(next, { replace: true });
   }
   function clearFilters() { setSearchParams(new URLSearchParams(), { replace: true }); }
+
+  // ── Sprint-4 §2.5 Saved Views ──────────────────────────────────────────
+  // A "view" here is a snapshot of the URL search params. Saving the
+  // current state captures whatever combination of module / workflow /
+  // status / search the reviewer has dialled in; applying a saved view
+  // restores it. Pinning a view as default auto-applies on next visit
+  // (we only auto-apply when no params are already present, so a
+  // Hub drill-down link still wins).
+  const PAGE_KEY = 'workflow/submissions';
+  const [activeViewId, setActiveViewId] = useState<string | undefined>(undefined);
+
+  function applyView(v: SavedView): void {
+    setActiveViewId(v.id);
+    const params = new URLSearchParams(v.urlQuery ?? '');
+    setSearchParams(params, { replace: true });
+  }
+
+  // Auto-apply default view on first mount if the URL is clean.
+  useEffect(() => {
+    if (searchParams.toString() !== '') return;     // URL drill-down wins
+    const def = defaultViewForPage(PAGE_KEY);
+    if (def) applyView(def);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [items, setItems] = useState<WorkflowSubmissionDto[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -309,7 +335,15 @@ export function WorkflowSubmissionsPage() {
           : 'Every wizard submission across the platform — filter, review, approve, reject, close'}
         eyebrow={isAr ? 'مركز المعالجات' : 'Workflow Hub'}
         actions={
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <SavedViewSelector
+              pageKey={PAGE_KEY}
+              activeViewId={activeViewId}
+              onApply={applyView}
+              onSnapshot={() => ({
+                name: '',     // user picks via the dialog prompt
+                urlQuery: searchParams.toString(),
+              })} />
             <Button variant="secondary" size="sm" Icon={Download}
                     disabled={visibleItems.length === 0}
                     onClick={exportCsv}>
