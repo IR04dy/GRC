@@ -25,6 +25,7 @@ import { toRiskResponse, usePromotedProvenance } from '../../lib/promotedAdapter
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel as i18nStatusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { LivePulse } from '../../components/ui/LivePulse';
@@ -90,9 +91,9 @@ const STATUS_TONES: Record<string, BadgeTone> = {
   CLOSED: 'neutral',
 };
 
-function statusLabel(status: string): string {
-  return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-}
+// Replaced by lib/statusLabels.statusLabel — kept signature for callers
+// that still pass `string`. Pages access lang via useI18n() at the call
+// site so we don't need to thread it through here.
 
 function scoreBg(s: number): string {
   if (s >= 16) return 'var(--risk-crit)';
@@ -302,7 +303,7 @@ export function RiskRegisterPage() {
           </span>
         ) : <span style={{ color: 'var(--ink-4)' }} className="mono">—</span>,
       align: 'center', width: '110px' },
-    { header: t('riskColStatus'),cell: r => <Badge tone={STATUS_TONES[r.status] ?? 'neutral'} dot>{statusLabel(r.status)}</Badge>, width: '130px' },
+    { header: t('riskColStatus'),cell: r => <Badge tone={STATUS_TONES[r.status] ?? 'neutral'} dot>{i18nStatusLabel(r.status, lang)}</Badge>, width: '130px' },
     { header: '', align: 'end', width: '180px',
       cell: r => {
         const extras: Array<{ Icon: typeof Send; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];

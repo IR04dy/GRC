@@ -238,3 +238,34 @@
  * domain dashboards via <DashboardLoading /> + <DashboardError />. */
 .dashboard-skeleton { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
 .dashboard-error    { display: flex; flex-direction: column; gap: 6px; }
+
+/* ─── Shared utility classes for design polish ─────────────────────────
+ * Replaces inline style={{...}} literals that appeared 5+ times across
+ * pages. Each class is a single-purpose layout primitive — compose them
+ * instead of inlining the same grid/flex/spacing recipe in every page. */
+
+/* 4-column auto-fit KPI strip (Cyber / Control Library / Compliance kpis). */
+.kpi-strip-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+
+/* Horizontal chip row with wrap (domain filters, severity filters). */
+.chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+/* Count badge appended to chip labels — "All · 24". */
+.chip-row__count { margin-inline-start: 6px; opacity: 0.7; }
+
+/* Two-column layout used by Control Library + Compliance Mapping pages
+ * — left list, right detail. Same as .dash-grid but tuned for the list/
+ * detail proportion. */
+.list-detail-grid { display: grid; grid-template-columns: minmax(440px, 1fr) minmax(0, 1.4fr); gap: 16px; }
+@media (max-width: 1100px) {
+  .list-detail-grid { grid-template-columns: 1fr; }
+}
+
+/* Centred loading message — drop-in replacement for the
+ * `<div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>Loading…</div>`
+ * pattern that appeared in 8+ places before the Skeleton refactor. */
+.loading-block { padding: 24px; text-align: center; color: var(--ink-3); }
+
+/* Selected row in the Control Library / Compliance Mapping list — clicking
+ * highlights with the surface-2 tint without losing hover affordance. */
+.table-row--selected { background: var(--surface-2); }
+.table-row-clickable { cursor: pointer; }

@@ -103,7 +103,7 @@ export function ControlLibraryPage() {
         title={isAr ? 'مكتبة الضوابط' : 'Control library'} />
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 14 }}>
+      <div className="kpi-strip-4">
         <Kpi Icon={Shield} label={isAr ? 'الضوابط' : 'Controls'} value={controls.length} />
         <Kpi Icon={Layers} label={isAr ? 'مرجعيات تنظيمية' : 'Authority documents'} value={docs.length} />
         <Kpi Icon={Wrench} label={isAr ? 'مرجعيات مؤقتة' : 'Placeholder docs'} value={placeholderDocs}
@@ -112,26 +112,35 @@ export function ControlLibraryPage() {
       </div>
 
       {/* Domain chips */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        <button onClick={() => setDomain('')} style={chip(domain === '')}>
+      <div className="chip-row">
+        <button
+          type="button"
+          onClick={() => setDomain('')}
+          aria-label={isAr ? 'تصفية: جميع المجالات' : 'Filter: all domains'}
+          aria-pressed={domain === ''}
+          style={chip(domain === '')}>
           {isAr ? 'الكل' : 'All'}
-          <span className="mono text-2xs" style={{ marginInlineStart: 6, opacity: 0.7 }}>{controls.length}</span>
+          <span className="mono text-2xs chip-row__count">{controls.length}</span>
         </button>
         {DOMAINS.map(d => (
-          <button key={d} onClick={() => setDomain(d)} style={chip(domain === d)}>
+          <button
+            key={d}
+            type="button"
+            onClick={() => setDomain(d)}
+            aria-label={(isAr ? 'تصفية بمجال: ' : 'Filter by domain: ') + domainLabel(d, isAr ? 'ar' : 'en')}
+            aria-pressed={domain === d}
+            style={chip(domain === d)}>
             {domainLabel(d, isAr ? 'ar' : 'en')}
-            <span className="mono text-2xs" style={{ marginInlineStart: 6, opacity: 0.7 }}>{byDomain.get(d) ?? 0}</span>
+            <span className="mono text-2xs chip-row__count">{byDomain.get(d) ?? 0}</span>
           </button>
         ))}
       </div>
 
-      <div className="dash-grid" style={{ gridTemplateColumns: 'minmax(440px, 1fr) minmax(0, 1.4fr)' }}>
+      <div className="list-detail-grid">
         <Card title={isAr ? 'الضوابط' : 'Controls'}
           action={<Badge tone="primary">{controls.length}</Badge>}>
           {loading
-            ? <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)' }}>
-                {isAr ? 'جاري التحميل…' : 'Loading…'}
-              </div>
+            ? <div className="loading-block">{isAr ? 'جاري التحميل…' : 'Loading…'}</div>
             : controls.length === 0
               ? <InlineEmpty>{isAr ? 'لا توجد ضوابط' : 'No controls'}</InlineEmpty>
               : <table className="grc-table">
@@ -145,10 +154,10 @@ export function ControlLibraryPage() {
                   </tr></thead>
                   <tbody>
                     {controls.map(c => (
-                      <tr key={c.id} style={{
-                        cursor: 'pointer',
-                        background: selected?.id === c.id ? 'var(--surface-2)' : undefined,
-                      }} onClick={() => selectControl(c)}>
+                      <tr
+                        key={c.id}
+                        className={`table-row-clickable${selected?.id === c.id ? ' table-row--selected' : ''}`}
+                        onClick={() => selectControl(c)}>
                         <td className="mono text-2xs">{c.controlCode}</td>
                         <td>
                           <div style={{ fontWeight: 600 }}>
