@@ -4,10 +4,13 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.incident.dto.*;
 import com.tss.grc.module.incident.entity.Incident;
 import com.tss.grc.module.incident.repository.IncidentRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,13 +18,38 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+/**
+ * Incident service — NIST SP 800-61r2 lifecycle + Saudi regulator
+ * notification flow.
+ *
+ * <p>Wired into the F7 (audit log) and F8 (automation rules) loops
+ * via {@link AuditLogService#log} + {@link ApplicationEventPublisher
+ * #publishEvent}. Every state mutation now writes an audit row AND
+ * publishes a canonical {@link DomainEvent} the rule engine
+ * evaluates. Event vocabulary:
+ *
+ *   - INCIDENT_CREATED        — new incident logged
+ *   - INCIDENT_PHASE_CHANGED  — NIST phase advance (carries previousPhase)
+ *   - INCIDENT_CLOSED         — terminal close (resolutionDate stamped)
+ *   - INCIDENT_REGULATOR_NOTIFIED — one of NCA_HEY / DATA_OFFICE / CITC /
+ *                              SAMA / HRSD recorded
+ *
+ * <p>The audit + event emission happens INSIDE the existing
+ * @Transactional methods so the writes commit together with the
+ * mutation — no risk of an event firing for a transaction that later
+ * rolls back.
+ */
 @Service
 @RequiredArgsConstructor
 public class IncidentService {
 
     private final IncidentRepository incidentRepo;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     /** Optional — null in unit tests, auto-wired by Spring at runtime. */
     @Autowired(required = false)
@@ -29,6 +57,33 @@ public class IncidentService {
 
     private void broadcast(Long orgId, Long id, Object payload) {
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "incident", String.valueOf(id), payload);
+    }
+
+    /** Build the F8 payload that downstream rules condition on. */
+    private Map<String, Object> payloadFor(Incident i, String previousPhase) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("incidentId",     nullSafeStr(i.getId()));
+        m.put("title",          nullSafeStr(i.getTitle()));
+        m.put("titleAr",        nullSafeStr(i.getTitleAr()));
+        m.put("severity",       nullSafeStr(i.getSeverity()));
+        m.put("category",       nullSafeStr(i.getCategory()));
+        m.put("status",         nullSafeStr(i.getStatus()));
+        m.put("nistPhase",      nullSafeStr(i.getNistPhase()));
+        m.put("previousPhase",  nullSafeStr(previousPhase));
+        m.put("assignee",       nullSafeStr(i.getAssignee()));
+        m.put("mitreTactics",   nullSafeStr(i.getMitreTactics()));
+        m.put("mitreTechniques",nullSafeStr(i.getMitreTechniques()));
+        return m;
+    }
+
+    /** Always returns a non-null String so the rule engine's equality
+     *  matcher doesn't NPE on null payload values. */
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+
+    private void emit(Long orgId, String trigger, Incident i, String previousPhase) {
+        publisher.publishEvent(new DomainEvent(
+            orgId, trigger, "Incident", i.getId(),
+            "incident:" + i.getId(), payloadFor(i, previousPhase)));
     }
 
     @Transactional(readOnly = true)
@@ -51,7 +106,11 @@ public class IncidentService {
         Incident i = new Incident();
         i.setOrganisationId(orgId);
         apply(i, req);
-        IncidentResponse out = toResponse(incidentRepo.save(i));
+        i = incidentRepo.save(i);
+        audit.log("CREATE", "Incident", i.getId(),
+            "Incident raised: " + nullSafe(i.getTitle()) + " — " + nullSafe(i.getSeverity()));
+        emit(orgId, "INCIDENT_CREATED", i, null);
+        IncidentResponse out = toResponse(i);
         broadcast(orgId, out.id(), out);
         return out;
     }
@@ -122,10 +181,15 @@ public class IncidentService {
         if (idx >= NIST_PHASES.size() - 1) {
             throw new IllegalArgumentException("Already at terminal phase POST_INCIDENT — call /close to finalise");
         }
+        String previousPhase = i.getNistPhase();
         String next = NIST_PHASES.get(idx + 1);
         i.setNistPhase(next);
         i.setStatus(mapPhaseToStatus(next));
-        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        i = incidentRepo.save(i);
+        audit.log("PHASE_ADVANCE", "Incident", i.getId(),
+            "Phase " + nullSafe(previousPhase) + " → " + next);
+        emit(orgId, "INCIDENT_PHASE_CHANGED", i, previousPhase);
+        java.util.Map<String, Object> snap = phaseSnapshot(i);
         broadcast(orgId, id, snap);
         return snap;
     }
@@ -137,9 +201,14 @@ public class IncidentService {
         if (!NIST_PHASES.contains(phase)) {
             throw new IllegalArgumentException("phase must be one of " + NIST_PHASES);
         }
+        String previousPhase = i.getNistPhase();
         i.setNistPhase(phase);
         i.setStatus(mapPhaseToStatus(phase));
-        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        i = incidentRepo.save(i);
+        audit.log("PHASE_SET", "Incident", i.getId(),
+            "Phase set to " + phase + " (was " + nullSafe(previousPhase) + ")");
+        emit(orgId, "INCIDENT_PHASE_CHANGED", i, previousPhase);
+        java.util.Map<String, Object> snap = phaseSnapshot(i);
         broadcast(orgId, id, snap);
         return snap;
     }
@@ -148,9 +217,14 @@ public class IncidentService {
     public java.util.Map<String, Object> closeIncident(Long id) {
         Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
+        String previousPhase = i.getNistPhase();
         i.setStatus("CLOSED");
         if (i.getResolutionDate() == null) i.setResolutionDate(java.time.LocalDate.now());
-        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        i = incidentRepo.save(i);
+        audit.log("CLOSE", "Incident", i.getId(),
+            "Incident closed — resolution date " + i.getResolutionDate());
+        emit(orgId, "INCIDENT_CLOSED", i, previousPhase);
+        java.util.Map<String, Object> snap = phaseSnapshot(i);
         broadcast(orgId, id, snap);
         return snap;
     }
@@ -171,7 +245,8 @@ public class IncidentService {
         Long orgId = TenantContext.getCurrentTenant();
         Incident i = require(id);
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        switch (regulator.toUpperCase()) {
+        String reg = regulator == null ? "" : regulator.toUpperCase();
+        switch (reg) {
             case "NCA_HEY"     -> i.setNcaHeyNotifiedAt(now);
             case "DATA_OFFICE" -> i.setDataOfficeNotifiedAt(now);
             case "CITC"        -> i.setCitcNotifiedAt(now);
@@ -179,7 +254,20 @@ public class IncidentService {
             case "HRSD"        -> i.setHrsdNotifiedAt(now);
             default -> throw new IllegalArgumentException("regulator must be one of NCA_HEY|DATA_OFFICE|CITC|SAMA|HRSD");
         }
-        java.util.Map<String, Object> snap = phaseSnapshot(incidentRepo.save(i));
+        i = incidentRepo.save(i);
+        audit.log("REGULATOR_NOTIFIED", "Incident", i.getId(),
+            "Regulator " + reg + " notified at " + now);
+        // Single canonical event with regulator in payload — rules
+        // match equality on `regulator` to route the right follow-up
+        // (e.g. PDPL DSR clock, NCA CMU coordination, SAMA reporting
+        // ladder).
+        Map<String, Object> p = payloadFor(i, null);
+        p.put("regulator", reg);
+        p.put("notifiedAt", now.toString());
+        publisher.publishEvent(new DomainEvent(
+            orgId, "INCIDENT_REGULATOR_NOTIFIED", "Incident", i.getId(),
+            "incident:" + i.getId() + ":" + reg, p));
+        java.util.Map<String, Object> snap = phaseSnapshot(i);
         broadcast(orgId, id, snap);
         return snap;
     }

@@ -1,16 +1,21 @@
 package com.tss.grc.module.incident.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.incident.dto.IncidentRequest;
 import com.tss.grc.module.incident.entity.Incident;
 import com.tss.grc.module.incident.repository.IncidentRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Map;
 import java.util.Optional;
@@ -18,6 +23,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -38,6 +47,8 @@ class IncidentServiceTest {
     private static final Long INC_ID = 42L;
 
     @Mock private IncidentRepository repo;
+    @Mock private AuditLogService audit;
+    @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private IncidentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -180,5 +191,79 @@ class IncidentServiceTest {
 
         assertThatThrownBy(() -> service.advancePhase(INC_ID))
             .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // ─── F8 audit + DomainEvent emission ─────────────────────────────
+
+    @Test
+    void create_emits_INCIDENT_CREATED_event_and_audit() {
+        when(repo.save(any(Incident.class))).thenAnswer(inv -> {
+            Incident i = inv.getArgument(0);
+            i.setId(INC_ID);
+            return i;
+        });
+        IncidentRequest req = new IncidentRequest(
+            "Ransomware on host-42", "هجوم فدية على host-42",
+            "CRITICAL", "MALWARE", "OPEN", "soc@tss",
+            null, null, "Encrypted shares observed", null, null, null);
+
+        service.create(req);
+
+        ArgumentCaptor<DomainEvent> cap = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(cap.capture());
+        DomainEvent de = cap.getValue();
+        assertThat(de.triggerEvent()).isEqualTo("INCIDENT_CREATED");
+        assertThat(de.entityType()).isEqualTo("Incident");
+        assertThat(de.payload()).containsEntry("severity", "CRITICAL");
+        assertThat(de.payload()).containsEntry("category", "MALWARE");
+        verify(audit).log(eq("CREATE"), eq("Incident"), eq(INC_ID), anyString());
+    }
+
+    @Test
+    void advancePhase_emits_INCIDENT_PHASE_CHANGED_with_previousPhase() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(incident("ANALYSIS")));
+        when(repo.save(any(Incident.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.advancePhase(INC_ID);
+
+        ArgumentCaptor<DomainEvent> cap = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(cap.capture());
+        DomainEvent de = cap.getValue();
+        assertThat(de.triggerEvent()).isEqualTo("INCIDENT_PHASE_CHANGED");
+        assertThat(de.payload()).containsEntry("nistPhase", "CONTAINMENT");
+        assertThat(de.payload()).containsEntry("previousPhase", "ANALYSIS");
+        verify(audit).log(eq("PHASE_ADVANCE"), eq("Incident"), eq(INC_ID), anyString());
+    }
+
+    @Test
+    void closeIncident_emits_INCIDENT_CLOSED_event() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(incident("POST_INCIDENT")));
+        when(repo.save(any(Incident.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.closeIncident(INC_ID);
+
+        ArgumentCaptor<DomainEvent> cap = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(cap.capture());
+        DomainEvent de = cap.getValue();
+        assertThat(de.triggerEvent()).isEqualTo("INCIDENT_CLOSED");
+        assertThat(de.payload()).containsEntry("status", "CLOSED");
+        assertThat(de.payload()).containsEntry("previousPhase", "POST_INCIDENT");
+        verify(audit).log(eq("CLOSE"), eq("Incident"), eq(INC_ID), anyString());
+    }
+
+    @Test
+    void notifyRegulator_emits_INCIDENT_REGULATOR_NOTIFIED_with_regulator_in_payload() {
+        when(repo.findById(INC_ID)).thenReturn(Optional.of(incident("ANALYSIS")));
+        when(repo.save(any(Incident.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.notifyRegulator(INC_ID, "NCA_HEY");
+
+        ArgumentCaptor<DomainEvent> cap = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(cap.capture());
+        DomainEvent de = cap.getValue();
+        assertThat(de.triggerEvent()).isEqualTo("INCIDENT_REGULATOR_NOTIFIED");
+        assertThat(de.payload()).containsEntry("regulator", "NCA_HEY");
+        assertThat(de.payload()).containsKey("notifiedAt");
+        verify(audit).log(eq("REGULATOR_NOTIFIED"), eq("Incident"), eq(INC_ID), anyString());
     }
 }
