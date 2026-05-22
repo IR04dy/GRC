@@ -2300,6 +2300,7 @@ export const ar = {
   bcmReadinessSidebar:    'جاهزية الاستمرارية',
   scmDashSidebar:         'لوحة سلسلة الإمداد',
   cyberDashSidebar:       'لوحة الأمن السيبراني',
+  socopsSidebar:          'عمليات مركز الأمن',
   pdplDashSidebar:        'لوحة الخصوصية',
   ptEyebrow:              'المحتوى · مكتبة قوالب السياسات',
   ptTitle:                'مكتبة قوالب السياسات',

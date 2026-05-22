@@ -2315,6 +2315,7 @@ export const en = {
   bcmReadinessSidebar:    'BCM readiness',
   scmDashSidebar:         'Supply chain dashboard',
   cyberDashSidebar:       'Cyber dashboard',
+  socopsSidebar:          'SOC operations',
   pdplDashSidebar:        'PDPL dashboard',
   ptEyebrow:              'Content · Policy template library',
   ptTitle:                'Policy Template Library',
