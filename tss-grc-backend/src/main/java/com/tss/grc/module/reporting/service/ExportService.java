@@ -28,20 +28,32 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Bilingual PDF export service (Q1) using OpenPDF.
+ * Bilingual operational-report export service (Q1) using OpenPDF.
  *
- * Locale handling: pass `lang = "ar"` to flip the page direction to RTL and use
- * Arabic column headers. The PdfFonts helper transparently swaps in an
- * Arabic-capable TTF.
+ * <p>Produces the three core register exports the platform offers as
+ * download buttons across the UI: Risk Register, Findings Aging, and
+ * KRI Dashboard. Each method emits both a leadership-grade PDF (cover
+ * hero + KPI strip + branded table + classification footer) and a
+ * tabular XLSX with live formulas for hands-on analysis.
+ *
+ * <p>The PDF side uses the shared {@link PdfTheme} primitives so every
+ * report looks identical to the BCP/Crisis/NDI exporters and the board
+ * pack — one brand identity across the whole platform's printed output.
+ *
+ * <p>Locale handling: pass {@code lang = "ar"} to render Arabic column
+ * headers and the Arabic organisation name on the cover. The exporter
+ * keeps the document run direction LTR throughout; Arabic glyphs are
+ * shaped at the run level by the bundled TTF so Latin codes (R-00012)
+ * and Arabic headers can coexist without flipping.
  */
 @Service
 @RequiredArgsConstructor
@@ -65,48 +77,45 @@ public class ExportService {
 
         List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document doc = new Document(PageSize.A4.rotate(), 28, 28, 36, 28);
-        try {
-            PdfWriter writer = PdfWriter.getInstance(doc, baos);
-            writer.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-            doc.open();
+        // KPI counts — surfaced on the cover so a reader sees the headline
+        // numbers before paging into the row dump.
+        long total    = risks.size();
+        long critical = risks.stream().filter(r -> "CRITICAL".equalsIgnoreCase(r.getRiskLevel())).count();
+        long high     = risks.stream().filter(r -> "HIGH".equalsIgnoreCase(r.getRiskLevel())).count();
+        long open     = risks.stream().filter(r -> "OPEN".equalsIgnoreCase(r.getStatus())).count();
 
-            addHeader(doc, ar ? "سجل المخاطر" : "Risk Register", o, ar);
-
-            float[] widths = ar
-                ? new float[]{ 1.2f, 4f, 1.6f, 1f, 1f, 1f, 1.5f }
-                : new float[]{ 1.2f, 4f, 1.6f, 1f, 1f, 1f, 1.5f };
-            PdfPTable t = new PdfPTable(widths);
-            t.setWidthPercentage(100);
-            t.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-            String[] hdr = ar
-                ? new String[]{ "الرقم", "المخاطرة", "الفئة", "الاحتمال", "الأثر", "النتيجة", "الحالة" }
-                : new String[]{ "Code",  "Risk",     "Category", "L",        "I",       "Score",   "Status" };
-            for (String h : hdr) t.addCell(headerCell(h, ar));
-
-            for (Risk r : risks) {
-                String name = ar && r.getTitleAr() != null ? r.getTitleAr() : r.getTitleEn();
-                t.addCell(bodyCell("R-" + String.format("%05d", r.getId()), false));
-                t.addCell(bodyCell(safe(name), ar));
-                t.addCell(bodyCell("", ar)); // category — could be joined
-                t.addCell(bodyCell(String.valueOf(r.getInherentLikelihood()), false));
-                t.addCell(bodyCell(String.valueOf(r.getInherentImpact()), false));
-                t.addCell(bodyCell(String.valueOf(r.getInherentScore()), false));
-                t.addCell(bodyCell(safe(r.getStatus()), ar));
-            }
-            doc.add(t);
-
-            addFooter(doc, ar);
-            doc.close();
-            writer.close();
-        } catch (DocumentException e) {
-            throw new RuntimeException("PDF generation failed", e);
-        }
-        return baos.toByteArray();
+        return buildReportPdf(o, ar,
+            "Risk Register",      "سجل المخاطر",
+            "Enterprise Risk Register", "سجل المخاطر المؤسسية",
+            List.of(
+                new PdfTheme.Kpi("Total risks", String.valueOf(total), "All states"),
+                new PdfTheme.Kpi(ar ? "حرجة" : "Critical", String.valueOf(critical), "Need attention"),
+                new PdfTheme.Kpi(ar ? "عالية" : "High",   String.valueOf(high), ""),
+                new PdfTheme.Kpi(ar ? "مفتوحة" : "Open",  String.valueOf(open), "")
+            ),
+            (doc) -> {
+                float[] widths = new float[]{ 1.2f, 4f, 1.6f, 1f, 1f, 1f, 1.5f };
+                PdfPTable t = new PdfPTable(widths);
+                t.setWidthPercentage(100);
+                String[] hdr = ar
+                    ? new String[]{ "الرقم", "المخاطرة", "الفئة", "الاحتمال", "الأثر", "النتيجة", "الحالة" }
+                    : new String[]{ "Code",  "Risk",     "Category", "L",       "I",       "Score",   "Status" };
+                for (String h : hdr) t.addCell(headerCell(h));
+                for (Risk r : risks) {
+                    String name = ar && r.getTitleAr() != null ? r.getTitleAr() : r.getTitleEn();
+                    cell(t, "R-" + String.format("%05d", r.getId()));
+                    cell(t, safe(name));
+                    cell(t, "");
+                    cell(t, String.valueOf(r.getInherentLikelihood()));
+                    cell(t, String.valueOf(r.getInherentImpact()));
+                    cell(t, String.valueOf(r.getInherentScore()));
+                    cell(t, safe(r.getStatus()));
+                }
+                doc.add(t);
+            });
     }
 
-    // ── Compliance findings (with aging) ───────────────────────────────────
+    // ── Findings aging ─────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public byte[] findingsAgingPdf(String lang) {
@@ -117,43 +126,52 @@ public class ExportService {
         List<AuditFinding> findings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
         LocalDate today = LocalDate.now();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document doc = new Document(PageSize.A4.rotate(), 28, 28, 36, 28);
-        try {
-            PdfWriter writer = PdfWriter.getInstance(doc, baos);
-            writer.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-            doc.open();
-            addHeader(doc, ar ? "ملاحظات التدقيق وتقادمها" : "Audit Findings — Aging Report", o, ar);
-
-            float[] widths = new float[]{ 4f, 1.4f, 1.2f, 1f, 1.4f, 1.6f, 1.4f };
-            PdfPTable t = new PdfPTable(widths);
-            t.setWidthPercentage(100);
-            t.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-            String[] hdr = ar
-                ? new String[]{ "الملاحظة", "الأهمية", "المالك", "الأيام", "التصعيد", "مرحلة CAPA", "الحالة" }
-                : new String[]{ "Finding",  "Severity", "Owner",  "Days",   "Tier",     "CAPA Stage",  "Status" };
-            for (String h : hdr) t.addCell(headerCell(h, ar));
-
-            for (AuditFinding f : findings) {
-                LocalDateTime created = f.getCreatedAt();
-                long daysOpen = created != null ? ChronoUnit.DAYS.between(created.toLocalDate(), today) : 0;
-                String tier = daysOpen >= 90 ? "EXEC" : daysOpen >= 60 ? "DIRECTOR" : daysOpen >= 30 ? "MANAGER" : "ON_TRACK";
-                t.addCell(bodyCell(safe(f.getTitle()), ar));
-                t.addCell(bodyCell(safe(f.getSeverity()), false));
-                t.addCell(bodyCell(safe(f.getOwner()), ar));
-                t.addCell(bodyCell(String.valueOf(daysOpen), false));
-                t.addCell(bodyCell(tier, false));
-                t.addCell(bodyCell(safe(f.getCapaStage()), false));
-                t.addCell(bodyCell(safe(f.getStatus()), false));
-            }
-            doc.add(t);
-            addFooter(doc, ar);
-            doc.close();
-            writer.close();
-        } catch (DocumentException e) {
-            throw new RuntimeException("PDF generation failed", e);
+        // KPI counts — total, open, past-30d, past-90d (escalation tier triggers)
+        long total = findings.size();
+        long open  = findings.stream().filter(f -> !"CLOSED".equalsIgnoreCase(f.getStatus())).count();
+        long past30 = 0, past90 = 0;
+        for (AuditFinding f : findings) {
+            if ("CLOSED".equalsIgnoreCase(f.getStatus())) continue;
+            LocalDateTime created = f.getCreatedAt();
+            long days = created != null ? ChronoUnit.DAYS.between(created.toLocalDate(), today) : 0;
+            if (days >= 90) past90++;
+            else if (days >= 30) past30++;
         }
-        return baos.toByteArray();
+        final long past30Final = past30;
+        final long past90Final = past90;
+
+        return buildReportPdf(o, ar,
+            "Audit Findings",                "ملاحظات التدقيق",
+            "Findings Aging Report",         "تقرير تقادم الملاحظات",
+            List.of(
+                new PdfTheme.Kpi(ar ? "إجمالي" : "Total",     String.valueOf(total), ""),
+                new PdfTheme.Kpi(ar ? "مفتوحة" : "Open",      String.valueOf(open),  ""),
+                new PdfTheme.Kpi(ar ? "متجاوزة 30 يوم" : "Past 30d", String.valueOf(past30Final), ar ? "تصعيد مدير" : "Manager tier"),
+                new PdfTheme.Kpi(ar ? "متجاوزة 90 يوم" : "Past 90d", String.valueOf(past90Final), ar ? "تصعيد تنفيذي" : "Exec tier")
+            ),
+            (doc) -> {
+                float[] widths = new float[]{ 4f, 1.4f, 1.2f, 1f, 1.4f, 1.6f, 1.4f };
+                PdfPTable t = new PdfPTable(widths);
+                t.setWidthPercentage(100);
+                String[] hdr = ar
+                    ? new String[]{ "الملاحظة", "الأهمية", "المالك", "الأيام", "التصعيد", "مرحلة CAPA", "الحالة" }
+                    : new String[]{ "Finding",  "Severity", "Owner",  "Days",   "Tier",     "CAPA Stage",  "Status" };
+                for (String h : hdr) t.addCell(headerCell(h));
+
+                for (AuditFinding f : findings) {
+                    LocalDateTime created = f.getCreatedAt();
+                    long daysOpen = created != null ? ChronoUnit.DAYS.between(created.toLocalDate(), today) : 0;
+                    String tier = daysOpen >= 90 ? "EXEC" : daysOpen >= 60 ? "DIRECTOR" : daysOpen >= 30 ? "MANAGER" : "ON_TRACK";
+                    cell(t, safe(f.getTitle()));
+                    cell(t, safe(f.getSeverity()));
+                    cell(t, safe(f.getOwner()));
+                    cell(t, String.valueOf(daysOpen));
+                    cell(t, tier);
+                    cell(t, safe(f.getCapaStage()));
+                    cell(t, safe(f.getStatus()));
+                }
+                doc.add(t);
+            });
     }
 
     // ── KRI dashboard ──────────────────────────────────────────────────────
@@ -166,36 +184,96 @@ public class ExportService {
 
         List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
 
+        // Band counts — green/amber/red/no-data — for the cover KPI strip
+        long green = 0, amber = 0, red = 0, noData = 0;
+        for (KriDefinition k : kris) {
+            String band = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId())
+                .map(KriReading::getBand).orElse(null);
+            if (band == null) noData++;
+            else if ("GREEN".equalsIgnoreCase(band)) green++;
+            else if ("AMBER".equalsIgnoreCase(band)) amber++;
+            else if ("RED".equalsIgnoreCase(band)) red++;
+        }
+        final long greenF = green, amberF = amber, redF = red, noDataF = noData;
+
+        return buildReportPdf(o, ar,
+            "Key Risk Indicators",         "مؤشرات المخاطر الرئيسية",
+            "KRI Dashboard",               "لوحة مؤشرات المخاطر",
+            List.of(
+                new PdfTheme.Kpi(ar ? "أخضر"  : "Green",  String.valueOf(greenF), ""),
+                new PdfTheme.Kpi(ar ? "أصفر"  : "Amber",  String.valueOf(amberF), ""),
+                new PdfTheme.Kpi(ar ? "أحمر"  : "Red",    String.valueOf(redF),   ""),
+                new PdfTheme.Kpi(ar ? "بدون بيانات" : "No data", String.valueOf(noDataF), "")
+            ),
+            (doc) -> {
+                float[] widths = new float[]{ 1.3f, 4f, 1f, 1.3f, 1.3f, 1.3f, 1.6f };
+                PdfPTable t = new PdfPTable(widths);
+                t.setWidthPercentage(100);
+                String[] hdr = ar
+                    ? new String[]{ "الرمز", "اسم المؤشر", "الحالة", "آخر قراءة", "حد أخضر", "حد أصفر", "المالك" }
+                    : new String[]{ "Code",  "KRI",        "Band",    "Latest",     "Green ≤", "Amber ≤", "Owner" };
+                for (String h : hdr) t.addCell(headerCell(h));
+
+                for (KriDefinition k : kris) {
+                    KriReading latest = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()).orElse(null);
+                    String name = ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn();
+                    cell(t, safe(k.getCode()));
+                    cell(t, safe(name));
+                    cell(t, latest != null ? safe(latest.getBand()) : "—");
+                    cell(t, latest != null ? latest.getReadingValue().toPlainString() : "—");
+                    cell(t, k.getGreenMax() != null ? k.getGreenMax().toPlainString() : "—");
+                    cell(t, k.getAmberMax() != null ? k.getAmberMax().toPlainString() : "—");
+                    cell(t, safe(k.getOwner()));
+                }
+                doc.add(t);
+            });
+    }
+
+    // ── Shared report skeleton ─────────────────────────────────────────────
+
+    /**
+     * Functional shape so each report type only has to describe its own
+     * table rendering — the cover hero, KPI strip, footer, and lifecycle
+     * are identical across all three reports and live here once.
+     */
+    @FunctionalInterface
+    private interface TableRenderer {
+        void render(Document doc) throws DocumentException;
+    }
+
+    private byte[] buildReportPdf(Organisation o, boolean ar,
+                                  String eyebrowEn, String eyebrowAr,
+                                  String titleEn, String titleAr,
+                                  List<PdfTheme.Kpi> kpis,
+                                  TableRenderer table) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document doc = new Document(PageSize.A4.rotate(), 28, 28, 36, 28);
+        // Landscape — register dumps tend to be wide (code + title + L/I/score
+        // + status + …). Portrait would force horizontal overflow.
+        Document doc = new Document(PageSize.A4.rotate(), 36, 36, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
-            writer.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
+            writer.setPageEvent(PdfTheme.professionalFooter(eyebrowEn, "Internal"));
             doc.open();
-            addHeader(doc, ar ? "لوحة مؤشرات المخاطر الرئيسية" : "Key Risk Indicators — Dashboard", o, ar);
 
-            float[] widths = new float[]{ 1.3f, 4f, 1f, 1.3f, 1.3f, 1.3f, 1.6f };
-            PdfPTable t = new PdfPTable(widths);
-            t.setWidthPercentage(100);
-            t.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-            String[] hdr = ar
-                ? new String[]{ "الرمز", "اسم المؤشر", "الحالة", "آخر قراءة", "حد أخضر", "حد أصفر", "المالك" }
-                : new String[]{ "Code",  "KRI",        "Band",    "Latest",     "Green ≤", "Amber ≤", "Owner" };
-            for (String h : hdr) t.addCell(headerCell(h, ar));
+            // Cover
+            PdfTheme.Cover cv = new PdfTheme.Cover();
+            cv.eyebrow = eyebrowEn;
+            cv.eyebrowAr = eyebrowAr;
+            cv.titleEn = titleEn;
+            cv.titleAr = titleAr;
+            cv.orgNameEn = o == null ? null : o.getNameEn();
+            cv.orgNameAr = o == null ? null : o.getNameAr();
+            cv.classification = "Internal";
+            PdfTheme.coverHero(doc, cv);
 
-            for (KriDefinition k : kris) {
-                KriReading latest = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()).orElse(null);
-                String name = ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn();
-                t.addCell(bodyCell(safe(k.getCode()), false));
-                t.addCell(bodyCell(safe(name), ar));
-                t.addCell(bodyCell(latest != null ? safe(latest.getBand()) : "—", false));
-                t.addCell(bodyCell(latest != null ? latest.getReadingValue().toPlainString() : "—", false));
-                t.addCell(bodyCell(k.getGreenMax() != null ? k.getGreenMax().toPlainString() : "—", false));
-                t.addCell(bodyCell(k.getAmberMax() != null ? k.getAmberMax().toPlainString() : "—", false));
-                t.addCell(bodyCell(safe(k.getOwner()), ar));
+            // KPI strip
+            if (kpis != null && !kpis.isEmpty()) {
+                PdfTheme.kpiStrip(doc, new ArrayList<>(kpis));
             }
-            doc.add(t);
-            addFooter(doc, ar);
+
+            // Table
+            table.render(doc);
+
             doc.close();
             writer.close();
         } catch (DocumentException e) {
@@ -204,53 +282,22 @@ public class ExportService {
         return baos.toByteArray();
     }
 
-    // ── Common helpers ─────────────────────────────────────────────────────
-
-    private void addHeader(Document doc, String title, Organisation o, boolean ar) throws DocumentException {
-        Paragraph p = new Paragraph(title, PdfFonts.bold(18));
-        p.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        doc.add(p);
-        if (o != null) {
-            String orgName = ar && o.getNameAr() != null ? o.getNameAr() : o.getNameEn();
-            Paragraph sub = new Paragraph(orgName + "  ·  " + LocalDate.now().format(DATE_FMT), PdfFonts.small(10));
-            sub.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-            sub.setSpacingAfter(8);
-            doc.add(sub);
-        }
-    }
-
-    private void addFooter(Document doc, boolean ar) throws DocumentException {
-        Paragraph footer = new Paragraph(
-            ar ? "تم إنشاء هذا التقرير تلقائيًا بواسطة منصة TSS GRC."
-               : "This report was generated automatically by the TSS GRC Platform.",
-            PdfFonts.small(8));
-        footer.setAlignment(Element.ALIGN_CENTER);
-        footer.setSpacingBefore(12);
-        doc.add(footer);
-    }
-
-    private PdfPCell headerCell(String text, boolean ar) {
+    private static PdfPCell headerCell(String text) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(10)));
-        c.setBackgroundColor(new Color(0x09, 0x42, 0x42));
-        c.setPadding(6);
-        c.setHorizontalAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        c.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-        c.setBorderColor(new Color(0xD6, 0xCE, 0xBC));
+        c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
+        c.setBorderColor(PdfFonts.HAIRLINE);
+        c.setPaddingTop(6); c.setPaddingBottom(6);
+        c.setPaddingLeft(6); c.setPaddingRight(6);
         return c;
     }
-
-    private PdfPCell bodyCell(String text, boolean rtl) {
-        PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.normal(9)));
-        c.setPadding(5);
-        c.setHorizontalAlignment(rtl ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        c.setRunDirection(rtl ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-        c.setBorderColor(new Color(0xE5, 0xDF, 0xD2));
-        return c;
+    private static void cell(PdfPTable t, String text) {
+        PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.body(9)));
+        c.setBorderColor(PdfFonts.PAPER_BORDER);
+        c.setPaddingTop(5); c.setPaddingBottom(5);
+        c.setPaddingLeft(6); c.setPaddingRight(6);
+        t.addCell(c);
     }
-
-    private static String safe(String s) {
-        return s == null ? "—" : s;
-    }
+    private static String safe(String s) { return s == null ? "—" : s; }
 
     // ════════════════════════════════════════════════════════════════════════
     // Excel exports (Q2) — same datasets, .xlsx with formulas + auto-sized cols
