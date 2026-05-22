@@ -18,6 +18,7 @@ import { ErrorState } from './ErrorState';
 export function LoadableSection<T>({
   loading,
   error,
+  errorObject,
   onRetry,
   data,
   empty,
@@ -29,7 +30,14 @@ export function LoadableSection<T>({
   children,
 }: {
   loading: boolean;
+  /** String error — back-compat with existing pages that already format
+   *  the error themselves. */
   error?: string | null;
+  /** Optional raw error object (ApiError | Error | unknown). When provided,
+   *  ErrorState extracts the RFC-7807 ProblemDetail and renders the
+   *  bootstrap-needed UX flavour for PR #117 "Module not yet bootstrapped"
+   *  503 responses. Takes precedence over `error` when both are set. */
+  errorObject?: unknown;
   onRetry?: () => void;
   data: T | null | undefined;
   /** Override the empty-state check; default treats arrays via .length and
@@ -53,6 +61,9 @@ export function LoadableSection<T>({
         ))}
       </div>
     );
+  }
+  if (errorObject !== undefined) {
+    return <ErrorState error={errorObject} onRetry={onRetry} />;
   }
   if (error) {
     return <ErrorState message={error} onRetry={onRetry} />;

@@ -133,10 +133,12 @@ public class CommitteeScheduledSweep {
     // ── Charter review due (30-day lead time) ─────────────────────────
 
     private int sweepCharterReviewDue(Long org, LocalDate today) {
-        List<Committee> all = committees.findAll();
+        // Scope to this org at the DB layer (replaces findAll().filter(byOrg) —
+        // that pattern is O(N×M) over N tenants and M committees; the sweep
+        // calls this method per-tenant inside a TenantContext loop already).
+        List<Committee> all = committees.findByOrganisationId(org);
         int fired = 0;
         for (Committee c : all) {
-            if (!org.equals(c.getOrganisationId())) continue;
             if (c.getNextCharterReviewAt() == null) continue;
             LocalDate dueDate = c.getNextCharterReviewAt();
             if (dueDate.isBefore(today) || dueDate.isAfter(today.plusDays(30))) continue;

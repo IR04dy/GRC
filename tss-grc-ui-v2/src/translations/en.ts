@@ -5562,4 +5562,18 @@ export const en = {
   dashTprmSnapshotSub:   'Live counters from the five new TPRM modules. Click any tile to drill in, or open the consolidated view.',
   dashTprmSnapshotCta:   'Open the full TPRM view',
   connectorsPausedToast: 'Connector {name} paused',
+
+  // Error state — bilingual, used by ErrorState component to surface
+  // RFC-7807 ProblemDetail responses from the backend (incl. PR #117's
+  // "Module not yet bootstrapped" 503 for dev installs that haven't run
+  // the per-module setup_*_db.py script yet).
+  errorStateTryAgain:           'Try again',
+  errorStateGeneric:            'Couldn’t load this section',
+  errorStateSessionExpired:     'Session expired',
+  errorStateConnectionProblem:  'Connection problem',
+  errorStateNotFound:           'Not found',
+  errorStateForbidden:          'Not authorised',
+  errorStateBootstrapTitle:     'Module not yet bootstrapped',
+  errorStateBootstrapHint:      'This module’s database tables aren’t created yet. Run the per-module setup script from the repo root.',
+  errorStateBootstrapCmdLabel:  'Run this from the repo root:',
 } as const;

@@ -173,9 +173,11 @@ public class SustainabilityEvidenceService {
 
     /** Per-org aggregate for the dashboard / repository tab. */
     public Map<String, Object> aggregate() {
-        List<SustainabilityEvidence> all = repo.findAll().stream()
-            .filter(e -> Objects.equals(e.getOrganisationId(), org()))
-            .toList();
+        // Tenant scoped at the DB layer (replaces an earlier
+        // findAll().stream().filter pattern that pulled every org's rows
+        // into memory before filtering — both a multi-tenant leak risk
+        // and a memory bomb at scale).
+        List<SustainabilityEvidence> all = repo.findByOrganisationId(org());
         Map<String, Integer> byStatus = new LinkedHashMap<>();
         Map<String, Integer> byModule = new LinkedHashMap<>();
         for (String s : APPROVAL_STATUSES) byStatus.put(s, 0);

@@ -21,6 +21,11 @@ public interface SustainabilityEvidenceRepository extends JpaRepository<Sustaina
 
     Optional<SustainabilityEvidence> findByIdAndOrganisationId(Long id, Long org);
 
+    /** All evidence for an org — used by the aggregate endpoint. Replaces
+     *  an earlier `findAll().stream().filter(...)` pattern that pulled
+     *  every tenant's rows into memory before filtering. */
+    List<SustainabilityEvidence> findByOrganisationId(Long org);
+
     /** All evidence for a year — used by aggregate / expiry sweep. */
     List<SustainabilityEvidence> findByOrganisationIdAndReportingYear(Long org, Short year);
 

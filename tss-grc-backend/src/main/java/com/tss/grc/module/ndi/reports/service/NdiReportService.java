@@ -384,11 +384,11 @@ public class NdiReportService {
     }
 
     private ReportResult cycleHistory() {
-        Long o = org();
-        var all = cycles.findAll().stream()
-            .filter(c -> Objects.equals(c.getOrganisationId(), o)
-                      && Boolean.FALSE.equals(c.getIsDeleted()))
-            .toList();
+        // Tenant scoped at the DB layer (replaces an earlier
+        // findAll().stream().filter pattern that pulled every org's
+        // cycles into memory). The @Where(is_deleted=0) on the entity
+        // already filters out soft-deleted rows.
+        var all = cycles.findByOrganisationIdOrderByReportingYearDesc(org());
         Map<String, Object> sum = new LinkedHashMap<>();
         sum.put("count", all.size());
         List<Map<String, Object>> out = all.stream().map(c -> {

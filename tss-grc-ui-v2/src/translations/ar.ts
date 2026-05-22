@@ -5541,4 +5541,18 @@ export const ar = {
   dashTprmSnapshotSub:   'عدّادات لحظية من وحدات TPRM الخمس. اضغط أي بطاقة للدخول، أو افتح العرض الموحّد.',
   dashTprmSnapshotCta:   'افتح عرض TPRM الكامل',
   connectorsPausedToast: 'تم إيقاف الموصِّل {name}',
+
+  // حالة الخطأ — يستخدمها مكون ErrorState لعرض ردود ProblemDetail من
+  // الخادم (بما فيها 503 "الوحدة لم يتم تجهيز قاعدة بياناتها" التي يعيدها
+  // المعالج العام بعد PR #117 للبيئات التطويرية التي لم تُشغّل
+  // setup_*_db.py للوحدة بعد).
+  errorStateTryAgain:           'إعادة المحاولة',
+  errorStateGeneric:            'تعذّر تحميل هذا القسم',
+  errorStateSessionExpired:     'انتهت صلاحية الجلسة',
+  errorStateConnectionProblem:  'تعذّر الاتصال بالخادم',
+  errorStateNotFound:           'غير موجود',
+  errorStateForbidden:          'لا تملك صلاحية',
+  errorStateBootstrapTitle:     'الوحدة لم يتم تجهيز قاعدة بياناتها',
+  errorStateBootstrapHint:      'جداول قاعدة بيانات هذه الوحدة لم تُنشأ بعد. شغّل سكربت التجهيز الخاص بالوحدة من مجلد المشروع.',
+  errorStateBootstrapCmdLabel:  'نفّذ الأمر التالي من مجلد المشروع:',
 } as const;
