@@ -5,6 +5,8 @@ import com.tss.grc.module.evidence.dto.*;
 import com.tss.grc.module.evidence.entity.*;
 import com.tss.grc.module.evidence.repository.*;
 import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -49,6 +52,8 @@ class EvidenceItemServiceTest {
     @Mock private EvidenceFrameworkRepository frameworkRepository;
     @Mock private EvidenceLinkRepository linkRepository;
     @Mock private UserRepository userRepository;
+    @Mock private AuditLogService audit;
+    @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private EvidenceItemService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -250,5 +255,96 @@ class EvidenceItemServiceTest {
         assertThat(link.getEvidenceId()).isEqualTo(ID);
         assertThat(link.getLinkedModule()).isEqualTo("RISK");
         assertThat(link.getLinkedEntityId()).isEqualTo(99L);
+    }
+
+    // ── F7 / F8 emission contract ─────────────────────────────────────────────
+
+    @Test
+    void create_emits_EVIDENCE_CREATED_and_writes_audit_log() {
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> {
+            EvidenceItem saved = inv.getArgument(0);
+            saved.setId(ID);
+            return saved;
+        });
+
+        service.create(createReq());
+
+        verify(audit).log(eq("CREATE"), eq("EvidenceItem"), eq(ID), any(String.class));
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("EVIDENCE_CREATED");
+        assertThat(emitted.entityType()).isEqualTo("EvidenceItem");
+        assertThat(emitted.payload()).containsEntry("evidenceType", "DOCUMENT");
+        assertThat(emitted.payload()).containsEntry("previousStatus", "");
+    }
+
+    @Test
+    void submitForReview_emits_EVIDENCE_SUBMITTED_with_previousStatus() {
+        EvidenceItem e = item("DRAFT");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(e));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.submitForReview(ID);
+
+        verify(audit).log(eq("TRANSITION"), eq("EvidenceItem"), eq(ID), any(String.class));
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("EVIDENCE_SUBMITTED");
+        assertThat(emitted.payload()).containsEntry("previousStatus", "DRAFT");
+        assertThat(emitted.payload()).containsEntry("status", "PENDING_REVIEW");
+    }
+
+    @Test
+    void approve_emits_EVIDENCE_APPROVED() {
+        EvidenceItem e = item("PENDING_REVIEW");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(e));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve(ID);
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("EVIDENCE_APPROVED");
+        assertThat(emitted.payload()).containsEntry("status", "APPROVED");
+        assertThat(emitted.payload()).containsEntry("previousStatus", "PENDING_REVIEW");
+    }
+
+    @Test
+    void reject_emits_EVIDENCE_REJECTED() {
+        EvidenceItem e = item("PENDING_REVIEW");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(e));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.reject(ID);
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("EVIDENCE_REJECTED");
+        assertThat(emitted.payload()).containsEntry("status", "REJECTED");
+        assertThat(emitted.payload()).containsEntry("previousStatus", "PENDING_REVIEW");
+    }
+
+    @Test
+    void delete_emits_EVIDENCE_DELETED_and_writes_audit() {
+        EvidenceItem e = item("APPROVED");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(e));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.delete(ID);
+
+        verify(audit).log(eq("DELETE"), eq("EvidenceItem"), eq(ID), any(String.class));
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("EVIDENCE_DELETED");
+        // Status is "APPROVED" since soft-delete doesn't change status
+        assertThat(emitted.payload()).containsEntry("status", "APPROVED");
     }
 }
