@@ -2,17 +2,21 @@ package com.tss.grc.module.privacy.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.privacy.entity.ConsentRecord;
 import com.tss.grc.module.privacy.repository.ConsentRecordRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -40,6 +44,48 @@ public class ConsentRecordService {
 
     private final ConsentRecordRepository repo;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
+
+    // ── F8 payload + emit ─────────────────────────────────────────────────────
+    //
+    // Consent is the cornerstone of PDPL — every personal-data
+    // processing activity must trace back to a valid lawful basis. F8
+    // events let downstream privacy workflows (DSR-clock starts on
+    // withdrawal, special-category data triggers DPO scrutiny) react
+    // automatically. Events:
+    //
+    //   CONSENT_GRANTED      — new record, ACTIVE (payload carries
+    //                          legalBasis, purposeCode, dataCategories)
+    //   CONSENT_WITHDRAWN    — ACTIVE → WITHDRAWN (payload carries
+    //                          withdrawnReason if provided)
+    //   CONSENT_SUPERSEDED   — ACTIVE → SUPERSEDED (carries
+    //                          supersededByConsentId)
+
+    private Map<String, Object> payloadFor(ConsentRecord c, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("consentId",       nullSafeStr(c.getId()));
+        m.put("dataSubjectRef",  nullSafeStr(c.getDataSubjectRef()));
+        m.put("purposeCode",     nullSafeStr(c.getPurposeCode()));
+        m.put("legalBasis",      nullSafeStr(c.getLegalBasis()));
+        m.put("grantedVia",      nullSafeStr(c.getGrantedVia()));
+        m.put("status",          nullSafeStr(c.getStatus()));
+        m.put("previousStatus",  nullSafeStr(previousStatus));
+        m.put("version",         nullSafeStr(c.getVersion()));
+        m.put("language",        nullSafeStr(c.getLanguage()));
+        m.put("validUntil",      nullSafeStr(c.getValidUntil()));
+        m.put("withdrawnReason", nullSafeStr(c.getWithdrawnReason()));
+        return m;
+    }
+
+    /** "" for null so the rule engine's equality matcher cannot NPE. */
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+
+    private void emit(String trigger, ConsentRecord c, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            TenantContext.getCurrentTenant(), trigger, "ConsentRecord", c.getId(),
+            "consent:" + c.getDataSubjectRef() + ":" + c.getPurposeCode(),
+            payloadFor(c, previousStatus)));
+    }
 
     @Transactional(readOnly = true)
     public Page<ConsentRecord> list(int page, int size) {
@@ -79,6 +125,7 @@ public class ConsentRecordService {
             "Consent granted: subject=" + saved.getDataSubjectRef()
                 + " purpose=" + saved.getPurposeCode()
                 + " basis=" + saved.getLegalBasis());
+        emit("CONSENT_GRANTED", saved, null);
         return saved;
     }
 
@@ -95,6 +142,7 @@ public class ConsentRecordService {
             "Consent withdrawn: subject=" + saved.getDataSubjectRef()
                 + " purpose=" + saved.getPurposeCode()
                 + (reason == null ? "" : " reason=" + reason));
+        emit("CONSENT_WITHDRAWN", saved, "ACTIVE");
         return saved;
     }
 
@@ -115,7 +163,19 @@ public class ConsentRecordService {
         ConsentRecord saved = repo.save(c);
         audit.log("CUSTOM", "ConsentRecord", saved.getId(),
             "Consent superseded by ConsentRecord#" + supersededByConsentId);
+        // Add the successor pointer to the payload so downstream rules
+        // can correlate the supersession chain without a second query.
+        publisher.publishEvent(new DomainEvent(
+            TenantContext.getCurrentTenant(), "CONSENT_SUPERSEDED", "ConsentRecord", saved.getId(),
+            "consent:" + saved.getDataSubjectRef() + ":" + saved.getPurposeCode(),
+            supersedePayload(saved, supersededByConsentId)));
         return saved;
+    }
+
+    private Map<String, Object> supersedePayload(ConsentRecord c, Long supersededByConsentId) {
+        Map<String, Object> m = payloadFor(c, "ACTIVE");
+        m.put("supersededByConsentId", nullSafeStr(supersededByConsentId));
+        return m;
     }
 
     @Transactional(readOnly = true)
