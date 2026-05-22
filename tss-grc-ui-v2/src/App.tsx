@@ -112,6 +112,9 @@ const PolicyDetailPage       = lazy(() => import('./pages/detail/PolicyDetailPag
 const VendorDetailPage       = lazy(() => import('./pages/detail/VendorDetailPage').then(m => ({ default: m.VendorDetailPage })));
 const DpiaDetailPage         = lazy(() => import('./pages/detail/DpiaDetailPage').then(m => ({ default: m.DpiaDetailPage })));
 const ConsentDetailPage      = lazy(() => import('./pages/detail/ConsentDetailPage').then(m => ({ default: m.ConsentDetailPage })));
+const DsrDetailPage          = lazy(() => import('./pages/detail/DsrDetailPage').then(m => ({ default: m.DsrDetailPage })));
+const PrivacyBreachDetailPage = lazy(() => import('./pages/detail/PrivacyBreachDetailPage').then(m => ({ default: m.PrivacyBreachDetailPage })));
+const RopaDetailPage         = lazy(() => import('./pages/detail/RopaDetailPage').then(m => ({ default: m.RopaDetailPage })));
 const AuthorityWorkspacePage = lazy(() => import('./pages/authority/AuthorityWorkspacePage').then(m => ({ default: m.AuthorityWorkspacePage })));
 const AuthoritiesIndexPage   = lazy(() => import('./pages/authority/AuthoritiesIndexPage').then(m => ({ default: m.AuthoritiesIndexPage })));
 const AuditWorkspacePage     = lazy(() => import('./pages/audit/AuditWorkspacePage').then(m => ({ default: m.AuditWorkspacePage })));
@@ -336,6 +339,9 @@ export function App() {
               <Route path="/vendors/:id"     element={<VendorDetailPage />} />
               <Route path="/dpias/:id"       element={<DpiaDetailPage />} />
               <Route path="/privacy/consents/:id" element={<ConsentDetailPage />} />
+              <Route path="/privacy/dsrs/:id"     element={<DsrDetailPage />} />
+              <Route path="/privacy/breaches/:id" element={<PrivacyBreachDetailPage />} />
+              <Route path="/privacy/ropa/:id"     element={<RopaDetailPage />} />
 
               {/* Authority workspace (Phase B — auditor pivot view) */}
               <Route path="/authorities"        element={<AuthoritiesIndexPage />} />

@@ -1230,6 +1230,9 @@ export interface PrivacyRopaRequest {
 }
 export const privacyApi = {
   dsrs:           (page = 0, size = 50) => api.get<PageResponse<PrivacyDsrDto>>(`/api/v1/privacy/dsrs${pageQ(page, size)}`),
+  getDsr:         (id: number) => api.get<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}`),
+  getBreach:      (id: number) => api.get<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}`),
+  getRopa:        (id: number) => api.get<PrivacyRopaDto>(`/api/v1/privacy/ropa/${id}`),
   createDsr:      (body: PrivacyDsrRequest) => api.post<PrivacyDsrDto>('/api/v1/privacy/dsrs', body),
   updateDsr:      (id: number, body: PrivacyDsrRequest) => api.put<PrivacyDsrDto>(`/api/v1/privacy/dsrs/${id}`, body),
   deleteDsr:      (id: number) => api.delete<void>(`/api/v1/privacy/dsrs/${id}`),
