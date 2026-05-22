@@ -1,12 +1,140 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PRs #11-72 — sprint + visible-bug fix sweep)
+**Last update:** 22 May 2026 (PRs #11-87 — F7/F8 parity arc + domain dashboard polish sweep)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Most recent — Visible-bug fix sweep (22 May 2026)
+## 🟢 Latest — Domain dashboard polish sweep (22 May 2026, PRs #86-87)
+
+User-visible cleanup of all 5 domain dashboards.
+
+### PR #86 — `/cyber/dashboard` real API + loading/error states
+- Backend: extended `CyberDashboardDto` with `overallScore`, `eccScore`, `csccScore`, `cccScore`, `otccScore`, `expiringEvidence60d`; `CyberService.getDashboard()` computes per-framework scores via case-insensitive prefix match on `frameworkName` ("ECC v2", "ECC-2" both count toward ECC)
+- Frontend: replaced hardcoded `FALLBACK` constant with real `cyberApi.dashboard()` call, four-state lifecycle (idle/loading/error/ready), Skeleton during load + retry button on error
+- CSS: extracted 6 inline `style={{...}}` objects to `shell.css` (`.cyber-dashboard__frameworks`, `.framework-row`, `.framework-row__bar`, `.framework-row__fill[data-tone=…]`)
+
+### PR #87 — BCM/ERM/PDPL/SCM dashboards apply the same pattern
+Shared infrastructure:
+- New hook `useDashboardLoader<T>(loader)` in `lib/useDashboardLoader.ts` — three states (loading / ready / error) with typed `{ data, state, errMsg, retry }` return
+- New render-only components `<DashboardLoading />` + `<DashboardError />` in `components/dashboard/DashboardLoadingState.tsx`
+- New CSS classes `.dashboard-skeleton` + `.dashboard-error` in `shell.css`
+
+Refactored 4 dashboards to use the shared infra:
+- `/bcm/dashboard` — drops FALLBACK_STATS, calls `bcmApi.stats()` via hook
+- `/risk/dashboard` (ERM) — drops FALLBACK, calls `dashboardApi.stats()` via hook
+- `/privacy/dashboard` (PDPL) — drops FALLBACK, calls `privacyApi.stats()` via hook
+- `/scm/dashboard` — drops FALLBACK, calls `scmApi.stats()` via hook
+
+All 5 domain dashboards now share the same loading/error vocabulary. Two real bugs fixed:
+1. First-paint showed fake numbers (1.24M consents, 12 critical suppliers, etc.) before the real API call resolved
+2. Silent fallback on backend failure — toast was the only signal; the user kept seeing FALLBACK numbers as if they were real
+
+Now the user always sees Skeleton → real data → or Error+Retry.
+
+### Design audit findings
+A focused review of the highest-traffic pages (Dashboard, Cyber, Privacy, Compliance, Incidents, Findings, CAPA) found:
+- HIGH severity reported by the audit (missing loading states on Cyber + Compliance) was a **false positive** — both pages already have `.loading ? <LoadingRow />` checks at the data-table level
+- MEDIUM: several inline `style={{...}}` literals could be extracted to CSS classes (~25 instances across 4 pages)
+- LOW: a few hardcoded English strings in cell content (Privacy "SMS/Profiling/3rd-party" labels; Incidents "Lessons Learned" subtitle; Compliance status enum `.replace(/_/g, ' ')`)
+
+These are tracked as follow-up polish — none are user-facing bugs.
+
+---
+
+---
+
+## 🟢 Most recent — F7/F8 parity arc → 18 services (22 May 2026, PRs #74-85)
+
+Twelve follow-up PRs extended the audit-log + automation-rule emission contract from 6 services (closed at AR-50/V132) to **18 services (closed at AR-110/V148, 110 active seed rules)**. The arc now covers the full GRC workflow backbone: workflow submissions, CAPA, findings, AAR, risk, incidents, vulnerability response, approvals, policy lifecycle, evidence, consent (PDPL), DSR (PDPL Article 4), DPIA (PDPL Article 25), cross-border transfer (PDPL Article 29), change management (CAB/emergency), treatment plans, and regulatory change tracking.
+
+| PR | Service | Trigger families | Seed rules |
+|---|---|---|---|
+| **#74** | IncidentService | 4 INCIDENT_* | AR-56..AR-60 (V138) |
+| **#75** | VulnerabilityService | 3 VULN_* | AR-61..AR-65 (V139) |
+| **#76** | ApprovalRequestService | 5 APPROVAL_* | AR-66..AR-70 (V140) |
+| **#77** | PolicyService | 11 POLICY_* + EXCEPTION_* + ATTESTATION_* | AR-71..AR-75 (V141) |
+| **#79** | EvidenceItemService | 6 EVIDENCE_* | AR-76..AR-80 (V142) |
+| **#80** | ConsentRecordService | 3 CONSENT_* (PDPL Art. 6) | AR-81..AR-85 (V143) |
+| **#81** | DsrCaseService | 8 DSR_* (PDPL Art. 4 — 30-day SLA) | AR-86..AR-90 (V144) |
+| **#82** | DpiaService + CrossBorderTransferService | 5 DPIA_* + 5 TRANSFER_* (PDPL Arts. 25 + 29) | AR-91..AR-95 (V145) |
+| **#83** | ChangeManagementService | 9 CHANGE_* (ITIL CAB + emergency bypass) | AR-96..AR-100 (V146) — **100-rule milestone** |
+| **#84** | TreatmentPlanService | 8 TREATMENT_* (board-commitment trail) | AR-101..AR-105 (V147) |
+| **#85** | RegulatoryChangeService | 8 REG_CHANGE_* (compliance intake pipeline) | AR-106..AR-110 (V148) |
+
+### Full parity arc — 18 services, 110 active seed rules
+
+| # | Service | Key events | Seed rules |
+|---|---|---|---|
+| 1 | WorkflowSubmissionService | SUBMISSION_* | AR-26..AR-30 |
+| 2 | CapaTaskService | CAPA_TASK_* | AR-31..AR-35 |
+| 3 | compliance CapaWorkflow | FINDING_CAPA_STAGE_CHANGED | AR-36..AR-40 |
+| 4 | FindingService (audit_lc) | FINDING_* | AR-41..AR-45 |
+| 5 | CrisisAarService | AAR_* | AR-46..AR-50 |
+| 6 | RiskService | RISK_* | (re-used range) |
+| 7 | IncidentService | INCIDENT_* | AR-56..AR-60 |
+| 8 | VulnerabilityService | VULN_* | AR-61..AR-65 |
+| 9 | ApprovalRequestService | APPROVAL_* | AR-66..AR-70 |
+| 10 | PolicyService | POLICY_* | AR-71..AR-75 |
+| 11 | EvidenceItemService | EVIDENCE_* | AR-76..AR-80 |
+| 12 | ConsentRecordService | CONSENT_* | AR-81..AR-85 |
+| 13 | DsrCaseService | DSR_* | AR-86..AR-90 |
+| 14 | DpiaService | DPIA_* | (V145 shared) |
+| 15 | CrossBorderTransferService | TRANSFER_* | AR-91..AR-95 |
+| 16 | ChangeManagementService | CHANGE_* | AR-96..AR-100 |
+| 17 | TreatmentPlanService | TREATMENT_* | AR-101..AR-105 |
+| 18 | RegulatoryChangeService | REG_CHANGE_* | AR-106..AR-110 |
+
+### Regulatory anchor events
+
+The arc now ships canonical triggers for every Saudi regulatory keystone:
+
+- **PDPL Article 4** — `DSR_RECEIVED`, `DSR_EXTENDED`, `DSR_REJECTED`, `DSR_DELIVERED` (30-day SLA, regulator spot-checks)
+- **PDPL Article 6** — `CONSENT_WITHDRAWN` (unconditional withdrawal right, DPO routing)
+- **PDPL Article 25** — `DPIA_APPROVED` with `overallResidualRisk=HIGH` (prior-consultation trigger)
+- **PDPL Article 29** — `TRANSFER_APPROVED`, `TRANSFER_REJECTED`, `TRANSFER_EXPIRED` (cross-border ledger)
+- **NCA ECC §3.4 / §3.4.6** — `VULN_TRANSITIONED` with `status=RISK_ACCEPTED` (compensating controls + GC + CRO)
+- **NCA ECC C5.4 / SP 800-61r2** — `INCIDENT_CREATED` with `severity=CRITICAL` (executive escalation)
+- **ITIL v4 Change Enablement** — `CHANGE_EMERGENCY_APPROVED`, `CHANGE_FAILED` (CTO/CISO + incident management)
+
+---
+
+## 🟢 Earlier — F7/F8 parity arc → 12 services (PRs #74-80)
+
+Six follow-up PRs extended the audit-log + automation-rule emission contract from 6 services (closed at AR-50/V132) to 12 services (closed at AR-85/V143). Each PR is self-contained: service wires `AuditLogService` (where not already wired) + `ApplicationEventPublisher`, emits canonical `DomainEvent`s on every mutation, ships a Flyway V-file with 5 bilingual EN+AR seed rules consuming those events, and extends the existing test class with emission-contract assertions.
+
+| PR | Service | Events | Seed rules | Tests |
+|---|---|---|---|---|
+| **#74** | `IncidentService` | `INCIDENT_CREATED`, `INCIDENT_PHASE_CHANGED`, `INCIDENT_CLOSED`, `INCIDENT_REGULATOR_NOTIFIED` | AR-56..AR-60 (V138) | 12 → 16 |
+| **#75** | `VulnerabilityService` (cyber_lc) | `VULN_CREATED`, `VULN_TRANSITIONED`, `VULN_CLOSED` | AR-61..AR-65 (V139) | 7 → 11 |
+| **#76** | `ApprovalRequestService` | `APPROVAL_CREATED`, `APPROVAL_DECIDED`, `APPROVAL_DELEGATED`, `APPROVAL_EXPIRED`, `APPROVAL_TRANSITIONED` | AR-66..AR-70 (V140) | 6 → 10 |
+| **#77** | `PolicyService` (module.policy) | `POLICY_PUBLISHED` (anchor) + 10 more across documents/exceptions/attestations | AR-71..AR-75 (V141) | 11 → 15 |
+| **#79** | `EvidenceItemService` | `EVIDENCE_CREATED`, `EVIDENCE_SUBMITTED`, `EVIDENCE_APPROVED`, `EVIDENCE_REJECTED`, `EVIDENCE_TRANSITIONED`, `EVIDENCE_DELETED` | AR-76..AR-80 (V142) | 13 → 18 |
+| **#80** | `ConsentRecordService` (privacy) | `CONSENT_GRANTED`, `CONSENT_WITHDRAWN`, `CONSENT_SUPERSEDED` | AR-81..AR-85 (V143) | 6 → 9 |
+
+### Full parity arc — 12 services, 85 active seed rules
+
+| # | Service | Key events | Seed rules |
+|---|---|---|---|
+| 1 | WorkflowSubmissionService | SUBMISSION_* | AR-26..AR-30 |
+| 2 | CapaTaskService | CAPA_TASK_* | AR-31..AR-35 |
+| 3 | compliance CapaWorkflow | FINDING_CAPA_STAGE_CHANGED | AR-36..AR-40 |
+| 4 | FindingService (audit_lc) | FINDING_* | AR-41..AR-45 |
+| 5 | CrisisAarService | AAR_* | AR-46..AR-50 |
+| 6 | RiskService | RISK_* | (re-used range) |
+| 7 | IncidentService | INCIDENT_* | AR-56..AR-60 |
+| 8 | VulnerabilityService | VULN_* | AR-61..AR-65 |
+| 9 | ApprovalRequestService | APPROVAL_* | AR-66..AR-70 |
+| 10 | PolicyService | POLICY_* | AR-71..AR-75 |
+| 11 | EvidenceItemService | EVIDENCE_* | AR-76..AR-80 |
+| 12 | ConsentRecordService | CONSENT_* | AR-81..AR-85 |
+
+Cross-regression check across the F8 parity-arc tests stayed green at every step. **PR #77 ships the compliance anchor (`POLICY_PUBLISHED`); PR #80 ships the PDPL anchor (`CONSENT_WITHDRAWN` → DPO escalation under PDPL Article 6's unconditional withdrawal right).**
+
+---
+
+## 🟢 Earlier — Visible-bug fix sweep (22 May 2026, PRs #71-72)
 
 After the four-track sprint (PRs #63-70) landed, a live walkthrough surfaced two visible issues on the most-touched pages. Two follow-up PRs and a cross-module sweep closed them:
 
