@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Database, FileText, Target, Wrench, AlertCircle, CheckCircle2,
@@ -2427,8 +2427,8 @@ function GapsTab() {
                                 : g.rollupProgress >= 40 ? 'var(--warning)'
                                 : 'var(--danger)';
                 return (
-                  <>
-                    <tr key={g.id}>
+                  <Fragment key={g.id}>
+                    <tr>
                       <td>
                         <Button size="sm" variant="ghost" Icon={open ? ArchiveIcon : ArrowRight}
                           onClick={() => toggleExpand(g)} title={open ? '−' : '+'} />
@@ -2535,7 +2535,7 @@ function GapsTab() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
