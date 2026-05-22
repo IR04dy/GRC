@@ -1095,7 +1095,38 @@ export interface CyberVulnRequest {
   workflowStatus?: string;
   remediationNotes?: string;
 }
+/** Dashboard aggregate shape returned by `GET /api/v1/cyber/dashboard`.
+ *  See `CyberDashboardDto` on the backend — extended in PR for /cyber/dashboard polish
+ *  with overallScore + per-framework breakdowns + expiringEvidence60d. */
+export interface CyberDashboardDto {
+  totalControls: number;
+  compliantControls: number;
+  nonCompliantControls: number;
+  partialControls: number;
+  openVulnerabilities: number;
+  criticalVulnerabilities: number;
+  overdueVulnerabilities: number;
+  openIncidents: number;
+  criticalIncidents: number;
+  totalAssets: number;
+  criticalAssets: number;
+  openActionPlans: number;
+  overdueActionPlans: number;
+  totalEvidence: number;
+  expiredEvidence: number;
+  expiringEvidence60d: number;
+  overallScore: number;
+  eccScore: number;
+  csccScore: number;
+  cccScore: number;
+  otccScore: number;
+  recentIncidents?: unknown[];
+  recentVulnerabilities?: unknown[];
+  recentActionPlans?: unknown[];
+}
+
 export const cyberApi = {
+  dashboard:      () => api.get<CyberDashboardDto>('/api/v1/cyber/dashboard'),
   controls:       (page = 0, size = 50) => api.get<PageResponse<CyberControlDto>>(`/api/v1/cyber/controls${pageQ(page, size)}`),
   createControl:  (body: CyberControlRequest) => api.post<CyberControlDto>('/api/v1/cyber/controls', body),
   updateControl:  (id: number, body: CyberControlRequest) => api.put<CyberControlDto>(`/api/v1/cyber/controls/${id}`, body),
@@ -1159,7 +1190,7 @@ export const cyberApi = {
 
   // Catalog
   controlsAll:        () => api.get<CyberControlDto[]>('/api/v1/cyber/controls/all'),
-  dashboard:          () => api.get<unknown>('/api/v1/cyber/dashboard'),
+  // dashboard:        moved up (typed as CyberDashboardDto)
   frameworks:         () => api.get<unknown>('/api/v1/cyber/frameworks'),
 };
 

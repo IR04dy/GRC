@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Shield, AlertTriangle, Bug, Activity, ServerCog, FileWarning } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Shield, AlertTriangle, Bug, Activity, ServerCog, FileWarning, RefreshCw } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useI18n } from '../../lib/i18n';
+import { cyberApi, type CyberDashboardDto } from '../../lib/api';
 
 /**
  * NCA Cybersecurity Dashboard — task #36 (prompt §30.5).
@@ -10,44 +12,98 @@ import { useI18n } from '../../lib/i18n';
  * Headline widgets: per-framework scores (ECC / CSCC / CCC / OTCC),
  * open cyber gaps, critical non-compliances, overdue remediation,
  * critical vulnerabilities, evidence expiry.
+ *
+ * <p>Wired to {@code GET /api/v1/cyber/dashboard} which returns a
+ * {@link CyberDashboardDto} computed server-side. Loading state shows
+ * a skeleton row; error state surfaces a retry button so the
+ * dashboard never silently stays blank.
  */
-interface CyberStatsShape {
-  overallScore?: number;
-  eccScore?: number;
-  csccScore?: number;
-  cccScore?: number;
-  otccScore?: number;
-  openGaps?: number;
-  criticalNonCompliances?: number;
-  overdueRemediation?: number;
-  criticalVulns?: number;
-  openIncidents?: number;
-  expiringEvidence60d?: number;
-}
-
-const FALLBACK: CyberStatsShape = {
-  overallScore: 65, eccScore: 65, csccScore: 0, cccScore: 72, otccScore: 0,
-  openGaps: 14, criticalNonCompliances: 3, overdueRemediation: 5,
-  criticalVulns: 8, openIncidents: 2, expiringEvidence60d: 6,
-};
+type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 export function CyberDashboardPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-  // No dedicated /api/v1/cyber/stats endpoint yet — dashboard runs on
-  // the seeded fallback until the backend ships a stats() aggregate.
-  // Tracked as a follow-up in 11_Implementation_Backlog.md.
-  const [stats] = useState<CyberStatsShape>(FALLBACK);
+  const [stats, setStats] = useState<CyberDashboardDto | null>(null);
+  const [state, setState] = useState<LoadState>('idle');
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  async function load() {
+    setState('loading');
+    setErrMsg(null);
+    try {
+      const data = await cyberApi.dashboard();
+      setStats(data);
+      setState('ready');
+    } catch (e) {
+      setErrMsg((e as Error)?.message ?? String(e));
+      setState('error');
+    }
+  }
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  if (state === 'loading' || state === 'idle') {
+    return (
+      <DomainDashboardShell
+        title={isAr ? 'لوحة الأمن السيبراني' : 'Cybersecurity dashboard'}
+        sub={isAr ? 'جارٍ التحميل…' : 'Loading…'}
+        eyebrow={isAr ? 'الأمن السيبراني' : 'Cybersecurity'}
+        kpis={[]}
+        widgets={[{
+          id: 'loading',
+          title: '',
+          body: (
+            <div className="cyber-dashboard__skeleton">
+              <Skeleton height={20} />
+              <Skeleton height={20} />
+              <Skeleton height={20} />
+              <Skeleton height={20} />
+            </div>
+          ),
+        }]}
+      />
+    );
+  }
+
+  if (state === 'error' || !stats) {
+    return (
+      <DomainDashboardShell
+        title={isAr ? 'لوحة الأمن السيبراني' : 'Cybersecurity dashboard'}
+        sub={isAr ? 'تعذّر تحميل البيانات' : 'Could not load dashboard'}
+        eyebrow={isAr ? 'الأمن السيبراني' : 'Cybersecurity'}
+        kpis={[]}
+        widgets={[{
+          id: 'error',
+          title: isAr ? 'خطأ' : 'Error',
+          body: (
+            <div className="cyber-dashboard__error">
+              <div className="text-muted text-xs">
+                {errMsg ?? (isAr ? 'تحقق من اتصال الخادم' : 'Check backend connectivity')}
+              </div>
+              <button type="button" className="btn btn-sm btn-outline mt-2" onClick={() => void load()}>
+                <RefreshCw size={14} /> {isAr ? 'إعادة المحاولة' : 'Retry'}
+              </button>
+            </div>
+          ),
+        }]}
+      />
+    );
+  }
+
+  // Open gaps = non-compliant + partial (anything that isn't fully compliant).
+  // The backend doesn't ship a single "gaps" count so we derive it from the
+  // status breakdown.
+  const openGaps = (stats.nonCompliantControls ?? 0) + (stats.partialControls ?? 0);
 
   const kpis: DomainDashboardKpi[] = [
     { Icon: Shield, label: isAr ? 'الالتزام الإجمالي NCA' : 'Overall NCA score', value: `${stats.overallScore ?? 0}%`,
       tone: tonePct(stats.overallScore), to: '/cyber' },
-    { Icon: AlertTriangle, label: isAr ? 'فجوات مفتوحة' : 'Open gaps', value: stats.openGaps ?? 0,
-      tone: (stats.openGaps ?? 0) > 0 ? 'warning' : 'success' },
-    { Icon: FileWarning, label: isAr ? 'عدم امتثال حرج' : 'Critical NCs', value: stats.criticalNonCompliances ?? 0,
-      tone: (stats.criticalNonCompliances ?? 0) > 0 ? 'danger' : 'success' },
-    { Icon: Bug, label: isAr ? 'ثغرات حرجة' : 'Critical vulns', value: stats.criticalVulns ?? 0,
-      tone: (stats.criticalVulns ?? 0) > 0 ? 'danger' : 'success' },
+    { Icon: AlertTriangle, label: isAr ? 'فجوات مفتوحة' : 'Open gaps', value: openGaps,
+      tone: openGaps > 0 ? 'warning' : 'success' },
+    { Icon: FileWarning, label: isAr ? 'عدم امتثال' : 'Non-compliances', value: stats.nonCompliantControls ?? 0,
+      tone: (stats.nonCompliantControls ?? 0) > 0 ? 'danger' : 'success' },
+    { Icon: Bug, label: isAr ? 'ثغرات حرجة' : 'Critical vulns', value: stats.criticalVulnerabilities ?? 0,
+      tone: (stats.criticalVulnerabilities ?? 0) > 0 ? 'danger' : 'success' },
     { Icon: Activity, label: isAr ? 'حوادث مفتوحة' : 'Open incidents', value: stats.openIncidents ?? 0,
       tone: (stats.openIncidents ?? 0) > 0 ? 'warning' : 'success' },
     { Icon: ServerCog, label: isAr ? 'أدلة على وشك الانتهاء' : 'Expiring evidence (60d)', value: stats.expiringEvidence60d ?? 0,
@@ -59,12 +115,12 @@ export function CyberDashboardPage() {
       id: 'frameworks',
       title: isAr ? 'النتائج حسب الإطار' : 'Score by framework',
       body: (
-        <div className="text-xs" style={{ lineHeight: 1.9 }}>
-          <FrameworkRow code="ECC v2" pct={stats.eccScore} isAr={isAr} />
-          <FrameworkRow code="CSCC" pct={stats.csccScore} isAr={isAr} />
-          <FrameworkRow code="CCC" pct={stats.cccScore} isAr={isAr} />
-          <FrameworkRow code="OTCC" pct={stats.otccScore} isAr={isAr} />
-          <div className="text-muted" style={{ marginTop: 6 }}>
+        <div className="cyber-dashboard__frameworks">
+          <FrameworkRow code="ECC v2" pct={stats.eccScore} />
+          <FrameworkRow code="CSCC" pct={stats.csccScore} />
+          <FrameworkRow code="CCC" pct={stats.cccScore} />
+          <FrameworkRow code="OTCC" pct={stats.otccScore} />
+          <div className="cyber-dashboard__hint text-muted">
             {isAr
               ? 'الـ0٪ يعني أن دورة التقييم لم تُفتح بعد لذلك الإطار.'
               : 'A 0% bar means the assessment cycle hasn’t opened yet for that framework.'}
@@ -76,12 +132,13 @@ export function CyberDashboardPage() {
     {
       id: 'gaps',
       title: isAr ? 'الفجوات والمعالجة' : 'Gaps + remediation',
-      badge: String((stats.openGaps ?? 0) + (stats.overdueRemediation ?? 0)),
+      badge: String(openGaps + (stats.overdueActionPlans ?? 0)),
       badgeTone: 'warning',
       body: (
-        <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'فجوات مفتوحة' : 'Open gaps'}: <strong>{stats.openGaps}</strong></div>
-          <div>{isAr ? 'معالجة متأخرة' : 'Overdue remediation'}: <Badge tone="danger">{stats.overdueRemediation}</Badge></div>
+        <div className="cyber-dashboard__lines text-xs">
+          <div>{isAr ? 'فجوات مفتوحة' : 'Open gaps'}: <strong>{openGaps}</strong></div>
+          <div>{isAr ? 'خطط معالجة متأخرة' : 'Overdue action plans'}: <Badge tone="danger">{stats.overdueActionPlans ?? 0}</Badge></div>
+          <div>{isAr ? 'ثغرات متأخرة' : 'Overdue vulns'}: <Badge tone="danger">{stats.overdueVulnerabilities ?? 0}</Badge></div>
         </div>
       ),
       href: '/cyber?tab=gaps',
@@ -90,9 +147,10 @@ export function CyberDashboardPage() {
       id: 'vulns',
       title: isAr ? 'الثغرات' : 'Vulnerabilities',
       body: (
-        <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'ثغرات حرجة مفتوحة' : 'Open critical vulns'}: <Badge tone="danger">{stats.criticalVulns}</Badge></div>
-          <div className="text-muted" style={{ marginTop: 4 }}>
+        <div className="cyber-dashboard__lines text-xs">
+          <div>{isAr ? 'ثغرات حرجة مفتوحة' : 'Open critical vulns'}: <Badge tone="danger">{stats.criticalVulnerabilities ?? 0}</Badge></div>
+          <div>{isAr ? 'إجمالي مفتوحة' : 'Total open'}: <strong>{stats.openVulnerabilities ?? 0}</strong></div>
+          <div className="cyber-dashboard__hint text-muted">
             {isAr
               ? 'تنبيه AR-13 يصعّد لمدير الأمن السيبراني عند خرق SLA المعالجة.'
               : 'AR-13 escalates to the cybersecurity manager when a remediation SLA is breached.'}
@@ -105,9 +163,10 @@ export function CyberDashboardPage() {
       id: 'evidence',
       title: isAr ? 'الأدلة' : 'Evidence',
       body: (
-        <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'تنتهي خلال 60 يوماً' : 'Expiring in 60 days'}: <Badge tone="warning">{stats.expiringEvidence60d}</Badge></div>
-          <div className="text-muted" style={{ marginTop: 4 }}>
+        <div className="cyber-dashboard__lines text-xs">
+          <div>{isAr ? 'تنتهي خلال 60 يوماً' : 'Expiring in 60 days'}: <Badge tone="warning">{stats.expiringEvidence60d ?? 0}</Badge></div>
+          <div>{isAr ? 'منتهية الصلاحية' : 'Already expired'}: <Badge tone="danger">{stats.expiredEvidence ?? 0}</Badge></div>
+          <div className="cyber-dashboard__hint text-muted">
             {isAr ? 'قاعدة AR-09 تُشعر مالك الدليل ومالك الضابط آلياً.'
                   : 'AR-09 fires a notification to the evidence + control owner.'}
           </div>
@@ -128,23 +187,16 @@ export function CyberDashboardPage() {
   );
 }
 
-function FrameworkRow({ code, pct, isAr }: { code: string; pct?: number; isAr: boolean }) {
+function FrameworkRow({ code, pct }: { code: string; pct?: number }) {
   const value = pct ?? 0;
   const tone = tonePct(pct);
-  void isAr;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 50px', gap: 6, alignItems: 'center' }}>
-      <span className="mono">{code}</span>
-      <div style={{ height: 8, borderRadius: 4, background: 'var(--surface-2)', overflow: 'hidden' }}>
-        <div style={{
-          width: `${value}%`, height: '100%',
-          background: tone === 'success' ? 'var(--success, #2e9c5e)'
-                    : tone === 'warning' ? 'var(--warning, #c47e00)'
-                    : tone === 'danger'  ? 'var(--danger, #c8362c)'
-                                         : 'var(--primary)',
-        }} />
+    <div className="framework-row">
+      <span className="mono framework-row__code">{code}</span>
+      <div className="framework-row__bar">
+        <div className="framework-row__fill" data-tone={tone} style={{ width: `${value}%` }} />
       </div>
-      <span className="mono" style={{ textAlign: 'end' }}>{value}%</span>
+      <span className="mono framework-row__value">{value}%</span>
     </div>
   );
 }

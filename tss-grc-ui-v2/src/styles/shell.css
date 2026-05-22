@@ -197,3 +197,39 @@
 @media (max-width: 1100px) {
   .dash-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── Cyber dashboard widgets ──────────────────────────────────────────────
+ * Extracted from CyberDashboardPage.tsx — replaces inline style={{...}}
+ * objects with reusable classes so RTL flips, theme tokens, and
+ * dark-mode contrast stay consistent. */
+
+.cyber-dashboard__frameworks { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.9; }
+.cyber-dashboard__lines      { display: flex; flex-direction: column; gap: 4px; line-height: 1.8; }
+.cyber-dashboard__hint       { margin-top: 4px; }
+.cyber-dashboard__skeleton   { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.cyber-dashboard__error      { display: flex; flex-direction: column; gap: 6px; }
+
+/* FrameworkRow — 3-col grid: code (mono, 70px), progress bar (flex), %% (mono, 50px) */
+.framework-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 50px;
+  gap: 8px;
+  align-items: center;
+}
+.framework-row__code  { font-weight: 600; }
+.framework-row__value { text-align: end; }
+.framework-row__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2, #f1f4f9);
+  overflow: hidden;
+}
+.framework-row__fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 280ms ease-out;
+}
+.framework-row__fill[data-tone="success"] { background: var(--success, #2e9c5e); }
+.framework-row__fill[data-tone="info"]    { background: var(--primary, #1f7ad8); }
+.framework-row__fill[data-tone="warning"] { background: var(--warning, #c47e00); }
+.framework-row__fill[data-tone="danger"]  { background: var(--danger,  #c8362c); }

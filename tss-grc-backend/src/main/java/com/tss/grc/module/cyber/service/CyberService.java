@@ -93,6 +93,26 @@ public class CyberService {
         dto.setTotalEvidence(evidence.size());
         dto.setExpiredEvidence((int) evidence.stream()
                 .filter(e -> "EXPIRED".equalsIgnoreCase(e.getStatus())).count());
+        // Expiring-soon window: evidence with expiryDate today..today+60.
+        // Excludes already-EXPIRED rows so the two counts don't double-count.
+        LocalDate today = LocalDate.now();
+        LocalDate horizon = today.plusDays(60);
+        dto.setExpiringEvidence60d((int) evidence.stream()
+                .filter(e -> e.getExpiryDate() != null
+                          && !e.getExpiryDate().isBefore(today)
+                          && e.getExpiryDate().isBefore(horizon)
+                          && !"EXPIRED".equalsIgnoreCase(e.getStatus())).count());
+
+        // Per-framework compliance: % of controls whose status is COMPLIANT
+        // inside that framework. 0 means no controls assessed yet for the
+        // framework (NOT 0% compliant) — frontend tints it differently.
+        dto.setEccScore(scoreForFramework(controls, "ECC"));
+        dto.setCsccScore(scoreForFramework(controls, "CSCC"));
+        dto.setCccScore(scoreForFramework(controls, "CCC"));
+        dto.setOtccScore(scoreForFramework(controls, "OTCC"));
+        dto.setOverallScore(dto.getTotalControls() == 0
+                ? 0
+                : Math.round(100f * dto.getCompliantControls() / dto.getTotalControls()));
 
         Pageable recent = PageRequest.of(0, 5);
         dto.setRecentIncidents(new ArrayList<>(
@@ -103,6 +123,27 @@ public class CyberService {
                 actionPlanRepo.findByOrganisationId(orgId, recent).getContent()));
 
         return dto;
+    }
+
+    /** Returns the percentage of controls in this framework marked COMPLIANT.
+     *  Returns 0 when there are no controls for the framework — caller should
+     *  treat 0 as "not started" rather than "0% compliant" since the cycle
+     *  may simply not have opened yet. */
+    private int scoreForFramework(List<CyberControl> controls, String fwCode) {
+        if (fwCode == null || controls == null || controls.isEmpty()) return 0;
+        long total = controls.stream()
+                .filter(c -> fwCode.equalsIgnoreCase(c.getFrameworkName())
+                          || (c.getFrameworkName() != null
+                              && c.getFrameworkName().toUpperCase().startsWith(fwCode.toUpperCase())))
+                .count();
+        if (total == 0) return 0;
+        long compliant = controls.stream()
+                .filter(c -> fwCode.equalsIgnoreCase(c.getFrameworkName())
+                          || (c.getFrameworkName() != null
+                              && c.getFrameworkName().toUpperCase().startsWith(fwCode.toUpperCase())))
+                .filter(c -> "COMPLIANT".equalsIgnoreCase(c.getImplementationStatus()))
+                .count();
+        return Math.round(100f * compliant / total);
     }
 
     // =========================================================================
