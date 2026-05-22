@@ -9,13 +9,18 @@ import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -31,17 +36,50 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CommitteeService {
 
+    private static final Logger log = LoggerFactory.getLogger(CommitteeService.class);
+
     private final CommitteeRepository repo;
     private final CommitteeMeetingRepository meetingRepo;
+
+    /**
+     * Returns {@code true} when the underlying SQL error looks like a
+     * missing-table error — usually because the committees schema
+     * hasn't been bootstrapped in this DB (dev profile, fresh tenant
+     * before {@code setup_committees_db.py} runs). We log once and
+     * return an empty page so the UI renders an empty register
+     * instead of "unable to load data".
+     */
+    private static boolean isMissingObjectError(Throwable t) {
+        Throwable cur = t;
+        while (cur != null) {
+            String msg = cur.getMessage();
+            if (msg != null) {
+                String low = msg.toLowerCase();
+                if (low.contains("invalid object name")
+                    || low.contains("does not exist")
+                    || low.contains("not found")) return true;
+            }
+            cur = cur.getCause();
+        }
+        return false;
+    }
 
     // ─── Committee reads/writes ───────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<Committee> listCommittees(String status, Pageable pageable) {
         Long org = TenantContext.getCurrentTenant();
-        return status == null
-                ? repo.findByOrganisationIdOrderByNameEnAsc(org, pageable)
-                : repo.findByOrganisationIdAndStatusOrderByNameEnAsc(org, status, pageable);
+        try {
+            return status == null
+                    ? repo.findByOrganisationIdOrderByNameEnAsc(org, pageable)
+                    : repo.findByOrganisationIdAndStatusOrderByNameEnAsc(org, status, pageable);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) {
+                log.warn("[committees] admin.committees table missing — run setup_committees_db.py; returning empty page");
+                return new PageImpl<>(Collections.emptyList(), pageable, 0);
+            }
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -111,9 +149,17 @@ public class CommitteeService {
     @Transactional(readOnly = true)
     public Page<CommitteeMeeting> listMeetings(String status, Pageable pageable) {
         Long org = TenantContext.getCurrentTenant();
-        return status == null
-                ? meetingRepo.findByOrganisationIdOrderByScheduledAtDesc(org, pageable)
-                : meetingRepo.findByOrganisationIdAndStatusOrderByScheduledAtDesc(org, status, pageable);
+        try {
+            return status == null
+                    ? meetingRepo.findByOrganisationIdOrderByScheduledAtDesc(org, pageable)
+                    : meetingRepo.findByOrganisationIdAndStatusOrderByScheduledAtDesc(org, status, pageable);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) {
+                log.warn("[committees] admin.committee_meetings table missing — run setup_committees_db.py; returning empty page");
+                return new PageImpl<>(Collections.emptyList(), pageable, 0);
+            }
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)

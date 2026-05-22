@@ -8,9 +8,13 @@ import com.tss.grc.module.admin.committee.repository.CommitteeStandingItemReposi
 import com.tss.grc.module.admin.committee.repository.CommitteeTemplateRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,18 +31,58 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class CommitteeCatalogService {
 
+    private static final Logger log = LoggerFactory.getLogger(CommitteeCatalogService.class);
+
     private final CommitteeTemplateRepository      templates;
     private final CommitteeStandingItemRepository  standingItems;
     private final CommitteeFormTemplateRepository  forms;
 
+    /**
+     * Returns {@code true} when the underlying SQL error indicates the
+     * committees tables don't exist in this database — typical on a
+     * fresh dev DB where Flyway is disabled and the {@code
+     * setup_committees_db.py} bootstrap hasn't been run. We log once and
+     * degrade to empty results so the catalog page renders an empty
+     * state instead of a 500 the user can't action.
+     */
+    private static boolean isMissingObjectError(Throwable t) {
+        Throwable cur = t;
+        while (cur != null) {
+            String msg = cur.getMessage();
+            if (msg != null) {
+                String low = msg.toLowerCase();
+                // SQL Server: "Invalid object name 'admin.committee_templates'"
+                // Postgres/H2 variants kept here for forward-compat
+                if (low.contains("invalid object name")
+                    || low.contains("does not exist")
+                    || low.contains("not found")) return true;
+            }
+            cur = cur.getCause();
+        }
+        return false;
+    }
+
     // ── Templates ─────────────────────────────────────────────────────
 
     public List<CommitteeTemplate> listAllTemplates() {
-        return templates.findAllActiveOrdered();
+        try {
+            return templates.findAllActiveOrdered();
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) {
+                log.warn("[catalog] admin.committee_templates missing — run setup_committees_db.py; returning empty list");
+                return Collections.emptyList();
+            }
+            throw e;
+        }
     }
 
     public List<CommitteeTemplate> listTemplatesByDomain(String domain) {
-        return templates.findActiveByDomain(domain);
+        try {
+            return templates.findActiveByDomain(domain);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) return Collections.emptyList();
+            throw e;
+        }
     }
 
     public CommitteeTemplate getTemplate(String templateCode) {
@@ -47,23 +91,46 @@ public class CommitteeCatalogService {
     }
 
     public Optional<CommitteeTemplate> findTemplate(String templateCode) {
-        return templates.findByTemplateCode(templateCode);
+        try {
+            return templates.findByTemplateCode(templateCode);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) return Optional.empty();
+            throw e;
+        }
     }
 
     // ── Standing items ────────────────────────────────────────────────
 
     public List<CommitteeStandingItem> getStandingItems(String templateCode) {
-        return standingItems.findByTemplateCodeOrderBySeqAsc(templateCode);
+        try {
+            return standingItems.findByTemplateCodeOrderBySeqAsc(templateCode);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) return Collections.emptyList();
+            throw e;
+        }
     }
 
     public long countStandingItems(String templateCode) {
-        return standingItems.countByTemplateCode(templateCode);
+        try {
+            return standingItems.countByTemplateCode(templateCode);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) return 0L;
+            throw e;
+        }
     }
 
     // ── Forms library ─────────────────────────────────────────────────
 
     public List<CommitteeFormTemplate> listAllForms() {
-        return forms.findAllActiveOrdered();
+        try {
+            return forms.findAllActiveOrdered();
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) {
+                log.warn("[catalog] admin.committee_form_templates missing — run setup_committees_db.py; returning empty list");
+                return Collections.emptyList();
+            }
+            throw e;
+        }
     }
 
     public CommitteeFormTemplate getForm(String formCode) {
@@ -79,6 +146,11 @@ public class CommitteeCatalogService {
         // SQL LIKE pattern: %TYPE% — matches anywhere in the comma list.
         // ALL match is handled in the query.
         String pattern = "%" + committeeType + "%";
-        return forms.findActiveApplicableTo(pattern);
+        try {
+            return forms.findActiveApplicableTo(pattern);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (isMissingObjectError(e)) return Collections.emptyList();
+            throw e;
+        }
     }
 }
