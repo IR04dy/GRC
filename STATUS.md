@@ -1,9 +1,139 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PRs #11-91 — all merged; UX polish + 20 F7/F8 services + 115 active rules)
+**Last update:** 22 May 2026 (PR #101 — Committees & Meetings GRC-SME platform foundation; 125 active rules — pending PR #100 merge for 155 total)
 
 ---
 
-## 🟢 Latest — UX polish foundation (22 May 2026, PRs #90-91)
+## 🟢 Latest — Committees & Meetings GRC-SME platform (22 May 2026, PR #101)
+
+Repositions the committees module from a basic register (V40 — just a
+`committees` table + meeting `decisions_json` blob) into a **real day-
+to-day operational platform** with full Saudi GRC content. Catalog +
+operational layer + worked examples + F8 rules + scheduled sweep — all
+in one PR.
+
+### What lands
+
+| # | Commit | What |
+|---|---|---|
+| 1 | `84950b0` | **V154-V156** schema (8 new tables) + 19 Saudi-regulated committee templates + ~150 standing items + 10 bilingual form templates (~2,591 LOC) |
+| 2 | `e73281c` | **Catalog backend** — 3 entities + 3 repos + service + REST controller exposing `/api/v1/committees/catalog/*` |
+| 3 | `adce1f1` | **Catalog frontend** — 3 React pages (catalog browser, charter detail, form viewer) + sidebar + translations |
+| 4 | `b3e2acd` | **Operational backend** — Resolution + ActionItem entities + repos + services + controllers + Annual Calendar generator + Agenda auto-populator |
+| 5 | `5b22b51` | **Operational frontend API** — 17 API functions covering resolutions / actions / calendar |
+| 6 | `6133746` | **Entity fix** — added V154 columns to Committee.java (`charterTemplateCode`, `regulatoryDomain`, etc.) so the catalog code compiles |
+| 7 | `dcb5e1e` | **V157 worked examples + V158 F8 rules + CommitteeScheduledSweep** — 8 resolutions + 9 actions seeded from V40 demo meetings, 10 automation rules, 3 time-based sweeps |
+
+### 19 Saudi-regulated committee templates (V154)
+
+| Committee | Regulator anchor | Cadence |
+|---|---|---|
+| Board of Directors | CMA Corp Gov + Companies Law | Quarterly |
+| Audit Committee | CMA Art. 14 + SAMA | Quarterly |
+| Risk Committee | SAMA RGov 2017 + Basel III | Monthly |
+| Nomination & Remuneration | CMA Art. 22-23 | Semi-annual |
+| Compliance Committee | SAMA + AML Law Art. 41 | Monthly |
+| Cyber Security Committee | NCA ECC-2 control 1-2-1 | Monthly |
+| Data Governance Committee | NDMO + SDAIA | Monthly |
+| Privacy / DPO Committee | PDPL Article 30 | Monthly |
+| BCM Steering Committee | ISO 22301 + SAMA BCM | Quarterly |
+| Crisis Management Committee | NCEMA + SAMA Crisis | Ad-hoc |
+| AML Committee | SAMA AML Manual + AML Law | Monthly |
+| IT Steering Committee | NCA + COBIT 2019 | Monthly |
+| ALCO (banking) | SAMA + Basel III | Monthly |
+| Investment Committee | CMA + sector | Monthly |
+| AI Ethics Committee | SDAIA AI Ethics Principles | Quarterly |
+| Anti-Fraud Committee | SAMA + ACFE | Monthly |
+| Internal Control Committee | SAMA + COSO ICF 2013 | Quarterly |
+| ESG / Sustainability Committee | CMA + Saudi Green Initiative | Quarterly |
+| Architecture Review Board | NCA + CCC + TOGAF | Bi-weekly |
+
+Each template carries 2-3 page bilingual content covering mandate,
+authority, composition, quorum, cadence, term-of-office, reports-to,
+escalation chain, regulator citation, independence + financial-expert
+flags, regulatory reporting expectations. **Saudi-native Arabic, not
+literal translations.**
+
+### 10 bilingual form templates (V156)
+
+CHARTER · AGENDA · PRE_READ_COVERSHEET · ATTENDANCE · MOTION · MINUTES
+· ACTION_REGISTER · COI_DECLARATION · SKILLS_MATRIX · ANNUAL_EVALUATION
+— ~50-100 lines each of real bilingual markdown with `[BRACKETED]`
+placeholders for platform auto-fill.
+
+### Operational layer — full lifecycle on first-class entities
+
+**Resolutions** — replaces V40 `decisions_json` blob with structured
+rows. Lifecycle: created at meeting time with vote breakdown + dissent
+record + regulatorNotify flag, becomes immutable. F8 fires
+`COMMITTEE_RESOLUTION_<OUTCOME>` on every creation.
+
+**Action items** — replaces V40 `action_items_json` blob with full
+lifecycle: OPEN → IN_PROGRESS → COMPLETED (+ CANCELLED, DEFERRED,
+OVERDUE side branches). Cross-module linkage (`linkedModule`,
+`linkedEntityType`, `linkedEntityId`, `linkedEntityCode`) lets the
+platform navigate from a stale risk-register entry back to the
+committee where its remediation was discussed.
+
+**Annual calendar generator** — `POST /api/v1/committees/calendar/generate-calendar/{committeeId}?year=2026`
+creates 4 / 12 / 26 / 52 scheduled meetings ahead based on the committee's
+cadence, pre-loading each agenda with the template's standing items.
+Anchored to 2nd Tuesday of each cadence period (Saudi-workweek-friendly).
+Idempotent.
+
+**Agenda auto-populator** — `POST /api/v1/committees/calendar/populate-agenda/{meetingId}`
+refreshes the agenda by combining standing items + open actions from
+prior meetings. Always pre-fills items 1-3 (welcome+quorum, minutes
+approval, matters arising with auto-count of open actions).
+
+### F8 automation rules AR-146..AR-155 (10 rules, V158)
+
+- **AR-146** Resolution with regulatorNotify → page Compliance + GC + DPO (24h SLA)
+- **AR-147** Board resolution APPROVED → board secretariat notification
+- **AR-148** Action OVERDUE → escalate owner → line manager → Chair
+- **AR-149** CRITICAL action created → owner SMS within 1h
+- **AR-150** Risk-linked action COMPLETED → update risk timeline
+- **AR-151** Audit-linked action COMPLETED → advance CAPA stage
+- **AR-152** Resolution DEFERRED → re-table at next meeting
+- **AR-153** Action CANCELLED → notify Chair for review
+- **AR-154** Resolution review due in 30d → reminder
+- **AR-155** Charter review due in 30d → reminder
+
+### Scheduled time-based triggers (CommitteeScheduledSweep)
+
+Hourly `@Scheduled` component, idempotent via audit-log marker `COM_FIRE:<TRIGGER>`:
+- **COMMITTEE_ACTION_OVERDUE** — flips action status + fires AR-148
+- **COMMITTEE_RESOLUTION_REVIEW_DUE_30D** — fires AR-154
+- **COMMITTEE_CHARTER_REVIEW_DUE_30D** — fires AR-155
+
+### Worked-example seed (V157)
+
+8 resolutions + 9 actions migrated from V40 demo meetings into the new
+first-class tables. Real Saudi-context content: Aramco-contract-delay
+scenario, M365 Copilot rollout under SDAIA + NCA ECC, BCR for TCS-India
+transfer, FY2025 KPMG audit endorsement, NCA ECC backup-verification
+gap closure, journal-posting SoD remediation. Vote breakdowns realistic
+(3-5 voting members), dissent recorded per CMA Art. 31 where relevant.
+
+### Active rule count
+
+| Source | Range | Count |
+|---|---|---|
+| V96 baseline → V149 | AR-001..AR-115 | 115 |
+| **V158 Committees** | **AR-146..AR-155** | **10** |
+| **Total on this branch** | — | **125** |
+| (When PR #100 SOC ops also merges) | AR-116..AR-145 | +30 → **155** |
+
+### Pending follow-ups (next PR)
+
+- Frontend UI tabs in CommitteesPage for Resolutions + Actions registers
+- "Generate Annual Calendar" button on committee detail
+- Action-item detail view with cross-module link
+- Member terms + skills matrix UI (schema exists in V154)
+- PDF/DOCX export of forms (V156 forms are markdown; PDF generation pending)
+
+---
+
+## 🟢 Earlier — UX polish foundation (22 May 2026, PRs #90-91)
 
 Cross-app design audit + first two UX polish PRs landed:
 

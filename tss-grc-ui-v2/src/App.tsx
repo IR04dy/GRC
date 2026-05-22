@@ -147,7 +147,10 @@ const RcaPage                = lazy(() => import('./pages/rca/RcaPage').then(m =
 const RiskScenariosPage      = lazy(() => import('./pages/risk-scenarios/RiskScenariosPage').then(m => ({ default: m.RiskScenariosPage })));
 const SupplierResiliencePage = lazy(() => import('./pages/supplier-resilience/SupplierResiliencePage').then(m => ({ default: m.SupplierResiliencePage })));
 const EmergingRiskPage       = lazy(() => import('./pages/emerging-risk/EmergingRiskPage').then(m => ({ default: m.EmergingRiskPage })));
-const CommitteesPage         = lazy(() => import('./pages/committees/CommitteesPage').then(m => ({ default: m.CommitteesPage })));
+const CommitteesPage              = lazy(() => import('./pages/committees/CommitteesPage').then(m => ({ default: m.CommitteesPage })));
+const CommitteeCatalogPage        = lazy(() => import('./pages/committees/CommitteeCatalogPage').then(m => ({ default: m.CommitteeCatalogPage })));
+const CommitteeTemplateDetailPage = lazy(() => import('./pages/committees/CommitteeTemplateDetailPage').then(m => ({ default: m.CommitteeTemplateDetailPage })));
+const CommitteeFormDetailPage     = lazy(() => import('./pages/committees/CommitteeFormDetailPage').then(m => ({ default: m.CommitteeFormDetailPage })));
 const DrPlansPage            = lazy(() => import('./pages/dr-plans/DrPlansPage').then(m => ({ default: m.DrPlansPage })));
 const FrameworkControlsPage  = lazy(() => import('./pages/framework-controls/FrameworkControlsPage').then(m => ({ default: m.FrameworkControlsPage })));
 const ContractClausesPage    = lazy(() => import('./pages/contract-clauses/ContractClausesPage').then(m => ({ default: m.ContractClausesPage })));
@@ -215,7 +218,10 @@ export function App() {
               <Route path="/rca"        element={<RcaPage />} />
               <Route path="/risk-scenarios"   element={<RiskScenariosPage />} />
               <Route path="/emerging-risk"    element={<EmergingRiskPage />} />
-              <Route path="/committees"       element={<CommitteesPage />} />
+              <Route path="/committees"                              element={<CommitteesPage />} />
+              <Route path="/committees/catalog"                      element={<CommitteeCatalogPage />} />
+              <Route path="/committees/catalog/forms/:formCode"      element={<CommitteeFormDetailPage />} />
+              <Route path="/committees/catalog/:templateCode"        element={<CommitteeTemplateDetailPage />} />
               <Route path="/dr-plans"         element={<DrPlansPage />} />
               <Route path="/framework-controls" element={<FrameworkControlsPage />} />
               <Route path="/contract-clauses"   element={<ContractClausesPage />} />

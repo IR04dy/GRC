@@ -72,6 +72,40 @@ public class Committee {
     @Column(name = "external_id", length = 64)
     private String externalId;
 
+    // ── V154 extensions — template instantiation + reporting line ────
+    /** Which V154 template did this committee instantiate from (if any). */
+    @Column(name = "charter_template_code", length = 80)
+    private String charterTemplateCode;
+
+    /** Sub-committee delegation — points at parent committee.id. */
+    @Column(name = "parent_committee_id")
+    private Long parentCommitteeId;
+
+    /** Reporting line — e.g. Risk Committee reports to Board. */
+    @Column(name = "reports_to_committee_id")
+    private Long reportsToCommitteeId;
+
+    /** BANKING | INSURANCE | CMA | PUBLIC | HEALTHCARE | GENERAL */
+    @Column(name = "regulatory_domain", length = 40)
+    private String regulatoryDomain;
+
+    /** Comma-separated: SAMA, CMA, NCA, PDPL, NDMO, SDAIA, ZATCA, ISO22301, … */
+    @Column(name = "regulator_anchors", length = 500)
+    private String regulatorAnchors;
+
+    /** Annual charter review due-date — drives an F8 reminder 30 days ahead. */
+    @Column(name = "next_charter_review_at")
+    private java.time.LocalDate nextCharterReviewAt;
+
+    /** Board resolution that established this committee. */
+    @Column(name = "formation_resolution_code", length = 80)
+    private String formationResolutionCode;
+
+    /** When the year-ahead calendar was finalised — drives "calendar already
+     *  generated" detection in the UI. */
+    @Column(name = "annual_calendar_locked_at")
+    private LocalDateTime annualCalendarLockedAt;
+
     @Column(name = "is_deleted", nullable = false) private Short isDeleted = 0;
     @Column(name = "is_active",  nullable = false) private Short isActive  = 1;
     @Column(name = "deleted_at")                   private LocalDateTime deletedAt;

@@ -4979,6 +4979,7 @@ export const en = {
 
   // ─── Committee workflows (gap remaining #6) ────────────────────────
   comSidebar:                  'Committees & meetings',
+  comCatalogSidebar:           'Committee catalog (Saudi GRC)',
   comPageTitle:                'Committees & meetings',
   comPageSub:                  'Governance bodies, charters, scheduled meetings, agenda, attendees, minutes, decisions, and follow-up action items.',
   comLoadFailed:               'Failed to load committees',

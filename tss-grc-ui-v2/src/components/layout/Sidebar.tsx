@@ -237,6 +237,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'admin',         to: '/admin',                  Icon: UserCog,       labelKey: 'adminTitle' },
       { id: 'licensing',     to: '/admin/licensing',        Icon: KeyRound,      labelKey: 'licensingSidebar' },
       { id: 'committees',    to: '/committees',             Icon: LandmarkIcon,  labelKey: 'comSidebar' },
+      { id: 'com-catalog',   to: '/committees/catalog',     Icon: BookOpen,      labelKey: 'comCatalogSidebar' },
       { id: 'sso',           to: '/sso',                    Icon: LockKeyhole,   labelKey: 'ssoSidebar' },
       { id: 'wf-versions',   to: '/workflow-versions',      Icon: Layers,      labelKey: 'wvSidebar' },
       { id: 'connectors',    to: '/connectors',             Icon: Plug,        labelKey: 'connectorsTitle' },
