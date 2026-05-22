@@ -1,5 +1,36 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PRs #11-88 — all merged; F7/F8 parity arc → 20 services, 115 active rules)
+**Last update:** 22 May 2026 (PRs #11-91 — all merged; UX polish + 20 F7/F8 services + 115 active rules)
+
+---
+
+## 🟢 Latest — UX polish foundation (22 May 2026, PRs #90-91)
+
+Cross-app design audit + first two UX polish PRs landed:
+
+### PR #90 — bilingual status labels, shared layout classes, a11y
+
+Three high-impact UX foundations shipped together:
+
+- **`lib/statusLabels.ts`** — shared `statusLabel(value, lang)` helper covering ~50 status enums the platform uses (risk, incident, capa, vulnerability, DSR, consent, change management, regulatory change, policy, evidence). Companion helpers for severity/priority/strategy. Falls back to title-cased English when an enum isn't in the table.
+
+- **Shared layout classes in `shell.css`** — five new utilities replace recurring inline-style recipes: `.kpi-strip-4`, `.chip-row` + `.chip-row__count`, `.list-detail-grid`, `.loading-block`, `.table-row--selected` + `.table-row-clickable`.
+
+- **A11y on filter chips** — ControlLibraryPage domain-filter chips now carry `aria-label` + `aria-pressed`.
+
+Smoke test: RiskRegisterPage status badges + ControlLibraryPage KPI strip / chip row.
+
+### PR #91 — extend polish to more pages
+
+Applied the shared infra to four more pages:
+- PosturePage + RegulatoryLibraryPage → use `.kpi-strip-4` (dropped inline grid styles)
+- BcmReadinessPage → `statusLabel(c.status, lang)` on cycle + risk badges
+- BcmRemediationPage → `statusLabel` in CapasTab sub-component (derives lang from isAr prop)
+
+### Strategy
+
+Rather than ship one massive sweep that risks breakage, each polish PR establishes shared primitives (helpers + CSS classes) then applies them to one more page per area. Future polish PRs can roll out the same primitives without re-inventing them.
+
+
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
