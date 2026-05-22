@@ -1,6 +1,8 @@
 package com.tss.grc.module.privacy.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.privacy.entity.Dpia;
 import com.tss.grc.module.privacy.entity.DpiaMitigation;
 import com.tss.grc.module.privacy.entity.DpiaQuestion;
@@ -11,12 +13,14 @@ import com.tss.grc.module.privacy.repository.DpiaRepository;
 import com.tss.grc.module.privacy.repository.DpiaReviewRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +39,44 @@ public class DpiaService {
     private final DpiaQuestionRepository   questionRepo;
     private final DpiaMitigationRepository mitigationRepo;
     private final DpiaReviewRepository     reviewRepo;
+    private final AuditLogService          audit;
+    private final ApplicationEventPublisher publisher;
+
+    // ── F8 payload + emit ─────────────────────────────────────────────────────
+    //
+    // DPIA is the PDPL Article 25 risk-assessment workflow for any new
+    // processing of personal data. F8 lets downstream privacy program
+    // tasks (re-assessment scheduling, mitigation tracking, DPO
+    // attention to HIGH residual risk) react automatically. Events:
+    //
+    //   DPIA_DRAFTED       — new assessment opened
+    //   DPIA_SUBMITTED     — DRAFT → IN_REVIEW
+    //   DPIA_APPROVED      — IN_REVIEW → APPROVED
+    //   DPIA_REJECTED      — IN_REVIEW → REJECTED
+    //   DPIA_EXPIRED       — APPROVED → EXPIRED (next-review past)
+
+    private Map<String, Object> payloadFor(Dpia d, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("dpiaId",                 nullSafeStr(d.getId()));
+        m.put("processingActivityId",   nullSafeStr(d.getProcessingActivityId()));
+        m.put("status",                 nullSafeStr(d.getStatus()));
+        m.put("previousStatus",         nullSafeStr(previousStatus));
+        m.put("overallResidualRisk",    nullSafeStr(d.getOverallResidualRisk()));
+        m.put("triggerReason",          nullSafeStr(d.getTriggerReason()));
+        m.put("nextReviewDate",         nullSafeStr(d.getNextReviewDate()));
+        m.put("dpoId",                  nullSafeStr(d.getDpoId()));
+        m.put("assessorId",             nullSafeStr(d.getAssessorId()));
+        return m;
+    }
+
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+    private static String nullSafe(Object o)    { return o == null ? "<not provided>" : o.toString(); }
+
+    private void emit(String trigger, Dpia d, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            TenantContext.getCurrentTenant(), trigger, "Dpia", d.getId(),
+            "dpia:" + d.getId(), payloadFor(d, previousStatus)));
+    }
 
     // ── DPIA CRUD ────────────────────────────────────────────────────────────
 
@@ -57,7 +99,11 @@ public class DpiaService {
     @Transactional
     public Dpia create(Dpia req) {
         req.setOrganisationId(TenantContext.getCurrentTenant());
-        return dpiaRepo.save(req);
+        Dpia saved = dpiaRepo.save(req);
+        audit.log("CREATE", "Dpia", saved.getId(),
+            "DPIA drafted: " + nullSafe(saved.getTitleEn()) + " (PDPL Article 25)");
+        emit("DPIA_DRAFTED", saved, null);
+        return saved;
     }
 
     @Transactional
@@ -91,7 +137,10 @@ public class DpiaService {
         Dpia d = mustGet(id);
         require(d, "DRAFT");
         d.setStatus("IN_REVIEW");
-        return dpiaRepo.save(d);
+        Dpia saved = dpiaRepo.save(d);
+        audit.log("TRANSITION", "Dpia", saved.getId(), "DPIA submitted for review (DRAFT → IN_REVIEW)");
+        emit("DPIA_SUBMITTED", saved, "DRAFT");
+        return saved;
     }
 
     @Transactional
@@ -102,17 +151,27 @@ public class DpiaService {
         d.setApprovedAt(LocalDateTime.now());
         if (body.get("conclusion") instanceof String s) d.setConclusion(s);
         if (d.getNextReviewDate() == null) d.setNextReviewDate(java.time.LocalDate.now().plusYears(1));
-        return dpiaRepo.save(d);
+        Dpia saved = dpiaRepo.save(d);
+        audit.log("TRANSITION", "Dpia", saved.getId(),
+            "DPIA approved (residual risk: " + nullSafe(saved.getOverallResidualRisk())
+                + ", next review: " + saved.getNextReviewDate() + ")");
+        emit("DPIA_APPROVED", saved, "IN_REVIEW");
+        return saved;
     }
 
     @Transactional
     public Dpia reject(Long id, Map<String, Object> body) {
         Dpia d = mustGet(id);
         require(d, "IN_REVIEW", "DRAFT");
+        String previousStatus = d.getStatus();
         d.setStatus("REJECTED");
         d.setRejectedAt(LocalDateTime.now());
         if (body.get("reason") instanceof String s) d.setRejectionReason(s);
-        return dpiaRepo.save(d);
+        Dpia saved = dpiaRepo.save(d);
+        audit.log("TRANSITION", "Dpia", saved.getId(),
+            "DPIA rejected: " + nullSafe(saved.getRejectionReason()));
+        emit("DPIA_REJECTED", saved, previousStatus);
+        return saved;
     }
 
     @Transactional
@@ -120,7 +179,10 @@ public class DpiaService {
         Dpia d = mustGet(id);
         require(d, "APPROVED");
         d.setStatus("EXPIRED");
-        return dpiaRepo.save(d);
+        Dpia saved = dpiaRepo.save(d);
+        audit.log("TRANSITION", "Dpia", saved.getId(), "DPIA expired (next review date passed)");
+        emit("DPIA_EXPIRED", saved, "APPROVED");
+        return saved;
     }
 
     // ── Children: questions + mitigations + reviews ─────────────────────────

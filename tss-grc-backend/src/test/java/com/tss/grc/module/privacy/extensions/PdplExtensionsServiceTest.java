@@ -2,6 +2,7 @@ package com.tss.grc.module.privacy.extensions;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.*;
 import com.tss.grc.module.privacy.extensions.entity.*;
 import com.tss.grc.module.privacy.extensions.repository.*;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,6 +46,8 @@ class PdplExtensionsServiceTest {
     class CrossBorderTransferTests {
 
         @Mock CrossBorderTransferRepository repo;
+        @Mock AuditLogService audit;
+        @Mock ApplicationEventPublisher publisher;
         @InjectMocks CrossBorderTransferService service;
 
         @BeforeEach void cbtSetup() { TenantContext.setCurrentTenant(ORG_ID); }
