@@ -1,12 +1,50 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PRs #11-69 — full sprint: Calendar finishing + Notifications + regulatory libraries + Cmd-K)
+**Last update:** 22 May 2026 (PRs #11-72 — sprint + visible-bug fix sweep)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Most recent — Calendar finishing + Notifications + Regulatory libraries + Cmd-K (22 May 2026)
+## 🟢 Most recent — Visible-bug fix sweep (22 May 2026)
+
+After the four-track sprint (PRs #63-70) landed, a live walkthrough surfaced two visible issues on the most-touched pages. Two follow-up PRs and a cross-module sweep closed them:
+
+| PR | Merge | What |
+|---|---|---|
+| **#71** | `c48fd54` | **`/calendar` page polish** — Topbar title + sub were wrapping onto 5+ lines when the sub was long, overflowing the topbar height and bleeding into the PageHeader below. CSS-only fix in `shell.css`: `.topbar { overflow: hidden }`, first-child wrapper gets `min-width:0`, `.topbar-title` + `.topbar-sub` get `white-space:nowrap` + `text-overflow:ellipsis`. Same PR adds the **iCal download button** in the Calendar header that was missing — PR #63 shipped the endpoint but never surfaced the action. Now the button fetches the .ics for the active window+filter and drops it into Downloads. |
+| **#72** | `f12cac1` | **NDI GapsTab Fragment key warning** — `<></>` Fragment wrapping the gap-row `<tr>` + expanded-CAPA `<tr>` had `key={g.id}` on the inner `<tr>` instead of on the Fragment itself. React reconciliation kept firing 'Each child in a list should have a unique key prop' on every Gaps tab render. Fix: import named `Fragment`, swap `<>` for `<Fragment key={g.id}>`, drop redundant inner `key`. |
+
+### Cross-module audit (live walkthrough)
+
+All 11 major module landing pages were navigated and screenshotted/inspected:
+
+| Module | Route | Cards | Status |
+|---|---|---|---|
+| Dashboard | `/dashboard` | 28 | ✓ renders, no errors |
+| CAPA Register | `/capa` | 4 | ✓ |
+| Workflow Submissions | `/workflows/submissions` | 96 | ✓ |
+| Enterprise Risk | `/risk` | 2 | ✓ |
+| BCM | `/bcm` | 24 | ✓ |
+| Compliance | `/compliance` | 8 | ✓ |
+| TPRM | `/tprm` | 12 | ✓ |
+| Cybersecurity | `/cyber` | 12 | ✓ |
+| Privacy / PDPL | `/privacy` | 8 | ✓ |
+| Findings | `/findings` | 28 | ✓ |
+| Audit Workspace | `/audit-workspace` | 32 | ✓ |
+| **NDI** | `/ndi` | 14 tabs | ✓ all populated |
+| **Calendar** | `/calendar` | month/week/agenda | ✓ post-fix |
+| **Notifications** | `/notifications` | inbox + badge | ✓ |
+
+No "Failed to load" / "Coming soon" / "Placeholder" states surfaced. The only unreachable code path is `NdiPage.NotYetShipped`, which is the catch-all else-branch when `tab` matches none of the 14 known tabs — by construction it never renders.
+
+### Sidebar route audit
+
+Diff between sidebar `to:` values and `<Route path=...>` declarations: only the two parameterised authority routes (`/authority/HRSD`, `/authority/MOC`) didn't have exact matches — both are covered by the dynamic `/authority/:code` route. **Every sidebar entry points at a real page.**
+
+---
+
+## 🟢 Earlier — Calendar finishing + Notifications + Regulatory libraries + Cmd-K (22 May 2026)
 
 After the Calendar foundation landed (PRs #60-62) a seven-PR sprint closed the remaining gaps across four tracks:
 
