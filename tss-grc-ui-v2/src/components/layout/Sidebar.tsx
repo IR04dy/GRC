@@ -144,7 +144,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'cyber', titleKey: 'navCyber',
     items: [
-      { id: 'socops',     to: '/socops',             Icon: Siren,           labelKey: 'socopsSidebar' },
+      { id: 'socops',         to: '/socops',                 Icon: Siren,           labelKey: 'socopsSidebar' },
+      { id: 'socops-events',  to: '/socops/events',          Icon: Siren,           labelKey: 'socopsEventsSidebar' },
+      { id: 'socops-playbks', to: '/socops/playbooks',       Icon: BookOpen,        labelKey: 'socopsPlaybooksSidebar' },
+      { id: 'socops-pentest', to: '/socops/pentests',        Icon: ShieldCheck,     labelKey: 'socopsPentestsSidebar' },
+      { id: 'socops-regexam', to: '/socops/regulator-exams', Icon: LockKeyhole,     labelKey: 'socopsRegulatorsSidebar' },
+      { id: 'socops-ot',      to: '/socops/ot-assets',       Icon: Server,          labelKey: 'socopsOtSidebar' },
       { id: 'cyber-dash', to: '/cyber/dashboard',  Icon: LayoutDashboard, labelKey: 'cyberDashSidebar' },
       { id: 'cyber',    to: '/cyber',              Icon: LockKeyhole, labelKey: 'modCyber' },
       { id: 'cyber-lc', to: '/cyber-lifecycle',    Icon: ShieldCheck, labelKey: 'cycSidebar' },

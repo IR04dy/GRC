@@ -2,6 +2,7 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.dto.ScannerRunIngestRequest;
 import com.tss.grc.module.socops.dto.SiemEventIngestRequest;
 import com.tss.grc.module.socops.entity.ScannerRun;
@@ -10,10 +11,12 @@ import com.tss.grc.module.socops.repository.ScannerRunRepository;
 import com.tss.grc.module.socops.repository.SecurityEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * Ingest endpoints for SIEM connectors and vulnerability scanners.
@@ -39,9 +42,10 @@ import java.time.LocalDateTime;
 @Slf4j
 public class SocOpsIngestService {
 
-    private final SecurityEventRepository securityEvents;
-    private final ScannerRunRepository    scannerRuns;
-    private final AuditLogService         audit;
+    private final SecurityEventRepository      securityEvents;
+    private final ScannerRunRepository         scannerRuns;
+    private final AuditLogService              audit;
+    private final ApplicationEventPublisher    publisher;
 
     // ── SIEM event ingest ──────────────────────────────────────────────
 
@@ -83,6 +87,21 @@ public class SocOpsIngestService {
             audit.log("INGEST_SIEM_EVENT", "SecurityEvent", saved.getId(),
                 "SIEM event ingested from " + req.sourceSystem()
                     + " (" + req.severity() + " · " + (req.ruleName() == null ? "—" : req.ruleName()) + ")");
+
+            // F8 — broadcast for AR-116..AR-130 (V151) automation rules.
+            // Two events: the generic "new event landed" + the CRITICAL fast-lane
+            // so the rule engine can match either signal without scanning payload.
+            Map<String, Object> payload = Map.of(
+                "severity",     req.severity()     == null ? "" : req.severity(),
+                "sourceSystem", req.sourceSystem() == null ? "" : req.sourceSystem(),
+                "category",     req.category()     == null ? "" : req.category(),
+                "ruleName",     req.ruleName()     == null ? "" : req.ruleName());
+            publisher.publishEvent(DomainEvent.of(
+                org, "SECURITY_EVENT_INGESTED", "SecurityEvent", saved.getId(), payload));
+            if ("CRITICAL".equalsIgnoreCase(req.severity())) {
+                publisher.publishEvent(DomainEvent.of(
+                    org, "SECURITY_EVENT_CRITICAL_NEW", "SecurityEvent", saved.getId(), payload));
+            }
         }
 
         return saved;
@@ -129,6 +148,23 @@ public class SocOpsIngestService {
             "Scanner run ingested from " + req.scanner()
                 + " (" + saved.getFindingsCritical() + " critical, "
                 + saved.getFindingsHigh() + " high)");
+
+        // F8 — broadcast scanner completion + a CRITICAL fast-lane signal so
+        // AR-126 (critical-finding ticket creation) fires without scanning
+        // the rollup again from inside the rule engine.
+        Map<String, Object> payload = Map.of(
+            "scanner",          saved.getScanner() == null ? "" : saved.getScanner(),
+            "status",           saved.getStatus()  == null ? "" : saved.getStatus(),
+            "findingsCritical", saved.getFindingsCritical(),
+            "findingsHigh",     saved.getFindingsHigh(),
+            "findingsTotal",    saved.getFindingsTotal(),
+            "assetsScanned",    saved.getAssetsScanned());
+        publisher.publishEvent(DomainEvent.of(
+            org, "SCANNER_RUN_COMPLETED", "ScannerRun", saved.getId(), payload));
+        if (saved.getFindingsCritical() != null && saved.getFindingsCritical() > 0) {
+            publisher.publishEvent(DomainEvent.of(
+                org, "SCANNER_RUN_CRITICAL_FOUND", "ScannerRun", saved.getId(), payload));
+        }
         return saved;
     }
 

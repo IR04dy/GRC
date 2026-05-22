@@ -12,6 +12,12 @@ import java.util.Optional;
 
 public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Long> {
 
+    /** Tenants that have at least one SOC event — used by the scheduled
+     *  sweep so a tenant with no SOC activity gets skipped without running
+     *  the per-org scan. */
+    @Query("SELECT DISTINCT e.organisationId FROM SecurityEvent e")
+    java.util.List<Long> findDistinctOrganisationIds();
+
     Optional<SecurityEvent> findByIdAndOrganisationId(Long id, Long organisationId);
 
     Optional<SecurityEvent> findByOrganisationIdAndSourceSystemAndExternalId(

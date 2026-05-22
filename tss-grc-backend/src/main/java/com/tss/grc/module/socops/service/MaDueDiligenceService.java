@@ -2,14 +2,18 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.MaDueDiligence;
 import com.tss.grc.module.socops.repository.MaDueDiligenceRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +21,7 @@ public class MaDueDiligenceService {
 
     private final MaDueDiligenceRepository repo;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public Page<MaDueDiligence> list(Pageable pageable) {
@@ -50,6 +55,18 @@ public class MaDueDiligenceService {
         MaDueDiligence saved = repo.save(dd);
         audit.log("MA_DD_TRANSITION", "MaDueDiligence", id,
             "Phase " + old + " → " + newPhase);
+        // F8 — AR-142. PIF / sovereign-fund deal phase transitions trigger
+        // legal + integration-readiness owner notifications. The rule's
+        // condition_json filters on (pif_aligned == true) so non-PIF deals
+        // still emit the event but don't escalate.
+        publisher.publishEvent(DomainEvent.of(
+            saved.getOrganisationId(), "MA_DD_PHASE_TRANSITION",
+            "MaDueDiligence", id,
+            Map.of("engagementCode", saved.getEngagementCode()   == null ? "" : saved.getEngagementCode(),
+                   "targetEntity",   saved.getTargetEntityName() == null ? "" : saved.getTargetEntityName(),
+                   "dealType",       saved.getDealType()         == null ? "" : saved.getDealType(),
+                   "oldPhase",       old                         == null ? "" : old,
+                   "newPhase",       newPhase                    == null ? "" : newPhase)));
         return saved;
     }
 

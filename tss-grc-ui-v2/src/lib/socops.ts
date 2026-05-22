@@ -1,5 +1,6 @@
 // SOC Operations API client + types — wires the frontend to the V150 +
-// V151 backbone shipped by PR #97 / V151 automation rules.
+// V151 + V152 backbone shipped by PRs #97 / #98 / #99 and the V153
+// automation rules layered on top.
 //
 // All endpoints live under /api/v1/socops/* and are gated server-side by
 // @RequireModule("SOCOPS"). Frontend hides nav entries that aren't in the
@@ -187,6 +188,314 @@ export interface RegulatorExamination {
   relatedFramework: string | null;
 }
 
+// ─── V150 entities (catalog completion) ─────────────────────────────
+
+export interface ThreatIntel {
+  id: number;
+  externalId: string;
+  source: string;                // Saudi-CERT | NCA | FS-ISAC | MISP | …
+  publishedAt: string;
+  expiresAt: string | null;
+  titleEn: string;
+  titleAr: string | null;
+  summary: string | null;
+  iocType: string | null;        // IP | DOMAIN | HASH | URL | …
+  iocValue: string | null;
+  severity: string | null;
+  confidence: string | null;
+  tlp: string | null;            // WHITE | GREEN | AMBER | RED
+  mitreTactics: string | null;
+  mitreTechniques: string | null;
+  affectedSectors: string | null;
+  actioned: boolean;
+  actionedAt: string | null;
+  actionNotes: string | null;
+}
+
+export interface ScannerRun {
+  id: number;
+  scanner: string;               // TENABLE | QUALYS | DEFENDER | …
+  scanName: string | null;
+  scope: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  status: string;
+  findingsTotal: number;
+  findingsCritical: number;
+  findingsHigh: number;
+  findingsMedium: number;
+  findingsLow: number;
+  assetsScanned: number;
+  errorMessage: string | null;
+}
+
+export interface CryptoAsset {
+  id: number;
+  assetCode: string;
+  assetType: string;              // CERT_TLS | CERT_SIGNING | KEY_HSM | …
+  titleEn: string;
+  titleAr: string | null;
+  issuedBy: string | null;
+  subjectDn: string | null;
+  fingerprint: string | null;
+  algorithm: string | null;
+  keyLength: number | null;
+  quantumSafe: boolean;
+  validFrom: string | null;
+  validUntil: string | null;
+  deployedOn: string | null;
+  owner: string | null;
+  rotationPeriodDays: number | null;
+  lastRotatedAt: string | null;
+  classification: string | null;
+  status: string;
+}
+
+export interface SbomComponent {
+  id: number;
+  applicationId: number | null;
+  applicationName: string;
+  componentName: string;
+  componentVersion: string | null;
+  packageEcosystem: string | null;   // npm | maven | pypi | …
+  purl: string | null;
+  license: string | null;
+  supplier: string | null;
+  hasKnownCves: boolean;
+  highestCveSeverity: string | null;
+  upgradeAvailable: boolean;
+  lastScannedAt: string | null;
+}
+
+export interface ZtMaturity {
+  id: number;
+  assessmentCode: string;
+  pillar: string;                 // IDENTITY | DEVICES | NETWORK | APPS | DATA
+  currentStage: string;           // TRADITIONAL | INITIAL | ADVANCED | OPTIMAL
+  targetStage: string | null;
+  score: number | null;
+  evidenceSummary: string | null;
+  gapSummary: string | null;
+  actionPlan: string | null;
+  assessedAt: string | null;
+  assessedBy: string | null;
+}
+
+export interface AwarenessCampaign {
+  id: number;
+  campaignCode: string;
+  titleEn: string;
+  titleAr: string | null;
+  campaignType: string;            // PHISH_SIM | TRAINING | NEWSLETTER | …
+  targetAudience: string | null;
+  targetUserCount: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  status: string;
+  deliveredCount: number;
+  openedCount: number;
+  clickedCount: number;
+  reportedCount: number;
+  completedCount: number;
+  repeatOffenderCount: number;
+  passRatePercent: number | null;
+  alignedControls: string | null;
+  notes: string | null;
+}
+
+// ─── V152 Tier-2 + Tier-3 entities ──────────────────────────────────
+
+// OT/ICS asset (Purdue-level inventory) — Aramco / SABIC / Ma'aden scale
+export interface OtAsset {
+  id: number;
+  assetCode: string;
+  titleEn: string;
+  titleAr: string | null;
+  purdueLevel: number;          // 0..5
+  assetClass: string;           // PLC | DCS | SCADA | HMI | RTU | HISTORIAN | …
+  vendor: string | null;
+  model: string | null;
+  firmwareVersion: string | null;
+  serialNumber: string | null;
+  siteCode: string | null;
+  siteName: string | null;
+  processFunction: string | null;
+  industrialProtocols: string | null;
+  safetyIntegrityLevel: string | null;  // SIL1 | SIL2 | SIL3 | SIL4
+  criticality: string;          // LOW | MEDIUM | HIGH | CRITICAL
+  lastPatchedAt: string | null;
+  patchWindow: string | null;
+  remoteAccessEnabled: boolean;
+  networkSegment: string | null;
+  status: string;
+  notes: string | null;
+}
+
+// IAM joiner-mover-leaver / privileged-access event
+export interface IamJmlEvent {
+  id: number;
+  eventCode: string;
+  eventType: string;            // JOINER | MOVER | LEAVER | PRIVILEGED_GRANT | …
+  occurredAt: string;
+  subjectUsername: string | null;
+  subjectEmail: string | null;
+  subjectDepartment: string | null;
+  subjectJobTitle: string | null;
+  sourceSystem: string;         // AD | Azure-AD | SailPoint | Okta | …
+  targetSystem: string | null;
+  roleOrEntitlement: string | null;
+  privileged: boolean;
+  outcome: string;              // PENDING | APPROVED | COMPLETED | REJECTED
+  sodViolationDetected: boolean;
+  sodViolationDetail: string | null;
+  approverUsername: string | null;
+  approverRole: string | null;
+  requestedAt: string | null;
+  approvedAt: string | null;
+  completedAt: string | null;
+}
+
+// AppSec finding (SAST/DAST/IAST/SCA/secrets/IaC unified)
+export interface AppsecFinding {
+  id: number;
+  externalId: string;
+  scanner: string;              // VERACODE | CHECKMARX | SNYK | …
+  scanType: string;             // SAST | DAST | IAST | SCA | SECRETS | IAC
+  applicationName: string;
+  applicationId: number | null;
+  repositoryUrl: string | null;
+  branch: string | null;
+  findingTitle: string;
+  cwe: string | null;
+  cve: string | null;
+  severity: string;
+  cvssScore: number | null;
+  filePath: string | null;
+  lineNumber: number | null;
+  componentName: string | null;
+  componentVersion: string | null;
+  fixedVersion: string | null;
+  description: string | null;
+  remediationAdvice: string | null;
+  status: string;               // OPEN | TRIAGED | IN_PROGRESS | FIXED | …
+  assignedToUserId: number | null;
+  discoveredAt: string;
+  fixedAt: string | null;
+  slaDueAt: string | null;
+  suppressionReason: string | null;
+}
+
+// DLP event (Microsoft Purview / Forcepoint / Symantec / Netskope)
+export interface DlpEvent {
+  id: number;
+  externalId: string;
+  sourceSystem: string;
+  eventTime: string;
+  severity: string;
+  username: string | null;
+  endpoint: string | null;
+  channel: string | null;       // EMAIL | USB | CLOUD | WEB | …
+  policyName: string | null;
+  dataClassification: string | null;  // PUBLIC | INTERNAL | CONFIDENTIAL | SECRET | TOP_SECRET
+  filename: string | null;
+  fileSizeBytes: number | null;
+  destination: string | null;
+  action: string | null;        // BLOCKED | ALERTED | ALLOWED
+  status: string;
+  reviewerUserId: number | null;
+  reviewedAt: string | null;
+  reviewOutcome: string | null;
+  notes: string | null;
+}
+
+// Cyber insurance policy
+export interface CyberInsurance {
+  id: number;
+  policyNumber: string;
+  carrierName: string;
+  brokerName: string | null;
+  policyType: string;
+  coverageAreas: string | null;
+  aggregateLimitSar: number | null;
+  perEventLimitSar: number | null;
+  retentionSar: number | null;
+  effectiveFrom: string;
+  effectiveTo: string;
+  renewalDueAt: string | null;
+  status: string;
+  claimCount: number;
+  lastClaimAt: string | null;
+  lastClaimPaidSar: number | null;
+  aggregateClaimsPaidSar: number | null;
+  notes: string | null;
+}
+
+// Brand / dark-web monitoring alert
+export interface BrandMonitoring {
+  id: number;
+  alertCode: string;
+  sourceSystem: string;         // Recorded Future | Digital Shadows | SOCRadar | …
+  detectedAt: string;
+  severity: string;
+  alertType: string | null;     // PHISHING_KIT | LEAKED_CRED | TYPOSQUAT | …
+  brandKeyword: string | null;
+  location: string | null;
+  urlObserved: string | null;
+  evidenceSummary: string | null;
+  status: string;
+  takedownRequestedAt: string | null;
+  takedownCompletedAt: string | null;
+  notes: string | null;
+}
+
+// Forensics artefact (chain-of-custody)
+export interface ForensicsArtefact {
+  id: number;
+  artefactCode: string;
+  caseCode: string;
+  artefactType: string | null;  // DISK_IMAGE | MEMORY | LOG | MOBILE | …
+  acquiredAt: string;
+  custodian: string;
+  location: string | null;
+  md5: string | null;
+  sha256: string | null;
+  sha512: string | null;
+  integrityStatus: string;       // VERIFIED | UNKNOWN | COMPROMISED
+  legalHold: boolean;
+  disposalDueAt: string | null;
+  notes: string | null;
+}
+
+// M&A cyber due diligence engagement.
+// Field shape mirrors the backend entity (`MaDueDiligence`) verbatim —
+// the previous shape (targetCompanyName / pifAligned / overallVerdict /
+// phaseStartedAt / phaseDueAt) was aspirational and never matched what
+// Jackson serialised. Page binds to these names.
+export interface MaDueDiligence {
+  id: number;
+  engagementCode: string;
+  titleEn: string;
+  titleAr: string | null;
+  targetEntityName: string;
+  targetIndustry: string | null;
+  targetCountry: string | null;
+  dealType: string;              // ACQUISITION | MERGER | DIVESTITURE | JV
+  phase: string;                 // PRE_LOI | PLANNING | DISCOVERY | ASSESSMENT | FINDINGS | INTEGRATION | CLOSED
+  dealStatus: string | null;
+  findingsTotal: number;
+  findingsCritical: number;
+  findingsHigh: number;
+  cyberRecommendation: string | null; // GREEN | YELLOW | RED | DEAL_BLOCKER
+  recommendationNotes: string | null;
+  loiSignedAt: string | null;
+  fieldworkStartAt: string | null;
+  fieldworkEndAt: string | null;
+  finalReportAt: string | null;
+  dealCloseAt: string | null;
+  integrationCompleteAt: string | null;
+  notes: string | null;
+}
+
 // ─── Seasonal overlays ───────────────────────────────────────────────
 export interface SeasonalOverlay {
   id: number;
@@ -242,5 +551,96 @@ export const socopsApi = {
     api.get<SeasonalOverlay[]>('/api/v1/socops/seasonal-overlays'),
 
   certsExpiring: (days = 30) =>
-    api.get<unknown[]>(`/api/v1/socops/crypto-assets/expiring?days=${days}`),
+    api.get<CryptoAsset[]>(`/api/v1/socops/crypto-assets/expiring?days=${days}`),
+
+  // ── V150 register endpoints ──────────────────────────────────────
+  threatIntel: (page = 0, size = 50) =>
+    api.get<PageResp<ThreatIntel>>(`/api/v1/socops/threat-intel${pageQ(page, size)}`),
+  threatIntelGet: (id: number) =>
+    api.get<ThreatIntel>(`/api/v1/socops/threat-intel/${id}`),
+  threatIntelAction: (id: number, body: { actioned: boolean; actionNotes?: string }) =>
+    api.post<ThreatIntel>(`/api/v1/socops/threat-intel/${id}/action`, body),
+
+  scannerRuns: (page = 0, size = 50) =>
+    api.get<PageResp<ScannerRun>>(`/api/v1/socops/scanner-runs${pageQ(page, size)}`),
+  scannerRunGet: (id: number) =>
+    api.get<ScannerRun>(`/api/v1/socops/scanner-runs/${id}`),
+
+  cryptoAssets: (page = 0, size = 50) =>
+    api.get<PageResp<CryptoAsset>>(`/api/v1/socops/crypto-assets${pageQ(page, size)}`),
+  cryptoAssetGet: (id: number) =>
+    api.get<CryptoAsset>(`/api/v1/socops/crypto-assets/${id}`),
+
+  sbom: (page = 0, size = 100) =>
+    api.get<PageResp<SbomComponent>>(`/api/v1/socops/sbom${pageQ(page, size)}`),
+
+  ztMaturity: () =>
+    api.get<ZtMaturity[]>('/api/v1/socops/zt-maturity'),
+  ztMaturityByCode: (assessmentCode: string) =>
+    api.get<ZtMaturity[]>(`/api/v1/socops/zt-maturity/${encodeURIComponent(assessmentCode)}`),
+
+  awareness: (page = 0, size = 50) =>
+    api.get<PageResp<AwarenessCampaign>>(`/api/v1/socops/awareness${pageQ(page, size)}`),
+  awarenessGet: (id: number) =>
+    api.get<AwarenessCampaign>(`/api/v1/socops/awareness/${id}`),
+
+  // ── V152 Tier-2 + Tier-3 ─────────────────────────────────────────
+  otAssets: (page = 0, size = 50) =>
+    api.get<PageResp<OtAsset>>(`/api/v1/socops/ot-assets${pageQ(page, size)}`),
+  otAssetGet: (id: number) =>
+    api.get<OtAsset>(`/api/v1/socops/ot-assets/${id}`),
+
+  iamJml: (page = 0, size = 50) =>
+    api.get<PageResp<IamJmlEvent>>(`/api/v1/socops/iam-jml${pageQ(page, size)}`),
+  iamJmlGet: (id: number) =>
+    api.get<IamJmlEvent>(`/api/v1/socops/iam-jml/${id}`),
+
+  appsec: (page = 0, size = 50) =>
+    api.get<PageResp<AppsecFinding>>(`/api/v1/socops/appsec${pageQ(page, size)}`),
+  appsecGet: (id: number) =>
+    api.get<AppsecFinding>(`/api/v1/socops/appsec/${id}`),
+
+  dlp: (page = 0, size = 50) =>
+    api.get<PageResp<DlpEvent>>(`/api/v1/socops/dlp${pageQ(page, size)}`),
+  dlpGet: (id: number) =>
+    api.get<DlpEvent>(`/api/v1/socops/dlp/${id}`),
+  dlpReview: (id: number, outcome: string, notes?: string) =>
+    api.post<DlpEvent>(`/api/v1/socops/dlp/${id}/review`, { outcome, notes: notes ?? '' }),
+
+  cyberInsurance: () =>
+    api.get<CyberInsurance[]>('/api/v1/socops/cyber-insurance'),
+  cyberInsuranceGet: (id: number) =>
+    api.get<CyberInsurance>(`/api/v1/socops/cyber-insurance/${id}`),
+  cyberInsuranceRenewals: (days = 90) =>
+    api.get<CyberInsurance[]>(`/api/v1/socops/cyber-insurance/renewals-due?days=${days}`),
+
+  brandAlerts: (page = 0, size = 50) =>
+    api.get<PageResp<BrandMonitoring>>(`/api/v1/socops/brand-monitoring${pageQ(page, size)}`),
+  brandAlertGet: (id: number) =>
+    api.get<BrandMonitoring>(`/api/v1/socops/brand-monitoring/${id}`),
+  brandRequestTakedown: (id: number) =>
+    api.post<BrandMonitoring>(`/api/v1/socops/brand-monitoring/${id}/request-takedown`),
+  brandCompleteTakedown: (id: number, notes?: string) =>
+    api.post<BrandMonitoring>(`/api/v1/socops/brand-monitoring/${id}/complete-takedown`,
+      { notes: notes ?? '' }),
+
+  forensics: (page = 0, size = 50) =>
+    api.get<PageResp<ForensicsArtefact>>(`/api/v1/socops/forensics${pageQ(page, size)}`),
+  forensicsGet: (id: number) =>
+    api.get<ForensicsArtefact>(`/api/v1/socops/forensics/${id}`),
+  forensicsByCase: (caseCode: string) =>
+    api.get<ForensicsArtefact[]>(`/api/v1/socops/forensics/by-case/${encodeURIComponent(caseCode)}`),
+  forensicsTransferCustody: (id: number, newCustodian: string, newLocation: string, notes?: string) =>
+    api.post<ForensicsArtefact>(`/api/v1/socops/forensics/${id}/transfer-custody`,
+      { newCustodian, newLocation, notes: notes ?? '' }),
+  forensicsVerify: (id: number, verified = true) =>
+    api.post<ForensicsArtefact>(`/api/v1/socops/forensics/${id}/verify-integrity`,
+      { verified }),
+
+  maDueDiligence: (page = 0, size = 50) =>
+    api.get<PageResp<MaDueDiligence>>(`/api/v1/socops/ma-due-diligence${pageQ(page, size)}`),
+  maDueDiligenceGet: (id: number) =>
+    api.get<MaDueDiligence>(`/api/v1/socops/ma-due-diligence/${id}`),
+  maTransitionPhase: (id: number, phase: string) =>
+    api.post<MaDueDiligence>(`/api/v1/socops/ma-due-diligence/${id}/transition`, { phase }),
 };

@@ -2,14 +2,18 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.DlpEvent;
 import com.tss.grc.module.socops.repository.DlpEventRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +21,7 @@ public class DlpEventService {
 
     private final DlpEventRepository repo;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public Page<DlpEvent> list(Pageable pageable) {
@@ -45,6 +50,25 @@ public class DlpEventService {
                 audit.log("DLP_INGEST", "DlpEvent", saved.getId(),
                     saved.getSourceSystem() + " · " + saved.getActionTaken()
                         + " · " + (saved.getDataClassification() == null ? "—" : saved.getDataClassification()));
+
+                // F8 — AR-136 (CRITICAL unreviewed) and AR-145 (NDC TOP_SECRET
+                // blocked → CISO instant page). Two distinct triggers because
+                // a CRITICAL of CONFIDENTIAL goes to a different inbox than a
+                // TOP_SECRET BLOCK that escalates straight to NDC's owner.
+                Map<String, Object> payload = Map.of(
+                    "sourceSystem",       saved.getSourceSystem()       == null ? "" : saved.getSourceSystem(),
+                    "actionTaken",        saved.getActionTaken()        == null ? "" : saved.getActionTaken(),
+                    "severity",           saved.getSeverity()           == null ? "" : saved.getSeverity(),
+                    "dataClassification", saved.getDataClassification() == null ? "" : saved.getDataClassification());
+                if ("CRITICAL".equalsIgnoreCase(saved.getSeverity()) && !Boolean.TRUE.equals(saved.getReviewed())) {
+                    publisher.publishEvent(DomainEvent.of(
+                        org, "DLP_CRITICAL_UNREVIEWED", "DlpEvent", saved.getId(), payload));
+                }
+                if ("TOP_SECRET".equalsIgnoreCase(saved.getDataClassification())
+                        && "BLOCK".equalsIgnoreCase(saved.getActionTaken())) {
+                    publisher.publishEvent(DomainEvent.of(
+                        org, "DLP_TOP_SECRET_BLOCKED", "DlpEvent", saved.getId(), payload));
+                }
                 return saved;
             });
     }

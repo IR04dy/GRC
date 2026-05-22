@@ -2,10 +2,12 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.ForensicsArtefact;
 import com.tss.grc.module.socops.repository.ForensicsArtefactRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ public class ForensicsArtefactService {
 
     private final ForensicsArtefactRepository repo;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public Page<ForensicsArtefact> list(Pageable pageable) {
@@ -76,6 +80,18 @@ public class ForensicsArtefactService {
         ForensicsArtefact saved = repo.save(a);
         audit.log("FORENSICS_INTEGRITY_CHECK", "ForensicsArtefact", id,
             verified ? "Verified OK" : "INTEGRITY COMPROMISED");
+        // F8 — AR-140. A failed integrity hash means the artefact is
+        // unusable in court — page legal counsel + CISO immediately so the
+        // chain-of-custody break is documented before any further handling.
+        if (!verified) {
+            publisher.publishEvent(DomainEvent.of(
+                saved.getOrganisationId(), "FORENSICS_INTEGRITY_LOST",
+                "ForensicsArtefact", id,
+                Map.of("artefactCode",   saved.getArtefactCode()   == null ? "" : saved.getArtefactCode(),
+                       "artefactType",   saved.getArtefactType()   == null ? "" : saved.getArtefactType(),
+                       "caseCode",       saved.getCaseCode()       == null ? "" : saved.getCaseCode(),
+                       "custodian",      saved.getCurrentCustodian() == null ? "" : saved.getCurrentCustodian())));
+        }
         return saved;
     }
 }

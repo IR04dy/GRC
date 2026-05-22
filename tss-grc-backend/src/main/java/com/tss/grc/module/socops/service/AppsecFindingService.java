@@ -2,16 +2,19 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.AppsecFinding;
 import com.tss.grc.module.socops.repository.AppsecFindingRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +22,7 @@ public class AppsecFindingService {
 
     private final AppsecFindingRepository repo;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public Page<AppsecFinding> list(Pageable pageable) {
@@ -60,6 +64,27 @@ public class AppsecFindingService {
         audit.log(isNew ? "APPSEC_INGEST" : "APPSEC_REFRESH",
             "AppsecFinding", existing.getId(),
             existing.getScanner() + " · " + existing.getScanType() + " · " + existing.getSeverity());
+
+        // F8 — AR-134 (critical finding) and AR-135 (SLA breach). Only fire
+        // for new rows so the rule engine doesn't refire on every connector
+        // re-sync of an already-tracked finding.
+        if (isNew) {
+            Map<String, Object> payload = Map.of(
+                "scanner",   existing.getScanner()  == null ? "" : existing.getScanner(),
+                "scanType",  existing.getScanType() == null ? "" : existing.getScanType(),
+                "severity",  existing.getSeverity() == null ? "" : existing.getSeverity(),
+                "cvssScore", existing.getCvssScore() == null ? 0.0 : existing.getCvssScore());
+            if ("CRITICAL".equalsIgnoreCase(existing.getSeverity())) {
+                publisher.publishEvent(DomainEvent.of(
+                    existing.getOrganisationId(), "APPSEC_CRITICAL_FINDING",
+                    "AppsecFinding", existing.getId(), payload));
+            }
+            if (existing.getSlaDueAt() != null && existing.getSlaDueAt().isBefore(LocalDateTime.now())) {
+                publisher.publishEvent(DomainEvent.of(
+                    existing.getOrganisationId(), "APPSEC_SLA_BREACHED",
+                    "AppsecFinding", existing.getId(), payload));
+            }
+        }
         return existing;
     }
 

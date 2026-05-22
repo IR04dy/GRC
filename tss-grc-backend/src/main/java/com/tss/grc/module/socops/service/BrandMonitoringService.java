@@ -2,16 +2,19 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.BrandMonitoring;
 import com.tss.grc.module.socops.repository.BrandMonitoringRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +22,7 @@ public class BrandMonitoringService {
 
     private final BrandMonitoringRepository repo;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public Page<BrandMonitoring> list(Pageable pageable) {
@@ -44,6 +48,17 @@ public class BrandMonitoringService {
                 audit.log("BRAND_INGEST", "BrandMonitoring", saved.getId(),
                     saved.getSourceSystem() + " · " + saved.getAlertType()
                         + (saved.getAffectedAsset() == null ? "" : " · " + saved.getAffectedAsset()));
+                // F8 — AR-139. Critical brand events (Recorded Future / Digital
+                // Shadows phishing kit alerts) need immediate triage so the
+                // takedown workflow starts in minutes, not days.
+                if ("CRITICAL".equalsIgnoreCase(saved.getSeverity())) {
+                    publisher.publishEvent(DomainEvent.of(
+                        org, "BRAND_CRITICAL_ALERT", "BrandMonitoring", saved.getId(),
+                        Map.of("sourceSystem",   saved.getSourceSystem()   == null ? "" : saved.getSourceSystem(),
+                               "alertType",      saved.getAlertType()      == null ? "" : saved.getAlertType(),
+                               "severity",       saved.getSeverity()       == null ? "" : saved.getSeverity(),
+                               "affectedAsset",  saved.getAffectedAsset()  == null ? "" : saved.getAffectedAsset())));
+                }
                 return saved;
             });
     }

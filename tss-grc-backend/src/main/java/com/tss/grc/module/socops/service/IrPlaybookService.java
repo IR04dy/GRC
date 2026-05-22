@@ -2,17 +2,20 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.IrPlaybook;
 import com.tss.grc.module.socops.entity.IrPlaybookStep;
 import com.tss.grc.module.socops.repository.IrPlaybookRepository;
 import com.tss.grc.module.socops.repository.IrPlaybookStepRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Service for IR playbook headers and their ordered steps.
@@ -32,6 +35,7 @@ public class IrPlaybookService {
     private final IrPlaybookRepository      playbooks;
     private final IrPlaybookStepRepository  steps;
     private final AuditLogService           audit;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public List<IrPlaybook> list() {
@@ -110,6 +114,14 @@ public class IrPlaybookService {
         p.setLastReviewedAt(LocalDateTime.now());
         IrPlaybook saved = playbooks.save(p);
         audit.log("IR_PLAYBOOK_INVOKE", "IrPlaybook", id, "Invocation count incremented");
+        // F8 — AR-119 picks this up to log the invocation and start the MTTD/MTTR clock.
+        publisher.publishEvent(DomainEvent.of(
+            saved.getOrganisationId(), "IR_PLAYBOOK_INVOKED",
+            "IrPlaybook", id,
+            Map.of("playbookCode",     saved.getPlaybookCode()    == null ? "" : saved.getPlaybookCode(),
+                   "category",         saved.getCategory()        == null ? "" : saved.getCategory(),
+                   "severityTrigger",  saved.getSeverityTrigger() == null ? "" : saved.getSeverityTrigger(),
+                   "invocationCount",  saved.getInvocationCount() == null ? 0  : saved.getInvocationCount())));
         return saved;
     }
 

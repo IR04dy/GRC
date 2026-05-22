@@ -45,6 +45,26 @@ const WorkflowHubPage        = lazy(() => import('./pages/workflow/WorkflowHubPa
 const WorkflowSubmissionsPage = lazy(() => import('./pages/workflow/WorkflowSubmissionsPage').then(m => ({ default: m.WorkflowSubmissionsPage })));
 const CalendarPage           = lazy(() => import('./pages/calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
 const SocOpsDashboardPage    = lazy(() => import('./pages/socops/SocOpsDashboardPage').then(m => ({ default: m.SocOpsDashboardPage })));
+const SocOpsEventsPage       = lazy(() => import('./pages/socops/SocOpsEventsPage').then(m => ({ default: m.SocOpsEventsPage })));
+const IrPlaybooksPage        = lazy(() => import('./pages/socops/IrPlaybooksPage').then(m => ({ default: m.IrPlaybooksPage })));
+const PentestsPage           = lazy(() => import('./pages/socops/PentestsPage').then(m => ({ default: m.PentestsPage })));
+const RegulatorExamsPage     = lazy(() => import('./pages/socops/RegulatorExamsPage').then(m => ({ default: m.RegulatorExamsPage })));
+const OtAssetsPage           = lazy(() => import('./pages/socops/OtAssetsPage').then(m => ({ default: m.OtAssetsPage })));
+const ThreatIntelPage        = lazy(() => import('./pages/socops/ThreatIntelPage').then(m => ({ default: m.ThreatIntelPage })));
+const ScannerRunsPage        = lazy(() => import('./pages/socops/ScannerRunsPage').then(m => ({ default: m.ScannerRunsPage })));
+const CryptoAssetsPage       = lazy(() => import('./pages/socops/CryptoAssetsPage').then(m => ({ default: m.CryptoAssetsPage })));
+const SbomPage               = lazy(() => import('./pages/socops/SbomPage').then(m => ({ default: m.SbomPage })));
+const ZtMaturityPage         = lazy(() => import('./pages/socops/ZtMaturityPage').then(m => ({ default: m.ZtMaturityPage })));
+const SeasonalOverlaysPage   = lazy(() => import('./pages/socops/SeasonalOverlaysPage').then(m => ({ default: m.SeasonalOverlaysPage })));
+const AwarenessPage          = lazy(() => import('./pages/socops/AwarenessPage').then(m => ({ default: m.AwarenessPage })));
+const IamJmlPage             = lazy(() => import('./pages/socops/IamJmlPage').then(m => ({ default: m.IamJmlPage })));
+const AppsecPage             = lazy(() => import('./pages/socops/AppsecPage').then(m => ({ default: m.AppsecPage })));
+const DlpPage                = lazy(() => import('./pages/socops/DlpPage').then(m => ({ default: m.DlpPage })));
+const CyberInsurancePage     = lazy(() => import('./pages/socops/CyberInsurancePage').then(m => ({ default: m.CyberInsurancePage })));
+const BrandMonitoringPage    = lazy(() => import('./pages/socops/BrandMonitoringPage').then(m => ({ default: m.BrandMonitoringPage })));
+const ForensicsPage          = lazy(() => import('./pages/socops/ForensicsPage').then(m => ({ default: m.ForensicsPage })));
+const MaDueDiligencePage     = lazy(() => import('./pages/socops/MaDueDiligencePage').then(m => ({ default: m.MaDueDiligencePage })));
+const SocOpsDetailPage       = lazy(() => import('./pages/socops/SocOpsDetailPage').then(m => ({ default: m.SocOpsDetailPage })));
 const NotificationInboxPage  = lazy(() => import('./pages/inbox/InboxPage').then(m => ({ default: m.InboxPage })));
 const WorkflowSubmissionDetailPage = lazy(() => import('./pages/workflow/WorkflowSubmissionDetailPage').then(m => ({ default: m.WorkflowSubmissionDetailPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
@@ -245,9 +265,31 @@ export function App() {
               {/* Compliance Calendar (PR #61) — Saudi-workdays-aware */}
               <Route path="/calendar"                                 element={<CalendarPage />} />
 
-              {/* SOC Operations — Saudi-CISO backbone (PR #97 + V151 rules) */}
+              {/* SOC Operations — Saudi-CISO backbone (PRs #97 / #98 / #99 + V151/V153 rules) */}
               <Route path="/socops"                                   element={<SocOpsDashboardPage />} />
               <Route path="/socops/dashboard"                         element={<SocOpsDashboardPage />} />
+              <Route path="/socops/events"                            element={<SocOpsEventsPage />} />
+              <Route path="/socops/playbooks"                         element={<IrPlaybooksPage />} />
+              <Route path="/socops/pentests"                          element={<PentestsPage />} />
+              <Route path="/socops/regulator-exams"                   element={<RegulatorExamsPage />} />
+              <Route path="/socops/ot-assets"                         element={<OtAssetsPage />} />
+              <Route path="/socops/threat-intel"                      element={<ThreatIntelPage />} />
+              <Route path="/socops/scanner-runs"                      element={<ScannerRunsPage />} />
+              <Route path="/socops/crypto-assets"                     element={<CryptoAssetsPage />} />
+              <Route path="/socops/sbom"                              element={<SbomPage />} />
+              <Route path="/socops/zt-maturity"                       element={<ZtMaturityPage />} />
+              <Route path="/socops/seasonal-overlays"                 element={<SeasonalOverlaysPage />} />
+              <Route path="/socops/awareness"                         element={<AwarenessPage />} />
+              <Route path="/socops/iam-jml"                           element={<IamJmlPage />} />
+              <Route path="/socops/appsec"                            element={<AppsecPage />} />
+              <Route path="/socops/dlp"                               element={<DlpPage />} />
+              <Route path="/socops/cyber-insurance"                   element={<CyberInsurancePage />} />
+              <Route path="/socops/brand-monitoring"                  element={<BrandMonitoringPage />} />
+              <Route path="/socops/forensics"                         element={<ForensicsPage />} />
+              <Route path="/socops/ma-due-diligence"                  element={<MaDueDiligencePage />} />
+              {/* Generic SOC ops detail route — single page renders every entity via RESOURCE_CONFIG.
+                  :resource is one of events|playbooks|pentests|ot-assets|iam-jml|threat-intel|... */}
+              <Route path="/socops/:resource/:id"                     element={<SocOpsDetailPage />} />
               <Route path="/notifications"                            element={<NotificationInboxPage />} />
               <Route path="/workflows/erm/risk-identification"       element={<RiskIdentificationWizard />} />
               <Route path="/workflows/pdpl/dsr-fulfilment"           element={<DsrFulfilmentWizard />} />

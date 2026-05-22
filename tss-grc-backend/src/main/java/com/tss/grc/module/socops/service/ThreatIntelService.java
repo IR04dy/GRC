@@ -2,23 +2,27 @@ package com.tss.grc.module.socops.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.ThreatIntel;
 import com.tss.grc.module.socops.repository.ThreatIntelRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class ThreatIntelService {
 
-    private final ThreatIntelRepository repo;
-    private final AuditLogService audit;
+    private final ThreatIntelRepository      repo;
+    private final AuditLogService            audit;
+    private final ApplicationEventPublisher  publisher;
 
     @Transactional(readOnly = true)
     public Page<ThreatIntel> list(Pageable pageable) {
@@ -58,6 +62,17 @@ public class ThreatIntelService {
                     ThreatIntel saved = repo.save(in);
                     audit.log("TI_CREATE", "ThreatIntel", saved.getId(),
                         saved.getSource() + " · " + saved.getExternalId());
+                    // F8 — AR-130 fans CRITICAL/HIGH TI rows out to SOC + IR.
+                    // The "actionable" tier is the cutoff Saudi-CERT, NCA and
+                    // MISP advisories use; LOW/MEDIUM stays in the queue.
+                    if ("CRITICAL".equalsIgnoreCase(saved.getSeverity())
+                            || "HIGH".equalsIgnoreCase(saved.getSeverity())) {
+                        publisher.publishEvent(DomainEvent.of(
+                            org, "TI_ACTIONABLE", "ThreatIntel", saved.getId(),
+                            Map.of("source",   saved.getSource()   == null ? "" : saved.getSource(),
+                                   "severity", saved.getSeverity() == null ? "" : saved.getSeverity(),
+                                   "iocType",  saved.getIocType()  == null ? "" : saved.getIocType())));
+                    }
                     return saved;
                 });
         }

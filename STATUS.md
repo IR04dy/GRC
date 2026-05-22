@@ -1,9 +1,139 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PR #101 — Committees & Meetings GRC-SME platform foundation; 125 active rules — pending PR #100 merge for 155 total)
+**Last update:** 22 May 2026 (PR #100 + PR #101–#103 merged — SOC ops F8 loop closed + Committees GRC-SME platform complete; 175 active rules)
 
 ---
 
-## 🟢 Latest — Committees & Meetings GRC-SME platform (22 May 2026, PR #101)
+## 🟢 Latest — SOC ops detail pages (22 May 2026, PR #100 cont.)
+
+Closes the "register row clicks go nowhere" UX gap. Single generic
+`SocOpsDetailPage` at `/socops/:resource/:id` covers every entity via
+a `RESOURCE_CONFIG` map (fetcher, audit-log entityType, headline builder,
+ordered field list with formatters). 14/19 register pages link the
+code-first cell into the detail page on this PR; the remaining 4 with
+non-code first cells (ThreatIntel, Scanner Runs, AppSec, DLP) can be
+linked in a follow-up.
+
+The detail page always drops in `EntityActivityTimeline` with the right
+`entityType` — clicking a row now shows the entity's fields + the full
+audit log + any F8 rule fires that touched it.
+
+### Pages linked
+
+| Register | Detail route | Linked field |
+|---|---|---|
+| SocOpsEventsPage | `/socops/events/:id` | `ruleName` |
+| IrPlaybooksPage | `/socops/playbooks/:id` | `playbookCode` |
+| PentestsPage | `/socops/pentests/:id` | `engagementCode` |
+| RegulatorExamsPage | `/socops/regulator-exams/:id` | `examinationCode` |
+| OtAssetsPage | `/socops/ot-assets/:id` | `assetCode` |
+| CryptoAssetsPage | `/socops/crypto-assets/:id` | `assetCode` |
+| AwarenessPage | `/socops/awareness/:id` | `campaignCode` |
+| IamJmlPage | `/socops/iam-jml/:id` | `eventCode` |
+| CyberInsurancePage | `/socops/cyber-insurance/:id` | `policyNumber` |
+| BrandMonitoringPage | `/socops/brand-monitoring/:id` | `alertCode` |
+| ForensicsPage | `/socops/forensics/:id` | `artefactCode` |
+| MaDueDiligencePage | `/socops/ma-due-diligence/:id` | `engagementCode` |
+| ZtMaturityPage | `/socops/zt-maturity/:id` | `assessmentCode` |
+| SeasonalOverlaysPage | `/socops/seasonal-overlays/:id` | `overlayCode` |
+
+The 3 entities without a backend get-by-id endpoint (SBOM, ZT maturity,
+seasonal overlays) render an Empty state in the detail page — the route
+exists for forward-compat but the API call resolves to a stub.
+
+---
+
+## 🟢 Earlier — SOC ops F8 loop closed end-to-end (22 May 2026, PR #100)
+
+Single PR, five commits, closes the loop between the SOC ops rule catalog
+(AR-116..AR-145 from V151 + V153) and live operator + sweep signals. Before
+this PR the catalog was 30 declarative entries with nothing on either end;
+after, every rule has either a service-side publisher or a scheduled sweep
+firing real `DomainEvent`s into the F8 engine.
+
+### What landed
+
+| Commit | Theme | Files |
+|---|---|---|
+| `72d6e92` | V153 SQL migration + 5 priority register pages | +6 |
+| `165fca0` | 14 catalog completion register pages | +14 |
+| `ffedbe6` | DomainEvent publishers wired into 13 SOC ops services | +13 |
+| `4551fc8` | Hourly scheduled sweep + 2 repo helpers (6 triggers) | +3 |
+| `8bf7e5a` | 5 more sweep triggers + MaDueDiligence FE/BE field fix | +8 |
+
+### Service-side publishers (state-change triggers)
+
+13 services now broadcast on the verbs that map 1-1 to rule triggers:
+
+| Service | Triggers |
+|---|---|
+| SocOpsIngestService | SECURITY_EVENT_INGESTED, SECURITY_EVENT_CRITICAL_NEW, SCANNER_RUN_COMPLETED, SCANNER_RUN_CRITICAL_FOUND |
+| SecurityEventService | SECURITY_EVENT_TRIAGED, SECURITY_EVENT_RESOLVED |
+| IrPlaybookService | IR_PLAYBOOK_INVOKED |
+| PentestEngagementService | PENTEST_REPORT_DELIVERED (transition-guarded) |
+| RegulatorExaminationService | REGULATOR_EXAM_NOTIFIED |
+| ThreatIntelService | TI_ACTIONABLE (HIGH/CRITICAL only) |
+| OtAssetService | OT_REMOTE_ACCESS_ENABLED (OFF→ON only) |
+| IamJmlEventService | IAM_SOD_VIOLATION, IAM_JML_PRIVILEGED_COMPLETE |
+| AppsecFindingService | APPSEC_CRITICAL_FINDING, APPSEC_SLA_BREACHED |
+| DlpEventService | DLP_CRITICAL_UNREVIEWED, DLP_TOP_SECRET_BLOCKED |
+| BrandMonitoringService | BRAND_CRITICAL_ALERT |
+| ForensicsArtefactService | FORENSICS_INTEGRITY_LOST |
+| MaDueDiligenceService | MA_DD_PHASE_TRANSITION |
+
+State-snapshot guards on the transition-only triggers (PENTEST→REPORT_DELIVERED,
+OT remote OFF→ON, IAM SoD first-trip, IAM privileged→COMPLETED) prevent
+refiring on every subsequent save of an already-tripped row.
+
+### Scheduled sweep — `SocOpsScheduledSweep`
+
+Single hourly `@Scheduled` component covering 10 elapsed-time triggers no
+operator action transitions across. Idempotent via audit-log marker
+(`SOC_FIRE:<TRIGGER>` — short prefix fits the 40-char `action_type` column):
+
+| Trigger | Window | Source |
+|---|---|---|
+| SECURITY_EVENT_SLA_APPROACHING | ≤30 min ahead | SecurityEvent.findApproachingSlaBreach |
+| SECURITY_EVENT_SLA_BREACHED | past sla_due_at | same |
+| REGULATOR_EXAM_RESPONSE_DUE | ≤14 days | new `findResponseDueBetween` |
+| CYBER_INSURANCE_RENEWAL_90D | (60d, 90d] | existing `findRenewalsDueBetween` |
+| CYBER_INSURANCE_RENEWAL_30D | (0d, 30d] | same |
+| IAM_PRIVILEGED_REVIEW_DUE | ≤14 days | existing `findPrivilegedReviewsDueBetween` |
+| CRYPTO_CERT_EXPIRING_30D | ≤30 days | existing `findExpiringBetween` |
+| CRYPTO_CERT_EXPIRED | past valid_until | same |
+| PENTEST_RETEST_DUE | ≤7 days | new `findRetestDueBetween` |
+| SEASONAL_OVERLAY_ACTIVATED | starts_at = today | new `findStartingBetween` |
+| FORENSICS_HOLD_DISPOSAL_DUE | legal hold + retention ≤14d | new `findHoldDisposalDueBetween` |
+| APPSEC_SLA_BREACHED (over-time) | sla_due_at past, not closed | new `findSlaBreached` |
+| DLP_CRITICAL_UNREVIEWED (over-time) | CRITICAL + unreviewed >24h | new `findCriticalUnreviewedBefore` |
+
+### Frontend register pages
+
+19 new `/socops/*` pages — 5 priority (SOC events queue, IR playbooks, pentests,
+regulator exams, OT assets) + 14 catalog (threat intel, scanner runs, crypto
+assets, SBOM, ZT maturity, seasonal overlays, awareness, IAM JML, AppSec, DLP,
+cyber insurance, brand monitoring, forensics, M&A DD). All Saudi-native Arabic
+labels (Pareto / connectors / catalog / board pack), all lazy-loaded routes.
+
+### MaDueDiligence FE/BE alignment fix
+
+The v2 page type was fabricated against an aspirational schema. Now mirrors
+the entity verbatim — `targetEntityName` (not `targetCompanyName`),
+`cyberRecommendation` (not `overallVerdict`), `findingsCritical`/`findingsHigh`
+exposed in the row, PIF chip removed because the entity has no PIF flag.
+
+### Out-of-tree (Track C, by design)
+
+External adapter projects — Splunk TA, QRadar app, Sentinel logic app,
+Tenable/Qualys/Defender connectors, Veracode/Snyk/Checkmarx plugins, Purview
+DLP forwarder, Recorded Future/Digital Shadows webhooks — are separate
+adapter-team scope, not platform engineering. PR #100 ships the platform
+side: ingestion endpoints (`/api/socops/ingest/*`), receivers (the V150
+service + the V152 entities), the F8 rule catalog, and the publisher/sweep
+wiring that lets the rules fire.
+
+---
+
+## 🟢 Latest — Committees & Meetings GRC-SME platform (22 May 2026, PRs #101–#103)
 
 Repositions the committees module from a basic register (V40 — just a
 `committees` table + meeting `decisions_json` blob) into a **real day-
@@ -114,22 +244,59 @@ transfer, FY2025 KPMG audit endorsement, NCA ECC backup-verification
 gap closure, journal-posting SoD remediation. Vote breakdowns realistic
 (3-5 voting members), dissent recorded per CMA Art. 31 where relevant.
 
+### PRs #102 + #103 — UI integration + follow-ups complete
+
+**PR #102 (UI)** — Resolutions + Actions register tabs on `CommitteesPage`
+with cross-module chip routing (RISK→/risk, INCIDENT→/incidents,
+COMPLIANCE→/compliance, etc.). "Generate Annual Calendar" + "Populate
+Agenda" buttons. 28 new Saudi-native Arabic translation keys.
+
+**PR #103 (follow-ups)** — V159 demo expansion (+5 committees:
+Compliance / Cyber / Privacy / AML / AI-Ethics; +6 MINUTES_APPROVED
+meetings; +9 resolutions; +11 cross-module-linked actions) +
+`CommitteeMemberTerm` + `CommitteeMemberSkill` + `CommitteeMeetingPaper`
+entities/repos/services + REST controllers + `CommitteeFormExportService`
+(OpenPDF, Arabic RTL) + `/committees/:committeeId/members`
+registry page with independence-ratio KPI (CMA Art 54).
+
 ### Active rule count
 
 | Source | Range | Count |
 |---|---|---|
-| V96 baseline → V149 | AR-001..AR-115 | 115 |
+| V96 baseline | AR-001..AR-020 | 20 |
+| V128 CAPA | AR-021..AR-030 | 10 |
+| V129 Finding/CAPA stage | AR-031..AR-035 | 5 |
+| V130 Finding lifecycle | AR-036..AR-040 | 5 |
+| V131 BCM AAR | AR-041..AR-045 | 5 |
+| V132 Risk | AR-046..AR-050 | 5 |
+| V135 Calendar reminder | AR-051..AR-055 | 5 |
+| V138 Incident | AR-056..AR-060 | 5 |
+| V139 Vulnerability | AR-061..AR-065 | 5 |
+| V140 Approval | AR-066..AR-070 | 5 |
+| V141 Policy | AR-071..AR-075 | 5 |
+| V142 Evidence | AR-076..AR-080 | 5 |
+| V143 Consent | AR-081..AR-085 | 5 |
+| V144 DSR | AR-086..AR-090 | 5 |
+| V145 DPIA + cross-border | AR-091..AR-095 | 5 |
+| V146 Change mgmt | AR-096..AR-100 | 5 |
+| V147 Treatment plan | AR-101..AR-105 | 5 |
+| V148 Regulatory change | AR-106..AR-110 | 5 |
+| V149 BCM issue | AR-111..AR-115 | 5 |
+| **V151 SOC ops baseline** | **AR-116..AR-130** | **15** |
+| **V153 SOC ops Tier-2/3** | **AR-131..AR-145** | **15** |
 | **V158 Committees** | **AR-146..AR-155** | **10** |
-| **Total on this branch** | — | **125** |
-| (When PR #100 SOC ops also merges) | AR-116..AR-145 | +30 → **155** |
+| **V159 Committees demo expansion** | (extends V158 + V157) | — |
+| **Total** | — | **155** |
 
-### Pending follow-ups (next PR)
+### Pending follow-ups — ALL CLOSED in PRs #102 + #103
 
-- Frontend UI tabs in CommitteesPage for Resolutions + Actions registers
-- "Generate Annual Calendar" button on committee detail
-- Action-item detail view with cross-module link
-- Member terms + skills matrix UI (schema exists in V154)
-- PDF/DOCX export of forms (V156 forms are markdown; PDF generation pending)
+- ✅ Frontend UI tabs in CommitteesPage for Resolutions + Actions (PR #102)
+- ✅ "Generate Annual Calendar" + "Populate Agenda" buttons (PR #102)
+- ✅ Action-item detail view with cross-module link (PR #102)
+- ✅ Member terms + skills matrix UI (PR #103 — `CommitteeMemberRegistryPage`)
+- ✅ PDF/DOCX export of forms (PR #103 — `CommitteeFormExportService` via OpenPDF)
+- ✅ More worked-example meetings (PR #103 — V159 +5 committees, +6 meetings)
+- ✅ Pre-read papers tracking (PR #103 — `CommitteeMeetingPaper` entity + REST)
 
 ---
 
