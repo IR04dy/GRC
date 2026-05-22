@@ -7,15 +7,19 @@ import com.tss.grc.module.bcm.cycle.entity.BcmGovernanceRecord;
 import com.tss.grc.module.bcm.cycle.repository.BcmAssessmentCycleRepository;
 import com.tss.grc.module.bcm.cycle.repository.BcmGovernanceRecordRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -52,8 +56,53 @@ public class BcmCycleService {
     private final BcmAssessmentCycleRepository cycles;
     private final BcmGovernanceRecordRepository governance;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    // ── F8 emit ───────────────────────────────────────────────────────────────
+    // BCM cycle is the annual assessment heartbeat — every BIA refresh, BCP
+    // edit, DR test, and governance record hangs off a cycle. F8 events let
+    // downstream consumers (calendar, KPI dashboards, regulator-facing AAR)
+    // react to cycle milestones automatically.
+    private Map<String, Object> cyclePayload(BcmAssessmentCycle c, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("cycleId",         nullSafeStr(c.getId()));
+        m.put("status",          nullSafeStr(c.getStatus()));
+        m.put("previousStatus",  nullSafeStr(previousStatus));
+        m.put("reportingYear",   nullSafeStr(c.getReportingYear()));
+        m.put("bcmManagerId",    nullSafeStr(c.getBcmManagerId()));
+        m.put("executiveSponsorId", nullSafeStr(c.getExecutiveSponsorId()));
+        m.put("startDate",       nullSafeStr(c.getStartDate()));
+        m.put("endDate",         nullSafeStr(c.getEndDate()));
+        return m;
+    }
+
+    private Map<String, Object> governancePayload(BcmGovernanceRecord g, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("governanceId",    nullSafeStr(g.getId()));
+        m.put("policyTitleEn",   nullSafeStr(g.getPolicyTitleEn()));
+        m.put("policyVersion",   nullSafeStr(g.getPolicyVersion()));
+        m.put("status",          nullSafeStr(g.getApprovalStatus()));
+        m.put("previousStatus",  nullSafeStr(previousStatus));
+        m.put("reviewFrequency", nullSafeStr(g.getReviewFrequency()));
+        m.put("nextReviewDate",  nullSafeStr(g.getNextReviewDate()));
+        return m;
+    }
+
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+
+    private void emitCycle(String trigger, BcmAssessmentCycle c, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            org(), trigger, "BcmAssessmentCycle", c.getId(),
+            "bcm_cycle:" + c.getId(), cyclePayload(c, previousStatus)));
+    }
+
+    private void emitGovernance(String trigger, BcmGovernanceRecord g, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            org(), trigger, "BcmGovernanceRecord", g.getId(),
+            "bcm_governance:" + g.getId(), governancePayload(g, previousStatus)));
+    }
 
     // ─── Assessment Cycles ────────────────────────────────────────
 
@@ -88,6 +137,7 @@ public class BcmCycleService {
         BcmAssessmentCycle saved = cycles.save(body);
         auditCycle(saved, "CREATE", null, saved.getStatus(),
             "BCM cycle created: " + saved.getCycleNameEn());
+        emitCycle("BCM_CYCLE_CREATED", saved, null);
         return saved;
     }
 
@@ -132,6 +182,14 @@ public class BcmCycleService {
         BcmAssessmentCycle saved = cycles.save(c);
         auditCycle(saved, "TRANSITION", from, to,
             "BCM cycle " + saved.getId() + " " + from + " → " + to);
+        String trigger = switch (to) {
+            case "IN_PROGRESS"  -> "BCM_CYCLE_STARTED";
+            case "UNDER_REVIEW" -> "BCM_CYCLE_UNDER_REVIEW";
+            case "APPROVED"     -> "BCM_CYCLE_APPROVED";
+            case "ARCHIVED"     -> "BCM_CYCLE_ARCHIVED";
+            default             -> "BCM_CYCLE_TRANSITIONED";
+        };
+        emitCycle(trigger, saved, from);
         return saved;
     }
 
@@ -166,6 +224,7 @@ public class BcmCycleService {
         BcmGovernanceRecord saved = governance.save(body);
         auditGovernance(saved, "CREATE", null, saved.getApprovalStatus(),
             "Governance record created: " + saved.getPolicyTitleEn());
+        emitGovernance("BCM_GOVERNANCE_CREATED", saved, null);
         return saved;
     }
 
@@ -221,6 +280,16 @@ public class BcmCycleService {
         BcmGovernanceRecord saved = governance.save(r);
         auditGovernance(saved, "TRANSITION", from, to,
             "Governance record " + saved.getId() + " " + from + " → " + to);
+        String trigger = switch (to) {
+            case "UNDER_REVIEW"     -> "BCM_GOVERNANCE_UNDER_REVIEW";
+            case "APPROVED"         -> "BCM_GOVERNANCE_APPROVED";
+            case "ACTIVE"           -> "BCM_GOVERNANCE_ACTIVATED";
+            case "REVIEW_DUE"       -> "BCM_GOVERNANCE_REVIEW_DUE";
+            case "ARCHIVED"         -> "BCM_GOVERNANCE_ARCHIVED";
+            case "CHANGES_REQUIRED" -> "BCM_GOVERNANCE_CHANGES_REQUIRED";
+            default                 -> "BCM_GOVERNANCE_TRANSITIONED";
+        };
+        emitGovernance(trigger, saved, from);
         return saved;
     }
 

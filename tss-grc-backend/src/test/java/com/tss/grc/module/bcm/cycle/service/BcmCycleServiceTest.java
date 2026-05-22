@@ -36,6 +36,7 @@ class BcmCycleServiceTest {
     @Mock private BcmAssessmentCycleRepository cycles;
     @Mock private BcmGovernanceRecordRepository governance;
     @Mock private AuditLogService audit;
+    @Mock private org.springframework.context.ApplicationEventPublisher publisher;
     @InjectMocks private BcmCycleService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

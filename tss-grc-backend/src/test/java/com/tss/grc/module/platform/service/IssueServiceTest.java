@@ -36,6 +36,7 @@ class IssueServiceTest {
 
     @Mock private IssueRepository repo;
     @Mock private AuditLogService audit;
+    @Mock private org.springframework.context.ApplicationEventPublisher publisher;
     @InjectMocks private IssueService service;
 
     @BeforeEach void setUp() { TenantContext.setCurrentTenant(ORG_ID); }

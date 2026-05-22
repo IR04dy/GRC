@@ -2,10 +2,12 @@ package com.tss.grc.module.platform.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.platform.entity.Issue;
 import com.tss.grc.module.platform.repository.IssueRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,34 @@ public class IssueService {
 
     private final IssueRepository repo;
     private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
+
+    // ── F8 emit ───────────────────────────────────────────────────────────────
+    // Issues are the cross-module finding lifecycle — they fan into CAPA,
+    // evidence, and notifications. F8 events let downstream consumers
+    // (assignee inbox, manager escalation, audit committee KPI) react
+    // automatically.
+    private Map<String, Object> payloadFor(Issue i, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("issueId",         nullSafeStr(i.getId()));
+        m.put("issueCode",       nullSafeStr(i.getIssueCode()));
+        m.put("status",          nullSafeStr(i.getStatus()));
+        m.put("previousStatus",  nullSafeStr(previousStatus));
+        m.put("severity",        nullSafeStr(i.getSeverity()));
+        m.put("priority",        nullSafeStr(i.getPriority()));
+        m.put("resolution",      nullSafeStr(i.getResolution()));
+        m.put("assigneeUserId",  nullSafeStr(i.getAssigneeUserId()));
+        m.put("assigneeRole",    nullSafeStr(i.getAssigneeRole()));
+        m.put("capaId",          nullSafeStr(i.getCapaId()));
+        return m;
+    }
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+
+    private void emit(String trigger, Issue i, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            TenantContext.getCurrentTenant(), trigger, "Issue", i.getId(),
+            "issue:" + nullSafeStr(i.getIssueCode()), payloadFor(i, previousStatus)));
+    }
 
     @Transactional(readOnly = true)
     public Page<Issue> list(int page, int size) {
@@ -69,6 +99,7 @@ public class IssueService {
         Issue saved = repo.save(body);
         audit.log("CREATE", "Issue", saved.getId(),
             "Issue created: " + saved.getIssueCode() + " — " + saved.getTitleEn());
+        emit("ISSUE_CREATED", saved, null);
         return saved;
     }
 
@@ -145,6 +176,15 @@ public class IssueService {
         Issue saved = repo.save(issue);
         audit.log("TRANSITION", "Issue", saved.getId(),
             "Issue " + saved.getIssueCode() + " " + from + " → " + toStatus);
+        String trigger = switch (toStatus) {
+            case "IN_PROGRESS" -> "ISSUE_STARTED";
+            case "BLOCKED"     -> "ISSUE_BLOCKED";
+            case "RESOLVED"    -> "ISSUE_RESOLVED";
+            case "CLOSED"      -> "ISSUE_CLOSED";
+            case "CANCELLED"   -> "ISSUE_CANCELLED";
+            default            -> "ISSUE_TRANSITIONED";
+        };
+        emit(trigger, saved, from);
         return saved;
     }
 
