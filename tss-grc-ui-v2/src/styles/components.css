@@ -162,6 +162,17 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-1);
   overflow: hidden;
+  /* Smooth elevation for interactive cards (dashboard tiles, KPI
+   * drill-down anchors). No transform — keeps layout stable so the
+   * user's mouse doesn't chase the card; only the shadow lifts. */
+  transition: box-shadow var(--dur-fast), border-color var(--dur-fast);
+}
+/* Opt-in lift on hover for cards that are actually clickable. Most
+ * cards are static containers, so we don't make every card feel
+ * interactive. Pages add `card-interactive` className when needed. */
+.card.card-interactive:hover {
+  box-shadow: var(--shadow-2);
+  border-color: var(--border-strong);
 }
 .card-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -416,7 +427,17 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   gap: 6px;
 }
 .tab:hover { color: var(--primary); }
+.tab:focus-visible {
+  /* Keyboard focus ring — matches button + table row-clickable focus
+   * elsewhere so Tab navigation is consistent across surfaces. */
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .tab.active { background: var(--surface); color: var(--primary-700); box-shadow: var(--shadow-1); }
+.tab[aria-disabled="true"] {
+  opacity: .45;
+  cursor: not-allowed;
+}
 
 /* Tab row-count chip — shown after the tab label when the parent passes
  * `count` on the TabItem. Gives the user instant feedback on how much
@@ -517,8 +538,18 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 
 /* ─── Risk Table ─────────────────────────────────── */
-.risk-table { width: 100%; border-collapse: collapse; font-family: var(--font-sans); }
+/* border-collapse: separate is required for position: sticky on <th> —
+ * collapse mode drops the border in sticky paint. We compensate with
+ * an inset box-shadow on th below. */
+.risk-table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: var(--font-sans); }
 .risk-table th {
+  /* Sticky header keeps column labels visible while scrolling long
+   * registers (vulns, findings, board pack, calendar). z-index keeps
+   * the header above hovered row backgrounds. The scroll context
+   * must live on an ancestor (Card body or page), not the table. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: var(--surface-2);
   padding: 11px 14px;
   text-align: left;
@@ -526,7 +557,9 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   color: var(--ink-3);
   letter-spacing: .06em;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
+  /* box-shadow instead of border-bottom — borders can scroll away
+   * with cell content in some browsers under sticky paint. */
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 [dir="rtl"] .risk-table th { text-align: right; }
 .risk-table td {
@@ -535,6 +568,9 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   font-size: 13px;
   color: var(--ink-1);
   vertical-align: middle;
+  /* Smooth tint on row hover — matches the var(--dur-fast) token
+   * used elsewhere. Without this the background snap feels harsh. */
+  transition: background-color var(--dur-fast);
 }
 .risk-table tbody tr:hover td { background: var(--surface-3); }
 .risk-table tr.row-clickable:hover td { background: var(--primary-50); }
@@ -543,6 +579,18 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   outline-offset: -2px;
 }
 .risk-table tr:last-child td { border-bottom: none; }
+/* Subtle zebra stripe for visual scanning on wide registers. Lighter
+ * than --surface-3 so hover and row-clickable backgrounds still win. */
+.risk-table tbody tr:nth-child(even):not(:hover) td {
+  background: color-mix(in srgb, var(--surface-3) 35%, transparent);
+}
+.risk-table tbody tr.row-clickable:nth-child(even):hover td {
+  background: var(--primary-50);
+}
+/* Fade in when the tbody subtree is replaced (filter applied, saved
+ * view loaded, WebSocket pushed a row). Runs only on React remount,
+ * so it's cheap — no per-render cost. */
+.risk-table tbody { animation: fade-in var(--dur-md) ease-out; }
 /* .mono — monospace for codes, IDs, timestamps, hex values, file paths.
  * `unicode-bidi: isolate` + `direction: ltr` lock the strong-LTR
  * direction so an Arabic UI doesn't reorder "INC-0042" / "AC-2.1.2" /

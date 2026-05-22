@@ -222,12 +222,24 @@ export function CalendarPage() {
   async function downloadIcs() {
     try {
       const typesParam = activeTypes.length ? `&types=${encodeURIComponent(activeTypes.join(','))}` : '';
-      const token = sessionStorage.getItem('accessToken') ?? '';
+      // Token key is `grc.accessToken` — set by lib/auth.ts and used by
+      // every other authenticated fetch (api.ts, kb.ts, ndiReports.ts,
+      // realtime.ts, platformPersistence.ts). The previous code looked
+      // up the unprefixed `accessToken` key which is never written by
+      // auth.ts, so every iCal download was sent unauthenticated and
+      // bounced to the login page.
+      const token = sessionStorage.getItem('grc.accessToken') ?? '';
       const url = `/api/v1/calendar/events.ics?from=${fromIso}&to=${toIso}${typesParam}`;
-      // Same-origin in prod via Vite proxy; in dev hit the backend host directly.
-      const apiHost = (window as { __GRC_API__?: string }).__GRC_API__
-                   ?? 'http://localhost:8084';
-      const resp = await fetch(`${apiHost}${url}`, {
+      // Resolve the API base the same way lib/api.ts does:
+      //   - VITE_API_BASE env var if set (e.g. https://api.example.com)
+      //   - window.__GRC_API__ runtime override (set in index.html by ops)
+      //   - empty string = same-origin (Vite proxy in dev, nginx in prod)
+      // The previous fallback was a hardcoded http://localhost:8084 which
+      // would 404/CORS in prod whenever neither override was set.
+      const apiBase = (import.meta.env.VITE_API_BASE as string | undefined)
+                   ?? (window as { __GRC_API__?: string }).__GRC_API__
+                   ?? '';
+      const resp = await fetch(`${apiBase}${url}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!resp.ok) {
