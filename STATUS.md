@@ -1,9 +1,37 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (Sprint-4 Track-1 audit closeout — all 6 production blockers verified; 175 active F8 rules)
+**Last update:** 22 May 2026 (Sprint-4 Track-2.5 Saved Views Phase 1 — Workflow Submissions + Risk Register integrated)
 
 ---
 
-## 🟢 Latest — Sprint-4 Track-1 audit closeout (22 May 2026)
+## 🟢 Latest — Saved Views Phase 1 expansion (22 May 2026, PR #106 + follow-up)
+
+Phase 1 of Sprint-4 Track-2.5 (localStorage-backed saved views) now
+has **three production consumers** sharing the same `urlQuery`
+pattern. A "view" is a snapshot of the URL search-params for pages
+whose filter state lives in the URL — saving captures the current
+combination, applying restores it. Pinning a view as default
+auto-applies on next visit (URL drill-down deep links still win).
+
+| Page | Status | Notes |
+|---|---|---|
+| `cyber/vulns` (VulnerabilitiesV2Page) | ✅ DONE (earlier) | Original consumer; uses `filter` + `sort` + `visibleColumns` |
+| `workflow/submissions` (WorkflowSubmissionsPage) | ✅ DONE (PR #106) | `urlQuery` snapshot — module + workflow + status + free-text search |
+| `risk/register` (RiskRegisterPage) | ✅ DONE (follow-up) | `urlQuery` snapshot — tab + heatmap drill-down (L×I) + status + category + level chips |
+
+**Sprint-5 backend migration** (Track-2.5 Phase 2) still owed:
+`platform.saved_views` V20 migration + `/api/platform/saved-views`
+controller. SavedView shape already matches the eventual backend DTO
+1-for-1. Estimated 1 day.
+
+**Pages explicitly skipped for Phase 1** — IncidentsPage, CompliancePage,
+CalendarPage: URL state is only `tab`, so snapshotting URL params
+wouldn't capture the React-state filter modals. These need Phase 1.5
+to also persist the in-memory filter object alongside `urlQuery`,
+or wait for Sprint-5's full filter-expression builder (Track-2.3).
+
+---
+
+## 🟢 Earlier — Sprint-4 Track-1 audit closeout (22 May 2026)
 
 Full code-walk verification of every Sprint-4 Track-1 ("Production
 Blockers") item from `sprints/sprint-4-convergence.md`. **All 6 items
@@ -46,7 +74,7 @@ These items have material scope and need explicit product / dev capacity allocat
 | **2.2** | Chart library — Recharts 2.x | ~7 days; adds `recharts` dep; migrate 5 dashboards from hand-rolled SVG |
 | **2.3** | Filter expression builder (AND/OR + URL-serialised) | ~4 days |
 | **2.4** | Generic `RecordPicker` + `recordRegistry` | ~3 days |
-| **2.5** | Saved views + per-user preferences (V20 schema + UI) | ~3 days |
+| **2.5** | Saved views Phase 2 — backend (`platform.saved_views` V20 + REST) | ~1 day (frontend Phase 1 already shipped on 3 pages) |
 | **2.6** | Bulk actions framework | ~3 days |
 | **2.7** | WebSocket / SSE real-time layer (STOMP) | ~5 days; touches ~6 services + topbar |
 | **2.8** | Mobile responsiveness (7 priority pages) | ~5 days |

@@ -18,6 +18,8 @@ import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
+import { SavedViewSelector } from '../../components/ui/SavedViewSelector';
+import { defaultViewForPage, type SavedView } from '../../lib/savedViews';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type KriBreachEventDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
 import { usePromoted } from '../../lib/promotedRecords';
@@ -127,6 +129,35 @@ export function RiskRegisterPage() {
       return next;
     });
   }
+
+  // ── Sprint-4 §2.5 Saved Views ──────────────────────────────────────────
+  // The Risk Register is URL-driven (tab + heatmap drill-down + chip
+  // filters), so a "view" is just a snapshot of the search-params string.
+  // Saving captures the current combination; applying restores it AND
+  // re-syncs the local `tab` / `filters` state so the table re-renders.
+  // Pinning a view as default auto-applies on next visit (only when the
+  // URL is clean — a Hub drill-down or risk?status=OPEN deep link wins).
+  const PAGE_KEY = 'risk/register';
+  const [activeViewId, setActiveViewId] = useState<string | undefined>(undefined);
+
+  function applyView(v: SavedView): void {
+    setActiveViewId(v.id);
+    const params = new URLSearchParams(v.urlQuery ?? '');
+    setSearchParams(params, { replace: true });
+    // Re-sync local state because setSearchParams only rewrites the URL.
+    const restoredTab = (params.get('tab') as TabId | null) ?? 'register';
+    setTabState(restoredTab === 'register' || restoredTab === 'heatmap' || restoredTab === 'kri' || restoredTab === 'appetite' || restoredTab === 'workflows' || restoredTab === 'alignment'
+      ? restoredTab : 'register');
+    setFiltersState(readFiltersFromQs(params));
+  }
+
+  // Auto-apply default view on first mount if the URL is clean.
+  useEffect(() => {
+    if (searchParams.toString() !== '') return;     // URL drill-down wins
+    const def = defaultViewForPage(PAGE_KEY);
+    if (def) applyView(def);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [apiRisks, setRisks] = useState<RiskResponse[]>([]);
   // DD-71: include intake-promoted risks in the visible register.
   const promotedRisks = usePromoted('RISK').map(toRiskResponse);
@@ -328,6 +359,14 @@ export function RiskRegisterPage() {
           <>
             {demoMode && <Badge tone="warning">{t('demoMode')}</Badge>}
             {!demoMode && <LivePulse pulse={pulse} />}
+            <SavedViewSelector
+              pageKey={PAGE_KEY}
+              activeViewId={activeViewId}
+              onApply={applyView}
+              onSnapshot={() => ({
+                name: '',     // user picks via the dialog prompt
+                urlQuery: searchParams.toString(),
+              })} />
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('riskFilter')}{Object.values(riskFilterValues).filter(Boolean).length > 0 ? ` · ${Object.values(riskFilterValues).filter(Boolean).length}` : ''}
             </Button>
