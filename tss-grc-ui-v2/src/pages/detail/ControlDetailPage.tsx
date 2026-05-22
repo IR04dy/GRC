@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { complianceApi, type ComplianceControlDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -20,7 +21,7 @@ import {
   COMPLIANCE_CONTROLS, CONTROL_SUBCONTROLS_BY_ID, CONTROL_EVIDENCE_BY_ID, CONTROL_TESTS_BY_ID,
 } from '../compliance/mockCompliance';
 
-type TabId = 'overview' | 'subcontrols' | 'evidence' | 'tests' | 'links';
+type TabId = 'overview' | 'subcontrols' | 'evidence' | 'tests' | 'links' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   IMPLEMENTED: 'success', PARTIAL: 'warning', PLANNED: 'info', NOT_APPLICABLE: 'neutral',
@@ -60,6 +61,7 @@ export function ControlDetailPage() {
     { id: 'evidence',    label: t('detailTabEvidence') },
     { id: 'tests',       label: t('detailTabTests') },
     { id: 'links',       label: t('detailTabLinks') },
+    { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
 
   return (
@@ -187,6 +189,13 @@ export function ControlDetailPage() {
         <Card title={t('detailTabLinks')} Icon={Link2}>
           <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
+      )}
+      {tab === 'activity' && (
+        <EntityActivityTimeline
+          entityType="ComplianceControl"
+          entityId={item.id}
+          titleEn="Control activity timeline"
+          titleAr="سجل نشاط الضابط" />
       )}
         </>}
       />

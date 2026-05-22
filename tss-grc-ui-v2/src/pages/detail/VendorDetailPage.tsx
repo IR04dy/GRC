@@ -11,12 +11,13 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { tprmApi, type TprmVendorDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { VENDORS, VENDOR_ASSESSMENTS_BY_ID, VENDOR_CONTRACTS_BY_ID } from '../tprm/mockTprm';
 
-type TabId = 'overview' | 'assessments' | 'contracts' | 'links';
+type TabId = 'overview' | 'assessments' | 'contracts' | 'links' | 'activity';
 
 const RISK_TONE: Record<string, BadgeTone> = {
   LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
@@ -54,6 +55,7 @@ export function VendorDetailPage() {
     { id: 'assessments', label: t('detailTabAssessments') },
     { id: 'contracts',   label: t('detailTabContracts') },
     { id: 'links',       label: t('detailTabLinks') },
+    { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
 
   return (
@@ -156,6 +158,13 @@ export function VendorDetailPage() {
         <Card title={t('detailTabLinks')} Icon={Link2}>
           <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
+      )}
+      {tab === 'activity' && (
+        <EntityActivityTimeline
+          entityType="TprmVendor"
+          entityId={item.id}
+          titleEn="Vendor activity timeline"
+          titleAr="سجل نشاط المورّد" />
       )}
         </>}
       />

@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { dpiaApi, type DpiaDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -18,7 +19,7 @@ import {
   DPIAS, DPIA_QUESTIONS_BY_ID, DPIA_MITIGATIONS_BY_ID, DPIA_REVIEWS_BY_ID,
 } from '../privacy/mockPrivacy';
 
-type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'links';
+type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'links' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', IN_REVIEW: 'warning', APPROVED: 'success', REJECTED: 'danger', EXPIRED: 'neutral',
@@ -60,6 +61,7 @@ export function DpiaDetailPage() {
     { id: 'mitigations', label: t('detailTabMitigations') },
     { id: 'reviews',     label: t('detailTabReviews') },
     { id: 'links',       label: t('detailTabLinks') },
+    { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
 
   return (
@@ -187,6 +189,13 @@ export function DpiaDetailPage() {
         <Card title={t('detailTabLinks')} Icon={Link2}>
           <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
+      )}
+      {tab === 'activity' && (
+        <EntityActivityTimeline
+          entityType="Dpia"
+          entityId={item.id}
+          titleEn="DPIA activity timeline"
+          titleAr="سجل نشاط تقييم الأثر" />
       )}
         </>}
       />

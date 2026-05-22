@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { complianceApi, frameworkApi, type PolicyDto, type PolicyMappingDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -21,7 +22,7 @@ import { PolicyLifecycleStrip } from '../../components/compliance/PolicyLifecycl
 import { PolicyVersionHistory } from '../../components/compliance/PolicyVersionHistory';
 import type { PolicyStage } from '../../lib/policyLifecycle';
 
-type TabId = 'overview' | 'mappings' | 'lifecycle' | 'versions' | 'links';
+type TabId = 'overview' | 'mappings' | 'lifecycle' | 'versions' | 'links' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', LEGAL_REVIEW: 'info', EXEC_APPROVAL: 'accent',
@@ -68,6 +69,7 @@ export function PolicyDetailPage() {
     { id: 'versions',  label: t('policyTabVersions') },
     { id: 'lifecycle', label: t('detailTabLifecycle') },
     { id: 'links',     label: t('detailTabLinks') },
+    { id: 'activity',  label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
 
   return (
@@ -181,6 +183,13 @@ export function PolicyDetailPage() {
         <Card title={t('detailTabLinks')} Icon={Link2}>
           <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
         </Card>
+      )}
+      {tab === 'activity' && (
+        <EntityActivityTimeline
+          entityType="Policy"
+          entityId={item.id}
+          titleEn="Policy activity timeline"
+          titleAr="سجل نشاط السياسة" />
       )}
         </>}
       />
