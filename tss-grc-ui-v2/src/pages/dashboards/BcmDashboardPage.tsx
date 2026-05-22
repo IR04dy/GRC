@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
 import { AlertTriangle, ClipboardCheck, FileText, ShieldCheck, Timer, Building2 } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
+import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
-import { useToast } from '../../lib/toast';
-import { bcmApi, ApiError } from '../../lib/api';
+import { bcmApi } from '../../lib/api';
+import { useDashboardLoader } from '../../lib/useDashboardLoader';
 
 /**
  * BCM Dashboard — task #36.
@@ -28,30 +28,20 @@ interface BcmStatsShape {
   upcomingExercises?: number;
 }
 
-const FALLBACK_STATS: BcmStatsShape = {
-  criticalServiceCount: 12, biaCompletionPercent: 72, bcpCompletionPercent: 58,
-  drpCompletionPercent: 67, rtoCompliancePercent: 81, rpoCompliancePercent: 76,
-  exerciseSuccessRate: 67, failedExercises: 2, openGaps: 5, overdueCapas: 3,
-  upcomingExercises: 4,
-};
-
 export function BcmDashboardPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-  const toast = useToast();
-  const [stats, setStats] = useState<BcmStatsShape>(FALLBACK_STATS);
+  const title   = isAr ? 'لوحة استمرارية الأعمال' : 'BCM dashboard';
+  const eyebrow = isAr ? 'استمرارية الأعمال' : 'Business continuity';
 
-  useEffect(() => {
-    bcmApi.stats()
-      .then((s: unknown) => setStats({ ...FALLBACK_STATS, ...(s as BcmStatsShape) }))
-      .catch((e: unknown) => {
-        // Falling back silently keeps the dashboard usable during BCM
-        // service development; surface real errors as info-toasts.
-        if (e instanceof ApiError && e.status >= 500) {
-          toast.danger(isAr ? 'تعذر تحميل إحصائيات BCM' : 'BCM stats unavailable');
-        }
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data, state, errMsg, retry } = useDashboardLoader<BcmStatsShape>(
+    () => bcmApi.stats() as Promise<BcmStatsShape>);
+
+  if (state === 'loading') return <DashboardLoading title={title} eyebrow={eyebrow} />;
+  if (state === 'error' || !data) {
+    return <DashboardError title={title} eyebrow={eyebrow} errMsg={errMsg} onRetry={retry} />;
+  }
+  const stats = data;
 
   const kpis: DomainDashboardKpi[] = [
     { Icon: Building2, label: isAr ? 'خدمات حرجة' : 'Critical services', value: stats.criticalServiceCount ?? 0, tone: 'primary' },

@@ -233,3 +233,8 @@
 .framework-row__fill[data-tone="info"]    { background: var(--primary, #1f7ad8); }
 .framework-row__fill[data-tone="warning"] { background: var(--warning, #c47e00); }
 .framework-row__fill[data-tone="danger"]  { background: var(--danger,  #c8362c); }
+
+/* Shared dashboard loading/error styles — used by BCM/ERM/PDPL/SCM/Cyber
+ * domain dashboards via <DashboardLoading /> + <DashboardError />. */
+.dashboard-skeleton { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.dashboard-error    { display: flex; flex-direction: column; gap: 6px; }

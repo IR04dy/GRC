@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
 import { TrendingUp, AlertTriangle, ShieldCheck, Activity, Layers, Target } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
+import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
-import { useToast } from '../../lib/toast';
-import { dashboardApi, ApiError, type DashboardStats } from '../../lib/api';
+import { dashboardApi, type DashboardStats } from '../../lib/api';
+import { useDashboardLoader } from '../../lib/useDashboardLoader';
 
 /**
  * ERM Dashboard — task #36 (prompt §30.4).
@@ -14,27 +14,20 @@ import { dashboardApi, ApiError, type DashboardStats } from '../../lib/api';
  * existing `/api/v1/dashboard/stats` endpoint (which is the ERM-
  * heavy aggregate today) and surfaces only the risk-specific tiles.
  */
-const FALLBACK: DashboardStats = {
-  totalRisks: 42, criticalRisks: 7, highRisks: 12, mediumRisks: 18, lowRisks: 5,
-  openRisks: 28, closedRisks: 14, openCriticalRisks: 7, openHighRisks: 12,
-  openIncidents: 3, complianceScore: 87, totalUsers: 0, activeUsers: 0,
-  pendingTasks: 4,
-};
 
 export function ErmDashboardPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-  const toast = useToast();
-  const [stats, setStats] = useState<DashboardStats>(FALLBACK);
+  const title   = isAr ? 'لوحة المخاطر المؤسسية' : 'Enterprise risk dashboard';
+  const eyebrow = isAr ? 'إدارة المخاطر' : 'Enterprise risk';
 
-  useEffect(() => {
-    dashboardApi.stats()
-      .then(s => setStats({ ...FALLBACK, ...s }))
-      .catch((e: unknown) => {
-        if (e instanceof ApiError && e.status >= 500)
-          toast.danger(isAr ? 'تعذر تحميل إحصائيات المخاطر' : 'Risk stats unavailable');
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data, state, errMsg, retry } = useDashboardLoader<DashboardStats>(() => dashboardApi.stats());
+
+  if (state === 'loading') return <DashboardLoading title={title} eyebrow={eyebrow} />;
+  if (state === 'error' || !data) {
+    return <DashboardError title={title} eyebrow={eyebrow} errMsg={errMsg} onRetry={retry} />;
+  }
+  const stats = data;
 
   const kpis: DomainDashboardKpi[] = [
     { Icon: Layers, label: isAr ? 'إجمالي المخاطر' : 'Total risks', value: stats.totalRisks, tone: 'primary', to: '/risk' },

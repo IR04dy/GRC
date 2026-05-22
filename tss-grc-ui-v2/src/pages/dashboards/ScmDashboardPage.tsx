@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Truck, AlertOctagon, FileText, Activity, Layers, Network } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
+import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
-import { useToast } from '../../lib/toast';
-import { scmApi, ApiError, type ScmStats } from '../../lib/api';
+import { scmApi, type ScmStats } from '../../lib/api';
+import { useDashboardLoader } from '../../lib/useDashboardLoader';
 
 /**
  * Supply Chain Resilience Dashboard — task #36 (prompt §30.3).
@@ -13,26 +13,20 @@ import { scmApi, ApiError, type ScmStats } from '../../lib/api';
  * SLA breaches, concentration risk, single points of failure,
  * 4th-party exposure.
  */
-const FALLBACK: ScmStats = {
-  totalVendors: 64, criticalVendors: 12, activeVendors: 58, pendingOnboarding: 4,
-  totalDependencies: 142, highDependencies: 21, openIncidents: 2, slaBreaches: 3,
-  activeContracts: 51, expiringContracts: 7,
-};
 
 export function ScmDashboardPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-  const toast = useToast();
-  const [stats, setStats] = useState<ScmStats>(FALLBACK);
+  const title   = isAr ? 'لوحة سلسلة الإمداد' : 'Supply chain dashboard';
+  const eyebrow = isAr ? 'إدارة الموردين' : 'Supply chain';
 
-  useEffect(() => {
-    scmApi.stats()
-      .then(s => setStats({ ...FALLBACK, ...s }))
-      .catch((e: unknown) => {
-        if (e instanceof ApiError && e.status >= 500)
-          toast.danger(isAr ? 'تعذر تحميل إحصائيات SCM' : 'SCM stats unavailable');
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data, state, errMsg, retry } = useDashboardLoader<ScmStats>(() => scmApi.stats());
+
+  if (state === 'loading') return <DashboardLoading title={title} eyebrow={eyebrow} />;
+  if (state === 'error' || !data) {
+    return <DashboardError title={title} eyebrow={eyebrow} errMsg={errMsg} onRetry={retry} />;
+  }
+  const stats = data;
 
   const kpis: DomainDashboardKpi[] = [
     { Icon: Truck, label: isAr ? 'موردون حرجون' : 'Critical suppliers', value: stats.criticalVendors, tone: 'primary', to: '/scm' },

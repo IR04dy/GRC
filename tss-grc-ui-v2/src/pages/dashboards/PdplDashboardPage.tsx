@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Fingerprint, AlertOctagon, ShieldAlert, Users, FileWarning, Send } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
+import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
-import { useToast } from '../../lib/toast';
-import { privacyApi, ApiError } from '../../lib/api';
+import { privacyApi } from '../../lib/api';
+import { useDashboardLoader } from '../../lib/useDashboardLoader';
 
 /**
  * PDPL Dashboard — task #36 (prompt §30.6).
@@ -30,27 +30,20 @@ interface PrivacyStatsShape {
   retentionViolations?: number;
 }
 
-const FALLBACK: PrivacyStatsShape = {
-  ropaCount: 142, highRiskRopa: 18, piaCompleted: 14, piaOverdue: 4,
-  dsrOpen: 7, dsrSlaBreaches: 1, activeConsents: 1_240_000, withdrawnConsents30d: 4_300,
-  crossBorderTransfers: 6, privacyIncidents12m: 3, breachNotifications: 3,
-  processorsWithoutDpa: 0, retentionViolations: 0,
-};
-
 export function PdplDashboardPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-  const toast = useToast();
-  const [stats, setStats] = useState<PrivacyStatsShape>(FALLBACK);
+  const title   = isAr ? 'لوحة نظام حماية البيانات' : 'PDPL dashboard';
+  const eyebrow = isAr ? 'الخصوصية' : 'Privacy';
 
-  useEffect(() => {
-    privacyApi.stats()
-      .then((s: unknown) => setStats({ ...FALLBACK, ...(s as PrivacyStatsShape) }))
-      .catch((e: unknown) => {
-        if (e instanceof ApiError && e.status >= 500)
-          toast.danger(isAr ? 'تعذر تحميل إحصائيات الخصوصية' : 'Privacy stats unavailable');
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data, state, errMsg, retry } = useDashboardLoader<PrivacyStatsShape>(
+    () => privacyApi.stats() as Promise<PrivacyStatsShape>);
+
+  if (state === 'loading') return <DashboardLoading title={title} eyebrow={eyebrow} />;
+  if (state === 'error' || !data) {
+    return <DashboardError title={title} eyebrow={eyebrow} errMsg={errMsg} onRetry={retry} />;
+  }
+  const stats = data;
 
   const kpis: DomainDashboardKpi[] = [
     { Icon: Fingerprint, label: isAr ? 'نشاطات معالجة' : 'Processing activities', value: stats.ropaCount ?? 0, tone: 'primary', to: '/privacy' },
