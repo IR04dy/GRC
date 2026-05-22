@@ -10,6 +10,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
@@ -187,7 +188,7 @@ export function BcmReadinessPage() {
                         <div style={{ fontWeight: 600 }}>{isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn}</div>
                         {c.approvedBy && <div className="text-2xs text-muted">{isAr ? 'اعتمدها' : 'approved by'}: {c.approvedBy}</div>}
                       </td>
-                      <td><Badge tone={cycleStatusTone(c.status)}>{c.status}</Badge></td>
+                      <td><Badge tone={cycleStatusTone(c.status)}>{statusLabel(c.status, lang)}</Badge></td>
                       <td className="mono text-2xs">{c.biaCompletionPercent ?? '—'}</td>
                       <td className="mono text-2xs">{c.bcpCompletionPercent ?? '—'}</td>
                       <td className="mono text-2xs">{c.drpCompletionPercent ?? '—'}</td>
@@ -272,7 +273,7 @@ export function BcmReadinessPage() {
                           ? <Badge tone={residualToTone(r.residualRiskScore)}>{r.residualRiskScore}</Badge>
                           : <span className="text-muted">—</span>}
                       </td>
-                      <td><Badge tone={bcmRiskStatusTone(r.status)}>{r.status}</Badge></td>
+                      <td><Badge tone={bcmRiskStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
                     </tr>
                   ))}
                 </tbody>

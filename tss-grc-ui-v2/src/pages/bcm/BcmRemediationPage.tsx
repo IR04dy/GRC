@@ -9,6 +9,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -258,6 +259,7 @@ function GapsTab({ gaps, onMove, isAr }: {
 function CapasTab({ capas, onMove, isAr }: {
   capas: BcmCorrectiveAction[]; onMove: (c: BcmCorrectiveAction, to: CapaStatus) => void; isAr: boolean;
 }) {
+  const lang = isAr ? 'ar' : 'en';
   if (capas.length === 0) return <Card title={isAr ? 'الإجراءات التصحيحية' : 'CAPAs'}>
     <InlineEmpty text={isAr ? 'لا توجد إجراءات تصحيحية' : 'No CAPAs yet'} />
   </Card>;
@@ -279,7 +281,7 @@ function CapasTab({ capas, onMove, isAr }: {
                 <td>{c.titleEn}</td>
                 <td><Badge tone={severityTone(c.priority)}>{c.priority}</Badge></td>
                 <td className="mono">{c.progressPercent}%</td>
-                <td><Badge tone={capaStatusTone(c.status)}>{c.status}</Badge></td>
+                <td><Badge tone={capaStatusTone(c.status)}>{statusLabel(c.status, lang)}</Badge></td>
                 <td className="mono">{c.dueDate ?? '—'}</td>
                 <td style={{ textAlign: 'end' }}>
                   {CAPA_NEXT[c.status].map(s => (

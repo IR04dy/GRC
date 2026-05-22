@@ -114,7 +114,7 @@ export function RegulatoryLibraryPage() {
       )}
 
       {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 14 }}>
+      <div className="kpi-strip-4">
         <Kpi Icon={BookOpen} label={isAr ? 'عدد الوثائق' : 'Documents'} value={documents.length} />
         <Kpi Icon={Landmark} label={isAr ? 'العائلات' : 'Families'} value={families.length} />
         <Kpi Icon={AlertTriangle} label={isAr ? 'عناصر مؤقتة' : 'Placeholders'} value={placeholderCount}

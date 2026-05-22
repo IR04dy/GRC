@@ -88,7 +88,7 @@ export function PosturePage() {
         title={isAr ? 'وضع الامتثال' : 'Compliance posture'} />
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 14 }}>
+      <div className="kpi-strip-4">
         <Kpi Icon={BookOpen}   label={isAr ? 'المرجعيات' : 'Authority documents'} value={totals.docCount} />
         <Kpi Icon={Shield}     label={isAr ? 'البنود المغطّاة' : 'Citations covered'}
              value={`${totals.mapped} / ${totals.cits}`} />
