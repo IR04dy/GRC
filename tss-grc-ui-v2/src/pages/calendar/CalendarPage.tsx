@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, X,
-  ListChecks, LayoutGrid, AlertTriangle, Sparkles, RefreshCw,
+  ListChecks, LayoutGrid, AlertTriangle, Sparkles, RefreshCw, Download,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -210,6 +210,45 @@ export function CalendarPage() {
     setReload(reload + 1);
   }
 
+  /**
+   * Trigger an iCal (.ics) download for the current window + type
+   * filter. We use a token-bearing fetch (the .ics endpoint sits behind
+   * the same JWT as the JSON feed) and feed the response into a Blob +
+   * synthetic <a download> so the file lands in the user's Downloads
+   * folder with a stable name. Buyers point Outlook (Internet Calendars)
+   * or Google Calendar (Add from URL) at the same endpoint for a live
+   * subscription — this button is the one-off "give me a snapshot" path.
+   */
+  async function downloadIcs() {
+    try {
+      const typesParam = activeTypes.length ? `&types=${encodeURIComponent(activeTypes.join(','))}` : '';
+      const token = sessionStorage.getItem('accessToken') ?? '';
+      const url = `/api/v1/calendar/events.ics?from=${fromIso}&to=${toIso}${typesParam}`;
+      // Same-origin in prod via Vite proxy; in dev hit the backend host directly.
+      const apiHost = (window as { __GRC_API__?: string }).__GRC_API__
+                   ?? 'http://localhost:8084';
+      const resp = await fetch(`${apiHost}${url}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!resp.ok) {
+        toast.danger(isAr ? 'تعذر تصدير ملف iCal' : 'iCal export failed');
+        return;
+      }
+      const blob = await resp.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = `tss-grc-calendar-${fromIso}-to-${toIso}.ics`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objUrl);
+      toast.success(isAr ? 'تم تنزيل ملف iCal' : 'iCal downloaded');
+    } catch (e) {
+      toast.danger((e as Error).message);
+    }
+  }
+
   const heading = view === 'month'
     ? monthYearLabel(year, month, isAr)
     : view === 'week'
@@ -230,6 +269,11 @@ export function CalendarPage() {
         actions={<>
           <Button variant="ghost" Icon={RefreshCw} onClick={refreshNow}>
             {t('actionRefresh')}
+          </Button>
+          <Button variant="ghost" Icon={Download} onClick={downloadIcs}
+            title={isAr ? 'تصدير ملف iCal (.ics) — يصلح للاشتراك من Outlook/Google'
+                        : 'Export iCal (.ics) — subscribe from Outlook / Google'}>
+            {isAr ? 'iCal' : 'iCal'}
           </Button>
           <Button variant="ghost" Icon={LayoutGrid} onClick={cycleView}>
             {switchLabel}

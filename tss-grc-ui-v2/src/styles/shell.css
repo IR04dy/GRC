@@ -97,10 +97,24 @@
   gap: 18px;
   height: var(--header-h);
   flex-shrink: 0;
+  overflow: hidden;
 }
-.topbar-title { font: 800 18px/1.1 var(--font-sans); color: var(--ink-1); letter-spacing: -.01em; margin: 0; }
-.topbar-sub   { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; }
-.topbar-right { display: flex; align-items: center; gap: 10px; }
+/* Topbar title block — must shrink in narrow viewports without
+   wrapping the long subtitle onto multiple rows. Without min-width:0
+   the flex child refuses to shrink below its intrinsic width and the
+   wrapped sub overflows the topbar height into the page body. */
+.topbar > div:first-child { min-width: 0; }
+.topbar > div:first-child > div { min-width: 0; }
+.topbar-title {
+  font: 800 18px/1.1 var(--font-sans);
+  color: var(--ink-1); letter-spacing: -.01em; margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar-sub {
+  font-size: 11.5px; color: var(--ink-3); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
 .search-box {
   display: flex; align-items: center; gap: 8px;
