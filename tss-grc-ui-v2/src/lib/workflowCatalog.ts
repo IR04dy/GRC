@@ -209,7 +209,7 @@ export const WORKFLOWS: WorkflowDef[] = [
     titleEn: 'Supplier Risk Assessment',
     titleAr: 'تقييم مخاطر المورد',
     descEn: 'Inherent × controls × residual scoring (5 steps). Auto-routes to DPO when supplier processes personal data.',
-    descAr: 'متأصل × ضوابط × متبقي (٥ خطوات). يُوجَّه تلقائياً إلى DPO عند معالجة بيانات شخصية.',
+    descAr: 'تقييم متأصل ثم الضوابط ثم تقييم متبقي (٥ خطوات). يُوجَّه تلقائياً لمسؤول حماية البيانات عند معالجة بيانات شخصية.',
     route: '/workflows/scm/vendor-risk-assessment',
     status: 'AVAILABLE',
     Icon: ShieldAlert,

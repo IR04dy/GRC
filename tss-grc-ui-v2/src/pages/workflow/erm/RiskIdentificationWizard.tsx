@@ -42,7 +42,10 @@ interface RiskDraft {
   residualImpact?: number;
 }
 
-const SCORE_LABELS = ['', 'Very low', 'Low', 'Moderate', 'High', 'Very high'];
+/** 1-5 likelihood/impact scale. Bilingual so Saudi users see Arabic
+ *  risk terminology in the wizard instead of English placeholders. */
+const SCORE_LABELS_EN = ['', 'Very low', 'Low', 'Moderate', 'High', 'Very high'];
+const SCORE_LABELS_AR = ['', 'منخفضة جدًا', 'منخفضة', 'متوسطة', 'عالية', 'عالية جدًا'];
 
 export function RiskIdentificationWizard() {
   const { lang } = useI18n();
@@ -205,10 +208,10 @@ export function RiskIdentificationWizard() {
         <div className="wf-form-grid">
           <ScoreField label={isAr ? 'الاحتمالية' : 'Likelihood'}
                       value={draft.inherentLikelihood}
-                      onChange={v => set('inherentLikelihood', v)} />
+                      onChange={v => set('inherentLikelihood', v)} isAr={isAr} />
           <ScoreField label={isAr ? 'الأثر' : 'Impact'}
                       value={draft.inherentImpact}
-                      onChange={v => set('inherentImpact', v)} />
+                      onChange={v => set('inherentImpact', v)} isAr={isAr} />
           {draft.inherentLikelihood && draft.inherentImpact && (
             <div className="wf-summary" style={{ gridColumn: '1 / -1' }}>
               <strong>{isAr ? 'النتيجة المتأصلة:' : 'Inherent score:'}</strong>{' '}
@@ -237,10 +240,10 @@ export function RiskIdentificationWizard() {
           </Field>
           <ScoreField label={isAr ? 'الاحتمالية المتبقية' : 'Residual likelihood'}
                       value={draft.residualLikelihood}
-                      onChange={v => set('residualLikelihood', v)} />
+                      onChange={v => set('residualLikelihood', v)} isAr={isAr} />
           <ScoreField label={isAr ? 'الأثر المتبقي' : 'Residual impact'}
                       value={draft.residualImpact}
-                      onChange={v => set('residualImpact', v)} />
+                      onChange={v => set('residualImpact', v)} isAr={isAr} />
         </div>
       ),
     },
@@ -306,11 +309,13 @@ function Field({ label, required, full, children }: {
   );
 }
 
-function ScoreField({ label, value, onChange }: {
+function ScoreField({ label, value, onChange, isAr }: {
   label: string;
   value?: number;
   onChange: (v: number) => void;
+  isAr: boolean;
 }) {
+  const labels = isAr ? SCORE_LABELS_AR : SCORE_LABELS_EN;
   return (
     <Field label={label}>
       <div className="wf-score-row">
@@ -319,7 +324,7 @@ function ScoreField({ label, value, onChange }: {
                   className={'wf-score-chip' + (value === n ? ' is-active' : '')}
                   onClick={() => onChange(n)}>
             <span className="wf-score-num">{n}</span>
-            <span className="wf-score-label">{SCORE_LABELS[n]}</span>
+            <span className="wf-score-label">{labels[n]}</span>
           </button>
         ))}
       </div>
