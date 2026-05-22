@@ -2,6 +2,8 @@ package com.tss.grc.module.risk_lc.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk_lc.dto.TreatmentPlanDto;
 import com.tss.grc.module.risk_lc.entity.TreatmentPlan;
 import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
@@ -10,9 +12,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 import java.util.Set;
@@ -20,6 +24,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -39,6 +44,8 @@ class TreatmentPlanServiceTest {
     private static final String EXT_ID = "TP-2026-001";
 
     @Mock private TreatmentPlanRepository repo;
+    @Mock private AuditLogService audit;
+    @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private TreatmentPlanService service;
 
     @BeforeEach

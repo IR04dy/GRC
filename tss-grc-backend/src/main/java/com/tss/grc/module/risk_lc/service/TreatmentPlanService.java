@@ -2,16 +2,21 @@ package com.tss.grc.module.risk_lc.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
-import com.tss.grc.platform.realtime.RealtimeBroadcaster;
-import jakarta.persistence.EntityNotFoundException;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk_lc.dto.TreatmentPlanDto;
 import com.tss.grc.module.risk_lc.entity.TreatmentPlan;
 import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
+import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +31,19 @@ import java.util.stream.Collectors;
  *   APPROVED    → IN_PROGRESS
  *   IN_PROGRESS → COMPLETED
  *   REJECTED    → DRAFT
+ *
+ * <p>Wired into F7 (audit) + F8 (automation). Treatment plans are the
+ * commitment side of the risk register — the moment a plan is APPROVED
+ * the residual-risk number on the parent risk becomes a board-level
+ * commitment. Events:
+ *
+ *   TREATMENT_DRAFTED   — new plan opened
+ *   TREATMENT_SUBMITTED — DRAFT → SUBMITTED
+ *   TREATMENT_APPROVED  — SUBMITTED → APPROVED (board commitment)
+ *   TREATMENT_REJECTED  — SUBMITTED → REJECTED (rework path)
+ *   TREATMENT_STARTED   — APPROVED → IN_PROGRESS
+ *   TREATMENT_COMPLETED — IN_PROGRESS → COMPLETED (residual realised)
+ *   TREATMENT_REOPENED  — REJECTED → DRAFT (rework loop)
  */
 @Service
 @RequiredArgsConstructor
@@ -40,10 +58,38 @@ public class TreatmentPlanService {
     );
 
     private final TreatmentPlanRepository repo;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     /** Optional — null in unit tests, auto-wired by Spring at runtime. */
     @Autowired(required = false)
     private RealtimeBroadcaster broadcaster;
+
+    // ── F8 payload + emit ─────────────────────────────────────────────────────
+
+    private Map<String, Object> payloadFor(TreatmentPlan p, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("treatmentPlanId", nullSafeStr(p.getId()));
+        m.put("externalId",      nullSafeStr(p.getExternalId()));
+        m.put("riskId",          nullSafeStr(p.getRiskId()));
+        m.put("strategy",        nullSafeStr(p.getStrategy()));
+        m.put("status",          nullSafeStr(p.getStatus()));
+        m.put("previousStatus",  nullSafeStr(previousStatus));
+        m.put("costSarK",        nullSafeStr(p.getCostSarK()));
+        m.put("approvedBy",      nullSafeStr(p.getApprovedBy()));
+        return m;
+    }
+
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+    private static String nullSafeMsg(Object o) { return o == null ? "<not provided>" : o.toString(); }
+
+    private void emit(String trigger, TreatmentPlan p, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            TenantContext.requireOrganisationId(), trigger, "TreatmentPlan", p.getId(),
+            "treatment:" + nullSafeStr(p.getExternalId()), payloadFor(p, previousStatus)));
+    }
+
+    // ── Reads ─────────────────────────────────────────────────────────────────
 
     public List<TreatmentPlanDto> listForOrg() {
         Long orgId = TenantContext.requireOrganisationId();
@@ -66,6 +112,8 @@ public class TreatmentPlanService {
             .orElseThrow(() -> new EntityNotFoundException("Treatment plan not found: " + externalId));
     }
 
+    // ── Writes ────────────────────────────────────────────────────────────────
+
     @Transactional
     public TreatmentPlanDto create(TreatmentPlanDto req) {
         Long orgId = TenantContext.requireOrganisationId();
@@ -80,7 +128,13 @@ public class TreatmentPlanService {
         p.setCostBenefitEn(req.getCostBenefitEn());
         p.setCostBenefitAr(req.getCostBenefitAr());
         p.setStatus("DRAFT");
-        return TreatmentPlanDto.from(repo.save(p));
+        p = repo.save(p);
+        audit.log("CREATE", "TreatmentPlan", p.getId(),
+            "Treatment plan drafted: " + nullSafeMsg(p.getExternalId())
+                + " on risk " + nullSafeMsg(p.getRiskId())
+                + " (strategy: " + nullSafeMsg(p.getStrategy()) + ")");
+        emit("TREATMENT_DRAFTED", p, null);
+        return TreatmentPlanDto.from(p);
     }
 
     @Transactional
@@ -92,6 +146,7 @@ public class TreatmentPlanService {
         if (!allowed.contains(req.getStatus())) {
             throw new IllegalTransitionException(p.getStatus(), req.getStatus(), allowed);
         }
+        String previousStatus = p.getStatus();
         p.setStatus(req.getStatus());
         if ("SUBMITTED".equals(req.getStatus()))   p.setSubmittedAt(LocalDateTime.now());
         if ("APPROVED".equals(req.getStatus())) {
@@ -101,7 +156,27 @@ public class TreatmentPlanService {
         if ("REJECTED".equals(req.getStatus())) {
             p.setRejectedReason(req.getRejectedReason());
         }
-        TreatmentPlanDto out = TreatmentPlanDto.from(repo.save(p));
+        p = repo.save(p);
+        audit.log("TRANSITION", "TreatmentPlan", p.getId(),
+            "Treatment plan " + nullSafeMsg(p.getExternalId())
+                + " status " + previousStatus + " → " + req.getStatus()
+                + ("APPROVED".equals(req.getStatus()) && req.getApprovedBy() != null
+                    ? " by " + req.getApprovedBy() : "")
+                + ("REJECTED".equals(req.getStatus()) && req.getRejectedReason() != null
+                    ? ": " + req.getRejectedReason() : ""));
+        // Per-state trigger so downstream rules can target specific lifecycle
+        // moments (board commitment on APPROVED is the leverage point).
+        String trigger = switch (req.getStatus()) {
+            case "SUBMITTED"   -> "TREATMENT_SUBMITTED";
+            case "APPROVED"    -> "TREATMENT_APPROVED";
+            case "REJECTED"    -> "TREATMENT_REJECTED";
+            case "IN_PROGRESS" -> "TREATMENT_STARTED";
+            case "COMPLETED"   -> "TREATMENT_COMPLETED";
+            case "DRAFT"       -> "TREATMENT_REOPENED";
+            default            -> "TREATMENT_TRANSITIONED";
+        };
+        emit(trigger, p, previousStatus);
+        TreatmentPlanDto out = TreatmentPlanDto.from(p);
         // Sprint 4 §2.7 — push state-machine transition to subscribed clients
         // (open detail pages, kanban watchers). No-op when broadcaster missing.
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "treatment_plan", externalId, out);
@@ -115,6 +190,8 @@ public class TreatmentPlanService {
             .orElseThrow(() -> new EntityNotFoundException("Treatment plan not found: " + externalId));
         p.setIsDeleted((short) 1);
         repo.save(p);
+        audit.log("DELETE", "TreatmentPlan", p.getId(),
+            "Treatment plan soft-deleted: " + nullSafeMsg(p.getExternalId()));
     }
 
     /** TP-2026-001 generator. */
