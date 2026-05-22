@@ -10,7 +10,6 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +27,14 @@ import java.util.Optional;
  */
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+// noRollbackFor RuntimeException is the critical bit — without it, Spring
+// marks the transaction rollback-only when the underlying JPA query throws
+// (e.g. SQL Server "Invalid object name 'admin.committee_templates'").
+// Even though our catch returns an empty list, Spring then throws
+// UnexpectedRollbackException at commit time because the tx was marked
+// rollback-only, which surfaces as a 500. With noRollbackFor the tx
+// stays committable and the catch's empty-list return reaches the client.
+@Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
 public class CommitteeCatalogService {
 
     private static final Logger log = LoggerFactory.getLogger(CommitteeCatalogService.class);
@@ -67,7 +73,7 @@ public class CommitteeCatalogService {
     public List<CommitteeTemplate> listAllTemplates() {
         try {
             return templates.findAllActiveOrdered();
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) {
                 log.warn("[catalog] admin.committee_templates missing — run setup_committees_db.py; returning empty list");
                 return Collections.emptyList();
@@ -79,7 +85,7 @@ public class CommitteeCatalogService {
     public List<CommitteeTemplate> listTemplatesByDomain(String domain) {
         try {
             return templates.findActiveByDomain(domain);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) return Collections.emptyList();
             throw e;
         }
@@ -93,7 +99,7 @@ public class CommitteeCatalogService {
     public Optional<CommitteeTemplate> findTemplate(String templateCode) {
         try {
             return templates.findByTemplateCode(templateCode);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) return Optional.empty();
             throw e;
         }
@@ -104,7 +110,7 @@ public class CommitteeCatalogService {
     public List<CommitteeStandingItem> getStandingItems(String templateCode) {
         try {
             return standingItems.findByTemplateCodeOrderBySeqAsc(templateCode);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) return Collections.emptyList();
             throw e;
         }
@@ -113,7 +119,7 @@ public class CommitteeCatalogService {
     public long countStandingItems(String templateCode) {
         try {
             return standingItems.countByTemplateCode(templateCode);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) return 0L;
             throw e;
         }
@@ -124,7 +130,7 @@ public class CommitteeCatalogService {
     public List<CommitteeFormTemplate> listAllForms() {
         try {
             return forms.findAllActiveOrdered();
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) {
                 log.warn("[catalog] admin.committee_form_templates missing — run setup_committees_db.py; returning empty list");
                 return Collections.emptyList();
@@ -148,7 +154,7 @@ public class CommitteeCatalogService {
         String pattern = "%" + committeeType + "%";
         try {
             return forms.findActiveApplicableTo(pattern);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) return Collections.emptyList();
             throw e;
         }

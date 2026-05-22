@@ -2,7 +2,8 @@ package com.tss.grc.common.exception;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -159,14 +160,15 @@ public class GlobalExceptionHandler {
     /**
      * Catches the "table doesn't exist yet" failure mode that hits a
      * fresh dev DB before its module-specific {@code
-     * setup_<module>_db.py} bootstrap has run. Spring wraps the
-     * underlying SQL error in
-     * {@link InvalidDataAccessResourceUsageException}, whose root
-     * cause carries SQL Server's "Invalid object name 'schema.table'"
-     * (or "does not exist" on Postgres / "not found" on H2). The
-     * default catch-all turns these into 500 Internal Server Error,
-     * which is misleading — nothing is broken, the dev environment
-     * just isn't fully bootstrapped.
+     * setup_<module>_db.py} bootstrap has run. Spring + Hibernate
+     * wrap the underlying SQL error in a number of different
+     * {@link DataAccessException} subclasses (BadSqlGrammar,
+     * InvalidDataAccessResourceUsage, JpaSystemException,
+     * UncategorizedDataAccessException, …) depending on the JPA /
+     * JDBC path the query took. Catching the common ancestor catches
+     * them all; we then walk the cause chain looking for SQL
+     * Server's "Invalid object name 'schema.table'" (or "does not
+     * exist" on Postgres / "not found" on H2).
      *
      * <p>Promotes the response to <strong>503 Service Unavailable</strong>
      * with a concrete remediation hint the user can act on. Modules
@@ -175,26 +177,63 @@ public class GlobalExceptionHandler {
      * try/catch — that runs <em>before</em> this handler does, so
      * existing per-service guards keep their semantics.
      */
-    @ExceptionHandler(InvalidDataAccessResourceUsageException.class)
-    public ProblemDetail handleMissingDbObject(InvalidDataAccessResourceUsageException ex) {
+    /**
+     * Companion to {@link #handleMissingDbObject}. When a service has a
+     * try/catch that swallows a DataAccessException, Spring still keeps
+     * the transaction in rollback-only state. On method return Spring's
+     * transaction interceptor calls {@code commit()}, sees rollback-only,
+     * and throws {@link UnexpectedRollbackException}. That escapes the
+     * service-layer catch entirely and surfaces as a 500.
+     *
+     * <p>The proper fix is to mark the @Transactional with
+     * {@code noRollbackFor = RuntimeException.class} on the read methods,
+     * which the committee services now do. This handler is a
+     * belt-and-braces — it makes any future module's accidentally
+     * unprotected read return the friendly 503 instead of a 500.
+     */
+    @ExceptionHandler(UnexpectedRollbackException.class)
+    public ProblemDetail handleUnexpectedRollback(UnexpectedRollbackException ex) {
         if (isMissingObjectError(ex)) {
-            String detail = "A database table or view this endpoint needs has not been "
-                + "created in the current database. In dev, run the module's "
-                + "setup_<module>_db.py bootstrap script (see CLAUDE.md). In other "
-                + "profiles, ensure all Flyway migrations have applied successfully.";
-            log.warn("[missing-db-object] {}", rootMessage(ex));
-            ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail);
-            pd.setTitle("Module not yet bootstrapped");
-            pd.setType(URI.create("https://grc.tss.com/errors/db-object-missing"));
-            pd.setProperty("rootCause", rootMessage(ex));
-            pd.setProperty("timestamp", Instant.now());
-            return pd;
+            return missingObjectResponse(ex);
+        }
+        log.warn("Unexpected rollback (non-missing-object): {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+            "The transaction was rolled back unexpectedly. The previous "
+            + "operation may have left the database in an inconsistent state — "
+            + "please retry.");
+        pd.setTitle("Transaction rolled back");
+        pd.setType(URI.create("https://grc.tss.com/errors/unexpected-rollback"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ProblemDetail handleMissingDbObject(DataAccessException ex) {
+        if (isMissingObjectError(ex)) {
+            return missingObjectResponse(ex);
         }
         // Otherwise it's a genuine SQL syntax error or similar — let
         // the catch-all handle it with a 500.
         log.error("Data-access error: {}", ex.getMessage(), ex);
         return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
             "An unexpected database error occurred.");
+    }
+
+    /** Shared body builder for the 503 "module not bootstrapped"
+     *  response. Both the DataAccessException and
+     *  UnexpectedRollbackException handlers route here. */
+    private ProblemDetail missingObjectResponse(Throwable ex) {
+        String detail = "A database table or view this endpoint needs has not been "
+            + "created in the current database. In dev, run the module's "
+            + "setup_<module>_db.py bootstrap script (see CLAUDE.md). In other "
+            + "profiles, ensure all Flyway migrations have applied successfully.";
+        log.warn("[missing-db-object] {}", rootMessage(ex));
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail);
+        pd.setTitle("Module not yet bootstrapped");
+        pd.setType(URI.create("https://grc.tss.com/errors/db-object-missing"));
+        pd.setProperty("rootCause", rootMessage(ex));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
     }
 
     /** True when the exception chain contains a missing-table SQL

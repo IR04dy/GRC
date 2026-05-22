@@ -8,7 +8,6 @@ import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -41,12 +40,12 @@ public class CommitteeResolutionService {
     private final AuditLogService               audit;
     private final ApplicationEventPublisher     publisher;
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public Page<CommitteeResolution> list(Pageable pageable) {
         try {
             return repo.findByOrganisationIdOrderByCreatedAtDesc(
                 TenantContext.getCurrentTenant(), pageable);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (CommitteeSqlGuards.isMissingObjectError(e)) {
                 return new PageImpl<>(Collections.emptyList(), pageable, 0);
             }
@@ -54,29 +53,29 @@ public class CommitteeResolutionService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public CommitteeResolution get(Long id) {
         return repo.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())
             .orElseThrow(() -> new EntityNotFoundException("CommitteeResolution " + id));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public List<CommitteeResolution> listByMeeting(Long meetingId) {
         try {
             return repo.findByOrganisationIdAndMeetingIdOrderBySeqAsc(
                 TenantContext.getCurrentTenant(), meetingId);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (CommitteeSqlGuards.isMissingObjectError(e)) return Collections.emptyList();
             throw e;
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public List<CommitteeResolution> listByCommittee(Long committeeId) {
         try {
             return repo.findByOrganisationIdAndCommitteeIdOrderByCreatedAtDesc(
                 TenantContext.getCurrentTenant(), committeeId);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (CommitteeSqlGuards.isMissingObjectError(e)) return Collections.emptyList();
             throw e;
         }

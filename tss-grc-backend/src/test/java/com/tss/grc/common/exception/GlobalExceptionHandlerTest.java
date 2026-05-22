@@ -4,6 +4,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.jdbc.BadSqlGrammarException;
+import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.transaction.UnexpectedRollbackException;
+
+import java.sql.SQLException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -89,5 +94,86 @@ class GlobalExceptionHandlerTest {
         ProblemDetail pd = handler.handleMissingDbObject(ex);
 
         assertThat(pd.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+    }
+
+    /**
+     * Real-world Hibernate path: a missing table can surface as
+     * {@link BadSqlGrammarException} when JDBC fails parsing the
+     * generated SQL against the schema. PR #114-#116 only caught
+     * the parent {@code InvalidDataAccessResourceUsageException}
+     * which BadSqlGrammar DOES extend, so this should still work
+     * — but we lock it in a test to prevent regression.
+     */
+    @Test
+    void missingDbObject_badSqlGrammarSubtype_returns503() {
+        Throwable root = new RuntimeException(
+            "Invalid object name 'admin.committee_templates'.");
+        SQLException sqlEx = new SQLException(
+            "Invalid object name 'admin.committee_templates'.", null, 208, root);
+        BadSqlGrammarException ex = new BadSqlGrammarException(
+            "Statement preparation failed", "SELECT * FROM admin.committee_templates", sqlEx);
+
+        ProblemDetail pd = handler.handleMissingDbObject(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+        assertThat(pd.getTitle()).isEqualTo("Module not yet bootstrapped");
+    }
+
+    /**
+     * Another real-world Hibernate path: when Spring wraps the JPA
+     * exception, it may surface as JpaSystemException with the SQL
+     * Server error buried in the cause chain. PR #117 broadens the
+     * handler to DataAccessException so this case is now covered too.
+     */
+    @Test
+    void missingDbObject_jpaSystemExceptionSubtype_returns503() {
+        Throwable root = new RuntimeException(
+            "Invalid object name 'admin.committees'.");
+        // Wrap once to simulate Hibernate's typical chain
+        RuntimeException hibernate = new RuntimeException(
+            "could not execute statement", root);
+        JpaSystemException ex = new JpaSystemException(hibernate);
+
+        ProblemDetail pd = handler.handleMissingDbObject(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+        assertThat(pd.getTitle()).isEqualTo("Module not yet bootstrapped");
+    }
+
+    /**
+     * When a @Transactional service catches a DataAccessException and
+     * returns normally, Spring still has the transaction marked
+     * rollback-only and throws UnexpectedRollbackException at commit
+     * time. That escapes the service's catch — the global handler must
+     * recognise it and surface the same friendly 503.
+     */
+    @Test
+    void unexpectedRollback_withMissingObjectInCause_returns503() {
+        Throwable root = new RuntimeException(
+            "Invalid object name 'admin.committee_templates'.");
+        UnexpectedRollbackException ex = new UnexpectedRollbackException(
+            "Transaction silently rolled back because it has been marked as rollback-only",
+            root);
+
+        ProblemDetail pd = handler.handleUnexpectedRollback(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+        assertThat(pd.getTitle()).isEqualTo("Module not yet bootstrapped");
+        assertThat(pd.getProperties().get("rootCause"))
+            .asString().contains("admin.committee_templates");
+    }
+
+    @Test
+    void unexpectedRollback_withoutMissingObject_returns503WithGenericMessage() {
+        // Rollback for some other reason (constraint violation etc.) —
+        // still degrade to 503 with a retry hint rather than a 500.
+        UnexpectedRollbackException ex = new UnexpectedRollbackException(
+            "Transaction silently rolled back because it has been marked as rollback-only");
+
+        ProblemDetail pd = handler.handleUnexpectedRollback(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+        assertThat(pd.getTitle()).isEqualTo("Transaction rolled back");
+        assertThat(pd.getDetail()).contains("retry");
     }
 }

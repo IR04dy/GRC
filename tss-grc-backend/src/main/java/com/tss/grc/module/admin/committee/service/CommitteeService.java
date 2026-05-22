@@ -11,7 +11,6 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -66,14 +65,18 @@ public class CommitteeService {
 
     // ─── Committee reads/writes ───────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    // noRollbackFor: when the underlying table is missing, the query
+    // throws and Spring would mark the tx rollback-only → commit throws
+    // UnexpectedRollbackException → 500. The flag keeps the tx committable
+    // so the catch's empty page reaches the client.
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public Page<Committee> listCommittees(String status, Pageable pageable) {
         Long org = TenantContext.getCurrentTenant();
         try {
             return status == null
                     ? repo.findByOrganisationIdOrderByNameEnAsc(org, pageable)
                     : repo.findByOrganisationIdAndStatusOrderByNameEnAsc(org, status, pageable);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) {
                 log.warn("[committees] admin.committees table missing — run setup_committees_db.py; returning empty page");
                 return new PageImpl<>(Collections.emptyList(), pageable, 0);
@@ -153,7 +156,7 @@ public class CommitteeService {
             return status == null
                     ? meetingRepo.findByOrganisationIdOrderByScheduledAtDesc(org, pageable)
                     : meetingRepo.findByOrganisationIdAndStatusOrderByScheduledAtDesc(org, status, pageable);
-        } catch (InvalidDataAccessResourceUsageException e) {
+        } catch (RuntimeException e) {
             if (isMissingObjectError(e)) {
                 log.warn("[committees] admin.committee_meetings table missing — run setup_committees_db.py; returning empty page");
                 return new PageImpl<>(Collections.emptyList(), pageable, 0);
