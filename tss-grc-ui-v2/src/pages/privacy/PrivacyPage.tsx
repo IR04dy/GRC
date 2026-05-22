@@ -375,7 +375,13 @@ export function PrivacyPage() {
       )}
       {tab === 'dsr' && (
         <Card padded={false}>
-          {dsrs.loading ? <LoadingRow /> : <DataTable columns={dsrCols} rows={filteredDsrs} empty={<EmptyState Icon={Inbox} />} />}
+          {dsrs.loading
+            ? <LoadingRow />
+            : <DataTable
+                columns={dsrCols}
+                rows={filteredDsrs}
+                rowHref={r => `/privacy/dsrs/${r.id}`}
+                empty={<EmptyState Icon={Inbox} />} />}
         </Card>
       )}
       {tab === 'breaches' && (
@@ -387,13 +393,25 @@ export function PrivacyPage() {
             <PdplBreachConsole breaches={allBreaches} onDispatch={notifyDataOfficeAction} />
           </div>
           <Card padded={false}>
-            {breaches.loading ? <LoadingRow /> : <DataTable columns={breachCols} rows={filteredBreaches} empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}
+            {breaches.loading
+              ? <LoadingRow />
+              : <DataTable
+                  columns={breachCols}
+                  rows={filteredBreaches}
+                  rowHref={r => `/privacy/breaches/${r.id}`}
+                  empty={<EmptyState Icon={ShieldAlert} title={t('privacyBreachesEmpty')} sub={t('privacyBreachesEmptySub')} />} />}
           </Card>
         </>
       )}
       {tab === 'ropa' && (
         <Card padded={false}>
-          {ropa.loading ? <LoadingRow /> : <DataTable columns={ropaCols} rows={ropa.data} empty={<EmptyState Icon={Database} title={t('privacyRopaEmpty')} sub={t('privacyRopaEmptySub')} />} />}
+          {ropa.loading
+            ? <LoadingRow />
+            : <DataTable
+                columns={ropaCols}
+                rows={ropa.data}
+                rowHref={r => `/privacy/ropa/${r.id}`}
+                empty={<EmptyState Icon={Database} title={t('privacyRopaEmpty')} sub={t('privacyRopaEmptySub')} />} />}
         </Card>
       )}
       {tab === 'dpia' && <DpiaTab toast={toast} t={t} />}
