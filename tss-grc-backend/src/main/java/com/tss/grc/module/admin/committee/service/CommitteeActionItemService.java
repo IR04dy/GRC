@@ -8,13 +8,16 @@ import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -40,8 +43,15 @@ public class CommitteeActionItemService {
 
     @Transactional(readOnly = true)
     public Page<CommitteeActionItem> list(Pageable pageable) {
-        return repo.findByOrganisationIdOrderByCreatedAtDesc(
-            TenantContext.getCurrentTenant(), pageable);
+        try {
+            return repo.findByOrganisationIdOrderByCreatedAtDesc(
+                TenantContext.getCurrentTenant(), pageable);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (CommitteeSqlGuards.isMissingObjectError(e)) {
+                return new PageImpl<>(Collections.emptyList(), pageable, 0);
+            }
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -52,28 +62,48 @@ public class CommitteeActionItemService {
 
     @Transactional(readOnly = true)
     public List<CommitteeActionItem> listByMeeting(Long meetingId) {
-        return repo.findByOrganisationIdAndMeetingIdOrderBySeqAsc(
-            TenantContext.getCurrentTenant(), meetingId);
+        try {
+            return repo.findByOrganisationIdAndMeetingIdOrderBySeqAsc(
+                TenantContext.getCurrentTenant(), meetingId);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (CommitteeSqlGuards.isMissingObjectError(e)) return Collections.emptyList();
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
     public List<CommitteeActionItem> listByCommittee(Long committeeId) {
-        return repo.findByOrganisationIdAndCommitteeIdOrderByDueDateAsc(
-            TenantContext.getCurrentTenant(), committeeId);
+        try {
+            return repo.findByOrganisationIdAndCommitteeIdOrderByDueDateAsc(
+                TenantContext.getCurrentTenant(), committeeId);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (CommitteeSqlGuards.isMissingObjectError(e)) return Collections.emptyList();
+            throw e;
+        }
     }
 
     /** Open actions for a committee — drives the "matters arising"
      *  section of the agenda auto-populator. */
     @Transactional(readOnly = true)
     public List<CommitteeActionItem> openActionsForCommittee(Long committeeId) {
-        return repo.findOpenByCommittee(
-            TenantContext.getCurrentTenant(), committeeId);
+        try {
+            return repo.findOpenByCommittee(
+                TenantContext.getCurrentTenant(), committeeId);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (CommitteeSqlGuards.isMissingObjectError(e)) return Collections.emptyList();
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
     public List<CommitteeActionItem> openActionsForOwner(Long ownerUserId) {
-        return repo.findOpenByOwner(
-            TenantContext.getCurrentTenant(), ownerUserId);
+        try {
+            return repo.findOpenByOwner(
+                TenantContext.getCurrentTenant(), ownerUserId);
+        } catch (InvalidDataAccessResourceUsageException e) {
+            if (CommitteeSqlGuards.isMissingObjectError(e)) return Collections.emptyList();
+            throw e;
+        }
     }
 
     @Transactional
