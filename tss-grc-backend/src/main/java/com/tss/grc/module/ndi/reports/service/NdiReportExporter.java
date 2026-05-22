@@ -1,16 +1,21 @@
 package com.tss.grc.module.ndi.reports.service;
 
 import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
-import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ndi.reports.service.NdiReportService.ReportResult;
+import com.tss.grc.module.platform.entity.Organisation;
+import com.tss.grc.module.platform.repository.OrganisationRepository;
+import com.tss.grc.module.reporting.service.PdfFonts;
+import com.tss.grc.module.reporting.service.PdfTheme;
+import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.IndexedColors;
@@ -23,8 +28,10 @@ import org.springframework.stereotype.Component;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -32,17 +39,37 @@ import java.util.Set;
  * Binary exporters for NDI reports — slice 11 follow-up.
  *
  * <p>Takes the structured {@link ReportResult} the synthesizer already
- * produces and emits PDF or XLSX bytes. Generic format: one
- * "Summary" pane (key/value pairs) + one "Rows" table built from the
- * union of all keys present in {@code rows}.
+ * produces and emits PDF, XLSX, or CSV bytes. PDF output uses the shared
+ * {@link PdfTheme} primitives so an NDI submission package looks like the
+ * BCP plan, crisis report, and board pack — same brand band, same KPI
+ * tiles, same footer style.
  *
- * <p>Arabic in PDF: OpenPDF's built-in fonts don't ship Arabic glyphs.
- * Arabic columns in the row data still appear in the document; they
- * render as boxes unless an Arabic TTF is installed and registered.
- * XLSX has no such restriction — Excel handles RTL natively.
+ * <p>The PDF layout is:
+ * <ol>
+ *   <li><b>Cover hero</b> — eyebrow ("NDI ASSESSMENT REPORT"), pretty
+ *       title derived from the report type, org name, classification, and
+ *       Hijri + Gregorian stamp.</li>
+ *   <li><b>Summary KPI strip</b> — the first 4 entries from
+ *       {@link ReportResult#summary()} rendered as warm-paper tiles. The
+ *       rest of the summary continues as a key/value table below.</li>
+ *   <li><b>Detail rows</b> — the union of all keys in
+ *       {@link ReportResult#rows()} as a brand-themed table, with the
+ *       page in A4 landscape so wide reports lay out cleanly.</li>
+ * </ol>
+ *
+ * <p>Arabic in PDF: this exporter previously used {@code FontFactory.HELVETICA}
+ * which has no Arabic glyphs — any Arabic data rendered as boxes. It now
+ * routes through {@link PdfFonts} which loads an Arabic-capable TTF on
+ * startup, so bilingual report keys/values render correctly.
+ *
+ * <p>XLSX/CSV emit-paths are unchanged — Excel + CSV both handle RTL natively
+ * once the bytes are encoded UTF-8.
  */
 @Component
+@RequiredArgsConstructor
 public class NdiReportExporter {
+
+    private final OrganisationRepository orgs;
 
     public byte[] toXlsx(ReportResult result) throws IOException {
         try (Workbook wb = new XSSFWorkbook();
@@ -115,45 +142,78 @@ public class NdiReportExporter {
 
     public byte[] toPdf(ReportResult result) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Document doc = new Document(PageSize.A4.rotate(), 36, 36, 36, 36);
-            PdfWriter.getInstance(doc, out);
+            // Landscape A4 — NDI report rows tend to be wide (control id,
+            // domain, score, status, owner, evidence ref…). Letter portrait
+            // would force horizontal overflow.
+            Document doc = new Document(PageSize.A4.rotate(), 40, 40, 60, 60);
+            PdfWriter writer = PdfWriter.getInstance(doc, out);
+            writer.setPageEvent(PdfTheme.professionalFooter(
+                "NDI · " + prettyTitle(result.reportType()), "Internal"));
             doc.open();
 
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
-            Font hFont     = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
-            Font cFont     = FontFactory.getFont(FontFactory.HELVETICA, 9);
+            // ── Cover hero ───────────────────────────────────────────
+            Organisation org = null;
+            try {
+                Long orgId = TenantContext.getCurrentTenant();
+                if (orgId != null) org = orgs.findById(orgId).orElse(null);
+            } catch (Exception ignored) { /* run outside tenant context — skip org */ }
 
-            doc.add(new Paragraph(prettyTitle(result.reportType()), titleFont));
-            doc.add(new Paragraph("Generated at: " + result.generatedAt(), cFont));
-            doc.add(new Paragraph("Cycle: " + (result.cycleId() == null ? "n/a" : result.cycleId()), cFont));
-            doc.add(new Paragraph(" "));
+            PdfTheme.Cover cv = new PdfTheme.Cover();
+            cv.eyebrow   = "NDI Assessment Report";
+            cv.eyebrowAr = "تقرير تقييم منظومة الحوكمة الرقمية الوطنية";
+            cv.titleEn   = prettyTitle(result.reportType());
+            cv.subtitle  = result.cycleId() == null ? "All cycles" : ("Cycle " + result.cycleId());
+            cv.orgNameEn = org == null ? null : org.getNameEn();
+            cv.orgNameAr = org == null ? null : org.getNameAr();
+            cv.classification = "Internal";
+            cv.generatedAt = result.generatedAt() == null ? null : result.generatedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+            PdfTheme.coverHero(doc, cv);
 
-            // Summary table.
-            if (!result.summary().isEmpty()) {
-                doc.add(new Paragraph("Summary", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-                PdfPTable summary = new PdfPTable(2);
-                summary.setWidthPercentage(60);
-                summary.setHorizontalAlignment(Element.ALIGN_LEFT);
-                summary.addCell(headerCell("Key", hFont));
-                summary.addCell(headerCell("Value", hFont));
-                for (Map.Entry<String, Object> e : result.summary().entrySet()) {
-                    summary.addCell(bodyCell(e.getKey(), cFont));
-                    summary.addCell(bodyCell(asString(e.getValue()), cFont));
+            // ── Summary KPI strip + key/value table ──────────────────
+            if (result.summary() != null && !result.summary().isEmpty()) {
+                List<Map.Entry<String, Object>> entries = new ArrayList<>(result.summary().entrySet());
+                List<PdfTheme.Kpi> kpis = new ArrayList<>();
+                int kpiCount = Math.min(4, entries.size());
+                for (int i = 0; i < kpiCount; i++) {
+                    Map.Entry<String, Object> e = entries.get(i);
+                    kpis.add(new PdfTheme.Kpi(prettyKey(e.getKey()), asString(e.getValue()), ""));
                 }
-                doc.add(summary);
-                doc.add(new Paragraph(" "));
+                PdfTheme.kpiStrip(doc, kpis);
+
+                // Remaining keys as a key/value list (only if more than 4)
+                if (entries.size() > 4) {
+                    Paragraph head = new Paragraph("Summary detail", PdfFonts.bold(12));
+                    head.setSpacingBefore(6);
+                    head.setSpacingAfter(8);
+                    doc.add(head);
+
+                    PdfPTable t = new PdfPTable(2);
+                    t.setWidthPercentage(60);
+                    t.setHorizontalAlignment(Element.ALIGN_LEFT);
+                    try { t.setWidths(new float[] {2, 3}); } catch (DocumentException ignored) {}
+                    headerCell(t, "Key");
+                    headerCell(t, "Value");
+                    for (int i = 4; i < entries.size(); i++) {
+                        Map.Entry<String, Object> e = entries.get(i);
+                        cell(t, prettyKey(e.getKey()));
+                        cell(t, asString(e.getValue()));
+                    }
+                    doc.add(t);
+                }
             }
 
-            // Rows table.
+            // ── Detail rows ──────────────────────────────────────────
             if (!result.rows().isEmpty()) {
-                doc.add(new Paragraph("Rows (" + result.rows().size() + ")",
-                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+                PdfTheme.sectionDivider(doc,
+                    "Detail Rows (" + result.rows().size() + ")",
+                    "تفاصيل النتائج");
+
                 List<String> cols = collectColumns(result.rows());
                 PdfPTable table = new PdfPTable(cols.size());
                 table.setWidthPercentage(100);
-                for (String c : cols) table.addCell(headerCell(c, hFont));
+                for (String c : cols) headerCell(table, prettyKey(c));
                 for (Map<String, Object> data : result.rows()) {
-                    for (String c : cols) table.addCell(bodyCell(asString(data.get(c)), cFont));
+                    for (String c : cols) cell(table, asString(data.get(c)));
                 }
                 doc.add(table);
             }
@@ -196,21 +256,42 @@ public class NdiReportExporter {
     }
 
     private static String prettyTitle(String reportType) {
-        return "NDI Report — " + reportType.replace('_', ' ').toLowerCase();
+        if (reportType == null) return "Report";
+        return "NDI Report — " + reportType.replace('_', ' ').toLowerCase(Locale.ROOT);
     }
 
-    private static PdfPCell headerCell(String text, Font font) {
-        PdfPCell c = new PdfPCell(new Phrase(text, font));
-        c.setHorizontalAlignment(Element.ALIGN_CENTER);
-        c.setBackgroundColor(new java.awt.Color(220, 220, 220));
-        c.setPadding(4f);
-        return c;
+    /** Converts SCREAMING_SNAKE_CASE to Title Case for column headers + KPI labels. */
+    private static String prettyKey(String key) {
+        if (key == null || key.isBlank()) return key;
+        String[] parts = key.replace('_', ' ').split(" ");
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            String p = parts[i];
+            if (p.isEmpty()) continue;
+            if (i > 0) out.append(' ');
+            out.append(Character.toUpperCase(p.charAt(0)));
+            if (p.length() > 1) out.append(p.substring(1).toLowerCase(Locale.ROOT));
+        }
+        return out.toString();
     }
 
-    private static PdfPCell bodyCell(String text, Font font) {
-        PdfPCell c = new PdfPCell(new Phrase(text, font));
-        c.setPadding(3f);
-        return c;
+    private static void headerCell(PdfPTable t, String text) {
+        PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(9)));
+        c.setHorizontalAlignment(Element.ALIGN_LEFT);
+        c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
+        c.setBorderColor(PdfFonts.HAIRLINE);
+        c.setPaddingTop(6); c.setPaddingBottom(6);
+        c.setPaddingLeft(6); c.setPaddingRight(6);
+        t.addCell(c);
+    }
+
+    private static void cell(PdfPTable t, String text) {
+        PdfPCell c = new PdfPCell(new Phrase(text == null || text.isEmpty() ? "—" : text,
+            PdfFonts.body(9)));
+        c.setBorderColor(PdfFonts.PAPER_BORDER);
+        c.setPaddingTop(5); c.setPaddingBottom(5);
+        c.setPaddingLeft(6); c.setPaddingRight(6);
+        t.addCell(c);
     }
 
     private String csvEscape(String s) {
