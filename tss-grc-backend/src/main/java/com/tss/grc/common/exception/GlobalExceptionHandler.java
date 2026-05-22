@@ -2,6 +2,7 @@ package com.tss.grc.common.exception;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -153,6 +154,73 @@ public class GlobalExceptionHandler {
         pd.setType(URI.create("https://grc.tss.com/errors/method-not-allowed"));
         pd.setProperty("timestamp", Instant.now());
         return pd;
+    }
+
+    /**
+     * Catches the "table doesn't exist yet" failure mode that hits a
+     * fresh dev DB before its module-specific {@code
+     * setup_<module>_db.py} bootstrap has run. Spring wraps the
+     * underlying SQL error in
+     * {@link InvalidDataAccessResourceUsageException}, whose root
+     * cause carries SQL Server's "Invalid object name 'schema.table'"
+     * (or "does not exist" on Postgres / "not found" on H2). The
+     * default catch-all turns these into 500 Internal Server Error,
+     * which is misleading — nothing is broken, the dev environment
+     * just isn't fully bootstrapped.
+     *
+     * <p>Promotes the response to <strong>503 Service Unavailable</strong>
+     * with a concrete remediation hint the user can act on. Modules
+     * that need a different behaviour (e.g. silently empty page)
+     * should still wrap their service-layer queries in a per-method
+     * try/catch — that runs <em>before</em> this handler does, so
+     * existing per-service guards keep their semantics.
+     */
+    @ExceptionHandler(InvalidDataAccessResourceUsageException.class)
+    public ProblemDetail handleMissingDbObject(InvalidDataAccessResourceUsageException ex) {
+        if (isMissingObjectError(ex)) {
+            String detail = "A database table or view this endpoint needs has not been "
+                + "created in the current database. In dev, run the module's "
+                + "setup_<module>_db.py bootstrap script (see CLAUDE.md). In other "
+                + "profiles, ensure all Flyway migrations have applied successfully.";
+            log.warn("[missing-db-object] {}", rootMessage(ex));
+            ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail);
+            pd.setTitle("Module not yet bootstrapped");
+            pd.setType(URI.create("https://grc.tss.com/errors/db-object-missing"));
+            pd.setProperty("rootCause", rootMessage(ex));
+            pd.setProperty("timestamp", Instant.now());
+            return pd;
+        }
+        // Otherwise it's a genuine SQL syntax error or similar — let
+        // the catch-all handle it with a 500.
+        log.error("Data-access error: {}", ex.getMessage(), ex);
+        return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+            "An unexpected database error occurred.");
+    }
+
+    /** True when the exception chain contains a missing-table SQL
+     *  error from any common backend (SQL Server / Postgres / H2). */
+    private static boolean isMissingObjectError(Throwable t) {
+        Throwable cur = t;
+        while (cur != null) {
+            String msg = cur.getMessage();
+            if (msg != null) {
+                String low = msg.toLowerCase();
+                if (low.contains("invalid object name")  // SQL Server
+                    || low.contains("does not exist")    // Postgres
+                    || low.contains("not found")         // H2 / generic
+                    ) return true;
+            }
+            cur = cur.getCause();
+        }
+        return false;
+    }
+
+    /** Walk to the root and return its message — what the user
+     *  actually needs to see ("Invalid object name 'admin.X'"). */
+    private static String rootMessage(Throwable t) {
+        Throwable cur = t;
+        while (cur.getCause() != null && cur.getCause() != cur) cur = cur.getCause();
+        return cur.getMessage();
     }
 
     @ExceptionHandler(Exception.class)
