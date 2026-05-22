@@ -1716,6 +1716,45 @@ export const dpiaApi = {
   stats:           () => api.get<{ draftCount: number; inReviewCount: number; approvedCount: number; rejectedCount: number; expiredCount: number }>('/api/v1/privacy/dpias/stats'),
 };
 
+// ─── Consent Records (PDPL Art. 5 ledger) ──────────────────────────────────
+//
+// One row per (data subject × purpose) consent grant. Append-mostly:
+// create / withdraw / supersede only — editing a granted consent's legal
+// terms requires issuing a new row with a bumped version.
+export interface ConsentRecordDto {
+  id: number;
+  externalId?: string;
+  dataSubjectRef: string;          // pseudonymous (hashed) — never raw PII
+  purposeCode: string;
+  purposeDescription?: string;
+  legalBasis: string;              // CONSENT | LEGITIMATE_INTEREST | CONTRACT | LEGAL_OBLIGATION | VITAL_INTEREST | PUBLIC_TASK
+  grantedAt: string;
+  grantedVia: string;              // WEB_FORM | PAPER | IN_PERSON | API | EMAIL | OTHER
+  validUntil?: string;
+  withdrawnAt?: string;
+  withdrawnReason?: string;
+  evidenceId?: number;
+  version: string;                 // e.g. "v1", "v2.3"
+  language: string;                // "ar" | "en"
+  status: 'ACTIVE' | 'EXPIRED' | 'WITHDRAWN' | 'SUPERSEDED';
+}
+export interface ConsentStatsDto {
+  active?: number;
+  expired?: number;
+  withdrawn?: number;
+  superseded?: number;
+}
+export const consentApi = {
+  list:        (page = 0, size = 100) => api.get<PageResponse<ConsentRecordDto>>(`/api/v1/privacy/consents${pageQ(page, size)}`),
+  get:         (id: number) => api.get<ConsentRecordDto>(`/api/v1/privacy/consents/${id}`),
+  history:     (subjectRef: string) => api.get<ConsentRecordDto[]>(`/api/v1/privacy/consents/by-subject/${encodeURIComponent(subjectRef)}`),
+  grant:       (body: Partial<ConsentRecordDto>) => api.post<ConsentRecordDto>('/api/v1/privacy/consents', body),
+  withdraw:    (id: number, reason: string) => api.post<ConsentRecordDto>(`/api/v1/privacy/consents/${id}/withdraw`, { reason }),
+  supersede:   (id: number, supersededByConsentId: number) =>
+                 api.post<ConsentRecordDto>(`/api/v1/privacy/consents/${id}/supersede`, { supersededByConsentId }),
+  stats:       () => api.get<ConsentStatsDto>('/api/v1/privacy/consents/stats'),
+};
+
 // ─── BCM Crisis Communication (assessment §5.5 #5) ─────────────────────────
 export interface CrisisCommsTemplateDto {
   id: number; code: string;

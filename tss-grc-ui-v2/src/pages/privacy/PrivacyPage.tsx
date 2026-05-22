@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Fingerprint, Inbox, ShieldAlert, Users, Filter, Download, Plus, BarChart3, FileText, Database, PlayCircle, CheckCheck, X as XIcon, Clock, Send, ShieldCheck, Archive, ScrollText, Shield } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -37,6 +37,7 @@ import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAl
 import { usePromoted } from '../../lib/promotedRecords';
 import { toDsrDto, toBreachDto, toDpiaDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PdplBreachConsole } from '../../components/privacy/PdplBreachConsole';
+import { ConsentTab } from '../../components/privacy/ConsentTab';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 
 type TabId = 'overview' | 'dsr' | 'breaches' | 'ropa' | 'dpia' | 'consent' | 'workflows' | 'comms' | 'alignment';
@@ -64,11 +65,24 @@ function dsrToReq(d: PrivacyDsrDto): PrivacyDsrRequest {
   };
 }
 
+const VALID_TABS: readonly TabId[] = ['overview', 'dsr', 'breaches', 'ropa', 'dpia', 'consent', 'workflows', 'comms', 'alignment'] as const;
+
 export function PrivacyPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TabId>('overview');
+  // Tab state lives in the URL so deep-links like /privacy?tab=consent
+  // open the right tab and stay shareable. Falls back to 'overview'
+  // when the param is missing or unrecognised.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab') as TabId | null;
+  const tab: TabId = (urlTab && VALID_TABS.includes(urlTab)) ? urlTab : 'overview';
+  function setTab(next: TabId) {
+    const updated = new URLSearchParams(searchParams);
+    if (next === 'overview') updated.delete('tab');
+    else updated.set('tab', next);
+    setSearchParams(updated, { replace: true });
+  }
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<PrivacyDsrDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<PrivacyDsrDto | null>(null);
@@ -383,22 +397,7 @@ export function PrivacyPage() {
         </Card>
       )}
       {tab === 'dpia' && <DpiaTab toast={toast} t={t} />}
-      {tab === 'consent' && (
-        <div className="dash-grid">
-          <Card title={t('privacyConsentCard')} Icon={Users} action={<Badge tone="primary">{t('privacyConsentChannel')}</Badge>}>
-            <Progress label={t('privacyChannelWeb')}    value={98} tone="success" />
-            <Progress label={t('privacyChannelMobile')} value={94} tone="success" />
-            <Progress label={t('privacyChannelBranch')} value={71} tone="accent" />
-            <Progress label={t('privacyChannelPhone')}  value={62} tone="primary" />
-          </Card>
-          <Card title={t('privacyWithdrawalsCard')} Icon={ShieldAlert}>
-            <Progress label={t('privacyWithdrawMarketing')} value={6}  tone="accent" />
-            <Progress label="SMS notifications" value={4}  tone="primary" />
-            <Progress label="Profiling"         value={2}  tone="success" />
-            <Progress label="3rd-party sharing" value={1}  tone="success" />
-          </Card>
-        </div>
-      )}
+      {tab === 'consent' && <ConsentTab />}
       {tab === 'workflows' && <ActiveWorkflowsPanel
         workflows={PRIVACY_WORKFLOWS}
         title={t('privacyTabWorkflows') ?? 'Workflows'}
