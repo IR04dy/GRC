@@ -2,6 +2,8 @@ package com.tss.grc.module.regchange.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.regchange.dto.RegulatoryChangeDto;
 import com.tss.grc.module.regchange.entity.RegulatoryChange;
 import com.tss.grc.module.regchange.repository.RegulatoryChangeRepository;
@@ -9,11 +11,15 @@ import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -29,6 +35,20 @@ import java.util.stream.Collectors;
  *
  * Explicit bean name avoids collision with legacy
  * {@code com.tss.grc.module.compliance.service.RegulatoryChangeService}.
+ *
+ * <p>Wired into F7 (audit) + F8 (automation). Regulatory change is the
+ * compliance team's intake-to-implementation pipeline — every new NCA
+ * ECC revision, SAMA circular, PDPL clarification, or DGA framework
+ * update enters here. Events let downstream consumers (CAPA fan-out,
+ * board pack, framework mapping refresh) react automatically:
+ *
+ *   REG_CHANGE_NEW                — new change logged
+ *   REG_CHANGE_ASSESSED           — applicability decided
+ *   REG_CHANGE_IMPACT_ANALYSED    — impact + scope quantified
+ *   REG_CHANGE_IN_IMPLEMENTATION  — action plan launched
+ *   REG_CHANGE_IMPLEMENTED        — controls/policies updated
+ *   REG_CHANGE_CLOSED             — terminal close
+ *   REG_CHANGE_DEPRIORITISED      — not applicable / deferred
  */
 @Service("regchangeRegulatoryChangeService")
 @RequiredArgsConstructor
@@ -43,9 +63,39 @@ public class RegulatoryChangeService {
     );
 
     private final RegulatoryChangeRepository repo;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     @Autowired(required = false)
     private RealtimeBroadcaster broadcaster;
+
+    // ── F8 payload + emit ─────────────────────────────────────────────────────
+
+    private Map<String, Object> payloadFor(RegulatoryChange c, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("regChangeId",        nullSafeStr(c.getId()));
+        m.put("externalId",         nullSafeStr(c.getExternalId()));
+        m.put("regulator",          nullSafeStr(c.getRegulator()));
+        m.put("citation",           nullSafeStr(c.getCitation()));
+        m.put("status",             nullSafeStr(c.getStatus()));
+        m.put("previousStatus",     nullSafeStr(previousStatus));
+        m.put("applicability",      nullSafeStr(c.getApplicability()));
+        m.put("impactScore",        nullSafeStr(c.getImpactScore()));
+        m.put("effectiveAt",        nullSafeStr(c.getEffectiveAt()));
+        m.put("implementationTargetDate", nullSafeStr(c.getImplementationTargetDate()));
+        return m;
+    }
+
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+    private static String nullSafeMsg(Object o) { return o == null ? "<not provided>" : o.toString(); }
+
+    private void emit(String trigger, RegulatoryChange c, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            TenantContext.requireOrganisationId(), trigger, "RegulatoryChange", c.getId(),
+            "reg_change:" + nullSafeStr(c.getExternalId()), payloadFor(c, previousStatus)));
+    }
+
+    // ── Reads ─────────────────────────────────────────────────────────────────
 
     public List<RegulatoryChangeDto> listForOrg() {
         Long orgId = TenantContext.requireOrganisationId();
@@ -66,6 +116,8 @@ public class RegulatoryChangeService {
             .orElseThrow(() -> new EntityNotFoundException("Regulatory change not found: " + externalId));
     }
 
+    // ── Writes ────────────────────────────────────────────────────────────────
+
     @Transactional
     public RegulatoryChangeDto create(RegulatoryChangeDto req) {
         Long orgId = TenantContext.requireOrganisationId();
@@ -82,7 +134,12 @@ public class RegulatoryChangeService {
         c.setPublishedAt(req.getPublishedAt());
         c.setEffectiveAt(req.getEffectiveAt());
         c.setStatus("NEW");
-        RegulatoryChangeDto out = RegulatoryChangeDto.from(repo.save(c));
+        c = repo.save(c);
+        audit.log("CREATE", "RegulatoryChange", c.getId(),
+            "Reg change logged: " + nullSafeMsg(c.getExternalId())
+                + " (" + nullSafeMsg(c.getRegulator()) + " — " + nullSafeMsg(c.getCitation()) + ")");
+        emit("REG_CHANGE_NEW", c, null);
+        RegulatoryChangeDto out = RegulatoryChangeDto.from(c);
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "regchange", c.getExternalId(), out);
         return out;
     }
@@ -96,6 +153,7 @@ public class RegulatoryChangeService {
         if (!allowed.contains(req.getStatus())) {
             throw new IllegalTransitionException(c.getStatus(), req.getStatus(), allowed);
         }
+        String previousStatus = c.getStatus();
         LocalDateTime now = LocalDateTime.now();
         c.setStatus(req.getStatus());
 
@@ -127,7 +185,21 @@ public class RegulatoryChangeService {
         if (req.getLinkedCapaIds() != null)  c.setLinkedCapaIds(req.getLinkedCapaIds());
         if (req.getLinkedEvidence() != null) c.setLinkedEvidence(req.getLinkedEvidence());
 
-        RegulatoryChangeDto out = RegulatoryChangeDto.from(repo.save(c));
+        c = repo.save(c);
+        audit.log("TRANSITION", "RegulatoryChange", c.getId(),
+            "Reg change " + nullSafeMsg(c.getExternalId())
+                + " status " + previousStatus + " → " + req.getStatus());
+        String trigger = switch (req.getStatus()) {
+            case "ASSESSED"          -> "REG_CHANGE_ASSESSED";
+            case "IMPACT_ANALYSED"   -> "REG_CHANGE_IMPACT_ANALYSED";
+            case "IN_IMPLEMENTATION" -> "REG_CHANGE_IN_IMPLEMENTATION";
+            case "IMPLEMENTED"       -> "REG_CHANGE_IMPLEMENTED";
+            case "CLOSED"            -> "REG_CHANGE_CLOSED";
+            case "DEPRIORITISED"     -> "REG_CHANGE_DEPRIORITISED";
+            default                  -> "REG_CHANGE_TRANSITIONED";
+        };
+        emit(trigger, c, previousStatus);
+        RegulatoryChangeDto out = RegulatoryChangeDto.from(c);
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "regchange", externalId, out);
         return out;
     }
@@ -139,6 +211,8 @@ public class RegulatoryChangeService {
             .orElseThrow(() -> new EntityNotFoundException("Regulatory change not found: " + externalId));
         c.setIsDeleted((short) 1);
         repo.save(c);
+        audit.log("DELETE", "RegulatoryChange", c.getId(),
+            "Reg change soft-deleted: " + nullSafeMsg(c.getExternalId()));
     }
 
     private String generateExternalId() {

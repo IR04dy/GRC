@@ -2,6 +2,7 @@ package com.tss.grc.module.regchange.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.regchange.dto.RegulatoryChangeDto;
 import com.tss.grc.module.regchange.entity.RegulatoryChange;
 import com.tss.grc.module.regchange.repository.RegulatoryChangeRepository;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
@@ -37,6 +39,8 @@ class RegulatoryChangeServiceTest {
     private static final String EXT_ID = "RC-2026-001";
 
     @Mock private RegulatoryChangeRepository repo;
+    @Mock private AuditLogService audit;
+    @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private RegulatoryChangeService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
