@@ -76,11 +76,17 @@ public class BoardPackService {
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document doc = new Document(PageSize.A4, 36, 36, 60, 36);
+        Document doc = new Document(PageSize.A4, 36, 36, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
             writer.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-            writer.setPageEvent(new BoardPackPageEvent(ar ? "حزمة المجلس — TSS GRC" : "Board Pack — TSS GRC"));
+            // Shared executive footer — hairline + classification + Page X of Y.
+            // Board packs sit at the highest sensitivity in the GRC platform
+            // (combine financial KRIs + open findings + ethics cases), so they
+            // ship as Confidential.
+            writer.setPageEvent(PdfTheme.professionalFooter(
+                ar ? "حزمة المجلس — TSS GRC" : "Board Pack — TSS GRC",
+                "Confidential"));
             doc.open();
 
             // 1. Cover
@@ -135,38 +141,26 @@ public class BoardPackService {
 
     // ── Section: Cover ─────────────────────────────────────────────────────
     private void renderCover(Document doc, Organisation o, boolean ar) throws DocumentException {
-        Paragraph eyebrow = new Paragraph(ar ? "حزمة الإدارة الفصلية" : "Quarterly Board Pack",
-            PdfFonts.small(10));
-        eyebrow.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        eyebrow.setSpacingBefore(120);
-        doc.add(eyebrow);
-
-        String orgName = o == null ? "—" : (ar && o.getNameAr() != null ? o.getNameAr() : o.getNameEn());
-        Paragraph title = new Paragraph(orgName, new Font(PdfFonts.bold(28).getBaseFont(), 28, Font.BOLD, new Color(0x09, 0x42, 0x42)));
-        title.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        title.setSpacingAfter(8);
-        doc.add(title);
-
-        Paragraph tagline = new Paragraph(
-            ar ? "نظرة شاملة على المخاطر والامتثال والاستمرارية"
-               : "Risk · Compliance · Continuity Snapshot",
-            PdfFonts.normal(12));
-        tagline.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        tagline.setSpacingAfter(40);
-        doc.add(tagline);
-
-        Paragraph stamp = new Paragraph(
-            (ar ? "تم الإنشاء: " : "Generated: ") + LocalDateTime.now().format(DT_FMT),
-            PdfFonts.small(10));
-        stamp.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        doc.add(stamp);
+        // Shared executive cover hero — brand band + eyebrow + bilingual
+        // organisation name as the title + tagline + Hijri+Gregorian stamp
+        // + Confidential badge. Identical look across BCP/Crisis/NDI/board
+        // pack so the platform's printed output reads as one document family.
+        PdfTheme.Cover cv = new PdfTheme.Cover();
+        cv.eyebrow    = "Quarterly Board Pack";
+        cv.eyebrowAr  = "حزمة الإدارة الفصلية";
+        cv.titleEn    = o == null ? "—" : o.getNameEn();
+        cv.titleAr    = o == null ? null : o.getNameAr();
+        cv.subtitle   = "Risk · Compliance · Continuity Snapshot";
+        cv.subtitleAr = "نظرة شاملة على المخاطر والامتثال والاستمرارية";
+        cv.classification = "Confidential";
+        PdfTheme.coverHero(doc, cv);
 
         Paragraph footnote = new Paragraph(
             ar ? "تم إنشاء هذه الحزمة تلقائيًا بواسطة منصة TSS GRC."
                : "This pack was generated automatically by the TSS GRC Platform.",
             PdfFonts.small(9));
         footnote.setAlignment(Element.ALIGN_CENTER);
-        footnote.setSpacingBefore(280);
+        footnote.setSpacingBefore(180);
         doc.add(footnote);
     }
 
@@ -200,18 +194,22 @@ public class BoardPackService {
         doc.add(t);
     }
 
+    /** RTL-aware KPI tile. Can't quite share {@link PdfTheme#kpiTile} verbatim
+     *  because the board pack flips paragraph alignment per cell when ar=true;
+     *  PdfTheme.kpiTile is LTR-only since it serves the per-document exporters
+     *  where Arabic stays inline as a second line. */
     private void kpi(PdfPTable t, String label, String value, String sub, boolean ar) {
         PdfPCell c = new PdfPCell();
         c.setPadding(10);
-        c.setBorderColor(new Color(0xE5, 0xDF, 0xD2));
-        c.setBackgroundColor(new Color(0xFA, 0xF8, 0xF4));
+        c.setBorderColor(PdfFonts.PAPER_BORDER);
+        c.setBackgroundColor(PdfFonts.PAPER_BG);
         c.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
 
         Paragraph l = new Paragraph(label, PdfFonts.small(9));
         l.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         c.addElement(l);
 
-        Paragraph v = new Paragraph(value, new Font(PdfFonts.bold(20).getBaseFont(), 20, Font.BOLD, new Color(0x09, 0x42, 0x42)));
+        Paragraph v = new Paragraph(value, PdfFonts.kpiValue(20));
         v.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         c.addElement(v);
 
@@ -444,7 +442,7 @@ public class BoardPackService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
     private void renderSectionHeader(Document doc, String title, boolean ar) throws DocumentException {
-        Paragraph p = new Paragraph(title, new Font(PdfFonts.bold(16).getBaseFont(), 16, Font.BOLD, new Color(0x09, 0x42, 0x42)));
+        Paragraph p = new Paragraph(title, PdfFonts.title(16));
         p.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         p.setSpacingAfter(12);
         doc.add(p);
@@ -459,44 +457,22 @@ public class BoardPackService {
 
     private PdfPCell headerCell(String text, boolean ar) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(10)));
-        c.setBackgroundColor(new Color(0x09, 0x42, 0x42));
+        c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
         c.setPadding(6);
         c.setHorizontalAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         c.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-        c.setBorderColor(new Color(0xD6, 0xCE, 0xBC));
+        c.setBorderColor(PdfFonts.HAIRLINE);
         return c;
     }
 
     private PdfPCell bodyCell(String text, boolean rtl) {
-        PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.normal(9)));
+        PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.body(9)));
         c.setPadding(5);
         c.setHorizontalAlignment(rtl ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         c.setRunDirection(rtl ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-        c.setBorderColor(new Color(0xE5, 0xDF, 0xD2));
+        c.setBorderColor(PdfFonts.PAPER_BORDER);
         return c;
     }
 
     private static String safe(String s) { return s == null ? "—" : s; }
-
-    /** Page event for footer with page numbers — runs on every page. */
-    private static class BoardPackPageEvent extends PdfPageEventHelper {
-        private final String headerText;
-        BoardPackPageEvent(String headerText) { this.headerText = headerText; }
-
-        @Override
-        public void onEndPage(PdfWriter writer, Document document) {
-            PdfContentByte cb = writer.getDirectContent();
-            // Footer line + page number
-            String footer = headerText + "  ·  " + writer.getPageNumber();
-            try {
-                cb.beginText();
-                cb.setFontAndSize(PdfFonts.small(8).getBaseFont(), 8);
-                cb.setColorFill(new Color(0x5C, 0x6A, 0x65));
-                float x = (document.right() + document.left()) / 2;
-                float y = document.bottom() - 18;
-                cb.showTextAligned(PdfContentByte.ALIGN_CENTER, footer, x, y, 0);
-                cb.endText();
-            } catch (Exception ignored) { /* never block document close */ }
-        }
-    }
 }
