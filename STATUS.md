@@ -1,12 +1,60 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PRs #11-87 — F7/F8 parity arc + domain dashboard polish sweep)
+**Last update:** 22 May 2026 (PRs #11-88 — all merged; F7/F8 parity arc → 20 services, 115 active rules)
 **Snapshot Date:** 22 April 2026 (initial), updated continuously
 **Branch Source:** `claude/quirky-borg` (commit `726cd1e`)
 **Stack:** Spring Boot 3.5 / Java 17 / SQL Server 2019 / React 18 + Vite / Bootstrap 5 RTL / Chart.js 4
 
 ---
 
-## 🟢 Latest — Domain dashboard polish sweep (22 May 2026, PRs #86-87)
+## 🟢 Latest — Merge sweep + final services (22 May 2026, PRs #75-88 all merged)
+
+Fourteen PRs merged into master in a single session, taking the F7/F8 parity arc from 10 services (post-PR-#77) to **20 services with 115 active seed rules** and closing every dashboard FALLBACK.
+
+### Merged PRs
+| Range | Theme | Services / pages affected |
+|---|---|---|
+| #75-77 | F7/F8 parity arc | Vulnerability, ApprovalRequest, Policy |
+| #79-85 | F7/F8 parity arc | Evidence, Consent, DSR, DPIA+CrossBorder, Change Mgmt, Treatment, RegChange |
+| #86 | Cyber dashboard | wired to real API + loading/error/retry + extracted CSS |
+| #87 | Sibling dashboards | shared useDashboardLoader hook + Skeleton/Error for BCM/ERM/PDPL/SCM |
+| #88 | F7/F8 parity arc | BcmCycle, Issue (services #19-20) |
+| #78 | STATUS doc | refresh capture (now superseded by this section) |
+
+### Full parity arc — 20 services, 115 active seed rules
+
+| # | Service | Trigger families | Seed rules |
+|---|---|---|---|
+| 1 | WorkflowSubmissionService | SUBMISSION_* | AR-26..AR-30 |
+| 2 | CapaTaskService | CAPA_TASK_* | AR-31..AR-35 |
+| 3 | compliance CapaWorkflow | FINDING_CAPA_STAGE_CHANGED | AR-36..AR-40 |
+| 4 | FindingService (audit_lc) | FINDING_* | AR-41..AR-45 |
+| 5 | CrisisAarService | AAR_* | AR-46..AR-50 |
+| 6 | RiskService | RISK_* | (re-used range) |
+| 7 | IncidentService | INCIDENT_* | AR-56..AR-60 |
+| 8 | VulnerabilityService | VULN_* | AR-61..AR-65 |
+| 9 | ApprovalRequestService | APPROVAL_* | AR-66..AR-70 |
+| 10 | PolicyService | POLICY_* | AR-71..AR-75 |
+| 11 | EvidenceItemService | EVIDENCE_* | AR-76..AR-80 |
+| 12 | ConsentRecordService | CONSENT_* | AR-81..AR-85 |
+| 13 | DsrCaseService | DSR_* | AR-86..AR-90 |
+| 14 | DpiaService | DPIA_* | (V145 shared) |
+| 15 | CrossBorderTransferService | TRANSFER_* | AR-91..AR-95 |
+| 16 | ChangeManagementService | CHANGE_* | AR-96..AR-100 |
+| 17 | TreatmentPlanService | TREATMENT_* | AR-101..AR-105 |
+| 18 | RegulatoryChangeService | REG_CHANGE_* | AR-106..AR-110 |
+| 19 | BcmCycleService | BCM_CYCLE_* + BCM_GOVERNANCE_* | (V149 shared) |
+| 20 | IssueService | ISSUE_* | AR-111..AR-115 |
+
+### Test suite health
+- Full backend test suite: **790 tests, 0 failures, 0 errors** on the merged master (post-PR-#88 master adds the BCM + Issue F8 wiring without regressing any existing test class)
+- Each PR was self-contained with mock updates to ensure `@Mock AuditLogService` + `@Mock ApplicationEventPublisher` were present in any test class touching a newly-wired service
+
+### Domain dashboards now consistent
+All five domain dashboards (Cyber, BCM, ERM, PDPL, SCM) share the `useDashboardLoader<T>` hook and `<DashboardLoading />` + `<DashboardError />` components — no more silent fallback to fake numbers, no more first-paint placeholder data.
+
+---
+
+## 🟢 Earlier — Domain dashboard polish sweep (PRs #86-87)
 
 User-visible cleanup of all 5 domain dashboards.
 
