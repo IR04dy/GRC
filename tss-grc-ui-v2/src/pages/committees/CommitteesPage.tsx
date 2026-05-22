@@ -272,6 +272,11 @@ export function CommitteesPage() {
                             <td className="mono">{c.quorumPct != null ? `${c.quorumPct}%` : '—'}</td>
                             <td><Badge tone={COM_STATUS_TONE[c.status]}>{statusLabel(c.status, lang)}</Badge></td>
                             <td style={{ textAlign: 'right' }}>
+                              <Link to={`/committees/${c.id}/members`}
+                                style={{ display:'inline-flex', alignItems:'center', gap:4, marginInlineEnd:8, fontSize:12, color:'var(--primary)' }}>
+                                <Users size={12} />
+                                {t('comMembers')}
+                              </Link>
                               <Button size="sm" variant="secondary" Icon={Calendar}
                                 disabled={busyId === c.id || c.status !== 'ACTIVE'}
                                 onClick={() => onGenerateCalendar(c.id)}>

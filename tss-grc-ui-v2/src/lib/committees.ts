@@ -1,6 +1,6 @@
 // Committees + meetings API client — uses shared api.ts.
 
-import { api } from './api';
+import { api, downloadFile } from './api';
 
 export type CommitteeStatus = 'ACTIVE' | 'INACTIVE' | 'DISSOLVED';
 export type MeetingStatus   = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'MINUTES_APPROVED' | 'CANCELLED';
@@ -199,6 +199,139 @@ export function listForms(committeeType?: ExtendedCommitteeType): Promise<FormTe
 
 export function getForm(formCode: string): Promise<FormTemplate> {
   return api.get(`${CATALOG_BASE}/forms/${encodeURIComponent(formCode)}`);
+}
+
+/** Download the form as a branded PDF — server-side render via OpenPDF
+ *  with bilingual cover band, purpose, body, and completion guide.
+ *  Filename: {formCode}-v{version}.pdf. */
+export function exportFormPdf(formCode: string, version?: string): Promise<void> {
+  const fallback = `${formCode}${version ? `-v${version}` : ''}.pdf`;
+  return downloadFile(
+    `${CATALOG_BASE}/forms/${encodeURIComponent(formCode)}/export?format=pdf`,
+    fallback);
+}
+
+// ─── Member registry (V154 — terms + skills) ──────────────────────────
+
+export interface CommitteeMemberTerm {
+  id: number;
+  committeeId: number;
+  memberName: string;
+  memberUserId: number | null;
+  role: string;
+  isVotingMember: number;
+  isIndependent: number;
+  independenceBasisEn: string | null;
+  appointedAt: string;
+  appointedByReso: string | null;
+  termStartsAt: string;
+  termEndsAt: string | null;
+  termNumber: number;
+  renewalStatus: 'ACTIVE' | 'EXPIRED' | 'RESIGNED' | 'REMOVED' | 'RENEWED';
+  endReason: string | null;
+  endedAt: string | null;
+  createdAt: string;
+}
+
+export interface CommitteeMemberSkill {
+  id: number;
+  committeeId: number;
+  memberTermId: number | null;
+  memberName: string;
+  skillDimension: string;       // FINANCIAL_EXPERT | CYBER_EXPERT | …
+  skillLevel: 'BASIC' | 'INTERMEDIATE' | 'EXPERT';
+  evidenceEn: string | null;
+  certification: string | null;
+  yearsExperience: number | null;
+  lastReviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface IndependenceStats {
+  activeMembers: number;
+  independentMembers: number;
+  independenceRatioPct: number;
+}
+
+const REG_BASE = '/api/v1/committees/registry';
+
+export function listMemberTerms(committeeId: number): Promise<CommitteeMemberTerm[]> {
+  return api.get(`${REG_BASE}/committees/${committeeId}/terms`);
+}
+export function listActiveMembers(committeeId: number): Promise<CommitteeMemberTerm[]> {
+  return api.get(`${REG_BASE}/committees/${committeeId}/active-members`);
+}
+export function getIndependenceStats(committeeId: number): Promise<IndependenceStats> {
+  return api.get(`${REG_BASE}/committees/${committeeId}/independence`);
+}
+export function appointMember(body: Partial<CommitteeMemberTerm>): Promise<CommitteeMemberTerm> {
+  return api.post(`${REG_BASE}/terms`, body);
+}
+export function endMemberTerm(termId: number, renewalStatus: string, reason: string)
+    : Promise<CommitteeMemberTerm> {
+  return api.post(`${REG_BASE}/terms/${termId}/end`, { renewalStatus, reason });
+}
+export function renewMemberTerm(termId: number, newStart: string, newEnd: string, resolutionCode: string)
+    : Promise<CommitteeMemberTerm> {
+  return api.post(`${REG_BASE}/terms/${termId}/renew`, { newStart, newEnd, resolutionCode });
+}
+
+export function listSkills(committeeId: number): Promise<CommitteeMemberSkill[]> {
+  return api.get(`${REG_BASE}/committees/${committeeId}/skills`);
+}
+export function skillCoverage(committeeId: number): Promise<Record<string, number>> {
+  return api.get(`${REG_BASE}/committees/${committeeId}/skills/coverage`);
+}
+export function addSkill(body: Partial<CommitteeMemberSkill>): Promise<CommitteeMemberSkill> {
+  return api.post(`${REG_BASE}/skills`, body);
+}
+export function removeSkill(skillId: number): Promise<void> {
+  return api.delete(`${REG_BASE}/skills/${skillId}`);
+}
+
+// ─── Meeting papers (V154 — pre-read tracking) ────────────────────────
+
+export interface MeetingPaper {
+  id: number;
+  meetingId: number;
+  paperCode: string;
+  titleEn: string;
+  titleAr: string | null;
+  agendaItemSeq: number | null;
+  authorName: string | null;
+  authorRole: string | null;
+  circulatedAt: string | null;
+  circulatedBy: number | null;
+  confidentiality: ConfidentialityLevel;
+  fileStorageRef: string | null;
+  readReceiptsJson: string | null;
+  latePaper: number;
+  latePaperReason: string | null;
+  createdAt: string;
+}
+
+export interface MeetingPaperStats {
+  totalPapers: number;
+  papersWithReceipts: number;
+  latePapers: number;
+}
+
+const PAPERS_BASE = '/api/v1/committees/papers';
+
+export function listMeetingPapers(meetingId: number): Promise<MeetingPaper[]> {
+  return api.get(`${PAPERS_BASE}/by-meeting/${meetingId}`);
+}
+export function meetingPaperStats(meetingId: number): Promise<MeetingPaperStats> {
+  return api.get(`${PAPERS_BASE}/by-meeting/${meetingId}/stats`);
+}
+export function circulatePaper(body: Partial<MeetingPaper>): Promise<MeetingPaper> {
+  return api.post(`${PAPERS_BASE}/circulate`, body);
+}
+export function markPaperRead(paperId: number, userId: number): Promise<MeetingPaper> {
+  return api.post(`${PAPERS_BASE}/${paperId}/read/${userId}`);
+}
+export function markPaperLate(paperId: number, reason: string): Promise<MeetingPaper> {
+  return api.post(`${PAPERS_BASE}/${paperId}/mark-late`, { reason });
 }
 
 /** Tone palette for the badge column in the catalog page — anchors render

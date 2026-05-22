@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileText, Download, Languages, Info } from 'lucide-react';
+import { FileText, Download, Languages, Info, FileDown } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { Card } from '../../components/ui/Card';
@@ -8,7 +8,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
-import { getForm, type FormTemplate } from '../../lib/committees';
+import { useToast } from '../../lib/toast';
+import { getForm, exportFormPdf, type FormTemplate } from '../../lib/committees';
 
 /**
  * Form detail page — renders the bilingual markdown template, lets the
@@ -21,12 +22,26 @@ import { getForm, type FormTemplate } from '../../lib/committees';
 export function CommitteeFormDetailPage() {
   const { formCode } = useParams<{ formCode: string }>();
   const { lang } = useI18n();
+  const toast = useToast();
   const isAr = lang === 'ar';
 
   const [form, setForm] = useState<FormTemplate | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'en' | 'ar'>(isAr ? 'ar' : 'en');
+  const [exporting, setExporting] = useState(false);
+
+  async function downloadPdf() {
+    if (!form) return;
+    setExporting(true);
+    try {
+      await exportFormPdf(form.formCode, form.version);
+    } catch {
+      toast.danger(isAr ? 'فشل تنزيل PDF' : 'PDF download failed');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     if (!formCode) return;
@@ -110,9 +125,15 @@ export function CommitteeFormDetailPage() {
             <Languages size={14} />
             {view === 'en' ? 'العربية' : 'English'}
           </Button>
-          <Button variant="primary" size="sm" onClick={download}>
+          <Button variant="ghost" size="sm" onClick={download}>
             <Download size={14} />
             {isAr ? 'تنزيل .md' : 'Download .md'}
+          </Button>
+          <Button variant="primary" size="sm" onClick={downloadPdf} disabled={exporting}>
+            <FileDown size={14} />
+            {exporting
+              ? (isAr ? 'جارٍ التصدير…' : 'Exporting…')
+              : (isAr ? 'تصدير PDF' : 'Export PDF')}
           </Button>
         </div>}
       />

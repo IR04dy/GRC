@@ -151,6 +151,7 @@ const CommitteesPage              = lazy(() => import('./pages/committees/Commit
 const CommitteeCatalogPage        = lazy(() => import('./pages/committees/CommitteeCatalogPage').then(m => ({ default: m.CommitteeCatalogPage })));
 const CommitteeTemplateDetailPage = lazy(() => import('./pages/committees/CommitteeTemplateDetailPage').then(m => ({ default: m.CommitteeTemplateDetailPage })));
 const CommitteeFormDetailPage     = lazy(() => import('./pages/committees/CommitteeFormDetailPage').then(m => ({ default: m.CommitteeFormDetailPage })));
+const CommitteeMemberRegistryPage = lazy(() => import('./pages/committees/CommitteeMemberRegistryPage').then(m => ({ default: m.CommitteeMemberRegistryPage })));
 const DrPlansPage            = lazy(() => import('./pages/dr-plans/DrPlansPage').then(m => ({ default: m.DrPlansPage })));
 const FrameworkControlsPage  = lazy(() => import('./pages/framework-controls/FrameworkControlsPage').then(m => ({ default: m.FrameworkControlsPage })));
 const ContractClausesPage    = lazy(() => import('./pages/contract-clauses/ContractClausesPage').then(m => ({ default: m.ContractClausesPage })));
@@ -222,6 +223,7 @@ export function App() {
               <Route path="/committees/catalog"                      element={<CommitteeCatalogPage />} />
               <Route path="/committees/catalog/forms/:formCode"      element={<CommitteeFormDetailPage />} />
               <Route path="/committees/catalog/:templateCode"        element={<CommitteeTemplateDetailPage />} />
+              <Route path="/committees/:committeeId/members"         element={<CommitteeMemberRegistryPage />} />
               <Route path="/dr-plans"         element={<DrPlansPage />} />
               <Route path="/framework-controls" element={<FrameworkControlsPage />} />
               <Route path="/contract-clauses"   element={<ContractClausesPage />} />

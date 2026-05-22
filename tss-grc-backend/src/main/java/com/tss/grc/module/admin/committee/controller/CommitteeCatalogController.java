@@ -4,7 +4,11 @@ import com.tss.grc.module.admin.committee.entity.CommitteeFormTemplate;
 import com.tss.grc.module.admin.committee.entity.CommitteeStandingItem;
 import com.tss.grc.module.admin.committee.entity.CommitteeTemplate;
 import com.tss.grc.module.admin.committee.service.CommitteeCatalogService;
+import com.tss.grc.module.admin.committee.service.CommitteeFormExportService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,7 +28,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CommitteeCatalogController {
 
-    private final CommitteeCatalogService catalog;
+    private final CommitteeCatalogService    catalog;
+    private final CommitteeFormExportService formExport;
 
     // ── Templates ─────────────────────────────────────────────────────
 
@@ -64,5 +69,24 @@ public class CommitteeCatalogController {
     @PreAuthorize("hasPermission('ADMIN','READ')")
     public CommitteeFormTemplate getForm(@PathVariable String formCode) {
         return catalog.getForm(formCode);
+    }
+
+    /** Export the form as a branded PDF (cover band + purpose + bilingual
+     *  body + completion guide). Filename: {formCode}-v{version}.pdf. */
+    @GetMapping("/forms/{formCode}/export")
+    @PreAuthorize("hasPermission('ADMIN','READ')")
+    public ResponseEntity<byte[]> exportForm(@PathVariable String formCode,
+                                              @RequestParam(defaultValue = "pdf") String format) {
+        if (!"pdf".equalsIgnoreCase(format)) {
+            return ResponseEntity.badRequest().build();
+        }
+        CommitteeFormTemplate form = catalog.getForm(formCode);
+        byte[] pdf = formExport.exportPdf(formCode);
+        String filename = form.getFormCode() + "-v" + form.getVersion() + ".pdf";
+        HttpHeaders h = new HttpHeaders();
+        h.setContentType(MediaType.APPLICATION_PDF);
+        h.setContentDisposition(org.springframework.http.ContentDisposition
+            .attachment().filename(filename).build());
+        return ResponseEntity.ok().headers(h).body(pdf);
     }
 }
