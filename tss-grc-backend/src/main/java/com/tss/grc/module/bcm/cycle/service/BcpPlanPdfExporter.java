@@ -6,7 +6,10 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.entity.Organisation;
+import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.reporting.service.PdfFonts;
+import com.tss.grc.module.reporting.service.PdfTheme;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,26 +18,37 @@ import org.springframework.transaction.annotation.Transactional;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * BCP / DRP PDF exporter — audit Tier-2 #12.
  *
- * <p>Renders an approved/published plan to a single PDF that an auditor or
- * a recipient can read offline. Output layout:
+ * <p>Renders an approved/published plan as a single executive-grade PDF that
+ * an auditor, regulator, or recipient can read offline. Layout:
  *
  * <ol>
- *   <li>Cover page — title, plan code, version, owner, recovery targets,
- *       last-attested stamp.</li>
- *   <li>Per-section pages — one section per ISO 22301 §8.4.2 named section,
+ *   <li><b>Cover hero</b> — brand band, eyebrow tag, plan code + bilingual
+ *       title, organisation name, Hijri + Gregorian generation stamp, and
+ *       a classification banner. Followed by a KPI strip for the four
+ *       continuity metrics auditors look for first: Version, RTO, RPO,
+ *       MTPD. The supporting metadata (status, owner, last-attested, etc.)
+ *       sits below as a borderless key/value grid.</li>
+ *   <li><b>Sections</b> — one page per ISO 22301 §8.4.2 named section,
  *       with EN body followed by AR body (when present).</li>
- *   <li>Version history table — every prior approval with approver + date
+ *   <li><b>Version history</b> — every prior approval with approver + date
  *       + change summary.</li>
- *   <li>Distribution roster — who received which version + ack status.</li>
+ *   <li><b>Distribution roster</b> — who received which version + ack status.</li>
+ *   <li><b>Recent attestations</b> — last 3 reviewer sign-offs as a tail
+ *       block on the distribution page.</li>
  * </ol>
  *
- * <p>Bilingual via the existing {@link PdfFonts} which loads an Arabic-capable
- * font on startup and falls back gracefully if none is available. The PDF
+ * <p>Visual identity comes from the shared {@link PdfTheme} primitives, so
+ * every TSS GRC PDF (BCP, crisis, board pack, NDI report) renders with the
+ * same brand palette, typography, KPI tiles, and footer style.
+ *
+ * <p>Bilingual via {@link PdfFonts} which loads an Arabic-capable font on
+ * startup and falls back gracefully if none is available. The document
  * stays LTR throughout; Arabic blocks are rendered with the same font so
  * the right-to-left script direction comes from the font shaper, not the
  * document run direction (avoids flipping English titles + section keys).
@@ -43,7 +57,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BcpPlanPdfExporter {
 
-    private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter DT   = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final BcpPlanRepository                       plans;
@@ -51,6 +65,7 @@ public class BcpPlanPdfExporter {
     private final BcpVersionRepository                    versions;
     private final BcpPlanAcknowledgementRepository        acks;
     private final BcpPlanReviewAttestationRepository      attestations;
+    private final OrganisationRepository                  orgs;
     private final AuditLogService                         audit;
 
     @Transactional(readOnly = true)
@@ -62,15 +77,20 @@ public class BcpPlanPdfExporter {
         List<BcpSection>          secs  = sections.findByOrganisationIdAndPlanIdOrderBySectionOrderAsc(org, planId);
         List<BcpVersion>          vers  = versions.findByOrganisationIdAndPlanIdOrderByVersionNumberDesc(org, planId);
         List<BcpPlanAcknowledgement> dist = acks.findByOrganisationIdAndPlanIdOrderByDistributedAtDesc(org, planId);
+        Organisation organisation = orgs.findById(org).orElse(null);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document doc = new Document(PageSize.A4, 40, 40, 60, 40);
+        Document doc = new Document(PageSize.A4, 40, 40, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
-            writer.setPageEvent(new PlanPageEvent(p.getPlanType() + " · " + p.getPlanCode()));
+            // Classification is RESTRICTED for plans — they expose recovery
+            // playbooks. Tenant-specific override could come from a column
+            // later; defaulting to RESTRICTED matches the audit threat model.
+            String docLabel = (p.getPlanType() == null ? "Plan" : p.getPlanType()) + " · " + p.getPlanCode();
+            writer.setPageEvent(PdfTheme.professionalFooter(docLabel, "Restricted"));
             doc.open();
 
-            renderCover(doc, p);
+            renderCover(doc, p, organisation);
             renderSections(doc, secs);
             renderVersionHistory(doc, vers);
             renderDistributionRoster(doc, dist);
@@ -90,77 +110,56 @@ public class BcpPlanPdfExporter {
 
     // ─── Cover ─────────────────────────────────────────────────────────
 
-    private void renderCover(Document doc, BcpPlan p) throws DocumentException {
-        Paragraph eyebrow = new Paragraph(
-            p.getPlanType().equals("BCP") ? "Business Continuity Plan" : "Disaster Recovery Plan",
-            PdfFonts.small(10));
-        eyebrow.setSpacingBefore(80);
-        doc.add(eyebrow);
+    private void renderCover(Document doc, BcpPlan p, Organisation o) throws DocumentException {
+        PdfTheme.Cover cv = new PdfTheme.Cover();
+        boolean isBcp = "BCP".equalsIgnoreCase(p.getPlanType());
+        cv.eyebrow    = isBcp ? "Business Continuity Plan" : "Disaster Recovery Plan";
+        cv.eyebrowAr  = isBcp ? "خطة استمرارية الأعمال"     : "خطة التعافي من الكوارث";
+        cv.code       = p.getPlanCode();
+        cv.titleEn    = nz(p.getTitleEn());
+        cv.titleAr    = p.getTitleAr();
+        cv.orgNameEn  = o == null ? null : o.getNameEn();
+        cv.orgNameAr  = o == null ? null : o.getNameAr();
+        cv.classification = "Restricted";
+        PdfTheme.coverHero(doc, cv);
 
-        Paragraph code = new Paragraph(p.getPlanCode(), PdfFonts.bold(20));
-        code.setSpacingAfter(4);
-        doc.add(code);
+        // KPI strip — the four continuity numbers auditors check first.
+        // Showing them above the metadata grid means a reader scanning the
+        // cover page can answer "what are the recovery targets?" in <2s.
+        List<PdfTheme.Kpi> kpis = new ArrayList<>();
+        kpis.add(new PdfTheme.Kpi("Version",
+            "v" + (p.getCurrentVersion() == null ? 1 : p.getCurrentVersion()),
+            nz(p.getStatus())));
+        kpis.add(new PdfTheme.Kpi("RTO",
+            p.getRtoHours()  == null ? "—" : (p.getRtoHours()  + "h"),
+            "Recovery Time"));
+        kpis.add(new PdfTheme.Kpi("RPO",
+            p.getRpoHours()  == null ? "—" : (p.getRpoHours()  + "h"),
+            "Recovery Point"));
+        kpis.add(new PdfTheme.Kpi("MTPD",
+            p.getMtpdHours() == null ? "—" : (p.getMtpdHours() + "h"),
+            "Max Tolerable Disruption"));
+        PdfTheme.kpiStrip(doc, kpis);
 
-        Paragraph titleEn = new Paragraph(nz(p.getTitleEn()), PdfFonts.bold(16));
-        titleEn.setSpacingAfter(2);
-        doc.add(titleEn);
-
-        if (p.getTitleAr() != null && !p.getTitleAr().isBlank()) {
-            Paragraph titleAr = new Paragraph(p.getTitleAr(), PdfFonts.normal(14));
-            titleAr.setSpacingAfter(20);
-            doc.add(titleAr);
-        }
-
-        // Metadata grid as a 2-column borderless table
-        PdfPTable meta = new PdfPTable(4);
-        meta.setWidthPercentage(100);
-        meta.setSpacingBefore(20);
-        try { meta.setWidths(new float[] {1, 2, 1, 2}); } catch (DocumentException ignored) {}
-
-        addMeta(meta, "Status",         nz(p.getStatus()));
-        addMeta(meta, "Version",        "v" + (p.getCurrentVersion() == null ? 1 : p.getCurrentVersion()));
-        addMeta(meta, "Plan type",      nz(p.getPlanType()));
-        addMeta(meta, "Source BIA",     p.getSourceBiaId() == null ? "—" : ("#" + p.getSourceBiaId()));
-
-        addMeta(meta, "RTO",            p.getRtoHours()  == null ? "—" : (p.getRtoHours()  + "h"));
-        addMeta(meta, "RPO",            p.getRpoHours()  == null ? "—" : (p.getRpoHours()  + "h"));
-        addMeta(meta, "MTPD",           p.getMtpdHours() == null ? "—" : (p.getMtpdHours() + "h"));
-        addMeta(meta, "Response team",  nz(p.getResponseTeamRole()));
-
-        addMeta(meta, "Approved by",    nz(p.getApprovedBy()));
-        addMeta(meta, "Approved at",    p.getApprovedAt()  == null ? "—" : p.getApprovedAt().format(DT));
-        addMeta(meta, "Published at",   p.getPublishedAt() == null ? "—" : p.getPublishedAt().format(DT));
-        addMeta(meta, "Next review",    p.getNextReviewDate() == null ? "—" : p.getNextReviewDate().format(DATE));
-
-        addMeta(meta, "Last attested",  p.getLastAttestedAt() == null ? "—" : p.getLastAttestedAt().format(DT));
-        addMeta(meta, "Attested by",    nz(p.getLastAttestedByName()));
-        addMeta(meta, "Review state",   nz(p.getReviewState()));
-        addMeta(meta, "Plan code",      p.getPlanCode());
-
+        // Secondary metadata as a borderless key/value grid
+        PdfPTable meta = PdfTheme.metadataGrid();
+        PdfTheme.addMetaCell(meta, "Plan type",     nz(p.getPlanType()));
+        PdfTheme.addMetaCell(meta, "Source BIA",    p.getSourceBiaId() == null ? "—" : ("#" + p.getSourceBiaId()));
+        PdfTheme.addMetaCell(meta, "Response team", nz(p.getResponseTeamRole()));
+        PdfTheme.addMetaCell(meta, "Review state",  nz(p.getReviewState()));
+        PdfTheme.addMetaCell(meta, "Approved by",   nz(p.getApprovedBy()));
+        PdfTheme.addMetaCell(meta, "Approved at",   p.getApprovedAt()  == null ? "—" : p.getApprovedAt().format(DT));
+        PdfTheme.addMetaCell(meta, "Published at",  p.getPublishedAt() == null ? "—" : p.getPublishedAt().format(DT));
+        PdfTheme.addMetaCell(meta, "Next review",   p.getNextReviewDate() == null ? "—" : p.getNextReviewDate().format(DATE));
+        PdfTheme.addMetaCell(meta, "Last attested", p.getLastAttestedAt() == null ? "—" : p.getLastAttestedAt().format(DT));
+        PdfTheme.addMetaCell(meta, "Attested by",   nz(p.getLastAttestedByName()));
         doc.add(meta);
-
-        Paragraph stamp = new Paragraph(
-            "Generated by TSS GRC Platform · " + java.time.LocalDateTime.now().format(DT),
-            PdfFonts.small(9));
-        stamp.setSpacingBefore(60);
-        doc.add(stamp);
-    }
-
-    private static void addMeta(PdfPTable t, String label, String value) {
-        PdfPCell l = new PdfPCell(new Phrase(label, PdfFonts.small(9)));
-        PdfPCell v = new PdfPCell(new Phrase(value, PdfFonts.normal(10)));
-        l.setBorder(0); v.setBorder(0);
-        l.setPaddingBottom(6); v.setPaddingBottom(6);
-        t.addCell(l); t.addCell(v);
     }
 
     // ─── Sections ──────────────────────────────────────────────────────
 
     private void renderSections(Document doc, List<BcpSection> secs) throws DocumentException {
-        doc.newPage();
-        Paragraph head = new Paragraph("Sections (ISO 22301 §8.4.2)", PdfFonts.bold(14));
-        head.setSpacingAfter(12);
-        doc.add(head);
+        PdfTheme.sectionDivider(doc, "Plan Sections", "أقسام الخطة — ISO 22301 §8.4.2");
 
         if (secs.isEmpty()) {
             doc.add(new Paragraph("(no sections)", PdfFonts.small(10)));
@@ -182,12 +181,12 @@ public class BcpPlanPdfExporter {
 
             String bodyEn = nz(s.getBodyEn());
             if (!bodyEn.isBlank()) {
-                Paragraph p = new Paragraph(bodyEn, PdfFonts.normal(10));
+                Paragraph p = new Paragraph(bodyEn, PdfFonts.body(10));
                 p.setSpacingAfter(4);
                 doc.add(p);
             }
             if (s.getBodyAr() != null && !s.getBodyAr().isBlank()) {
-                Paragraph p = new Paragraph(s.getBodyAr(), PdfFonts.normal(10));
+                Paragraph p = new Paragraph(s.getBodyAr(), PdfFonts.body(10));
                 p.setSpacingAfter(10);
                 doc.add(p);
             }
@@ -197,10 +196,7 @@ public class BcpPlanPdfExporter {
     // ─── Version history ───────────────────────────────────────────────
 
     private void renderVersionHistory(Document doc, List<BcpVersion> vers) throws DocumentException {
-        doc.newPage();
-        Paragraph head = new Paragraph("Version history", PdfFonts.bold(14));
-        head.setSpacingAfter(10);
-        doc.add(head);
+        PdfTheme.sectionDivider(doc, "Version History", "سجل الإصدارات");
 
         if (vers.isEmpty()) {
             doc.add(new Paragraph("(no approved versions yet)", PdfFonts.small(10)));
@@ -227,10 +223,7 @@ public class BcpPlanPdfExporter {
     // ─── Distribution roster ───────────────────────────────────────────
 
     private void renderDistributionRoster(Document doc, List<BcpPlanAcknowledgement> dist) throws DocumentException {
-        doc.newPage();
-        Paragraph head = new Paragraph("Distribution & acknowledgement", PdfFonts.bold(14));
-        head.setSpacingAfter(10);
-        doc.add(head);
+        PdfTheme.sectionDivider(doc, "Distribution & Acknowledgement", "التوزيع والإقرار");
 
         if (dist.isEmpty()) {
             doc.add(new Paragraph("(plan has not been distributed yet)", PdfFonts.small(10)));
@@ -287,34 +280,18 @@ public class BcpPlanPdfExporter {
 
     private static void headerCell(PdfPTable t, String txt) {
         PdfPCell c = new PdfPCell(new Phrase(txt, PdfFonts.header(10)));
-        c.setBackgroundColor(new Color(0x09, 0x42, 0x42));
+        c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
+        c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(6); c.setPaddingBottom(6);
         c.setPaddingLeft(6); c.setPaddingRight(6);
         t.addCell(c);
     }
     private static void cell(PdfPTable t, String txt) {
-        PdfPCell c = new PdfPCell(new Phrase(txt, PdfFonts.normal(9)));
+        PdfPCell c = new PdfPCell(new Phrase(txt, PdfFonts.body(9)));
+        c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPaddingTop(5); c.setPaddingBottom(5);
         c.setPaddingLeft(6); c.setPaddingRight(6);
         t.addCell(c);
     }
     private static String nz(String s) { return s == null ? "—" : s; }
-
-    // ─── Page event: footer with page number + plan code ─────────────
-
-    private static final class PlanPageEvent extends PdfPageEventHelper {
-        private final String label;
-        PlanPageEvent(String label) { this.label = label; }
-
-        @Override
-        public void onEndPage(PdfWriter writer, Document doc) {
-            try {
-                PdfContentByte cb = writer.getDirectContent();
-                Phrase left  = new Phrase(label, PdfFonts.small(8));
-                Phrase right = new Phrase("p. " + writer.getPageNumber(), PdfFonts.small(8));
-                ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,  left,  doc.left(),  doc.bottom() - 18, 0);
-                ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT, right, doc.right(), doc.bottom() - 18, 0);
-            } catch (Exception ignored) {}
-        }
-    }
 }

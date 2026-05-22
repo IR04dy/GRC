@@ -12,7 +12,10 @@ import com.tss.grc.module.bcm.cycle.repository.CrisisEventRepository;
 import com.tss.grc.module.bcm.cycle.repository.CrisisRegulatoryNotificationRepository;
 import com.tss.grc.module.bcm.cycle.repository.CrisisSituationReportRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.entity.Organisation;
+import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.reporting.service.PdfFonts;
+import com.tss.grc.module.reporting.service.PdfTheme;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,7 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -31,8 +35,13 @@ import java.util.List;
  * regulator can request after a crisis is closed. Sections:
  *
  * <ol>
- *   <li>Cover — event code, title, severity, status, scope, timing</li>
- *   <li>Description + root cause + activated plans</li>
+ *   <li><b>Cover hero</b> — brand band, event code + bilingual title,
+ *       organisation name, Hijri + Gregorian stamp, classification banner.
+ *       KPI strip exposes the four numbers regulators look for first:
+ *       severity, status, regulatory-exposure flags (PDPL/Cyber), and
+ *       outage duration. Secondary metadata (timestamps, owner, trigger,
+ *       crisis manager) sits below as a borderless key/value grid.</li>
+ *   <li>Description + root cause + activated plans + affected scope</li>
  *   <li>SitReps timeline (oldest first)</li>
  *   <li>Decisions log (oldest first)</li>
  *   <li>Regulatory notifications log with reference numbers + ack status</li>
@@ -48,6 +57,7 @@ public class CrisisEventPdfExporter {
     private final CrisisSituationReportRepository           sitreps;
     private final CrisisDecisionRepository                  decisions;
     private final CrisisRegulatoryNotificationRepository    regNotifs;
+    private final OrganisationRepository                    orgs;
     private final AuditLogService                           audit;
 
     @Transactional(readOnly = true)
@@ -56,18 +66,23 @@ public class CrisisEventPdfExporter {
         CrisisEvent e = events.findByIdAndOrganisationId(eventId, org)
             .orElseThrow(() -> new EntityNotFoundException("Crisis event not found: " + eventId));
 
-        List<CrisisSituationReport>        srs   = sitreps   .findByOrganisationIdAndCrisisEventIdOrderByReportedAtAsc(org, eventId);
-        List<CrisisDecision>               ds    = decisions .findByOrganisationIdAndCrisisEventIdOrderByDecidedAtAsc(org, eventId);
-        List<CrisisRegulatoryNotification> rns   = regNotifs .findByOrganisationIdAndCrisisEventIdOrderByNotifiedAtAsc(org, eventId);
+        List<CrisisSituationReport>        srs = sitreps  .findByOrganisationIdAndCrisisEventIdOrderByReportedAtAsc(org, eventId);
+        List<CrisisDecision>               ds  = decisions.findByOrganisationIdAndCrisisEventIdOrderByDecidedAtAsc(org, eventId);
+        List<CrisisRegulatoryNotification> rns = regNotifs.findByOrganisationIdAndCrisisEventIdOrderByNotifiedAtAsc(org, eventId);
+        Organisation organisation = orgs.findById(org).orElse(null);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document doc = new Document(PageSize.A4, 40, 40, 60, 40);
+        Document doc = new Document(PageSize.A4, 40, 40, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
-            writer.setPageEvent(new EventPageEvent("Crisis · " + e.getEventCode()));
+            // Crisis after-action reports are CONFIDENTIAL — they contain
+            // incident timelines and regulator interactions that aren't
+            // released externally without legal review.
+            writer.setPageEvent(PdfTheme.professionalFooter(
+                "Crisis · " + e.getEventCode(), "Confidential"));
             doc.open();
 
-            renderCover(doc, e);
+            renderCover(doc, e, organisation);
             renderNarrative(doc, e);
             renderSitReps(doc, srs);
             renderDecisions(doc, ds);
@@ -87,64 +102,81 @@ public class CrisisEventPdfExporter {
 
     // ─── Cover ────────────────────────────────────────────────────────
 
-    private void renderCover(Document doc, CrisisEvent e) throws DocumentException {
-        Paragraph eyebrow = new Paragraph("Crisis Event — After-Action Report", PdfFonts.small(10));
-        eyebrow.setSpacingBefore(80);
-        doc.add(eyebrow);
+    private void renderCover(Document doc, CrisisEvent e, Organisation o) throws DocumentException {
+        PdfTheme.Cover cv = new PdfTheme.Cover();
+        cv.eyebrow    = "Crisis Event — After-Action Report";
+        cv.eyebrowAr  = "حدث أزمة — تقرير ما بعد الحدث";
+        cv.code       = e.getEventCode();
+        cv.titleEn    = nz(e.getTitleEn());
+        cv.titleAr    = e.getTitleAr();
+        cv.orgNameEn  = o == null ? null : o.getNameEn();
+        cv.orgNameAr  = o == null ? null : o.getNameAr();
+        cv.classification = "Confidential";
+        PdfTheme.coverHero(doc, cv);
 
-        Paragraph code = new Paragraph(e.getEventCode(), PdfFonts.bold(20));
-        code.setSpacingAfter(4);
-        doc.add(code);
+        // KPI strip — the four headline numbers a regulator scans first.
+        // Severity drives the chip colour we apply below the strip; the
+        // boolean flags collapse into a single "Regulatory" indicator so
+        // the row stays at exactly four tiles.
+        long durationH = durationHours(e.getStartTime(), e.getClosureTime());
+        String regFlags = (Boolean.TRUE.equals(e.getPersonalDataAffected()) ? "PDPL " : "")
+                        + (Boolean.TRUE.equals(e.getCyberRelated())         ? "NCA "  : "")
+                        + (Boolean.TRUE.equals(e.getSupplierInvolved())     ? "TPRM"  : "");
+        if (regFlags.isBlank()) regFlags = "None";
 
-        Paragraph title = new Paragraph(nz(e.getTitleEn()), PdfFonts.bold(16));
-        title.setSpacingAfter(2);
-        doc.add(title);
+        List<PdfTheme.Kpi> kpis = new ArrayList<>();
+        kpis.add(new PdfTheme.Kpi("Severity",
+            severityLabel(e.getSeverity()),
+            "Crisis tier"));
+        kpis.add(new PdfTheme.Kpi("Status",
+            nz(e.getStatus()),
+            nz(e.getTriggerSource())));
+        kpis.add(new PdfTheme.Kpi("Duration",
+            durationH < 0 ? "—" : (durationH + "h"),
+            "Start → Closure"));
+        kpis.add(new PdfTheme.Kpi("Regulatory",
+            regFlags.trim(),
+            "Notification triggers"));
+        PdfTheme.kpiStrip(doc, kpis);
 
-        if (e.getTitleAr() != null && !e.getTitleAr().isBlank()) {
-            Paragraph titleAr = new Paragraph(e.getTitleAr(), PdfFonts.normal(14));
-            titleAr.setSpacingAfter(20);
-            doc.add(titleAr);
+        // Severity chip — small coloured pill keyed to the numeric tier
+        if (e.getSeverity() != null) {
+            PdfPTable chipWrap = new PdfPTable(2);
+            chipWrap.setWidthPercentage(100);
+            try { chipWrap.setWidths(new float[] {1, 9}); } catch (DocumentException ignored) {}
+            PdfPCell label = new PdfPCell(new Phrase("SEVERITY", PdfFonts.kpiLabel(8)));
+            label.setBorder(0); label.setPaddingTop(4); label.setPaddingBottom(8);
+            chipWrap.addCell(label);
+            PdfPCell chipCell = new PdfPCell();
+            chipCell.setBorder(0);
+            chipCell.addElement(PdfTheme.statusChip(severityLabel(e.getSeverity()),
+                severityChipKind(e.getSeverity())));
+            chipWrap.addCell(chipCell);
+            doc.add(chipWrap);
         }
 
-        PdfPTable meta = new PdfPTable(4);
-        meta.setWidthPercentage(100);
-        meta.setSpacingBefore(20);
-        try { meta.setWidths(new float[] {1, 2, 1, 2}); } catch (DocumentException ignored) {}
-
-        addMeta(meta, "Severity",       severityLabel(e.getSeverity()));
-        addMeta(meta, "Status",         nz(e.getStatus()));
-        addMeta(meta, "Trigger",        nz(e.getTriggerSource()));
-        addMeta(meta, "Crisis manager", e.getCrisisManagerId() == null ? "—" : ("#" + e.getCrisisManagerId()));
-
-        addMeta(meta, "Detected at",    fmt(e.getDetectionTime()));
-        addMeta(meta, "Activated at",   fmt(e.getActivationTime()));
-        addMeta(meta, "Started at",     fmt(e.getStartTime()));
-        addMeta(meta, "Closed at",      fmt(e.getClosureTime()));
-
-        addMeta(meta, "PDPL breach",   Boolean.TRUE.equals(e.getPersonalDataAffected()) ? "Yes" : "No");
-        addMeta(meta, "Cyber-related", Boolean.TRUE.equals(e.getCyberRelated())          ? "Yes" : "No");
-        addMeta(meta, "Supplier-related", Boolean.TRUE.equals(e.getSupplierInvolved())   ? "Yes" : "No");
-        addMeta(meta, "Lessons row",   e.getLessonsLearnedId() == null ? "—" : ("#" + e.getLessonsLearnedId()));
-
+        // Secondary metadata — timestamps, owner, related entities
+        PdfPTable meta = PdfTheme.metadataGrid();
+        PdfTheme.addMetaCell(meta, "Detected at",       fmt(e.getDetectionTime()));
+        PdfTheme.addMetaCell(meta, "Activated at",      fmt(e.getActivationTime()));
+        PdfTheme.addMetaCell(meta, "Started at",        fmt(e.getStartTime()));
+        PdfTheme.addMetaCell(meta, "Closed at",         fmt(e.getClosureTime()));
+        PdfTheme.addMetaCell(meta, "Crisis manager",    e.getCrisisManagerId() == null ? "—" : ("#" + e.getCrisisManagerId()));
+        PdfTheme.addMetaCell(meta, "Trigger",           nz(e.getTriggerSource()));
+        PdfTheme.addMetaCell(meta, "PDPL breach",       Boolean.TRUE.equals(e.getPersonalDataAffected()) ? "Yes" : "No");
+        PdfTheme.addMetaCell(meta, "Cyber-related",     Boolean.TRUE.equals(e.getCyberRelated())          ? "Yes" : "No");
+        PdfTheme.addMetaCell(meta, "Supplier-related",  Boolean.TRUE.equals(e.getSupplierInvolved())      ? "Yes" : "No");
+        PdfTheme.addMetaCell(meta, "Lessons row",       e.getLessonsLearnedId() == null ? "—" : ("#" + e.getLessonsLearnedId()));
         doc.add(meta);
-
-        Paragraph stamp = new Paragraph(
-            "Generated by TSS GRC Platform · " + LocalDateTime.now().format(DT),
-            PdfFonts.small(9));
-        stamp.setSpacingBefore(40);
-        doc.add(stamp);
     }
 
     // ─── Narrative ────────────────────────────────────────────────────
 
     private void renderNarrative(Document doc, CrisisEvent e) throws DocumentException {
-        doc.newPage();
-        Paragraph head = new Paragraph("Description & root cause", PdfFonts.bold(14));
-        head.setSpacingAfter(10);
-        doc.add(head);
+        PdfTheme.sectionDivider(doc, "Description & Root Cause", "الوصف والسبب الجذري");
 
         if (e.getDescription() != null && !e.getDescription().isBlank()) {
-            Paragraph desc = new Paragraph(e.getDescription(), PdfFonts.normal(10));
+            Paragraph desc = new Paragraph(e.getDescription(), PdfFonts.body(10));
             desc.setSpacingAfter(10);
             doc.add(desc);
         } else {
@@ -157,7 +189,7 @@ public class CrisisEventPdfExporter {
             rcLabel.setSpacingAfter(4);
             doc.add(rcLabel);
 
-            Paragraph rc = new Paragraph(e.getRootCause(), PdfFonts.normal(10));
+            Paragraph rc = new Paragraph(e.getRootCause(), PdfFonts.body(10));
             rc.setSpacingAfter(10);
             doc.add(rc);
         }
@@ -184,10 +216,7 @@ public class CrisisEventPdfExporter {
     // ─── SitReps ──────────────────────────────────────────────────────
 
     private void renderSitReps(Document doc, List<CrisisSituationReport> srs) throws DocumentException {
-        doc.newPage();
-        Paragraph head = new Paragraph("Situation reports", PdfFonts.bold(14));
-        head.setSpacingAfter(10);
-        doc.add(head);
+        PdfTheme.sectionDivider(doc, "Situation Reports", "تقارير الموقف");
 
         if (srs.isEmpty()) {
             doc.add(new Paragraph("(no SitReps recorded)", PdfFonts.small(10)));
@@ -212,10 +241,7 @@ public class CrisisEventPdfExporter {
     // ─── Decisions ────────────────────────────────────────────────────
 
     private void renderDecisions(Document doc, List<CrisisDecision> ds) throws DocumentException {
-        doc.newPage();
-        Paragraph head = new Paragraph("Decisions log", PdfFonts.bold(14));
-        head.setSpacingAfter(10);
-        doc.add(head);
+        PdfTheme.sectionDivider(doc, "Decisions Log", "سجل القرارات");
 
         if (ds.isEmpty()) {
             doc.add(new Paragraph("(no decisions recorded)", PdfFonts.small(10)));
@@ -247,10 +273,7 @@ public class CrisisEventPdfExporter {
 
     private void renderRegulatoryNotifications(Document doc, List<CrisisRegulatoryNotification> rns)
             throws DocumentException {
-        doc.newPage();
-        Paragraph head = new Paragraph("Regulatory notifications", PdfFonts.bold(14));
-        head.setSpacingAfter(10);
-        doc.add(head);
+        PdfTheme.sectionDivider(doc, "Regulatory Notifications", "إخطارات الجهات التنظيمية");
 
         if (rns.isEmpty()) {
             doc.add(new Paragraph("(no regulator notifications recorded)", PdfFonts.small(10)));
@@ -294,42 +317,40 @@ public class CrisisEventPdfExporter {
         };
     }
 
+    /** Maps severity tier → chip colour. 4/5 are red, 3 amber, 1/2 blue. */
+    private static PdfTheme.ChipKind severityChipKind(Integer sev) {
+        if (sev == null) return PdfTheme.ChipKind.NEUTRAL;
+        return switch (sev) {
+            case 5, 4 -> PdfTheme.ChipKind.DANGER;
+            case 3    -> PdfTheme.ChipKind.WARNING;
+            case 2    -> PdfTheme.ChipKind.INFO;
+            case 1    -> PdfTheme.ChipKind.SUCCESS;
+            default   -> PdfTheme.ChipKind.NEUTRAL;
+        };
+    }
+
+    /** Returns hours between two timestamps, or -1 if either is null. */
+    private static long durationHours(LocalDateTime start, LocalDateTime end) {
+        if (start == null || end == null) return -1;
+        return java.time.Duration.between(start, end).toHours();
+    }
+
     private static String fmt(LocalDateTime t) { return t == null ? "—" : t.format(DT); }
     private static String nz(String s) { return s == null ? "—" : s; }
 
-    private static void addMeta(PdfPTable t, String label, String value) {
-        PdfPCell l = new PdfPCell(new Phrase(label, PdfFonts.small(9)));
-        PdfPCell v = new PdfPCell(new Phrase(value, PdfFonts.normal(10)));
-        l.setBorder(0); v.setBorder(0);
-        l.setPaddingBottom(6); v.setPaddingBottom(6);
-        t.addCell(l); t.addCell(v);
-    }
     private static void headerCell(PdfPTable t, String txt) {
         PdfPCell c = new PdfPCell(new Phrase(txt, PdfFonts.header(10)));
-        c.setBackgroundColor(new Color(0x09, 0x42, 0x42));
+        c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
+        c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(6); c.setPaddingBottom(6);
         c.setPaddingLeft(6); c.setPaddingRight(6);
         t.addCell(c);
     }
     private static void cell(PdfPTable t, String txt) {
-        PdfPCell c = new PdfPCell(new Phrase(txt, PdfFonts.normal(9)));
+        PdfPCell c = new PdfPCell(new Phrase(txt, PdfFonts.body(9)));
+        c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPaddingTop(5); c.setPaddingBottom(5);
         c.setPaddingLeft(6); c.setPaddingRight(6);
         t.addCell(c);
-    }
-
-    private static final class EventPageEvent extends PdfPageEventHelper {
-        private final String label;
-        EventPageEvent(String label) { this.label = label; }
-        @Override
-        public void onEndPage(PdfWriter writer, Document doc) {
-            try {
-                PdfContentByte cb = writer.getDirectContent();
-                Phrase left  = new Phrase(label, PdfFonts.small(8));
-                Phrase right = new Phrase("p. " + writer.getPageNumber(), PdfFonts.small(8));
-                ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,  left,  doc.left(),  doc.bottom() - 18, 0);
-                ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT, right, doc.right(), doc.bottom() - 18, 0);
-            } catch (Exception ignored) {}
-        }
     }
 }
