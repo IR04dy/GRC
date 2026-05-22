@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.cycle.service;
 
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
@@ -99,7 +100,7 @@ public class BcpPlanPdfExporter {
             doc.close();
             writer.close();
         } catch (DocumentException e) {
-            throw new RuntimeException("Plan PDF generation failed", e);
+            throw new ExportException("PDF", "Plan PDF generation failed", e);
         }
 
         audit.log("EXPORT_PDF", "BcpPlan", planId,

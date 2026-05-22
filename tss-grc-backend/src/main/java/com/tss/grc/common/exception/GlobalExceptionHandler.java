@@ -104,6 +104,25 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Document generation (PDF / Excel / PPTX / DOCX) failed. Returns a 500
+     * with a clear "Document generation failed" message + the {@code
+     * documentKind} so the frontend toast can render "PDF export failed —
+     * try again or contact support" instead of the generic
+     * "An unexpected error occurred" that the catch-all surfaces.
+     */
+    @ExceptionHandler(ExportException.class)
+    public ProblemDetail handleExportFailure(ExportException ex) {
+        log.error("Document export failed [{}]: {}", ex.getDocumentKind(), ex.getMessage(), ex);
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+            "Document generation failed. Please try again or contact your administrator.");
+        pd.setTitle(ex.getDocumentKind() + " export failed");
+        pd.setType(URI.create("https://grc.tss.com/errors/export-failed"));
+        pd.setProperty("documentKind", ex.getDocumentKind());
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
      * Spring throws {@link NoResourceFoundException} when no controller
      * is mapped to the requested path. The default behaviour bubbles up
      * to {@link #handleGeneral} and surfaces as a 500, which is

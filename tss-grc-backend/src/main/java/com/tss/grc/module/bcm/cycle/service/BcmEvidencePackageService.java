@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
@@ -145,7 +146,7 @@ public class BcmEvidencePackageService {
                 "audit_log.csv",          audit_csv);
             addEntry(zip, "MANIFEST.txt", manifest.getBytes());
         } catch (IOException e) {
-            throw new RuntimeException("Failed to assemble evidence package: " + e.getMessage(), e);
+            throw new ExportException("ZIP", "Failed to assemble evidence package: " + e.getMessage(), e);
         }
 
         byte[] zipBytes = out.toByteArray();
@@ -190,7 +191,7 @@ public class BcmEvidencePackageService {
             wb.write(bos);
             return bos.toByteArray();
         } catch (IOException e) {
-            throw new RuntimeException("Failed to write " + sheetName + " sheet: " + e.getMessage(), e);
+            throw new ExportException("Excel", "Failed to write " + sheetName + " sheet: " + e.getMessage(), e);
         }
     }
 
@@ -278,7 +279,7 @@ public class BcmEvidencePackageService {
             wb.write(bos);
             return bos.toByteArray();
         } catch (IOException e) {
-            throw new RuntimeException("Failed to write gaps/capas sheet: " + e.getMessage(), e);
+            throw new ExportException("Excel", "Failed to write gaps/capas sheet: " + e.getMessage(), e);
         }
     }
 

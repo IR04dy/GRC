@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.cycle.service;
 
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.CrisisDecision;
 import com.tss.grc.module.bcm.cycle.entity.CrisisEvent;
@@ -91,7 +92,7 @@ public class CrisisEventPdfExporter {
             doc.close();
             writer.close();
         } catch (DocumentException ex) {
-            throw new RuntimeException("Crisis-event PDF generation failed", ex);
+            throw new ExportException("PDF", "Crisis-event PDF generation failed", ex);
         }
 
         audit.log("EXPORT_PDF", "CrisisEvent", eventId,

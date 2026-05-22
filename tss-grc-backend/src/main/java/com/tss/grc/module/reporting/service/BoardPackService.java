@@ -2,6 +2,7 @@ package com.tss.grc.module.reporting.service;
 
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
 import com.tss.grc.module.compliance.entity.AuditFinding;
@@ -134,7 +135,7 @@ public class BoardPackService {
             doc.close();
             writer.close();
         } catch (DocumentException e) {
-            throw new RuntimeException("Board pack generation failed", e);
+            throw new ExportException("PDF", "Board pack PDF generation failed", e);
         }
         return baos.toByteArray();
     }

@@ -9,6 +9,7 @@ import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.*;
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
@@ -277,7 +278,7 @@ public class ExportService {
             doc.close();
             writer.close();
         } catch (DocumentException e) {
-            throw new RuntimeException("PDF generation failed", e);
+            throw new ExportException("PDF", "PDF generation failed", e);
         }
         return baos.toByteArray();
     }
@@ -354,7 +355,7 @@ public class ExportService {
             for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
             return writeWorkbook(wb);
         } catch (Exception e) {
-            throw new RuntimeException("Excel generation failed", e);
+            throw new ExportException("Excel", "Excel generation failed", e);
         }
     }
 
@@ -398,7 +399,7 @@ public class ExportService {
             for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
             return writeWorkbook(wb);
         } catch (Exception e) {
-            throw new RuntimeException("Excel generation failed", e);
+            throw new ExportException("Excel", "Excel generation failed", e);
         }
     }
 
@@ -461,7 +462,7 @@ public class ExportService {
             summary.autoSizeColumn(0); summary.autoSizeColumn(1);
             return writeWorkbook(wb);
         } catch (Exception e) {
-            throw new RuntimeException("Excel generation failed", e);
+            throw new ExportException("Excel", "Excel generation failed", e);
         }
     }
 

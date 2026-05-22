@@ -9,6 +9,7 @@ import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ndi.reports.service.NdiReportService.ReportResult;
 import com.tss.grc.module.platform.entity.Organisation;
@@ -221,7 +222,7 @@ public class NdiReportExporter {
             doc.close();
             return out.toByteArray();
         } catch (Exception ex) {
-            throw new RuntimeException("PDF export failed", ex);
+            throw new ExportException("PDF", "NDI report PDF export failed", ex);
         }
     }
 

@@ -3,6 +3,7 @@ package com.tss.grc.module.admin.committee.service;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.CommitteeFormTemplate;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -67,7 +68,7 @@ public class CommitteeFormExportService {
             doc.close();
             writer.close();
         } catch (DocumentException e) {
-            throw new RuntimeException("Form PDF generation failed", e);
+            throw new ExportException("PDF", "Form PDF generation failed", e);
         } catch (EntityNotFoundException nf) {
             throw nf;
         }

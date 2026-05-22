@@ -1,5 +1,6 @@
 package com.tss.grc.module.reporting.service;
 
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
 import com.tss.grc.module.compliance.entity.AuditFinding;
@@ -95,7 +96,7 @@ public class BoardPackPptxService {
             ppt.write(baos);
             return baos.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Board PPTX generation failed", e);
+            throw new ExportException("PPTX", "Board pack PPTX generation failed", e);
         }
     }
 
