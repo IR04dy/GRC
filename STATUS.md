@@ -1,9 +1,59 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (Sprint-5 Track-2.5 Phase 2 Saved Views backend — V160 + REST + frontend sync)
+**Last update:** 22 May 2026 (Privacy module end-to-end completion — Consent + DSR + Breach + RoPA detail pages with Saudi-native PDPL UX)
 
 ---
 
-## 🟢 Latest — Saved Views Phase 2 backend (22 May 2026, PR #108)
+## 🟢 Latest — Privacy / PDPL module complete (22 May 2026, PRs #109 + #110 + #111)
+
+The Privacy module is now end-to-end complete: every register tab is
+backed by real `/api/v1/privacy/*` data, every row has a real detail
+page, every workflow button is wired to its lifecycle endpoint, and
+every PDPL article anchor is visible to the DPO.
+
+### What landed across three PRs
+
+| PR | Closes | Description |
+|---|---|---|
+| #109 | Consent tab was hardcoded percentages | Real `ConsentRecord` ledger backed by `/api/v1/privacy/consents` + `/stats`. New `ConsentTab` component: lifecycle KPIs, channel mix, purpose mix with hot-purpose highlight, expiring-soon banner with inline Withdraw, recent grants + withdrawals. `ConsentDetailPage` at `/privacy/consents/:id` with full subject history. |
+| #110 | DSR / Breach / RoPA rows had no detail page | Three new detail pages: `DsrDetailPage` (30-day SLA countdown + Start/Fulfil/Extend/Reject workflow), `PrivacyBreachDetailPage` (72-hour SDAIA notification clock + Contain/Notify/Close), `RopaDetailPage` (Art. 25 completeness check). All three carry the PDPL legal anchor, audit timeline tab, and Saudi-native Arabic labels. |
+| #111 | Row clicks did nothing | Wired `rowHref` on DSR / Breach / RoPA `DataTable` instances so clicking a row lands on its detail page (same convention as Vulnerabilities / Workflow Submissions / Risk Register). |
+
+### Saudi-native UX guarantee
+
+Every purpose code, channel label, request type, breach type, and
+status badge carries an idiomatic Arabic label — never a
+transliteration. Examples:
+- `KYC_ONBOARDING` → "التحقق من الهوية"
+- `CREDIT_SCORING` → "التقييم الائتماني (سمة)" (SIMAH-specific)
+- `CROSS_BORDER` → "النقل خارج المملكة"
+- `UNAUTHORISED_DISCLOSURE` → "إفشاء غير مصرح"
+- "Notify SDAIA" → "إخطار سدايا"
+
+### PDPL article anchors visible everywhere
+
+| Article | Surface |
+|---|---|
+| Art. 4 (Data subject rights, 30d SLA) | DSR detail header countdown + body anchor |
+| Art. 5 (Consent ledger) | Consent tab footer + detail body |
+| Art. 6 (Right of withdrawal) | Consent withdraw action + detail body |
+| Art. 20 (SDAIA notification, 72h) | Breach detail header clock + body anchor |
+| Art. 21 (Subject notification) | Breach detail affected-records panel + checklist |
+| Art. 24 (DPIA) | Existing DPIA detail page |
+| Art. 25 (RoPA register) | RoPA detail body + completeness check |
+
+### Detail page coverage matrix
+
+| Entity | Detail page | Workflow buttons | Audit timeline | PDPL anchor |
+|---|---|---|---|---|
+| DSR | `/privacy/dsrs/:id` | Start / Fulfil / Extend / Reject | ✅ | Art. 4 |
+| Breach | `/privacy/breaches/:id` | Contain / Notify SDAIA / Close | ✅ | Art. 20+21 |
+| RoPA | `/privacy/ropa/:id` | (read-only register entry) | ✅ | Art. 25 |
+| DPIA | `/dpias/:id` (existed) | Submit / Approve / Reject / Expire | ✅ | Art. 24 |
+| Consent | `/privacy/consents/:id` | Withdraw (only when ACTIVE) | ✅ | Art. 5+6 |
+
+---
+
+## 🟢 Earlier — Saved Views Phase 2 backend (22 May 2026, PR #108)
 
 Closes the loop on the localStorage-only Phase 1. Saved views now
 round-trip through `/api/platform/saved-views` whenever the user is
