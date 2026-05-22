@@ -11,6 +11,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LoadableSection } from '../../components/ui/LoadableSection';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { useLoadable } from '../../lib/useLoadable';
 import {
@@ -137,6 +138,7 @@ function SubmissionBody({
   onAct: (decision: 'APPROVE' | 'REJECT' | 'CLOSE' | 'UNDER_REVIEW') => void | Promise<void>;
   onNavigate: ReturnType<typeof useNavigate>;
 }) {
+  const lang = isAr ? 'ar' : 'en';
   const cat = useMemo(() => WORKFLOWS.find(w => w.id === s.workflowId), [s.workflowId]);
   const moduleLabel = MODULE_LABEL[s.workflowModule as keyof typeof MODULE_LABEL];
   const wizardLabel = isAr ? (cat?.titleAr ?? s.workflowId) : (cat?.titleEn ?? s.workflowId);
@@ -150,7 +152,7 @@ function SubmissionBody({
             Icon={cat?.Icon ?? ClipboardCheck}
             action={(
               <div style={{ display: 'flex', gap: 6 }}>
-                <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{s.status}</Badge>
+                <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{statusLabel(s.status, lang)}</Badge>
                 <Badge tone="neutral">
                   {isAr && moduleLabel ? moduleLabel.ar : (moduleLabel?.en ?? s.workflowModule)}
                 </Badge>

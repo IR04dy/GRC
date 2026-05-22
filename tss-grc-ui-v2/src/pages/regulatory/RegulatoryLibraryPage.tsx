@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listAuthorityDocuments, listAuthorityDocumentCitations,
@@ -178,7 +179,7 @@ export function RegulatoryLibraryPage() {
                         </td>
                         <td className="text-xs">{d.family}</td>
                         <td className="mono text-2xs">v{d.version}</td>
-                        <td><Badge tone={authorityStatusTone(d.status)}>{d.status}</Badge></td>
+                        <td><Badge tone={authorityStatusTone(d.status)}>{statusLabel(d.status, lang)}</Badge></td>
                         <td>
                           <Badge tone={translationTone(d.translationStatus)}>
                             {translationLabel(d.translationStatus, isAr ? 'ar' : 'en')}

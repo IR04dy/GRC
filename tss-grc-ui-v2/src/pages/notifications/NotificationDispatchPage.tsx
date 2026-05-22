@@ -11,6 +11,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   CHANNEL_CONFIG, CHANNEL_LABEL, STATUS_TONE,
@@ -220,7 +221,7 @@ export function NotificationDispatchPage() {
                           {r.errorMessage && <> · <span style={{ color: 'var(--danger)' }}>{r.errorMessage}</span></>}
                         </div>
                       </div>
-                      <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>
+                      <Badge tone={STATUS_TONE[r.status]}>{statusLabel(r.status, lang)}</Badge>
                     </div>
                   );
                 })}

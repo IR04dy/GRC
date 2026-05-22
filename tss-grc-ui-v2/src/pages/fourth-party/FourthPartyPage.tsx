@@ -13,6 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listFourthParty, validateFourthParty, mitigateFourthParty, retireFourthParty,
@@ -191,7 +192,7 @@ export function FourthPartyPage() {
                           <td>{r.dependencyType.replace(/_/g, ' ')}</td>
                           <td><Badge tone={FP_CRIT_TONE[r.downstreamCriticality]}>{r.downstreamCriticality}</Badge></td>
                           <td><Badge tone={FP_CONC_TONE[r.concentrationRisk]}>{r.concentrationRisk}</Badge></td>
-                          <td><Badge tone={FP_STATUS_TONE[r.status]}>{r.status}</Badge></td>
+                          <td><Badge tone={FP_STATUS_TONE[r.status]}>{statusLabel(r.status, lang)}</Badge></td>
                           <td style={{ textAlign: 'right' }}>
                             {r.status === 'DISCOVERED' && (
                               <Button size="sm" variant="primary" disabled={busyId === r.id} onClick={() => onValidate(r.id)}>

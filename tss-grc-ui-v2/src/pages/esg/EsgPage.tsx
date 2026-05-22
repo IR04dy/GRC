@@ -15,6 +15,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listClimateItems, createClimateItem, assessClimateItem, treatClimateItem,
@@ -2783,7 +2784,7 @@ function AnnexTab() {
                     <td><Badge tone="info">{r.reportType}</Badge></td>
                     <td className="mono">{r.version}</td>
                     <td className="mono text-xs">{r.generatedAt?.slice(0, 16).replace('T', ' ')}</td>
-                    <td><Badge tone={reportStatusTone(r.status)}>{r.status}</Badge></td>
+                    <td><Badge tone={reportStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
                     <td style={{ textAlign: 'end' }}>
                       <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                         <Button variant="ghost"     size="sm" onClick={() => setPreviewId(r.id!)}>{t('annexActPreview')}</Button>
@@ -3031,7 +3032,7 @@ function GhgInventoryTab() {
                           {Number(r.coveragePercent).toFixed(0)}%
                         </Badge>
                       </td>
-                      <td><Badge tone={ghgStatusTone(r.status)}>{r.status}</Badge></td>
+                      <td><Badge tone={ghgStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
                       <td style={{ textAlign: 'end' }}>
                         <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onSubmit_(r.id!)}>{t('ghgActSubmit')}</Button>}

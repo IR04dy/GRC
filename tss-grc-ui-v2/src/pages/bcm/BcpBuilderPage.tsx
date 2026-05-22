@@ -11,6 +11,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -376,7 +377,7 @@ export function BcpBuilderPage() {
                       <td className="mono">{p.planCode}</td>
                       <td><Badge tone={p.planType === 'BCP' ? 'info' : 'primary'}>{p.planType}</Badge></td>
                       <td>{p.titleEn}</td>
-                      <td><Badge tone={planStatusTone(p.status)}>{p.status}</Badge></td>
+                      <td><Badge tone={planStatusTone(p.status)}>{statusLabel(p.status, lang)}</Badge></td>
                       <td className="mono">v{p.currentVersion}</td>
                       <td className="mono">{p.rtoHours ?? '—'}h</td>
                       <td className="mono">{p.rpoHours ?? '—'}h</td>
@@ -581,7 +582,7 @@ export function BcpBuilderPage() {
                           <td className="text-muted">{a.recipientRole ?? '—'}</td>
                           <td className="mono" style={{ fontSize: 11 }}>{a.distributionChannel}</td>
                           <td className="mono" style={{ fontSize: 11 }}>{a.distributedAt?.slice(0, 16) ?? '—'}</td>
-                          <td><Badge tone={ackStatusTone(a.status)}>{a.status}</Badge></td>
+                          <td><Badge tone={ackStatusTone(a.status)}>{statusLabel(a.status, lang)}</Badge></td>
                           <td className="mono" style={{ fontSize: 11 }}>{a.acknowledgedAt?.slice(0, 16) ?? '—'}</td>
                           <td style={{ textAlign: 'end' }}>
                             {a.status === 'PENDING' && (

@@ -20,6 +20,7 @@ import {
   type ReportScheduleDto, type ReportRunDto,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 import { REPORT_SCHEDULES, REPORT_RUNS } from './mockReports';
@@ -54,7 +55,7 @@ const EMPTY: Partial<ReportScheduleDto> = {
 };
 
 export function ReportSchedulesPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const demoMode = !isAuthenticated();
   const [items, setItems] = useState<ReportScheduleDto[]>([]);
@@ -221,7 +222,7 @@ export function ReportSchedulesPage() {
             <div style={{ display: 'grid', gap: 6 }}>
               {recent.map(r => (
                 <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 12 }}>
-                  <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{r.status}</Badge>
+                  <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(r.status, lang)}</Badge>
                   <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.triggeredBy}</span>
                   {r.triggeredAt && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{new Date(r.triggeredAt).toLocaleString()}</span>}
                   {typeof r.bytes === 'number' && r.bytes > 0 && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{Math.round(r.bytes / 1024)} KB</span>}

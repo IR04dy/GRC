@@ -13,6 +13,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   loadBia, transitionBia,
@@ -355,7 +356,7 @@ function StrategyTab({ strategies, bias: _bias, onTransition, onCreate }: {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                   <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{s.id}</span>
-                  <Badge tone={STRATEGY_STATUS_TONE[s.status]}>{s.status}</Badge>
+                  <Badge tone={STRATEGY_STATUS_TONE[s.status]}>{statusLabel(s.status, lang)}</Badge>
                   <Badge tone={s.maturity >= 4 ? 'success' : s.maturity >= 3 ? 'info' : 'warning'}>
                     {t('bclMaturity')} {s.maturity}/5
                   </Badge>

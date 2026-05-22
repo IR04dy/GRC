@@ -11,6 +11,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LoadableSection } from '../../components/ui/LoadableSection';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   workflowSubmissionApi, type WorkflowSubmissionDto,
@@ -561,7 +562,7 @@ export function WorkflowSubmissionsPage() {
                               {stale ? (isAr ? ' · قديم' : ' · stale') : ''}
                             </Badge>
                           )}
-                          <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{s.status}</Badge>
+                          <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{statusLabel(s.status, lang)}</Badge>
                           <Badge tone="neutral">{s.workflowModule}</Badge>
                         </div>
                       )}>

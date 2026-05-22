@@ -22,6 +22,7 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { SEVERITY_TONE, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
@@ -678,7 +679,7 @@ export function CompliancePage() {
     { header: t('colAuditor'),   cell: r => r.auditor ?? '—' },
     { header: t('colScore'),     cell: r => <ScorePillCompliance score={r.score ?? 0} /> },
     { header: t('colDate'),      cell: r => r.assessmentDate ?? '—', mono: true },
-    { header: t('colStatus'),    cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'neutral'} dot>{r.status}</Badge> },
+    { header: t('colStatus'),    cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'neutral'} dot>{statusLabel(r.status, lang)}</Badge> },
   ];
 
   const findingCols: Column<ComplianceFindingDto>[] = [
@@ -687,7 +688,7 @@ export function CompliancePage() {
     { header: t('colOwner'),    cell: r => r.owner ?? '—' },
     { header: t('colCapa'),     cell: r => <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{(r.capa ?? '—').slice(0, 60)}</span> },
     { header: t('colDue'),      cell: r => r.dueDate ?? '—', mono: true },
-    { header: t('colStatus'),   cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'neutral'} dot>{r.status}</Badge> },
+    { header: t('colStatus'),   cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'neutral'} dot>{statusLabel(r.status, lang)}</Badge> },
   ];
 
   const internalAssess = assessments.data.filter(a => !/external|bsi|kpmg|deloitte|pwc|ey/i.test(a.auditor ?? ''));
@@ -970,6 +971,7 @@ function sheetTabStyle(active: boolean): React.CSSProperties {
 }
 
 function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: ReturnType<typeof useToast> }) {
+  const { lang } = useI18n();
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
   const [coverage, setCoverage] = useState<Record<number, FrameworkCoverageDto>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -1208,7 +1210,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                       { header: t('dpiaResidualRisk'), cell: d => d.overallResidualRisk ? <Badge tone={RISK_TONE_BADGE[d.overallResidualRisk] ?? 'neutral'} dot>{d.overallResidualRisk}</Badge> : '—', width: '120px' },
                       { header: t('colDate'),     cell: d => d.assessmentDate ?? '—', mono: true, width: '110px' },
                       { header: t('fldNextReviewDate'), cell: d => d.nextReviewDate ?? '—', mono: true, width: '120px' },
-                      { header: t('colStatus'),   cell: d => <Badge tone={d.status === 'APPROVED' ? 'success' : d.status === 'REJECTED' ? 'danger' : 'info'} dot>{d.status}</Badge>, width: '120px' },
+                      { header: t('colStatus'),   cell: d => <Badge tone={d.status === 'APPROVED' ? 'success' : d.status === 'REJECTED' ? 'danger' : 'info'} dot>{statusLabel(d.status, lang)}</Badge>, width: '120px' },
                     ]}
                     rows={dpias}
                     empty={<EmptyState />}

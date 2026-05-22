@@ -12,6 +12,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listDrPlans, approveDrPlan, rejectDrPlan, activateDrPlan, archiveDrPlan, recordDrTest,
@@ -179,7 +180,7 @@ export function DrPlansPage() {
                               ? <Badge tone={DR_TEST_TONE[r.lastTestedOutcome]}>{r.lastTestedOutcome}</Badge>
                               : <Badge tone="info">NOT TESTED</Badge>}
                           </td>
-                          <td><Badge tone={DR_STATUS_TONE[r.status]}>{r.status}</Badge></td>
+                          <td><Badge tone={DR_STATUS_TONE[r.status]}>{statusLabel(r.status, lang)}</Badge></td>
                           <td style={{ textAlign: 'right' }}>
                             {r.status === 'DRAFT' && (
                               <>

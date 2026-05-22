@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import {
   ASSETS, downstreamOf, upstreamOf, transitiveBlastRadius,
   ccmChecksForAsset, approvalsForAsset,
@@ -299,7 +300,7 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{lang === 'ar' ? a.titleAr : a.titleEn}</div>
                   <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{a.module} · {a.sourceRef}</div>
                 </div>
-                <Badge tone="info">{a.status}</Badge>
+                <Badge tone="info">{statusLabel(a.status, lang)}</Badge>
               </div>
             ))}
           </div>

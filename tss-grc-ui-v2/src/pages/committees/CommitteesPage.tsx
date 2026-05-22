@@ -12,6 +12,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMeetings, startMeeting, completeMeeting, approveMinutes, cancelMeeting,
@@ -161,7 +162,7 @@ export function CommitteesPage() {
                             <td>{c.chairpersonName ?? '—'}</td>
                             <td>{c.meetingCadence}</td>
                             <td className="mono">{c.quorumPct != null ? `${c.quorumPct}%` : '—'}</td>
-                            <td><Badge tone={COM_STATUS_TONE[c.status]}>{c.status}</Badge></td>
+                            <td><Badge tone={COM_STATUS_TONE[c.status]}>{statusLabel(c.status, lang)}</Badge></td>
                           </tr>
                           {open && (
                             <tr>

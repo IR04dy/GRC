@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listClauses, approveClause, deprecateClause,
@@ -148,7 +149,7 @@ export function ContractClausesPage() {
                           <td><Badge tone={CLAUSE_RISK_TONE[r.riskLevel]}>{r.riskLevel}</Badge></td>
                           <td><Badge tone={CLAUSE_NEGOTIABILITY_TONE[r.negotiability]}>{r.negotiability}</Badge></td>
                           <td className="mono">v{r.version}</td>
-                          <td><Badge tone={CLAUSE_STATUS_TONE[r.status]}>{r.status}</Badge></td>
+                          <td><Badge tone={CLAUSE_STATUS_TONE[r.status]}>{statusLabel(r.status, lang)}</Badge></td>
                           <td style={{ textAlign: 'right' }}>
                             {r.status === 'DRAFT' && (
                               <Button size="sm" variant="primary" Icon={CheckCircle2}

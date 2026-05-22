@@ -10,6 +10,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LoadableSection } from '../../components/ui/LoadableSection';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { useLoadable } from '../../lib/useLoadable';
 import { aar, type CrisisAar, type AarStatus } from '../../lib/aar';
@@ -116,7 +117,7 @@ export function AarDetailPage() {
             <>
               {/* Header card */}
               <Card title={current.reportCode} Icon={FileCheck2}
-                    action={<Badge tone={STATUS_TONE[a.status]}>{a.status}</Badge>}>
+                    action={<Badge tone={STATUS_TONE[a.status]}>{statusLabel(a.status, lang)}</Badge>}>
                 {editing ? (
                   <div className="wf-form-grid">
                     <Field label={isAr ? 'العنوان (إنجليزي)' : 'Title (English)'} required>

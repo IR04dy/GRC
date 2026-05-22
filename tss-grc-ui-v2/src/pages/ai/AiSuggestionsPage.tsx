@@ -9,6 +9,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LoadableSection } from '../../components/ui/LoadableSection';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { ai, type AiFeature, type AiStatus, type AiSuggestion } from '../../lib/ai';
 
@@ -133,7 +134,7 @@ export function AiSuggestionsPage() {
                     title={`#${s.id} · ${formatDate(s.createdAt)}`}
                     action={(
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <Badge tone={STATUS_TONE[s.status]}>{s.status}</Badge>
+                        <Badge tone={STATUS_TONE[s.status]}>{statusLabel(s.status, lang)}</Badge>
                         {s.confidence != null && (
                           <Badge tone="info">{Number(s.confidence).toFixed(0)}%</Badge>
                         )}

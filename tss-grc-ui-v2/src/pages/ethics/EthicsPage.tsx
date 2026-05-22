@@ -25,6 +25,7 @@ import {
   type AmlAlertDto, type AmlAnalyticsDto, type FrameworkDto,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 import {
@@ -1159,7 +1160,7 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     { header: t('discFldType'),    cell: d => <Badge tone="primary">{d.disclosureType.replace(/_/g, ' ')}</Badge>, width: '180px' },
     { header: t('discFldDiscloser'), cell: d => d.discloserName, width: '180px' },
     { header: t('discFldValue'),   cell: d => d.monetaryValue ? `${d.monetaryValue.toLocaleString()} ${d.currency ?? 'SAR'}` : '—', mono: true, width: '130px' },
-    { header: t('colStatus'),      cell: d => <Badge tone={DISCLOSURE_STATUS_TONE[d.status] ?? 'neutral'} dot>{d.status}</Badge>, width: '120px' },
+    { header: t('colStatus'),      cell: d => <Badge tone={DISCLOSURE_STATUS_TONE[d.status] ?? 'neutral'} dot>{statusLabel(d.status, lang)}</Badge>, width: '120px' },
     { header: '', align: 'end', width: '180px',
       cell: d => {
         const next = nextDiscStatus(d);

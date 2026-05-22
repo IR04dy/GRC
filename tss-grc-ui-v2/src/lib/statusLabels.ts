@@ -17,7 +17,11 @@
  * helpers for the same reason. All four tables are exhaustive for
  * the enums the platform actually uses today.
  */
-type Lang = 'en' | 'ar';
+/** Accepts any string and narrows to 'ar' / 'en' internally so the
+ *  helper composes with `useI18n().lang` regardless of how widely
+ *  the i18n module types that field. Defaults to 'en' for anything
+ *  other than the literal 'ar'. */
+type Lang = string;
 
 /** Generic status enum used across risk, incident, capa, issue, etc. */
 const STATUS_LABELS: Record<string, { en: string; ar: string }> = {
@@ -117,7 +121,7 @@ function lookup(
   if (value == null || value === '') return '';
   const key = value.toUpperCase().replace(/[\s-]/g, '_');
   const row = table[key];
-  if (row) return row[lang];
+  if (row) return lang === 'ar' ? row.ar : row.en;
   // Fallback: humanize "PARTIAL_SUCCESS" → "Partial Success"
   return value
     .replace(/[_-]/g, ' ')
