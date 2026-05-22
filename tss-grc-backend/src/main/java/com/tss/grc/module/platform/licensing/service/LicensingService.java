@@ -42,13 +42,18 @@ public class LicensingService {
     private final OrganisationLicenseRepository repo;
     private final AuditLogService audit;
 
-    /** Master list of canonical module codes — kept in sync with the V97 seed. */
+    /** Master list of canonical module codes — kept in sync with the V97 seed
+     *  and any subsequent migration that introduces a new module (SOCOPS in
+     *  V150). The {@link LicensingService#assign(...)} validation rejects
+     *  unknown codes, so this list is the source of truth for "what modules
+     *  can a platform admin entitle a tenant to". */
     public static final Set<String> KNOWN_MODULES = Set.of(
         "RISK", "BCM", "SCM", "CYBER", "PDPL", "TPRM",
         "POLICY", "NDI", "COMPLIANCE", "AUDIT_LC",
         "INCIDENT", "EVIDENCE", "REPORTING",
         "REGULATORY", "CONTROL_LIB", "POSTURE",
-        "AUTOMATION", "AUDIT_LOG", "PLATFORM_ADMIN"
+        "AUTOMATION", "AUDIT_LOG", "PLATFORM_ADMIN",
+        "SOCOPS"
     );
 
     @Cacheable(value = "licenses", key = "#organisationId")
