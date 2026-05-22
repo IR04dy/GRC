@@ -135,9 +135,16 @@ const NAV_GROUPS: NavGroup[] = [
   // ─── 6. Cybersecurity ───────────────────────────────────────────────
   // Standalone vertical per industry convention (IT and Cyber Risk). Assets folded
   // in as the asset register is cyber-owned in our domain model.
+  //
+  // SOC Operations (V150/V151) is the CISO-grade operational layer — SIEM
+  // ingest, IR playbooks, threat intel, pentests, cert expiry, regulator
+  // exams, Saudi seasonal overlays. Sits above the framework-and-controls
+  // governance entries because the SOC dashboard is what the CISO opens
+  // first, daily.
   {
     id: 'cyber', titleKey: 'navCyber',
     items: [
+      { id: 'socops',     to: '/socops',             Icon: Siren,           labelKey: 'socopsSidebar' },
       { id: 'cyber-dash', to: '/cyber/dashboard',  Icon: LayoutDashboard, labelKey: 'cyberDashSidebar' },
       { id: 'cyber',    to: '/cyber',              Icon: LockKeyhole, labelKey: 'modCyber' },
       { id: 'cyber-lc', to: '/cyber-lifecycle',    Icon: ShieldCheck, labelKey: 'cycSidebar' },
