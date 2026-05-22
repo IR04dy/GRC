@@ -3,10 +3,13 @@ package com.tss.grc.module.change_mgmt.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -52,11 +55,63 @@ public class ChangeManagementService {
     private final ChangeTaskRepository taskRepo;
     private final ChangeLinkRepository linkRepo;
     private final ChangeCommentRepository commentRepo;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
     private void emitChange(ChangeRequest cr) {
         if (bcast != null) bcast.entity(cr.getOrganisationId(), "change_request", cr.getId(), cr);
+    }
+
+    // ── F8 payload + emit ─────────────────────────────────────────────────────
+    //
+    // Change Management is the ITIL v4 Change Enablement workflow,
+    // high-visibility for the audit committee. F8 events let downstream
+    // consumers (CMDB sync, BCM-impact notifications, post-implementation
+    // reviews) react to specific lifecycle moments. The state machine
+    // has 14 states; events are emitted for the 7 milestones that
+    // matter most to downstream consumers.
+
+    private Map<String, Object> payloadFor(ChangeRequest c, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("changeId",         nullSafeStr(c.getId()));
+        m.put("changeCode",       nullSafeStr(c.getChangeCode()));
+        m.put("status",           nullSafeStr(c.getStatus()));
+        m.put("previousStatus",   nullSafeStr(previousStatus));
+        m.put("changeType",       nullSafeStr(c.getChangeType()));
+        m.put("category",         nullSafeStr(c.getCategory()));
+        m.put("riskLevel",        nullSafeStr(c.getRiskLevel()));
+        m.put("outcome",          nullSafeStr(c.getOutcome()));
+        m.put("requestedByName",  nullSafeStr(c.getRequestedByName()));
+        m.put("changeOwnerName",  nullSafeStr(c.getChangeOwnerName()));
+        m.put("scheduledStart",   nullSafeStr(c.getScheduledStart()));
+        return m;
+    }
+
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+    private static String nullSafeMsg(Object o) { return o == null ? "<not provided>" : o.toString(); }
+
+    private void emit(String trigger, ChangeRequest c, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            TenantContext.getCurrentTenant(), trigger, "ChangeRequest", c.getId(),
+            "change:" + nullSafeStr(c.getChangeCode()), payloadFor(c, previousStatus)));
+    }
+
+    /** Map the new status to the canonical F8 trigger, or null for states
+     *  that don't deserve a dedicated event (intermediate routing states). */
+    private String triggerFor(String newStatus) {
+        return switch (newStatus) {
+            case "SUBMITTED"          -> "CHANGE_SUBMITTED";
+            case "IMPACT_ASSESSED"    -> "CHANGE_IMPACT_ASSESSED";
+            case "CAB_APPROVED"       -> "CHANGE_CAB_APPROVED";
+            case "CAB_REJECTED"       -> "CHANGE_CAB_REJECTED";
+            case "EMERGENCY_APPROVED" -> "CHANGE_EMERGENCY_APPROVED";
+            case "IMPLEMENTED"        -> "CHANGE_IMPLEMENTED";
+            case "ROLLED_BACK"        -> "CHANGE_FAILED";
+            case "CLOSED"             -> "CHANGE_CLOSED";
+            default                   -> "CHANGE_TRANSITIONED";
+        };
     }
 
     // ── Listing + CRUD ──────────────────────────────────────────────────────
@@ -81,6 +136,11 @@ public class ChangeManagementService {
         if (c.getChangeType() == null) c.setChangeType("NORMAL");
         if (c.getRequestedDate() == null) c.setRequestedDate(LocalDate.now());
         ChangeRequest saved = changeRepo.save(c);
+        audit.log("CREATE", "ChangeRequest", saved.getId(),
+            "Change drafted: " + nullSafeMsg(saved.getChangeCode())
+                + " — " + nullSafeMsg(saved.getTitleEn())
+                + " (" + nullSafeMsg(saved.getChangeType()) + ", risk " + nullSafeMsg(saved.getRiskLevel()) + ")");
+        emit("CHANGE_CREATED", saved, null);
         emitChange(saved);
         return saved;
     }
@@ -143,8 +203,14 @@ public class ChangeManagementService {
             }
             default -> { /* no extra side-effects */ }
         }
+        String previousStatus = c.getStatus();
         c.setStatus(target);
         ChangeRequest saved = changeRepo.save(c);
+        audit.log("TRANSITION", "ChangeRequest", saved.getId(),
+            "Change " + nullSafeMsg(saved.getChangeCode())
+                + " status " + previousStatus + " → " + target
+                + (saved.getOutcome() != null ? " (outcome: " + saved.getOutcome() + ")" : ""));
+        emit(triggerFor(target), saved, previousStatus);
         emitChange(saved);
         return saved;
     }

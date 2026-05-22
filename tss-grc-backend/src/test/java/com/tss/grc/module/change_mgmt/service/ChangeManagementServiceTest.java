@@ -3,14 +3,18 @@ package com.tss.grc.module.change_mgmt.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
 import com.tss.grc.module.change_mgmt.repository.*;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +23,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -53,6 +60,8 @@ class ChangeManagementServiceTest {
     @Mock private ChangeTaskRepository taskRepo;
     @Mock private ChangeLinkRepository linkRepo;
     @Mock private ChangeCommentRepository commentRepo;
+    @Mock private AuditLogService audit;
+    @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private ChangeManagementService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -237,5 +246,82 @@ class ChangeManagementServiceTest {
 
         assertThatThrownBy(() -> service.transition(CHANGE_ID, "SUBMITTED", new HashMap<>()))
             .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // ── F7 / F8 emission contract ─────────────────────────────────────────────
+
+    @Test
+    void create_emits_CHANGE_CREATED_and_writes_audit_log() {
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> {
+            ChangeRequest c = inv.getArgument(0);
+            c.setId(CHANGE_ID);
+            return c;
+        });
+
+        ChangeRequest req = new ChangeRequest();
+        req.setChangeCode("CHG-2026-001");
+        req.setTitleEn("Database failover test");
+        req.setChangeType("NORMAL");
+        req.setRiskLevel("MEDIUM");
+        service.create(req);
+
+        verify(audit).log(eq("CREATE"), eq("ChangeRequest"), eq(CHANGE_ID), any(String.class));
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("CHANGE_CREATED");
+        assertThat(emitted.payload()).containsEntry("changeCode", "CHG-2026-001");
+        assertThat(emitted.payload()).containsEntry("riskLevel", "MEDIUM");
+        assertThat(emitted.payload()).containsEntry("status", "DRAFT");
+    }
+
+    @Test
+    void transition_to_CAB_APPROVED_emits_CHANGE_CAB_APPROVED() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CAB_PENDING", "NORMAL")));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("notes", "Approved unanimously");
+        service.transition(CHANGE_ID, "CAB_APPROVED", body);
+
+        verify(audit, atLeastOnce()).log(eq("TRANSITION"), eq("ChangeRequest"), any(), any(String.class));
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("CHANGE_CAB_APPROVED");
+        assertThat(emitted.payload()).containsEntry("status", "CAB_APPROVED");
+        assertThat(emitted.payload()).containsEntry("previousStatus", "CAB_PENDING");
+    }
+
+    @Test
+    void transition_to_EMERGENCY_APPROVED_emits_CHANGE_EMERGENCY_APPROVED() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("DRAFT", "EMERGENCY")));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.transition(CHANGE_ID, "EMERGENCY_APPROVED", new HashMap<>());
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("CHANGE_EMERGENCY_APPROVED");
+        assertThat(emitted.payload()).containsEntry("changeType", "EMERGENCY");
+        assertThat(emitted.payload()).containsEntry("previousStatus", "DRAFT");
+    }
+
+    @Test
+    void transition_to_ROLLED_BACK_emits_CHANGE_FAILED() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("IMPLEMENTING", "NORMAL")));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.transition(CHANGE_ID, "ROLLED_BACK", new HashMap<>());
+
+        ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        DomainEvent emitted = ev.getValue();
+        assertThat(emitted.triggerEvent()).isEqualTo("CHANGE_FAILED");
+        assertThat(emitted.payload()).containsEntry("status", "ROLLED_BACK");
+        assertThat(emitted.payload()).containsEntry("outcome", "ROLLED_BACK");
     }
 }
