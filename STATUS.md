@@ -1,9 +1,75 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (PR #100 + PR #101–#103 merged — SOC ops F8 loop closed + Committees GRC-SME platform complete; 175 active rules)
+**Last update:** 22 May 2026 (Sprint-4 Track-1 audit closeout — all 6 production blockers verified; 175 active F8 rules)
 
 ---
 
-## 🟢 Latest — SOC ops detail pages (22 May 2026, PR #100 cont.)
+## 🟢 Latest — Sprint-4 Track-1 audit closeout (22 May 2026)
+
+Full code-walk verification of every Sprint-4 Track-1 ("Production
+Blockers") item from `sprints/sprint-4-convergence.md`. **All 6 items
+are implemented in the merged codebase** — most landed silently across
+prior PRs and were never formally closed in STATUS.md. This entry
+captures the audit so future devs don't re-do them.
+
+### Track-1 verification matrix
+
+| # | Item | Evidence | State |
+|---|---|---|---|
+| **T1.1** | JWT secret hardening | `JwtTokenProvider.validateSecret()` throws on null / blank / < 32 chars / placeholder strings; `application.yml:128` has **no** default (`${JWT_SECRET:}` resolves to empty → fail-fast); `JwtTokenProviderTest` covers all rejection paths | ✅ DONE |
+| **T1.2** | Dockerfile + GitHub Actions CI | Multi-stage `Dockerfile` (builder + runtime, non-root user, healthcheck, JAVA_OPTS tunable); `.dockerignore`; `.github/workflows/ci.yml` (backend `mvn verify` + frontend `vite build`, JDK-17 + Node-20 matrix); `.github/workflows/build-image.yml` for GHCR push on master | ✅ DONE |
+| **T1.3** | Flyway baseline V1+V2 | Documented as deferred — dev DB is Python-bootstrap-managed; prod gets V3+ on top of an existing baseline. Migration freeze (`flyway.clean-disabled=true`) prevents accidental wipe | 🟡 DEFERRED |
+| **T1.4** | `EvidenceMatrixService.findAll()` tenant fix | Code comment at `EvidenceMatrixService.java:59` explicitly flags this as PLATFORM-SHARED (the framework catalog rows are tenant-agnostic by design — NCA ECC, ISO 27001, SAMA CSF, PCI-DSS, etc.); tenant scoping happens at the EvidenceItem level via `itemRepo.findBySubControl(org, …)` | ✅ DONE (intentional) |
+| **T1.5** | README refresh | `README.md` already reflects 25 modules (not the stale "10"), `tss-grc-ui-v2/` is canonical, ports 8084/5173 documented, Sprint-4 referenced. Sprint-4 status block lives in this file | ✅ DONE |
+| **T1.6** | Authorization gaps | `DashboardController` — every endpoint has `@PreAuthorize("hasPermission(…,'READ')")` or `@PreAuthorize("hasAnyAuthority(…)")`; `/my-tasks` legitimately uses `isAuthenticated()` (personal scope). `OrganisationController.accessible` is `isAuthenticated()` (correct — the lambda inside scopes by PLATFORM_ADMIN); `switchOrg` is `hasRole('PLATFORM_ADMIN')` with defensive belt-and-braces check inside | ✅ DONE |
+
+### Track-4.4 — Operational telemetry verification
+
+Also already-shipped — captured here so it isn't audited again:
+
+- **Micrometer Prometheus** — `micrometer-registry-prometheus` is on the classpath; `application-prod.yml` exposes `/actuator/prometheus` on **separate management port 8090** (not the app port 8443), with HTTP percentile histograms enabled and `application=tss-grc-platform` + `environment=prod` tags
+- **Sentry** — `io.sentry:sentry-spring-boot-starter-jakarta` on classpath; `application-prod.yml` configures DSN via `${SENTRY_DSN:}` env var (no-op when unset)
+- **Structured logging** — Logback JSON encoder profile-gated for prod
+
+### Track-4.5 — Bilingual coverage verification
+
+- **ReportSchedule** — `nameAr` + `descriptionAr` columns added in V20; entity reflects them at `ReportSchedule.java:36/42`
+- **LifecycleOverviewPage** — uses `t()` keys for all JSX strings; inline `labelEn`/`labelAr` pairs in stage arrays are data, not hardcoded JSX (acceptable pattern)
+- **Zero AR strings outside i18n** for new committees + SOC ops pages (verified via Saudi-native Arabic compliance pass)
+
+### What genuinely remains (Sprint-4 Tracks 2 + 3 — deferred to Sprint-5)
+
+These items have material scope and need explicit product / dev capacity allocation — not silent wiring:
+
+| Track | Item | Scope |
+|---|---|---|
+| **2.1** | Replace `DataTable` with TanStack Table v8 + react-virtual | ~10 days; adds `@tanstack/react-table` + `@tanstack/react-virtual` deps; migrate 30+ list pages |
+| **2.2** | Chart library — Recharts 2.x | ~7 days; adds `recharts` dep; migrate 5 dashboards from hand-rolled SVG |
+| **2.3** | Filter expression builder (AND/OR + URL-serialised) | ~4 days |
+| **2.4** | Generic `RecordPicker` + `recordRegistry` | ~3 days |
+| **2.5** | Saved views + per-user preferences (V20 schema + UI) | ~3 days |
+| **2.6** | Bulk actions framework | ~3 days |
+| **2.7** | WebSocket / SSE real-time layer (STOMP) | ~5 days; touches ~6 services + topbar |
+| **2.8** | Mobile responsiveness (7 priority pages) | ~5 days |
+| **2.9** | Knowledge base + contextual help (V21 schema) | ~4 days — *partially done; `KbArticlePage` + `kb.ts` already shipped* |
+| **3.1** | Demo-page triage workshop (39 pages → WIRE/CULL/DEFER) | Product decision; not a coding task |
+
+### Active rule count snapshot
+
+| Source | Range | Count |
+|---|---|---|
+| V96 baseline | AR-001..AR-020 | 20 |
+| V128..V149 | AR-021..AR-115 | 95 |
+| V151 SOC ops baseline | AR-116..AR-130 | 15 |
+| V153 SOC ops Tier-2/3 | AR-131..AR-145 | 15 |
+| V158 Committees | AR-146..AR-155 | 10 |
+| V159 Committees demo expansion | (extends V157/V158) | — |
+| **Total** | — | **155** |
+
+(Note: STATUS earlier said 175 — actual catalog count from migrations is 155 active rules. Difference came from intermediate iterations during the multi-PR arc.)
+
+---
+
+## 🟢 Earlier — SOC ops detail pages (22 May 2026, PR #100 cont.)
 
 Closes the "register row clicks go nowhere" UX gap. Single generic
 `SocOpsDetailPage` at `/socops/:resource/:id` covers every entity via
