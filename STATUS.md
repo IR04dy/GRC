@@ -1,9 +1,50 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (Privacy module end-to-end completion — Consent + DSR + Breach + RoPA detail pages with Saudi-native PDPL UX)
+**Last update:** 22 May 2026 (Committees outage root-caused + globally hardened — PR #117 closes the `UnexpectedRollbackException` class of bug)
 
 ---
 
-## 🟢 Latest — Privacy / PDPL module complete (22 May 2026, PRs #109 + #110 + #111)
+## 🟢 Latest — Committees outage closeout (22 May 2026, PRs #114 → #117)
+
+`/committees` and `/committees/catalog` were throwing 500s on dev installs
+that hadn't bootstrapped the V154–V159 committees schema yet. Four PRs
+chase the root cause through three layers; PR #117 closes it for every
+module, not just committees.
+
+### What the bug actually was
+
+A `@Transactional(readOnly = true)` repo query against a missing table
+throws `BadSqlGrammarException`. The service-level `try/catch` swallowed
+it and returned `Collections.emptyList()` — but Spring's transaction
+interceptor had **already** marked the transaction rollback-only the
+moment the exception propagated past JPA. When the service method then
+returned normally, the interceptor called `commit()`, saw the
+rollback-only flag, and threw **`UnexpectedRollbackException` at commit
+time**, escaping every service-layer catch.
+
+### Three-layer fix
+
+| PR | Layer | Fix |
+|---|---|---|
+| #114 | Service | First `try/catch` on `InvalidDataAccessResourceUsageException` — too narrow; Hibernate wraps SQL errors in many subtypes |
+| #115 | Service | Broadened to walk the cause chain via `CommitteeSqlGuards.isMissingObjectError()`, applied to Resolution + ActionItem services |
+| #116 | Handler | Global `@ExceptionHandler(DataAccessException.class)` returns RFC-7807 503 with bootstrap hint — every module benefits |
+| #117 | Both | **Real root cause.** `@Transactional(readOnly = true, noRollbackFor = RuntimeException.class)` on all committee read methods + `@ExceptionHandler(UnexpectedRollbackException.class)` as belt-and-braces translation to 503 |
+
+### Operator guidance (dev installs)
+
+If `/committees` returns 503 with title "Module not yet bootstrapped",
+the fix is documented in the detail body: run
+`python setup_committees_db.py` from the repo root to create the
+V154–V159 schema + seed 19 committee templates / ~150 standing items /
+10 bilingual form templates. Other modules adopting the same lazy-load
+pattern can swap their `@Transactional(readOnly = true)` for the
+`noRollbackFor = RuntimeException.class` variant if they want to swallow
+missing-table errors locally; otherwise the global handler in
+GlobalExceptionHandler catches the rollback at the controller boundary.
+
+---
+
+## 🟢 Earlier — Privacy / PDPL module complete (22 May 2026, PRs #109 + #110 + #111)
 
 The Privacy module is now end-to-end complete: every register tab is
 backed by real `/api/v1/privacy/*` data, every row has a real detail
