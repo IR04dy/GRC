@@ -1,9 +1,47 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (Sprint-4 Track-2.5 Saved Views Phase 1 — Workflow Submissions + Risk Register integrated)
+**Last update:** 22 May 2026 (Sprint-5 Track-2.5 Phase 2 Saved Views backend — V160 + REST + frontend sync)
 
 ---
 
-## 🟢 Latest — Saved Views Phase 1 expansion (22 May 2026, PR #106 + follow-up)
+## 🟢 Latest — Saved Views Phase 2 backend (22 May 2026, PR #108)
+
+Closes the loop on the localStorage-only Phase 1. Saved views now
+round-trip through `/api/platform/saved-views` whenever the user is
+authenticated, and fall back gracefully to localStorage for
+kiosk/demo/offline.
+
+### What landed
+
+| Layer | Artefact | Notes |
+|---|---|---|
+| Migration | `V160__platform_saved_views.sql` | Creates `platform.saved_views` with per-user-per-page unique partial index on `is_default` |
+| Entity | `SavedView.java` | `@Where(is_deleted=0)`, opaque JSON columns for `filter` / `sort` / `visibleColumns`, separate `url_query` field |
+| Repository | `SavedViewRepository.java` | Org+user+page lookup, default lookup, bulk clear-default-except |
+| Service | `SavedViewService.java` | CRUD + audit-logged + clears previous default on promotion |
+| Controller | `SavedViewController.java` | REST under `/api/platform/saved-views`, all endpoints `isAuthenticated()` |
+| Frontend adapter | `lib/savedViews.ts` | Best-effort write-through: localStorage stays the synchronous source of truth, backend sync runs in the background. `syncSavedViewsFromBackend(pageKey)` available for one-shot pull on login. |
+
+### Design choices worth remembering
+
+- **JSON columns, not relational filter/sort/columns** — each list
+  page owns the shape of its own filter (workflow uses URL strings,
+  cyber uses FilterGroup trees). The DB never reads inside these
+  blobs.
+- **Per-user, not per-org** — saved views are personal preferences.
+  `is_shared` is persisted for the Phase-3 org-wide story but
+  ignored locally today.
+- **No module permission check** — the controller is just
+  `isAuthenticated()`. A user might have views across modules; gating
+  on a per-page permission would force the backend to know the
+  page→module mapping, which is a frontend concern.
+- **Local-first** — reads are synchronous against localStorage so
+  component renders don't go async. Writes update localStorage
+  immediately and fire a best-effort backend call. If the backend
+  is down, the local copy keeps working.
+
+---
+
+## 🟢 Earlier — Saved Views Phase 1 expansion (22 May 2026, PR #106 + #107)
 
 Phase 1 of Sprint-4 Track-2.5 (localStorage-backed saved views) now
 has **three production consumers** sharing the same `urlQuery`
@@ -74,7 +112,7 @@ These items have material scope and need explicit product / dev capacity allocat
 | **2.2** | Chart library — Recharts 2.x | ~7 days; adds `recharts` dep; migrate 5 dashboards from hand-rolled SVG |
 | **2.3** | Filter expression builder (AND/OR + URL-serialised) | ~4 days |
 | **2.4** | Generic `RecordPicker` + `recordRegistry` | ~3 days |
-| **2.5** | Saved views Phase 2 — backend (`platform.saved_views` V20 + REST) | ~1 day (frontend Phase 1 already shipped on 3 pages) |
+| ~~2.5~~ | ~~Saved views Phase 2 — backend~~ | ✅ DONE on 22 May 2026 (PR #108) — V160 migration + REST + frontend write-through |
 | **2.6** | Bulk actions framework | ~3 days |
 | **2.7** | WebSocket / SSE real-time layer (STOMP) | ~5 days; touches ~6 services + topbar |
 | **2.8** | Mobile responsiveness (7 priority pages) | ~5 days |
