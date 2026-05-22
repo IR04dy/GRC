@@ -2,6 +2,8 @@ package com.tss.grc.module.policy.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
@@ -10,6 +12,7 @@ import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import com.tss.grc.module.policy.repository.PolicyExceptionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,8 +49,87 @@ public class PolicyService {
     private final PolicyDocumentRepository docs;
     private final PolicyExceptionRepository exceptions;
     private final PolicyAttestationRepository attestations;
+    private final AuditLogService audit;
+    private final ApplicationEventPublisher publisher;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    // ── F8 payload + emit helpers ─────────────────────────────────────────────
+    //
+    // Policy events anchor downstream attestation + compliance workflows:
+    //   POLICY_PUBLISHED         — new version went live (payload carries
+    //                              policyCode + version + category)
+    //   POLICY_TRANSITIONED      — any other state change (carries
+    //                              previousStatus + status)
+    //   POLICY_EXPIRED           — expiry sweep flipped a row
+    //   POLICY_EXCEPTION_APPROVED — exception approved (carries riskLevel)
+    //   POLICY_EXCEPTION_EXPIRED  — exception expiry sweep
+    //   POLICY_ATTESTED          — attestation recorded
+    //   POLICY_ATTESTATION_DECLINED — attestation declined
+
+    private Map<String, Object> policyPayload(PolicyDocument p, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("policyId",       nullSafeStr(p.getId()));
+        m.put("policyCode",     nullSafeStr(p.getPolicyCode()));
+        m.put("version",        nullSafeStr(p.getVersion()));
+        m.put("status",         nullSafeStr(p.getStatus()));
+        m.put("previousStatus", nullSafeStr(previousStatus));
+        m.put("category",       nullSafeStr(p.getCategory()));
+        m.put("ownerEmail",     nullSafeStr(p.getOwnerEmail()));
+        m.put("approverEmail",  nullSafeStr(p.getApproverEmail()));
+        m.put("effectiveDate",  nullSafeStr(p.getEffectiveDate()));
+        m.put("expiryDate",     nullSafeStr(p.getExpiryDate()));
+        return m;
+    }
+
+    private Map<String, Object> exceptionPayload(PolicyException e, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("exceptionId",    nullSafeStr(e.getId()));
+        m.put("policyId",       nullSafeStr(e.getPolicyId()));
+        m.put("status",         nullSafeStr(e.getStatus()));
+        m.put("previousStatus", nullSafeStr(previousStatus));
+        m.put("riskLevel",      nullSafeStr(e.getRiskLevel()));
+        m.put("expiryDate",     nullSafeStr(e.getExpiryDate()));
+        return m;
+    }
+
+    private Map<String, Object> attestationPayload(PolicyAttestation a, String previousStatus) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("attestationId",  nullSafeStr(a.getId()));
+        m.put("policyId",       nullSafeStr(a.getPolicyId()));
+        m.put("status",         nullSafeStr(a.getStatus()));
+        m.put("previousStatus", nullSafeStr(previousStatus));
+        m.put("userUsername",   nullSafeStr(a.getUserUsername()));
+        m.put("evidenceRef",    nullSafeStr(a.getEvidenceRef()));
+        return m;
+    }
+
+    /** "" for null so the rule engine's equality matcher cannot NPE. */
+    private static String nullSafeStr(Object o) { return o == null ? "" : o.toString(); }
+
+    /** "<not provided>" for null — for human-readable audit messages. */
+    private static String nullSafe(Object o) { return o == null ? "<not provided>" : o.toString(); }
+
+    private void emitPolicy(String trigger, PolicyDocument p, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            org(), trigger, "PolicyDocument", p.getId(),
+            "policy:" + nullSafe(p.getPolicyCode()) + ":v" + nullSafe(p.getVersion()),
+            policyPayload(p, previousStatus)));
+    }
+
+    private void emitException(String trigger, PolicyException e, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            org(), trigger, "PolicyException", e.getId(),
+            "policy_exception:" + e.getId(),
+            exceptionPayload(e, previousStatus)));
+    }
+
+    private void emitAttestation(String trigger, PolicyAttestation a, String previousStatus) {
+        publisher.publishEvent(new DomainEvent(
+            org(), trigger, "PolicyAttestation", a.getId(),
+            "policy_attestation:" + a.getId(),
+            attestationPayload(a, previousStatus)));
+    }
 
     public record PolicyAggregate(
         long total,
@@ -94,7 +176,12 @@ public class PolicyService {
                 "Policy version already exists: " + body.getPolicyCode() + " v" + body.getVersion());
         body.setId(null);
         body.setOrganisationId(org());
-        return docs.save(body);
+        PolicyDocument saved = docs.save(body);
+        audit.log("CREATE", "PolicyDocument", saved.getId(),
+            "Policy created: " + nullSafe(saved.getPolicyCode()) + " v" + nullSafe(saved.getVersion())
+                + " (" + nullSafe(saved.getStatus()) + ")");
+        emitPolicy("POLICY_CREATED", saved, null);
+        return saved;
     }
 
     @Transactional
@@ -147,7 +234,21 @@ public class PolicyService {
         p.setStatus(to);
         if ("APPROVED".equals(to) && actor != null) p.setApproverName(actor);
         if ("PUBLISHED".equals(to))                 p.setPublishedAt(LocalDateTime.now());
-        return docs.save(p);
+        PolicyDocument saved = docs.save(p);
+        audit.log("TRANSITION", "PolicyDocument", saved.getId(),
+            "Status " + from + " → " + to
+                + (actor != null ? " by " + actor : ""));
+        // PUBLISHED is the anchor event — every attestation campaign and
+        // compliance posture refresh keys on it, so it gets a dedicated
+        // trigger separate from the generic transition stream.
+        if ("PUBLISHED".equals(to)) {
+            emitPolicy("POLICY_PUBLISHED", saved, from);
+        } else if ("EXPIRED".equals(to)) {
+            emitPolicy("POLICY_EXPIRED", saved, from);
+        } else {
+            emitPolicy("POLICY_TRANSITIONED", saved, from);
+        }
+        return saved;
     }
 
     /**
@@ -201,8 +302,11 @@ public class PolicyService {
         List<Long> flipped = new ArrayList<>();
         for (PolicyDocument p : hits) {
             p.setStatus("EXPIRED");
-            docs.save(p);
-            flipped.add(p.getId());
+            PolicyDocument saved = docs.save(p);
+            audit.log("EXPIRY_SWEEP", "PolicyDocument", saved.getId(),
+                "Policy expired by sweep: " + nullSafe(saved.getPolicyCode()) + " v" + nullSafe(saved.getVersion()));
+            emitPolicy("POLICY_EXPIRED", saved, "PUBLISHED");
+            flipped.add(saved.getId());
         }
         return flipped;
     }
@@ -233,7 +337,11 @@ public class PolicyService {
         if (body.getStatus() == null)    body.setStatus("REQUESTED");
         if (body.getRiskLevel() == null) body.setRiskLevel("MEDIUM");
         if (body.getRequestedAt() == null) body.setRequestedAt(LocalDateTime.now());
-        return exceptions.save(body);
+        PolicyException saved = exceptions.save(body);
+        audit.log("CREATE", "PolicyException", saved.getId(),
+            "Policy exception requested on policy " + saved.getPolicyId() + " (risk " + nullSafe(saved.getRiskLevel()) + ")");
+        emitException("POLICY_EXCEPTION_REQUESTED", saved, null);
+        return saved;
     }
 
     @Transactional
@@ -271,7 +379,21 @@ public class PolicyService {
         if ("UNDER_REVIEW".equals(to)) { e.setReviewerName(actor); e.setReviewedAt(now); }
         if ("APPROVED".equals(to))     { e.setApproverName(actor); e.setApprovedAt(now); }
         if ("REJECTED".equals(to))     { e.setRejectedAt(now); e.setRejectionReason(reason); }
-        return exceptions.save(e);
+        PolicyException saved = exceptions.save(e);
+        audit.log("TRANSITION", "PolicyException", saved.getId(),
+            "Exception status " + from + " → " + to
+                + (actor != null ? " by " + actor : "")
+                + ("REJECTED".equals(to) && reason != null ? " (" + reason + ")" : ""));
+        // Approved exceptions need a dedicated trigger — they're the
+        // legally significant ones (residual risk accepted with
+        // compensating controls + expiry).
+        String trigger = "APPROVED".equals(to) ? "POLICY_EXCEPTION_APPROVED" :
+                         "REJECTED".equals(to) ? "POLICY_EXCEPTION_REJECTED" :
+                         "EXPIRED".equals(to)  ? "POLICY_EXCEPTION_EXPIRED"  :
+                         "REVOKED".equals(to)  ? "POLICY_EXCEPTION_REVOKED"  :
+                                                 "POLICY_EXCEPTION_TRANSITIONED";
+        emitException(trigger, saved, from);
+        return saved;
     }
 
     @Transactional
@@ -288,8 +410,11 @@ public class PolicyService {
         List<Long> flipped = new ArrayList<>();
         for (PolicyException e : hits) {
             e.setStatus("EXPIRED");
-            exceptions.save(e);
-            flipped.add(e.getId());
+            PolicyException saved = exceptions.save(e);
+            audit.log("EXPIRY_SWEEP", "PolicyException", saved.getId(),
+                "Exception expired by sweep on policy " + saved.getPolicyId());
+            emitException("POLICY_EXCEPTION_EXPIRED", saved, "APPROVED");
+            flipped.add(saved.getId());
         }
         return flipped;
     }
@@ -312,7 +437,11 @@ public class PolicyService {
         body.setId(null);
         body.setOrganisationId(org());
         if (body.getStatus() == null) body.setStatus("PENDING");
-        return attestations.save(body);
+        PolicyAttestation saved = attestations.save(body);
+        audit.log("CREATE", "PolicyAttestation", saved.getId(),
+            "Attestation assigned to " + nullSafe(saved.getUserUsername()) + " on policy " + saved.getPolicyId());
+        emitAttestation("POLICY_ATTESTATION_ASSIGNED", saved, null);
+        return saved;
     }
 
     @Transactional
@@ -324,7 +453,12 @@ public class PolicyService {
         a.setStatus("ATTESTED");
         a.setAttestedAt(LocalDateTime.now());
         if (evidenceRef != null) a.setEvidenceRef(evidenceRef);
-        return attestations.save(a);
+        PolicyAttestation saved = attestations.save(a);
+        audit.log("ATTEST", "PolicyAttestation", saved.getId(),
+            "Attestation completed by " + nullSafe(saved.getUserUsername())
+                + (evidenceRef != null ? " (evidence " + evidenceRef + ")" : ""));
+        emitAttestation("POLICY_ATTESTED", saved, "PENDING");
+        return saved;
     }
 
     @Transactional
@@ -338,7 +472,11 @@ public class PolicyService {
         a.setStatus("DECLINED");
         a.setDeclinedAt(LocalDateTime.now());
         a.setDeclinedReason(reason);
-        return attestations.save(a);
+        PolicyAttestation saved = attestations.save(a);
+        audit.log("DECLINE", "PolicyAttestation", saved.getId(),
+            "Attestation declined by " + nullSafe(saved.getUserUsername()) + ": " + reason);
+        emitAttestation("POLICY_ATTESTATION_DECLINED", saved, "PENDING");
+        return saved;
     }
 
     // ─── Aggregate ────────────────────────────────────────────────
