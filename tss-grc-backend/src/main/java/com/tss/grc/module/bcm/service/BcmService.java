@@ -73,6 +73,10 @@ public class BcmService {
 
     @Transactional
     public BcmPlan createPlan(BcmPlan req) {
+        // Mass-assignment defense — controller accepts the entity via
+        // @RequestBody. Null id forces save() to INSERT instead of
+        // merge() into a potentially cross-tenant row.
+        req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
         return planRepo.save(req);
     }
@@ -166,6 +170,8 @@ public class BcmService {
 
     @Transactional
     public CriticalProcess createProcess(CriticalProcess req) {
+        // Mass-assignment defense — see createPlan().
+        req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
         return processRepo.save(req);
     }
@@ -200,6 +206,12 @@ public class BcmService {
 
     @Transactional
     public BiaRecord createBia(BiaRecord req) {
+        // Mass-assignment defense — see createPlan(). BiaRecord doesn't
+        // carry an organisationId column directly (tenant scoping is
+        // inherited via the parent CriticalProcess link); the
+        // platform-wide tenant guarantee for this entity comes from the
+        // BiaRecordRepository query layer, not the entity field.
+        req.setId(null);
         return biaRepo.save(req);
     }
 
@@ -238,6 +250,8 @@ public class BcmService {
 
     @Transactional
     public BcmExercise createExercise(BcmExercise req) {
+        // Mass-assignment defense — see createPlan().
+        req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
         return exerciseRepo.save(req);
     }

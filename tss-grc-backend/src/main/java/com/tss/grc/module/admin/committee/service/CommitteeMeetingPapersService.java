@@ -57,6 +57,10 @@ public class CommitteeMeetingPapersService {
     /** Circulate a paper — sets circulatedAt and auto-flags late papers. */
     @Transactional
     public CommitteeMeetingPaper circulate(CommitteeMeetingPaper in) {
+        // Mass-assignment defense — controller accepts the entity directly
+        // via @RequestBody. Null id forces save() into INSERT instead of
+        // merge() which could overwrite a cross-tenant row.
+        in.setId(null);
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());

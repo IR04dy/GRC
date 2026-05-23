@@ -37,6 +37,10 @@ public class RegulatoryChangeService {
 
     @Transactional
     public RegulatoryChange create(RegulatoryChange req) {
+        // Mass-assignment defense — see PolicyService.create() for the
+        // full attack path. Null id forces save() to INSERT, blocking
+        // cross-tenant merge() overwrites.
+        req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
         return repo.save(req);
     }

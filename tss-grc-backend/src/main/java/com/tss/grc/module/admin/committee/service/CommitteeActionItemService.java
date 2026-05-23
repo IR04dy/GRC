@@ -107,6 +107,15 @@ public class CommitteeActionItemService {
 
     @Transactional
     public CommitteeActionItem create(CommitteeActionItem in) {
+        // Mass-assignment defense. The controller accepts CommitteeActionItem
+        // directly via @RequestBody, so a malicious client could submit
+        // {"id": 12345, ...} — JPA's save() then routes through merge()
+        // instead of persist(), SELECTs row 12345, copies the (now
+        // tenant-scoped) fields onto it, and UPDATEs WHERE id=12345.
+        // If row 12345 belongs to ANOTHER tenant, that row gets silently
+        // overwritten with this caller's content. Force id to null so
+        // save() always becomes a fresh INSERT.
+        in.setId(null);
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());

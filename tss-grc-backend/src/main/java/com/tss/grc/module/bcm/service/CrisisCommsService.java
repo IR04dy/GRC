@@ -61,6 +61,10 @@ public class CrisisCommsService {
 
     @Transactional
     public CrisisCommsTemplate createTemplate(CrisisCommsTemplate t) {
+        // Mass-assignment defense — controller accepts the entity via
+        // @RequestBody. Null id forces save() to INSERT instead of
+        // merge() into a potentially cross-tenant row.
+        t.setId(null);
         t.setOrganisationId(TenantContext.getCurrentTenant());
         return templateRepo.save(t);
     }
@@ -105,6 +109,8 @@ public class CrisisCommsService {
 
     @Transactional
     public CrisisCommsAudience createAudience(CrisisCommsAudience a) {
+        // Mass-assignment defense — see createTemplate().
+        a.setId(null);
         a.setOrganisationId(TenantContext.getCurrentTenant());
         // recalc count from contacts CSV
         a.setRecipientCount(countRecipients(a.getContactsCsv()));

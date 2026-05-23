@@ -157,6 +157,10 @@ public class CyberService {
 
     @Transactional
     public CyberFramework saveFramework(CyberFramework f, Long orgId) {
+        // Mass-assignment defense — controller accepts the entity directly
+        // via @RequestBody. Null id forces save() to INSERT instead of
+        // merge() into a potentially cross-tenant row.
+        f.setId(null);
         f.setOrganisationId(orgId);
         f.setIsDeleted(false);
         return frameworkRepo.save(f);
@@ -184,6 +188,8 @@ public class CyberService {
 
     @Transactional
     public CyberControl saveControl(CyberControl c, Long orgId) {
+        // Mass-assignment defense — see saveFramework().
+        c.setId(null);
         c.setOrganisationId(orgId);
         c.setIsDeleted(false);
         return controlRepo.save(c);
@@ -223,6 +229,8 @@ public class CyberService {
 
     @Transactional
     public CyberSubControl saveSubControl(CyberSubControl s, Long orgId) {
+        // Mass-assignment defense — see saveFramework().
+        s.setId(null);
         s.setOrganisationId(orgId);
         s.setIsDeleted(false);
         return subControlRepo.save(s);
@@ -436,6 +444,8 @@ public class CyberService {
 
     @Transactional
     public CyberIncident saveIncident(CyberIncident inc, Long orgId) {
+        // Mass-assignment defense — see saveFramework().
+        inc.setId(null);
         inc.setOrganisationId(orgId);
         inc.setIsDeleted(false);
         return incidentRepo.save(inc);
@@ -487,6 +497,8 @@ public class CyberService {
 
     @Transactional
     public CyberAsset saveAsset(CyberAsset a, Long orgId) {
+        // Mass-assignment defense — see saveFramework().
+        a.setId(null);
         a.setOrganisationId(orgId);
         a.setIsDeleted(false);
         return assetRepo.save(a);

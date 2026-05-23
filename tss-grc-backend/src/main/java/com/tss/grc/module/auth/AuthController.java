@@ -106,24 +106,27 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "Invalidate the refresh token cookie")
     public ResponseEntity<Void> logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie("grc_refresh", "");
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath("/api/auth/refresh");
-        cookie.setMaxAge(0);
-        response.addCookie(cookie);
+        // Send a single, fully-attributed Set-Cookie matching the
+        // login-time cookie so the browser clears it. The Cookie API
+        // doesn't expose SameSite pre-Java 21 / Servlet 6, so we
+        // write the header directly — same approach as setRefreshTokenCookie
+        // below for consistency.
+        response.addHeader("Set-Cookie",
+            "grc_refresh=; HttpOnly; Secure; Path=/api/auth/refresh; SameSite=Strict; Max-Age=0");
         return ResponseEntity.noContent().build();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
-        Cookie cookie = new Cookie("grc_refresh", refreshToken);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);                        // HTTPS only in production
-        cookie.setPath("/api/auth/refresh");           // Scoped — not sent on every API call
-        cookie.setMaxAge((int) (refreshTokenExpiryMs / 1000));
-        // SameSite=Strict set via header (Cookie API doesn't expose SameSite pre-Java 21)
+        // Single source of truth — write the Set-Cookie header directly with
+        // every attribute (HttpOnly, Secure, Path, SameSite, Max-Age). The
+        // earlier code ALSO called response.addCookie(new Cookie(...))
+        // which emitted a SECOND Set-Cookie header without SameSite, so
+        // browsers received two cookies for the same name and the resulting
+        // attribute set was implementation-defined. SameSite=Strict is what
+        // pins refresh tokens to first-party navigation only — if it gets
+        // dropped, CSRF protection on the refresh endpoint disappears.
         response.addHeader("Set-Cookie",
             String.format("grc_refresh=%s; HttpOnly; Secure; Path=/api/auth/refresh; SameSite=Strict; Max-Age=%d",
                 refreshToken, refreshTokenExpiryMs / 1000));

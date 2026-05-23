@@ -70,6 +70,10 @@ public class CommitteeMemberRegistryService {
     /** Appoint a member. Creates a new term row with {@code renewalStatus=ACTIVE}. */
     @Transactional
     public CommitteeMemberTerm appoint(CommitteeMemberTerm in) {
+        // Mass-assignment defense — controller accepts the entity directly
+        // via @RequestBody. Null id forces save() into INSERT instead of
+        // merge() which could overwrite a cross-tenant row.
+        in.setId(null);
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());
@@ -201,6 +205,8 @@ public class CommitteeMemberRegistryService {
 
     @Transactional
     public CommitteeMemberSkill addSkill(CommitteeMemberSkill in) {
+        // Mass-assignment defense — see appoint() above.
+        in.setId(null);
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());

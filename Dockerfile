@@ -55,8 +55,17 @@ USER grc
 EXPOSE 8084
 
 # Tunables (override via -e at run time)
+#
+# -Duser.timezone=Asia/Riyadh pins the JVM default timezone so every
+# LocalDate.now() / LocalDateTime.now() returns Saudi-local dates. The
+# Alpine base defaults to UTC, which would silently shift dates by 3
+# hours every day for any "now" call between midnight and 3am Riyadh
+# — wrong audit due dates, wrong SLA windows, wrong overdue sweeps.
+# GrcApplication.main() sets the same value as a safety net for
+# non-Docker launches; defining it here makes the intent visible and
+# lets operators override per-deploy via JAVA_OPTS env override.
 ENV PROFILE=prod \
-    JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XshowSettings:vm" \
+    JAVA_OPTS="-Duser.timezone=Asia/Riyadh -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XshowSettings:vm" \
     SPRING_PROFILES_ACTIVE=prod
 
 # Liveness via Actuator. Adjust path if /actuator changes.

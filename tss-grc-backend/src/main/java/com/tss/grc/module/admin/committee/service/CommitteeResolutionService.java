@@ -83,6 +83,10 @@ public class CommitteeResolutionService {
 
     @Transactional
     public CommitteeResolution create(CommitteeResolution in) {
+        // Mass-assignment defense — see CommitteeActionItemService.create()
+        // for the full attack path. Force id=null so save() persists a new
+        // row instead of merge()-ing into a potentially cross-tenant row.
+        in.setId(null);
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());

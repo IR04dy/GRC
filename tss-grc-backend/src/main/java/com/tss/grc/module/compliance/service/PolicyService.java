@@ -47,6 +47,10 @@ public class PolicyService {
 
     @Transactional
     public Policy create(Policy req) {
+        // Mass-assignment defense — controller accepts the entity via
+        // @RequestBody. Null id forces save() to INSERT instead of
+        // merge() into a potentially cross-tenant row.
+        req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
         Policy saved = repo.save(req);
         emit(saved);
