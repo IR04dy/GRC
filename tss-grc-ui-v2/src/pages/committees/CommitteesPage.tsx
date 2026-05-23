@@ -66,19 +66,25 @@ export function CommitteesPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [c, m, r, a] = await Promise.all([
-        listCommittees(undefined, 0, 200),
-        listMeetings(undefined, 0, 200),
-        listResolutions(0, 200).catch(() => ({ content: [] as Resolution[], totalElements: 0 })),
-        listActions(0, 200).catch(() => ({ content: [] as ActionItemRecord[], totalElements: 0 })),
-      ]);
-      setCommittees(c.content);
-      setMeetings(m.content);
-      setResolutions(r.content);
-      setActions(a.content);
-    } catch { toast.danger(t('comLoadFailed')); }
-    finally { setLoading(false); }
+    // Per-call .catch() so partial backend failures don't blank the whole
+    // page. A fresh dev DB without V154-V159 bootstrapped returns 503
+    // ("Module not yet bootstrapped" from the global handler in PR #117),
+    // which used to reject Promise.all and trigger the outer catch ->
+    // toast.danger -> "unable to load data" on every tab. Now each tab
+    // degrades to an empty list independently. Both endpoints already
+    // had this guard for resolutions + actions; this commit extends it
+    // to committees + meetings.
+    const [c, m, r, a] = await Promise.all([
+      listCommittees(undefined, 0, 200).catch(() => ({ content: [] as Committee[], totalElements: 0 })),
+      listMeetings(undefined, 0, 200).catch(() => ({ content: [] as CommitteeMeeting[], totalElements: 0 })),
+      listResolutions(0, 200).catch(() => ({ content: [] as Resolution[], totalElements: 0 })),
+      listActions(0, 200).catch(() => ({ content: [] as ActionItemRecord[], totalElements: 0 })),
+    ]);
+    setCommittees(c.content);
+    setMeetings(m.content);
+    setResolutions(r.content);
+    setActions(a.content);
+    setLoading(false);
   }
 
   const stats = useMemo(() => ({
