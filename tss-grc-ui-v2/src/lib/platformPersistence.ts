@@ -8,6 +8,8 @@
 // Mode is persisted in localStorage so a tester can switch without rebuild.
 // Drives the ModeBadge in the topbar.
 
+import { api } from './api';
+
 export type PersistenceMode = 'demo' | 'rest' | 'mixed';
 
 const KEY = 'grc.persistence.mode.v1';
@@ -54,9 +56,7 @@ export async function adapterListAll<T>(adapter: PersistenceAdapter<T>, fallback
   if (mode === 'demo') return loadLocal(adapter.localKey, fallbackSeed);
   if (mode === 'rest' || mode === 'mixed') {
     try {
-      const res = await fetch(adapter.restEndpoint, { headers: authHeaders() });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json() as Promise<T[]>;
+      return await api.get<T[]>(adapter.restEndpoint);
     } catch (e) {
       if (mode === 'mixed') return loadLocal(adapter.localKey, fallbackSeed);
       throw e;
@@ -76,14 +76,10 @@ export async function adapterSave<T>(adapter: PersistenceAdapter<T>, item: T, al
       const id = adapter.idOf(item);
       const exists = allItems.some(x => adapter.idOf(x) === id);
       const url = exists ? `${adapter.restEndpoint}/${id}` : adapter.restEndpoint;
-      const method = exists ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(item),
-      });
-      if (!res.ok && mode === 'rest') throw new Error(`HTTP ${res.status}`);
-      if (res.ok) return res.json() as Promise<T>;
+      const saved = exists
+        ? await api.put<T>(url, item)
+        : await api.post<T>(url, item);
+      return saved;
     } catch (e) {
       if (mode === 'rest') throw e;
       // mixed: fall through, local already saved
@@ -97,16 +93,7 @@ export async function adapterTransition<T>(adapter: PersistenceAdapter<T>, exter
   const mode = currentPersistenceMode();
   if (mode === 'demo') return null; // local mode doesn't go through REST
   try {
-    const res = await fetch(`${adapter.restEndpoint}/${externalId}/transition`, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      if (mode === 'rest') throw new Error(`HTTP ${res.status}`);
-      return null;
-    }
-    return res.json() as Promise<T>;
+    return await api.post<T>(`${adapter.restEndpoint}/${externalId}/transition`, payload);
   } catch (e) {
     if (mode === 'rest') throw e;
     return null;
@@ -134,15 +121,10 @@ export function mirrorSaveToBackend<T>(
   const id = adapter.idOf(item);
   const url = isNew ? adapter.restEndpoint : `${adapter.restEndpoint}/${id}`;
   const method = isNew ? 'POST' : 'PUT';
-  fetch(url, {
-    method,
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
-  }).catch((e) => {
-    // Warn so a tester can see sync issues, but don't surface to the user —
-    // the local copy is already written.
-    console.warn(`[mirrorSaveToBackend] ${method} ${url} failed:`, e);
-  });
+  const call = isNew ? api.post(url, item) : api.put(url, item);
+  // Warn so a tester can see sync issues, but don't surface to the user —
+  // the local copy is already written.
+  call.catch((e) => console.warn(`[mirrorSaveToBackend] ${method} ${url} failed:`, e));
 }
 
 /** Mirror a state-machine transition to the REST backend.
@@ -155,11 +137,7 @@ export function mirrorTransitionToBackend<T>(
   const mode = currentPersistenceMode();
   if (mode === 'demo') return;
   const url = `${adapter.restEndpoint}/${externalId}/transition`;
-  fetch(url, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  }).catch((e) => {
+  api.post(url, payload).catch((e) => {
     console.warn(`[mirrorTransitionToBackend] POST ${url} failed:`, e);
   });
 }
@@ -172,7 +150,7 @@ export function mirrorDeleteToBackend<T>(
   const mode = currentPersistenceMode();
   if (mode === 'demo') return;
   const url = `${adapter.restEndpoint}/${externalId}`;
-  fetch(url, { method: 'DELETE', headers: authHeaders() }).catch((e) => {
+  api.delete(url).catch((e) => {
     console.warn(`[mirrorDeleteToBackend] DELETE ${url} failed:`, e);
   });
 }
@@ -191,13 +169,10 @@ function saveLocal<T>(key: string, items: T[]): void {
   try { window.localStorage.setItem(key, JSON.stringify(items)); } catch { /* ignore */ }
 }
 
-function authHeaders(): Record<string, string> {
-  // Best-effort — read JWT from existing auth lib if present.
-  try {
-    const token = window.sessionStorage.getItem('grc.accessToken');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch { return {}; }
-}
+// Note: a homegrown authHeaders() used to live here that read
+// sessionStorage directly. Removed in favour of the central api client,
+// which builds the Bearer header via getAccessToken() and handles the
+// 401-refresh-retry flow consistently across the platform.
 
 // ─── Concrete adapters for the four lifecycle workspaces ──────────────────
 //
