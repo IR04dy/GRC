@@ -1,9 +1,75 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (Sprint-7 BCM/GRC plan + Saudi regulatory seed arc — PRs #148 → #154)
+**Last update:** 23 May 2026 (Sprint-7 closeout — code slices land — PRs #148 → #159)
 
 ---
 
-## 🟢 Latest — Sprint-7 BCM/GRC plan + Saudi regulatory seed arc (23 May 2026, PRs #148 → #154)
+## 🟢 Latest — Sprint-7 code slices land (23 May 2026, PRs #155 → #159)
+
+The Sprint-7 plan from `BCM_GRC_GAP_ANALYSIS_AND_PLAN.md` §4 lands five executable slices on top of the PR #148-#154 data + plan groundwork. Pure-additive backend services + frontend tiles — zero schema changes — making the BCM Manager's job actually doable from inside the platform.
+
+### Five-PR code slice arc
+
+| PR | Slice | What lands |
+|---|---|---|
+| #155 | **7-D** | `BcmBoardPackService` + `GET /api/v1/bcm/board-pack-section` — single aggregator returning Board-ready BCM snapshot: top critical processes by MTPD, last exercises, CAPA snapshot, last AAR, active crises, regulator notifications, readiness headline |
+| #156 | **7-E** | `RegulatorCountdownService` + 3 endpoints — SAMA Cyber 4h / SAMA BCF 6h / NCA 24h / SDAIA PDPL 72h / NCEMA 24h / CMA 24h / MOH 24h countdowns with BREACHED/NEAR_DEADLINE/ON_TRACK/NOTIFIED traffic light |
+| #157 | **7-C** | `BcmAnnualCycleScheduledSweep` — hourly `@Scheduled` sweep fires `BCM_CYCLE_CLOSEOUT_DUE_{90,60,30,7}D` and `BCM_CYCLE_OVERDUE` triggers; audit-log dedup; mirrors proven `CommitteeScheduledSweep` pattern |
+| #158 | **7-G** | V161 — 11 F8 automation rules `AR-160..AR-170` consuming the new BCM cycle triggers (NOTIFY / ESCALATE / CREATE_RECORD / FLAG); reuses existing handlers — no new rule-engine code |
+| #159 | **7-H** | Frontend wiring — `lib/bcmBoardPack.ts` + `lib/bcmRegulatorCountdown.ts` + two graceful-degrade tiles on BCM dashboard with bilingual Saudi-native copy |
+
+### What the Saudi BCM Manager can now do without leaving the platform
+
+| Daily / weekly | Before | After |
+|---|---|---|
+| See where the cycle stands at a glance | bounce between 5 pages | one Board-pack tile on BCM dashboard |
+| Know which regulators need a call right now | manual timer in Excel | traffic-light countdown tile |
+| Get reminded about T-90/60/30/7 cycle milestones | personal calendar | platform fires `DomainEvent` → F8 rules → NOTIFY/ESCALATE |
+| Spot a cycle going overdue | quarterly meeting | daily re-armed `OVERDUE` trigger → CRO escalation |
+| Open a remediation CAPA when readiness drops below 70% | manual triage | `AR-166` `CREATE_RECORD` fires automatically at T-90 |
+| Track every regulator notification in one log | scattered emails | `Last 20 across all crisis events` tile + audit-trail row per regulator |
+
+### Pure-additive numbers
+
+- **6 new Java files** (3 services, 3 controllers; 2 inline DTO records)
+- **2 new TypeScript lib files** + 2 new dashboard tiles
+- **1 Flyway migration** (V161) — 11 idempotent rules
+- **0 schema changes** — every endpoint reads existing tables
+- **0 new routes** — tiles link to existing pages
+- **CI green** on every PR (Backend Spring Boot + Frontend Vite jobs)
+
+### Saudi regulator SLA matrix (now encoded in code, not docs)
+
+| Regulator | Window | Trigger condition | Rule |
+|---|---|---|---|
+| SAMA Cyber Framework | 4 h | severity ≥ 3 AND cyber_related | `RegulatorCountdownService` |
+| SAMA BCF (operational) | 6 h | severity ≥ 3 | `RegulatorCountdownService` |
+| NCA (ECC / OTCC) | 24 h | cyber_related (any severity) | `RegulatorCountdownService` |
+| SDAIA PDPL Article 23 | 72 h | personal_data_affected | `RegulatorCountdownService` + V115 `pdpl_72h_deadline_at` |
+| NCEMA | 24 h | severity ≥ 4 | `RegulatorCountdownService` |
+| CMA | 24 h | severity ≥ 4 — listed-entity disclosure | `RegulatorCountdownService` |
+| MOH | 24 h | severity ≥ 4 AND supplier_involved | `RegulatorCountdownService` |
+
+### Backend endpoints shipped this sub-sprint
+
+```
+GET /api/v1/bcm/board-pack-section
+GET /api/v1/bcm/regulator-countdowns
+GET /api/v1/bcm/regulator-countdowns/summary
+GET /api/v1/bcm/regulator-countdowns/event/{id}
+@Scheduled hourly: BcmAnnualCycleScheduledSweep.tick()
+```
+
+### What's still ahead in Sprint-7 / 8
+
+From `BCM_GRC_GAP_ANALYSIS_AND_PLAN.md`:
+- Slice 7-A — Multi-year strategic roadmap Gantt (frontend)
+- Slice 7-B (full) — Maturity-assessment wizard UI (frontend)
+- Sprint-8 — FAIR risk lane, regulatory horizon scanner, PDPL data-flow viz, threat-intel ingestion, AI control-mapping
+- Sprint-6 task #207 — tenant-write-guard activation (operator action)
+
+---
+
+## Previously latest — Sprint-7 BCM/GRC plan + Saudi regulatory seed arc (PRs #148 → #154)
 
 User asked: "as Saudi BCM Manager what you still need... as GRC expert and SME make a plan in md file". Result: a complete BCM playbook (gap analysis + plan + operational doc library + first execution slices delivering 540+ rows of Saudi-regulatory compliance data).
 
