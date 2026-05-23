@@ -14,4 +14,11 @@ public interface CrisisRegulatoryNotificationRepository extends JpaRepository<Cr
     Optional<CrisisRegulatoryNotification> findByIdAndOrganisationId(Long id, Long organisationId);
 
     long countByOrganisationIdAndCrisisEventId(Long organisationId, Long crisisEventId);
+
+    /**
+     * Tenant-wide recent regulator notification log — used by the BCM Board Pack
+     * section to surface the last 20 notifications across all crisis events.
+     * Slice 7-D (Sprint-7).
+     */
+    List<CrisisRegulatoryNotification> findTop20ByOrganisationIdOrderByNotifiedAtDesc(Long organisationId);
 }
