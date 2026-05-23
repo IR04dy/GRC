@@ -100,18 +100,15 @@ export function BcpBuilderPage() {
   // ── Register loaders ──
   async function reload() {
     setLoading(true);
-    try {
-      const [page, st] = await Promise.all([
-        listPlans(planTypeFilter || undefined, 0, 200),
-        planStats(),
-      ]);
-      setItems(page.content);
-      setStats(st);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التحميل' : 'Load failed'));
-    } finally {
-      setLoading(false);
-    }
+    // Per-call .catch() — list and stats should fail independently so the
+    // plan list still renders if the stats aggregator hiccups (and vice versa).
+    const [page, st] = await Promise.all([
+      listPlans(planTypeFilter || undefined, 0, 200).catch(() => ({ content: [] as BcpPlan[], totalElements: 0 })),
+      planStats().catch(() => ({} as Record<string, number>)),
+    ]);
+    setItems(page.content);
+    setStats(st);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, [planTypeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -230,16 +227,13 @@ export function BcpBuilderPage() {
   // ── Distribution (Tier-2 #11) ──
   async function reloadDistribution() {
     if (!plan) return;
-    try {
-      const [list, s] = await Promise.all([
-        listDistribution(plan.id),
-        distributionStats(plan.id),
-      ]);
-      setAcks(Array.isArray(list) ? list : []);
-      setDistStats(s);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحميل التوزيع' : 'Distribution load failed'));
-    }
+    // Per-call .catch() — show acks list even if stats aggregator is down.
+    const [list, s] = await Promise.all([
+      listDistribution(plan.id).catch(() => [] as PlanAcknowledgement[]),
+      distributionStats(plan.id).catch(() => null as DistributionStats | null),
+    ]);
+    setAcks(Array.isArray(list) ? list : []);
+    setDistStats(s);
   }
   // Auto-load when the user switches to the Distribution tab the first time.
   useEffect(() => {

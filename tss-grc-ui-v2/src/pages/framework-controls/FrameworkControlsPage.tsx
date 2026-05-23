@@ -10,7 +10,6 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
-import { useToast } from '../../lib/toast';
 import {
   listFrameworks, listAllControls,
   CTRL_IMPL_TONE, CTRL_MATURITY_TONE,
@@ -33,7 +32,6 @@ const TAB_TO_FRAMEWORK_NAME: Record<TabId, string | null> = {
 
 export function FrameworkControlsPage() {
   const { t, lang } = useI18n();
-  const toast = useToast();
   const [tab, setTab] = useState<TabId>('ALL');
   const [frameworks, setFrameworks] = useState<CyberFramework[]>([]);
   const [controls, setControls] = useState<CyberControl[]>([]);
@@ -44,12 +42,16 @@ export function FrameworkControlsPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [fw, ct] = await Promise.all([listFrameworks(), listAllControls()]);
-      setFrameworks(fw);
-      setControls(ct);
-    } catch { toast.danger(t('fwcLoadFailed')); }
-    finally { setLoading(false); }
+    // Per-call .catch() — if one of the two endpoints is missing in a dev
+    // DB the user can still see the other (e.g. browse controls even when
+    // the frameworks list is empty).
+    const [fw, ct] = await Promise.all([
+      listFrameworks().catch(() => [] as CyberFramework[]),
+      listAllControls().catch(() => [] as CyberControl[]),
+    ]);
+    setFrameworks(fw);
+    setControls(ct);
+    setLoading(false);
   }
 
   const fwByName = useMemo(() => {

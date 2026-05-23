@@ -48,19 +48,15 @@ export function RegulatoryLibraryPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [docs, agg] = await Promise.all([
-        listAuthorityDocuments(familyFilter || undefined),
-        rollupAuthorityDocumentsByFamily(),
-      ]);
-      setDocuments(docs);
-      setRollup(agg);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'فشل تحميل المرجعيات' : 'Failed to load authority documents'));
-      setDocuments([]);
-      setRollup({});
-    } finally { setLoading(false); }
+    // Per-call .catch() — show the document list even if the rollup endpoint
+    // fails (e.g. missing aggregation view in dev DB), and vice versa.
+    const [docs, agg] = await Promise.all([
+      listAuthorityDocuments(familyFilter || undefined).catch(() => [] as AuthorityDocument[]),
+      rollupAuthorityDocumentsByFamily().catch(() => ({} as Record<string, number>)),
+    ]);
+    setDocuments(docs);
+    setRollup(agg);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, [familyFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 

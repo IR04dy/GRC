@@ -64,20 +64,18 @@ export function BiaWizardPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [page, st, cat] = await Promise.all([
-        listBiaAssessments(0, 100),
-        biaStats(),
-        listBiaCatalog(),
-      ]);
-      setItems(page.content);
-      setStats(st);
-      setCatalog(cat);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحميل BIA' : 'Failed to load BIA list'));
-    } finally {
-      setLoading(false);
-    }
+    // Per-call .catch() — render whatever loaded successfully. A blank
+    // catalog still lets the user view existing BIAs; a missing stats
+    // endpoint shouldn't hide the list.
+    const [page, st, cat] = await Promise.all([
+      listBiaAssessments(0, 100).catch(() => ({ content: [] as BcmBiaAssessment[], totalElements: 0 })),
+      biaStats().catch(() => ({} as Record<string, number>)),
+      listBiaCatalog().catch(() => ({ timeBands: [] as string[], impactDimensions: [] as string[] })),
+    ]);
+    setItems(page.content);
+    setStats(st);
+    setCatalog(cat);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

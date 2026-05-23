@@ -55,20 +55,18 @@ export function BcmComplianceMappingPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [list, cov, st] = await Promise.all([
-        listCompliance(filter || undefined),
-        coverageByFramework(),
-        overallStats(),
-      ]);
-      setItems(list);
-      setCoverage(cov);
-      setStats(st);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التحميل' : 'Load failed'));
-    } finally {
-      setLoading(false);
-    }
+    // Per-call .catch() so a partial backend failure (e.g. missing-table 503
+    // from the global handler in PR #117) doesn't blank the whole page.
+    // Each panel degrades independently to its empty default.
+    const [list, cov, st] = await Promise.all([
+      listCompliance(filter || undefined).catch(() => [] as BcmComplianceMapping[]),
+      coverageByFramework().catch(() => ({} as Record<string, Record<string, number>>)),
+      overallStats().catch(() => ({} as Record<string, number>)),
+    ]);
+    setItems(list);
+    setCoverage(cov);
+    setStats(st);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 

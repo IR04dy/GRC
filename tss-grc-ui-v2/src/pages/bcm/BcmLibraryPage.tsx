@@ -51,22 +51,20 @@ export function BcmLibraryPage() {
   useEffect(() => {
     void (async () => {
       setLoading(true);
-      try {
-        const [t, s, p, u] = await Promise.all([
-          listPlanTemplates(),
-          listExerciseScenarios(),
-          listPeakSeasons(),
-          upcomingPeakSeasons(120),
-        ]);
-        setTemplates(Array.isArray(t) ? t : []);
-        setScenarios(Array.isArray(s) ? s : []);
-        setPeaks(Array.isArray(p) ? p : []);
-        setUpcoming(Array.isArray(u) ? u : []);
-      } catch (e) {
-        toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحميل المكتبة' : 'Failed to load library'));
-      } finally {
-        setLoading(false);
-      }
+      // Per-call .catch() so a partial backend failure (e.g. missing-table
+      // 503 on a fresh dev DB) doesn't blank the whole library. Each panel
+      // degrades independently to its empty default.
+      const [t, s, p, u] = await Promise.all([
+        listPlanTemplates().catch(() => []),
+        listExerciseScenarios().catch(() => []),
+        listPeakSeasons().catch(() => []),
+        upcomingPeakSeasons(120).catch(() => []),
+      ]);
+      setTemplates(Array.isArray(t) ? t : []);
+      setScenarios(Array.isArray(s) ? s : []);
+      setPeaks(Array.isArray(p) ? p : []);
+      setUpcoming(Array.isArray(u) ? u : []);
+      setLoading(false);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

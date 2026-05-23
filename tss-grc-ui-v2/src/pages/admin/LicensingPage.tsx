@@ -47,16 +47,16 @@ export function LicensingPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [cat, lic] = await Promise.all([listCatalog(), listLicenses()]);
-      setCatalog(cat.slice().sort());
-      setLicenses(lic);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل بيانات الاشتراك' : 'Failed to load licensing data'));
-    } finally {
-      setLoading(false);
-    }
+    // Per-call .catch() so one failing endpoint does not blank the whole page.
+    // Real dev DBs are often missing one or the other (catalog seed lag, no
+    // licence rows yet) — we still want the other table to render.
+    const [cat, lic] = await Promise.all([
+      listCatalog().catch(() => [] as string[]),
+      listLicenses().catch(() => [] as OrganisationLicense[]),
+    ]);
+    setCatalog(cat.slice().sort());
+    setLicenses(lic);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

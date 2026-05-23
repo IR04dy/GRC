@@ -78,16 +78,15 @@ export function SupplierResiliencePage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [a, p] = await Promise.all([
-        listAlternates(undefined, 0, 200),
-        listExitPlans(undefined, 0, 200),
-      ]);
-      setAlts(a.content);
-      setPlans(p.content);
-    } catch {
-      toast.danger(t('srpLoadFailed'));
-    } finally { setLoading(false); }
+    // Per-call .catch() — alternates and exit plans live in separate
+    // backends; one outage shouldn't blank the entire SCM workspace.
+    const [a, p] = await Promise.all([
+      listAlternates(undefined, 0, 200).catch(() => ({ content: [] as AlternateSupplier[], totalElements: 0 })),
+      listExitPlans(undefined, 0, 200).catch(() => ({ content: [] as ExitPlan[], totalElements: 0 })),
+    ]);
+    setAlts(a.content);
+    setPlans(p.content);
+    setLoading(false);
   }
 
   // ─── KPIs ────────────────────────────────────────────────────────

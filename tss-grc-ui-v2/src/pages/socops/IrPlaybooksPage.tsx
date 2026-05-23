@@ -53,14 +53,21 @@ export function IrPlaybooksPage() {
   async function load() {
     setState('loading');
     setErrMsg(null);
-    try {
-      const [a, t] = await Promise.all([socopsApi.playbooks(), socopsApi.templates()]);
-      setActive(a);
-      setTemplates(t);
-      setState('ready');
-    } catch (e) {
-      setErrMsg((e as Error)?.message ?? String(e));
+    // Per-call .catch() — if templates endpoint fails the playbooks tab
+    // should still render (and vice versa). Whole-page error only when
+    // BOTH calls fail.
+    let anyError: unknown = null;
+    const [a, t] = await Promise.all([
+      socopsApi.playbooks().catch((e) => { anyError = e; return [] as IrPlaybook[]; }),
+      socopsApi.templates().catch((e) => { anyError = e; return [] as IrPlaybook[]; }),
+    ]);
+    setActive(a);
+    setTemplates(t);
+    if (a.length === 0 && t.length === 0 && anyError) {
+      setErrMsg((anyError as Error)?.message ?? String(anyError));
       setState('error');
+    } else {
+      setState('ready');
     }
   }
   useEffect(() => { void load(); }, []);

@@ -61,16 +61,20 @@ export function BcmReadinessPage() {
   // ── Loaders ────
   async function reload() {
     setLoading(true);
-    try {
-      const [c, g, r, s, ct, cs] = await Promise.all([
-        listCycles(), listGovernance(), listRisks(), listStrategies(),
-        listContacts(), contactTestStats(),
-      ]);
-      setCycles(c); setGovernance(g); setRisks(r); setStrategies(s);
-      setContacts(ct); setContactStats(cs);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحميل بيانات BCM' : 'Failed to load BCM data'));
-    } finally { setLoading(false); }
+    // Per-call .catch() so a partial backend failure (e.g. missing-table 503
+    // on a fresh dev DB) doesn't blank the whole page. Each panel degrades
+    // independently to its empty default.
+    const [c, g, r, s, ct, cs] = await Promise.all([
+      listCycles().catch(() => []),
+      listGovernance().catch(() => []),
+      listRisks().catch(() => []),
+      listStrategies().catch(() => []),
+      listContacts().catch(() => []),
+      contactTestStats().catch(() => null),
+    ]);
+    setCycles(c); setGovernance(g); setRisks(r); setStrategies(s);
+    setContacts(ct); setContactStats(cs);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

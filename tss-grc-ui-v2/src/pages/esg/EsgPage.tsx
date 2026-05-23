@@ -480,19 +480,15 @@ function CapaTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([
-        listCapas({ size: 200 }),
-        capaAggregate(),
-      ]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل الإجراءات التصحيحية' : 'Failed to load corrective actions'));
-      setItems([]);
-      setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — render whatever loaded; one endpoint failing
+    // shouldn't blank the whole CAPA tab.
+    const [pg, a] = await Promise.all([
+      listCapas({ size: 200 }).catch(() => ({ content: [] as CorrectiveAction[], totalElements: 0 })),
+      capaAggregate().catch(() => null as CapaAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -744,7 +740,6 @@ function CapaTab() {
 
 function OverviewTab() {
   const { lang } = useI18n();
-  const toast = useToast();
   const isAr = lang === 'ar';
   const [data, setData] = useState<DashboardPayload | null>(null);
   // Slice 14-C — settings drive Rule 14 banner thresholds. Loaded in
@@ -755,18 +750,15 @@ function OverviewTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [dash, s] = await Promise.all([
-        getDashboard(2025),
-        getSettings().catch(() => null),  // banner is non-critical
-      ]);
-      setData(dash);
-      setSettings(s as SustSettings | null);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل لوحة المعلومات' : 'Failed to load dashboard'));
-      setData(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — settings already soft-fail; do the same for the
+    // dashboard payload so the page shell still renders.
+    const [dash, s] = await Promise.all([
+      getDashboard(2025).catch(() => null),
+      getSettings().catch(() => null),  // banner is non-critical
+    ]);
+    setData(dash);
+    setSettings(s as SustSettings | null);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -1429,15 +1421,14 @@ function CmaTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, r] = await Promise.all([listCma({ year: 2025, size: 100 }), cmaReadiness(2025)]);
-      setItems(pg.content);
-      setReadi(r);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل سجلّ الإفصاحات' : 'Failed to load disclosure matrix'));
-      setItems([]); setReadi(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — disclosures and readiness load independently.
+    const [pg, r] = await Promise.all([
+      listCma({ year: 2025, size: 100 }).catch(() => ({ content: [] as CmaD[], totalElements: 0 })),
+      cmaReadiness(2025).catch(() => null as CmaR | null),
+    ]);
+    setItems(pg.content);
+    setReadi(r);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -1692,15 +1683,14 @@ function TcfdTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, r] = await Promise.all([listTcfd({ year: 2025, size: 100 }), tcfdReadiness(2025)]);
-      setItems(pg.content);
-      setReadi(r);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل مصفوفة TCFD' : 'Failed to load TCFD matrix'));
-      setItems([]); setReadi(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — matrix and readiness load independently.
+    const [pg, r] = await Promise.all([
+      listTcfd({ year: 2025, size: 100 }).catch(() => ({ content: [] as TcfdI[], totalElements: 0 })),
+      tcfdReadiness(2025).catch(() => null as TcfdR | null),
+    ]);
+    setItems(pg.content);
+    setReadi(r);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -1930,15 +1920,14 @@ function MaterialityTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, m] = await Promise.all([listMateriality({ year: 2025, size: 100 }), generateMatrix(2025)]);
-      setTopics(pg.content);
-      setMatrix(m);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل تقييم الجوهرية' : 'Failed to load materiality assessment'));
-      setTopics([]); setMatrix(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — list and generated matrix load independently.
+    const [pg, m] = await Promise.all([
+      listMateriality({ year: 2025, size: 100 }).catch(() => ({ content: [] as MaterialTopic[], totalElements: 0 })),
+      generateMatrix(2025).catch(() => null as MaterialMatrix | null),
+    ]);
+    setTopics(pg.content);
+    setMatrix(m);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -2187,15 +2176,14 @@ function MetricsTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([listMetrics({ year: 2025, size: 200 }), metricsAggregate(2025)]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل المؤشّرات' : 'Failed to load metrics'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — metrics list and aggregate are independent.
+    const [pg, a] = await Promise.all([
+      listMetrics({ year: 2025, size: 200 }).catch(() => ({ content: [] as EsgM[], totalElements: 0 })),
+      metricsAggregate(2025).catch(() => null as MetricAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -2392,15 +2380,14 @@ function EvidenceTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([listEvidence({ size: 200 }), evidenceAggregate()]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل مستودع الأدلة' : 'Failed to load evidence repository'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — evidence list and aggregate are independent.
+    const [pg, a] = await Promise.all([
+      listEvidence({ size: 200 }).catch(() => ({ content: [] as SE[], totalElements: 0 })),
+      evidenceAggregate().catch(() => null as EvidenceAgg | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -2846,18 +2833,17 @@ function GhgInventoryTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [page, aggData, yoyData] = await Promise.all([
-        listGhgRecords({ year, scope, size: 200 }),
-        ghgAggregate(year),
-        ghgYoy(year),
-      ]);
-      setRows(page.content);
-      setAgg(aggData);
-      setYoy(yoyData);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : t('ghgLoadFailed'));
-    } finally { setLoading(false); }
+    // Per-call .catch() — GHG records list, aggregate, and YoY are
+    // independent; loss of one shouldn't blank the GHG tab.
+    const [page, aggData, yoyData] = await Promise.all([
+      listGhgRecords({ year, scope, size: 200 }).catch(() => ({ content: [] as GhgEmissionRecord[], totalElements: 0 })),
+      ghgAggregate(year).catch(() => null as GhgAggregate | null),
+      ghgYoy(year).catch(() => null as GhgYoY | null),
+    ]);
+    setRows(page.content);
+    setAgg(aggData);
+    setYoy(yoyData);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, [year, scope]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -3093,15 +3079,14 @@ function SgiTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([listSgi({ size: 200 }), sgiAggregate()]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل الالتزامات' : 'Failed to load commitments'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — SGI list and aggregate load independently.
+    const [pg, a] = await Promise.all([
+      listSgi({ size: 200 }).catch(() => ({ content: [] as SgiC[], totalElements: 0 })),
+      sgiAggregate().catch(() => null as SgiAgg | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 

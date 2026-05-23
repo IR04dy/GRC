@@ -387,18 +387,17 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
     }
     setOpenFill(va);
     setFillBusy(true);
-    try {
-      const [qs, rs] = await Promise.all([
-        listQtQuestions(va.templateId),
-        listAssessmentResponses(va.id),
-      ]);
-      setFillQuestions(qs);
-      const map: Record<number, QuestionnaireResponse> = {};
-      for (const r of rs) map[r.questionId] = r;
-      setFillResponses(map);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : 'Failed to load questionnaire');
-    } finally { setFillBusy(false); }
+    // Per-call .catch() — show the question form even if no responses
+    // have been saved yet (404/empty), and vice versa.
+    const [qs, rs] = await Promise.all([
+      listQtQuestions(va.templateId).catch(() => [] as QuestionnaireQuestion[]),
+      listAssessmentResponses(va.id).catch(() => [] as QuestionnaireResponse[]),
+    ]);
+    setFillQuestions(qs);
+    const map: Record<number, QuestionnaireResponse> = {};
+    for (const r of rs) map[r.questionId] = r;
+    setFillResponses(map);
+    setFillBusy(false);
   }
 
   async function onAssignTemplate(va: QtVendorAssessment) {

@@ -986,18 +986,17 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
 
   useEffect(() => {
     (async () => {
-      try {
-        const [fs, cov] = await Promise.all([frameworkApi.list(), frameworkApi.coverage()]);
-        setFrameworks(fs);
-        setCoverage(Object.fromEntries(cov.map(c => [c.frameworkId, c])));
-        if (fs.length > 0 && activeId == null) setActiveId(fs[0].id);
-      } catch {
-        // Demo mode — fall back to bundled mock catalogue + coverage so the
-        // frameworks tab is fully populated without authentication.
-        setFrameworks(FRAMEWORKS);
-        setCoverage(Object.fromEntries(FRAMEWORK_COVERAGE.map(c => [c.frameworkId, c])));
-        if (activeId == null) setActiveId(FRAMEWORKS[0]?.id ?? null);
-      }
+      // Per-call .catch() — coverage may be unavailable in dev DBs while the
+      // catalogue is fine (and vice versa). Each call falls back to its own
+      // demo slice independently so we keep partial real data on screen.
+      const [fs, cov] = await Promise.all([
+        frameworkApi.list().catch(() => FRAMEWORKS),
+        frameworkApi.coverage().catch(() => FRAMEWORK_COVERAGE),
+      ]);
+      const finalFs = fs.length ? fs : FRAMEWORKS;
+      setFrameworks(finalFs);
+      setCoverage(Object.fromEntries(cov.map(c => [c.frameworkId, c])));
+      if (finalFs.length > 0 && activeId == null) setActiveId(finalFs[0].id);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

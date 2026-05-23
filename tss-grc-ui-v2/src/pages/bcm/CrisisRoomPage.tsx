@@ -95,43 +95,37 @@ export function CrisisRoomPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [page, act, st] = await Promise.all([
-        listCrisisEvents(0, 100),
-        listActiveCrisisEvents(),
-        crisisEventStats(),
-      ]);
-      setEvents(page.content);
-      setActive(act);
-      setStats(st);
-      if (!selected && page.content.length) {
-        await loadDetail(page.content[0].id);
-      }
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'فشل تحميل الأزمات' : 'Failed to load crisis events'));
-    } finally {
-      setLoading(false);
+    // Per-call .catch() — list, active subset and stats failing independently
+    // shouldn't blank the whole crisis room. Stale stats are better than no UI.
+    const [page, act, st] = await Promise.all([
+      listCrisisEvents(0, 100).catch(() => ({ content: [] as CrisisEvent[], totalElements: 0 })),
+      listActiveCrisisEvents().catch(() => [] as CrisisEvent[]),
+      crisisEventStats().catch(() => ({} as Record<string, number>)),
+    ]);
+    setEvents(page.content);
+    setActive(act);
+    setStats(st);
+    if (!selected && page.content.length) {
+      await loadDetail(page.content[0].id);
     }
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadDetail(id: number) {
-    try {
-      const [e, sr, dec, rn] = await Promise.all([
-        getCrisisEvent(id),
-        listSitReps(id),
-        listDecisions(id),
-        listRegulatoryNotifications(id),
-      ]);
-      setSelected(e);
-      setSitreps(sr);
-      setDecisions(dec);
-      setRegNotifs(rn);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل تفاصيل الأزمة' : 'Failed to load event details'));
-    }
+    // Per-call .catch() — sub-resources (sitreps, decisions, notifications)
+    // may not exist for a brand-new crisis event; treat each as empty if it
+    // fails so the rest of the detail still renders.
+    const [e, sr, dec, rn] = await Promise.all([
+      getCrisisEvent(id).catch(() => null as CrisisEvent | null),
+      listSitReps(id).catch(() => [] as CrisisSituationReport[]),
+      listDecisions(id).catch(() => [] as CrisisDecision[]),
+      listRegulatoryNotifications(id).catch(() => [] as CrisisRegulatoryNotification[]),
+    ]);
+    if (e) setSelected(e);
+    setSitreps(sr);
+    setDecisions(dec);
+    setRegNotifs(rn);
   }
 
   async function handleCreate(e: FormEvent) {

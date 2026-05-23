@@ -71,17 +71,17 @@ export function ReportSchedulesPage() {
   async function load() {
     if (demoMode) { applyDemo(); return; }
     setLoading(true);
-    try {
-      const [page, runs] = await Promise.all([
-        reportScheduleApi.list(0, 100),
-        reportScheduleApi.recent().catch(() => [] as ReportRunDto[]),
-      ]);
-      const list = page.content ?? [];
-      if (list.length === 0) { applyDemo(); return; }
-      setItems(list);
-      setRecent(runs);
-    } catch { applyDemo(); }
-    finally { setLoading(false); }
+    // Per-call .catch() — if `list` fails fall back to demo, but don't let
+    // a transient `recent` failure also wipe out the (potentially good) list.
+    const [page, runs] = await Promise.all([
+      reportScheduleApi.list(0, 100).catch(() => null),
+      reportScheduleApi.recent().catch(() => [] as ReportRunDto[]),
+    ]);
+    const list = page?.content ?? [];
+    if (list.length === 0) { applyDemo(); setLoading(false); return; }
+    setItems(list);
+    setRecent(runs);
+    setLoading(false);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 

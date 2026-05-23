@@ -246,15 +246,14 @@ function CyclesTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([listCycles({ size: 100 }), cyclesAggregate()]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل الدورات' : 'Failed to load cycles'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — render whichever loaded; aggregate failure shouldn't blank the list.
+    const [pg, a] = await Promise.all([
+      listCycles({ size: 100 }).catch(() => ({ content: [] as NdiAssessmentCycle[], totalElements: 0 })),
+      cyclesAggregate().catch(() => null as NdiCycleAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -478,15 +477,14 @@ function FrameworkTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([listFramework({ size: 500 }), frameworkAggregate()]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل مكتبة الإطار' : 'Failed to load framework library'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — framework list and aggregate load independently.
+    const [pg, a] = await Promise.all([
+      listFramework({ size: 500 }).catch(() => ({ content: [] as NdiFrameworkItem[], totalElements: 0 })),
+      frameworkAggregate().catch(() => null as NdiFrameworkAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
@@ -715,18 +713,14 @@ function MaturityTab() {
   async function reload() {
     if (!cycleId) return;
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([
-        listMaturity(cycleId, { size: 500 }),
-        maturityAggregate(cycleId),
-      ]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل النضج' : 'Failed to load maturity'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — maturity list and aggregate load independently.
+    const [pg, a] = await Promise.all([
+      listMaturity(cycleId, { size: 500 }).catch(() => ({ content: [] as NdiMaturityAssessment[], totalElements: 0 })),
+      maturityAggregate(cycleId).catch(() => null as NdiMaturityAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
 
@@ -1053,18 +1047,14 @@ function ComplianceTab() {
   async function reload() {
     if (!cycleId) return;
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([
-        listCompliance(cycleId, { size: 500 }),
-        complianceAggregate(cycleId),
-      ]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل الامتثال' : 'Failed to load compliance'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — compliance list and aggregate load independently.
+    const [pg, a] = await Promise.all([
+      listCompliance(cycleId, { size: 500 }).catch(() => ({ content: [] as NdiComplianceAssessment[], totalElements: 0 })),
+      complianceAggregate(cycleId).catch(() => null as NdiComplianceAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
 
@@ -1383,18 +1373,14 @@ function OpexTab() {
   async function reload() {
     if (!cycleId) return;
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([
-        listOpex(cycleId, { size: 500 }),
-        opexAggregate(cycleId),
-      ]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل المؤشّرات' : 'Failed to load KPIs'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — KPI list and aggregate load independently.
+    const [pg, a] = await Promise.all([
+      listOpex(cycleId, { size: 500 }).catch(() => ({ content: [] as NdiOpexKpi[], totalElements: 0 })),
+      opexAggregate(cycleId).catch(() => null as NdiOpexAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
 
@@ -1559,18 +1545,14 @@ function DomainsTab() {
   async function reload() {
     if (!cycleId) return;
     setLoading(true);
-    try {
-      const [list, r] = await Promise.all([
-        listDomains(false),
-        rollupForCycle(cycleId),
-      ]);
-      setDomains(list);
-      setRollup(r);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل المجالات' : 'Failed to load domains'));
-      setDomains([]); setRollup(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — domains and rollup load independently.
+    const [list, r] = await Promise.all([
+      listDomains(false).catch(() => [] as NdiGovernanceDomain[]),
+      rollupForCycle(cycleId).catch(() => null as CycleRollup | null),
+    ]);
+    setDomains(list);
+    setRollup(r);
+    setLoading(false);
   }
   useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
 
@@ -1862,23 +1844,22 @@ function EvidenceTab() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [pg, a, exp] = await Promise.all([
-        listEvidence({ size: 500,
-          type: typeFilter || undefined,
-          status: (statusFilter as 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'SUPERSEDED' | 'REJECTED') || undefined }),
-        evidenceAggregate(),
-        runExpiryCheckSilently().then(() => /* re-run */ {/* noop */}).then(() =>
-          import('../../lib/ndiEvidence').then(m => m.expiringSoon(60))),
-      ]);
-      setItems(pg.content);
-      setAgg(a);
-      setExpiring(exp);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تحميل الأدلة' : 'Failed to load evidence'));
-      setItems([]); setAgg(null); setExpiring([]);
-    } finally { setLoading(false); }
+    // Per-call .catch() — evidence list, aggregate and expiring-soon
+    // load independently. One missing endpoint shouldn't blank the tab.
+    const [pg, a, exp] = await Promise.all([
+      listEvidence({ size: 500,
+        type: typeFilter || undefined,
+        status: (statusFilter as 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'SUPERSEDED' | 'REJECTED') || undefined })
+        .catch(() => ({ content: [] as NdiEvidenceItem[], totalElements: 0 })),
+      evidenceAggregate().catch(() => null as NdiEvidenceAggregate | null),
+      runExpiryCheckSilently().then(() => /* re-run */ {/* noop */}).then(() =>
+        import('../../lib/ndiEvidence').then(m => m.expiringSoon(60)))
+        .catch(() => [] as NdiEvidenceItem[]),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setExpiring(exp);
+    setLoading(false);
   }
 
   // Best-effort expiry flip — silently swallow errors so a misconfigured
@@ -2172,17 +2153,15 @@ function GapsTab() {
   async function reload() {
     if (!cycleId) return;
     setLoading(true);
-    try {
-      const [pg, a] = await Promise.all([
-        listGaps(cycleId, { status: statusFilter || undefined, severity: severityFilter || undefined, size: 500 }),
-        gapsAggregate(cycleId),
-      ]);
-      setItems(pg.content);
-      setAgg(a);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل الفجوات' : 'Failed to load gaps'));
-      setItems([]); setAgg(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — gaps list and aggregate load independently.
+    const [pg, a] = await Promise.all([
+      listGaps(cycleId, { status: statusFilter || undefined, severity: severityFilter || undefined, size: 500 })
+        .catch(() => ({ content: [] as NdiGap[], totalElements: 0 })),
+      gapsAggregate(cycleId).catch(() => null as GapAggregate | null),
+    ]);
+    setItems(pg.content);
+    setAgg(a);
+    setLoading(false);
   }
   useEffect(() => { if (cycleId) void reload(); }, [cycleId, statusFilter, severityFilter]);
 
@@ -2943,18 +2922,15 @@ function SubmissionTab() {
   async function reload() {
     if (!cycleId) return;
     setLoading(true);
-    try {
-      const [list, p] = await Promise.all([
-        listSubmissions(cycleId),
-        fetchPreflight(cycleId),
-      ]);
-      setPackages(list);
-      setCurrent(list[0] ?? null);
-      setPf(p);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل الحزم' : 'Failed to load packages'));
-      setPackages([]); setCurrent(null); setPf(null);
-    } finally { setLoading(false); }
+    // Per-call .catch() — submission list and preflight load independently.
+    const [list, p] = await Promise.all([
+      listSubmissions(cycleId).catch(() => [] as NdiSubmissionPackage[]),
+      fetchPreflight(cycleId).catch(() => null as Preflight | null),
+    ]);
+    setPackages(list);
+    setCurrent(list[0] ?? null);
+    setPf(p);
+    setLoading(false);
   }
   useEffect(() => { if (cycleId) void reload(); }, [cycleId]);
 

@@ -6,9 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
-import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
-import { useToast } from '../../lib/toast';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
   controlStatusTone, controlTypeTone, coverageTone, effectivenessTone, domainLabel,
@@ -35,7 +33,6 @@ const DOMAINS: ControlDomain[] = ['RISK', 'CYBER', 'BCM', 'PRIVACY', 'TPRM', 'CO
 export function ControlLibraryPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-  const toast = useToast();
 
   const [controls, setControls] = useState<Control[]>([]);
   const [docs, setDocs] = useState<AuthorityDocument[]>([]);
@@ -50,34 +47,30 @@ export function ControlLibraryPage() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const [cs, ds] = await Promise.all([
-        listControls(domain || undefined),
-        listAuthorityDocuments(),
-      ]);
-      setControls(cs);
-      setDocs(ds);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التحميل' : 'Failed to load controls'));
-      setControls([]); setDocs([]);
-    } finally { setLoading(false); }
+    // Per-call .catch() — controls and authority docs come from independent
+    // tables; either failing shouldn't blank the whole library.
+    const [cs, ds] = await Promise.all([
+      listControls(domain || undefined).catch(() => [] as Control[]),
+      listAuthorityDocuments().catch(() => [] as AuthorityDocument[]),
+    ]);
+    setControls(cs);
+    setDocs(ds);
+    setLoading(false);
   }
   useEffect(() => { void reload(); }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function selectControl(c: Control) {
     setSelected(c);
     setDetailLoading(true);
-    try {
-      const [ms, rl, as] = await Promise.all([
-        listControlMappings(c.id),
-        listControlRiskLinks(c.id),
-        listControlAssessments(c.id),
-      ]);
-      setMappings(ms); setRiskLinks(rl); setAssessments(as);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : 'Detail load failed');
-      setMappings([]); setRiskLinks([]); setAssessments([]);
-    } finally { setDetailLoading(false); }
+    // Per-call .catch() — show whatever sub-tab loaded; a missing
+    // assessments endpoint shouldn't hide mappings.
+    const [ms, rl, as] = await Promise.all([
+      listControlMappings(c.id).catch(() => [] as ControlMapping[]),
+      listControlRiskLinks(c.id).catch(() => [] as RiskControlLink[]),
+      listControlAssessments(c.id).catch(() => [] as ControlAssessment[]),
+    ]);
+    setMappings(ms); setRiskLinks(rl); setAssessments(as);
+    setDetailLoading(false);
   }
 
   // Future F5 slice will resolve citationId → document via a dedicated

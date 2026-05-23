@@ -80,24 +80,24 @@ export function BcmRemediationPage() {
   const [showCreate, setShowCreate] = useState(false);
 
   async function reload() {
-    try {
-      // The shared `api` helper already resolves to the parsed JSON body
-      // (it is NOT axios-style), so callers must NOT chain `.data` — the
-      // earlier `.then(r => r.data)` made every list `undefined` and blanked
-      // the page on first render (same class of bug fixed across other BCM libs).
-      const [l, g, c, s] = await Promise.all([
-        listLessons(),
-        listGaps(),
-        listCapas(),
-        remediationStats(),
-      ]);
-      setLessons(Array.isArray(l) ? l : []);
-      setGaps(Array.isArray(g) ? g : []);
-      setCapas(Array.isArray(c) ? c : []);
-      setStats(s ?? null);
-    } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التحميل' : 'Load failed'));
-    }
+    // The shared `api` helper already resolves to the parsed JSON body
+    // (it is NOT axios-style), so callers must NOT chain `.data` — the
+    // earlier `.then(r => r.data)` made every list `undefined` and blanked
+    // the page on first render (same class of bug fixed across other BCM libs).
+    //
+    // Per-call .catch() so a partial backend failure (e.g. missing-table
+    // 503 on a fresh dev DB) doesn't blank the whole page. Each panel
+    // degrades independently to its empty default.
+    const [l, g, c, s] = await Promise.all([
+      listLessons().catch(() => []),
+      listGaps().catch(() => []),
+      listCapas().catch(() => []),
+      remediationStats().catch(() => null),
+    ]);
+    setLessons(Array.isArray(l) ? l : []);
+    setGaps(Array.isArray(g) ? g : []);
+    setCapas(Array.isArray(c) ? c : []);
+    setStats(s ?? null);
   }
   useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
