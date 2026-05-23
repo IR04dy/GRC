@@ -1,9 +1,103 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (10-round static-analysis bug-hunt arc — 12+ real production bugs caught and fixed across PRs #117 → #121)
+**Last update:** 23 May 2026 (Sprint-6 platform-wide mass-assignment defense — design, code, wiring, tests across PRs #122 → #127)
 
 ---
 
-## 🟢 Latest — Static-analysis bug-hunt closeout (23 May 2026, PRs #117 → #121)
+## 🟢 Latest — Sprint-6 mass-assignment AOP backstop (23 May 2026, PRs #122 → #127)
+
+The per-service `setId(null)` defense from PR #121 + #123 patched 19
+write endpoints, but relied on every future developer to remember the
+pattern on the next service. Sprint-6 adds a **platform-wide AOP
+backstop** so the regression case fails loudly instead of silently.
+
+### Six-PR arc
+
+| PR | What lands |
+|---|---|
+| #122 | `STATUS.md` capture of the bug-hunt arc (#117 → #121) |
+| #123 | DPIA `setId(null)` — one more service the earlier sweep missed |
+| #124 | `docs/security/MASS_ASSIGNMENT_DEFENSE.md` — pattern + Sprint-6 design |
+| #125 | `TenantContext.allowCrossTenantWrite()` + `TenantWriteGuardInterceptor` stub (not wired) |
+| #126 | `TenantWriteGuardConfig` — `HibernatePropertiesCustomizer` wiring, feature-flagged default OFF |
+| #127 | 8 unit tests for the interceptor decision logic |
+
+### The defense in one paragraph
+
+The `TenantWriteGuardInterceptor` implements Hibernate's
+`Interceptor.onFlushDirty`. On every UPDATE, it checks if
+`organisationId` is changing between previous-state and current-state.
+If yes, it allows the change **only** when the calling thread has
+explicitly opted in via `try (var scope =
+TenantContext.allowCrossTenantWrite()) { ... }`; otherwise it throws
+`SecurityException` with a diagnostic message naming the entity, id,
+old/new org, and pointing the developer at both `allowCrossTenantWrite()`
+and the per-service `setId(null)` defense. Blocked attempts are also
+written to the audit log (`SECURITY_BLOCK` action) so ops can spot
+attack attempts even when an upstream try/catch masks the exception.
+
+### Why `onFlushDirty` (not `@PreUpdate`)
+
+JPA's `@PreUpdate` only sees post-mutation state — by then the
+attacker's cross-tenant `organisationId` has already been copied onto
+the managed entity. Hibernate's `onFlushDirty` is the only place that
+sees BOTH old and new property values.
+
+### Activation pathway (default OFF on master)
+
+The wiring config (PR #126) reads the property
+`grc.security.tenant-write-guard.enabled` (default `false`).
+Operators flip it on per-deployment:
+
+```yaml
+grc:
+  security:
+    tenant-write-guard:
+      enabled: true
+```
+
+Rollout plan documented in `docs/security/MASS_ASSIGNMENT_DEFENSE.md`:
+
+1. **Staging**: flip `enabled: true`, run for one sprint, watch
+   audit log for `SECURITY_BLOCK` entries on legitimate flows.
+2. **Prod**: flip `enabled: true` once staging is clean.
+3. **Remove the flag**: once prod has been default-on for a sprint
+   with zero false positives.
+
+### What's still unblocked vs blocked
+
+| Status | Item |
+|---|---|
+| ✅ Done | Per-service `setId(null)` (19 services patched) — primary defense, no flag dependency |
+| ✅ Done | Interceptor implemented + tested |
+| ✅ Done | Wiring config behind feature flag, default OFF — boots clean |
+| ⏸️ Operator | Staging activation (flip flag, monitor one sprint) |
+| ⏸️ Operator | Prod activation (after staging clean) |
+| ⏸️ Cleanup | Remove the flag once prod is stable on default-on |
+
+Tracked as task #207 (`Sprint-6 tenant-write-guard activation`).
+
+### Test coverage
+
+PR #127's 8 unit tests cover the security-critical decision logic via
+a package-private `decide()` helper that the interceptor delegates to.
+Using `decide()` instead of `onFlushDirty()` shields the tests from
+Hibernate's deprecated/new overload churn — same logic, more robust
+test seam.
+
+| Scenario | Test |
+|---|---|
+| Attack (org changes, no opt-in) | `blocksWhenOrganisationIdChangesWithoutOptIn` |
+| Defensive (org null → value, no opt-in) | `blocksWhenOrganisationIdGoesFromNullToValue` |
+| Legitimate (org changes, inside opt-in scope) | `allowsCrossTenantWriteInsideExplicitOptInScope` |
+| Normal (org unchanged) | `allowsNormalUpdateWhereOrganisationIdUnchanged` |
+| Out of scope (no org column) | `ignoresEntitiesWithoutOrganisationIdColumn` |
+| Null safety (Hibernate quirk) | `handlesNullPreviousStateGracefully` |
+| Cleanup (normal exit) | `optInScopeClearsAfterTryWithResources` |
+| Cleanup (exception in body) | `optInScopeClearsEvenIfBodyThrows` |
+
+---
+
+## 🟢 Earlier — Static-analysis bug-hunt closeout (23 May 2026, PRs #117 → #121)
 
 Five-PR arc covering 10 rounds of platform-wide static-analysis bug-hunting,
 starting from the committees outage and ending with the cross-tenant
