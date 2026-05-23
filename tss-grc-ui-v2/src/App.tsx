@@ -36,6 +36,8 @@ const QuantitativeBiaPage    = lazy(() => import('./pages/bcm/QuantitativeBiaPag
 const StrategyRoiPage        = lazy(() => import('./pages/bcm/StrategyRoiPage').then(m => ({ default: m.StrategyRoiPage })));
 const ExerciseScenarioLibraryPage = lazy(() => import('./pages/bcm/ExerciseScenarioLibraryPage').then(m => ({ default: m.ExerciseScenarioLibraryPage })));
 const ExerciseScenarioDetailPage  = lazy(() => import('./pages/bcm/ExerciseScenarioDetailPage').then(m => ({ default: m.ExerciseScenarioDetailPage })));
+const FacilitatorConsolePage      = lazy(() => import('./pages/bcm/FacilitatorConsolePage').then(m => ({ default: m.FacilitatorConsolePage })));
+const ParticipantViewPage         = lazy(() => import('./pages/bcm/ParticipantViewPage').then(m => ({ default: m.ParticipantViewPage })));
 const BcmRemediationPage     = lazy(() => import('./pages/bcm/BcmRemediationPage').then(m => ({ default: m.BcmRemediationPage })));
 const BcpBuilderPage         = lazy(() => import('./pages/bcm/BcpBuilderPage').then(m => ({ default: m.BcpBuilderPage })));
 const BcmSettingsPage        = lazy(() => import('./pages/bcm/BcmSettingsPage').then(m => ({ default: m.BcmSettingsPage })));
@@ -245,6 +247,8 @@ export function App() {
               <Route path="/bcm/strategy-roi"     element={<StrategyRoiPage />} />
               <Route path="/bcm/scenarios"        element={<ExerciseScenarioLibraryPage />} />
               <Route path="/bcm/scenarios/:id"    element={<ExerciseScenarioDetailPage />} />
+              <Route path="/bcm/exercises/run/:runId/facilitate"  element={<FacilitatorConsolePage />} />
+              <Route path="/bcm/exercises/run/:runId/participate" element={<ParticipantViewPage />} />
               <Route path="/bcm/remediation"    element={<BcmRemediationPage />} />
               <Route path="/bcm/plans"          element={<BcpBuilderPage />} />
               <Route path="/bcm/settings"       element={<BcmSettingsPage />} />
