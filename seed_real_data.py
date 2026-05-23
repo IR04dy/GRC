@@ -874,6 +874,238 @@ for i, (ref, t_en, t_ar, sev, status, cond_en, cond_ar) in enumerate(FINDINGS):
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# Approvals inbox — pending / decided requests
+# ──────────────────────────────────────────────────────────────────────
+section("approvals.requests — approvals inbox")
+
+APPROVALS = [
+    # (entity_type, entity_id, title_en, title_ar, summary_en, requested_by, assigned_to, priority, status, days_offset)
+    ("RISK",            "1001", "Treatment plan approval — Cyber Risk #1001",
+                                 "اعتماد خطة معالجة — مخاطر سيبرانية #1001",
+                                 "Mitigate via EDR deployment + privileged-access overhaul.",
+                                 "Khalid Al-Shehri", "Mohammed Al-Otaibi", "HIGH",       "PENDING",   -2),
+    ("CAPA",            "F-2026-001", "CAPA closure — Privileged access review",
+                                 "إغلاق إجراء تصحيحي — مراجعة صلاحيات الوصول المميَّز",
+                                 "All 7 PAM accounts now attest; closure evidence attached.",
+                                 "Faisal Al-Dosari", "Bandar Al-Rashidi",  "MEDIUM",    "PENDING",   -1),
+    ("POLICY",          "POL-IS-2026-1.3", "Information Security Policy v1.3 publication",
+                                 "اعتماد نشر سياسة أمن المعلومات الإصدار 1.3",
+                                 "Updates Article 5 (cloud) and Article 9 (BYOD). Reviewed by CISO + Legal.",
+                                 "Reema Al-Asiri",   "Mohammed Al-Otaibi", "MEDIUM",    "APPROVED",  -8),
+    ("PDPL_CBT",        "CBT-2026-012", "Cross-Border Transfer — Salesforce US",
+                                 "نقل خارج الحدود — Salesforce US",
+                                 "Tier-3 country; requires SCC + DPIA addendum per SDAIA decision.",
+                                 "Layla Al-Ghamdi",  "Faisal Al-Dosari",   "HIGH",      "PENDING",   -3),
+    ("PDPL_DPIA",       "DPIA-2026-007", "DPIA approval — Open-Banking phase 3",
+                                 "اعتماد تقييم أثر الخصوصية — المنظومة المفتوحة مرحلة 3",
+                                 "Account-info sharing with 8 aggregators; mitigations + consent flow approved.",
+                                 "Layla Al-Ghamdi",  "Mohammed Al-Otaibi", "CRITICAL",  "APPROVED",  -15),
+    ("VENDOR_ONBOARD",  "VND-014", "Vendor onboarding — Crowdstrike (Critical)",
+                                 "تأهيل مورّد — Crowdstrike (حرج)",
+                                 "Critical-tier vendor; SAMA notification + security review complete.",
+                                 "Sarah Al-Qahtani", "Mohammed Al-Otaibi", "HIGH",      "PENDING",   -5),
+    ("BCP_PLAN",        "BCP-OPS-002", "BCP plan approval — Branch Ops 2026",
+                                 "اعتماد خطة استمرارية — عمليات الفروع 2026",
+                                 "Updated to address Q1 lessons; Tier-1 critical processes covered.",
+                                 "Khalid Al-Shehri", "Sarah Al-Qahtani",   "MEDIUM",    "PENDING",   -4),
+    ("RISK_ACCEPTANCE", "RA-2026-003", "Risk acceptance — Legacy ATM-Switch OS",
+                                 "قبول مخاطرة — نظام تشغيل محوّل أجهزة الصراف الآلي القديم",
+                                 "Vendor support extended; replacement in 2026-Q4 roadmap.",
+                                 "Bandar Al-Rashidi","Mohammed Al-Otaibi", "MEDIUM",    "PENDING",   -1),
+    ("BOARD_PACK",      "BP-2026-Q1", "Board Pack — Q1 2026 distribution",
+                                 "حزمة مجلس الإدارة — توزيع الربع الأول 2026",
+                                 "Risk + Cyber + ESG + Audit summary; ready for chair sign-off.",
+                                 "Sarah Al-Qahtani", "Reema Al-Asiri",     "HIGH",      "APPROVED",  -10),
+    ("REG_CHANGE",      "SAMA/CIRC/2026/04", "Regulatory change assessment — SAMA OBF Phase 3",
+                                 "تقييم تغيير تنظيمي — منظومة ساما المفتوحة مرحلة 3",
+                                 "Impact analysis + control update plan; awaiting compliance sign-off.",
+                                 "Reema Al-Asiri",   "Khalid Al-Shehri",   "HIGH",      "PENDING",   -2),
+    ("ESG_ANNEX",       "ESG-2026", "ESG Sustainability Annex — CMA Art.91-94",
+                                 "ملحق الاستدامة — هيئة السوق المالية المواد 91-94",
+                                 "TCFD-aligned annex; reviewed by Sustainability + IR.",
+                                 "Yousef Al-Mansouri","Mohammed Al-Otaibi","HIGH",      "PENDING",   -6),
+    ("AUDIT_FINDING",   "F-2026-005", "Audit finding remediation plan — Backup encryption",
+                                 "خطة معالجة ملاحظة تدقيق — تشفير النسخ الاحتياطية",
+                                 "CRITICAL finding; Q2 deployment of encrypted backup vault.",
+                                 "Saud Al-Harbi",    "Mohammed Al-Otaibi", "CRITICAL",  "PENDING",   -1),
+]
+for entity_type, entity_id, t_en, t_ar, summary, req, assigned, priority, status, days_offset in APPROVALS:
+    decided_at = "GETDATE()" if status in ("APPROVED", "REJECTED") else "NULL"
+    decided_by = "?" if status in ("APPROVED", "REJECTED") else "NULL"
+    decided_by_param = [assigned] if status in ("APPROVED", "REJECTED") else []
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM approvals.requests
+                       WHERE entity_type = ? AND entity_id = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO approvals.requests (external_id, organisation_id, entity_type, entity_id,
+            title_en, title_ar, summary_en, summary_ar, requested_by, requested_at,
+            assigned_to, original_assigned_to, priority,
+            sla_deadline, status, decided_at, decided_by, is_deleted)
+        VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?,
+            DATEADD(day, {days_offset}, GETDATE()), ?, ?, ?,
+            DATEADD(day, {days_offset} + 7, GETDATE()), ?, {decided_at}, {decided_by}, 0)
+        """,
+        entity_type, entity_id, ORG_TSS,
+        ORG_TSS, entity_type, entity_id, t_en, t_ar, summary,
+        f"ملخّص: {summary}",
+        req, req, assigned, priority, status,
+        *decided_by_param,
+        label=f"approval: [{priority}] {entity_type} {t_en[:40]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# audit_lc CAPA tasks — link to findings
+# ──────────────────────────────────────────────────────────────────────
+section("audit_lc.capa_tasks — CAPA tasks tied to audit findings")
+
+CAPA_TASKS = [
+    # (finding_ref, kind, title_en, title_ar, owner_role, target_days, status)
+    ("F-2026-001", "CORRECTIVE",  "Roll out quarterly PAM attestation workflow in CyberArk",
+                                  "تفعيل سير عمل مصادقة PAM ربعي في CyberArk",
+                                  "CISO", 30, "IN_PROGRESS"),
+    ("F-2026-001", "PREVENTIVE",  "Auto-revoke PAM accounts inactive 90 days",
+                                  "إلغاء حسابات PAM غير المستخدمة لمدة 90 يوماً تلقائياً",
+                                  "CISO", 60, "OPEN"),
+    ("F-2026-002", "CORRECTIVE",  "Approve BCP v3.3 with Q1 lessons",
+                                  "اعتماد خطة استمرارية الإصدار 3.3 مع دروس الربع الأول",
+                                  "BCM_LEAD", 14, "IN_PROGRESS"),
+    ("F-2026-003", "CORRECTIVE",  "Draft exit playbooks for STC Cloud, MSFT Saudi, AWS",
+                                  "صياغة خطط الخروج لـ STC Cloud و Microsoft Saudi و AWS",
+                                  "VENDOR_MGR", 45, "OPEN"),
+    ("F-2026-004", "PREVENTIVE",  "Auto-trigger SLA reminder at day 21 for DSR cases",
+                                  "تذكير SLA تلقائي لطلبات أصحاب البيانات في اليوم 21",
+                                  "DPO", 21, "VERIFIED"),
+    ("F-2026-005", "CORRECTIVE",  "Procure encrypted backup vault + migrate 2024 tapes",
+                                  "شراء خزينة نسخ مشفّرة + ترحيل شرائط 2024",
+                                  "CISO", 90, "IN_PROGRESS"),
+    ("F-2026-006", "CORRECTIVE",  "Implement SoD on SADAD batch upload + approve",
+                                  "تطبيق فصل المهام لرفع واعتماد دفعات SADAD",
+                                  "OPS_HEAD", 30, "VERIFIED"),
+    ("F-2026-007", "CORRECTIVE",  "Backfill residual likelihood/impact for 14 risks",
+                                  "تعبئة الاحتمال/الأثر المتبقي لـ 14 خطراً",
+                                  "CRO", 28, "IN_PROGRESS"),
+    ("F-2026-008", "PREVENTIVE",  "Annual KRI threshold review on 1 Apr",
+                                  "مراجعة سنوية لحدود مؤشّرات المخاطر في 1 أبريل",
+                                  "CRO", 75, "OPEN"),
+    ("F-2026-009", "CORRECTIVE",  "Attach SCC PDFs for 4 active cross-border transfers",
+                                  "إرفاق PDFs للعقود القياسية لـ 4 عمليات نقل نشطة",
+                                  "DPO", 30, "IN_PROGRESS"),
+    ("F-2026-010", "PREVENTIVE",  "Make lessons-learned narrative required field at SOC closure",
+                                  "جعل سرد الدروس المستفادة حقلاً إلزامياً عند إغلاق SOC",
+                                  "SOC_HEAD", 14, "VERIFIED"),
+    ("F-2026-011", "CORRECTIVE",  "Assign owner + due date to 5 unresolved 2024 pentest highs",
+                                  "تعيين مالك وتاريخ استحقاق لـ 5 ملاحظات اختبار اختراق 2024",
+                                  "CISO", 21, "IN_PROGRESS"),
+]
+for fref, kind, t_en, t_ar, role, target_days, status in CAPA_TASKS:
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM audit_lc.capa_tasks
+                       WHERE finding_id = ? AND title_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO audit_lc.capa_tasks (external_id, organisation_id, finding_id, kind,
+            title_en, title_ar, owner_role, target_date, status, is_deleted)
+        VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?,
+            DATEADD(day, {target_days}, CAST(GETDATE() AS DATE)), ?, 0)
+        """,
+        fref, t_en, ORG_TSS,
+        ORG_TSS, fref, kind, t_en, t_ar, role, status,
+        label=f"capa: [{kind}/{status}] {fref} {t_en[:40]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# BCM recovery operations — live + recent
+# ──────────────────────────────────────────────────────────────────────
+section("bcm.recovery_operations — recovery activations")
+
+RECOVERY_OPS = [
+    # (title_en, title_ar, op_type, rto_target, rto_actual, status, days_ago_triggered, days_ago_resolved)
+    ("Treasury settlement — DR failover",
+     "تعافي تسوية الخزينة — التحوّل لموقع الاحتياط",
+     "DR_FAILOVER",   4, 3, "RESOLVED",   95, 95-1),
+    ("Internet Banking — DDoS mitigation drill",
+     "الخدمات المصرفية عبر الإنترنت — تمرين تخفيف DDoS",
+     "MITIGATION",    2, 2, "RESOLVED",   40, 40),
+    ("Card mgmt — Way4 partial outage",
+     "إدارة البطاقات — انقطاع جزئي Way4",
+     "PARTIAL_RESTORE",6, 8, "RESOLVED",   75, 73),
+    ("ATM Switch — cardless cash service restore",
+     "محوّل أجهزة الصراف — استعادة خدمة السحب بدون بطاقة",
+     "FULL_RESTORE",  3, 4, "RESOLVED",   30, 30-1),
+    ("Core T24 — emergency patch deploy",
+     "T24 الأساسي — نشر طارئ للتحديثات",
+     "EMERGENCY_CHANGE",2, 2, "RESOLVED",  22, 22),
+    ("Branch Ops — Eastern Province sandstorm",
+     "عمليات الفروع — عاصفة رملية في المنطقة الشرقية",
+     "ENVIRONMENTAL", 12, 16, "RESOLVED",  60, 59),
+    ("AWS Bahrain — regional outage failover",
+     "AWS البحرين — تحوّل بسبب انقطاع إقليمي",
+     "DR_FAILOVER",   4, 5, "ACTIVE",      2, None),
+    ("Splunk SIEM — index rebuild",
+     "Splunk SIEM — إعادة بناء فهرس",
+     "RESTORE",       8, None, "ACTIVE",   1, None),
+]
+for t_en, t_ar, op_type, rto_t, rto_a, status, trig_ago, res_ago in RECOVERY_OPS:
+    triggered_at = f"DATEADD(day, -{trig_ago}, GETDATE())"
+    resolved_at = "NULL" if res_ago is None else f"DATEADD(day, -{res_ago}, GETDATE())"
+    rto_actual_val = "NULL" if rto_a is None else str(rto_a)
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM bcm.recovery_operations
+                       WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO bcm.recovery_operations (external_id, organisation_id, title_en, title_ar,
+            operation_type, triggered_at, resolved_at, rto_target_hours, rto_actual_hours,
+            status, assigned_to, description_en, is_deleted, created_at)
+        VALUES (NEWID(), ?, ?, ?, ?, {triggered_at}, {resolved_at}, ?, {rto_actual_val},
+            ?, ?, ?, 0, GETDATE())
+        """,
+        t_en, ORG_TSS,
+        ORG_TSS, t_en, t_ar, op_type, rto_t, status, "BCM Crisis Team",
+        f"BCM recovery operation — {t_en}. RTO target {rto_t}h.",
+        label=f"recovery: [{status}] {t_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# BCM communication contacts — crisis comms tree
+# ──────────────────────────────────────────────────────────────────────
+section("bcm.communication_contacts — crisis comms tree")
+
+CONTACTS = [
+    # (name, role, primary_phone, email, escalation_level, status, last_test_result)
+    ("Mohammed Al-Otaibi",   "Chief Executive Officer (CEO)",     "+966-50-100-0001", "ceo@example.sa",         1, "ACTIVE", "PASSED"),
+    ("Sarah Al-Qahtani",     "Chief Operating Officer (COO)",      "+966-50-100-0002", "coo@example.sa",         1, "ACTIVE", "PASSED"),
+    ("Khalid Al-Shehri",     "Chief Risk Officer (CRO)",            "+966-50-100-0003", "cro@example.sa",         1, "ACTIVE", "PASSED"),
+    ("Faisal Al-Dosari",     "Chief Information Security Officer", "+966-50-100-0004", "ciso@example.sa",        1, "ACTIVE", "PASSED"),
+    ("Reema Al-Asiri",       "General Counsel + DPO",                "+966-50-100-0005", "gc@example.sa",          2, "ACTIVE", "PASSED"),
+    ("Layla Al-Ghamdi",      "Head of HR + Crisis Comms",            "+966-50-100-0006", "hr-comms@example.sa",    2, "ACTIVE", "PASSED"),
+    ("Yousef Al-Mansouri",   "Head of Customer Experience",         "+966-50-100-0007", "cx@example.sa",          2, "ACTIVE", "NOT_REACHED"),
+    ("Bandar Al-Rashidi",    "Head of IT Operations",               "+966-50-100-0008", "it-ops@example.sa",      2, "ACTIVE", "PASSED"),
+    ("Saud Al-Harbi",        "Head of DR + BCM",                     "+966-50-100-0009", "bcm@example.sa",         1, "ACTIVE", "PASSED"),
+    ("Abdulaziz Al-Sayed",   "Head of Treasury",                     "+966-50-100-0010", "treasury@example.sa",    2, "ACTIVE", "PASSED"),
+    ("SAMA Cyber Incident Desk", "Regulator — SAMA",                 "+966-11-463-2000", "cir@sama.gov.sa",        1, "ACTIVE", "PASSED"),
+    ("NCA SOC Hotline",         "Regulator — NCA",                  "+966-11-282-3000", "soc@nca.gov.sa",         1, "ACTIVE", "PASSED"),
+    ("SDAIA Privacy Office",   "Regulator — SDAIA",                   "+966-11-808-7000", "privacy@sdaia.gov.sa",   2, "ACTIVE", "PASSED"),
+    ("CMA Investor Relations",  "Regulator — CMA",                    "+966-11-205-3000", "ir@cma.org.sa",          2, "ACTIVE", "PASSED"),
+    ("STC Cloud — Critical Account Mgr","Vendor — STC Cloud",        "+966-11-911-1000", "kam-stc@stc.com.sa",     3, "ACTIVE", "PASSED"),
+    ("Crowdstrike — Falcon TAM","Vendor — Crowdstrike",                "+1-888-512-8755",  "tam@crowdstrike.com",    3, "ACTIVE", "PASSED"),
+    ("Microsoft Saudi CSM",    "Vendor — Microsoft Saudi",            "+966-11-282-1000", "csm@microsoft.com",      3, "ACTIVE", "NOT_REACHED"),
+]
+for name, role, phone, email, level, status, last_test in CONTACTS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM bcm.communication_contacts
+                       WHERE email = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO bcm.communication_contacts (organisation_id, external_id, name, role_title,
+            primary_phone, email, escalation_level, availability_status, last_tested_date,
+            last_test_result, status, is_deleted, created_at)
+        VALUES (?, NEWID(), ?, ?, ?, ?, ?, 'AVAILABLE', DATEADD(month, -1, CAST(GETDATE() AS DATE)),
+            ?, ?, 0, GETDATE())
+        """,
+        email, ORG_TSS,
+        ORG_TSS, name, role, phone, email, level, last_test, status,
+        label=f"contact: L{level} {name[:30]} ({role[:30]})",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
 print(f"  inserted: {inserted}")
 print(f"  skipped (already present): {skipped}")
