@@ -71,11 +71,25 @@ sqlcmd -S localhost -U sa -P tss.123 -Q "CREATE DATABASE TSS_GRC COLLATE Latin1_
 # 2. Run module bootstrap scripts (one per module)
 python setup_cyber_db.py     # cyber schema + 41 seed rows
 python setup_bcm_db.py       # bcm schema + seed
+python setup_committees_db.py # admin.committee_* tables (V154..V159)
 python fix_arabic_db.py      # Arabic collation/data repair
 
 # Sprint-1 schemas (auth, iam, risk, incident, etc.) come from the SQL files
 # under db/sqlserver/ and from Sprint-1's setup steps documented in STATUS.md.
+
+# 3. (Optional but recommended) Populate registers with Saudi-native demo data
+python seed_real_data.py     # ~450 rows across 23 tables + 3 tenants
 ```
+
+`seed_real_data.py` is idempotent (every INSERT is `IF NOT EXISTS …`) — safe to re-run on DB refresh. It populates:
+
+| Tenant | org_id | Theme | Rows |
+|---|---:|---|---:|
+| TSS GRC | 1 | Saudi Bank — T24/SADAD/Exadata/Murex; PDPL Art.4/5/6/20/29; SAMA/NCA/SDAIA/CMA | ~400 |
+| Aramco Trading | 2 | Energy + trading — Honeywell DCS, pipeline SCADA, Eka TRM | 28 |
+| STC Bank (demo) | 3 | Telco-banking — USSD *900#, SS7/SIGTRAN, HSM cluster, voice biometrics | 28 |
+
+The script targets tables already created by the per-module bootstrap scripts; it does NOT create schema. If a target table is missing, the script reports `! [label] Invalid object name '...'` and skips that section — fix by running the corresponding `setup_<module>_db.py` first.
 
 Flyway migrations under `tss-grc-backend/src/main/resources/db/migration/sqlserver/` (`V3__compliance_module.sql` … `V10__evidence_permissions.sql`) are intended for **non-dev profiles** and apply on top of an already-bootstrapped DB. Treat the dev DB as Python-managed; treat staging/prod as Flyway-managed. `flyway.clean-disabled=true` always — never run `mvn flyway:clean`.
 
@@ -140,6 +154,8 @@ Dev DB account: `sa / tss.123` (hard-coded in `application-dev.yml`).
 │                                                incidents, privacy, risk, scm, tprm
 │
 ├── setup_cyber_db.py, setup_bcm_db.py        ← module DB bootstrap (dev — replaces Flyway)
+├── setup_committees_db.py                    ← committees module bootstrap (V154..V159 port)
+├── seed_real_data.py                         ← Saudi-native demo data for 3 tenants (~450 rows, idempotent)
 ├── fix_arabic_db.py                          ← Arabic collation/data repair utility
 ├── db/sqlserver/                             ← reference DDL (schemas, tables, indexes, views)
 ├── docs/   {analysis,architecture,domain,database,diagrams,grc,roadmap}/
