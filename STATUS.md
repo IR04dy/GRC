@@ -1,9 +1,45 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (Sprint-7 closeout — code slices land — PRs #148 → #159)
+**Last update:** 23 May 2026 (Sprint-8 opening — risk + compliance + privacy slices — PRs #161 → #163)
 
 ---
 
-## 🟢 Latest — Sprint-7 code slices land (23 May 2026, PRs #155 → #159)
+## 🟢 Latest — Sprint-8 opens with three high-leverage backends (23 May 2026, PRs #161 → #163)
+
+Sprint-7 closed clean with PRs #155-#160. Sprint-8 opens with **three pure-additive backend slices** — risk, compliance, and privacy — that each unlock a Saudi-native capability the platform was missing.
+
+### Three-PR opening arc
+
+| PR | Slice | Module | What lands |
+|---|---|---|---|
+| #161 | **8-A** | risk | `FairCalculatorService` — Open Group FAIR Monte Carlo (10K iterations default, 100K cap). Triangular inputs (threatEventFrequency × vulnerability × primaryLoss + secondaryLoss). Returns p10 / p50 / p90 / mean / max ALE + 10-bucket histogram. Stateless — no DB. |
+| #162 | **8-B** | compliance | `RegulatoryHorizonService` — tenant-wide horizon view bucketed PAST_DUE / IMMINENT (≤30d) / NEAR_TERM (31–90d) / QUARTER (91–180d) / HORIZON (>180d) with distributions `bySourceAuthority` (SAMA, NCA, SDAIA, CMA, NCEMA, ZATCA, MOH) + `byImpactLevel`. |
+| #163 | **8-C** | privacy | `PdplDataFlowService` — node-link graph aggregating RoPA rows: ACTIVITY ← CATEGORY (USED_BY) → COUNTRY (TRANSFERS_TO with adequacy tag) → MECHANISM (GOVERNED_BY). Saudi-native bilingual labels for category + mechanism codes. UNDOCUMENTED node surfaces compliance gaps. |
+
+### Three new endpoints
+
+```
+POST /api/v1/risk/fair/calculate
+GET  /api/v1/compliance/regulatory-horizon
+GET  /api/v1/privacy/data-flow-graph
+```
+
+### What's now possible (and wasn't yesterday)
+
+- **CRO can quantify cyber-loss exposure in SAR** without exporting to Excel and running a Monte Carlo locally
+- **Chief Compliance Officer sees every Saudi regulator change** on one horizon view sorted by lead time, with PAST_DUE rows flagged separately
+- **DPO has the SDAIA-inspection-ready data-flow map** (PII category → activity → cross-border destination + mechanism) without ad-hoc Visio diagrams
+
+### Pure-additive scorecard
+
+- **5 new Java files** (3 services, 2 controllers; all inline DTO records)
+- **1 finder added** to `RegulatoryChangeRepository`
+- **0 schema changes** — every endpoint reads existing tables
+- **0 new routes** — frontend wiring is the next slice
+- **CI green** on every PR
+
+---
+
+## Previously — Sprint-7 closeout — code slices land (PRs #155 → #160)
 
 The Sprint-7 plan from `BCM_GRC_GAP_ANALYSIS_AND_PLAN.md` §4 lands five executable slices on top of the PR #148-#154 data + plan groundwork. Pure-additive backend services + frontend tiles — zero schema changes — making the BCM Manager's job actually doable from inside the platform.
 
