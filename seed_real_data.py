@@ -50,11 +50,27 @@ errors = 0
 
 
 def run(sql: str, *params, label: str = '') -> bool:
-    """Execute INSERT, return True if a row was inserted."""
+    """Execute `IF NOT EXISTS ... INSERT` SQL and report inserted vs skipped.
+
+    `cur.rowcount` after the `IF NOT EXISTS (SELECT 1 ...) INSERT` pattern is
+    unreliable on SQL Server — it reflects the SELECT inside EXISTS (always 1
+    if a row matched), not whether the INSERT actually ran. That made the
+    progress counter wildly over-report on re-runs.
+
+    Fix: append `SELECT @@ROWCOUNT AS inserted_count` to the SQL we pass in,
+    fetch that single value, and decide insert-vs-skip from it. `@@ROWCOUNT`
+    *is* trustworthy here — it's the row count of the LAST statement in the
+    batch, which is the INSERT (when it ran) or the (zero-row) SELECT inside
+    EXISTS (when the row already existed).
+    """
     global inserted, skipped, errors
     try:
-        cur.execute(sql, params)
-        n = cur.rowcount
+        # Append a sentinel SELECT so we can read @@ROWCOUNT from the INSERT.
+        # We strip a trailing semicolon if present so the concatenation works.
+        wrapped = sql.rstrip().rstrip(';') + ";\nSELECT @@ROWCOUNT AS inserted_count;"
+        cur.execute(wrapped, params)
+        row = cur.fetchone()
+        n = int(row[0]) if row and row[0] is not None else 0
         if n > 0:
             inserted += n
             if label:
