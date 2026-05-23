@@ -1,5 +1,18 @@
 // Knowledge Base API + types — Sprint 4 §2.9.
+//
+// Refactored to use the central `api` client so we get for free:
+//   - 401 → refresh-token retry (was hard-failing on token expiry)
+//   - ProblemDetail.detail extraction (was showing generic "HTTP 500")
+//   - Consistent Bearer-header construction via getAccessToken()
+//   - ApiError-typed errors for downstream apiError.ts helpers
+//
+// Before this refactor, every write call would on token expiry throw
+// "createArticle failed: HTTP 401" instead of transparently refreshing,
+// and every server-side validation failure surfaced as a meaningless
+// "HTTP 400" instead of the actual "Title is required" / "Slug already
+// taken" message.
 
+import { api, ApiError } from './api';
 import { adapterListAll, KB_ARTICLE_ADAPTER } from './platformPersistence';
 
 export type KbStatus     = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -33,26 +46,20 @@ export type KbArticleDraft = Omit<
   'id' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'viewCount' | 'author'
 > & { slug?: string };
 
-function authHeaders(extra?: Record<string, string>): HeadersInit {
-  const tok = window.sessionStorage.getItem('grc.accessToken') ?? '';
-  return {
-    ...(extra ?? {}),
-    ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
-  };
-}
-
 export async function listArticles(): Promise<KbArticle[]> {
   return adapterListAll(KB_ARTICLE_ADAPTER as any, [] as KbArticle[]);
 }
 
 export async function getArticle(slug: string): Promise<KbArticle | null> {
   try {
-    const res = await fetch(`/api/kb/articles/${encodeURIComponent(slug)}`, {
-      headers: authHeaders(),
-    });
-    if (!res.ok) return null;
-    return res.json() as Promise<KbArticle>;
-  } catch { return null; }
+    return await api.get<KbArticle>(`/api/kb/articles/${encodeURIComponent(slug)}`);
+  } catch (e) {
+    // 404 is a normal "no such article" — return null silently.
+    // For any other status (403 forbidden, 500 server error) re-throw so
+    // callers can surface the real reason via apiError.ts helpers.
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
 }
 
 /**
@@ -61,24 +68,12 @@ export async function getArticle(slug: string): Promise<KbArticle | null> {
  * article with its server-generated id, slug, and status=DRAFT.
  */
 export async function createArticle(draft: KbArticleDraft): Promise<KbArticle> {
-  const res = await fetch('/api/kb/articles', {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(draft),
-  });
-  if (!res.ok) throw new Error(`createArticle failed: HTTP ${res.status}`);
-  return res.json() as Promise<KbArticle>;
+  return api.post<KbArticle>('/api/kb/articles', draft);
 }
 
 /** Update an existing article in place. PUT /api/kb/articles/{slug} */
 export async function updateArticle(slug: string, draft: KbArticleDraft): Promise<KbArticle> {
-  const res = await fetch(`/api/kb/articles/${encodeURIComponent(slug)}`, {
-    method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(draft),
-  });
-  if (!res.ok) throw new Error(`updateArticle failed: HTTP ${res.status}`);
-  return res.json() as Promise<KbArticle>;
+  return api.put<KbArticle>(`/api/kb/articles/${encodeURIComponent(slug)}`, draft);
 }
 
 /**
@@ -99,22 +94,15 @@ const TRANSITION_TARGET: Record<KbTransition, KbStatus> = {
 };
 
 export async function transitionArticle(slug: string, action: KbTransition): Promise<KbArticle> {
-  const res = await fetch(`/api/kb/articles/${encodeURIComponent(slug)}/transition`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ status: TRANSITION_TARGET[action] }),
-  });
-  if (!res.ok) throw new Error(`transition failed: HTTP ${res.status}`);
-  return res.json() as Promise<KbArticle>;
+  return api.post<KbArticle>(
+    `/api/kb/articles/${encodeURIComponent(slug)}/transition`,
+    { status: TRANSITION_TARGET[action] },
+  );
 }
 
 /** Soft-delete an article. DELETE /api/kb/articles/{slug} (admin only). */
 export async function deleteArticle(slug: string): Promise<void> {
-  const res = await fetch(`/api/kb/articles/${encodeURIComponent(slug)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
-  if (!res.ok) throw new Error(`deleteArticle failed: HTTP ${res.status}`);
+  await api.delete(`/api/kb/articles/${encodeURIComponent(slug)}`);
 }
 
 /** Filter results client-side by query string (search-as-you-type). */

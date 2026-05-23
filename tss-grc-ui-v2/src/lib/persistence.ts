@@ -12,6 +12,7 @@
 // clears localStorage during migration. The demo data is preserved as
 // the seed; production state grows on top.
 
+import { api, ApiError } from './api';
 import { isProductionMode, currentMode } from './productionMode';
 
 export type PersistenceMode = 'demo' | 'migrating' | 'production';
@@ -50,46 +51,36 @@ function lsWrite<T>(key: string, rows: T[]): void {
 //
 // API path convention: each store maps to `/api/v1/persistence/<key>`.
 // Backend stubs need to implement GET/PUT/POST/DELETE for these.
+//
+// Routes through the central api client (lib/api.ts) so we get:
+//   - Bearer token (was completely missing — only cookies were sent)
+//   - 401 → refresh-token retry
+//   - ProblemDetail.detail extraction
+//   - Typed ApiError so callers can distinguish 404 from "real" errors
 
 const API_BASE = '/api/v1/persistence';
 
 async function apiList<T>(key: string): Promise<T[]> {
-  const res = await fetch(`${API_BASE}/${encodeURIComponent(key)}`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: { 'Accept': 'application/json' },
-  });
-  if (!res.ok) throw new Error(`GET ${key} → ${res.status}`);
-  const body = await res.json();
+  const body = await api.get<T[] | { rows?: T[] }>(`${API_BASE}/${encodeURIComponent(key)}`);
   return Array.isArray(body) ? body : (body.rows ?? []);
 }
 
 async function apiSetAll<T>(key: string, rows: T[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/${encodeURIComponent(key)}`, {
-    method: 'PUT',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify({ rows }),
-  });
-  if (!res.ok) throw new Error(`PUT ${key} → ${res.status}`);
+  await api.put(`${API_BASE}/${encodeURIComponent(key)}`, { rows });
 }
 
 async function apiAppend<T>(key: string, row: T): Promise<void> {
-  const res = await fetch(`${API_BASE}/${encodeURIComponent(key)}`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify(row),
-  });
-  if (!res.ok) throw new Error(`POST ${key} → ${res.status}`);
+  await api.post(`${API_BASE}/${encodeURIComponent(key)}`, row);
 }
 
 async function apiClear(key: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/${encodeURIComponent(key)}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  });
-  if (!res.ok && res.status !== 404) throw new Error(`DELETE ${key} → ${res.status}`);
+  try {
+    await api.delete(`${API_BASE}/${encodeURIComponent(key)}`);
+  } catch (e) {
+    // 404 is "key doesn't exist yet" — treat as success (idempotent clear).
+    if (e instanceof ApiError && e.status === 404) return;
+    throw e;
+  }
 }
 
 // ─── Adapter factory ───────────────────────────────────────────────────────
