@@ -1,9 +1,99 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (Sprint-6 platform-wide mass-assignment defense — design, code, wiring, tests across PRs #122 → #127)
+**Last update:** 23 May 2026 (Graceful-degrade + Saudi-native seed sweep — PRs #130 → #137)
 
 ---
 
-## 🟢 Latest — Sprint-6 mass-assignment AOP backstop (23 May 2026, PRs #122 → #127)
+## 🟢 Latest — Graceful-degrade + Saudi-native seed sweep (23 May 2026, PRs #130 → #137)
+
+User complaint at start of session: "unable to load data in all pages, **تعذّر تحميل هذا القسم / Internal Server Error**, fill all pages with data". Two distinct problems were tangled together: (1) one failing aggregate endpoint blanking the entire page, (2) thin tables (~5 rows) making pages look empty.
+
+### Eight-PR arc
+
+| PR | Module | What lands |
+|---|---|---|
+| #130 | committees ui | `CommitteesPage` graceful-degrade — root-cause fix: `Promise.all` rejected on a single aggregate failure |
+| #131 | platform ui   | Sweep — extends `.catch(() => fallback)` per-call across **18 pages / ~24 `Promise.all` blocks** (Licensing, BCM × 7, Compliance, Controls, ESG × 9, FrameworkControls, NDI × 9, Regulatory, Reporting, IrPlaybooks, SupplierResilience, TPRM) |
+| #132 | data seed     | Wave 1 — `seed_real_data.py` populates 8 tables / 117 rows: privacy.consents (15), DSRs (15), breaches (11), cyber.cyber_assets (20), bia_records (5), vendor_onboarding (6), reporting.report_definitions (20), workflow.workflow_definitions (20) |
+| #133 | data seed     | Wave 2 — +5 tables / 56 rows: cyber_incidents (12), bcm.bcm_exercises (10), regulatory_changes (12), material_topic (12), ndi.gap (10) |
+| #134 | data seed     | Wave 3 — +2 tables / 22 rows: sust.climate_risk_opportunity (10), audit_lc.findings (12) |
+| #135 | data seed     | Wave 4 — +4 tables / 49 rows: approvals.requests (12), audit_lc.capa_tasks (12), bcm.recovery_operations (8), bcm.communication_contacts (17) |
+| #136 | data seed     | Wave 5 — +3 tables / 30 rows: risk_lc.kri_breaches (12), board_pack.packs (8), ethics.cases (10) |
+| #137 | data seed     | Wave 6 — +2 tables / 13 rows: audit_lc.annual_plans (+2027), audit_lc.working_papers (12) — closes the IA lifecycle end-to-end |
+
+**Cumulative:** 21 tables seeded, ~375 rows of Saudi-native day-to-day GRC content.
+
+### The graceful-degrade pattern (PR #130 / #131)
+
+**Before** (one failure blanks the page):
+```ts
+try {
+  const [a, b, c] = await Promise.all([listA(), listB(), aggregateC()]);
+  setA(a); setB(b); setC(c);
+} catch (e) { toast.danger('Failed to load'); }
+```
+
+**After** (partial data still renders):
+```ts
+const [a, b, c] = await Promise.all([
+  listA().catch(() => fallbackA),
+  listB().catch(() => fallbackB),
+  aggregateC().catch(() => null),
+]);
+setA(a); setB(b); setC(c);
+```
+
+Write paths (enable/disable/upsert/etc) keep their own per-action toast — only the page-load `Promise.all` blocks were softened.
+
+### The "Internal Server Error" trail
+
+Tailed `.tools/backend.log`. Every recorded 500 was a stale `NoResourceFoundException` for `/api/signatures`, `/api/rca` etc — paths that don't exist. `GlobalExceptionHandler.handleNoResource` now maps those to 404, so after a backend restart the toast title reads "Not Found" not "Internal Server Error". Combined with PR #131's graceful degrade, single-endpoint failures no longer blank pages.
+
+### Saudi-native data themes
+
+Every seed row models a Saudi Bank / TASI-listed company:
+- **Banking stack** — T24, SADAD, Exadata, Murex, Way4, Actimize, AWS me-south-1 (Bahrain)
+- **PDPL** — Art.4 (30-day DSR SLA), Art.5/6 consents, Art.20 breach notification, Art.29 cross-border with SCC requirements
+- **SAMA** — Cyber Framework 1.3 (6h major-incident), Cloud Outsourcing v2, Open Banking phase 3
+- **NCA** — ECC-2, CCC v1.1, OTCC
+- **SDAIA** — PDPL exec regs, Tier-1 country transfer decision
+- **CMA** — Sustainability Articles 91-94, governance code, ESG annex
+- **ZATCA, MOH** — e-invoicing wave 23, healthcare patient privacy
+- **Arabic content** — Saudi-native naming (Mohammed Al-Otaibi, Sarah Al-Qahtani…), bilingual + RTL-aware
+
+### Schema discoveries this session
+
+The seed script tripped on several CHECK constraints. The successful enum values were:
+- `sust.material_topic.category` — `ENVIRONMENTAL` (not ENVIRONMENT), SOCIAL, GOVERNANCE
+- `sust.material_topic.priority_tier` — LOW / MEDIUM / HIGH / CRITICAL (no VERY_HIGH)
+- `sust.material_topic.status` — DRAFT / SCORED / APPROVED / ARCHIVED (no IN_REVIEW)
+- `ndi.gap.status` — OPEN / IN_PROGRESS / RESOLVED / ACCEPTED_RISK / CLOSED (no IN_REMEDIATION / REMEDIATED)
+- `scm.vendor_onboarding.current_stage` — REGISTRATION / CRITICALITY_CLASSIFICATION / SECURITY_REVIEW / OPERATIONAL_REVIEW / LEGAL_REVIEW / APPROVAL (no KYC_VERIFICATION / DUE_DILIGENCE / SAMA_OUTSOURCING_NOTIFICATION)
+
+These are now baked into `seed_real_data.py` so future re-runs don't trip them.
+
+### Audit lifecycle end-to-end
+
+The seed waves together stand up the full IA chain:
+```
+audit_lc.annual_plans (2026 + 2027, wave 6)
+    └─ engagements (existing)
+        └─ audit_lc.working_papers (12, wave 6)
+            └─ audit_lc.findings (12, wave 3)
+                └─ audit_lc.capa_tasks (12, wave 4)
+                    └─ approvals.requests (12, wave 4)
+```
+Every IA register on the frontend now renders content all the way through.
+
+### How to run the seed
+
+```bash
+python seed_real_data.py
+```
+Idempotent — every INSERT is guarded by `IF NOT EXISTS (...)`. Safe to re-run on demos / DB refreshes; reports `inserted: 0, skipped: ~375` on the second pass.
+
+---
+
+## Sprint-6 mass-assignment AOP backstop (23 May 2026, PRs #122 → #127)
 
 The per-service `setId(null)` defense from PR #121 + #123 patched 19
 write endpoints, but relied on every future developer to remember the
