@@ -95,6 +95,29 @@ public class TenantWriteGuardInterceptor implements Interceptor {
         Object[] currentState, Object[] previousState,
         String[] propertyNames, Type[] types
     ) {
+        // Delegate to the package-private decide() method so the decision
+        // logic is unit-testable without instantiating Hibernate. The
+        // interface signature here can shift across Hibernate minor
+        // versions (deprecated overloads, etc) — keeping the body thin
+        // shields the tests from that churn.
+        return decide(entity, id, currentState, previousState, propertyNames);
+    }
+
+    /**
+     * Package-private decision logic — pure function over the Hibernate
+     * change-set plus the thread-local cross-tenant-write flag. Returns
+     * false if the change should be allowed; throws SecurityException if
+     * the change is a blocked cross-tenant write.
+     *
+     * <p>Visible for testing so the test can call it without depending on
+     * the exact Hibernate {@code Interceptor} method overload Hibernate
+     * decides to dispatch to.
+     */
+    boolean decide(
+        Object entity, Object id,
+        Object[] currentState, Object[] previousState,
+        String[] propertyNames
+    ) {
         int orgIdx = indexOf(propertyNames, ORG_PROP);
         if (orgIdx < 0) {
             // Entity doesn't have an organisationId — out of scope for
@@ -120,7 +143,7 @@ public class TenantWriteGuardInterceptor implements Interceptor {
         // forgot to wrap in TenantContext.allowCrossTenantWrite().
         String entityName = entity.getClass().getSimpleName();
         String msg = String.format(
-            "Cross-tenant write blocked on %s id=%s (org %s → %s). " +
+            "Cross-tenant write blocked on %s id=%s (org %s -> %s). " +
             "Use TenantContext.allowCrossTenantWrite() for legitimate cross-tenant " +
             "operations; otherwise check the calling service for a missing " +
             "req.setId(null) mass-assignment defense.",
