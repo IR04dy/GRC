@@ -98,7 +98,16 @@ async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
   }
 
   if (!res.ok) {
-    const msg = (parsed as { message?: string })?.message ?? res.statusText ?? 'Request failed';
+    // Backend uses Spring's `ProblemDetail.forStatusAndDetail(...)` (RFC-7807)
+    // which serialises the human-readable string in `.detail` — NOT `.message`.
+    // The legacy `.message` is kept as a fallback for any endpoint that still
+    // returns the old shape. Without this, every backend error ApiError.message
+    // fell back to res.statusText ("Internal Server Error" etc.) so the toast
+    // never showed the actual reason. apiError.ts's getErrorDisplayMessage()
+    // already extracted .detail correctly for callers that used it — but
+    // pages that did `toast.danger(e.message)` directly missed it.
+    const p = (parsed as { detail?: string; title?: string; message?: string }) ?? {};
+    const msg = p.detail ?? p.title ?? p.message ?? res.statusText ?? 'Request failed';
 
     // 401 handling: try once to refresh + retry. Skip if:
     //   - this IS the refresh / login / logout endpoint (would loop)
