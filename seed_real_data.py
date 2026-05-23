@@ -1290,6 +1290,168 @@ for code, t_en, t_ar, category, severity, channel, status, desc, anon, days_ago 
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# Crisis AARs — after-action reviews for closed crisis events
+# ──────────────────────────────────────────────────────────────────────
+section("bcm.crisis_aar — after-action reviews")
+
+# Lookup crisis events to link AARs to
+cur.execute(
+    "SELECT TOP 10 id, title_en FROM bcm.crisis_events WHERE is_deleted=0 AND organisation_id=? ORDER BY id",
+    ORG_TSS,
+)
+crisis_events = [(r[0], r[1]) for r in cur.fetchall()]
+print(f"  found {len(crisis_events)} crisis events")
+
+AAR_PROFILES = [
+    # (status, summary, what_worked, what_failed, root_cause)
+    ("PUBLISHED",   "Major incident — full AAR published to stakeholders.",
+     "SAMA 6h notification met. EDR isolation stopped lateral movement within 22 minutes.",
+     "Patch deployment lagged by 4 weeks behind public CVE disclosure. Email-filter false-negative rate higher than SLA.",
+     "Patching SLA exception process is informal and rarely tracked. Threat-intel feed not wired to email filter."),
+    ("APPROVED",    "Lessons documented, awaiting board publication.",
+     "Failover to DR site completed in 3h vs 4h target. Crisis comms tree reached all L1 contacts within 12 minutes.",
+     "Customer-facing communication on Twitter was delayed 90 minutes. Mobile app fail-open didn't trigger.",
+     "Twitter SLA missing from comms runbook. Mobile-app health-check threshold set too low."),
+    ("APPROVED",    "Branch ops AAR — Eastern Province sandstorm.",
+     "Manual ATM cash recycling kept 8 branches partially open. Tier-2 contacts mobilised on day 1.",
+     "BCP plan didn't account for region-wide sandstorm; only single-site outage scenarios documented.",
+     "Plan scenarios biased toward IT outages. Regional-scale weather events not modelled."),
+    ("UNDER_REVIEW","Treasury settlement AAR — pending CRO sign-off.",
+     "Manual settlement workaround executed for 6 hours; no missed SAMA deadlines.",
+     "Lack of pre-position approval to extend SLA window. Treasury team had to escalate twice.",
+     "Pre-position approval form missing. Treasury escalation chain ambiguous."),
+    ("DRAFT",       "Vendor outage AAR — STC Cloud regional impact.",
+     "Vendor exit plan kicked in at hour 2. Failover to AWS Bahrain succeeded.",
+     "Customer-impacting latency for 38 minutes during cutover. Internal stakeholders not all notified.",
+     "Vendor monitoring lacked anomaly threshold. Crisis comms tree not invoked for Tier-3 vendor."),
+]
+for i, (eid, ename) in enumerate(crisis_events[:5]):
+    status, summary, worked, failed, root = AAR_PROFILES[i % len(AAR_PROFILES)]
+    report_code = f"AAR-2026-{eid:03d}"
+    approved_at = "DATEADD(day, -5, GETDATE())" if status in ("APPROVED", "PUBLISHED") else "NULL"
+    published_at = "DATEADD(day, -2, GETDATE())" if status == "PUBLISHED" else "NULL"
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM bcm.crisis_aar
+                       WHERE crisis_event_id = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO bcm.crisis_aar (organisation_id, external_id, crisis_event_id,
+            report_code, title_en, title_ar, executive_summary_en, executive_summary_ar,
+            what_worked_md_en, what_failed_md_en, root_cause_md_en,
+            recommendations_md_en, status, approved_at, published_at, is_deleted, created_at)
+        VALUES (?, NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, {approved_at}, {published_at}, 0, GETDATE())
+        """,
+        eid, ORG_TSS,
+        ORG_TSS, eid, report_code,
+        f"AAR — {ename}",
+        f"تقرير ما بعد الحدث — {ename}",
+        summary,
+        f"تقرير {report_code} — تفاصيل الاستجابة والدروس المستفادة.",
+        worked, failed, root,
+        "Refresh patching SLA + add weather scenario to BCP + formalise vendor exit invocation runbook. Trigger CAPA for each gap.",
+        status,
+        label=f"AAR: [{status}] {report_code} {ename[:35]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# Audit IA annual plans — 2026 + 2027
+# ──────────────────────────────────────────────────────────────────────
+section("audit_lc.annual_plans — IA annual plans 2026 + 2027")
+
+PLANS = [
+    # (year, status, q1, q2, q3, q4, budget_hours, notes_en)
+    (2026, "APPROVED",
+     "ENG-CYBER-2026Q1,ENG-PRIV-2026Q1,ENG-TPRM-2026Q1",
+     "ENG-AML-2026Q2,ENG-BCM-2026Q2,ENG-CMA-2026Q2",
+     "ENG-CRDIT-2026Q3,ENG-TREAS-2026Q3,ENG-FIN-2026Q3",
+     "ENG-IT-2026Q4,ENG-OPS-2026Q4,ENG-FOLLOW-2026Q4",
+     4800,
+     "2026 IA Annual Plan — 12 engagements aligned to SAMA, NCA, SDAIA, CMA priorities. Board-approved."),
+    (2027, "DRAFT",
+     "ENG-CYBER-2027Q1,ENG-AI-2027Q1,ENG-PRIV-2027Q1",
+     "ENG-CMA-2027Q2,ENG-CLIMATE-2027Q2,ENG-CRDIT-2027Q2",
+     "ENG-TPRM-2027Q3,ENG-TREAS-2027Q3,ENG-OPS-2027Q3",
+     "ENG-IT-2027Q4,ENG-BCM-2027Q4,ENG-FRAUD-2027Q4",
+     5200,
+     "2027 IA Annual Plan — emphasis on AI governance + climate risk per CMA Art.91-94 maturation."),
+]
+for year, status, q1, q2, q3, q4, budget, notes in PLANS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM audit_lc.annual_plans
+                       WHERE year = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO audit_lc.annual_plans (external_id, organisation_id, year, status,
+            last_updated, q1_codes, q2_codes, q3_codes, q4_codes, budget_hours,
+            ac_notes_en, ac_notes_ar, is_deleted)
+        VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, 0)
+        """,
+        year, ORG_TSS,
+        ORG_TSS, year, status, q1, q2, q3, q4, budget,
+        notes,
+        f"خطة التدقيق الداخلي السنوية {year} — معتمدة من لجنة التدقيق.",
+        label=f"IA plan: {year} {status} budget={budget}h",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# Audit working papers — IA evidence ledger
+# ──────────────────────────────────────────────────────────────────────
+section("audit_lc.working_papers — IA evidence ledger")
+
+DEFAULT_ENG_CODE_WP = "IA-2026-001"
+PAPERS = [
+    # (wp_ref, type, title_en, title_ar, author, status, hours)
+    ("WP-2026-001", "WALKTHROUGH",  "PAM walkthrough — CyberArk",
+                                     "جولة على نظام PAM — CyberArk",
+                                     "Faisal Al-Dosari", "REVIEWED", 12.0),
+    ("WP-2026-002", "SAMPLE_TEST",  "Sample of 20 PAM accounts — quarterly attestation",
+                                     "عيّنة 20 حساب PAM — مصادقة ربعية",
+                                     "Faisal Al-Dosari", "REVIEWED", 8.5),
+    ("WP-2026-003", "DESIGN_TEST",  "BCP design effectiveness — ISO 22301 §8.4",
+                                     "فعالية تصميم خطة استمرارية — أيزو 22301 §8.4",
+                                     "Khalid Al-Shehri", "DRAFT",    16.0),
+    ("WP-2026-004", "OPERATING_TEST","Vendor due-diligence sample — 3 critical suppliers",
+                                     "عيّنة عناية واجبة على الموردين — 3 مورّدين حرجين",
+                                     "Sarah Al-Qahtani", "REVIEWED", 10.5),
+    ("WP-2026-005", "WALKTHROUGH",  "DSR end-to-end walkthrough",
+                                     "جولة طلبات أصحاب البيانات من البداية للنهاية",
+                                     "Reema Al-Asiri",   "REVIEWED",  6.0),
+    ("WP-2026-006", "INTERVIEW",    "Backup-vault tour + ops interview",
+                                     "زيارة خزينة النسخ الاحتياطية + مقابلة العمليات",
+                                     "Saud Al-Harbi",    "REVIEWED",  4.0),
+    ("WP-2026-007", "SAMPLE_TEST",  "SADAD payment file uploader+approver — SoD sample",
+                                     "عيّنة فصل المهام — رفع واعتماد SADAD",
+                                     "Faisal Al-Dosari", "REVIEWED",  7.0),
+    ("WP-2026-008", "DESIGN_TEST",  "Risk-register residual-score policy design",
+                                     "تصميم سياسة درجة المخاطر المتبقية",
+                                     "Khalid Al-Shehri", "DRAFT",     5.0),
+    ("WP-2026-009", "WALKTHROUGH",  "KRI threshold-setting workflow",
+                                     "جولة على سير عمل تحديد حدود مؤشّرات المخاطر",
+                                     "Khalid Al-Shehri", "DRAFT",     3.5),
+    ("WP-2026-010", "OPERATING_TEST","Cross-border transfer log sample — Q1 2026",
+                                     "عيّنة سجل النقل خارج الحدود — Q1 2026",
+                                     "Reema Al-Asiri",   "REVIEWED",  9.0),
+    ("WP-2026-011", "FOLLOW_UP",    "Closure follow-up — 2024 pentest findings",
+                                     "متابعة إغلاق — ملاحظات اختبار الاختراق 2024",
+                                     "Faisal Al-Dosari", "DRAFT",     11.0),
+    ("WP-2026-012", "WALKTHROUGH",  "Committee minutes quorum-enforcement check",
+                                     "تحقّق من إنفاذ النصاب في محاضر اللجان",
+                                     "Reema Al-Asiri",   "REVIEWED",  2.5),
+]
+for wp_ref, wp_type, t_en, t_ar, author, status, hours in PAPERS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM audit_lc.working_papers
+                       WHERE ref_number = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO audit_lc.working_papers (external_id, organisation_id, engagement_code,
+            type, ref_number, title_en, title_ar, author, created_at, status, hours, is_deleted)
+        VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, 0)
+        """,
+        wp_ref, ORG_TSS,
+        ORG_TSS, DEFAULT_ENG_CODE_WP, wp_type, wp_ref, t_en, t_ar, author, status, hours,
+        label=f"WP: [{wp_type}/{status}] {wp_ref} {t_en[:40]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
 print(f"  inserted: {inserted}")
 print(f"  skipped (already present): {skipped}")
