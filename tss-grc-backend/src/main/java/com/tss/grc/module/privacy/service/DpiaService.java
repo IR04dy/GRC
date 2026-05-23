@@ -98,6 +98,12 @@ public class DpiaService {
 
     @Transactional
     public Dpia create(Dpia req) {
+        // Mass-assignment defense — controller accepts the entity via
+        // @RequestBody. Null id forces save() to INSERT instead of
+        // merge() into a potentially cross-tenant row. DPIAs are PDPL
+        // Article 25 records, so cross-tenant data corruption here
+        // is also a regulatory disclosure risk.
+        req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
         Dpia saved = dpiaRepo.save(req);
         audit.log("CREATE", "Dpia", saved.getId(),
