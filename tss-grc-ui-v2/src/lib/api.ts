@@ -169,7 +169,18 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
     }
   }
   if (!res.ok) {
-    throw new ApiError(res.status, res.statusText || 'Download failed');
+    // Match request()'s ProblemDetail handling: download endpoints return
+    // binary on success but JSON ProblemDetail on failure (Spring's
+    // standard error response). Without this, a 503 "Module not yet
+    // bootstrapped" surfaced as a generic "Service Unavailable" toast.
+    let parsed: unknown = undefined;
+    try {
+      const text = await res.text();
+      if (text) parsed = JSON.parse(text);
+    } catch { /* body wasn't JSON; carry on with statusText only */ }
+    const p = (parsed as { detail?: string; title?: string; message?: string }) ?? {};
+    const msg = p.detail ?? p.title ?? p.message ?? res.statusText ?? 'Download failed';
+    throw new ApiError(res.status, msg, parsed);
   }
   const cd = res.headers.get('Content-Disposition') ?? '';
   const m = /filename="?([^";]+)"?/i.exec(cd);
