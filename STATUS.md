@@ -1,9 +1,63 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (Graceful-degrade + Saudi-native seed sweep — PRs #130 → #137)
+**Last update:** 23 May 2026 (API client unification — PRs #142 → #146)
 
 ---
 
-## 🟢 Latest — Graceful-degrade + Saudi-native seed sweep (23 May 2026, PRs #130 → #137)
+## 🟢 Latest — API client unification (23 May 2026, PRs #142 → #146)
+
+The deeper root cause of the "Internal Server Error" toast complaint. Even after PRs #130/#131 stopped pages from blanking on partial failures, real backend errors still showed generic "Internal Server Error" / "Bad Request" / "Service Unavailable" in toasts instead of the actual backend diagnostic. This arc finds and fixes why.
+
+### Five-PR arc
+
+| PR | What lands |
+|---|---|
+| #142 | `seed_real_data.py` — counter fix (cur.rowcount was misleading; now uses `SELECT @@ROWCOUNT`) |
+| #143 | `api.ts request()` — use `ProblemDetail.detail / title / message` (not just `.message`) |
+| #144 | `api.ts downloadFile()` — companion fix: parse JSON ProblemDetail from binary endpoints' error responses |
+| #145 | `kb.ts` + `persistence.ts` — refactored to route through the central `api.*` client (had been raw fetch with home-rolled `authHeaders`) |
+| #146 | `platformPersistence.ts` — last raw-fetch holdout closed out; 6 sites refactored, demo-mode preserved |
+
+### The root-cause bug (PR #143)
+
+Backend `GlobalExceptionHandler` returns Spring's `ProblemDetail` for every error (RFC-7807):
+```json
+{
+  "type": "https://...",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Title is required.",
+  "timestamp": "..."
+}
+```
+
+But `api.ts:request()` extracted the toast message with:
+```ts
+const msg = (parsed as { message?: string })?.message ?? res.statusText ?? 'Request failed';
+```
+
+ProblemDetail has no `.message` field. So `msg` always fell back to `res.statusText` — "Bad Request", "Internal Server Error", "Service Unavailable" — for every backend error. Pages doing `toast.danger(e.message)` directly missed the real reason.
+
+Fix: prefer **`detail → title → message → statusText`**. After this change, the 503 "Module not yet bootstrapped" actually shows its full diagnostic instead of "Service Unavailable".
+
+### Companion fixes
+
+- `downloadFile()` (PR #144) had the same bug — never parsed the error body at all. PDF/XLSX/ICS downloads hitting 503 showed "Service Unavailable" too. Now parses JSON ProblemDetail when `!res.ok`.
+- Three lib files were bypassing the central api client entirely:
+  - `kb.ts` (Knowledge Base) — home-rolled authHeaders + raw fetch; `throw new Error('HTTP 400')` discarded the real backend reason.
+  - `persistence.ts` (production-mode store) — **wasn't sending the Bearer token at all** (only cookies); every call would 401 in production mode.
+  - `platformPersistence.ts` (3-mode demo/rest/mixed adapter) — same antipattern, 6 fetch sites.
+- All three refactored to use `api.get / post / put / delete`. Demo mode preserved (early returns).
+
+### Closeout state
+
+```
+Zero raw fetch() calls to /api/* remain in src/.
+```
+Every backend call goes through `request()` / `api.*` / `downloadFile()` in `lib/api.ts`. Every error gets transparent 401-refresh-retry, ProblemDetail.detail extraction, consistent Bearer-header construction via `getAccessToken()`.
+
+---
+
+## Graceful-degrade + Saudi-native seed sweep (23 May 2026, PRs #130 → #137)
 
 User complaint at start of session: "unable to load data in all pages, **تعذّر تحميل هذا القسم / Internal Server Error**, fill all pages with data". Two distinct problems were tangled together: (1) one failing aggregate endpoint blanking the entire page, (2) thin tables (~5 rows) making pages look empty.
 
