@@ -3309,6 +3309,7 @@ export const ar = {
   biaWizardSidebar: 'معالج تحليل الأثر',
   biaQuantSidebar: 'تحليل الأثر — كمي',
   strategyRoiSidebar: 'العائد على استراتيجيات الاستمرارية',
+  scenarioLibrarySidebar: 'مكتبة السيناريوهات',
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',

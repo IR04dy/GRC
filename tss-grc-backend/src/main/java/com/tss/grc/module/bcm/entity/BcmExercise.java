@@ -66,4 +66,12 @@ public class BcmExercise {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /**
+     * Slice 10-A — pointer back to the {@code bcm.exercise_scenarios}
+     * library row this exercise was instantiated from, if any. NULL for
+     * manually-created exercises that were not derived from a scenario.
+     */
+    @Column(name = "scenario_id")
+    private Long scenarioId;
 }

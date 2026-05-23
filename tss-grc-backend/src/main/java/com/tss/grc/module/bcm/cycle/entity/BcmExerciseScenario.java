@@ -75,4 +75,47 @@ public class BcmExerciseScenario {
 
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
+
+    // ─── Slice 10-A — Scenario Library extensions (V171) ────────────────
+
+    /** TABLETOP | FUNCTIONAL | FULL_SCALE | WORKSHOP | DRILL | SIMULATION */
+    @Column(name = "scenario_type", length = 40)
+    private String scenarioType;
+
+    /** BASIC | INTERMEDIATE | ADVANCED */
+    @Column(name = "complexity", length = 20)
+    private String complexity;
+
+    @Column(name = "target_audience", length = 200)
+    private String targetAudience;
+
+    @Column(name = "recommended_duration_minutes")
+    private Integer recommendedDurationMinutes;
+
+    /** Comma-separated framework codes, e.g. {@code SAMA_CSF,NCA_ECC2,ISO_22301}. */
+    @Column(name = "framework_alignment", length = 500)
+    private String frameworkAlignment;
+
+    @Column(name = "learning_objectives_en", columnDefinition = "NVARCHAR(MAX)")
+    private String learningObjectivesEn;
+
+    @Column(name = "learning_objectives_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String learningObjectivesAr;
+
+    @Column(name = "success_criteria_en", columnDefinition = "NVARCHAR(MAX)")
+    private String successCriteriaEn;
+
+    @Column(name = "success_criteria_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String successCriteriaAr;
+
+    @Column(name = "recommended_observers", length = 500)
+    private String recommendedObservers;
+
+    /**
+     * Monotonically increasing counter — incremented every time the
+     * scenario is instantiated as a runnable exercise. Powers the
+     * "popular this quarter" library view.
+     */
+    @Column(name = "usage_count", nullable = false)
+    private Integer usageCount = 0;
 }

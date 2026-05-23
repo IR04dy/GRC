@@ -3325,6 +3325,7 @@ export const en = {
   biaWizardSidebar: 'BIA wizard',
   biaQuantSidebar: 'BIA — quantitative',
   strategyRoiSidebar: 'Strategy ROI',
+  scenarioLibrarySidebar: 'Scenario Library',
   bcmRemediationSidebar: 'BCM remediation',
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',
