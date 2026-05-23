@@ -21,6 +21,8 @@ public interface BiaQuantitativeRepository extends JpaRepository<BiaQuantitative
 
     Optional<BiaQuantitative> findByOrganisationIdAndExternalIdAndIsDeletedFalse(Long organisationId, UUID externalId);
 
+    Optional<BiaQuantitative> findByOrganisationIdAndIdAndIsDeletedFalse(Long organisationId, Long id);
+
     List<BiaQuantitative> findByOrganisationIdAndStatusInAndIsDeletedFalse(Long organisationId, List<String> statuses);
 
     List<BiaQuantitative> findByOrganisationIdAndProcessIdAndIsDeletedFalse(Long organisationId, Long processId);

@@ -194,3 +194,12 @@ grc:
         max-attempts: 3
         initial-delay-ms: 500
         backoff-multiplier: 2.0
+
+  # BCM module — Slice 9-D Continuity Strategy ROI
+  # Discount rate used for NPV calculation across the planning horizon.
+  # Default 8% = SAMA reference repo rate (2026 figure). Override via
+  # GRC_BCM_ROI_DISCOUNT_RATE env var if SAMA changes the reference rate
+  # without redeploying.
+  bcm:
+    roi:
+      discount-rate: ${GRC_BCM_ROI_DISCOUNT_RATE:8.00}

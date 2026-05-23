@@ -3308,6 +3308,7 @@ export const ar = {
   crisisRoomSidebar: 'غرفة الأزمات',
   biaWizardSidebar: 'معالج تحليل الأثر',
   biaQuantSidebar: 'تحليل الأثر — كمي',
+  strategyRoiSidebar: 'العائد على استراتيجيات الاستمرارية',
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',
