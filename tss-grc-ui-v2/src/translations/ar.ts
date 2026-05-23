@@ -2420,6 +2420,9 @@ export const ar = {
   rlcControlEvidence:     'آخر دليل',
   rlcPipelineTitle:       'مسار خطط المعالجة',
 
+  // Sprint 11 — خطوط الدفاع الثلاثة (إطار IIA 2020 + ساما 1-1-1)
+  '3lodSidebar':          'خطوط الدفاع الثلاثة',
+
   // Audit lifecycle — production hardening (Option 2)
   alcSidebar:             'دورة حياة التدقيق',
   alcEyebrow:             'التدقيق · سير عمل حيّ',

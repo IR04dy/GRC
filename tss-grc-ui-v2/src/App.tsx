@@ -66,6 +66,7 @@ const BrandMonitoringPage    = lazy(() => import('./pages/socops/BrandMonitoring
 const ForensicsPage          = lazy(() => import('./pages/socops/ForensicsPage').then(m => ({ default: m.ForensicsPage })));
 const MaDueDiligencePage     = lazy(() => import('./pages/socops/MaDueDiligencePage').then(m => ({ default: m.MaDueDiligencePage })));
 const SocOpsDetailPage       = lazy(() => import('./pages/socops/SocOpsDetailPage').then(m => ({ default: m.SocOpsDetailPage })));
+const ThreeLinesOfDefensePage = lazy(() => import('./pages/governance/ThreeLinesOfDefensePage').then(m => ({ default: m.ThreeLinesOfDefensePage })));
 const NotificationInboxPage  = lazy(() => import('./pages/inbox/InboxPage').then(m => ({ default: m.InboxPage })));
 const WorkflowSubmissionDetailPage = lazy(() => import('./pages/workflow/WorkflowSubmissionDetailPage').then(m => ({ default: m.WorkflowSubmissionDetailPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
@@ -323,6 +324,9 @@ export function App() {
               <Route path="/workflows/governance/digital-signature"  element={<DigitalSignatureWizard />} />
               <Route path="/workflows/governance/board-pack"         element={<BoardPackWizard />} />
               <Route path="/workflows/compliance/control-test"       element={<ControlTestWizard />} />
+
+              {/* Sprint 11 — Three Lines of Defense (IIA 2020 / SAMA CSF 1.1.1) */}
+              <Route path="/governance/three-lines"                  element={<ThreeLinesOfDefensePage />} />
 
               {/* Detail + admin pages for V115/V116 modules */}
               <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />

@@ -106,9 +106,15 @@ const NAV_GROUPS: NavGroup[] = [
   // Own top-level group per industry convention (Audit Management). + industry-standard tooling
   // (their flagship). NCA ECC Filing is here because it's an annual audit-style
   // self-assessment, not a continuous compliance activity.
+  //
+  // Sprint 11 — 3LoD (Three Lines of Defense) lives at the top of this
+  // group because Internal Audit is the system's Line 3, and the
+  // dashboard maps every audit artefact to its accountable line per
+  // SAMA CSF 1.1.1 + IIA 2020.
   {
     id: 'audit', titleKey: 'navAudit',
     items: [
+      { id: '3lod',      to: '/governance/three-lines', Icon: ShieldCheck, labelKey: '3lodSidebar' },
       { id: 'audit-ws',  to: '/audit-workspace',   Icon: Stamp,       labelKey: 'modAuditWorkspace' },
       { id: 'audit-lc',  to: '/audit-lifecycle',   Icon: BookOpen,    labelKey: 'alcSidebar' },
       { id: 'ev-chain',  to: '/evidence-chain',    Icon: Fingerprint, labelKey: 'echSidebar' },

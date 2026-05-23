@@ -1,5 +1,6 @@
 package com.tss.grc.security;
 
+import com.tss.grc.module.governance.threelines.service.ThreeLinesService;
 import com.tss.grc.module.platform.licensing.service.LicensingService;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
@@ -56,18 +57,21 @@ public class JwtTokenProvider {
     private final SecretKey secretKey;
     private final long accessTokenExpiryMs;
     private final long refreshTokenExpiryMs;
-    private final ObjectProvider<LicensingService> licensingProvider;
+    private final ObjectProvider<LicensingService>    licensingProvider;
+    private final ObjectProvider<ThreeLinesService>   threeLinesProvider;
 
     public JwtTokenProvider(
             @Value("${grc.jwt.secret:}") String secret,
             @Value("${grc.jwt.access-token-expiry-ms:900000}") long accessTokenExpiryMs,
             @Value("${grc.jwt.refresh-token-expiry-ms:604800000}") long refreshTokenExpiryMs,
-            ObjectProvider<LicensingService> licensingProvider) {
+            ObjectProvider<LicensingService>  licensingProvider,
+            ObjectProvider<ThreeLinesService> threeLinesProvider) {
         validateSecret(secret);
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
         this.accessTokenExpiryMs = accessTokenExpiryMs;
         this.refreshTokenExpiryMs = refreshTokenExpiryMs;
-        this.licensingProvider = licensingProvider;
+        this.licensingProvider  = licensingProvider;
+        this.threeLinesProvider = threeLinesProvider;
         log.info("JwtTokenProvider initialised: access={}ms refresh={}ms keyBytes={}",
                 accessTokenExpiryMs, refreshTokenExpiryMs, secret.getBytes().length);
     }
@@ -126,10 +130,34 @@ public class JwtTokenProvider {
                 .claim("org",             String.valueOf(principal.getOrganisationId()))
                 .claim("roles",           roles)
                 .claim("enabled_modules", enabledModulesAsList(principal.getOrganisationId()))
+                .claim("lod_band",        lodBandsFor(principal.getUserId()))
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(secretKey)
                 .compact();
+    }
+
+    /**
+     * Look up the user's LoD bands via {@link ThreeLinesService}. Returns
+     * an empty list when the service isn't bootstrapped yet (e.g. very
+     * first request, test slices without the governance module on the
+     * classpath). The frontend treats an empty array as "no band
+     * highlight"; the dashboard endpoint is still authoritative.
+     *
+     * <p>Sprint 11 — additive only, never breaks token shape for callers
+     * that don't read the claim.
+     */
+    private List<String> lodBandsFor(Long userId) {
+        if (userId == null) return Collections.emptyList();
+        ThreeLinesService svc = threeLinesProvider.getIfAvailable();
+        if (svc == null) return Collections.emptyList();
+        try {
+            List<String> bands = svc.bandsForUser(userId);
+            return bands == null ? Collections.emptyList() : List.copyOf(bands);
+        } catch (Exception ex) {
+            log.warn("Failed to load lod_band for user {}: {}", userId, ex.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     /**

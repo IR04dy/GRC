@@ -2435,6 +2435,10 @@ export const en = {
   rlcControlEvidence:     'Last evidence',
   rlcPipelineTitle:       'Treatment plan pipeline',
 
+  // Sprint 11 — Three Lines of Defense sidebar entry. Aligned with
+  // SAMA CSF 1.1.1 (Governance) + IIA 2020 Three Lines Model.
+  '3lodSidebar':          'Three Lines of Defense',
+
   // Audit lifecycle — production hardening (Option 2)
   alcSidebar:             'Audit lifecycle',
   alcEyebrow:             'Audit · Live workflow',
