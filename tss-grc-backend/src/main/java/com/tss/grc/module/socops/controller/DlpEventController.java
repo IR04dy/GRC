@@ -22,22 +22,22 @@ public class DlpEventController {
     private final DlpEventService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','DLP_REVIEWER','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','DLP_REVIEWER','PLATFORM_ADMIN','AUDITOR')")
     public Page<DlpEvent> list(@RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','DLP_REVIEWER','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','DLP_REVIEWER','PLATFORM_ADMIN','AUDITOR')")
     public DlpEvent get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping("/ingest")
-    @PreAuthorize("hasAnyAuthority('DLP_INGEST','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('DLP_INGEST','PLATFORM_ADMIN','CISO')")
     public DlpEvent ingest(@RequestBody DlpEvent body) { return svc.ingest(body); }
 
     @PostMapping("/{id}/review")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','DLP_REVIEWER','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','DLP_REVIEWER','CISO','PLATFORM_ADMIN')")
     public DlpEvent review(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return svc.review(id, body.get("outcome"), body.get("notes"));
     }

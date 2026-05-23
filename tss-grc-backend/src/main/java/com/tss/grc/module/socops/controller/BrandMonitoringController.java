@@ -22,26 +22,26 @@ public class BrandMonitoringController {
     private final BrandMonitoringService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
     public Page<BrandMonitoring> list(@RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
     public BrandMonitoring get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping("/ingest")
-    @PreAuthorize("hasAnyAuthority('BRAND_INGEST','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('BRAND_INGEST','PLATFORM_ADMIN','CISO')")
     public BrandMonitoring ingest(@RequestBody BrandMonitoring body) { return svc.ingest(body); }
 
     @PostMapping("/{id}/request-takedown")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public BrandMonitoring requestTakedown(@PathVariable Long id) { return svc.requestTakedown(id); }
 
     @PostMapping("/{id}/complete-takedown")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public BrandMonitoring completeTakedown(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return svc.completeTakedown(id, body.get("notes"));
     }

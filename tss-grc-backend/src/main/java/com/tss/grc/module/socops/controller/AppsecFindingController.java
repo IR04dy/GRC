@@ -21,37 +21,37 @@ public class AppsecFindingController {
     private final AppsecFindingService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','APPSEC_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','APPSEC_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public Page<AppsecFinding> list(@RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','APPSEC_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','APPSEC_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public AppsecFinding get(@PathVariable Long id) { return svc.get(id); }
 
     /** Scanner ingest endpoint — Veracode / Snyk / Checkmarx / SonarQube /
      *  GitHub AS adapters POST findings here. Idempotent on (scanner, externalId). */
     @PostMapping("/ingest")
-    @PreAuthorize("hasAnyAuthority('APPSEC_INGEST','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('APPSEC_INGEST','PLATFORM_ADMIN','CISO')")
     public AppsecFinding ingest(@RequestBody AppsecFinding body) {
         return svc.ingest(body);
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('APPSEC_LEAD','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('APPSEC_LEAD','PLATFORM_ADMIN','CISO')")
     public AppsecFinding create(@RequestBody AppsecFinding body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('APPSEC_LEAD','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('APPSEC_LEAD','PLATFORM_ADMIN','CISO')")
     public AppsecFinding update(@PathVariable Long id, @RequestBody AppsecFinding body) {
         body.setId(id);
         return svc.save(body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }

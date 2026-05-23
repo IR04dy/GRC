@@ -23,22 +23,22 @@ public class ThreatIntelController {
     private final ThreatIntelService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public Page<ThreatIntel> list(@RequestParam(defaultValue = "0") int page,
                                   @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public ThreatIntel get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('TI_INGEST','SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('TI_INGEST','SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public ThreatIntel save(@RequestBody ThreatIntel body) { return svc.save(body); }
 
     @PostMapping("/{id}/action")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public ThreatIntel action(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Long userId = body.get("userId") instanceof Number n ? n.longValue() : null;
         String notes = body.get("notes") == null ? null : body.get("notes").toString();
@@ -46,7 +46,7 @@ public class ThreatIntelController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CISO')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }

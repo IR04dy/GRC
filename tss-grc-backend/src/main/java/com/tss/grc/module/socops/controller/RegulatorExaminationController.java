@@ -21,29 +21,29 @@ public class RegulatorExaminationController {
     private final RegulatorExaminationService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','AUDITOR','RISK_MANAGER','COMPLIANCE_OFFICER')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','AUDITOR','RISK_MANAGER','COMPLIANCE_OFFICER')")
     public Page<RegulatorExamination> list(@RequestParam(defaultValue = "0") int page,
                                            @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','AUDITOR','COMPLIANCE_OFFICER')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','AUDITOR','COMPLIANCE_OFFICER')")
     public RegulatorExamination get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','COMPLIANCE_OFFICER')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','COMPLIANCE_OFFICER')")
     public RegulatorExamination save(@RequestBody RegulatorExamination body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','COMPLIANCE_OFFICER')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','COMPLIANCE_OFFICER')")
     public RegulatorExamination update(@PathVariable Long id, @RequestBody RegulatorExamination body) {
         body.setId(id);
         return svc.save(body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }

@@ -20,16 +20,16 @@ public class ZtMaturityController {
     private final ZtMaturityService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','AUDITOR')")
     public List<ZtMaturity> list() { return svc.list(); }
 
     @GetMapping("/{assessmentCode}")
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','AUDITOR')")
     public List<ZtMaturity> byAssessment(@PathVariable String assessmentCode) {
         return svc.byAssessment(assessmentCode);
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     public ZtMaturity save(@RequestBody ZtMaturity body) { return svc.save(body); }
 }

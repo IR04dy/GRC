@@ -21,32 +21,32 @@ public class CyberInsuranceController {
     private final CyberInsuranceService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','RISK_MANAGER','PLATFORM_ADMIN','AUDITOR','FINANCE_LEAD')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN','AUDITOR','FINANCE_LEAD')")
     public List<CyberInsurance> list() { return svc.list(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','RISK_MANAGER','PLATFORM_ADMIN','AUDITOR','FINANCE_LEAD')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN','AUDITOR','FINANCE_LEAD')")
     public CyberInsurance get(@PathVariable Long id) { return svc.get(id); }
 
     @GetMapping("/renewals-due")
-    @PreAuthorize("hasAnyAuthority('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
     public List<CyberInsurance> renewalsDue(@RequestParam(defaultValue = "90") int days) {
         return svc.renewalsDueWithinDays(days);
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
     public CyberInsurance create(@RequestBody CyberInsurance body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
     public CyberInsurance update(@PathVariable Long id, @RequestBody CyberInsurance body) {
         body.setId(id);
         return svc.save(body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }

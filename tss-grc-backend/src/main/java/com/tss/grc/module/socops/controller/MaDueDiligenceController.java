@@ -23,35 +23,35 @@ public class MaDueDiligenceController {
     private final MaDueDiligenceService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','RISK_MANAGER','MA_LEAD','PLATFORM_ADMIN','AUDITOR','LEGAL_COUNSEL','CFO')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','MA_LEAD','PLATFORM_ADMIN','AUDITOR','LEGAL_COUNSEL','CFO')")
     public Page<MaDueDiligence> list(@RequestParam(defaultValue = "0") int page,
                                      @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','RISK_MANAGER','MA_LEAD','PLATFORM_ADMIN','AUDITOR','LEGAL_COUNSEL','CFO')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','MA_LEAD','PLATFORM_ADMIN','AUDITOR','LEGAL_COUNSEL','CFO')")
     public MaDueDiligence get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','MA_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','MA_LEAD','PLATFORM_ADMIN')")
     public MaDueDiligence create(@RequestBody MaDueDiligence body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','MA_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','MA_LEAD','PLATFORM_ADMIN')")
     public MaDueDiligence update(@PathVariable Long id, @RequestBody MaDueDiligence body) {
         body.setId(id);
         return svc.save(body);
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("hasAnyAuthority('CISO','MA_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','MA_LEAD','PLATFORM_ADMIN')")
     public MaDueDiligence transition(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return svc.transitionPhase(id, body.get("phase"));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }

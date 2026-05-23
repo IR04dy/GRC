@@ -20,18 +20,18 @@ public class SeasonalOverlayController {
     private final SeasonalOverlayService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR')")
     public List<SeasonalOverlay> list() { return svc.list(); }
 
     @GetMapping("/active-now")
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','SECURITY_ANALYST','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','SECURITY_ANALYST','RISK_MANAGER')")
     public List<SeasonalOverlay> activeNow() { return svc.activeNow(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR')")
     public SeasonalOverlay get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     public SeasonalOverlay save(@RequestBody SeasonalOverlay body) { return svc.save(body); }
 }

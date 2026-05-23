@@ -34,27 +34,27 @@ public class SecurityEventController {
     private final SecurityEventService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public Page<SecurityEvent> list(@RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public SecurityEvent get(@PathVariable Long id) {
         return svc.get(id);
     }
 
     @PostMapping("/{id}/triage")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public SecurityEvent triage(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         Long assignee = body == null ? null : numericId(body.get("assigneeUserId"));
         return svc.triage(id, assignee);
     }
 
     @PostMapping("/{id}/resolve")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public SecurityEvent resolve(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String resolution = body == null ? null : (String) body.get("resolution");
         boolean fp = body != null && Boolean.TRUE.equals(body.get("falsePositive"));
@@ -62,7 +62,7 @@ public class SecurityEventController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CISO')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id);
         return ResponseEntity.noContent().build();

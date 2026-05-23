@@ -23,35 +23,35 @@ public class IamJmlEventController {
     private final IamJmlEventService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','IAM_LEAD','PLATFORM_ADMIN','AUDITOR','HR_LEAD')")
+    @PreAuthorize("hasAnyRole('CISO','IAM_LEAD','PLATFORM_ADMIN','AUDITOR','HR_LEAD')")
     public Page<IamJmlEvent> list(@RequestParam(defaultValue = "0") int page,
                                   @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','IAM_LEAD','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','IAM_LEAD','PLATFORM_ADMIN','AUDITOR')")
     public IamJmlEvent get(@PathVariable Long id) { return svc.get(id); }
 
     @GetMapping("/privileged-reviews-due")
-    @PreAuthorize("hasAnyAuthority('CISO','IAM_LEAD','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','IAM_LEAD','PLATFORM_ADMIN','AUDITOR')")
     public List<IamJmlEvent> reviewsDue(@RequestParam(defaultValue = "30") int days) {
         return svc.privilegedReviewsDueWithinDays(days);
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('JML_INGEST','IAM_LEAD','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('JML_INGEST','IAM_LEAD','PLATFORM_ADMIN','CISO')")
     public IamJmlEvent create(@RequestBody IamJmlEvent body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('IAM_LEAD','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('IAM_LEAD','PLATFORM_ADMIN','CISO')")
     public IamJmlEvent update(@PathVariable Long id, @RequestBody IamJmlEvent body) {
         body.setId(id);
         return svc.save(body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }

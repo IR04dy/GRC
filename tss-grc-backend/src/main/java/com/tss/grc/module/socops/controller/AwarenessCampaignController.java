@@ -21,29 +21,29 @@ public class AwarenessCampaignController {
     private final AwarenessCampaignService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public Page<AwarenessCampaign> list(@RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public AwarenessCampaign get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     public AwarenessCampaign save(@RequestBody AwarenessCampaign body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     public AwarenessCampaign update(@PathVariable Long id, @RequestBody AwarenessCampaign body) {
         body.setId(id);
         return svc.save(body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PLATFORM_ADMIN')")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }

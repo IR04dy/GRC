@@ -48,7 +48,7 @@ public class SocOpsController {
     /** Leadership-ops dashboard payload — MTTD/MTTR, open by severity,
      *  SLA-breach approaching, TI/awareness/cert/regulator KPIs. */
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR')")
     public SocOpsDashboardResponse dashboard() {
         return dashboard.get();
     }
@@ -58,7 +58,7 @@ public class SocOpsController {
      *  webhook, etc.) maps that vendor's schema to {@link SiemEventIngestRequest}.
      *  Idempotent on ({@code sourceSystem}, {@code externalId}). */
     @PostMapping("/siem-events")
-    @PreAuthorize("hasAnyAuthority('SIEM_INGEST','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('SIEM_INGEST','PLATFORM_ADMIN','CISO')")
     public ResponseEntity<SecurityEvent> ingestSiemEvent(@Valid @RequestBody SiemEventIngestRequest req) {
         return ResponseEntity.ok(ingest.ingestSiemEvent(req));
     }
@@ -68,7 +68,7 @@ public class SocOpsController {
      *  the summary; detail findings load separately into the cyber.vulnerability
      *  tables. */
     @PostMapping("/scanner-runs")
-    @PreAuthorize("hasAnyAuthority('SCANNER_INGEST','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('SCANNER_INGEST','PLATFORM_ADMIN','CISO')")
     public ResponseEntity<ScannerRun> ingestScannerRun(@Valid @RequestBody ScannerRunIngestRequest req) {
         return ResponseEntity.ok(ingest.ingestScannerRun(req));
     }

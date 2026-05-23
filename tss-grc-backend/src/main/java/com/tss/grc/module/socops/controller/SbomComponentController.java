@@ -20,13 +20,13 @@ public class SbomComponentController {
     private final SbomComponentService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public Page<SbomComponent> list(@RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "100") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN','SBOM_INGEST')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','SBOM_INGEST')")
     public SbomComponent save(@RequestBody SbomComponent body) { return svc.save(body); }
 }

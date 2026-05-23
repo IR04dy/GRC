@@ -33,32 +33,32 @@ public class IrPlaybookController {
     private final IrPlaybookService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public List<IrPlaybook> list() { return svc.list(); }
 
     @GetMapping("/templates")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public List<IrPlaybook> templates() { return svc.templates(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public IrPlaybook get(@PathVariable Long id) { return svc.get(id); }
 
     @GetMapping("/{id}/steps")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public List<IrPlaybookStep> steps(@PathVariable Long id) { return svc.stepsOf(id); }
 
     @PostMapping("/clone")
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     public IrPlaybook clone(@RequestBody Map<String, String> body) {
         return svc.cloneFromTemplate(body.get("templateCode"));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     public IrPlaybook save(@RequestBody IrPlaybook body) { return svc.save(body); }
 
     @PostMapping("/{id}/invoke")
-    @PreAuthorize("hasAnyAuthority('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public IrPlaybook invoke(@PathVariable Long id) { return svc.recordInvocation(id); }
 }

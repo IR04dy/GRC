@@ -23,26 +23,26 @@ public class ForensicsArtefactController {
     private final ForensicsArtefactService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
     public Page<ForensicsArtefact> list(@RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
     public ForensicsArtefact get(@PathVariable Long id) { return svc.get(id); }
 
     @GetMapping("/by-case/{caseCode}")
-    @PreAuthorize("hasAnyAuthority('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
     public List<ForensicsArtefact> byCase(@PathVariable String caseCode) { return svc.byCase(caseCode); }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')")
     public ForensicsArtefact create(@RequestBody ForensicsArtefact body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')")
     public ForensicsArtefact update(@PathVariable Long id, @RequestBody ForensicsArtefact body) {
         body.setId(id);
         return svc.save(body);
@@ -52,14 +52,14 @@ public class ForensicsArtefactController {
      *  entry tied to the artefact so the chain can be reconstructed
      *  verbatim in a courtroom. */
     @PostMapping("/{id}/transfer-custody")
-    @PreAuthorize("hasAnyAuthority('FORENSICS_LEAD','IR_LEAD','CISO','LEGAL_COUNSEL')")
+    @PreAuthorize("hasAnyRole('FORENSICS_LEAD','IR_LEAD','CISO','LEGAL_COUNSEL')")
     public ForensicsArtefact transferCustody(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return svc.transferCustody(id,
             body.get("newCustodian"), body.get("newLocation"), body.get("notes"));
     }
 
     @PostMapping("/{id}/verify-integrity")
-    @PreAuthorize("hasAnyAuthority('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')")
     public ForensicsArtefact verify(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         boolean verified = body == null || !Boolean.FALSE.equals(body.get("verified"));
         return svc.verifyIntegrity(id, verified);

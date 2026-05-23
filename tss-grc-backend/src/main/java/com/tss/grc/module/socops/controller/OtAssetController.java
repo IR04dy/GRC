@@ -21,29 +21,29 @@ public class OtAssetController {
     private final OtAssetService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CISO','OT_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','OT_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public Page<OtAsset> list(@RequestParam(defaultValue = "0") int page,
                               @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','OT_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasAnyRole('CISO','OT_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public OtAsset get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CISO','OT_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','OT_LEAD','PLATFORM_ADMIN')")
     public OtAsset create(@RequestBody OtAsset body) { return svc.save(body); }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CISO','OT_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','OT_LEAD','PLATFORM_ADMIN')")
     public OtAsset update(@PathVariable Long id, @RequestBody OtAsset body) {
         body.setId(id);
         return svc.save(body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CISO')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         svc.delete(id); return ResponseEntity.noContent().build();
     }
