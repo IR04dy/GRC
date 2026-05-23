@@ -1451,6 +1451,170 @@ for wp_ref, wp_type, t_en, t_ar, author, status, hours in PAPERS:
         label=f"WP: [{wp_type}/{status}] {wp_ref} {t_en[:40]}",
     )
 
+# ══════════════════════════════════════════════════════════════════════
+# Multi-tenant — Aramco Trading Company (org_id = 2)
+# Energy industry: oil & gas, refinery, OT/SCADA, exporter operations.
+# Keeps the script idempotent across tenants (IF NOT EXISTS by org+key).
+# ══════════════════════════════════════════════════════════════════════
+
+print("\n\n" + "═" * 70)
+print(f"  AR — Aramco Trading Company (org_id={ORG_ARAMCO})")
+print("═" * 70)
+
+# ──────────────────────────────────────────────────────────────────────
+# Aramco — cyber assets (OT + IT stack)
+# ──────────────────────────────────────────────────────────────────────
+section("cyber.cyber_assets — Aramco OT + IT production assets")
+
+ARAMCO_ASSETS = [
+    # (name, type, biz_owner, tech_owner, classification, criticality, ip, hostname, os)
+    ("DCS — Honeywell Experion (Ras Tanura Refinery)",
+     "OT", "Saad Al-Otaibi", "Ahmed Al-Ghamdi", "RESTRICTED",   "TIER_1",
+     "10.30.10.5",  "exp-rt-dcs-01",  "Windows Server 2019"),
+    ("SCADA — GE iFix (Yanbu Refinery)",
+     "OT", "Saad Al-Otaibi", "Ahmed Al-Ghamdi", "RESTRICTED",   "TIER_1",
+     "10.31.10.5",  "ifix-yanbu-01",  "Windows Server 2019"),
+    ("Pipeline SCADA — East-West Crude Line",
+     "OT", "Khalid Al-Ahmadi", "Saud Al-Rashid", "RESTRICTED",   "TIER_1",
+     "10.32.10.5",  "ew-pipe-scada",   "RHEL 8.6"),
+    ("Historian — OSIsoft PI System",
+     "OT", "Saad Al-Otaibi", "Ahmed Al-Ghamdi", "CONFIDENTIAL", "TIER_2",
+     "10.30.20.10", "pi-historian-01", "Windows Server 2022"),
+    ("ERP — SAP S/4HANA (Trading)",
+     "APPLICATION", "Nora Al-Sayed",  "Mansour Al-Qarni",   "RESTRICTED",   "TIER_1",
+     "10.40.10.10", "sap-s4-prod",      "RHEL 9.2"),
+    ("Trading Risk Mgmt — Eka Software",
+     "APPLICATION", "Nora Al-Sayed",  "Mansour Al-Qarni",   "RESTRICTED",   "TIER_1",
+     "10.40.20.5",  "eka-trm-prod",     "Windows Server 2022"),
+    ("Active Directory Forest (CORP)",
+     "INFRASTRUCTURE", "Mansour Al-Qarni", "Saud Al-Rashid",  "RESTRICTED",   "TIER_1",
+     "10.10.10.5",  "ad-corp-prod",     "Windows Server 2022"),
+    ("Splunk Enterprise SIEM",
+     "INFRASTRUCTURE", "Ahmed Al-Ghamdi", "Saud Al-Rashid",   "CONFIDENTIAL", "TIER_2",
+     "10.70.10.10", "splunk-arc-01",    "RHEL 9.2"),
+    ("Palo Alto NGFW (DMZ Refinery)",
+     "INFRASTRUCTURE", "Saad Al-Otaibi", "Saud Al-Rashid",    "RESTRICTED",   "TIER_1",
+     "10.30.1.1",   "pa-dmz-rt",        "PAN-OS 11.0"),
+    ("Refinery Email Filter — Proofpoint",
+     "APPLICATION",    "Mansour Al-Qarni", "Saud Al-Rashid", "CONFIDENTIAL", "TIER_2",
+     None,           "proofpoint-arc",   None),
+]
+for name, atype, biz, tech, cls, crit, ip, host, os_name in ARAMCO_ASSETS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM cyber.cyber_assets
+                       WHERE asset_name = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO cyber.cyber_assets (external_id, organisation_id, asset_name, asset_type,
+            business_owner, technical_owner, classification, criticality, ip_address, hostname,
+            operating_system, linked_vulnerabilities_count, linked_incidents_count,
+            linked_controls_count, status, is_deleted, created_at)
+        VALUES (LOWER(REPLACE(NEWID(), '-', '')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0,
+            'ACTIVE', 0, GETDATE())
+        """,
+        name, ORG_ARAMCO,
+        ORG_ARAMCO, name, atype, biz, tech, cls, crit, ip, host, os_name,
+        label=f"AR asset: {name}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# Aramco — privacy consents (energy partner data sharing)
+# ──────────────────────────────────────────────────────────────────────
+section("privacy.consents — Aramco energy-partner data sharing")
+
+ARAMCO_CONSENTS = [
+    # (purpose_en, purpose_ar, channel, status)
+    ("Counterparty KYC data sharing — Mubadala",
+     "مشاركة بيانات KYC للأطراف المقابلة — مبادلة",                   "API",   "ACTIVE"),
+    ("Bunker-fuel buyer credit assessment",
+     "تقييم الائتمان لمشتري وقود السفن",                                "WEB",   "ACTIVE"),
+    ("Marine surveyor inspection reports (Lloyd's)",
+     "تقارير فحص مفتشي السفن — لويدز",                                  "EMAIL", "ACTIVE"),
+    ("PetroChina counterparty due-diligence package",
+     "حزمة العناية الواجبة للطرف المقابل — PetroChina",                 "API",   "ACTIVE"),
+    ("Saudi Aramco trading data feed to refinery customers",
+     "تغذية بيانات التداول لعملاء المصافي",                              "API",   "ACTIVE"),
+    ("Vendor onboarding KYC questionnaire",
+     "استبيان KYC لتأهيل المورّدين",                                     "WEB",   "ACTIVE"),
+    ("Saudi Customs Authority transaction reporting",
+     "تقارير المعاملات للهيئة العامة للجمارك",                            "API",   "ACTIVE"),
+    ("ESG carbon-footprint partner reporting",
+     "تقارير شريك بصمة الكربون ESG",                                     "API",   "ACTIVE"),
+]
+for purpose_en, purpose_ar, channel, status in ARAMCO_CONSENTS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM privacy.consents
+                       WHERE purpose_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO privacy.consents (external_id, organisation_id, purpose_en, purpose_ar,
+            channel, version_label, effective_date, status, is_deleted, created_at)
+        VALUES (NEWID(), ?, ?, ?, ?, 'v1', GETDATE(), ?, 0, GETDATE())
+        """,
+        purpose_en, ORG_ARAMCO,
+        ORG_ARAMCO, purpose_en, purpose_ar, channel, status,
+        label=f"AR consent: {purpose_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# Aramco — enterprise risks (energy + trading)
+# ──────────────────────────────────────────────────────────────────────
+section("risk.risks — Aramco enterprise risk register")
+
+ARAMCO_RISKS = [
+    # (title_en, title_ar, source, status, inh_lik, inh_imp, res_lik, res_imp)
+    ("Crude oil price shock impact on margins",
+     "صدمة سعر النفط الخام على الهوامش",
+     "ERM",       "MITIGATING", 4, 5, 3, 4),
+    ("OT cyber attack on refinery DCS/SCADA",
+     "هجوم سيبراني على نظام التحكّم في المصافي",
+     "CYBER",     "MITIGATING", 3, 5, 2, 4),
+    ("Pipeline integrity failure — East-West line",
+     "فشل سلامة خط الأنابيب شرق-غرب",
+     "BCM",       "MITIGATING", 2, 5, 2, 3),
+    ("Sanctions exposure on counterparty trading",
+     "تعرّض العقوبات على تداول الأطراف المقابلة",
+     "COMPLIANCE","MITIGATING", 3, 5, 2, 4),
+    ("Cross-border data transfer violation (SDAIA)",
+     "مخالفة نقل البيانات خارج الحدود (سدايا)",
+     "PRIVACY",   "MITIGATING", 3, 4, 2, 3),
+    ("Refinery safety incident — process safety",
+     "حادث سلامة العمليات في المصافي",
+     "BCM",       "MITIGATING", 2, 5, 1, 4),
+    ("Climate transition risk — Scope-3 financed emissions",
+     "مخاطر التحول المناخي — انبعاثات النطاق 3",
+     "ERM",       "UNDER_REVIEW", 4, 5, 3, 4),
+    ("Insider trading on commodity positions",
+     "تداول داخلي على مراكز السلع",
+     "COMPLIANCE","MITIGATING", 2, 5, 1, 4),
+    ("Vendor concentration on critical OT services",
+     "تركّز المورّدين على خدمات OT الحرجة",
+     "ERM",       "MITIGATING", 3, 4, 2, 3),
+    ("FX volatility on USD-denominated trades",
+     "تقلّبات الصرف الأجنبي على التداولات بالدولار",
+     "ERM",       "ACCEPTED",   4, 3, 3, 3),
+]
+for title_en, title_ar, source, status, il, ii, rl, ri in ARAMCO_RISKS:
+    # inherent_score + residual_score + risk_level are computed columns —
+    # don't INSERT them. The DB derives them from likelihood × impact.
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM risk.risks
+                       WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO risk.risks (external_id, organisation_id, title_en, title_ar,
+            source_module, status, inherent_likelihood, inherent_impact,
+            residual_likelihood, residual_impact,
+            identified_date, review_date, attestation_cadence_days,
+            created_at, updated_at, is_deleted)
+        VALUES (NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            DATEADD(month, -3, CAST(GETDATE() AS DATE)),
+            DATEADD(month, 3, CAST(GETDATE() AS DATE)),
+            90, GETDATE(), GETDATE(), 0)
+        """,
+        title_en, ORG_ARAMCO,
+        ORG_ARAMCO, title_en, title_ar, source, status,
+        il, ii, rl, ri,
+        label=f"AR risk: [{source}] {title_en[:50]} L{il}×I{ii} → L{rl}×I{ri}",
+    )
+
 # ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
 print(f"  inserted: {inserted}")
