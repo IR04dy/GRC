@@ -3326,6 +3326,10 @@ export const en = {
   biaWizardSidebar: 'BIA wizard',
   biaQuantSidebar: 'BIA — quantitative',
   strategyRoiSidebar: 'Strategy ROI',
+  // Slice 10-D — Vendor BCP attestation campaigns.
+  vbcpSidebar: 'Vendor BCP attestation',
+  vbcpTitle: 'Vendor BCP Attestation Campaigns',
+  vbcpSub: 'Launch an annual or quarterly cycle to collect BCP attestations from critical third parties.',
   scenarioLibrarySidebar: 'Scenario Library',
   facilitatorConsoleSidebar: 'Facilitate Exercise',
   facilitatorConsoleTitle: 'Facilitator console',

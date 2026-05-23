@@ -34,6 +34,9 @@ const MobileCrisisRoomPage   = lazy(() => import('./pages/bcm/MobileCrisisRoomPa
 const BiaWizardPage          = lazy(() => import('./pages/bcm/BiaWizardPage').then(m => ({ default: m.BiaWizardPage })));
 const QuantitativeBiaPage    = lazy(() => import('./pages/bcm/QuantitativeBiaPage').then(m => ({ default: m.QuantitativeBiaPage })));
 const StrategyRoiPage        = lazy(() => import('./pages/bcm/StrategyRoiPage').then(m => ({ default: m.StrategyRoiPage })));
+const VendorBcpCampaignsPage = lazy(() => import('./pages/tprm/VendorBcpCampaignsPage').then(m => ({ default: m.VendorBcpCampaignsPage })));
+const VendorBcpCampaignDetailPage = lazy(() => import('./pages/tprm/VendorBcpCampaignDetailPage').then(m => ({ default: m.VendorBcpCampaignDetailPage })));
+const VendorAttestationSubmitPage = lazy(() => import('./pages/tprm/VendorAttestationSubmitPage').then(m => ({ default: m.VendorAttestationSubmitPage })));
 const ExerciseScenarioLibraryPage = lazy(() => import('./pages/bcm/ExerciseScenarioLibraryPage').then(m => ({ default: m.ExerciseScenarioLibraryPage })));
 const ExerciseScenarioDetailPage  = lazy(() => import('./pages/bcm/ExerciseScenarioDetailPage').then(m => ({ default: m.ExerciseScenarioDetailPage })));
 const FacilitatorConsolePage      = lazy(() => import('./pages/bcm/FacilitatorConsolePage').then(m => ({ default: m.FacilitatorConsolePage })));
@@ -264,7 +267,12 @@ export function App() {
               <Route path="/risk/dashboard"     element={<ErmDashboardPage />} />
               <Route path="/cyber/dashboard"    element={<CyberDashboardPage />} />
               <Route path="/privacy/dashboard"  element={<PdplDashboardPage />} />
-              <Route path="/tprm"       element={<TprmPage />} />
+              <Route path="/tprm"                    element={<TprmPage />} />
+              {/* Slice 10-D — Vendor BCP attestation campaigns. */}
+              <Route path="/tprm/bcp-campaigns"        element={<VendorBcpCampaignsPage />} />
+              <Route path="/tprm/bcp-campaigns/:id"    element={<VendorBcpCampaignDetailPage />} />
+              {/* Public vendor-portal stub — token IS the credential. */}
+              <Route path="/tprm/attestations/:token/submit" element={<VendorAttestationSubmitPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/rca"        element={<RcaPage />} />
               <Route path="/risk-scenarios"   element={<RiskScenariosPage />} />

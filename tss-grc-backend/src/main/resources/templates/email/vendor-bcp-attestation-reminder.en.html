@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reminder: Vendor BCP Attestation Outstanding</title>
+</head>
+<body style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
+  <div style="border-top: 4px solid #b45309; padding-top: 16px;">
+    <p style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #b45309; margin: 0 0 8px; font-weight: 700;">⏰ Reminder · Action still outstanding</p>
+    <h1 style="font-size: 22px; margin: 0 0 16px; color: #92400e;">{{campaign_title}}</h1>
+
+    <p>Dear {{vendor_name}} team,</p>
+    <p>Our records show that we have not yet received your Business Continuity attestation for the {{campaign_title}} cycle. The submission deadline is <strong style="color: #b45309;">{{deadline_date}}</strong> — please complete the form at your earliest convenience.</p>
+
+    <p>This attestation is required by <strong>{{regulatory_reference}}</strong>. Failure to respond before the deadline will trigger escalation to our Audit Committee and may impact your current risk rating in our third-party register.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #6b7280; width: 200px;">Deadline</td><td style="padding: 6px 0; color: #b45309; font-weight: 700;">{{deadline_date}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Regulatory basis</td><td style="padding: 6px 0;">{{regulatory_reference}}</td></tr>
+    </table>
+
+    <p style="margin: 24px 0;">
+      <a href="{{attestation_url}}" style="background: #b45309; color: #ffffff; text-decoration: none; padding: 12px 22px; border-radius: 4px; display: inline-block; font-weight: 700; font-size: 15px;">Complete attestation now</a>
+    </p>
+
+    <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">If your service has been retired or is no longer in scope, please reply to this email so we can mark the row accordingly. For any technical issue with the portal, contact the TPRM Office on <strong>{{contact_phone}}</strong>.</p>
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0 16px;" />
+    <p style="font-size: 12px; color: #9ca3af; line-height: 1.5;">Automated reminder from the TSS GRC Platform · Third-Party Risk Management — Business Continuity Attestation workflow.</p>
+  </div>
+</body>
+</html>

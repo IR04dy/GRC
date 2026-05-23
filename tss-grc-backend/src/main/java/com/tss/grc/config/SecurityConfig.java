@@ -91,6 +91,11 @@ public class SecurityConfig {
                 // DD-82: public case-tracker — anonymous submitters look up their
                 // intake by reference code without logging in.
                 .requestMatchers(HttpMethod.GET, "/api/v1/intake/track/**").permitAll()
+                // Slice 10-D: vendor BCP attestation submission portal — token IS
+                // the credential, so these two endpoints are auth-free. Full vendor
+                // portal hardening (rate-limit, MFA bind, full audit) is a follow-up.
+                .requestMatchers(HttpMethod.GET,  "/api/v1/tprm/bcp-attestations/by-token/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/tprm/bcp-attestations/by-token/**").permitAll()
                 .anyRequest().authenticated()
             )
 

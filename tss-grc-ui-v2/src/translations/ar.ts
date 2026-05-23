@@ -3310,6 +3310,10 @@ export const ar = {
   biaWizardSidebar: 'معالج تحليل الأثر',
   biaQuantSidebar: 'تحليل الأثر — كمي',
   strategyRoiSidebar: 'العائد على استراتيجيات الاستمرارية',
+  // Slice 10-D — Saudi-native phrasing, NOT literal "حملة BCP للموردين" calque.
+  vbcpSidebar: 'شهادات استمرارية الموردين',
+  vbcpTitle: 'حملة شهادات استمرارية الموردين',
+  vbcpSub: 'إطلاق دورة سنوية أو ربعية لجمع شهادات استمرارية الأعمال من الموردين الجوهريين.',
   scenarioLibrarySidebar: 'مكتبة السيناريوهات',
   facilitatorConsoleSidebar: 'إدارة التمرين الحيّ',
   facilitatorConsoleTitle: 'وحدة تحكم المُنسِّق',
