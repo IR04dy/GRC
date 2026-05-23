@@ -1,9 +1,92 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 22 May 2026 (Committees outage root-caused + globally hardened — PR #117 closes the `UnexpectedRollbackException` class of bug)
+**Last update:** 23 May 2026 (10-round static-analysis bug-hunt arc — 12+ real production bugs caught and fixed across PRs #117 → #121)
 
 ---
 
-## 🟢 Latest — Committees outage closeout (22 May 2026, PRs #114 → #117)
+## 🟢 Latest — Static-analysis bug-hunt closeout (23 May 2026, PRs #117 → #121)
+
+Five-PR arc covering 10 rounds of platform-wide static-analysis bug-hunting,
+starting from the committees outage and ending with the cross-tenant
+mass-assignment sweep. **12+ real production bugs caught and fixed**,
+of which 4 were security-severity. The bug-hunt surface from static
+reading is now genuinely exhausted — further finds need DAST / fuzz /
+dependency CVE scanning.
+
+### Bug inventory (by severity)
+
+| # | Bug | PR | Severity |
+|---|---|---|---|
+| 1 | Committees `UnexpectedRollbackException` at tx commit time | #117 | High (feature-breaking) |
+| 2 | Global handler missing for `DataAccessException` (every module) | #116 | High |
+| 3 | ErrorState UX flattened backend ProblemDetail to generic English | #119 | UX |
+| 4 | Sustainability evidence aggregate tenant-leak (`findAll().filter`) | #119 | High (multi-tenant) |
+| 5 | NDI report cycle-history tenant-leak | #119 | High |
+| 6 | Committee sweep O(N×M) per tick | #119 | Performance |
+| 7 | Calendar wrong sessionStorage token key (`'accessToken'` vs `'grc.accessToken'`) | #120 | High (feature 100% broken) |
+| 8 | Calendar hardcoded `http://localhost:8084` fallback | #120 | Medium |
+| 9 | **KB stored-XSS via `javascript:` URLs in markdown links** | #120 | **High (security)** |
+| 10 | **JVM TZ defaulted to UTC on Saudi-only platform (3 hrs/day silent data corruption)** | #121 | **High (data quality)** |
+| 11 | **Refresh-cookie emitted two Set-Cookie headers — `SameSite=Strict` could be dropped** | #121 | **High (security — CSRF)** |
+| 12 | Logout missing `SameSite` on cookie-clear | #121 | Medium |
+| 13 | **Cross-tenant mass-assignment via JPA `merge()` — 18 service methods affected** | #121 | **High (security — IDOR)** |
+| 14 | `BcmService.createBia` missing org scope (caught while patching #13) | #121 | Medium |
+
+### Mass-assignment pattern audit summary
+
+The deepest finding of the arc. Every committee/cyber/BCM/compliance/crisis-comms
+service that accepted a JPA entity directly via `@RequestBody` was vulnerable
+to cross-tenant `merge()` overwrites — a client supplying `{"id": 12345, ...}`
+could rewrite arbitrary cross-tenant rows. **18 services patched** with the
+defensive `setId(null)` pattern; **17 services verified safe** (already use
+the `new Entity() + apply(dto)` pattern).
+
+| Module | Methods patched |
+|---|---|
+| `admin.committee` | `CommitteeActionItemService.create`, `CommitteeResolutionService.create`, `CommitteeMemberRegistryService.appoint` + `addSkill`, `CommitteeMeetingPapersService.circulate` |
+| `cyber` | `CyberService.saveFramework` + `saveControl` + `saveSubControl` + `saveIncident` + `saveAsset` |
+| `bcm` | `BcmService.createPlan` + `createProcess` + `createBia` + `createExercise` |
+| `compliance` | `PolicyService.create`, `RegulatoryChangeService.create` |
+| `bcm.service.crisis` | `CrisisCommsService.createTemplate` + `createAudience` |
+
+Verified safe (use safer DTO-construct pattern, no fix needed): approvals,
+audit_lc.FindingService, audit_eng.AuditEngagementService, bcm.cycle.CrisisAarService,
+bcm_lc.InvocationService, board_pack, capa, change_mgmt,
+compliance.AuditEngagementService, cyber_lc.VulnerabilityService,
+evidence (×3), ethics (×4), incident, nca_ecc.
+
+**Sprint-6 proposal**: introduce a platform-wide AOP defense (annotation
+or BaseEntity `@PrePersist` hook) so future write endpoints can't
+reintroduce this class of bug. The per-service `setId(null)` is correct
+but easy to forget on the next service.
+
+### Timezone hardening
+
+`Dockerfile` + `GrcApplication.main()` both pin `user.timezone=Asia/Riyadh`.
+Operator can override via `-e JAVA_OPTS="... -Duser.timezone=..."` for
+future multi-region deployments. Jackson's `spring.jackson.time-zone: UTC`
+unchanged — wire format remains UTC, wall-clock reads now Riyadh. The
+100+ existing `LocalDate.now()` callsites pick up the new default
+automatically; no code changes needed across services.
+
+### UI polish (PR #120)
+
+Cross-cutting CSS upgrade dropped into every consumer of the shared
+primitives:
+- **Tables**: sticky `<th>`, smooth row-hover, zebra striping, fade-in on data refresh.
+- **Tabs**: `:focus-visible` keyboard ring; `[aria-disabled]` dimmed state.
+- **Cards**: smooth elevation transition; opt-in `.card-interactive` lift-on-hover.
+
+### Saudi-native ErrorState (PR #119)
+
+Closes the loop on PR #117's backend ProblemDetail. New `lib/apiError.ts`
+extractor + bilingual ErrorState. When a module's tables aren't bootstrapped,
+the user sees a friendly card with `python setup_<module>_db.py` and a
+copy-to-clipboard button — in their selected language — instead of a
+generic English failure.
+
+---
+
+## 🟢 Earlier — Committees outage closeout (22 May 2026, PRs #114 → #117)
 
 `/committees` and `/committees/catalog` were throwing 500s on dev installs
 that hadn't bootstrapped the V154–V159 committees schema yet. Four PRs
