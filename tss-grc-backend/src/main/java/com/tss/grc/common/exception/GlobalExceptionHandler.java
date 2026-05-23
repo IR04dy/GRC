@@ -1,19 +1,23 @@
 package com.tss.grc.common.exception;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
@@ -262,12 +266,108 @@ public class GlobalExceptionHandler {
         return cur.getMessage();
     }
 
+    /**
+     * Malformed JSON in the request body (e.g. user sent invalid syntax,
+     * unknown field, wrong type). Without this handler Spring's default was
+     * to throw, get caught by {@link #handleGeneral}, and surface as a
+     * misleading "Internal Server Error" — when really it was a 400 client
+     * mistake. The detail message includes the part of the body that the
+     * Jackson parser stumbled on.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException ex) {
+        String detail = "The request body could not be parsed as JSON.";
+        // Most readable bit of the error chain — Jackson typically gives
+        // "Cannot deserialize value of type X from String '...'" or similar.
+        String root = rootMessage(ex);
+        if (root != null && !root.isBlank()) {
+            // Trim noisy framework prefixes the user can't act on.
+            String trimmed = root.replaceFirst("^JSON parse error: ", "");
+            detail = "Could not parse request body: " + trimmed;
+        }
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        pd.setTitle("Malformed Request Body");
+        pd.setType(URI.create("https://grc.tss.com/errors/bad-request"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * Path variable or query param of the wrong type (e.g. "abc" for an
+     * `int id` path variable, or "yesterday" for a `LocalDate` query param).
+     * Spring's default behaviour escalated this to handleGeneral too,
+     * which is wrong — it's a client error, not a server error.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String required = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "the expected type";
+        String detail = String.format(
+            "Parameter '%s' could not be parsed as %s (got '%s').",
+            ex.getName(), required, String.valueOf(ex.getValue())
+        );
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        pd.setTitle("Invalid Parameter Type");
+        pd.setType(URI.create("https://grc.tss.com/errors/bad-request"));
+        pd.setProperty("parameter", ex.getName());
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * Required query parameter missing — e.g. `?from=` left off when the
+     * controller declared {@code @RequestParam(required = true)}.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail handleMissingParam(MissingServletRequestParameterException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
+            HttpStatus.BAD_REQUEST,
+            "Required " + ex.getParameterType() + " parameter '" + ex.getParameterName() + "' is missing.");
+        pd.setTitle("Missing Required Parameter");
+        pd.setType(URI.create("https://grc.tss.com/errors/bad-request"));
+        pd.setProperty("parameter", ex.getParameterName());
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * Bean Validation constraint violation surfaced from inside a service
+     * (typically a {@code @Validated} method-level check). Without this,
+     * Hibernate's constraint failures bubbled up as 500.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ProblemDetail handleConstraint(ConstraintViolationException ex) {
+        String detail = ex.getConstraintViolations().stream()
+            .map(v -> v.getPropertyPath() + " " + v.getMessage())
+            .collect(Collectors.joining("; "));
+        if (detail.isBlank()) detail = "Validation failed.";
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        pd.setTitle("Validation Failed");
+        pd.setType(URI.create("https://grc.tss.com/errors/validation"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * Catch-all for any exception that wasn't recognised above. Stays a 500
+     * — these are genuine server errors that need investigating.
+     *
+     * <p>Returns a detail message that includes the exception class name +
+     * its root message so the developer can grep the server log straight
+     * from the toast text. The {@code rootCause} property carries the same
+     * for structured access. Real bugs surface clearly instead of hiding
+     * behind "An unexpected error occurred."
+     */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneral(Exception ex) {
         log.error("Unhandled exception [{}]: {}", ex.getClass().getName(), ex.getMessage(), ex);
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.");
+        String root = rootMessage(ex);
+        String detail = ex.getClass().getSimpleName()
+            + (root != null && !root.isBlank() ? ": " + root : "");
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detail);
         pd.setTitle("Internal Server Error");
         pd.setType(URI.create("https://grc.tss.com/errors/internal"));
+        pd.setProperty("exception", ex.getClass().getName());
+        pd.setProperty("rootCause", root);
         pd.setProperty("timestamp", Instant.now());
         return pd;
     }
