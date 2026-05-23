@@ -724,6 +724,156 @@ if ndi_cycle_id:
         )
 
 # ──────────────────────────────────────────────────────────────────────
+# Climate risks & opportunities — TCFD physical + transition
+# ──────────────────────────────────────────────────────────────────────
+section("sust.climate_risk_opportunity — TCFD physical + transition")
+
+CROS = [
+    # (code, kind, category, title_en, title_ar, horizon, likelihood, impact, status, fin_impact_sar)
+    ("CRO-001", "RISK",        "ACUTE_PHYSICAL",  "Extreme heat days disrupting Riyadh branch ops",
+                                                  "أيام الحرّ الشديد تؤثّر على عمليات فروع الرياض",
+                                                  "SHORT",  4, 4, "ASSESSED",   12000000),
+    ("CRO-002", "RISK",        "CHRONIC_PHYSICAL","Sea-level rise — Eastern Province coastal branches",
+                                                  "ارتفاع منسوب البحر — فروع المنطقة الشرقية الساحلية",
+                                                  "LONG",   3, 4, "IDENTIFIED",  35000000),
+    ("CRO-003", "RISK",        "TRANSITION",      "Carbon price escalation on Scope-3 financed emissions",
+                                                  "ارتفاع تسعير الكربون على انبعاثات النطاق 3 المموَّلة",
+                                                  "MEDIUM", 4, 5, "ASSESSED",   85000000),
+    ("CRO-004", "RISK",        "REGULATORY",      "CMA Art.91-94 disclosure compliance gap",
+                                                  "فجوة الامتثال للإفصاح وفقاً لمواد 91-94 لهيئة السوق",
+                                                  "SHORT",  3, 3, "TREATED",     5000000),
+    ("CRO-005", "RISK",        "LITIGATION",      "Climate-related lawsuit risk on financed projects",
+                                                  "مخاطر دعاوى قضائية مرتبطة بالمناخ على مشاريع مموَّلة",
+                                                  "MEDIUM", 2, 4, "IDENTIFIED",  20000000),
+    ("CRO-006", "RISK",        "REPUTATIONAL",    "ESG-rating downgrade if scope-3 reduction missed",
+                                                  "تراجع التصنيف ESG عند فوات هدف خفض النطاق 3",
+                                                  "MEDIUM", 3, 4, "ASSESSED",   15000000),
+    ("CRO-007", "OPPORTUNITY", "PRODUCTS",        "Green Sukuk issuance pipeline 2026-2028",
+                                                  "خط إصدار الصكوك الخضراء 2026-2028",
+                                                  "MEDIUM", 4, 5, "TREATED",    450000000),
+    ("CRO-008", "OPPORTUNITY", "MARKETS",         "Sustainable supply-chain finance for KSA SMEs",
+                                                  "تمويل السلاسل المستدامة للشركات السعودية الصغيرة",
+                                                  "MEDIUM", 4, 4, "ASSESSED",   180000000),
+    ("CRO-009", "OPPORTUNITY", "ENERGY_SOURCE",   "Solar-powered branch programme (12 sites by 2027)",
+                                                  "برنامج الفروع المُغذّاة بالطاقة الشمسية (12 موقعاً)",
+                                                  "SHORT",  4, 3, "TREATED",     8000000),
+    ("CRO-010", "OPPORTUNITY", "RESILIENCE",      "Climate-resilient HQ + Data-Centre upgrade",
+                                                  "تحديث المقر ومركز البيانات بمقاومة المناخ",
+                                                  "LONG",   3, 4, "IDENTIFIED",  60000000),
+]
+for code, kind, cat, t_en, t_ar, horizon, lik, imp, status, fin in CROS:
+    risk_score = lik * imp
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM sust.climate_risk_opportunity
+                       WHERE item_code = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO sust.climate_risk_opportunity (organisation_id, external_id, item_code,
+            reporting_year, kind, category, title_en, title_ar, description_en, description_ar,
+            time_horizon, likelihood, impact, risk_score, financial_impact_sar,
+            owner_name, status, identified_at, is_deleted, created_at)
+        VALUES (?, NEWID(), ?, 2026, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), 0, GETDATE())
+        """,
+        code, ORG_TSS,
+        ORG_TSS, code, kind, cat, t_en, t_ar,
+        f"TCFD-aligned {kind.lower()} reviewed in 2026 climate workshop.",
+        f"بند {('فرصة' if kind == 'OPPORTUNITY' else 'مخاطرة')} متوافق مع TCFD روجع في ورشة المناخ 2026.",
+        horizon, lik, imp, risk_score, fin, "Sarah Al-Qahtani", status,
+        label=f"CRO: [{kind}/{cat}] {t_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# Audit findings — IA + external engagements
+# ──────────────────────────────────────────────────────────────────────
+section("audit_lc.findings — Internal & external audit findings")
+
+# Engagement code default. The audit_lc.findings table requires a non-null
+# engagement_code; existing rows may use various codes — we use a stable default.
+DEFAULT_ENG_CODE = "IA-2026-001"
+
+FINDINGS = [
+    # (ref, title_en, title_ar, severity, status, condition_en, condition_ar)
+    ("F-2026-001", "Privileged access not reviewed quarterly",
+                   "صلاحيات الوصول المميَّز لم تُراجع ربعياً",
+                   "HIGH",    "IN_PROGRESS",
+                   "Sample of 20 PAM accounts; 7 lacked Q4 2025 attestation evidence.",
+                   "عيّنة 20 حساباً مميَّزاً، 7 منها بلا دليل مصادقة للربع الرابع 2025."),
+    ("F-2026-002", "BCP plan version older than 12 months",
+                   "إصدار خطة استمرارية الأعمال أقدم من 12 شهراً",
+                   "MEDIUM",  "OPEN",
+                   "BCP version 3.2 effective 2024-11-04; ISO 22301 §8.4.4 requires annual review.",
+                   "الإصدار 3.2 ساري من 2024-11-04، أيزو 22301 §8.4.4 يستوجب مراجعة سنوية."),
+    ("F-2026-003", "Vendor exit plans missing for 3 critical suppliers",
+                   "خطط الخروج مفقودة لـ 3 مورّدين حرجين",
+                   "HIGH",    "OPEN",
+                   "STC Cloud, Microsoft Saudi, AWS — no documented exit playbook.",
+                   "STC Cloud، Microsoft Saudi، AWS — لا توجد خطة خروج موثَّقة."),
+    ("F-2026-004", "DSR SLA exceeded for 2 of 38 cases in Q1",
+                   "تجاوز SLA لطلبات أصحاب البيانات في 2 من 38 حالة بالربع الأول",
+                   "MEDIUM",  "REMEDIATED",
+                   "PDPL Art.4 sets 30-day SLA; 2 cases breached by 4 and 9 days respectively.",
+                   "المادة 4 من PDPL تشترط 30 يوماً، حالتان تجاوزتا بـ 4 و 9 أيام على التوالي."),
+    ("F-2026-005", "Encryption-at-rest gap on archived backups",
+                   "فجوة في تشفير النسخ الاحتياطية المؤرشفة",
+                   "CRITICAL","IN_PROGRESS",
+                   "Tape backups older than 2024 stored unencrypted in off-site vault.",
+                   "النسخ على شرائط أقدم من 2024 مخزّنة دون تشفير في الخزينة الخارجية."),
+    ("F-2026-006", "Segregation of duties — payment-file uploader = approver",
+                   "فصل المهام — مُحمِّل ملف المدفوعات هو نفسه المعتمِد",
+                   "HIGH",    "VERIFIED",
+                   "User M.Otaibi can both upload and approve outgoing SADAD batches.",
+                   "المستخدم M.Otaibi يستطيع رفع واعتماد دفعات SADAD الصادرة."),
+    ("F-2026-007", "Risk register — 14 of 50 risks lack residual score",
+                   "سجل المخاطر — 14 من 50 خطراً بلا درجة متبقية",
+                   "MEDIUM",  "IN_PROGRESS",
+                   "After-control residual likelihood/impact missing on 28% of register.",
+                   "بعد الضوابط، الاحتمال/الأثر المتبقي مفقود في 28% من السجل."),
+    ("F-2026-008", "KRI thresholds not re-baselined annually",
+                   "حدود KRI لم يُعَد ضبطها سنوياً",
+                   "LOW",     "OPEN",
+                   "Sample of 8 KRIs; thresholds set in 2024 still in force.",
+                   "عيّنة 8 مؤشّرات؛ الحدود المضبوطة 2024 ما زالت سارية."),
+    ("F-2026-009", "Cross-border transfer log missing safeguard evidence",
+                   "سجل النقل خارج الحدود يفتقر إلى أدلة الضمانات",
+                   "HIGH",    "OPEN",
+                   "PDPL Art.29 — 4 of 12 active transfers lack SCC or adequacy decision PDF.",
+                   "PDPL المادة 29 — 4 من 12 عملية نقل بلا عقود قياسية أو قرار كفاية."),
+    ("F-2026-010", "Incident lessons-learned not captured for 3 SOC closures",
+                   "الدروس المستفادة لم تُسجَّل لـ 3 حوادث مغلقة في SOC",
+                   "LOW",     "REMEDIATED",
+                   "Q1 2026 sample; 3 of 14 closed cases skipped lessons-learned narrative.",
+                   "عيّنة Q1 2026، 3 من 14 حالة مغلقة تخطّت سرد الدروس المستفادة."),
+    ("F-2026-011", "Penetration-test report findings not tracked to closure",
+                   "ملاحظات اختبار الاختراق غير مُتتبّعة حتى الإغلاق",
+                   "MEDIUM",  "OPEN",
+                   "2024 external pentest had 12 highs; 5 still without remediation owner.",
+                   "اختبار الاختراق الخارجي 2024 سجّل 12 ملاحظة عالية، 5 منها بلا مسؤول معالجة."),
+    ("F-2026-012", "Committee meeting quorum not enforced in minutes template",
+                   "النصاب القانوني للاجتماع غير مُلزَم في قالب المحاضر",
+                   "LOW",     "VERIFIED",
+                   "Charter requires 60% quorum; minutes template lacks quorum-met checkbox.",
+                   "الميثاق يستوجب 60% نصاب، قالب المحاضر يفتقر إلى مربّع تحقّق النصاب."),
+]
+for i, (ref, t_en, t_ar, sev, status, cond_en, cond_ar) in enumerate(FINDINGS):
+    days_ago = 10 + i * 5  # spread raised_at across last 12 weeks
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM audit_lc.findings
+                       WHERE ref_number = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO audit_lc.findings (external_id, organisation_id, engagement_code, ref_number,
+            title_en, title_ar, severity, status, condition_en, condition_ar,
+            recommendation_en, recommendation_ar, target_date, owner_role, raised_at, is_deleted)
+        VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            DATEADD(day, 60, CAST(GETDATE() AS DATE)), 'CISO',
+            DATEADD(day, -{days_ago}, GETDATE()), 0)
+        """,
+        ref, ORG_TSS,
+        ORG_TSS, DEFAULT_ENG_CODE, ref, t_en, t_ar, sev, status, cond_en, cond_ar,
+        "Establish a quarterly review cadence with documented evidence and owner sign-off.",
+        "وضع دورة مراجعة ربعية مع توثيق الأدلة وموافقة المالك.",
+        label=f"finding: [{sev}] {ref} {t_en[:40]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
 print(f"  inserted: {inserted}")
 print(f"  skipped (already present): {skipped}")
