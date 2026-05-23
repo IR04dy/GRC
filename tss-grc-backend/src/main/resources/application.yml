@@ -195,6 +195,24 @@ grc:
         initial-delay-ms: 500
         backoff-multiplier: 2.0
 
+    # CrowdStrike Falcon EDR bridge (slice 3 — see docs/integrations/CROWDSTRIKE.md).
+    # OAuth2 client credentials; KSA-resident EU-1 cloud by default.
+    # Pulls /detects into socops.security_event; pushes host containment
+    # via /devices/entities/devices-actions/v2.
+    crowdstrike:
+      enabled: false                              # master kill-switch
+      mode: STUB                                  # STUB (in-memory) | LIVE (real Falcon HTTPS)
+      base-url: "https://api.eu-1.crowdstrike.com"
+      client-id: ${CROWDSTRIKE_CLIENT_ID:}
+      client-secret: ${CROWDSTRIKE_CLIENT_SECRET:}
+      polling-interval-seconds: 60
+      polling-enabled: false                      # independent — manual poll first, then enable loop
+      retry:
+        max-attempts: 3
+        initial-delay-ms: 500
+        backoff-multiplier: 2.0
+      timeout-ms: 5000
+
   # BCM module — Slice 9-D Continuity Strategy ROI
   # Discount rate used for NPV calculation across the planning horizon.
   # Default 8% = SAMA reference repo rate (2026 figure). Override via

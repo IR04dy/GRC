@@ -82,6 +82,16 @@ grc:
       default-index: tss_grc_dev
       default-sourcetype: grc:event:json
 
+    # CrowdStrike Falcon EDR — enabled in STUB so the SOC routes work
+    # out of the box. The scheduled poll loop stays OFF in dev so we don't
+    # spam the audit log with synthetic detections on every boot.
+    crowdstrike:
+      enabled: true
+      mode: STUB
+      base-url: "https://api.eu-1.crowdstrike.com"
+      polling-enabled: false
+      polling-interval-seconds: 60
+
 springdoc:
   swagger-ui:
     enabled: true
