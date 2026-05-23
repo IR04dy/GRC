@@ -176,3 +176,21 @@ grc:
         impact: 3                                 # ServiceNow 1=high, 3=low
         urgency: 3
         category: Security
+
+    # Splunk SIEM bridge (slice 2 — see docs/integrations/SPLUNK.md).
+    # HEC token auth (not OAuth). Push pulls from socops.security_event;
+    # webhook accepts Splunk saved-search alerts.
+    splunk:
+      enabled: false                              # default OFF; flip per-env
+      mode: STUB                                  # STUB (in-memory) | LIVE (real HEC HTTP)
+      hec-url: https://splunk.example.sa:8088/services/collector/event
+      hec-token: ${SPLUNK_HEC_TOKEN:}
+      default-index: tss_grc
+      default-sourcetype: grc:event:json
+      verify-ssl: true
+      timeout-ms: 5000
+      webhook-shared-secret: ${SPLUNK_WEBHOOK_SECRET:}
+      retry:
+        max-attempts: 3
+        initial-delay-ms: 500
+        backoff-multiplier: 2.0

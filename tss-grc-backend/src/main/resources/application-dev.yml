@@ -72,6 +72,16 @@ grc:
       mode: STUB
       base-url: https://acme-dev.service-now.com
 
+    # Splunk SIEM bridge — enabled in STUB so the SOC routes work
+    # out of the box. Flip mode=LIVE + set SPLUNK_HEC_TOKEN to talk
+    # to a real HEC endpoint.
+    splunk:
+      enabled: true
+      mode: STUB
+      hec-url: https://splunk-dev.example.sa:8088/services/collector/event
+      default-index: tss_grc_dev
+      default-sourcetype: grc:event:json
+
 springdoc:
   swagger-ui:
     enabled: true
