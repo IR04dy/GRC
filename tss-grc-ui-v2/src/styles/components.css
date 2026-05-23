@@ -1814,6 +1814,134 @@ tr:hover .row-actions { opacity: 1; }
 .tabs::-webkit-scrollbar { height: 6px; }
 .tabs::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--r-pill); }
 
+/* ─── Design-system utilities (Slice 1) ──────────────
+   Reusable layout + typography helpers introduced 2026-05 to retire the
+   repeated inline `style={{...}}` patterns scattered across operational
+   pages (CrisisRoomPage was the seed). Adding new utilities here keeps
+   the design-system tokens canonical and stops pages from reinventing
+   the same grid/flex/font combinations. */
+
+/* Auto-fit KPI tile grids. The "minmax" lets cards reflow on narrow
+   screens without media queries. -sm = denser tile (170px); the default
+   matches the existing .kpi card width (220px). */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.kpi-grid-sm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.kpi-grid-xs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+/* Two-pane operational layouts (list | detail). The narrow variant is
+   for register-style left rails (Crisis Room, Incident Console, etc.). */
+.split-pane {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+}
+.split-pane-wide {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .split-pane, .split-pane-wide { grid-template-columns: 1fr; }
+}
+
+/* Timeline list — used by SitRep / Decision / Notification streams and
+   the EntityActivityTimeline. Reset list semantics + per-item card. */
+.timeline-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0 0;
+  display: grid;
+  gap: 8px;
+}
+.timeline-item {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+}
+.timeline-item-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.timeline-item-body { margin-top: 6px; font-size: 13px; }
+/* Meta line in a timeline item — composes with .text-muted when the
+   line should read as secondary (the color is intentionally not baked
+   in so callers can use .text-muted explicitly). */
+.timeline-item-meta {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Stack — vertical rhythm without per-element margin hacks. */
+.stack { display: grid; gap: 12px; }
+.stack-sm { display: grid; gap: 8px; }
+.stack-xs { display: grid; gap: 4px; }
+
+/* Row helpers — flex with sensible defaults for chip/badge rows,
+   transition button rows, header bars, etc. */
+.row { display: flex; gap: 6px; flex-wrap: wrap; }
+.row-tight { display: flex; gap: 4px; flex-wrap: wrap; }
+.row-gap-sm { display: flex; gap: 6px; }
+.row-gap-md { display: flex; gap: 10px; }
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.row-baseline { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+
+/* Typography utilities. The design system tokenises common font sizes
+   used inline across pages. Keep these aligned to the kit type ramp. */
+.text-xs { font-size: 11px; }
+.text-sm { font-size: 12px; }
+.text-md { font-size: 13px; }
+.text-lg { font-size: 15px; }
+.text-bold { font-weight: 600; }
+.text-bolder { font-weight: 700; }
+.text-relaxed { line-height: 1.6; }
+
+/* Tight margin helpers — common offsets used after KPI strips,
+   between sections, etc. */
+.mt-xs { margin-top: 4px; }
+.mt-sm { margin-top: 6px; }
+.mt-md { margin-top: 10px; }
+.mt-lg { margin-top: 14px; }
+.mb-sm { margin-bottom: 6px; }
+.mb-md { margin-bottom: 12px; }
+
+/* Operational event-list row (left rail of the split-pane). Hover +
+   selected affordances mirror the .ss-item pattern but for plain <li>. */
+.event-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.event-list-item {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.event-list-item:hover {
+  background: var(--surface-2);
+  border-color: var(--primary-200);
+}
+.event-list-item.is-selected {
+  background: var(--primary-50);
+  border-color: var(--primary-300);
+}
+
 /* ─── Animations ─────────────────────────────────── */
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop-in {

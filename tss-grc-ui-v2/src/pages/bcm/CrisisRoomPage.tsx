@@ -271,7 +271,7 @@ export function CrisisRoomPage() {
         </Button>}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>
+      <div className="kpi-grid-sm">
         <Kpi Icon={Siren}        label={isAr ? 'أزمات نشطة'    : 'Active events'}       value={stats.active ?? 0}        tone="danger" />
         <Kpi Icon={ShieldAlert}  label={isAr ? 'شدة عالية'     : 'High severity (≥4)'}  value={stats.high_severity ?? 0} tone="danger" />
         <Kpi Icon={AlertTriangle} label={isAr ? 'قيد التقييم'  : 'Assessing'}           value={stats.assessing ?? 0}     tone="warning" />
@@ -293,34 +293,32 @@ export function CrisisRoomPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+      <div className="split-pane">
         {/* ── Left: event list ── */}
         <Card title={isAr ? 'الأزمات' : 'Events'}>
           {loading && (
-            <div className="text-muted" style={{ fontSize: 11, marginBottom: 6 }}>
+            <div className="text-muted text-xs mb-sm">
               {isAr ? 'جارٍ التحميل…' : 'Loading…'}
             </div>
           )}
           {events.length === 0 ? (
             <InlineEmpty text={isAr ? 'لا توجد أزمات بعد' : 'No events yet'} />
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 4 }}>
+            <ul className="event-list">
               {events.map(e => (
                 <li key={e.id}>
                   <button
                     onClick={() => void loadDetail(e.id)}
+                    className={`event-list-item${selected?.id === e.id ? ' is-selected' : ''}`}
                     style={{
                       width: '100%', textAlign: 'start',
-                      padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
-                      background: selected?.id === e.id ? 'var(--surface-2)' : 'transparent',
-                      border: '1px solid var(--border)',
                       display: 'grid', gap: 4,
                     }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span className="mono" style={{ fontSize: 11 }}>{e.eventCode}</span>
+                    <div className="row-between">
+                      <span className="mono text-xs">{e.eventCode}</span>
                       <Badge tone={severityTone(e.severity)}>sev {e.severity}</Badge>
                     </div>
-                    <div style={{ fontSize: 12 }}>{e.titleEn}</div>
+                    <div className="text-sm">{e.titleEn}</div>
                     <Badge tone={statusTone(e.status)}>{e.status}</Badge>
                   </button>
                 </li>
@@ -330,7 +328,7 @@ export function CrisisRoomPage() {
         </Card>
 
         {/* ── Right: selected event detail ── */}
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className="stack">
           {!selected ? (
             <Card title={isAr ? 'تفاصيل الأزمة' : 'Event details'}>
               <InlineEmpty text={isAr ? 'اختر أزمة من القائمة' : 'Pick an event from the list'} />
@@ -344,7 +342,7 @@ export function CrisisRoomPage() {
                         <Download size={14} /> {isAr ? 'تقرير PDF' : 'After-action PDF'}
                       </Button>
                     }>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, fontSize: 12 }}>
+                <div className="kpi-grid-xs text-sm">
                   <div><span className="text-muted">{isAr ? 'الشدة' : 'Severity'}: </span>
                     <Badge tone={severityTone(selected.severity)}>
                       {selected.severity} — {isAr ? SEVERITY_LABELS[selected.severity]?.ar : SEVERITY_LABELS[selected.severity]?.en}
@@ -365,18 +363,18 @@ export function CrisisRoomPage() {
                   </div>
                 </div>
 
-                <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div className="row mt-md">
                   {selected.personalDataAffected && <Badge tone="danger">{isAr ? 'بيانات شخصية متأثرة' : 'Personal data affected'}</Badge>}
                   {selected.cyberRelated && <Badge tone="danger">{isAr ? 'مرتبط بالأمن السيبراني' : 'Cyber-related'}</Badge>}
                   {selected.supplierInvolved && <Badge tone="warning">{isAr ? 'تورّط مورّد' : 'Supplier involved'}</Badge>}
                 </div>
 
                 {selected.description && (
-                  <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.6 }}>{selected.description}</div>
+                  <div className="mt-md text-md text-relaxed">{selected.description}</div>
                 )}
 
-                <div style={{ marginTop: 14, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span className="text-muted" style={{ fontSize: 11 }}>{isAr ? 'الانتقال' : 'Transition'}:</span>
+                <div className="row mt-lg" style={{ alignItems: 'center' }}>
+                  <span className="text-muted text-xs">{isAr ? 'الانتقال' : 'Transition'}:</span>
                   {NEXT_STATUSES[selected.status].map(s => {
                     const blocked = s === 'CLOSED' && closureBlocked;
                     return (
@@ -386,7 +384,7 @@ export function CrisisRoomPage() {
                     );
                   })}
                   {closureBlocked && (
-                    <span className="text-muted" style={{ fontSize: 11 }}>
+                    <span className="text-muted text-xs">
                       {isAr
                         ? 'لا يمكن الإغلاق قبل تسجيل السبب الجذري وربط درس مستفاد'
                         : 'Cannot close until root cause + lessons-learned are set'}
@@ -394,7 +392,7 @@ export function CrisisRoomPage() {
                   )}
                 </div>
 
-                <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div className="row mt-sm">
                   <Button variant="secondary" onClick={handleActivateBcp}>
                     {isAr ? 'تفعيل BCP' : 'Activate BCP'}
                   </Button>
@@ -404,7 +402,7 @@ export function CrisisRoomPage() {
                 </div>
 
                 {(selected.relatedBcpIdsJson || selected.relatedDrpIdsJson) && (
-                  <div className="text-muted" style={{ marginTop: 10, fontSize: 11 }}>
+                  <div className="text-muted text-xs mt-md">
                     {selected.relatedBcpIdsJson && <>BCPs: <span className="mono">{selected.relatedBcpIdsJson}</span> · </>}
                     {selected.relatedDrpIdsJson && <>DRPs: <span className="mono">{selected.relatedDrpIdsJson}</span></>}
                   </div>
@@ -417,17 +415,17 @@ export function CrisisRoomPage() {
                 {sitreps.length === 0 ? (
                   <InlineEmpty text={isAr ? 'لم يُسجَّل أي تقرير بعد' : 'No SitReps yet'} />
                 ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, marginTop: 12, display: 'grid', gap: 8 }}>
+                  <ul className="timeline-list">
                     {sitreps.map(s => (
-                      <li key={s.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                      <li key={s.id} className="timeline-item">
+                        <div className="timeline-item-header">
                           <span className="mono">{s.reportedAt.slice(0, 16)}</span>
-                          <div style={{ display: 'flex', gap: 6 }}>
+                          <div className="row-gap-sm">
                             {s.statusUpdate && <Badge tone="info">{s.statusUpdate}</Badge>}
                             {s.severityChange && <Badge tone={severityTone(s.severityChange)}>sev → {s.severityChange}</Badge>}
                           </div>
                         </div>
-                        <div style={{ marginTop: 6, fontSize: 13 }}>{s.summary}</div>
+                        <div className="timeline-item-body">{s.summary}</div>
                       </li>
                     ))}
                   </ul>
@@ -440,16 +438,16 @@ export function CrisisRoomPage() {
                 {decisions.length === 0 ? (
                   <InlineEmpty text={isAr ? 'لم تُسجَّل قرارات' : 'No decisions yet'} />
                 ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, marginTop: 12, display: 'grid', gap: 8 }}>
+                  <ul className="timeline-list">
                     {decisions.map(d => (
-                      <li key={d.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                      <li key={d.id} className="timeline-item">
+                        <div className="timeline-item-header">
                           <span><Gavel size={11} /> <span className="mono">{d.decidedAt.slice(0, 16)}</span></span>
                           <span className="text-muted">{d.decidedByName ?? `user#${d.decidedBy ?? '?'}`}</span>
                         </div>
-                        <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600 }}>{d.decisionText}</div>
-                        {d.rationale       && <div className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>{isAr ? 'المبرر' : 'Rationale'}: {d.rationale}</div>}
-                        {d.actionRequired  && <div style={{ fontSize: 12, marginTop: 4 }}><Badge tone="warning">{isAr ? 'إجراء مطلوب' : 'Action'}</Badge> {d.actionRequired}</div>}
+                        <div className="timeline-item-body text-bold">{d.decisionText}</div>
+                        {d.rationale       && <div className="text-muted timeline-item-meta">{isAr ? 'المبرر' : 'Rationale'}: {d.rationale}</div>}
+                        {d.actionRequired  && <div className="timeline-item-meta"><Badge tone="warning">{isAr ? 'إجراء مطلوب' : 'Action'}</Badge> {d.actionRequired}</div>}
                       </li>
                     ))}
                   </ul>
@@ -462,10 +460,10 @@ export function CrisisRoomPage() {
                 {regNotifs.length === 0 ? (
                   <InlineEmpty text={isAr ? 'لم تُرسل إخطارات' : 'No notifications yet'} />
                 ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, marginTop: 12, display: 'grid', gap: 8 }}>
+                  <ul className="timeline-list">
                     {regNotifs.map(n => (
-                      <li key={n.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                      <li key={n.id} className="timeline-item">
+                        <div className="row-between text-sm">
                           <div>
                             <Badge tone="info">{n.regulator}</Badge>
                             <span className="mono" style={{ marginInlineStart: 6 }}>{n.notifiedAt.slice(0, 16)}</span>
@@ -477,7 +475,7 @@ export function CrisisRoomPage() {
                                 {isAr ? 'تسجيل الإقرار' : 'Record ack'}
                               </Button>}
                         </div>
-                        {n.bodySummary && <div style={{ marginTop: 6, fontSize: 12 }}>{n.bodySummary}</div>}
+                        {n.bodySummary && <div className="mt-sm text-sm">{n.bodySummary}</div>}
                       </li>
                     ))}
                   </ul>
