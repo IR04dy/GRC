@@ -1106,6 +1106,190 @@ for name, role, phone, email, level, status, last_test in CONTACTS:
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# KRI breaches — risk_lc.kri_breaches
+# ──────────────────────────────────────────────────────────────────────
+section("risk_lc.kri_breaches — KRI threshold breach events")
+
+# Pick the first 10 risk ids dynamically so the FK is valid even on
+# fresh DBs where the seeded risks may start at a different id.
+cur.execute(
+    "SELECT TOP 10 id FROM risk.risks WHERE is_deleted=0 AND organisation_id=? ORDER BY id",
+    ORG_TSS,
+)
+risk_ids = [r[0] for r in cur.fetchall()]
+print(f"  found {len(risk_ids)} risks to link KRI breaches to")
+
+if risk_ids:
+    KRI_BREACHES = [
+        # (kri_code, name_en, name_ar, threshold, actual, direction, status, owner, days_ago)
+        ("KRI-FRAUD-01",   "Fraud loss rate (bps)",
+                           "نسبة خسائر الاحتيال (bps)",            5.0,  7.2,  "HIGH",  "OPEN",        "Faisal Al-Dosari",  3),
+        ("KRI-AML-02",    "Open AML alerts > 30 days",
+                          "تنبيهات غسل الأموال المفتوحة > 30 يوماً", 25, 42,    "HIGH",  "IN_PROGRESS", "Reema Al-Asiri",    8),
+        ("KRI-SLA-03",    "Customer complaint resolution > 5 days",
+                          "حل شكاوى العملاء > 5 أيام",              10, 14,    "HIGH",  "IN_PROGRESS", "Layla Al-Ghamdi",   2),
+        ("KRI-CYBER-04",  "Critical patches > 30 days overdue",
+                          "ترقيات حرجة متأخّرة > 30 يوماً",          0,  3,     "HIGH",  "OPEN",        "Khalid Al-Shehri",  1),
+        ("KRI-OPS-05",    "Branch service availability (%)",
+                          "توفّر خدمة الفرع (%)",                   99.5, 98.2, "LOW",   "OPEN",        "Sarah Al-Qahtani",  5),
+        ("KRI-OPS-06",    "ATM uptime (%)",
+                          "توفّر أجهزة الصراف الآلي (%)",           99.8, 99.1, "LOW",   "RESOLVED",    "Bandar Al-Rashidi", 25),
+        ("KRI-FRAUD-07",  "Card-not-present chargeback ratio (bps)",
+                          "نسبة استرداد المعاملات دون البطاقة (bps)", 4.0,  6.5,  "HIGH",  "IN_PROGRESS", "Sarah Al-Qahtani",  12),
+        ("KRI-PDPL-08",   "DSR cases breaching 30-day SLA",
+                          "حالات طلبات أصحاب البيانات المتجاوزة SLA 30 يوماً", 0,  2, "HIGH", "RESOLVED", "Reema Al-Asiri",    33),
+        ("KRI-IT-09",     "Production incidents per month",
+                          "حوادث الإنتاج شهرياً",                    5,   8,     "HIGH",  "OPEN",        "Bandar Al-Rashidi", 4),
+        ("KRI-RISK-10",   "Risk acceptances > 90 days unresolved",
+                          "قبول مخاطرة > 90 يوماً دون حل",            5,   7,     "HIGH",  "OPEN",        "Khalid Al-Shehri",  18),
+        ("KRI-BCM-11",    "DR-test failure rate (%)",
+                          "نسبة فشل تمارين التعافي (%)",            10.0, 18.0, "HIGH",  "IN_PROGRESS", "Saud Al-Harbi",     45),
+        ("KRI-TPRM-12",   "Critical vendors with expired security review",
+                          "موردون حرجون بتقييم أمني منتهي",           0,   2,     "HIGH",  "IN_PROGRESS", "Sarah Al-Qahtani",  9),
+    ]
+    for i, (code, name_en, name_ar, threshold, actual, direction, status, owner, days_ago) in enumerate(KRI_BREACHES):
+        rid = risk_ids[i % len(risk_ids)]
+        run(
+            f"""
+            IF NOT EXISTS (SELECT 1 FROM risk_lc.kri_breaches
+                           WHERE kri_code = ? AND organisation_id = ? AND is_deleted = 0)
+            INSERT INTO risk_lc.kri_breaches (external_id, organisation_id, risk_id,
+                kri_code, kri_name_en, kri_name_ar, threshold_value, actual_value,
+                direction, detected_at, status, current_owner, is_deleted)
+            VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?,
+                DATEADD(day, -{days_ago}, GETDATE()), ?, ?, 0)
+            """,
+            code, ORG_TSS,
+            ORG_TSS, rid, code, name_en, name_ar, threshold, actual, direction, status, owner,
+            label=f"KRI breach: [{status}] {code} thr={threshold} actual={actual}",
+        )
+
+# ──────────────────────────────────────────────────────────────────────
+# Board packs — quarterly + annual + AGM
+# ──────────────────────────────────────────────────────────────────────
+section("board_pack.packs — quarterly + annual board packs")
+
+BOARD_PACKS = [
+    # (title_en, title_ar, period, p_start, p_end, audience, status, drafted_by)
+    ("Q1 2026 Board Pack — Risk + Cyber + ESG",
+     "حزمة مجلس الإدارة Q1 2026 — مخاطر + سيبراني + استدامة",
+     "2026-Q1", "2026-01-01", "2026-03-31", "BOARD",          "APPROVED",     "Sarah Al-Qahtani"),
+    ("Q2 2026 Board Pack — Mid-year posture",
+     "حزمة مجلس الإدارة Q2 2026 — موقف منتصف العام",
+     "2026-Q2", "2026-04-01", "2026-06-30", "BOARD",          "DRAFT",        "Sarah Al-Qahtani"),
+    ("Q3 2026 Board Pack — Annual planning prep",
+     "حزمة مجلس الإدارة Q3 2026 — تحضير التخطيط السنوي",
+     "2026-Q3", "2026-07-01", "2026-09-30", "BOARD",          "DRAFT",        "Sarah Al-Qahtani"),
+    ("Audit Committee Q1 2026 — Findings + CAPA",
+     "لجنة التدقيق Q1 2026 — الملاحظات والإجراءات التصحيحية",
+     "2026-Q1", "2026-01-01", "2026-03-31", "AUDIT_COMMITTEE","APPROVED",     "Reema Al-Asiri"),
+    ("Risk Committee Q1 2026 — Appetite + KRIs",
+     "لجنة المخاطر Q1 2026 — شهيّة المخاطر ومؤشّراتها",
+     "2026-Q1", "2026-01-01", "2026-03-31", "RISK_COMMITTEE", "APPROVED",     "Khalid Al-Shehri"),
+    ("Risk Committee Q2 2026 — Q2 review",
+     "لجنة المخاطر Q2 2026 — مراجعة الربع الثاني",
+     "2026-Q2", "2026-04-01", "2026-06-30", "RISK_COMMITTEE", "IN_REVIEW",    "Khalid Al-Shehri"),
+    ("AGM 2026 — Annual ESG + Sustainability Annex",
+     "الجمعية العمومية 2026 — ملحق الاستدامة السنوي",
+     "2026-FY", "2026-01-01", "2026-12-31", "BOARD",          "DRAFT",        "Yousef Al-Mansouri"),
+    ("Cyber Committee Q1 2026 — SAMA + NCA posture",
+     "لجنة الأمن السيبراني Q1 2026 — موقف ساما والهيئة الوطنية",
+     "2026-Q1", "2026-01-01", "2026-03-31", "CYBER_COMMITTEE","APPROVED",     "Faisal Al-Dosari"),
+]
+for t_en, t_ar, period, p_start, p_end, audience, status, drafted_by in BOARD_PACKS:
+    drafted_offset = -45 if status == "APPROVED" else -15
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM board_pack.packs
+                       WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO board_pack.packs (external_id, organisation_id, title_en, title_ar,
+            period_label, period_start, period_end, audience, status, drafted_by, drafted_at,
+            is_deleted)
+        VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            DATEADD(day, {drafted_offset}, GETDATE()), 0)
+        """,
+        t_en, ORG_TSS,
+        ORG_TSS, t_en, t_ar, period, p_start, p_end, audience, status, drafted_by,
+        label=f"board pack: [{audience}/{status}] {t_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# Ethics cases — whistleblower + AML + harassment
+# ──────────────────────────────────────────────────────────────────────
+section("ethics.cases — whistleblower + AML + harassment + policy breaches")
+
+ETHICS_CASES = [
+    # (code, title_en, title_ar, category, severity, intake_channel, status, description, is_anonymous, days_ago)
+    ("ETH-2026-001", "Allegation: gift acceptance breach in procurement",
+                     "ادعاء: مخالفة قبول هدية في المشتريات",
+                     "GIFTS_HOSPITALITY", "MEDIUM", "WHISTLEBLOWER_HOTLINE", "INVESTIGATING",
+                     "Anonymous tip via SpeakUp portal alleging a procurement employee accepted SAR 12k watch from a vendor.",
+                     True, 22),
+    ("ETH-2026-002", "Reported harassment — Branch Riyadh Olaya",
+                     "بلاغ تحرّش — فرع الرياض العليا",
+                     "HARASSMENT",       "HIGH",   "HR_DIRECT", "TRIAGED",
+                     "Female teller reports verbal harassment by branch operations supervisor. HR + Legal engaged.",
+                     False, 8),
+    ("ETH-2026-003", "Suspected layering — SADAD bulk transfers",
+                     "اشتباه طبقات غسيل أموال — تحويلات SADAD مجمّعة",
+                     "AML",              "HIGH",   "TRANSACTION_MONITORING", "INVESTIGATING",
+                     "Actimize flagged 47 transactions across 9 accounts with classic layering pattern.",
+                     False, 5),
+    ("ETH-2026-004", "Conflict of interest — director on vendor RFP panel",
+                     "تضارب مصالح — مدير في لجنة تقييم عرض مورّد",
+                     "CONFLICT_OF_INTEREST", "MEDIUM", "MANAGER_REPORT", "CLOSED",
+                     "Director recused after disclosure; no decision impact. CAPA: COI form for all RFP panels.",
+                     False, 75),
+    ("ETH-2026-005", "Unauthorised disclosure of customer data to relative",
+                     "إفصاح غير مصرّح به عن بيانات عميل لقريب",
+                     "DATA_PRIVACY",     "CRITICAL","WHISTLEBLOWER_HOTLINE","INVESTIGATING",
+                     "Branch employee allegedly shared customer balance with sister-in-law. Termination + SDAIA report pending.",
+                     True, 12),
+    ("ETH-2026-006", "Falsified KYC document — onboarding",
+                     "وثيقة KYC مزوّرة في التأهيل",
+                     "FRAUD",            "HIGH",   "INTERNAL_AUDIT", "INVESTIGATING",
+                     "IA found 3 onboarding files with photoshopped national ID images. AML + SAMA breach notification underway.",
+                     False, 18),
+    ("ETH-2026-007", "Time-theft — branch staff buddy-punching",
+                     "سرقة وقت — تسجيل حضور بالنيابة بين موظفي الفرع",
+                     "POLICY_BREACH",    "LOW",    "ANALYTICS", "CLOSED",
+                     "HR analytics detected pattern across 4 employees. Verbal warning + biometric clock-in deployed.",
+                     False, 90),
+    ("ETH-2026-008", "Retaliation report — manager downgraded whistleblower review",
+                     "بلاغ انتقام — مدير خفّض تقييم مبلّغ",
+                     "RETALIATION",      "HIGH",   "HR_DIRECT", "TRIAGED",
+                     "Employee who reported ETH-2026-001 got 2-grade downgrade in 360 review. Investigation opened.",
+                     False, 3),
+    ("ETH-2026-009", "Sanctions list — customer name partial-match",
+                     "قائمة عقوبات — تطابق جزئي لاسم عميل",
+                     "AML",              "CRITICAL","SCREENING", "INVESTIGATING",
+                     "OFAC screening flagged 3 customer names within 0.85 similarity. Enhanced due diligence in progress.",
+                     False, 1),
+    ("ETH-2026-010","Misuse of corporate card",
+                     "سوء استخدام بطاقة شركة",
+                     "FRAUD",            "MEDIUM", "ACCOUNTING_REVIEW", "CLOSED",
+                     "Senior manager used corporate card for SAR 4,500 personal expenses. Recovered + written warning.",
+                     False, 60),
+]
+for code, t_en, t_ar, category, severity, channel, status, desc, anon, days_ago in ETHICS_CASES:
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM ethics.cases
+                       WHERE case_code = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO ethics.cases (external_id, organisation_id, case_code, title_en, title_ar,
+            category, severity, intake_channel, is_anonymous, description,
+            status, date_of_incident, regulator_notified, is_deleted, created_at)
+        VALUES (NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            DATEADD(day, -{days_ago}, CAST(GETDATE() AS DATE)),
+            {'1' if severity == 'CRITICAL' else '0'}, 0, DATEADD(day, -{days_ago}, GETDATE()))
+        """,
+        code, ORG_TSS,
+        ORG_TSS, code, t_en, t_ar, category, severity, channel, 1 if anon else 0, desc,
+        status,
+        label=f"ethics: [{severity}/{category}] {code} {t_en[:35]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
 print(f"  inserted: {inserted}")
 print(f"  skipped (already present): {skipped}")
