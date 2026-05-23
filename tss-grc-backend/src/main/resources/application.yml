@@ -155,3 +155,24 @@ grc:
   # Platform defaults
   default-locale: en
   supported-locales: en,ar
+
+  # Integrations — outbound adapters to third-party systems
+  # See tss-grc-backend/docs/integrations/SERVICENOW.md for operator notes.
+  integrations:
+    servicenow:
+      enabled: false                              # default OFF; flip per-env
+      mode: STUB                                  # STUB (in-memory) | LIVE (real HTTP)
+      base-url: https://example.service-now.com
+      auth:
+        type: OAUTH2_CLIENT_CREDENTIALS           # OAUTH2_CLIENT_CREDENTIALS | BASIC
+        client-id: ${SERVICENOW_CLIENT_ID:}
+        client-secret: ${SERVICENOW_CLIENT_SECRET:}
+        token-url: ${SERVICENOW_TOKEN_URL:}
+        username: ${SERVICENOW_USERNAME:}
+        password: ${SERVICENOW_PASSWORD:}
+      timeout-seconds: 30
+      max-retries: 3
+      defaults:
+        impact: 3                                 # ServiceNow 1=high, 3=low
+        urgency: 3
+        category: Security
