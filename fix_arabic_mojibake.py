@@ -60,9 +60,14 @@ def discover_columns(cn: pyodbc.Connection) -> list[tuple[str, str, list[str]]]:
 
 
 def main() -> int:
-    cn = pyodbc.connect(CONN, autocommit=False)
+    # autocommit=True so a single broken row (e.g. legacy ntext column that
+    # the SC_UTF8 collation can't bind) doesn't roll back everything else.
+    # Repair is row-idempotent — re-running is safe.
+    cn = pyodbc.connect(CONN, autocommit=True)
     cur = cn.cursor()
     total_fixed = 0
+    skipped_rows = 0
+    skipped_tables = 0
     for schema, table, cols in discover_columns(cn):
         # Skip tables without an integer id (we can't address rows otherwise).
         cur.execute(
@@ -79,9 +84,11 @@ def main() -> int:
         cols_csv = ", ".join(f"[{c}]" for c in cols)
         try:
             cur.execute(f"SELECT id, {cols_csv} FROM [{schema}].[{table}]")
-        except pyodbc.Error:
+            rows = cur.fetchall()
+        except pyodbc.Error as e:
+            print(f"  {schema}.{table}: SELECT failed - {str(e)[:120]}")
+            skipped_tables += 1
             continue
-        rows = cur.fetchall()
         fixed_in_table = 0
         for row in rows:
             row_id = row[0]
@@ -99,17 +106,26 @@ def main() -> int:
             if not sets:
                 continue
             params.append(row_id)
-            cur.execute(
-                f"UPDATE [{schema}].[{table}] SET {', '.join(sets)} WHERE id = ?",
-                *params,
-            )
-            fixed_in_table += 1
+            try:
+                cur.execute(
+                    f"UPDATE [{schema}].[{table}] SET {', '.join(sets)} WHERE id = ?",
+                    *params,
+                )
+                fixed_in_table += 1
+            except pyodbc.Error as e:
+                # Skip rows whose update fails (e.g. legacy ntext columns that
+                # can't bind under SC_UTF8). Other rows in the same table can
+                # still succeed under autocommit=True.
+                msg = str(e)
+                if skipped_rows < 5:
+                    print(f"    skip {schema}.{table} id={row_id}: {msg[:120]}")
+                skipped_rows += 1
         if fixed_in_table:
             print(f"  {schema}.{table}: repaired {fixed_in_table} row(s)")
             total_fixed += fixed_in_table
-    cn.commit()
     cn.close()
-    print(f"\nDone - repaired {total_fixed} row(s) total.")
+    print(f"\nDone - repaired {total_fixed} row(s) total. "
+          f"Skipped {skipped_rows} row(s) and {skipped_tables} table(s).")
     return 0
 
 
