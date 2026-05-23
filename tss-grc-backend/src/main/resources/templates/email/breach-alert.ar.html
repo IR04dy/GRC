@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>حرج: خرق بيانات شخصية — يلزم اتخاذ إجراء فوري</title>
+</head>
+<body style="font-family: 'Tahoma', 'Segoe UI', Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px; direction: rtl; text-align: right;">
+  <div style="border-top: 4px solid #b91c1c; padding-top: 16px;">
+    <p style="font-size: 12px; letter-spacing: 0.04em; color: #b91c1c; margin: 0 0 8px; font-weight: 700;">⚠ تنبيه حرج · خرق بيانات شخصية</p>
+    <h1 style="font-size: 22px; margin: 0 0 16px; color: #7f1d1d;">المادة 31 من نظام حماية البيانات — مهلة 72 ساعة قيد العد</h1>
+
+    <p>السيد/ة {{dpo_name}}،</p>
+    <p>تم تسجيل خرق بيانات شخصية في المنصة. تشترط المادة 31 من نظام حماية البيانات السعودي إبلاغ سدايا خلال <strong>72 ساعة</strong> من الاكتشاف، وإبلاغ أصحاب البيانات المتأثرين دون تأخير غير مبرر متى كان الخرق يمثل خطراً مرتفعاً على حقوقهم.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #6b7280; width: 220px;">رقم الخرق</td><td style="padding: 6px 0; font-weight: 600;">{{breach_code}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">وقت الاكتشاف</td><td style="padding: 6px 0;">{{discovered_at}} بتوقيت السعودية</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">الموعد النهائي لإبلاغ سدايا</td><td style="padding: 6px 0; color: #b91c1c; font-weight: 700;">{{sdaia_deadline}} بتوقيت السعودية</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">عدد المتأثرين</td><td style="padding: 6px 0;">{{affected_count}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">فئات البيانات</td><td style="padding: 6px 0;">{{data_categories}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">الخطورة الأولية</td><td style="padding: 6px 0;"><span style="background: #fee2e2; color: #7f1d1d; padding: 2px 8px; border-radius: 3px; font-weight: 700;">{{severity}}</span></td></tr>
+    </table>
+
+    <p><strong>الخطوات الفورية المطلوبة:</strong></p>
+    <ol style="padding-right: 18px; padding-left: 0; line-height: 1.7;">
+      <li>تشكيل فريق الاستجابة للخرق (مسؤول حماية البيانات + رئيس أمن المعلومات + الإدارة القانونية + الاتصال المؤسسي + مالك العمل).</li>
+      <li>تأكيد النطاق وفئات البيانات الشخصية وعدد المتأثرين.</li>
+      <li>تقييم مدى احتمال وجود خطر مرتفع على أصحاب البيانات (عتبة المادة 31).</li>
+      <li>إعداد وتقديم إخطار سدايا قبل الموعد النهائي أعلاه.</li>
+      <li>اتخاذ قرار بشأن إخطار أصحاب البيانات والقناة المستخدمة (المادة 32).</li>
+      <li>توثيق مسار الأدلة في المنصة — كل قرار يُسجَّل تلقائياً.</li>
+    </ol>
+
+    <p style="margin: 24px 0;">
+      <a href="{{deep_link}}" style="background: #b91c1c; color: #ffffff; text-decoration: none; padding: 12px 22px; border-radius: 4px; display: inline-block; font-weight: 700; font-size: 15px;">فتح سجل الخرق</a>
+    </p>
+
+    <p style="font-size: 13px; color: #6b7280; line-height: 1.6;">إن لم يتم التصرف خلال مدة الـ SLA، تقوم المنصة بالتصعيد التلقائي إلى المسؤول الرئيسي للخصوصية ورئيس أمن المعلومات وفق قاعدة الأتمتة AR-57.</p>
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0 16px;" />
+    <p style="font-size: 12px; color: #9ca3af; line-height: 1.6;">تنبيه تلقائي من منصة TSS GRC · سير عمل امتثال المادة 31 من نظام حماية البيانات.</p>
+  </div>
+</body>
+</html>

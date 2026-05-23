@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CAPA Task Due — {{capa_code}}</title>
+</head>
+<body style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
+  <div style="border-top: 4px solid #b45309; padding-top: 16px;">
+    <p style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; margin: 0 0 8px;">TSS GRC Platform · CAPA Workflow</p>
+    <h1 style="font-size: 22px; margin: 0 0 16px; color: #111827;">CAPA task due in {{days_until_due}} day(s)</h1>
+
+    <p>Dear {{assignee_name}},</p>
+    <p>The corrective action you own is approaching its due date. Closing CAPA actions on time is part of the regulator-facing audit trail (NCA ECC-2 / SAMA CSF / ISO 27001 A.10).</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #6b7280; width: 180px;">CAPA reference</td><td style="padding: 6px 0; font-weight: 600;">{{capa_code}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Title</td><td style="padding: 6px 0;">{{capa_title}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Source finding</td><td style="padding: 6px 0;">{{source_module}} — {{source_ref}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Priority</td><td style="padding: 6px 0;"><span style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 3px; font-weight: 600;">{{priority}}</span></td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Current stage</td><td style="padding: 6px 0;">{{stage}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Due date</td><td style="padding: 6px 0; color: #b91c1c; font-weight: 600;">{{due_at}}</td></tr>
+    </table>
+
+    <p>If the action is complete, attach the evidence and mark the CAPA task closed. If you need an extension, request it via the platform — late closures are flagged in the next board pack.</p>
+
+    <p style="margin: 24px 0;">
+      <a href="{{deep_link}}" style="background: #b45309; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block; font-weight: 600;">Open CAPA task</a>
+    </p>
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0 16px;" />
+    <p style="font-size: 12px; color: #9ca3af; line-height: 1.5;">Automated reminder from the TSS GRC Platform.</p>
+  </div>
+</body>
+</html>

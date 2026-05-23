@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تم إسناد خطر — يلزم اتخاذ إجراء</title>
+</head>
+<body style="font-family: 'Tahoma', 'Segoe UI', Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px; direction: rtl; text-align: right;">
+  <div style="border-top: 4px solid #1d4ed8; padding-top: 16px;">
+    <p style="font-size: 12px; letter-spacing: 0.04em; color: #6b7280; margin: 0 0 8px;">منصة TSS للحوكمة والمخاطر والامتثال · إدارة المخاطر</p>
+    <h1 style="font-size: 22px; margin: 0 0 16px; color: #111827;">تم إسناد خطر لاتخاذ الإجراء</h1>
+
+    <p>السيد/ة {{assignee_name}}،</p>
+    <p>تم إسناد خطر إليك في منصة TSS GRC. يُرجى مراجعة التفاصيل أدناه وإكمال التقييم الأولي خلال مدة الـ SLA المحددة.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #6b7280; width: 180px;">رقم الخطر</td><td style="padding: 6px 0; font-weight: 600;">{{risk_code}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">العنوان</td><td style="padding: 6px 0;">{{risk_title}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">التصنيف</td><td style="padding: 6px 0;">{{risk_category}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">التصنيف الكامن</td><td style="padding: 6px 0;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 3px; font-weight: 600;">{{risk_inherent_rating}}</span></td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">المالك</td><td style="padding: 6px 0;">{{risk_owner}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">موعد المراجعة الأولية</td><td style="padding: 6px 0; color: #b91c1c; font-weight: 600;">{{sla_due_at}}</td></tr>
+    </table>
+
+    <p><strong>الإجراءات المطلوبة منك:</strong></p>
+    <ol style="padding-right: 18px; padding-left: 0; line-height: 1.7;">
+      <li>افتح سجل الخطر وراجع الوصف والمسببات والضوابط الحالية.</li>
+      <li>أكِّد أو عدِّل التصنيف الكامن (الاحتمالية × الأثر).</li>
+      <li>حدِّد الضوابط المخففة القائمة وسجّل التصنيف المتبقي.</li>
+      <li>اقترح خطة المعالجة: قبول / تخفيف / نقل / تجنب.</li>
+    </ol>
+
+    <p style="margin: 24px 0;">
+      <a href="{{deep_link}}" style="background: #1d4ed8; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block; font-weight: 600;">فتح سجل الخطر</a>
+    </p>
+
+    <p style="font-size: 13px; color: #6b7280; line-height: 1.6;">إن لم تتمكن من إنجاز المراجعة قبل تاريخ الـ SLA، يُرجى طلب إعادة الإسناد عبر مديرك المباشر. تتم تصعيد السجلات المتأخرة تلقائياً وفق قاعدة الأتمتة AR-23.</p>
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0 16px;" />
+    <p style="font-size: 12px; color: #9ca3af; line-height: 1.6;">
+      هذا إشعار تلقائي من منصة TSS GRC.<br />
+      متوافق مع SAMA CSF · NCA ECC-2 · ISO 31000.
+    </p>
+  </div>
+</body>
+</html>

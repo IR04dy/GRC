@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Risk Assigned — Action Required</title>
+</head>
+<body style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
+  <div style="border-top: 4px solid #1d4ed8; padding-top: 16px;">
+    <p style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; margin: 0 0 8px;">TSS GRC Platform · Risk Management</p>
+    <h1 style="font-size: 22px; margin: 0 0 16px; color: #111827;">Risk assigned for your attention</h1>
+
+    <p>Dear {{assignee_name}},</p>
+    <p>A risk has been assigned to you in the TSS GRC Platform. Please review the details below and complete an initial assessment within the SLA window.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #6b7280; width: 180px;">Risk reference</td><td style="padding: 6px 0; font-weight: 600;">{{risk_code}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Title</td><td style="padding: 6px 0;">{{risk_title}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Category</td><td style="padding: 6px 0;">{{risk_category}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Inherent rating</td><td style="padding: 6px 0;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 3px; font-weight: 600;">{{risk_inherent_rating}}</span></td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Owner</td><td style="padding: 6px 0;">{{risk_owner}}</td></tr>
+      <tr><td style="padding: 6px 0; color: #6b7280;">Initial review due</td><td style="padding: 6px 0; color: #b91c1c; font-weight: 600;">{{sla_due_at}}</td></tr>
+    </table>
+
+    <p><strong>What you need to do:</strong></p>
+    <ol style="padding-left: 18px; line-height: 1.6;">
+      <li>Open the risk record and review the description, drivers, and current controls.</li>
+      <li>Confirm or revise the inherent rating (likelihood × impact).</li>
+      <li>Identify mitigating controls already in place and capture the residual rating.</li>
+      <li>Propose a treatment plan: Accept / Mitigate / Transfer / Avoid.</li>
+    </ol>
+
+    <p style="margin: 24px 0;">
+      <a href="{{deep_link}}" style="background: #1d4ed8; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 4px; display: inline-block; font-weight: 600;">Open risk record</a>
+    </p>
+
+    <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">If you cannot complete the review by the SLA date, please request a re-assignment through your line manager. Late records are escalated automatically per the platform's automation rule AR-23.</p>
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0 16px;" />
+    <p style="font-size: 12px; color: #9ca3af; line-height: 1.5;">
+      This is an automated notification from the TSS GRC Platform.<br />
+      Aligned to SAMA CSF · NCA ECC-2 · ISO 31000.
+    </p>
+  </div>
+</body>
+</html>
