@@ -1615,6 +1615,167 @@ for title_en, title_ar, source, status, il, ii, rl, ri in ARAMCO_RISKS:
         label=f"AR risk: [{source}] {title_en[:50]} L{il}×I{ii} → L{rl}×I{ri}",
     )
 
+# ══════════════════════════════════════════════════════════════════════
+# Multi-tenant — STC Bank (org_id = 3, demo tenant)
+# Telco-banking hybrid: mobile-first banking, payment switch, SS7.
+# ══════════════════════════════════════════════════════════════════════
+
+print("\n\n" + "═" * 70)
+print(f"  STC — STC Bank Demo Tenant (org_id={ORG_STC})")
+print("═" * 70)
+
+# ──────────────────────────────────────────────────────────────────────
+# STC — cyber assets (telco-banking hybrid)
+# ──────────────────────────────────────────────────────────────────────
+section("cyber.cyber_assets — STC Bank telco-banking stack")
+
+STC_ASSETS = [
+    # (name, type, biz_owner, tech_owner, classification, criticality, ip, hostname, os)
+    ("Mobile Banking Backend — Spring Boot K8s",
+     "APPLICATION", "Hessa Al-Subaie", "Bandar Al-Otaibi",  "RESTRICTED",   "TIER_1",
+     "10.50.10.10", "mob-be-prod-01",   "EKS 1.29 (Linux)"),
+    ("Mobile Banking iOS App (Apple Store)",
+     "APPLICATION", "Hessa Al-Subaie", "Adel Al-Mutairi",   "CONFIDENTIAL", "TIER_1",
+     None,           "stc-ios-bundle",   None),
+    ("Mobile Banking Android App (Google Play)",
+     "APPLICATION", "Hessa Al-Subaie", "Adel Al-Mutairi",   "CONFIDENTIAL", "TIER_1",
+     None,           "stc-android-bundle",None),
+    ("Payment Switch — Ericsson Money",
+     "APPLICATION", "Talal Al-Anazi",  "Saud Al-Kharji",    "RESTRICTED",   "TIER_1",
+     "10.50.30.5",  "ericsson-money",   "Solaris 11.4"),
+    ("USSD Banking Gateway — *900#",
+     "APPLICATION", "Talal Al-Anazi",  "Saud Al-Kharji",    "RESTRICTED",   "TIER_1",
+     "10.50.40.5",  "ussd-gw-prod",     "RHEL 9.2"),
+    ("SS7/SIGTRAN Signalling Gateway",
+     "INFRASTRUCTURE","Saud Al-Kharji", "Adel Al-Mutairi",  "RESTRICTED",   "TIER_1",
+     "10.50.50.5",  "ss7-sigtran",      "RHEL 8.6"),
+    ("Cards Personalisation Bureau — HSM Cluster",
+     "INFRASTRUCTURE","Talal Al-Anazi", "Saud Al-Kharji",   "RESTRICTED",   "TIER_1",
+     "10.50.60.5",  "hsm-cluster-prod", "PROPRIETARY"),
+    ("KYC OTP Service",
+     "APPLICATION", "Hessa Al-Subaie", "Bandar Al-Otaibi",  "RESTRICTED",   "TIER_1",
+     "10.50.70.10", "otp-svc-prod",     "Linux Alpine 3.19"),
+    ("Customer Voice Biometrics Engine",
+     "APPLICATION", "Talal Al-Anazi",  "Adel Al-Mutairi",   "CONFIDENTIAL", "TIER_2",
+     "10.50.80.10", "voicebio-prod",    "Ubuntu 22.04"),
+    ("Fraud Detection — Featurespace ARIC",
+     "APPLICATION", "Talal Al-Anazi",  "Bandar Al-Otaibi",  "RESTRICTED",   "TIER_1",
+     "10.50.90.10", "aric-prod-01",     "RHEL 9.2"),
+]
+for name, atype, biz, tech, cls, crit, ip, host, os_name in STC_ASSETS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM cyber.cyber_assets
+                       WHERE asset_name = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO cyber.cyber_assets (external_id, organisation_id, asset_name, asset_type,
+            business_owner, technical_owner, classification, criticality, ip_address, hostname,
+            operating_system, linked_vulnerabilities_count, linked_incidents_count,
+            linked_controls_count, status, is_deleted, created_at)
+        VALUES (LOWER(REPLACE(NEWID(), '-', '')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0,
+            'ACTIVE', 0, GETDATE())
+        """,
+        name, ORG_STC,
+        ORG_STC, name, atype, biz, tech, cls, crit, ip, host, os_name,
+        label=f"STC asset: {name}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# STC — privacy consents (mobile + telco-banking scenarios)
+# ──────────────────────────────────────────────────────────────────────
+section("privacy.consents — STC Bank mobile + telco data sharing")
+
+STC_CONSENTS = [
+    ("Mobile banking biometric login (face/fingerprint)",
+     "تسجيل الدخول البيومتري للخدمات المصرفية للجوّال (الوجه/البصمة)", "APP",       "ACTIVE"),
+    ("USSD *900# transaction confirmation",
+     "تأكيد المعاملات عبر USSD *900#",                                    "USSD",      "ACTIVE"),
+    ("Voice biometrics for IVR authentication",
+     "بصمة الصوت لمصادقة IVR",                                            "CALL",      "ACTIVE"),
+    ("SMS OTP for transactions over SAR 1,000",
+     "OTP عبر الرسائل القصيرة للمعاملات فوق 1,000 ريال",                "SMS",       "ACTIVE"),
+    ("Location-based ATM finder + offers",
+     "خدمة محدد ATM والعروض حسب الموقع",                                   "APP",       "ACTIVE"),
+    ("Behavioural biometrics for fraud detection",
+     "البصمات السلوكية لكشف الاحتيال",                                     "APP",       "ACTIVE"),
+    ("STC Pay wallet linking",
+     "ربط محفظة STC Pay",                                                  "API",       "ACTIVE"),
+    ("Marketing SMS — product offers",
+     "رسائل تسويق — عروض المنتجات",                                        "SMS",       "WITHDRAWN"),
+]
+for purpose_en, purpose_ar, channel, status in STC_CONSENTS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM privacy.consents
+                       WHERE purpose_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO privacy.consents (external_id, organisation_id, purpose_en, purpose_ar,
+            channel, version_label, effective_date, status, is_deleted, created_at)
+        VALUES (NEWID(), ?, ?, ?, ?, 'v1', GETDATE(), ?, 0, GETDATE())
+        """,
+        purpose_en, ORG_STC,
+        ORG_STC, purpose_en, purpose_ar, channel, status,
+        label=f"STC consent: {purpose_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# STC — enterprise risks (telco-bank specific)
+# ──────────────────────────────────────────────────────────────────────
+section("risk.risks — STC Bank enterprise risk register")
+
+STC_RISKS = [
+    # (title_en, title_ar, source, status, il, ii, rl, ri)
+    ("SS7/SIGTRAN attack on OTP delivery",
+     "هجوم SS7/SIGTRAN على تسليم OTP",
+     "CYBER",     "MITIGATING", 3, 5, 2, 4),
+    ("SIM-swap fraud on high-value customers",
+     "الاحتيال بتبديل شريحة SIM للعملاء الفئة العليا",
+     "CYBER",     "MITIGATING", 4, 4, 2, 3),
+    ("Payment switch DDoS during peak (Hajj+Ramadan)",
+     "هجوم DDoS على محوّل المدفوعات في الذروة (الحج ورمضان)",
+     "CYBER",     "MITIGATING", 3, 5, 2, 3),
+    ("Mobile-banking malware (RATs targeting Saudi Android)",
+     "البرمجيات الخبيثة على الخدمات المصرفية للجوّال (RATs أندرويد)",
+     "CYBER",     "MITIGATING", 4, 4, 3, 3),
+    ("Open-Banking aggregator data leak",
+     "تسرّب بيانات مُجمّع المنظومة المفتوحة",
+     "PRIVACY",   "MITIGATING", 3, 5, 2, 4),
+    ("USSD man-in-the-middle on shared SIM tower",
+     "هجوم وسيط على USSD عبر برج SIM مشترك",
+     "CYBER",     "MITIGATING", 2, 4, 1, 3),
+    ("Voice biometrics deepfake attack",
+     "هجوم التزييف العميق على بصمة الصوت",
+     "CYBER",     "UNDER_REVIEW", 3, 4, 2, 3),
+    ("CMA short-selling regulation compliance",
+     "الامتثال للوائح البيع على المكشوف — هيئة السوق المالية",
+     "COMPLIANCE","MITIGATING", 2, 4, 1, 3),
+    ("Card personalisation HSM key compromise",
+     "اختراق مفاتيح HSM لتجهيز البطاقات",
+     "CYBER",     "MITIGATING", 2, 5, 1, 4),
+    ("STC Pay wallet linking customer-due-diligence gap",
+     "فجوة العناية الواجبة في ربط محفظة STC Pay",
+     "COMPLIANCE","MITIGATING", 3, 4, 2, 3),
+]
+for title_en, title_ar, source, status, il, ii, rl, ri in STC_RISKS:
+    # inherent_score / residual_score / risk_level are computed columns — let DB derive.
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM risk.risks
+                       WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO risk.risks (external_id, organisation_id, title_en, title_ar,
+            source_module, status, inherent_likelihood, inherent_impact,
+            residual_likelihood, residual_impact,
+            identified_date, review_date, attestation_cadence_days,
+            created_at, updated_at, is_deleted)
+        VALUES (NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            DATEADD(month, -3, CAST(GETDATE() AS DATE)),
+            DATEADD(month, 3, CAST(GETDATE() AS DATE)),
+            90, GETDATE(), GETDATE(), 0)
+        """,
+        title_en, ORG_STC,
+        ORG_STC, title_en, title_ar, source, status,
+        il, ii, rl, ri,
+        label=f"STC risk: [{source}] {title_en[:50]} L{il}×I{ii} → L{rl}×I{ri}",
+    )
+
 # ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
 print(f"  inserted: {inserted}")
