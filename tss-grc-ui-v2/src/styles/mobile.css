@@ -1,0 +1,289 @@
+/* Slice 9-F — Mobile-first utilities for the Crisis Commander.
+   Used only by /crisis/mobile and any future thumb-driven views.
+
+   Design principles:
+     1. Single column, 16 px base font, 48 px-tall touch targets (WCAG 2.1
+        AA target-size requirement at the AAA level — banking auditors
+        explicitly check for this).
+     2. No horizontal scroll — every container is max-width: 100vw with
+        box-sizing: border-box so a 320-wide phone never overflows.
+     3. RTL-aware: every direction-sensitive property uses logical
+        properties (margin-inline-*, padding-inline-*, inset-inline-*)
+        so direction:rtl on <html> flips the flow automatically.
+     4. Pure CSS-variable theming — no hardcoded colors; everything goes
+        through --primary, --danger, --warning, --bg, --surface, etc.
+        Lets a tenant retheme without forking this file.
+*/
+
+.mob-shell {
+  min-height: 100vh;
+  background: var(--bg, #f7f7f5);
+  color: var(--ink-1, #16322f);
+  font: 500 16px/1.5 var(--font-sans, system-ui, sans-serif);
+  padding-bottom: 96px; /* leave room for sticky action bar */
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.mob-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  min-height: 56px;
+  box-sizing: border-box;
+}
+.mob-topbar-title { font-weight: 800; font-size: 18px; letter-spacing: -.2px; }
+.mob-topbar-sub   { font-size: 12px; color: var(--ink-3, #6b7280); margin-top: 2px; }
+
+.mob-critical-banner {
+  background: var(--danger-bg, #fee2e2);
+  color: var(--danger-strong, #991b1b);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--danger, #dc2626);
+  animation: mob-pulse 2.4s ease-in-out infinite;
+}
+@keyframes mob-pulse {
+  0%, 100% { box-shadow: inset 0 -2px 0 var(--danger, #dc2626); }
+  50%      { box-shadow: inset 0 -4px 0 var(--danger, #dc2626); }
+}
+
+.mob-banner {
+  background: var(--info-bg, #eff6ff);
+  color: var(--info-strong, #1e40af);
+  font-size: 14px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--info, #3b82f6);
+}
+.mob-banner button {
+  margin-inline-start: auto;
+  min-height: 44px;
+  min-width: 60px;
+  border-radius: 999px;
+  border: 1px solid var(--info, #3b82f6);
+  background: var(--surface, #fff);
+  color: var(--info-strong, #1e40af);
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.mob-content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+.mob-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+}
+.mob-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.mob-card-title {
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.35;
+  word-break: break-word; /* allow multi-line wrap; no truncation jitter */
+}
+.mob-card-code {
+  font: 600 12px var(--font-mono, monospace);
+  color: var(--ink-3, #6b7280);
+  margin-top: 2px;
+}
+
+.mob-sev-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: 0 0 14px;
+  margin-top: 5px;
+  box-shadow: 0 0 0 3px var(--surface, #fff);
+}
+.mob-sev-1 { background: var(--success, #16a34a); }
+.mob-sev-2 { background: var(--info, #3b82f6); }
+.mob-sev-3 { background: var(--warning, #f59e0b); }
+.mob-sev-4 { background: var(--danger, #dc2626); }
+.mob-sev-5 { background: #7f1d1d; }
+
+.mob-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.mob-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--surface-2, #f3f4f6);
+  color: var(--ink-2, #374151);
+  white-space: nowrap;
+}
+.mob-chip-danger  { background: var(--danger-bg, #fee2e2);  color: var(--danger-strong, #991b1b); }
+.mob-chip-warning { background: var(--warning-bg, #fef3c7); color: var(--warning-strong, #92400e); }
+.mob-chip-info    { background: var(--info-bg, #eff6ff);    color: var(--info-strong, #1e40af); }
+.mob-chip-success { background: var(--success-bg, #dcfce7); color: var(--success-strong, #166534); }
+
+.mob-action-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.mob-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 48px;           /* WCAG 2.1 AAA target-size */
+  padding: 8px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--surface, #fff);
+  color: var(--ink-1, #16322f);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 100ms ease, transform 50ms ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-btn:active { transform: scale(.97); background: var(--surface-2, #f3f4f6); }
+.mob-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.mob-btn-primary { background: var(--primary, #14b8a6); border-color: var(--primary, #14b8a6); color: #fff; }
+.mob-btn-danger  { background: var(--danger, #dc2626);  border-color: var(--danger, #dc2626);  color: #fff; }
+
+.mob-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--ink-3, #6b7280);
+  font-size: 14px;
+}
+
+/* Sticky bottom action bar — the "declare crisis" panic button. */
+.mob-bottom-bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 60;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface, #fff);
+  border-top: 1px solid var(--border, #e5e7eb);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, .06);
+}
+.mob-bottom-bar .mob-btn {
+  width: 100%;
+  min-height: 56px;
+  font-size: 16px;
+}
+
+/* Bottom-sheet modal for crisis detail. */
+.mob-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .5);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: mob-sheet-fade 180ms ease;
+}
+@keyframes mob-sheet-fade { from { background: rgba(0,0,0,0); } to { background: rgba(0,0,0,.5); } }
+
+.mob-sheet {
+  background: var(--surface, #fff);
+  border-radius: 20px 20px 0 0;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: mob-sheet-up 220ms cubic-bezier(.2,.7,.2,1);
+}
+@keyframes mob-sheet-up { from { transform: translateY(60%); } to { transform: translateY(0); } }
+.mob-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border-strong, #cbd5e1);
+  border-radius: 2px;
+  margin: 0 auto 8px;
+}
+
+.mob-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mob-contact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  min-height: 64px;
+  color: inherit;
+  text-decoration: none;
+}
+.mob-contact-role  { font-size: 12px; color: var(--ink-3, #6b7280); }
+.mob-contact-name  { font-weight: 700; }
+.mob-contact-phone { margin-inline-start: auto; font-weight: 700; color: var(--primary, #14b8a6); font: 700 14px var(--font-mono, monospace); }
+
+/* Owner avatar (initials circle) */
+.mob-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--primary, #14b8a6);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  flex: 0 0 28px;
+}
+
+/* Pull-to-refresh visual hint (CSS only — actual refetch wired to button) */
+.mob-refresh-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+.mob-refresh-btn {
+  min-height: 44px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--surface, #fff);
+  color: var(--ink-2, #374151);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Right-aligned in RTL (Arabic) when the page is in rtl mode */
+[dir="rtl"] .mob-action-row { direction: rtl; }

@@ -3306,6 +3306,7 @@ export const ar = {
   licensingSidebar: 'تراخيص الوحدات',
   bcmReportsSidebar: 'تقارير الاستمرارية',
   crisisRoomSidebar: 'غرفة الأزمات',
+  crisisMobileSidebar: 'غرفة إدارة الأزمات (محمول)',
   biaWizardSidebar: 'معالج تحليل الأثر',
   biaQuantSidebar: 'تحليل الأثر — كمي',
   strategyRoiSidebar: 'العائد على استراتيجيات الاستمرارية',

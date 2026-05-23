@@ -3322,6 +3322,7 @@ export const en = {
   licensingSidebar: 'Module licensing',
   bcmReportsSidebar: 'BCM reports',
   crisisRoomSidebar: 'Crisis Room',
+  crisisMobileSidebar: 'Crisis Room (mobile)',
   biaWizardSidebar: 'BIA wizard',
   biaQuantSidebar: 'BIA — quantitative',
   strategyRoiSidebar: 'Strategy ROI',

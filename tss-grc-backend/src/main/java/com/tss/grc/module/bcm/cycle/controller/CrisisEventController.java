@@ -65,6 +65,18 @@ public class CrisisEventController {
     @PreAuthorize("isAuthenticated()")
     public List<CrisisEvent> active() { return service.listActive(); }
 
+    /**
+     * Slice 9-F — mobile-optimised summary of active crises with the
+     * shortest regulatory deadline pre-computed. Restricted to
+     * commander-tier roles because the {@code nextActionLabel} and tier
+     * fields are part of the live command loop, not the wider read view.
+     */
+    @GetMapping("/active-summary")
+    @PreAuthorize("hasAnyRole('CRISIS_COMMANDER','CISO','BCM_MANAGER','PLATFORM_ADMIN','INCIDENT_COMMANDER')")
+    public List<CrisisEventService.ActiveCrisisSummaryRow> activeSummary() {
+        return service.getActiveCrisisSummary();
+    }
+
     @GetMapping("/stats")
     @PreAuthorize("isAuthenticated()")
     public Map<String, Long> stats() { return service.stats(); }

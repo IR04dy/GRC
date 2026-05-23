@@ -30,6 +30,7 @@ const BcmDashboardPage       = lazy(() => import('./pages/dashboards/BcmDashboar
 const BcmReadinessPage       = lazy(() => import('./pages/bcm/BcmReadinessPage').then(m => ({ default: m.BcmReadinessPage })));
 const BcmReportsPage         = lazy(() => import('./pages/bcm/BcmReportsPage').then(m => ({ default: m.BcmReportsPage })));
 const CrisisRoomPage         = lazy(() => import('./pages/bcm/CrisisRoomPage').then(m => ({ default: m.CrisisRoomPage })));
+const MobileCrisisRoomPage   = lazy(() => import('./pages/bcm/MobileCrisisRoomPage').then(m => ({ default: m.MobileCrisisRoomPage })));
 const BiaWizardPage          = lazy(() => import('./pages/bcm/BiaWizardPage').then(m => ({ default: m.BiaWizardPage })));
 const QuantitativeBiaPage    = lazy(() => import('./pages/bcm/QuantitativeBiaPage').then(m => ({ default: m.QuantitativeBiaPage })));
 const StrategyRoiPage        = lazy(() => import('./pages/bcm/StrategyRoiPage').then(m => ({ default: m.StrategyRoiPage })));
@@ -236,6 +237,9 @@ export function App() {
               <Route path="/bcm/readiness"      element={<BcmReadinessPage />} />
               <Route path="/bcm/reports"        element={<BcmReportsPage />} />
               <Route path="/bcm/crisis-room"    element={<CrisisRoomPage />} />
+              {/* Slice 9-F — mobile-optimised Crisis Room for the Crisis Commander on a phone. */}
+              <Route path="/crisis/mobile"      element={<MobileCrisisRoomPage />} />
+              <Route path="/bcm/crisis/mobile"  element={<MobileCrisisRoomPage />} />
               <Route path="/bcm/bia"            element={<BiaWizardPage />} />
               <Route path="/bcm/bia-quantitative" element={<QuantitativeBiaPage />} />
               <Route path="/bcm/strategy-roi"     element={<StrategyRoiPage />} />

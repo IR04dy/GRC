@@ -338,4 +338,55 @@ class CrisisEventServiceTest {
         verify(audit, atLeastOnce()).log(any(), any(), any(), any());
         verify(audit, never()).log(eq("UPDATE"), any(), any(), any());
     }
+
+    // ─── Slice 9-F: Mobile crisis active summary ───────────────
+
+    @Test void getActiveCrisisSummary_returnsEmptyWhenNoActiveEvents() {
+        when(events.findByOrganisationIdAndStatusNotInOrderByIdDesc(eq(ORG_ID), any()))
+            .thenReturn(List.of());
+
+        var rows = service.getActiveCrisisSummary();
+        assertThat(rows).isEmpty();
+    }
+
+    @Test void getActiveCrisisSummary_sortsBySeverityDescAndDeadlineAsc() {
+        // Two active events:
+        //  - low sev cyber (sev 2, NCA 24h deadline)
+        //  - high sev with personal data (sev 4, NCEMA 24h + PDPL 72h)
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        CrisisEvent low = event(2, "ASSESSING");
+        low.setId(10L); low.setCyberRelated(true); low.setDetectionTime(now);
+        CrisisEvent high = event(4, "ACTIVATED");
+        high.setId(20L); high.setPersonalDataAffected(true); high.setDetectionTime(now);
+
+        when(events.findByOrganisationIdAndStatusNotInOrderByIdDesc(eq(ORG_ID), any()))
+            .thenReturn(List.of(low, high));
+
+        var rows = service.getActiveCrisisSummary();
+        assertThat(rows).hasSize(2);
+        // Highest severity first
+        assertThat(rows.get(0).severity()).isEqualTo(4);
+        assertThat(rows.get(0).id()).isEqualTo(20L);
+        assertThat(rows.get(0).escalationTier()).isEqualTo("T1");
+        assertThat(rows.get(1).severity()).isEqualTo(2);
+        assertThat(rows.get(1).id()).isEqualTo(10L);
+        // Low sev cyber → NCA 24h selected
+        assertThat(rows.get(1).regulatoryRegulator()).isEqualTo("NCA");
+        // High sev with PDPL → NCEMA wins (24h < 72h)
+        assertThat(rows.get(0).regulatoryDeadlineAt()).isNotNull();
+    }
+
+    @Test void getActiveCrisisSummary_picksSamaCyberAsShortestForCyberSev3Plus() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        CrisisEvent ev = event(3, "ACTIVATED");
+        ev.setId(30L); ev.setCyberRelated(true); ev.setDetectionTime(now);
+        when(events.findByOrganisationIdAndStatusNotInOrderByIdDesc(eq(ORG_ID), any()))
+            .thenReturn(List.of(ev));
+
+        var rows = service.getActiveCrisisSummary();
+        // SAMA Cyber 4h is the shortest deadline for sev>=3 + cyber
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).regulatoryRegulator()).isEqualTo("SAMA_CYBER");
+        assertThat(rows.get(0).escalationTier()).isEqualTo("T2");
+    }
 }

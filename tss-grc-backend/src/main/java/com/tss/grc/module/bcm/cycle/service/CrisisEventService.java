@@ -77,6 +77,16 @@ public class CrisisEventService {
     private final AuditLogService audit;
     private final ApplicationEventPublisher eventPublisher;
 
+    // Slice 9-F regulatory windows. Kept in lock-step with
+    // RegulatorCountdownService — duplicated intentionally because the
+    // mobile summary only needs the headline "shortest deadline" and
+    // pulling the full countdown service onto the mobile path would be
+    // overkill for a 6-card list.
+    private static final int PDPL_WINDOW_HOURS = 72;
+    private static final int SAMA_CYBER_WINDOW_HOURS = 4;
+    private static final int SAMA_BCF_WINDOW_HOURS = 6;
+    private static final int NCA_WINDOW_HOURS = 24;
+
     // ─── Event CRUD ──────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -91,6 +101,165 @@ public class CrisisEventService {
         return events.findByOrganisationIdAndStatusNotInOrderByIdDesc(
             TenantContext.getCurrentTenant(), List.of("CLOSED", "CANCELLED"));
     }
+
+    /**
+     * Slice 9-F — compact summary tailored for the mobile Crisis Room.
+     *
+     * <p>Each row carries only the fields the thumb-sized card needs:
+     * id / code / severity / status / openedAt / ownerUserId plus the
+     * <b>shortest applicable regulatory deadline</b> across the SAMA-cyber
+     * (4h), SAMA-BCF (6h), NCA (24h), PDPL Art.23 (72h), and NCEMA (24h)
+     * windows. Sort order:
+     * <ol>
+     *   <li>highest severity first</li>
+     *   <li>then earliest regulatory deadline (already-breached events sort first)</li>
+     *   <li>then by detection time descending</li>
+     * </ol>
+     *
+     * <p>Comparing this to the heavier {@link RegulatorCountdownService}:
+     * that one explodes one event into N regulator rows for the desktop
+     * Crisis Room. The mobile summary deliberately collapses to one row per
+     * event, picking only the most-urgent deadline.
+     */
+    @Transactional(readOnly = true)
+    public List<ActiveCrisisSummaryRow> getActiveCrisisSummary() {
+        Long org = TenantContext.requireOrganisationId();
+        List<CrisisEvent> active = events.findByOrganisationIdAndStatusNotInOrderByIdDesc(
+            org, List.of("CLOSED", "CANCELLED"));
+        if (active.isEmpty()) return List.of();
+
+        LocalDateTime now = LocalDateTime.now();
+        List<ActiveCrisisSummaryRow> rows = new ArrayList<>();
+        for (CrisisEvent e : active) {
+            LocalDateTime anchor = e.getDetectionTime() != null
+                ? e.getDetectionTime()
+                : (e.getStartTime() != null ? e.getStartTime() : e.getCreatedAt());
+
+            LocalDateTime shortestDeadline = null;
+            String shortestRegulator = null;
+
+            if (Boolean.TRUE.equals(e.getPersonalDataAffected()) && anchor != null) {
+                LocalDateTime d = anchor.plusHours(PDPL_WINDOW_HOURS);
+                shortestDeadline = d;
+                shortestRegulator = "SDAIA_PDPL";
+            }
+            if (Boolean.TRUE.equals(e.getCyberRelated()) && anchor != null) {
+                LocalDateTime d = anchor.plusHours(NCA_WINDOW_HOURS);
+                if (shortestDeadline == null || d.isBefore(shortestDeadline)) {
+                    shortestDeadline = d;
+                    shortestRegulator = "NCA";
+                }
+                if (e.getSeverity() != null && e.getSeverity() >= 3) {
+                    LocalDateTime samaC = anchor.plusHours(SAMA_CYBER_WINDOW_HOURS);
+                    if (samaC.isBefore(shortestDeadline)) {
+                        shortestDeadline = samaC;
+                        shortestRegulator = "SAMA_CYBER";
+                    }
+                }
+            }
+            if (e.getSeverity() != null && e.getSeverity() >= 3 && anchor != null) {
+                LocalDateTime samaB = anchor.plusHours(SAMA_BCF_WINDOW_HOURS);
+                if (shortestDeadline == null || samaB.isBefore(shortestDeadline)) {
+                    shortestDeadline = samaB;
+                    shortestRegulator = "SAMA_BCF";
+                }
+            }
+            if (e.getSeverity() != null && e.getSeverity() >= 4 && anchor != null) {
+                LocalDateTime ncema = anchor.plusHours(NCA_WINDOW_HOURS);
+                if (shortestDeadline == null || ncema.isBefore(shortestDeadline)) {
+                    shortestDeadline = ncema;
+                    shortestRegulator = "NCEMA";
+                }
+            }
+
+            Long minutesRemaining = null;
+            if (shortestDeadline != null) {
+                minutesRemaining = java.time.Duration.between(now, shortestDeadline).toMinutes();
+            }
+
+            // Escalation tier — convenient single-letter for the mobile chip:
+            //   T1 (sev 4-5) — critical / national
+            //   T2 (sev 3)   — major disruption
+            //   T3 (sev 1-2) — operational
+            String escalationTier;
+            int sev = e.getSeverity() == null ? 1 : e.getSeverity();
+            if (sev >= 4)      escalationTier = "T1";
+            else if (sev == 3) escalationTier = "T2";
+            else               escalationTier = "T3";
+
+            // nextActionLabel reflects the workflow stage in Saudi-native shorthand.
+            String nextActionLabel = switch (Objects.requireNonNullElse(e.getStatus(), "DETECTED")) {
+                case "DETECTED"  -> "بحاجة للتقييم";          // needs triage
+                case "ASSESSING" -> "بحاجة للتفعيل";          // needs activation
+                case "ACTIVATED" -> "بحاجة للاحتواء";         // needs containment
+                case "CONTAINED" -> "بحاجة للاسترداد";        // needs recovery
+                case "RECOVERED" -> "جاهز للإغلاق";           // ready to close
+                default          -> "متابعة";                  // follow-up
+            };
+
+            rows.add(new ActiveCrisisSummaryRow(
+                e.getId(),
+                e.getEventCode(),
+                e.getTitleEn(),
+                e.getTitleAr(),
+                sev,
+                e.getStatus(),
+                e.getCrisisManagerId(),
+                escalationTier,
+                anchor,
+                shortestRegulator,
+                shortestDeadline,
+                minutesRemaining,
+                Boolean.TRUE.equals(e.getPersonalDataAffected()),
+                Boolean.TRUE.equals(e.getCyberRelated()),
+                Boolean.TRUE.equals(e.getSupplierInvolved()),
+                nextActionLabel
+            ));
+        }
+
+        // Sort: severity desc, then earliest deadline first (null last), then anchor desc.
+        rows.sort((a, b) -> {
+            int s = Integer.compare(b.severity(), a.severity());
+            if (s != 0) return s;
+            if (a.regulatoryDeadlineAt() == null && b.regulatoryDeadlineAt() == null) {
+                // both null → fall through
+            } else if (a.regulatoryDeadlineAt() == null) return 1;
+            else if (b.regulatoryDeadlineAt() == null) return -1;
+            else {
+                int d = a.regulatoryDeadlineAt().compareTo(b.regulatoryDeadlineAt());
+                if (d != 0) return d;
+            }
+            if (a.openedAt() == null && b.openedAt() == null) return 0;
+            if (a.openedAt() == null) return 1;
+            if (b.openedAt() == null) return -1;
+            return b.openedAt().compareTo(a.openedAt());
+        });
+        return rows;
+    }
+
+    /**
+     * Compact row tailored for the mobile Crisis Room card list.
+     * Distinct from {@link RegulatorCountdownService.CountdownRow} which
+     * is one row per (event × regulator) — this one is one row per event.
+     */
+    public record ActiveCrisisSummaryRow(
+        Long id,
+        String code,
+        String titleEn,
+        String titleAr,
+        Integer severity,
+        String status,
+        Long ownerUserId,
+        String escalationTier,
+        LocalDateTime openedAt,
+        String regulatoryRegulator,
+        LocalDateTime regulatoryDeadlineAt,
+        Long regulatoryMinutesRemaining,
+        Boolean personalDataAffected,
+        Boolean cyberRelated,
+        Boolean supplierInvolved,
+        String nextActionLabel
+    ) {}
 
     @Transactional(readOnly = true)
     public CrisisEvent get(Long id) {
