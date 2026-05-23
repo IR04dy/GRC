@@ -317,7 +317,7 @@ BREACHES = [
      "PHISHING", 0, False, "INVESTIGATED", 5),
     ("Test data exposed in lower env",
      "بيانات إنتاج اختبارية تحتوي على أسماء وأرقام هواتف ظهرت في بيئة UAT.",
-     "DATA_EXPOSURE_LOWER_ENV", 412, True, "REMEDIATED", 75),
+     "DATA_EXPOSURE_LOWER_ENV", 412, True, "RESOLVED", 75),
 ]
 for title, desc, btype, count, notify, status, days_ago in BREACHES:
     run(
@@ -350,7 +350,7 @@ print(f"  found {len(processes)} critical processes")
 
 BIA_PROFILE = [
     # (rto_hours, rpo_hours, mtpd_hours, impact, criticality, financial, operational, regulatory, reputational, risk_level)
-    (2, 1, 4, "CRITICAL", "TIER_1", "HIGH",     "HIGH",     "HIGH",     "HIGH",     "VERY_HIGH"),
+    (2, 1, 4, "CRITICAL", "TIER_1", "HIGH",     "HIGH",     "HIGH",     "HIGH",     "CRITICAL"),
     (4, 2, 8, "HIGH",     "TIER_1", "HIGH",     "MEDIUM",   "MEDIUM",   "HIGH",     "HIGH"),
     (8, 4, 24,"MEDIUM",  "TIER_2", "MEDIUM",   "HIGH",     "LOW",      "MEDIUM",   "MEDIUM"),
     (24,8, 72,"MEDIUM",  "TIER_2", "LOW",      "MEDIUM",   "MEDIUM",   "LOW",      "MEDIUM"),
@@ -422,6 +422,306 @@ for i, (vid, vname) in enumerate(vendors):
         f"تأهيل المورد {vname}. المرحلة الحالية: {stage}.",
         label=f"onboarding: {vname} → {stage}",
     )
+
+# ──────────────────────────────────────────────────────────────────────
+# Cyber incidents — SOC operational ledger
+# ──────────────────────────────────────────────────────────────────────
+section("cyber.cyber_incidents — SOC ledger (resolved + active)")
+
+INCIDENTS = [
+    # (title_en, title_ar, type, impact, severity, status, asset, lead, days_ago)
+    ("Spear-phishing wave targeting Treasury",
+     "موجة تصيد موجّه ضد قسم الخزينة",
+     "PHISHING", "HIGH", "CRITICAL", "CLOSED",
+     "Email — Microsoft 365 EX5", "Faisal Al-Dosari", 95),
+    ("Suspicious PowerShell on retail-banking endpoint",
+     "نشاط PowerShell مشبوه على نقطة عميل الأفراد",
+     "MALWARE", "MEDIUM", "HIGH", "CLOSED",
+     "Active Directory Domain", "Bandar Al-Rashidi", 60),
+    ("DDoS — Internet Banking front",
+     "هجوم حرمان من الخدمة على واجهة الخدمات المصرفية",
+     "DDoS", "HIGH", "CRITICAL", "CLOSED",
+     "Internet Banking Web Front", "Saud Al-Harbi", 40),
+    ("Unauthorised access attempt to T24 admin console",
+     "محاولة وصول غير مخوّل لوحدة إدارة T24",
+     "UNAUTHORISED_ACCESS", "CRITICAL", "CRITICAL", "RESOLVED",
+     "Core Banking — T24", "Mohammed Al-Otaibi", 22),
+    ("Vulnerability exploited — F5 CVE-2024-XYZ",
+     "استغلال ثغرة على F5 — CVE-2024-XYZ",
+     "VULN_EXPLOIT", "HIGH", "HIGH", "IN_PROGRESS",
+     "F5 BIG-IP LTM Pair", "Khalid Al-Shehri", 8),
+    ("Suspicious data exfiltration via cloud-storage",
+     "اشتباه بتسريب بيانات عبر التخزين السحابي",
+     "DATA_EXFIL", "HIGH", "HIGH", "IN_PROGRESS",
+     "AWS Production Account (Bahrain)", "Sarah Al-Qahtani", 4),
+    ("Brute-force on RDP — exposed to internet",
+     "هجوم تخمين كلمات مرور على RDP المعرَّض للإنترنت",
+     "BRUTE_FORCE", "MEDIUM", "MEDIUM", "RESOLVED",
+     "Backup — Commvault DR Site", "Faisal Al-Dosari", 18),
+    ("Ransomware indicator — branch ops endpoint",
+     "مؤشّر فدية على نقطة عمليات الفرع",
+     "MALWARE", "CRITICAL", "CRITICAL", "CLOSED",
+     "Document Mgmt — OpenText", "Mohammed Al-Otaibi", 75),
+    ("Insider — privileged token shared on Teams",
+     "تسرّب رمز صلاحيات على Teams من موظف",
+     "INSIDER_THREAT", "MEDIUM", "HIGH", "IN_REVIEW",
+     "Splunk SIEM Cluster", "Bandar Al-Rashidi", 11),
+    ("Vendor breach — Crowdstrike token exposure",
+     "اختراق المورّد — تسرّب رمز Crowdstrike",
+     "VENDOR_BREACH", "MEDIUM", "MEDIUM", "CLOSED",
+     "Splunk SIEM Cluster", "Saud Al-Harbi", 105),
+    ("DNS poisoning attempt — ATM switch",
+     "محاولة تسميم DNS على محوّل أجهزة الصراف الآلي",
+     "DNS_ATTACK", "HIGH", "HIGH", "RESOLVED",
+     "ATM Switch — Cardless Cash", "Khalid Al-Shehri", 30),
+    ("Malicious npm-package detected in CI/CD",
+     "اكتشاف حزمة npm خبيثة في خطوط CI/CD",
+     "SUPPLY_CHAIN", "MEDIUM", "MEDIUM", "RESOLVED",
+     "ITSM — ServiceNow", "Yousef Al-Mansouri", 50),
+]
+for i, (title_en, title_ar, itype, impact, severity, status, asset, lead, days_ago) in enumerate(INCIDENTS, start=1):
+    incident_number = f"INC-{2026}-{1000+i:04d}"
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM cyber.cyber_incidents
+                       WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO cyber.cyber_incidents (external_id, organisation_id, incident_number,
+            title_en, title_ar, incident_type, affected_asset_name, impact, severity,
+            workflow_status, detected_at, reported_at,
+            resolved_at, incident_lead, notification_sent, bcm_handoff,
+            linked_vulnerabilities_count, linked_evidence_count,
+            is_deleted, created_at)
+        VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            DATEADD(day, -{days_ago}, GETDATE()), DATEADD(day, -{days_ago}, GETDATE()),
+            {('DATEADD(day, -' + str(max(days_ago - 7, 1)) + ', GETDATE())') if status in ('CLOSED','RESOLVED') else 'NULL'},
+            ?, {'1' if severity in ('CRITICAL','HIGH') else '0'},
+            {'1' if itype in ('MALWARE','RANSOMWARE','DDoS') else '0'},
+            0, 0, 0, DATEADD(day, -{days_ago}, GETDATE()))
+        """,
+        title_en, ORG_TSS,
+        ORG_TSS, incident_number, title_en, title_ar, itype, asset, impact, severity, status,
+        lead,
+        label=f"incident: {incident_number} {title_en[:40]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# BCM exercises — quarterly drills
+# ──────────────────────────────────────────────────────────────────────
+section("bcm.bcm_exercises — quarterly drills")
+
+EXERCISES = [
+    # (title_en, title_ar, exercise_type, status, facilitator, days_ago_or_ahead, result)
+    ("Q1 2026 — Data-Centre Failover Drill",       "تمرين Q1 2026 — تجربة التحوّل لمركز البيانات",      "FAILOVER",    "COMPLETED",   "Mohammed Al-Otaibi", -75, "PASS"),
+    ("Q2 2026 — Pandemic Tabletop",                 "تمرين Q2 2026 — مكتبي للجائحة",                   "TABLETOP",    "COMPLETED",   "Reema Al-Asiri",     -15, "PASS_WITH_OBSERVATIONS"),
+    ("Q3 2026 — Ransomware Live-Fire (SOC)",        "تمرين Q3 2026 — هجوم فدية حي",                   "FUNCTIONAL",  "SCHEDULED",   "Faisal Al-Dosari",    25, None),
+    ("Q4 2026 — Full Crisis Activation",            "تمرين Q4 2026 — تفعيل أزمة كاملة",               "FULL_SCALE",  "SCHEDULED",   "Sarah Al-Qahtani",    85, None),
+    ("Annual — Treasury Settlement Outage",         "السنوي — انقطاع التسوية في الخزينة",              "FUNCTIONAL",  "COMPLETED",   "Khalid Al-Shehri",   -120, "PASS"),
+    ("ATM-Switch Failover Walkthrough",             "محاكاة تحوّل محوّل أجهزة الصراف الآلي",           "WALKTHROUGH", "COMPLETED",   "Bandar Al-Rashidi",   -45, "PASS"),
+    ("DR Site Activation (Jeddah → Riyadh)",        "تفعيل موقع التعافي (جدة → الرياض)",               "FAILOVER",    "COMPLETED",   "Saud Al-Harbi",       -90, "PASS"),
+    ("Crisis Comms Cascade Test",                   "اختبار شجرة الاتصالات في الأزمة",                  "COMMS",       "COMPLETED",   "Layla Al-Ghamdi",     -30, "PASS"),
+    ("SAMA Major-Incident 6-Hour Drill",             "تمرين الحادث الكبير 6 ساعات — ساما",              "REGULATORY",  "COMPLETED",   "Mohammed Al-Otaibi", -150, "PASS"),
+    ("Vendor Failure — STC Cloud Service Drill",    "تمرين فشل المورّد — خدمة سحابة STC",              "VENDOR",      "SCHEDULED",   "Sarah Al-Qahtani",    55, None),
+]
+for title_en, title_ar, etype, status, fac, days_offset, result in EXERCISES:
+    exec_date = "NULL" if status == "SCHEDULED" else f"DATEADD(day, {days_offset}, CAST(GETDATE() AS DATE))"
+    sched_date = f"DATEADD(day, {days_offset - 7 if status == 'COMPLETED' else days_offset}, CAST(GETDATE() AS DATE))"
+    result_val = "NULL" if result is None else f"'{result}'"
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM bcm.bcm_exercises
+                       WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO bcm.bcm_exercises (external_id, organisation_id, title_en, title_ar,
+            exercise_type, scheduled_date, executed_date, status, facilitator,
+            objectives, overall_result, is_deleted, created_at)
+        VALUES (NEWID(), ?, ?, ?, ?, {sched_date}, {exec_date}, ?, ?,
+            'التحقّق من جاهزية الخطة + قياس RTO/RPO الفعلي + ملاحظات لتحسين العملية.',
+            {result_val}, 0, GETDATE())
+        """,
+        title_en, ORG_TSS,
+        ORG_TSS, title_en, title_ar, etype, status, fac,
+        label=f"exercise: {title_en}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# Compliance regulatory changes — SAMA / NCA / SDAIA / CMA / ZATCA
+# ──────────────────────────────────────────────────────────────────────
+section("compliance.regulatory_changes — Saudi authority circulars")
+
+REG_CHANGES = [
+    # (authority, title_en, title_ar, citation, applicability, impact, status, days_ago)
+    ("SAMA",  "Cloud Computing Outsourcing Framework — Update v2",
+              "إطار الحوسبة السحابية والاستعانة بمصادر خارجية — تحديث الإصدار 2",
+              "SAMA/CIRC/2026/01", "BANKING", "HIGH",   "IMPLEMENTED",  90),
+    ("SAMA",  "Open Banking Phase 3 — Account Information Sharing",
+              "المنظومة المفتوحة المرحلة 3 — مشاركة معلومات الحساب",
+              "SAMA/CIRC/2026/04", "BANKING", "HIGH",   "IN_REVIEW",    20),
+    ("SAMA",  "Cyber Security Framework v1.3 — Incident Reporting 6h SLA",
+              "إطار الأمن السيبراني الإصدار 1.3 — تقرير الحوادث ضمن 6 ساعات",
+              "SAMA/CSF/1.3",      "BANKING", "CRITICAL","IMPLEMENTED",  180),
+    ("NCA",   "Essential Cybersecurity Controls ECC-2",
+              "الضوابط الأساسية للأمن السيبراني ECC-2",
+              "NCA/ECC-2/2026",    "ALL",     "CRITICAL","IN_PROGRESS",  45),
+    ("NCA",   "Cloud Cybersecurity Controls CCC v1.1",
+              "ضوابط الأمن السيبراني السحابي CCC v1.1",
+              "NCA/CCC/1.1",       "ALL",     "HIGH",   "IN_PROGRESS",   25),
+    ("NCA",   "OT Cybersecurity Controls OTCC",
+              "ضوابط أمن أنظمة التحكم الصناعي OTCC",
+              "NCA/OTCC/2026",     "ALL",     "MEDIUM", "ASSIGNED",      10),
+    ("SDAIA", "PDPL — Executive Regulations — Final",
+              "نظام حماية البيانات الشخصية — اللائحة التنفيذية — النسخة النهائية",
+              "SDAIA/PDPL/EXEC",   "ALL",     "CRITICAL","IMPLEMENTED",  200),
+    ("SDAIA", "Cross-Border Transfer Decision — Tier 1 countries",
+              "قرار النقل خارج الحدود — دول الفئة الأولى",
+              "SDAIA/CBT/2026/01", "ALL",     "HIGH",   "IN_REVIEW",     15),
+    ("CMA",   "Sustainability Disclosure Articles 91-94 — Mandatory FY26",
+              "إفصاحات الاستدامة المواد 91-94 — إلزامية للعام المالي 2026",
+              "CMA/SUST/91-94",    "LISTED",  "HIGH",   "IN_PROGRESS",    60),
+    ("CMA",   "Corporate Governance Code — Board Independence Update",
+              "نظام حوكمة الشركات — تحديث استقلالية المجلس",
+              "CMA/CG/2026",       "LISTED",  "MEDIUM", "IMPLEMENTED",   140),
+    ("ZATCA", "Electronic Invoicing Phase 4 — Wave 23",
+              "الفوترة الإلكترونية المرحلة 4 — الموجة 23",
+              "ZATCA/E-INV/4-23",  "ALL",     "MEDIUM", "IN_PROGRESS",     5),
+    ("MOH",   "Patient Privacy & Healthcare Data Sharing — Update",
+              "خصوصية المريض ومشاركة بيانات الرعاية الصحية — تحديث",
+              "MOH/PP/2026/02",    "HEALTHCARE","MEDIUM","ASSIGNED",      18),
+]
+for auth, title_en, title_ar, cite, applic, impact, status, days_ago in REG_CHANGES:
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM compliance.regulatory_changes
+                       WHERE citation = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO compliance.regulatory_changes (external_id, organisation_id, source_authority,
+            title_en, title_ar, citation, summary_ar, published_date, effective_date,
+            applicability, impact_level, status, controls_updated_count, is_deleted, created_at)
+        VALUES (NEWID(), ?, ?, ?, ?, ?, ?, DATEADD(day, -{days_ago}, CAST(GETDATE() AS DATE)),
+            DATEADD(day, -{days_ago} + 60, CAST(GETDATE() AS DATE)), ?, ?, ?, 0, 0, GETDATE())
+        """,
+        cite, ORG_TSS,
+        ORG_TSS, auth, title_en, title_ar, cite,
+        f"إصدار من {auth} يتطلّب مراجعة ضوابط البنك وإجراء تحديث على السياسات + الأدلة الداعمة.",
+        applic, impact, status,
+        label=f"regchange: [{auth}] {title_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# ESG materiality topics — CMA Art.91-94 themes
+# ──────────────────────────────────────────────────────────────────────
+section("sust.material_topic — CMA Art.91-94 materiality matrix")
+
+MATERIAL_TOPICS = [
+    # (code, category, topic_en, topic_ar, stakeholder, business, tier, status, owner)
+    ("MT-001", "ENVIRONMENTAL", "GHG emissions reduction — Scopes 1+2",
+                              "خفض انبعاثات غازات الدفيئة — النطاقات 1+2", 4.6, 4.8, "CRITICAL",  "APPROVED",  "Mohammed Al-Otaibi"),
+    ("MT-002", "ENVIRONMENTAL", "Energy efficiency in data-centres",
+                              "كفاءة الطاقة في مراكز البيانات",                4.2, 4.5, "HIGH",       "APPROVED",  "Khalid Al-Shehri"),
+    ("MT-003", "ENVIRONMENTAL", "Water consumption — branches & HQ",
+                              "استهلاك المياه — الفروع والمقر",                3.4, 3.0, "MEDIUM",     "APPROVED",  "Reema Al-Asiri"),
+    ("MT-004", "ENVIRONMENTAL", "Sustainable financing & green bonds",
+                              "التمويل المستدام والصكوك الخضراء",              4.7, 4.6, "CRITICAL",  "APPROVED",  "Sarah Al-Qahtani"),
+    ("MT-005", "SOCIAL",      "Saudization & Vision 2030 alignment",
+                              "السعودة والتوافق مع رؤية 2030",                 4.8, 4.7, "CRITICAL",  "APPROVED",  "Layla Al-Ghamdi"),
+    ("MT-006", "SOCIAL",      "Customer privacy & PDPL compliance",
+                              "خصوصية العملاء والامتثال لـ PDPL",              4.9, 4.9, "CRITICAL",  "APPROVED",  "Faisal Al-Dosari"),
+    ("MT-007", "SOCIAL",      "Financial literacy & inclusion",
+                              "التثقيف المالي والشمول المالي",                  4.3, 4.1, "HIGH",       "SCORED", "Reema Al-Asiri"),
+    ("MT-008", "SOCIAL",      "Health, safety & wellbeing of employees",
+                              "الصحة والسلامة ورفاهية الموظفين",                3.8, 3.5, "MEDIUM",     "APPROVED",  "Layla Al-Ghamdi"),
+    ("MT-009", "GOVERNANCE",  "Board diversity & independence",
+                              "تنوّع المجلس واستقلاليته",                       4.5, 4.4, "HIGH",       "APPROVED",  "Mohammed Al-Otaibi"),
+    ("MT-010", "GOVERNANCE",  "Anti-bribery & corruption",
+                              "مكافحة الرشوة والفساد",                          4.7, 4.6, "CRITICAL",  "APPROVED",  "Khalid Al-Shehri"),
+    ("MT-011", "GOVERNANCE",  "Cybersecurity & operational resilience",
+                              "الأمن السيبراني والمرونة التشغيلية",             4.8, 4.9, "CRITICAL",  "APPROVED",  "Faisal Al-Dosari"),
+    ("MT-012", "GOVERNANCE",  "Responsible AI & algorithmic fairness",
+                              "الذكاء الاصطناعي المسؤول والعدالة الخوارزمية",   4.0, 3.9, "HIGH",       "SCORED", "Yousef Al-Mansouri"),
+]
+for code, cat, t_en, t_ar, stake, biz, tier, status, owner in MATERIAL_TOPICS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM sust.material_topic
+                       WHERE topic_code = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO sust.material_topic (organisation_id, external_id, topic_code, reporting_year,
+            category, topic_en, topic_ar, description_en, description_ar,
+            stakeholder_importance, business_impact, materiality_score, priority_tier, status,
+            owner_name, is_deleted, created_at)
+        VALUES (?, NEWID(), ?, 2026, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, GETDATE())
+        """,
+        code, ORG_TSS,
+        ORG_TSS, code, cat, t_en, t_ar,
+        f"Theme reviewed in 2026 CMA Art.91-94 alignment workshop.",
+        f"موضوع روجِع في ورشة محاذاة المواد 91-94 لهيئة السوق المالية 2026.",
+        stake, biz, round((stake + biz) / 2, 2), tier, status, owner,
+        label=f"material: [{cat}] {t_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
+# NDI gaps — DGA assessment findings
+# ──────────────────────────────────────────────────────────────────────
+section("ndi.gap — DGA NDI cycle findings")
+
+cur.execute(
+    "SELECT TOP 1 id FROM ndi.assessment_cycle WHERE is_deleted=0 AND organisation_id=? ORDER BY id DESC",
+    ORG_TSS,
+)
+row = cur.fetchone()
+ndi_cycle_id = row[0] if row else None
+print(f"  using NDI cycle id={ndi_cycle_id}")
+
+if ndi_cycle_id:
+    GAPS = [
+        # (code, domain, title_en, title_ar, severity, status, owner)
+        ("GAP-001", "DATA_GOVERNANCE", "Missing data classification labels on 18% of business datasets",
+                                       "وسوم تصنيف البيانات غير مكتملة على 18% من مجموعات البيانات",
+                                       "HIGH",     "OPEN",     "Reema Al-Asiri"),
+        ("GAP-002", "DATA_GOVERNANCE", "Inconsistent retention schedule across legacy systems",
+                                       "جدول احتفاظ بالبيانات غير متّسق عبر الأنظمة القديمة",
+                                       "MEDIUM",   "IN_PROGRESS","Khalid Al-Shehri"),
+        ("GAP-003", "DATA_QUALITY",    "Customer KYC dataset — 4.2% duplicate rate",
+                                       "بيانات KYC — معدّل تكرار 4.2%",
+                                       "MEDIUM",   "IN_PROGRESS","Sarah Al-Qahtani"),
+        ("GAP-004", "INTEROPERABILITY", "API contract drift between Open-Banking peers",
+                                        "انحراف عقود API بين شركاء المنظومة المفتوحة",
+                                        "HIGH",    "OPEN",         "Mohammed Al-Otaibi"),
+        ("GAP-005", "PRIVACY",         "DSR SLA missed twice in Q1 2026",
+                                       "تجاوز SLA طلبات أصحاب البيانات مرّتين في الربع الأول",
+                                       "HIGH",     "RESOLVED",   "Faisal Al-Dosari"),
+        ("GAP-006", "SECURITY",        "Encryption-at-rest gap in archived backups",
+                                       "فجوة في تشفير النسخ الاحتياطية المؤرشفة",
+                                       "CRITICAL", "IN_PROGRESS","Saud Al-Harbi"),
+        ("GAP-007", "OPERATIONAL_EXCELLENCE", "Manual reconciliation step in nightly ETL",
+                                              "خطوة مطابقة يدوية في خط ETL الليلي",
+                                              "LOW",       "OPEN",         "Bandar Al-Rashidi"),
+        ("GAP-008", "GOVERNANCE",      "Data ownership matrix missing 6 product lines",
+                                       "مصفوفة ملكية البيانات تفتقر إلى 6 خطوط منتجات",
+                                       "MEDIUM",   "OPEN",         "Layla Al-Ghamdi"),
+        ("GAP-009", "PRIVACY",         "Consent re-collection not triggered after policy update",
+                                       "إعادة جمع الموافقة لم تُفعَّل بعد تحديث السياسة",
+                                       "HIGH",     "IN_PROGRESS","Reema Al-Asiri"),
+        ("GAP-010", "DATA_QUALITY",    "Address normalisation failing for Saudi geocodes",
+                                       "تطبيع العناوين فاشل لأكواد GPS السعودية",
+                                       "LOW",      "OPEN",         "Yousef Al-Mansouri"),
+    ]
+    for code, domain, t_en, t_ar, severity, status, owner in GAPS:
+        run(
+            f"""
+            IF NOT EXISTS (SELECT 1 FROM ndi.gap
+                           WHERE gap_code = ? AND organisation_id = ? AND is_deleted = 0)
+            INSERT INTO ndi.gap (organisation_id, external_id, cycle_id, gap_code,
+                source_type, domain, title_en, title_ar, severity, likelihood, risk_score,
+                owner_name, open_date, target_date, rollup_progress, capa_count, capa_completed_count,
+                status, is_deleted, created_at)
+            VALUES (?, LOWER(REPLACE(NEWID(),'-','')), ?, ?, 'MANUAL', ?, ?, ?, ?, 'LIKELY', ?, ?,
+                CAST(GETDATE() AS DATE), DATEADD(day, 60, CAST(GETDATE() AS DATE)),
+                {0 if status == 'OPEN' else (50 if status == 'IN_REMEDIATION' else 100)},
+                0, 0, ?, 0, GETDATE())
+            """,
+            code, ORG_TSS,
+            ORG_TSS, ndi_cycle_id, code, domain, t_en, t_ar, severity,
+            10 if severity == 'CRITICAL' else (7 if severity == 'HIGH' else (5 if severity == 'MEDIUM' else 2)),
+            owner, status,
+            label=f"NDI gap: [{domain}] {t_en[:50]}",
+        )
 
 # ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
