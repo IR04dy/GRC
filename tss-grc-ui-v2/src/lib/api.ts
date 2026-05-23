@@ -803,6 +803,147 @@ export const ermAdvancedApi = {
   appetiteDashboard: () => api.get<{ total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number }>('/api/v1/risk/appetite/dashboard'),
 };
 
+// ─── Risk Bow-Tie Analysis (ISO 31010) ──────────────────────────────────────
+// Sprint 11 P1 GRC. Each bow-tie has one top-event header plus four child
+// collections: threats (left), consequences (right), preventive controls
+// (between threat & top event), and mitigating controls (between top event &
+// consequence). The detail page renders the full picture as an SVG bow-tie.
+
+export interface BowTieAnalysisResponse {
+  id: number;
+  externalId: string;
+  bowtieCode: string;
+  linkedRiskId?: number;
+  topEventTitleEn: string;
+  topEventTitleAr?: string;
+  topEventDescriptionEn?: string;
+  topEventDescriptionAr?: string;
+  riskCategory?: string;
+  assessmentDate: string;
+  assessedByName?: string;
+  methodology: string;
+  overallResidualRating?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  overallControlEffectiveness?: number;
+  status: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SUPERSEDED' | 'ARCHIVED';
+  approvedAt?: string;
+  approvedByName?: string;
+  nextReviewAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BowTieThreatDto {
+  id?: number;
+  externalId?: string;
+  bowtieId?: number;
+  threatOrder?: number;
+  titleEn: string;
+  titleAr?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  inherentLikelihood?: string;
+  residualLikelihood?: string;
+  source?: string;
+}
+
+export interface BowTieConsequenceDto {
+  id?: number;
+  externalId?: string;
+  bowtieId?: number;
+  consequenceOrder?: number;
+  titleEn: string;
+  titleAr?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  consequenceType?: string;
+  inherentSeverity?: string;
+  residualSeverity?: string;
+  estimatedLossSar?: number;
+}
+
+export interface BowTiePreventiveControlDto {
+  id?: number;
+  externalId?: string;
+  bowtieId?: number;
+  threatId?: number;
+  threatExternalId?: string;
+  controlOrder?: number;
+  titleEn: string;
+  titleAr?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  controlType?: string;
+  linkedControlId?: number;
+  effectiveness: 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+  lastTestedAt?: string;
+  lastTestResult?: string;
+  responsibleRole?: string;
+  responsibleOwner?: string;
+}
+
+export interface BowTieMitigatingControlDto {
+  id?: number;
+  externalId?: string;
+  bowtieId?: number;
+  consequenceId?: number;
+  consequenceExternalId?: string;
+  controlOrder?: number;
+  titleEn: string;
+  titleAr?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  controlType?: string;
+  linkedControlId?: number;
+  effectiveness: 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+  lastTestedAt?: string;
+  lastTestResult?: string;
+  responsibleRole?: string;
+  responsibleOwner?: string;
+}
+
+export interface BowTieFullResponse {
+  header: BowTieAnalysisResponse;
+  threats: BowTieThreatDto[];
+  consequences: BowTieConsequenceDto[];
+  preventiveControls: BowTiePreventiveControlDto[];
+  mitigatingControls: BowTieMitigatingControlDto[];
+}
+
+export interface BowTieAnalysisRequest {
+  bowtieCode?: string;
+  linkedRiskId?: number;
+  topEventTitleEn: string;
+  topEventTitleAr?: string;
+  topEventDescriptionEn?: string;
+  topEventDescriptionAr?: string;
+  riskCategory?: string;
+  assessmentDate?: string;
+  assessedByName?: string;
+  methodology?: string;
+  nextReviewAt?: string;
+  threats?: BowTieThreatDto[];
+  consequences?: BowTieConsequenceDto[];
+}
+
+export const bowtieApi = {
+  list:      () => api.get<BowTieAnalysisResponse[]>('/api/v1/risk/bowtie'),
+  get:       (externalId: string) => api.get<BowTieFullResponse>(`/api/v1/risk/bowtie/${externalId}`),
+  create:    (body: BowTieAnalysisRequest) => api.post<BowTieAnalysisResponse>('/api/v1/risk/bowtie', body),
+  update:    (externalId: string, body: BowTieAnalysisRequest) => api.put<BowTieAnalysisResponse>(`/api/v1/risk/bowtie/${externalId}`, body),
+  addThreat: (externalId: string, dto: BowTieThreatDto) => api.post<BowTieThreatDto>(`/api/v1/risk/bowtie/${externalId}/threats`, dto),
+  removeThreat: (threatExternalId: string) => api.delete<void>(`/api/v1/risk/bowtie/threats/${threatExternalId}`),
+  addConsequence: (externalId: string, dto: BowTieConsequenceDto) => api.post<BowTieConsequenceDto>(`/api/v1/risk/bowtie/${externalId}/consequences`, dto),
+  removeConsequence: (consExternalId: string) => api.delete<void>(`/api/v1/risk/bowtie/consequences/${consExternalId}`),
+  addPreventiveControl: (threatExternalId: string, dto: BowTiePreventiveControlDto) =>
+    api.post<BowTiePreventiveControlDto>(`/api/v1/risk/bowtie/threats/${threatExternalId}/preventive-controls`, dto),
+  addMitigatingControl: (consExternalId: string, dto: BowTieMitigatingControlDto) =>
+    api.post<BowTieMitigatingControlDto>(`/api/v1/risk/bowtie/consequences/${consExternalId}/mitigating-controls`, dto),
+  submit:    (externalId: string) => api.post<BowTieAnalysisResponse>(`/api/v1/risk/bowtie/${externalId}/submit`),
+  approve:   (externalId: string, approverName?: string) =>
+    api.post<BowTieAnalysisResponse>(`/api/v1/risk/bowtie/${externalId}/approve`, { approverName }),
+  archive:   (externalId: string) => api.delete<void>(`/api/v1/risk/bowtie/${externalId}`),
+};
+
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 export interface DashboardStats {
   totalRisks: number; criticalRisks: number; highRisks: number; mediumRisks: number; lowRisks: number;

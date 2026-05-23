@@ -4740,6 +4740,9 @@ export const en = {
   dpiaActReject:               'Reject',
   dpiaActPeriodicReview:       'Initiate periodic review',
 
+  // Sprint 11 P1 GRC — ISO 31010 bow-tie analysis sidebar label.
+  bowtieSidebar:               'Bow-tie analysis',
+
   // ─── Risk Scenarios (gap-analysis item 3) ──────────────────────────
   scnSidebar:                  'Scenario analysis',
   scnPageTitle:                'Scenario analysis',

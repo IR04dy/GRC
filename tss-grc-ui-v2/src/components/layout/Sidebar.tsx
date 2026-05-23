@@ -69,6 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'risk',      to: '/risk',           Icon: AlertTriangle, labelKey: 'modRisk' },
       { id: 'risk-lc',   to: '/risk-lifecycle', Icon: GitBranch,     labelKey: 'rlcSidebar' },
       { id: 'scenarios', to: '/risk-scenarios', Icon: Sigma,         labelKey: 'scnSidebar' },
+      { id: 'bowtie',    to: '/risk/bowtie',    Icon: GitBranch,     labelKey: 'bowtieSidebar' },
       { id: 'emerging',  to: '/emerging-risk',  Icon: Telescope,     labelKey: 'emrSidebar' },
       { id: 'incidents', to: '/incidents',      Icon: AlertOctagon,  labelKey: 'incidentsTitle' },
       { id: 'rca',       to: '/rca',            Icon: Microscope,    labelKey: 'rcaSidebar' },

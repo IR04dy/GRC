@@ -4719,6 +4719,9 @@ export const ar = {
   dpiaActReject:               'رفض',
   dpiaActPeriodicReview:       'بدء مراجعة دورية',
 
+  // Sprint 11 P1 GRC — ISO 31010 bow-tie analysis sidebar label.
+  bowtieSidebar:               'تحليل الفيونكة',
+
   // ─── Risk Scenarios (gap-analysis item 3) ──────────────────────────
   scnSidebar:                  'تحليل السيناريوهات',
   scnPageTitle:                'تحليل السيناريوهات',

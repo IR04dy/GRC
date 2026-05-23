@@ -187,6 +187,9 @@ const DataSharingPage        = lazy(() => import('./pages/data-sharing/DataShari
 const ProcessorAssessmentsPage = lazy(() => import('./pages/processor-assessments/ProcessorAssessmentsPage').then(m => ({ default: m.ProcessorAssessmentsPage })));
 const ThirdPartyCyberPage    = lazy(() => import('./pages/third-party-cyber/ThirdPartyCyberPage').then(m => ({ default: m.ThirdPartyCyberPage })));
 const ResilienceTestsPage    = lazy(() => import('./pages/resilience-tests/ResilienceTestsPage').then(m => ({ default: m.ResilienceTestsPage })));
+// Sprint 11 P1 GRC — ISO 31010 Bow-Tie analysis pages.
+const RiskBowTiePage         = lazy(() => import('./pages/risk/RiskBowTiePage').then(m => ({ default: m.RiskBowTiePage })));
+const RiskBowTieDetailPage   = lazy(() => import('./pages/risk/RiskBowTieDetailPage').then(m => ({ default: m.RiskBowTieDetailPage })));
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 export function App() {
@@ -332,6 +335,11 @@ export function App() {
               <Route path="/changes"    element={<ChangesPage />} />
               <Route path="/ethics"     element={<EthicsPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
+
+              {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE
+                  /risk/:id so the static "bowtie" segment matches first. */}
+              <Route path="/risk/bowtie"                 element={<RiskBowTiePage />} />
+              <Route path="/risk/bowtie/:externalId"     element={<RiskBowTieDetailPage />} />
 
               {/* Detail-page deep-drill routes (Tier 2) */}
               <Route path="/risk/:id"        element={<RiskDetailPage />} />
