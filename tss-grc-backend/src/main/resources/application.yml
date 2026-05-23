@@ -213,6 +213,26 @@ grc:
         backoff-multiplier: 2.0
       timeout-ms: 5000
 
+    # Tenable.io / Tenable.sc VM bridge (slice 4 — see docs/integrations/TENABLE.md).
+    # API key pair (X-ApiKeys header); choose platform=IO for cloud, SC for on-prem.
+    # Pulls /vulns/export into cyber.vulnerabilities; pushes recast/accept-risk
+    # decisions via the workbench endpoints. PDPL Art.29 — Tenable.io has no
+    # KSA datacenter; banks needing KSA-resident data should pick SC on-prem.
+    tenable:
+      enabled: false                              # master kill-switch
+      mode: STUB                                  # STUB (in-memory) | LIVE (real Tenable HTTPS)
+      platform: IO                                # IO (cloud) | SC (on-prem Security Center)
+      base-url: "https://cloud.tenable.com"
+      access-key: ${TENABLE_ACCESS_KEY:}
+      secret-key: ${TENABLE_SECRET_KEY:}
+      polling-interval-seconds: 900               # 15 min — scans aggregate slowly vs EDR streaming
+      polling-enabled: false                      # independent — manual poll first, then enable loop
+      retry:
+        max-attempts: 3
+        initial-delay-ms: 500
+        backoff-multiplier: 2.0
+      timeout-ms: 5000
+
   # BCM module — Slice 9-D Continuity Strategy ROI
   # Discount rate used for NPV calculation across the planning horizon.
   # Default 8% = SAMA reference repo rate (2026 figure). Override via

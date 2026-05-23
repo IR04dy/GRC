@@ -92,6 +92,17 @@ grc:
       polling-enabled: false
       polling-interval-seconds: 60
 
+    # Tenable VM — enabled in STUB so the /api/v1/integrations/tenable routes
+    # work out of the box. The scheduled poll loop stays OFF in dev so we don't
+    # spam cyber.vulnerabilities with synthetic findings on every boot.
+    tenable:
+      enabled: true
+      mode: STUB
+      platform: IO
+      base-url: "https://cloud.tenable.com"
+      polling-enabled: false
+      polling-interval-seconds: 900
+
 springdoc:
   swagger-ui:
     enabled: true
