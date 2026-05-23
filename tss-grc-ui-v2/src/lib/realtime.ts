@@ -13,6 +13,7 @@
 // are the next iteration.
 
 import { Client, type StompSubscription, type Message } from '@stomp/stompjs';
+import { getAccessToken } from './auth';
 
 export type RealtimeHandler = (envelope: { type: string; ts: string; data: any }) => void;
 
@@ -58,8 +59,15 @@ function ensureClient(): Client {
   if (client) return client;
   client = new Client({
     brokerURL: brokerUrl(),
-    connectHeaders: {
-      Authorization: `Bearer ${getJwt()}`,
+    // The token can refresh mid-session (PR #143 added transparent 401 →
+    // /refresh → retry). Reading connectHeaders once at client creation
+    // would mean every STOMP reconnect (reconnectDelay=5s) reuses the
+    // stale token captured at app start — real-time notifications would
+    // silently die after the first refresh. `beforeConnect` is the
+    // @stomp/stompjs hook to re-evaluate headers on every (re)connect.
+    beforeConnect: () => {
+      const tok = getAccessToken() ?? '';
+      if (client) client.connectHeaders = { Authorization: `Bearer ${tok}` };
     },
     reconnectDelay: 5000,                 // initial reconnect attempt after 5s
     heartbeatIncoming: 30_000,
@@ -80,10 +88,6 @@ function ensureClient(): Client {
   });
   client.activate();
   return client;
-}
-
-function getJwt(): string {
-  try { return window.sessionStorage.getItem('grc.accessToken') ?? ''; } catch { return ''; }
 }
 
 function doSubscribe(topic: string, handler: RealtimeHandler) {
@@ -127,7 +131,7 @@ export function subscribe(topic: string, handler: RealtimeHandler): () => void {
  *  verified by the server on every API call). */
 export function currentOrgId(): string | null {
   try {
-    const tok = window.sessionStorage.getItem('grc.accessToken');
+    const tok = getAccessToken();
     if (!tok) return null;
     const payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
     return payload?.org ?? null;
