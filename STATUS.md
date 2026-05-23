@@ -1,9 +1,82 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (API client unification — PRs #142 → #146)
+**Last update:** 23 May 2026 (Sprint-7 BCM/GRC plan + Saudi regulatory seed arc — PRs #148 → #154)
 
 ---
 
-## 🟢 Latest — API client unification (23 May 2026, PRs #142 → #146)
+## 🟢 Latest — Sprint-7 BCM/GRC plan + Saudi regulatory seed arc (23 May 2026, PRs #148 → #154)
+
+User asked: "as Saudi BCM Manager what you still need... as GRC expert and SME make a plan in md file". Result: a complete BCM playbook (gap analysis + plan + operational doc library + first execution slices delivering 540+ rows of Saudi-regulatory compliance data).
+
+### Seven-PR arc
+
+| PR | What lands |
+|---|---|
+| #148 | `realtime.ts` STOMP stale-JWT fix + sessionStorage antipattern (the silent twin of the api unification arc) |
+| #149 | Backend `GlobalExceptionHandler` — 4 new `@ExceptionHandlers` for common 500 sources + richer `handleGeneral` detail |
+| #150 | `BCM_GRC_GAP_ANALYSIS_AND_PLAN.md` — 28 BCM-Manager gaps + 30 GRC SME gaps + sprint plan (Sprints 7-12, ~30 slices) |
+| #151 | **Slice 7-F** — SAMA BCF clause-level mapping seed (47 clauses across 8 chapters + 3 SAMA-specific addenda) |
+| #152 | `docs/bcm-manager/` — **19 operational MD files**: charter, RACI, glossary, BIA methodology + template, risk methodology, continuity strategy, BCP/DRP/IRP/comms/pandemic plans, exercise strategy + templates, annual review, regulator runbooks, vendor BCP attestation, KPI dashboard, lessons-learned template |
+| #153 | **4 plan slices batched**: 7-G NCA OTCC (27 controls), 7-B precursor ISO 22301 §4-10 (47 sub-clauses), NCEMA/NRC (10), 9-A precursor 40 new exercise scenarios |
+| #154 | Closeout seed — DGA expansion (7), SAMA OPRES expansion (7), multi-tenant replication to Aramco + STC (252 rows) |
+
+### The 7-PR result in numbers
+
+**`bcm.compliance_mappings`** (across 3 tenants):
+
+| Framework | TSS (org=1) | Aramco (org=2) | STC (org=3) | Total |
+|---|---:|---:|---:|---:|
+| ISO 22301 §4-10 | 52 | 52 | 52 | 156 |
+| SAMA BCF | 47 | 47 | 47 | 141 |
+| NCA OTCC | 27 | 27 | 27 | 81 |
+| SAMA Operational Resilience | 12 | - | - | 12 |
+| DGA Digital Govt | 10 | - | - | 10 |
+| NCEMA crisis classification | 7 | - | - | 7 |
+| NRC critical infrastructure | 5 | - | - | 5 |
+| **Total** | **160** | **126** | **126** | **412** |
+
+**`bcm.exercise_scenarios`**: 50 (up from 10) — 8 cyber, 4 physical, 5 tech, 4 vendor, 2 people, 3 regulatory, 2 climate, 4 multi-event, 2 governance, 2 recovery, 1 annual, 2 OT (Aramco), 1 telco (STC).
+
+### The plan document set
+
+The session ships two distinct planning artefacts:
+
+1. **`BCM_GRC_GAP_ANALYSIS_AND_PLAN.md`** at the repo root — gap analysis + 6-sprint roadmap, slice-numbered for stable references.
+2. **`docs/bcm-manager/`** — 19 operational documents (README + 18 templates / runbooks / methodologies) that the BCM Manager works from day-to-day. Each doc maps to backing platform entities.
+
+### Saudi regulatory coverage
+
+Every Saudi regulator a banking BCM Manager interacts with now has clause-level data:
+- **SAMA BCF** — 8 chapters (Governance, Embedding, BIA, Risk, Strategy, Plans, Exercises, Reporting) + 3 SAMA-specific addenda (Hajj/Ramadan, cross-border, outsourcing)
+- **SAMA Operational Resilience** — Important Business Services + impact tolerance methodology
+- **SAMA Cyber Framework v1.3** — 6h major-incident reporting (workflow exists; countdown timer is Sprint-7 Slice 7-E future work)
+- **NCA ECC-2 / CSCC / OTCC** — full ECC mapped; OTCC OT-BCM now clause-level (27 controls across 5 domains: Governance, Defence, Resilience, Third Party, Cloud)
+- **SDAIA PDPL** — Articles 4 / 5 / 6 / 20 (72h) / 21 (subject) / 29 (cross-border) all live end-to-end
+- **NRC** — critical-sector designation + 72h notification workflow
+- **NCEMA** — tier classification + multi-agency coordination
+- **CMA** — Articles 91-94 (sustainability) + Article 41 (operational-resilience) referenced
+- **ZATCA, MOH** — compliance records exist
+
+### What's left in the plan (Sprints 7-12)
+
+Still to ship (each needs schema + Java service + React page, ~3-5 PRs each):
+
+| Slice | Sprint | Effort |
+|---|---|---|
+| 7-A Multi-year strategic roadmap (Gantt) | 7 | Schema + service + page |
+| 7-B (full) Maturity-assessment wizard UI | 7 | Page + scoring + evidence link |
+| 7-C Annual cycle automation (reminder inbox) | 7 | Spring scheduler + email channel |
+| 7-D Board pack BCM section auto-gen | 7 | Aggregator service + button |
+| 7-E Regulator countdown timers (SAMA 6h, etc.) | 7 | Service + timer widget |
+| 8-A FAIR quantitative risk lane | 8 | Wizard + monte-carlo |
+| 8-B Regulatory horizon scanner | 8 | RSS ingest + inbox |
+| 8-C PDPL data-flow viz | 8 | React-flow + per-category overlay |
+| 8-D Threat-intel ingestion (MISP/OTX) | 8 | HTTP client + IOC table |
+| 9-A Dependency cascade simulator | 9 | Service + algorithm |
+| ...and Sprint 10-12 P1+P2 items |
+
+---
+
+## API client unification (23 May 2026, PRs #142 → #146)
 
 The deeper root cause of the "Internal Server Error" toast complaint. Even after PRs #130/#131 stopped pages from blanking on partial failures, real backend errors still showed generic "Internal Server Error" / "Bad Request" / "Service Unavailable" in toasts instead of the actual backend diagnostic. This arc finds and fixes why.
 
