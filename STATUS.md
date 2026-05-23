@@ -1,9 +1,64 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (Sprint-8 opening — risk + compliance + privacy slices — PRs #161 → #163)
+**Last update:** 23 May 2026 (Sprint-8 P0 GRC block closes — PRs #161 → #167)
 
 ---
 
-## 🟢 Latest — Sprint-8 opens with three high-leverage backends (23 May 2026, PRs #161 → #163)
+## 🟢 Latest — Sprint-8 P0 GRC block closes (23 May 2026, PRs #161 → #167)
+
+The full Sprint-8 P0 GRC block from `BCM_GRC_GAP_ANALYSIS_AND_PLAN.md` §4 is in. Five pure-additive backend slices land plus one production-bug fix unblocking local startup.
+
+### Seven-PR arc
+
+| PR | Slice | Module | What lands |
+|---|---|---|---|
+| #161 | **8-A** | risk | `FairCalculatorService` — Open Group FAIR Monte Carlo (10K iterations default, 100K cap). Triangular inputs. Returns p10 / p50 / p90 / mean ALE + 10-bucket histogram in SAR. |
+| #162 | **8-B** | compliance | `RegulatoryHorizonService` — tenant-wide horizon view bucketed PAST_DUE / IMMINENT (≤30d) / NEAR_TERM (31–90d) / QUARTER (91–180d) / HORIZON (>180d) with `bySourceAuthority` + `byImpactLevel` distributions. |
+| #163 | **8-C** | privacy | `PdplDataFlowService` — node-link graph aggregating RoPA rows: ACTIVITY ← CATEGORY (USED_BY) → COUNTRY (TRANSFERS_TO with adequacy tag) → MECHANISM (GOVERNED_BY). Saudi-native bilingual labels. |
+| #165 | **fix** | security | Break `TenantWriteGuardConfig` → JPA circular dependency that prevented backend startup on default profile. Use `ObjectProvider<TenantWriteGuardInterceptor>` for lazy resolution. |
+| #166 | **8-D** | cyber | `ThreatIntelCorrelationService` — accepts CVE/IP/HOSTNAME IOC bundle from SAMA/NCA/MISP/vendor feed, correlates against tenant assets + vulnerabilities, fires `regulatorEscalation=true` for SAMA Cyber 4h clock. |
+| #167 | **8-E** | controls | `AiControlMappingService` — deterministic AI suggestor for risk → control mapping. Jaccard + Saudi-regulatory keyword boost (SAMA, NCA, PDPL, OTCC, BCF, BIA, MTPD...) + control-code mention boost. No LLM dependency. |
+
+### Six new endpoints
+
+```
+POST /api/v1/risk/fair/calculate                   (8-A)
+GET  /api/v1/compliance/regulatory-horizon         (8-B)
+GET  /api/v1/privacy/data-flow-graph               (8-C)
+POST /api/v1/cyber/threat-intel/correlate          (8-D)
+POST /api/v1/controls/ai/suggest                   (8-E)
+```
+
+### What the Saudi GRC team can now do
+
+| Role | Before | After |
+|---|---|---|
+| **CRO** | export to Excel + run Monte Carlo locally | quantify cyber-loss in SAR with p10/p50/p90 ALE inside the platform |
+| **CCO** | scattered regulator email digests | one bucketed horizon view sorted by lead time, PAST_DUE flagged red |
+| **DPO** | ad-hoc Visio diagrams for SDAIA inspection | SDAIA-inspection-ready data-flow node-link graph |
+| **SOC** | manual IOC review against asset spreadsheet | POST IOC bundle → instant correlation + SAMA 4h escalation flag |
+| **GRC analyst** | hand-map findings to controls | top-N control suggestions with confidence + rationale (Saudi-keyword boosted) |
+
+### Restart + ops verification (this session)
+
+Local stack restarted cleanly after PRs #161-#167 merged:
+
+- Backend Spring Boot started in ~17s; `/actuator/health` → `{"status":"UP"}`
+- Login `POST /api/auth/login` returns access token (admin / Admin@12345)
+- 16 endpoints smoke-tested — all 200 for available data
+- One real schema bug surfaced + fixed inline: `admin.committees` table missing V154 columns. Reconciled via direct SQL + V154-V161 migration replay; `/api/admin/committees` flipped from 503 → 200.
+- One real Spring bug surfaced + fixed (PR #165): `TenantWriteGuardConfig` circular dep with JPA.
+
+### Pure-additive scorecard (Sprint-8 PRs #161-#167)
+
+- **10 new Java files** (5 services, 5 controllers; all inline DTO records)
+- **1 finder added** to `RegulatoryChangeRepository`
+- **0 schema changes** — every endpoint reads existing tables
+- **0 new frontend routes**
+- **CI green** on every PR
+
+---
+
+## Previously latest — Sprint-8 opens with three high-leverage backends (PRs #161 → #163)
 
 Sprint-7 closed clean with PRs #155-#160. Sprint-8 opens with **three pure-additive backend slices** — risk, compliance, and privacy — that each unlock a Saudi-native capability the platform was missing.
 
