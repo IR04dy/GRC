@@ -3323,6 +3323,7 @@ export const ar = {
   facAwaitingResponses: 'بانتظار الردود',
   facOnSchedule: 'في الموعد',
   facResponseSubmitted: 'تم تسجيل الرد',
+  crisisCommsSidebar: 'اتصالات الأزمات',
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',

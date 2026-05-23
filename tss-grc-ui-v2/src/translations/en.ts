@@ -3339,6 +3339,7 @@ export const en = {
   facAwaitingResponses: 'Awaiting responses',
   facOnSchedule: 'On schedule',
   facResponseSubmitted: 'Response submitted',
+  crisisCommsSidebar: 'Crisis Comms',
   bcmRemediationSidebar: 'BCM remediation',
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',

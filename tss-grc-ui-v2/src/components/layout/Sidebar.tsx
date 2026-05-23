@@ -6,7 +6,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
          TrendingUp,
-         Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell,
+         Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell, Megaphone,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -191,6 +191,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'dr-plans',        to: '/dr-plans',          Icon: Server,         labelKey: 'drpSidebar' },
       { id: 'crisis-room',     to: '/bcm/crisis-room',   Icon: Siren,          labelKey: 'crisisRoomSidebar' },
       { id: 'crisis-mobile',   to: '/crisis/mobile',     Icon: Siren,          labelKey: 'crisisMobileSidebar' },
+      { id: 'crisis-comms',    to: '/bcm/comms/templates', Icon: Megaphone,    labelKey: 'crisisCommsSidebar' },
       { id: 'bcm-remediation', to: '/bcm/remediation',   Icon: AlertOctagon,   labelKey: 'bcmRemediationSidebar' },
       { id: 'bcm-compliance',  to: '/bcm/compliance',    Icon: Stamp,          labelKey: 'bcmComplianceSidebar' },
       { id: 'bcm-reports',     to: '/bcm/reports',       Icon: BarChart3,      labelKey: 'bcmReportsSidebar' },

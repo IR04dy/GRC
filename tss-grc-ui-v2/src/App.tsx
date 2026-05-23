@@ -38,6 +38,9 @@ const ExerciseScenarioLibraryPage = lazy(() => import('./pages/bcm/ExerciseScena
 const ExerciseScenarioDetailPage  = lazy(() => import('./pages/bcm/ExerciseScenarioDetailPage').then(m => ({ default: m.ExerciseScenarioDetailPage })));
 const FacilitatorConsolePage      = lazy(() => import('./pages/bcm/FacilitatorConsolePage').then(m => ({ default: m.FacilitatorConsolePage })));
 const ParticipantViewPage         = lazy(() => import('./pages/bcm/ParticipantViewPage').then(m => ({ default: m.ParticipantViewPage })));
+const CrisisCommsTemplatesPage      = lazy(() => import('./pages/bcm/CrisisCommsTemplatesPage').then(m => ({ default: m.CrisisCommsTemplatesPage })));
+const CrisisCommsTemplateDetailPage = lazy(() => import('./pages/bcm/CrisisCommsTemplateDetailPage').then(m => ({ default: m.CrisisCommsTemplateDetailPage })));
+const CrisisCommsDispatchWizard     = lazy(() => import('./pages/bcm/CrisisCommsDispatchWizard').then(m => ({ default: m.CrisisCommsDispatchWizard })));
 const BcmRemediationPage     = lazy(() => import('./pages/bcm/BcmRemediationPage').then(m => ({ default: m.BcmRemediationPage })));
 const BcpBuilderPage         = lazy(() => import('./pages/bcm/BcpBuilderPage').then(m => ({ default: m.BcpBuilderPage })));
 const BcmSettingsPage        = lazy(() => import('./pages/bcm/BcmSettingsPage').then(m => ({ default: m.BcmSettingsPage })));
@@ -249,6 +252,9 @@ export function App() {
               <Route path="/bcm/scenarios/:id"    element={<ExerciseScenarioDetailPage />} />
               <Route path="/bcm/exercises/run/:runId/facilitate"  element={<FacilitatorConsolePage />} />
               <Route path="/bcm/exercises/run/:runId/participate" element={<ParticipantViewPage />} />
+              <Route path="/bcm/comms/templates"        element={<CrisisCommsTemplatesPage />} />
+              <Route path="/bcm/comms/templates/:id"    element={<CrisisCommsTemplateDetailPage />} />
+              <Route path="/bcm/comms/dispatch"         element={<CrisisCommsDispatchWizard />} />
               <Route path="/bcm/remediation"    element={<BcmRemediationPage />} />
               <Route path="/bcm/plans"          element={<BcpBuilderPage />} />
               <Route path="/bcm/settings"       element={<BcmSettingsPage />} />
