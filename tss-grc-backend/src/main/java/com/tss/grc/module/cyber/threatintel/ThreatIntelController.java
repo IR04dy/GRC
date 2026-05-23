@@ -26,7 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code regulatorEscalation=true} — the frontend uses this to start
  * the SAMA Cyber 4h notification clock.
  */
-@RestController
+// Explicit bean name avoids a Spring ConflictingBeanDefinitionException with
+// com.tss.grc.module.socops.controller.ThreatIntelController (same simple class
+// name; Spring's auto-generated bean ids collide). Renaming the file would be
+// cleaner long-term but would invalidate the recently-merged PR #166 import
+// graph; the explicit name is a one-line, non-breaking equivalent.
+@RestController("cyberThreatIntelController")
 @RequestMapping("/api/v1/cyber/threat-intel")
 @RequiredArgsConstructor
 @Tag(name = "Cyber — Threat Intelligence")
