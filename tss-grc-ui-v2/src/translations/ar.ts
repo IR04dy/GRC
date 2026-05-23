@@ -3304,6 +3304,7 @@ export const ar = {
   bcmReportsSidebar: 'تقارير الاستمرارية',
   crisisRoomSidebar: 'غرفة الأزمات',
   biaWizardSidebar: 'معالج تحليل الأثر',
+  biaQuantSidebar: 'تحليل الأثر — كمي',
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',

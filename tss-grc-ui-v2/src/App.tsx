@@ -31,6 +31,7 @@ const BcmReadinessPage       = lazy(() => import('./pages/bcm/BcmReadinessPage')
 const BcmReportsPage         = lazy(() => import('./pages/bcm/BcmReportsPage').then(m => ({ default: m.BcmReportsPage })));
 const CrisisRoomPage         = lazy(() => import('./pages/bcm/CrisisRoomPage').then(m => ({ default: m.CrisisRoomPage })));
 const BiaWizardPage          = lazy(() => import('./pages/bcm/BiaWizardPage').then(m => ({ default: m.BiaWizardPage })));
+const QuantitativeBiaPage    = lazy(() => import('./pages/bcm/QuantitativeBiaPage').then(m => ({ default: m.QuantitativeBiaPage })));
 const BcmRemediationPage     = lazy(() => import('./pages/bcm/BcmRemediationPage').then(m => ({ default: m.BcmRemediationPage })));
 const BcpBuilderPage         = lazy(() => import('./pages/bcm/BcpBuilderPage').then(m => ({ default: m.BcpBuilderPage })));
 const BcmSettingsPage        = lazy(() => import('./pages/bcm/BcmSettingsPage').then(m => ({ default: m.BcmSettingsPage })));
@@ -229,6 +230,7 @@ export function App() {
               <Route path="/bcm/reports"        element={<BcmReportsPage />} />
               <Route path="/bcm/crisis-room"    element={<CrisisRoomPage />} />
               <Route path="/bcm/bia"            element={<BiaWizardPage />} />
+              <Route path="/bcm/bia-quantitative" element={<QuantitativeBiaPage />} />
               <Route path="/bcm/remediation"    element={<BcmRemediationPage />} />
               <Route path="/bcm/plans"          element={<BcpBuilderPage />} />
               <Route path="/bcm/settings"       element={<BcmSettingsPage />} />

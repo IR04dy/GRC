@@ -3319,6 +3319,7 @@ export const en = {
   bcmReportsSidebar: 'BCM reports',
   crisisRoomSidebar: 'Crisis Room',
   biaWizardSidebar: 'BIA wizard',
+  biaQuantSidebar: 'BIA — quantitative',
   bcmRemediationSidebar: 'BCM remediation',
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',
