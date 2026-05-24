@@ -1,0 +1,454 @@
+/* TSS GRC Platform — RiskLifecyclePage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-2).
+ * Every value resolves to a design token. RTL-safe (logical properties only).
+ */
+
+/* ─── KPI strip spacing ──────────────────────────────────────────── */
+.rlc-kpi-strip { margin-bottom: var(--sp-6); }
+
+/* ─── Top-level sections (each wraps a Card) ─────────────────────── */
+.rlc-section { margin-top: var(--sp-6); }
+
+/* ─── Risk picker (button group) ─────────────────────────────────── */
+.rlc-picker-row {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.rlc-pick-btn {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-2xs);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  cursor: pointer;
+  text-align: start;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rlc-pick-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+.rlc-pick-btn__code {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.rlc-pick-btn__title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Risk header card body ─────────────────────────────────────── */
+.rlc-header-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.rlc-header-main {
+  flex: 1;
+  min-width: 240px;
+}
+.rlc-header-chips {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  margin-bottom: var(--sp-2);
+  flex-wrap: wrap;
+}
+.rlc-header-code {
+  font-size: var(--text-xs);
+  color: var(--primary);
+}
+.rlc-header-title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+.rlc-header-desc {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-top: var(--sp-2);
+  line-height: 1.6;
+}
+
+/* ─── Card intro paragraph ───────────────────────────────────────── */
+.rlc-card-intro {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-5);
+  line-height: 1.5;
+}
+
+/* ─── Monte Carlo card ───────────────────────────────────────────── */
+.rlc-mc-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-6);
+}
+.rlc-mc-eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  margin-bottom: var(--sp-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-2);
+}
+.rlc-mc-controls {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  margin-top: var(--sp-5);
+}
+.rlc-mc-trials-label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.rlc-mc-trials-select {
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--text-2xs);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+.rlc-mc-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-4);
+  margin-top: var(--sp-6);
+}
+.rlc-mc-hist-wrap { margin-top: var(--sp-6); }
+.rlc-mc-hist-label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-2);
+}
+.rlc-mc-hist-grid {
+  display: grid;
+  gap: 2px;
+  align-items: end;
+  height: 100px;
+}
+.rlc-mc-hist-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+}
+.rlc-mc-hist-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.rlc-mc-hist-bar {
+  width: 100%;
+  background: var(--primary);
+  border-radius: 2px 2px 0 0;
+}
+.rlc-mc-hist-tick {
+  font-size: 9px;
+  color: var(--ink-3);
+}
+.rlc-mc-hist-axis {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-align: center;
+  margin-top: var(--sp-2);
+}
+
+/* Slider row */
+.rlc-slider-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 80px;
+  gap: var(--sp-4);
+  align-items: center;
+  margin-bottom: var(--sp-3);
+}
+.rlc-slider-label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.rlc-slider-input { width: 100%; }
+.rlc-slider-value {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-align: end;
+}
+
+/* ─── KRI breach card ────────────────────────────────────────────── */
+.rlc-kri-actions {
+  display: flex;
+  gap: var(--sp-3);
+}
+.rlc-breach-card {
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.rlc-breach-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+.rlc-breach-card__owner {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-inline-start: auto;
+}
+.rlc-breach-card__code {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.rlc-breach-card__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.rlc-arrow-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+.rlc-breach-card__esc {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-bottom: var(--sp-3);
+}
+.rlc-breach-esc-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.rlc-breach-esc-pill {
+  padding: 2px 6px;
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+}
+.rlc-breach-actions {
+  display: flex;
+  gap: var(--sp-3);
+}
+.rlc-breach-resolution {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  margin-top: var(--sp-3);
+}
+
+/* ─── Treatment plan card ───────────────────────────────────────── */
+.rlc-plan-card {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.rlc-plan-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+.rlc-plan-card__main { flex: 1; }
+.rlc-plan-card__chips {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.rlc-plan-card__id {
+  font-size: var(--text-2xs);
+}
+.rlc-plan-card__rationale {
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.rlc-plan-card__cb {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-top: var(--sp-2);
+  font-style: italic;
+}
+.rlc-plan-card__approval {
+  font-size: 10px;
+  color: var(--success-fg);
+  margin-top: var(--sp-2);
+}
+.rlc-plan-card__actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* Progress bar */
+.rlc-progress-wrap { margin-bottom: var(--sp-4); }
+.rlc-progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-2);
+}
+.rlc-progress-track {
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.rlc-progress-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 3px;
+}
+
+/* Action items */
+.rlc-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.rlc-action-row {
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: var(--sp-4);
+  align-items: center;
+}
+.rlc-action-title { font-size: var(--text-xs); font-weight: 600; }
+.rlc-action-meta {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+/* ─── Acceptance card ────────────────────────────────────────────── */
+.rlc-accept-card {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.rlc-accept-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+.rlc-accept-card__main { flex: 1; }
+.rlc-accept-card__chips {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.rlc-accept-card__rationale {
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.rlc-accept-card__expiry {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-top: var(--sp-2);
+}
+.rlc-accept-card__actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+.rlc-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  font-size: var(--text-2xs);
+}
+.rlc-signature-label {
+  color: var(--ink-3);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+.rlc-signature-date {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.rlc-signature-pending { color: var(--ink-3); }
+
+/* ─── Control linkage card ──────────────────────────────────────── */
+.rlc-table-full { width: 100%; }
+.rlc-ccm-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.rlc-ccm-track {
+  width: 50px;
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.rlc-ccm-fill { height: 100%; }
+.rlc-ccm-fill[data-tone="success"] { background: var(--success); }
+.rlc-ccm-fill[data-tone="warning"] { background: var(--warning); }
+.rlc-ccm-fill[data-tone="danger"]  { background: var(--danger); }
+.rlc-ccm-text {
+  font-size: var(--text-2xs);
+}
+
+/* ─── Stat tile (Monte Carlo + other stats) ─────────────────────── */
+.rlc-stat-tile {
+  padding: var(--sp-4);
+  border: 1px solid var(--primary);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.rlc-stat-tile[data-tone="warning"] { border-color: var(--warning-fg); }
+.rlc-stat-tile[data-tone="danger"]  { border-color: var(--danger-fg); }
+.rlc-stat-tile[data-tone="info"]    { border-color: var(--ink-2); }
+.rlc-stat-tile__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rlc-stat-tile__value {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 2px;
+  color: var(--primary);
+}
+.rlc-stat-tile[data-tone="warning"] .rlc-stat-tile__value { color: var(--warning-fg); }
+.rlc-stat-tile[data-tone="danger"]  .rlc-stat-tile__value { color: var(--danger-fg); }
+.rlc-stat-tile[data-tone="info"]    .rlc-stat-tile__value { color: var(--ink-2); }
+.rlc-stat-tile__unit {
+  font-size: var(--text-2xs);
+  margin-inline-start: var(--sp-2);
+  color: var(--ink-3);
+}

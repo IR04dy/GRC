@@ -34,6 +34,7 @@ import { ActivityFeedDrawer } from '../../components/lifecycle/ActivityFeedDrawe
 import { logTransition } from '../../lib/activityLog';
 import { notify } from '../../lib/notificationOutbox';
 import { lookupUserByName } from '../../lib/userDirectory';
+import '../../styles/pages/risk-lifecycle.css';
 
 /**
  * RiskLifecyclePage — production hardening (Option 1).
@@ -80,7 +81,7 @@ export function RiskLifecyclePage() {
         sub={t('rlcPageSub')}
       />
 
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+      <div className="kpi-grid rlc-kpi-strip">
         <Kpi Icon={AlertTriangle}    label={t('rlcKpiTotal')}        value={String(stats.risksTotal)}                tone="primary" />
         <Kpi Icon={AlertOctagon}     label={t('rlcKpiOpenBreach')}   value={String(stats.risksWithOpenBreach)}      tone={stats.risksWithOpenBreach > 0 ? 'danger' : 'success'} />
         <Kpi Icon={ShieldCheck}      label={t('rlcKpiTreated')}      value={String(stats.risksWithApprovedTreatment)} tone="success" />
@@ -164,23 +165,17 @@ export function RiskLifecyclePage() {
       />
 
       {/* Risk picker */}
-      <div style={{ marginTop: 16 }}>
+      <div className="rlc-section">
       <Card title={t('rlcPickRisk')} Icon={AlertTriangle}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="rlc-picker-row">
           {MOCK_RISKS.slice(0, 12).map(r => {
             const isOn = r.id === riskId;
             const titleR = lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn;
             return (
               <button key={r.id} onClick={() => setRiskId(r.id)}
-                style={{
-                  padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 11,
-                  border: `1px solid ${isOn ? 'var(--primary)' : 'var(--border)'}`,
-                  background: isOn ? 'var(--primary-50)' : 'var(--surface-1)',
-                  cursor: 'pointer', textAlign: 'start', maxWidth: 220,
-                  display: 'flex', flexDirection: 'column', gap: 2,
-                }}>
-                <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{r.riskCode}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                className={`rlc-pick-btn${isOn ? ' is-active' : ''}`}>
+                <span className="mono rlc-pick-btn__code">{r.riskCode}</span>
+                <span className="rlc-pick-btn__title">
                   {titleR}
                 </span>
                 <Badge tone={r.riskLevel === 'CRITICAL' ? 'danger' : r.riskLevel === 'HIGH' ? 'warning' : r.riskLevel === 'MEDIUM' ? 'info' : 'success'}>
@@ -194,20 +189,20 @@ export function RiskLifecyclePage() {
       </div>
 
       {/* Risk header */}
-      <div style={{ marginTop: 16 }}>
+      <div className="rlc-section">
         <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                <span className="mono" style={{ fontSize: 12, color: 'var(--primary)' }}>{risk.riskCode}</span>
+          <div className="rlc-header-row">
+            <div className="rlc-header-main">
+              <div className="rlc-header-chips">
+                <span className="mono rlc-header-code">{risk.riskCode}</span>
                 <Badge tone="info">{lang === 'ar' && risk.categoryNameAr ? risk.categoryNameAr : risk.categoryNameEn}</Badge>
                 <Badge tone={risk.riskLevel === 'CRITICAL' ? 'danger' : risk.riskLevel === 'HIGH' ? 'warning' : 'info'}>
                   L{risk.inherentLikelihood} × I{risk.inherentImpact} = {risk.inherentScore}
                 </Badge>
                 <Badge tone="primary">{t('rlcOwner')}: {risk.ownerFullNameEn}</Badge>
               </div>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4, lineHeight: 1.6 }}>
+              <div className="rlc-header-title">{title}</div>
+              <div className="rlc-header-desc">
                 {risk.descriptionEn}
               </div>
             </div>
@@ -314,14 +309,14 @@ function MonteCarloCard({ riskId, risk }: { riskId: number; risk: any }) {
   }
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="rlc-section">
       <Card title={t('rlcMcTitle')} Icon={Calculator}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="rlc-card-intro">
           {t('rlcMcSub')}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="rlc-mc-cols">
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-2)' }}>
+            <div className="rlc-mc-eyebrow">
               {t('rlcMcLikelihood')}
             </div>
             <SliderRow label={t('rlcMcMin')} value={pMin} min={0} max={1} step={0.01} fmt={v => `${(v * 100).toFixed(0)}%`} onChange={setPMin} />
@@ -329,7 +324,7 @@ function MonteCarloCard({ riskId, risk }: { riskId: number; risk: any }) {
             <SliderRow label={t('rlcMcMax')} value={pMax} min={0} max={1} step={0.01} fmt={v => `${(v * 100).toFixed(0)}%`} onChange={setPMax} />
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-2)' }}>
+            <div className="rlc-mc-eyebrow">
               {t('rlcMcImpact')} (SAR)
             </div>
             <SliderRow label={t('rlcMcMin')} value={iMin} min={0} max={iMax} step={50_000} fmt={v => `${(v / 1_000_000).toFixed(2)}M`} onChange={setIMin} />
@@ -338,11 +333,11 @@ function MonteCarloCard({ riskId, risk }: { riskId: number; risk: any }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
-          <label style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="rlc-mc-controls">
+          <label className="rlc-mc-trials-label">
             {t('rlcMcTrials')}:
             <select value={trials} onChange={e => setTrials(Number(e.target.value))}
-              style={{ padding: '4px 8px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
+              className="rlc-mc-trials-select">
               <option value={1000}>1,000</option>
               <option value={5000}>5,000</option>
               <option value={10000}>10,000</option>
@@ -354,33 +349,34 @@ function MonteCarloCard({ riskId, risk }: { riskId: number; risk: any }) {
 
         {result && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 16 }}>
+            <div className="rlc-mc-stats">
               <Stat label={t('rlcMcExpected')} value={`${(result.expectedLoss / 1_000_000).toFixed(2)}M`} unit="SAR" tone="primary" />
               <Stat label={t('rlcMcP95')}      value={`${(result.p95Loss / 1_000_000).toFixed(2)}M`}      unit="SAR" tone="warning" />
               <Stat label={t('rlcMcP99')}      value={`${(result.p99Loss / 1_000_000).toFixed(2)}M`}      unit="SAR" tone="danger" />
               <Stat label={t('rlcMcStdev')}    value={`${(result.stdev / 1_000_000).toFixed(2)}M`}        unit="SAR" tone="info" />
             </div>
             {/* Histogram */}
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>{t('rlcMcHistogram')}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${result.histogram.length}, 1fr)`, gap: 2, alignItems: 'end', height: 100 }}>
+            <div className="rlc-mc-hist-wrap">
+              <div className="rlc-mc-hist-label">{t('rlcMcHistogram')}</div>
+              <div className="rlc-mc-hist-grid" style={{ gridTemplateColumns: `repeat(${result.histogram.length}, 1fr)` }}>
                 {result.histogram.map((b, i) => {
                   const max = Math.max(...result.histogram.map(h => h.count));
                   const heightPct = max > 0 ? (b.count / max) * 100 : 0;
                   return (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, height: '100%' }}>
-                      <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column-reverse' }}>
-                        <div style={{ width: '100%', height: `${heightPct}%`, background: 'var(--primary)', borderRadius: '2px 2px 0 0', minHeight: b.count > 0 ? 2 : 0 }}
+                    <div key={i} className="rlc-mc-hist-col">
+                      <div className="rlc-mc-hist-bar-wrap">
+                        <div className="rlc-mc-hist-bar"
+                          style={{ height: `${heightPct}%`, minHeight: b.count > 0 ? 2 : 0 }}
                           title={`${b.rangeStart.toFixed(0)} - ${b.rangeEnd.toFixed(0)}: ${b.count}`} />
                       </div>
-                      <div style={{ fontSize: 9, color: 'var(--ink-3)' }} className="mono">
+                      <div className="mono rlc-mc-hist-tick">
                         {(b.rangeEnd / 1_000_000).toFixed(1)}
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <div style={{ fontSize: 10, color: 'var(--ink-3)', textAlign: 'center', marginTop: 4 }}>
+              <div className="rlc-mc-hist-axis">
                 {t('rlcMcLossSar')} (M)
               </div>
             </div>
@@ -396,11 +392,11 @@ function SliderRow({ label, value, min, max, step, fmt, onChange }: {
   fmt: (v: number) => string; onChange: (v: number) => void;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 80px', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-      <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{label}</span>
+    <div className="rlc-slider-row">
+      <span className="rlc-slider-label">{label}</span>
       <input type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(Number(e.target.value))} style={{ width: '100%' }} />
-      <span className="mono" style={{ fontSize: 11, fontWeight: 700, textAlign: 'end' }}>{fmt(value)}</span>
+        onChange={e => onChange(Number(e.target.value))} className="rlc-slider-input" />
+      <span className="mono rlc-slider-value">{fmt(value)}</span>
     </div>
   );
 }
@@ -419,37 +415,37 @@ function KriBreachCard({ riskId: _riskId, breaches, onFire, onEscalate, onResolv
   const resolved = breaches.filter(b => b.status === 'RESOLVED');
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="rlc-section">
       <Card title={t('rlcKriTitle')} Icon={Activity}
         action={
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="rlc-kri-actions">
             <Badge tone={open.length > 0 ? 'danger' : 'success'}>{open.length} {t('rlcKriOpen')}</Badge>
             <Button size="sm" variant="secondary" Icon={AlertOctagon} onClick={onFire}>{t('rlcFireBreach')}</Button>
           </div>
         }>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="rlc-card-intro">
           {t('rlcKriSub')}
         </div>
         {breaches.length === 0
           ? <InlineEmpty>{t('rlcKriEmpty')}</InlineEmpty>
           : [...open, ...resolved].map(b => (
-              <div key={b.id} style={{ padding: 10, marginBottom: 8, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+              <div key={b.id} className="rlc-breach-card">
+                <div className="rlc-breach-card__head">
                   <Badge tone={BREACH_STATUS_TONE[b.status]}>{BREACH_STATUS_LABEL[b.status][lang]}</Badge>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{b.kriCode}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{lang === 'ar' ? b.kriNameAr : b.kriNameEn}</span>
+                  <span className="mono rlc-breach-card__code">{b.kriCode}</span>
+                  <span className="rlc-breach-card__name">{lang === 'ar' ? b.kriNameAr : b.kriNameEn}</span>
                   <Badge tone={b.direction === 'UP_BAD' ? 'danger' : 'warning'}>
-                    {b.actualValue} <ArrowUpRight size={11} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> {b.thresholdValue} ({b.direction === 'UP_BAD' ? '+' : '−'}{Math.abs(((b.actualValue - b.thresholdValue) / b.thresholdValue) * 100).toFixed(0)}%)
+                    {b.actualValue} <ArrowUpRight size={11} className="rlc-arrow-inline" /> {b.thresholdValue} ({b.direction === 'UP_BAD' ? '+' : '−'}{Math.abs(((b.actualValue - b.thresholdValue) / b.thresholdValue) * 100).toFixed(0)}%)
                   </Badge>
-                  <span style={{ fontSize: 11, color: 'var(--ink-3)', marginInlineStart: 'auto' }}>
+                  <span className="rlc-breach-card__owner">
                     {t('rlcOwner')}: <b>{b.currentOwner}</b>
                   </span>
                 </div>
                 {/* Escalation chain */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', fontSize: 10, color: 'var(--ink-3)', marginBottom: 6 }}>
+                <div className="rlc-breach-card__esc">
                   {b.escalationLog.map((e, i) => (
-                    <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ padding: '2px 6px', background: 'var(--surface-2)', borderRadius: 4 }}>
+                    <span key={i} className="rlc-breach-esc-step">
+                      <span className="rlc-breach-esc-pill">
                         {lang === 'ar' ? e.stepAr : e.stepEn}
                       </span>
                       {i < b.escalationLog.length - 1 && <ArrowUpRight size={10} />}
@@ -457,13 +453,13 @@ function KriBreachCard({ riskId: _riskId, breaches, onFire, onEscalate, onResolv
                   ))}
                 </div>
                 {b.status !== 'RESOLVED' && (
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div className="rlc-breach-actions">
                     <Button size="sm" variant="secondary" Icon={ArrowUpRight} onClick={() => onEscalate(b)}>{t('rlcEscalate')}</Button>
                     <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onResolve(b)}>{t('rlcResolve')}</Button>
                   </div>
                 )}
                 {b.resolutionEn && (
-                  <div style={{ fontSize: 11, color: 'var(--ink-2)', padding: 8, background: 'var(--surface-2)', borderRadius: 4, marginTop: 6 }}>
+                  <div className="rlc-breach-resolution">
                     {lang === 'ar' ? b.resolutionAr : b.resolutionEn}
                   </div>
                 )}
@@ -489,10 +485,10 @@ function TreatmentCard({ riskId: _riskId, plans, onCreate, onSubmit, onApprove, 
 }) {
   const { t, lang } = useI18n();
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="rlc-section">
       <Card title={t('rlcTreatTitle')} Icon={ShieldCheck}
         action={<Button size="sm" variant="secondary" onClick={onCreate}>{t('rlcCreatePlan')}</Button>}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="rlc-card-intro">
           {t('rlcTreatSub')}
         </div>
         {plans.length === 0
@@ -501,30 +497,30 @@ function TreatmentCard({ riskId: _riskId, plans, onCreate, onSubmit, onApprove, 
               const completedActions = p.actions.filter(a => a.status === 'COMPLETED').length;
               const totalReduction = p.actions.filter(a => a.status === 'COMPLETED').reduce((acc, a) => acc + a.expectedRiskReduction, 0);
               return (
-                <div key={p.id} style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                        <span className="mono" style={{ fontSize: 11 }}>{p.id}</span>
+                <div key={p.id} className="rlc-plan-card">
+                  <div className="rlc-plan-card__head">
+                    <div className="rlc-plan-card__main">
+                      <div className="rlc-plan-card__chips">
+                        <span className="mono rlc-plan-card__id">{p.id}</span>
                         <Badge tone={TREATMENT_STATUS_TONE[p.status]}>{TREATMENT_STATUS_LABEL[p.status][lang]}</Badge>
                         <Badge tone="info">{STRATEGY_LABEL[p.strategy][lang]}</Badge>
                         {p.costSarK > 0 && <Badge tone="primary">{p.costSarK.toLocaleString()}k SAR</Badge>}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                      <div className="rlc-plan-card__rationale">
                         {lang === 'ar' ? p.rationaleAr : p.rationaleEn}
                       </div>
                       {p.costBenefitEn && (
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4, fontStyle: 'italic' }}>
+                        <div className="rlc-plan-card__cb">
                           {lang === 'ar' ? p.costBenefitAr : p.costBenefitEn}
                         </div>
                       )}
                       {p.approvedBy && (
-                        <div style={{ fontSize: 10, color: 'var(--success-fg)', marginTop: 4 }}>
+                        <div className="rlc-plan-card__approval">
                           {t('rlcApprovedBy')}: {p.approvedBy}
                         </div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div className="rlc-plan-card__actions">
                       {p.status === 'DRAFT' && <Button size="sm" variant="primary" Icon={Send} onClick={() => onSubmit(p)}>{t('rlcSubmit')}</Button>}
                       {p.status === 'SUBMITTED' && (
                         <>
@@ -537,27 +533,24 @@ function TreatmentCard({ riskId: _riskId, plans, onCreate, onSubmit, onApprove, 
                   </div>
                   {/* Progress bar */}
                   {p.actions.length > 0 && (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>
+                    <div className="rlc-progress-wrap">
+                      <div className="rlc-progress-head">
                         <span>{t('rlcActions')} {completedActions}/{p.actions.length}</span>
                         <span>{t('rlcExpectedReduction')}: {(totalReduction * 100).toFixed(0)}%</span>
                       </div>
-                      <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${(completedActions / p.actions.length) * 100}%`, background: 'var(--success)', borderRadius: 3 }} />
+                      <div className="rlc-progress-track">
+                        <div className="rlc-progress-fill" style={{ width: `${(completedActions / p.actions.length) * 100}%` }} />
                       </div>
                     </div>
                   )}
                   {/* Actions */}
                   {p.actions.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div className="rlc-action-list">
                       {p.actions.map(a => (
-                        <div key={a.id} style={{
-                          padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 4,
-                          display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 8, alignItems: 'center',
-                        }}>
+                        <div key={a.id} className="rlc-action-row">
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 600 }}>{lang === 'ar' ? a.titleAr : a.titleEn}</div>
-                            <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+                            <div className="rlc-action-title">{lang === 'ar' ? a.titleAr : a.titleEn}</div>
+                            <div className="rlc-action-meta">
                               {a.ownerRole} · {t('rlcDue')} {a.targetDate} · −{(a.expectedRiskReduction * 100).toFixed(0)}%
                             </div>
                           </div>
@@ -593,51 +586,51 @@ function AcceptanceCard({ riskId: _riskId, risk: _risk, accepts, onCreate, onSub
 }) {
   const { t, lang } = useI18n();
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="rlc-section">
       <Card title={t('rlcAcceptTitle')} Icon={GitBranch}
         action={<Button size="sm" variant="secondary" onClick={onCreate}>{t('rlcCreateAcceptance')}</Button>}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="rlc-card-intro">
           {t('rlcAcceptSub')}
         </div>
         {accepts.length === 0
           ? <InlineEmpty>{t('rlcAcceptEmpty')}</InlineEmpty>
           : accepts.map(a => (
-              <div key={a.id} style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                      <span className="mono" style={{ fontSize: 11 }}>{a.id}</span>
+              <div key={a.id} className="rlc-accept-card">
+                <div className="rlc-accept-card__head">
+                  <div className="rlc-accept-card__main">
+                    <div className="rlc-accept-card__chips">
+                      <span className="mono rlc-plan-card__id">{a.id}</span>
                       <Badge tone={ACCEPTANCE_STATUS_TONE[a.status]}>{ACCEPTANCE_STATUS_LABEL[a.status][lang]}</Badge>
                       <Badge tone="warning">{t('rlcResidual')}: {a.residualScore}</Badge>
                       <Badge tone="info">{t('rlcAppetite')}: ≤ {a.appetiteUpper}</Badge>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                    <div className="rlc-accept-card__rationale">
                       {lang === 'ar' ? a.rationaleAr : a.rationaleEn}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                    <div className="rlc-accept-card__expiry">
                       {t('rlcExpiresAt')}: <span className="mono">{a.expiresAt}</span>
                       {a.expiresAtHijri && <> · <span className="mono">{a.expiresAtHijri}</span></>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="rlc-accept-card__actions">
                     {a.status === 'DRAFT' && <Button size="sm" variant="primary" Icon={Send} onClick={() => onSubmitToCro(a)}>{t('rlcSendToCro')}</Button>}
                     {a.status === 'CRO_REVIEW' && <Button size="sm" variant="primary" onClick={() => onPromoteToBoard(a)}>{t('rlcPromoteBoard')}</Button>}
                     {a.status === 'BOARD_APPROVAL' && <Button size="sm" variant="primary" Icon={ThumbsUp} onClick={() => onApprove(a)}>{t('rlcBoardSign')}</Button>}
                   </div>
                 </div>
                 {/* Signatures */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 8, background: 'var(--surface-2)', borderRadius: 4, fontSize: 11 }}>
+                <div className="rlc-signatures">
                   <div>
-                    <div style={{ color: 'var(--ink-3)', textTransform: 'uppercase', fontSize: 9, letterSpacing: '0.04em' }}>{t('rlcCroSignoff')}</div>
+                    <div className="rlc-signature-label">{t('rlcCroSignoff')}</div>
                     {a.croSignedBy
-                      ? <div><b>{a.croSignedBy}</b><div style={{ fontSize: 10, color: 'var(--ink-3)' }} className="mono">{a.croSignedAt?.slice(0, 10)}</div></div>
-                      : <span style={{ color: 'var(--ink-3)' }}>{t('rlcPending')}</span>}
+                      ? <div><b>{a.croSignedBy}</b><div className="mono rlc-signature-date">{a.croSignedAt?.slice(0, 10)}</div></div>
+                      : <span className="rlc-signature-pending">{t('rlcPending')}</span>}
                   </div>
                   <div>
-                    <div style={{ color: 'var(--ink-3)', textTransform: 'uppercase', fontSize: 9, letterSpacing: '0.04em' }}>{t('rlcBoardSignoff')}</div>
+                    <div className="rlc-signature-label">{t('rlcBoardSignoff')}</div>
                     {a.boardSignedBy
-                      ? <div><b>{a.boardSignedBy}</b><div style={{ fontSize: 10, color: 'var(--ink-3)' }} className="mono">{a.boardSignedAt?.slice(0, 10)}</div></div>
-                      : <span style={{ color: 'var(--ink-3)' }}>{t('rlcPending')}</span>}
+                      ? <div><b>{a.boardSignedBy}</b><div className="mono rlc-signature-date">{a.boardSignedAt?.slice(0, 10)}</div></div>
+                      : <span className="rlc-signature-pending">{t('rlcPending')}</span>}
                   </div>
                 </div>
               </div>
@@ -653,15 +646,15 @@ function AcceptanceCard({ riskId: _riskId, risk: _risk, accepts, onCreate, onSub
 function ControlLinkageCard({ controls }: { controls: ReturnType<typeof controlsForRisk> }) {
   const { t, lang } = useI18n();
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="rlc-section">
       <Card title={t('rlcControlsTitle')} Icon={ShieldCheck}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="rlc-card-intro">
           {t('rlcControlsSub')}
         </div>
         {controls.length === 0
           ? <InlineEmpty>{t('rlcControlsEmpty')}</InlineEmpty>
           : (
-            <table className="tbl" style={{ width: '100%' }}>
+            <table className="tbl rlc-table-full">
               <thead>
                 <tr>
                   <th>{t('rlcControlCode')}</th>
@@ -673,9 +666,11 @@ function ControlLinkageCard({ controls }: { controls: ReturnType<typeof controls
                 </tr>
               </thead>
               <tbody>
-                {controls.map(c => (
+                {controls.map(c => {
+                  const tone = c.ccmCoveragePct >= 80 ? 'success' : c.ccmCoveragePct >= 50 ? 'warning' : 'danger';
+                  return (
                   <tr key={c.controlCode}>
-                    <td className="mono" style={{ fontSize: 11 }}>{c.controlCode}</td>
+                    <td className="mono rlc-ccm-text">{c.controlCode}</td>
                     <td>{lang === 'ar' ? c.controlTitleAr : c.controlTitleEn}</td>
                     <td><Badge tone="info">{c.framework}</Badge></td>
                     <td>
@@ -684,16 +679,17 @@ function ControlLinkageCard({ controls }: { controls: ReturnType<typeof controls
                       </Badge>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ width: 50, height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${c.ccmCoveragePct}%`, background: c.ccmCoveragePct >= 80 ? 'var(--success)' : c.ccmCoveragePct >= 50 ? 'var(--warning)' : 'var(--danger)' }} />
+                      <div className="rlc-ccm-row">
+                        <div className="rlc-ccm-track">
+                          <div className="rlc-ccm-fill" data-tone={tone} style={{ width: `${c.ccmCoveragePct}%` }} />
                         </div>
-                        <span className="mono" style={{ fontSize: 11 }}>{c.ccmCoveragePct}%</span>
+                        <span className="mono rlc-ccm-text">{c.ccmCoveragePct}%</span>
                       </div>
                     </td>
-                    <td className="mono" style={{ fontSize: 11 }}>{c.lastEvidenceAt ?? '—'}</td>
+                    <td className="mono rlc-ccm-text">{c.lastEvidenceAt ?? '—'}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -754,15 +750,11 @@ function RiskTreatmentPipeline({ allPlans, onAdvance, onBulkAdvance, onCardHisto
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function Stat({ label, value, unit, tone }: { label: string; value: string; unit?: string; tone: 'primary' | 'warning' | 'danger' | 'info' }) {
-  const colour = tone === 'danger' ? 'var(--danger-fg)' : tone === 'warning' ? 'var(--warning-fg)' : tone === 'info' ? 'var(--ink-2)' : 'var(--primary)';
   return (
-    <div style={{
-      padding: 10, border: `1px solid ${colour}`, borderRadius: 'var(--r-sm)',
-      background: 'var(--surface-2)',
-    }}>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-      <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: colour, marginTop: 2 }}>
-        {value}{unit && <span style={{ fontSize: 11, marginInlineStart: 4, color: 'var(--ink-3)' }}>{unit}</span>}
+    <div className="rlc-stat-tile" data-tone={tone}>
+      <div className="rlc-stat-tile__label">{label}</div>
+      <div className="mono rlc-stat-tile__value">
+        {value}{unit && <span className="rlc-stat-tile__unit">{unit}</span>}
       </div>
     </div>
   );

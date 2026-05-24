@@ -34,6 +34,7 @@ import {
 } from '../../lib/bcmLifecycle';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
+import '../../styles/pages/bcm-lifecycle.css';
 
 type BcmTab = 'pipeline' | 'bia' | 'strategy' | 'drills' | 'invocation' | 'history' | 'packet';
 
@@ -112,7 +113,7 @@ export function BcmLifecyclePage() {
         }}
       />}
 
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+      <div className="kpi-grid bcl-kpi-strip">
         <Kpi Icon={Activity}        label={t('bclKpiProcesses')}     value={String(stats.bcmProcessTotal)}             tone="primary" />
         <Kpi Icon={ShieldCheck}     label={t('bclKpiBiaApproved')}   value={`${stats.biaApproved} / ${bias.length}`} tone="success" />
         <Kpi Icon={Clock}            label={t('bclKpiBiaExpiring')}    value={String(stats.biaExpiringSoon)}             tone={stats.biaExpiringSoon > 0 ? 'warning' : 'success'} />
@@ -124,7 +125,7 @@ export function BcmLifecyclePage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="bcl-tab-row">
         {([
           { id: 'pipeline',   labelKey: 'lpcTabPipeline', Icon: Activity },
           { id: 'bia',        labelKey: 'bclTabBia',      Icon: ShieldCheck },
@@ -135,12 +136,7 @@ export function BcmLifecyclePage() {
           { id: 'packet',     labelKey: 'bclTabPacket',   Icon: FileText },
         ] as { id: BcmTab; labelKey: string; Icon: typeof Activity }[]).map(td => (
           <button key={td.id} onClick={() => setTab(td.id)}
-            style={{
-              padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600,
-              border: `1px solid ${tab === td.id ? 'var(--primary)' : 'var(--border)'}`,
-              background: tab === td.id ? 'var(--primary-50)' : 'var(--surface-1)',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
+            className={`bcl-tab-btn${tab === td.id ? ' is-active' : ''}`}>
             <td.Icon size={13} />
             {t(td.labelKey)}
           </button>
@@ -201,30 +197,25 @@ function ActiveInvocationBanner({ active, onTransition }: {
     : null;
 
   return (
-    <div style={{
-      padding: 16, marginBottom: 16,
-      borderRadius: 'var(--r-md)',
-      border: `2px solid ${active.status === 'INVOKED' ? 'var(--danger-fg)' : 'var(--warning-fg)'}`,
-      background: active.status === 'INVOKED' ? 'rgba(220,38,38,0.06)' : 'rgba(245,158,11,0.06)',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+    <div className="bcl-active-banner" data-tone={active.status === 'INVOKED' ? 'invoked' : 'declared'}>
+      <div className="bcl-active-banner__head">
+        <div className="bcl-active-banner__main">
+          <div className="bcl-active-banner__chips">
             <Siren size={20} color={active.status === 'INVOKED' ? 'var(--danger-fg)' : 'var(--warning-fg)'} />
-            <span className="mono" style={{ fontSize: 11 }}>{active.id}</span>
+            <span className="mono bcl-active-banner__id">{active.id}</span>
             <Badge tone={INVOCATION_STATUS_TONE[active.status]}>{INVOCATION_STATUS_LABEL[active.status][lang]}</Badge>
             <Badge tone={active.isReal ? 'danger' : 'neutral'}>{active.isReal ? t('bclReal') : t('bclDrill')}</Badge>
             {elapsed != null && <Badge tone="warning">T+{elapsed}h</Badge>}
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>{plan ? (lang === 'ar' ? plan.planNameAr : plan.planNameEn) : active.planId}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.5 }}>
+          <div className="bcl-active-banner__title">{plan ? (lang === 'ar' ? plan.planNameAr : plan.planNameEn) : active.planId}</div>
+          <div className="bcl-active-banner__body">
             {lang === 'ar' ? active.disruptionAr : active.disruptionEn}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+          <div className="bcl-active-banner__meta">
             {t('bclCommander')}: <b>{active.commander}</b>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="bcl-active-banner__actions">
           {active.status === 'DECLARED' && <Button variant="danger" Icon={Play} onClick={() => onTransition('INVOKED')}>{t('bclInvoke')}</Button>}
           {active.status === 'INVOKED' && <Button variant="primary" Icon={CheckCircle2} onClick={() => onTransition('STABILISED')}>{t('bclStabilise')}</Button>}
           {active.status === 'STABILISED' && <Button variant="primary" Icon={StopCircle} onClick={() => onTransition('STAND_DOWN')}>{t('bclStandDown')}</Button>}
@@ -238,11 +229,11 @@ function ActiveInvocationBanner({ active, onTransition }: {
 
       {/* Notifications quick log */}
       {active.notifications.length > 0 && (
-        <div style={{ marginTop: 12, padding: 10, background: 'var(--surface-2)', borderRadius: 4 }}>
-          <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+        <div className="bcl-active-banner__notif">
+          <div className="bcl-active-banner__notif-label">
             {t('bclRegNotifications')}
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="bcl-active-banner__notif-list">
             {active.notifications.map(n => (
               <Badge key={n.regulator} tone={n.sentAt ? 'success' : n.maxHours <= 4 ? 'danger' : 'warning'}>
                 {n.regulator} · ≤{n.maxHours}h {n.sentAt ? '✓' : ''}
@@ -270,10 +261,10 @@ function BiaTab({ bias, onApprove, onCreate }: {
       action={uncovered
         ? <Button size="sm" variant="primary" onClick={() => onCreate(uncovered.id, 'TIER-3-OPERATIONAL', 24, 'Process Owner')}>{t('bclBiaCreate')}</Button>
         : null}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="bcl-card-intro">
         {t('bclBiaSub')}
       </div>
-      <table className="tbl" style={{ width: '100%' }}>
+      <table className="tbl bcl-table-full">
         <thead>
           <tr>
             <th>{t('bclBiaProcess')}</th>
@@ -292,31 +283,32 @@ function BiaTab({ bias, onApprove, onCreate }: {
             const daysToExpiry = Math.round((exp.getTime() - Date.now()) / 86_400_000);
             const expiringSoon = daysToExpiry > 0 && daysToExpiry < 60;
             const expired = daysToExpiry <= 0;
+            const expiryClass = expired ? 'bcl-bia-expiry--expired' : expiringSoon ? 'bcl-bia-expiry--soon' : '';
             return (
               <tr key={b.id}>
                 <td>
-                  <div style={{ fontWeight: 600 }}>
+                  <div className="bcl-bia-process-name">
                     {proc ? (lang === 'ar' ? proc.processNameAr : proc.processNameEn) : b.processId}
                   </div>
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{b.id}</div>
-                  <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>{b.processOwner}</div>
+                  <div className="mono bcl-bia-process-id">{b.id}</div>
+                  <div className="bcl-bia-process-owner">{b.processOwner}</div>
                 </td>
                 <td><Badge tone={TIER_TONE[b.tier]}>{TIER_LABEL[b.tier][lang]}</Badge></td>
-                <td className="mono" style={{ fontSize: 11 }}>
+                <td className="mono bcl-bia-numeric">
                   {b.rtoHours}h / {b.rpoHours}h / {b.mtpdHours}h
                 </td>
                 <td>
-                  <div style={{ fontSize: 11, fontWeight: 600 }} className="mono">
+                  <div className="mono bcl-bia-impact-value">
                     {(b.financialImpactSarPerHour / 1000).toFixed(0)}k SAR/h
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--ink-3)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div className="bcl-bia-impact-text">
                     {lang === 'ar' ? b.regulatoryImpactAr : b.regulatoryImpactEn}
                   </div>
                 </td>
                 <td><Badge tone={BIA_STATUS_TONE[b.status]}>{BIA_STATUS_LABEL[b.status][lang]}</Badge></td>
-                <td className="mono" style={{ fontSize: 11, color: expired ? 'var(--danger-fg)' : expiringSoon ? 'var(--warning-fg)' : 'var(--ink-2)' }}>
+                <td className={`mono bcl-bia-expiry ${expiryClass}`}>
                   {b.expiresAt}
-                  {expiringSoon && <div style={{ fontSize: 9 }}>{daysToExpiry}d</div>}
+                  {expiringSoon && <div className="bcl-bia-expiry__delta">{daysToExpiry}d</div>}
                 </td>
                 <td>
                   {b.status === 'DEPT_REVIEW' && <Button size="sm" variant="primary" Icon={ThumbsUp} onClick={() => onApprove(b)}>{t('bclApprove')}</Button>}
@@ -345,32 +337,32 @@ function StrategyTab({ strategies, bias: _bias, onTransition, onCreate }: {
       action={uncoveredProc
         ? <Button size="sm" variant="primary" onClick={() => onCreate(uncoveredProc.id, 'RIYADH-PRIMARY', 'JEDDAH-DR', 'Layla Al-Ghamdi (Head of BCM)')}>{t('bclStrategyCreate')}</Button>
         : null}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="bcl-card-intro">
         {t('bclStrategySub')}
       </div>
       {strategies.map(s => {
         const proc = pickProcessById(s.processId);
         return (
-          <div key={s.id} style={{ padding: 14, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{s.id}</span>
+          <div key={s.id} className="bcl-card">
+            <div className="bcl-card-head">
+              <div className="bcl-card-head__main">
+                <div className="bcl-card-head__chips">
+                  <span className="mono bcl-card-id">{s.id}</span>
                   <Badge tone={STRATEGY_STATUS_TONE[s.status]}>{statusLabel(s.status, lang)}</Badge>
                   <Badge tone={s.maturity >= 4 ? 'success' : s.maturity >= 3 ? 'info' : 'warning'}>
                     {t('bclMaturity')} {s.maturity}/5
                   </Badge>
                   <Badge tone="primary">{(s.annualCostSar / 1_000_000).toFixed(2)}M SAR/y</Badge>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                <div className="bcl-card-title">
                   {proc ? (lang === 'ar' ? proc.processNameAr : proc.processNameEn) : s.processId}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                <div className="bcl-card-sub">
                   {t('bclActivationOwner')}: <b>{s.activationOwner}</b>
                 </div>
               </div>
               {/* Strategy transition buttons */}
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div className="bcl-card-actions">
                 {s.status === 'DRAFT' && <Button size="sm" variant="primary" onClick={() => onTransition(s, 'TESTED')}>{t('bclStrategyMarkTested')}</Button>}
                 {s.status === 'TESTED' && <Button size="sm" variant="primary" onClick={() => onTransition(s, 'APPROVED')}>{t('bclStrategyApprove')}</Button>}
                 {s.status === 'APPROVED' && <Button size="sm" variant="ghost" onClick={() => onTransition(s, 'NEEDS_UPDATE')}>{t('bclStrategyMarkUpdate')}</Button>}
@@ -379,28 +371,28 @@ function StrategyTab({ strategies, bias: _bias, onTransition, onCreate }: {
             </div>
 
             {/* Site flow */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: 10, background: 'var(--surface-2)', borderRadius: 4 }}>
+            <div className="bcl-site-flow">
               <Badge tone="success">{SITE_LABEL[s.primarySite][lang]}</Badge>
               <ArrowRight size={14} color="var(--ink-3)" />
               <Badge tone="info">{SITE_LABEL[s.alternateSite][lang]}</Badge>
               <ArrowRight size={14} color="var(--ink-3)" />
               <Badge tone="warning">{SITE_LABEL['MANUAL-PROCESS'][lang]}</Badge>
               {s.lastTestedAt && (
-                <span style={{ marginInlineStart: 'auto', fontSize: 10, color: 'var(--ink-3)' }}>
+                <span className="bcl-site-flow__test">
                   {t('bclLastTested')}: <span className="mono">{s.lastTestedAt.slice(0, 10)}</span>
                 </span>
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 11 }}>
+            <div className="bcl-field-grid-2">
               <FieldBlock label={t('bclManualWorkaround')} value={lang === 'ar' ? s.manualWorkaroundAr : s.manualWorkaroundEn} />
               <FieldBlock label={t('bclTechDeps')} value={lang === 'ar' ? s.techDependenciesAr : s.techDependenciesEn} />
               <FieldBlock label={t('bclPremises')} value={lang === 'ar' ? s.premisesAr : s.premisesEn} />
               <div>
-                <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                <div className="bcl-field-label">
                   {t('bclDependencies')}
                 </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <div className="bcl-field-badges">
                   <Badge tone="neutral">👥 {s.peopleMin} {t('bclPeople')}</Badge>
                   {s.supplierDependencies.map(sup => <Badge key={sup} tone="info">{sup}</Badge>)}
                 </div>
@@ -416,8 +408,8 @@ function StrategyTab({ strategies, bias: _bias, onTransition, onCreate }: {
 function FieldBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>{value}</div>
+      <div className="bcl-field-label">{label}</div>
+      <div className="bcl-field-value">{value}</div>
     </div>
   );
 }
@@ -436,35 +428,35 @@ function DrillsTab({ drills, onTransition, onSchedule }: {
   return (
     <Card title={t('bclDrillsTitle')} Icon={Calendar}
       action={<Button size="sm" variant="primary" onClick={() => onSchedule(BCM_PLANS[0].id, 'TABLETOP', `Quick tabletop drill ${nextQuarterDate}`, `تمرين طاولة سريع ${nextQuarterDate}`, nextQuarterDate, false)}>{t('bclDrillSchedule')}</Button>}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="bcl-card-intro">
         {t('bclDrillsSub')}
       </div>
       {sorted.map(d => {
         const plan = pickPlanById(d.planId);
         const rtoMet = d.rtoActualHours != null && d.rtoTargetHours != null && d.rtoActualHours <= d.rtoTargetHours;
         return (
-          <div key={d.id} style={{ padding: 14, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{d.id}</span>
+          <div key={d.id} className="bcl-card">
+            <div className="bcl-card-head">
+              <div className="bcl-card-head__main">
+                <div className="bcl-card-head__chips">
+                  <span className="mono bcl-card-id">{d.id}</span>
                   <Badge tone={DRILL_STATUS_TONE[d.status]}>{DRILL_STATUS_LABEL[d.status][lang]}</Badge>
                   <Badge tone="info">{DRILL_TYPE_LABEL[d.type][lang]}</Badge>
                   {d.ncemaLed && <Badge tone="warning">NCEMA</Badge>}
                   {d.score != null && <Badge tone={d.score >= 80 ? 'success' : 'warning'}>{d.score}/100</Badge>}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                <div className="bcl-card-title">
                   {lang === 'ar' ? d.titleAr : d.titleEn}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 4 }}>
+                <div className="bcl-card-scenario">
                   {lang === 'ar' ? d.scenarioAr : d.scenarioEn}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+                <div className="bcl-card-meta">
                   {plan?.planNameEn} · {t('bclFacilitator')}: {d.facilitator} · {d.participantsCount} {t('bclParticipants')}
                   {' · '} <span className="mono">{d.scheduledDate}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div className="bcl-card-actions">
                 {d.status === 'PLANNED' && <Button size="sm" variant="primary" Icon={Play} onClick={() => onTransition(d, 'IN_PROGRESS')}>{t('bclStart')}</Button>}
                 {d.status === 'IN_PROGRESS' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'EXECUTED')}>{t('bclMarkExecuted')}</Button>}
                 {d.status === 'EXECUTED' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'AFTER_ACTION')}>{t('bclOpenAfterAction')}</Button>}
@@ -474,12 +466,12 @@ function DrillsTab({ drills, onTransition, onSchedule }: {
 
             {/* RTO actual vs target */}
             {d.rtoActualHours != null && d.rtoTargetHours != null && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 11 }}>
-                <span style={{ color: 'var(--ink-3)' }}>{t('bclRtoActual')}:</span>
-                <span className="mono" style={{ fontWeight: 700, color: rtoMet ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
+              <div className="bcl-rto-row">
+                <span className="bcl-rto-row__label">{t('bclRtoActual')}:</span>
+                <span className={`mono bcl-rto-row__actual${rtoMet ? ' bcl-rto-row__actual--met' : ''}`}>
                   {d.rtoActualHours}h
                 </span>
-                <span style={{ color: 'var(--ink-3)' }}>vs target</span>
+                <span className="bcl-rto-row__label">vs target</span>
                 <span className="mono">{d.rtoTargetHours}h</span>
                 {rtoMet
                   ? <Badge tone="success"><CheckCircle2 size={11} /> {t('bclRtoMet')}</Badge>
@@ -489,21 +481,21 @@ function DrillsTab({ drills, onTransition, onSchedule }: {
 
             {/* After-action narrative */}
             {(d.whatWorkedEn || d.whatDidntEn) && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+              <div className="bcl-aa-grid">
                 {d.whatWorkedEn && (
-                  <div style={{ padding: 10, background: 'rgba(16,185,129,0.06)', borderRadius: 4, borderInlineStart: '3px solid var(--success)' }}>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 4 }}>{t('bclWhatWorked')}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                  <div className="bcl-aa-block">
+                    <div className="bcl-aa-block__label">{t('bclWhatWorked')}</div>
+                    <div className="bcl-aa-block__body">
                       {lang === 'ar' ? d.whatWorkedAr : d.whatWorkedEn}
                     </div>
                   </div>
                 )}
                 {d.whatDidntEn && (
-                  <div style={{ padding: 10, background: 'rgba(245,158,11,0.06)', borderRadius: 4, borderInlineStart: '3px solid var(--warning)' }}>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 4 }}>
+                  <div className="bcl-aa-block bcl-aa-block--warning">
+                    <div className="bcl-aa-block__label">
                       {t('bclWhatDidnt')} {d.capaCount > 0 && `· ${d.capaCount} CAPA`}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                    <div className="bcl-aa-block__body">
                       {lang === 'ar' ? d.whatDidntAr : d.whatDidntEn}
                     </div>
                   </div>
@@ -537,34 +529,29 @@ function InvocationTab({ active, onDeclare, onLogNotification }: {
     <>
       {!active && (
         <Card title={t('bclDeclareTitle')} Icon={Siren}>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+          <div className="bcl-card-intro">
             {t('bclDeclareSub')}
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+          <div className="bcl-section">
+            <div className="bcl-section-label">
               {t('bclSelectPlan')}
             </div>
-            <select value={planId} onChange={e => setPlanId(Number(e.target.value))} style={inputStyle}>
+            <select value={planId} onChange={e => setPlanId(Number(e.target.value))} className="bcl-input">
               {BCM_PLANS.map(p => <option key={p.id} value={p.id}>{p.planNameEn}</option>)}
             </select>
           </div>
 
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+          <div className="bcl-section">
+            <div className="bcl-section-label">
               {t('bclAffectedProcesses')}
             </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <div className="bcl-process-chip-row">
               {BCM_PROCESSES.slice(0, 8).map(p => {
                 const isOn = processIds.includes(p.id);
                 return (
                   <button key={p.id} onClick={() => toggleProcess(p.id)}
-                    style={{
-                      padding: '6px 10px', borderRadius: 'var(--r-sm)', fontSize: 11,
-                      border: `1px solid ${isOn ? 'var(--primary)' : 'var(--border)'}`,
-                      background: isOn ? 'var(--primary-50)' : 'var(--surface-1)',
-                      cursor: 'pointer', fontWeight: 600,
-                    }}>
+                    className={`bcl-process-chip${isOn ? ' is-active' : ''}`}>
                     {lang === 'ar' ? p.processNameAr : p.processNameEn}
                   </button>
                 );
@@ -572,7 +559,7 @@ function InvocationTab({ active, onDeclare, onLogNotification }: {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="bcl-declare-actions">
             <Button variant="danger" Icon={Siren} onClick={() => onDeclare(planId, processIds, true)}>
               {t('bclDeclareReal')}
             </Button>
@@ -585,22 +572,15 @@ function InvocationTab({ active, onDeclare, onLogNotification }: {
 
       {active && (
         <Card title={t('bclActiveStageLog')} Icon={Clock}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="bcl-stage-list">
             {active.stageLog.map((s, i) => (
-              <div key={i} style={{
-                padding: '8px 0', borderBottom: '1px dashed var(--border)',
-                display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 10, alignItems: 'center',
-              }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%',
-                  background: 'var(--primary)', color: 'white',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700,
-                }}>{i + 1}</div>
+              <div key={i} className="bcl-stage-row">
+                <div className="bcl-stage-bullet">{i + 1}</div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600 }}>{lang === 'ar' ? s.stepAr : s.stepEn}</div>
-                  <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{s.byRole}</div>
+                  <div className="bcl-stage-text">{lang === 'ar' ? s.stepAr : s.stepEn}</div>
+                  <div className="bcl-stage-role">{s.byRole}</div>
                 </div>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+                <div className="mono bcl-stage-time">
                   {new Date(s.atTs).toLocaleTimeString()}
                 </div>
               </div>
@@ -611,44 +591,36 @@ function InvocationTab({ active, onDeclare, onLogNotification }: {
 
       {/* Regulatory notifications */}
       {active && active.notifications.length > 0 && (
-        <div style={{ marginTop: 16 }}>
+        <div className="bcl-notif-section">
           <Card title={t('bclRegNotifications')} Icon={FileText}>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+            <div className="bcl-card-intro">
               {t('bclRegNotificationsSub')}
             </div>
             {active.notifications.map(n => (
-              <div key={n.regulator} style={{
-                padding: '10px 0', borderBottom: '1px dashed var(--border)',
-                display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center',
-              }}>
+              <div key={n.regulator} className="bcl-notif-row">
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div className="bcl-notif-row__head">
                     <Badge tone={n.maxHours <= 4 ? 'danger' : n.maxHours <= 24 ? 'warning' : 'info'}>
                       {n.regulator} · ≤ {n.maxHours}h
                     </Badge>
                     {n.sentAt && <Badge tone="success"><CheckCircle2 size={11} /> {t('bclSent')}</Badge>}
                     {n.referenceId && (
-                      <span className="mono" style={{ fontSize: 10, color: 'var(--ink-2)' }}>
+                      <span className="mono bcl-notif-ref">
                         ref {n.referenceId}
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+                  <div className="bcl-notif-body">
                     {lang === 'ar' ? n.basisAr : n.basisEn}
                   </div>
                 </div>
                 {!n.sentAt && (
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="bcl-notif-actions">
                     <input
                       placeholder={t('bclRefPlaceholder')}
                       value={refs[n.regulator] ?? ''}
                       onChange={e => setRefs(r => ({ ...r, [n.regulator]: e.target.value }))}
-                      className="mono"
-                      style={{
-                        padding: '6px 8px', fontSize: 11,
-                        border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                        background: 'var(--surface-1)', width: 140,
-                      }} />
+                      className="mono bcl-notif-input" />
                     <Button size="sm" variant="primary"
                       onClick={() => { onLogNotification(active.id, n.regulator, refs[n.regulator] ?? ''); setRefs(r => ({ ...r, [n.regulator]: '' })); }}>
                       {t('bclLog')}
@@ -671,40 +643,40 @@ function HistoryTab({ invocations }: { invocations: Invocation[] }) {
   const sorted = [...invocations].sort((a, b) => new Date(b.declaredAt).getTime() - new Date(a.declaredAt).getTime());
   return (
     <Card title={t('bclHistoryTitle')} Icon={Activity}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="bcl-card-intro">
         {t('bclHistorySub')}
       </div>
       {sorted.length === 0
-        ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
+        ? <div className="bcl-history-empty">
             {t('bclHistoryEmpty')}
           </div>
         : sorted.map(inv => {
             const plan = pickPlanById(inv.planId);
             return (
-              <div key={inv.id} style={{ padding: 12, marginBottom: 10, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                      <span className="mono" style={{ fontSize: 11 }}>{inv.id}</span>
+              <div key={inv.id} className="bcl-history-card">
+                <div className="bcl-card-head">
+                  <div className="bcl-card-head__main">
+                    <div className="bcl-card-head__chips">
+                      <span className="mono bcl-active-banner__id">{inv.id}</span>
                       <Badge tone={INVOCATION_STATUS_TONE[inv.status]}>{INVOCATION_STATUS_LABEL[inv.status][lang]}</Badge>
                       <Badge tone={inv.isReal ? 'danger' : 'neutral'}>{inv.isReal ? t('bclReal') : t('bclDrill')}</Badge>
                       {inv.actualRtoHours != null && <Badge tone="primary">RTO {inv.actualRtoHours}h</Badge>}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div className="bcl-history-title">
                       {plan ? (lang === 'ar' ? plan.planNameAr : plan.planNameEn) : inv.planId}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.5, marginTop: 4 }}>
+                    <div className="bcl-card-scenario">
                       {lang === 'ar' ? inv.disruptionAr : inv.disruptionEn}
                     </div>
                   </div>
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+                  <div className="mono bcl-history-time">
                     <div>{inv.declaredAt.slice(0, 10)} {inv.declaredAt.slice(11, 16)}</div>
                     {inv.standDownAt && <div>→ {inv.standDownAt.slice(0, 10)} {inv.standDownAt.slice(11, 16)}</div>}
                   </div>
                 </div>
                 {inv.lessonsLearnedEn && (
-                  <div style={{ marginTop: 8, padding: 8, background: 'var(--surface-2)', borderRadius: 4, fontSize: 11, lineHeight: 1.6 }}>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 4 }}>{t('bclLessons')}</div>
+                  <div className="bcl-history-lessons">
+                    <div className="bcl-history-lessons__label">{t('bclLessons')}</div>
                     {lang === 'ar' ? inv.lessonsLearnedAr : inv.lessonsLearnedEn}
                   </div>
                 )}
@@ -724,19 +696,19 @@ function PacketTab({ stats, bias, drills }: { stats: ReturnType<typeof aggregate
   const completedDrills = drills.filter(d => d.status === 'CLOSED');
   return (
     <Card title={t('bclPacketTitle')} Icon={FileText}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="bcl-card-intro">
         {t('bclPacketSub')}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div className="bcl-packet-stat-grid">
         <Stat label={t('bclPacketTierCov')} value={`${stats.tier1Count + stats.tier2Count}`} unit={t('bclPacketCriticalProcs')} tone="primary" />
         <Stat label={t('bclPacketRtoRate')} value={`${stats.rtoComplianceRate}%`} unit={t('bclPacketLastDrills')} tone={stats.rtoComplianceRate >= 80 ? 'success' : 'warning'} />
         <Stat label={t('bclPacketDrillRecency')} value={`${stats.drillsCompleted}`} unit={t('bclPacketCompleted')} tone="info" />
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>{t('bclPacketTier1')}</div>
-        <table className="tbl" style={{ width: '100%' }}>
+      <div className="bcl-packet-section">
+        <div className="bcl-packet-heading">{t('bclPacketTier1')}</div>
+        <table className="tbl bcl-table-full">
           <thead>
             <tr>
               <th>{t('bclBiaProcess')}</th>
@@ -764,14 +736,14 @@ function PacketTab({ stats, bias, drills }: { stats: ReturnType<typeof aggregate
       </div>
 
       <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>{t('bclPacketRecentDrills')}</div>
+        <div className="bcl-packet-heading">{t('bclPacketRecentDrills')}</div>
         {completedDrills.slice(0, 5).map(d => {
           const rtoMet = d.rtoActualHours != null && d.rtoTargetHours != null && d.rtoActualHours <= d.rtoTargetHours;
           return (
-            <div key={d.id} style={{ padding: 8, marginBottom: 6, fontSize: 11, background: 'var(--surface-2)', borderRadius: 4, display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="mono" style={{ color: 'var(--ink-3)' }}>{d.scheduledDate}</span>
+            <div key={d.id} className="bcl-packet-drill-row">
+              <span className="mono bcl-packet-drill-row__date">{d.scheduledDate}</span>
               <Badge tone="info">{DRILL_TYPE_LABEL[d.type][lang]}</Badge>
-              <span style={{ fontWeight: 600, flex: 1 }}>{lang === 'ar' ? d.titleAr : d.titleEn}</span>
+              <span className="bcl-packet-drill-row__title">{lang === 'ar' ? d.titleAr : d.titleEn}</span>
               {d.rtoActualHours != null && (
                 <Badge tone={rtoMet ? 'success' : 'warning'}>RTO {d.rtoActualHours}h / {d.rtoTargetHours}h</Badge>
               )}
@@ -781,7 +753,7 @@ function PacketTab({ stats, bias, drills }: { stats: ReturnType<typeof aggregate
         })}
       </div>
 
-      <div style={{ marginTop: 12, fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+      <div className="bcl-packet-hint">
         {t('bclPacketHint')}
       </div>
     </Card>
@@ -789,21 +761,14 @@ function PacketTab({ stats, bias, drills }: { stats: ReturnType<typeof aggregate
 }
 
 function Stat({ label, value, unit, tone }: { label: string; value: string; unit?: string; tone: 'primary' | 'success' | 'warning' | 'danger' | 'info' }) {
-  const colour = tone === 'danger' ? 'var(--danger-fg)' : tone === 'warning' ? 'var(--warning-fg)' : tone === 'success' ? 'var(--success-fg)' : tone === 'info' ? 'var(--ink-2)' : 'var(--primary)';
   return (
-    <div style={{ padding: 12, border: `1px solid ${colour}`, borderRadius: 'var(--r-sm)', background: 'var(--surface-2)' }}>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase' }}>{label}</div>
-      <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: colour, marginTop: 4 }}>{value}</div>
-      {unit && <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>{unit}</div>}
+    <div className="bcl-stat-tile" data-tone={tone}>
+      <div className="bcl-stat-tile__label">{label}</div>
+      <div className="mono bcl-stat-tile__value">{value}</div>
+      {unit && <div className="bcl-stat-tile__unit">{unit}</div>}
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: '8px 10px', fontSize: 13,
-  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-  background: 'var(--surface-1)', minWidth: 280,
-};
 
 // ─── Invocation pipeline (interactive kanban) ──────────────────────────────
 

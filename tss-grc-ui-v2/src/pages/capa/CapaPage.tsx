@@ -30,6 +30,7 @@ import { deriveCapaNotifs, audCommitteeDigest, type CapaNotif } from '../../lib/
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toCapaFromObservation } from '../../lib/promotedAdapters';
+import '../../styles/pages/capa.css';
 
 type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers' | 'committee';
 
@@ -181,7 +182,7 @@ export function CapaPage() {
         </>}
       />
 
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+      <div className="kpi-grid capa-kpi-strip">
         <Kpi Icon={ListChecks}    label={t('capaKpiOpen')}            value={open.length}                tone="primary" />
         <Kpi Icon={AlertTriangle} label={t('capaKpiOverdue')}         value={overdue.length}             tone="danger" />
         <Kpi Icon={Repeat}        label={t('capaKpiVerificationFail')} value={failed.length}             tone="warning" />
@@ -192,19 +193,13 @@ export function CapaPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'register' && criticalNotifs.length > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-          padding: 12, marginBottom: 12,
-          background: 'var(--danger-bg)',
-          border: '1px solid var(--danger-fg)',
-          borderRadius: 'var(--r-sm)',
-        }}>
+        <div className="capa-alert-banner">
           <AlertTriangle size={18} color="var(--danger-fg)" />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger-fg)' }}>
+          <div className="capa-alert-banner__body">
+            <div className="capa-alert-banner__title">
               {criticalNotifs.length} {t('capaAlertsStripTitle')}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>
+            <div className="capa-alert-banner__sub">
               {t('capaAlertsStripBody')}
             </div>
           </div>
@@ -216,23 +211,23 @@ export function CapaPage() {
 
       {tab === 'register' && (
         <Card title={t('capaTabRegister')} Icon={ListChecks}
-          action={<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', insetInlineStart: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-4)' }} />
+          action={<div className="capa-toolbar">
+            <div className="capa-search-wrap">
+              <Search size={14} className="capa-search-icon" />
               <input
                 value={q} onChange={e => setQ(e.target.value)}
                 placeholder={t('capaSearchPh')}
-                style={{ paddingInlineStart: 28, paddingInlineEnd: 8, paddingBlock: 6, fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)' }}
+                className="capa-search-input"
               />
             </div>
             <select value={filterType} onChange={e => setFilterType(e.target.value as any)}
-              style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)' }}>
+              className="capa-input">
               <option value="ALL">{t('capaFilterTypeAll')}</option>
               <option value="CORRECTIVE">{t('capaFilterTypeCA')}</option>
               <option value="PREVENTIVE">{t('capaFilterTypePA')}</option>
             </select>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}
-              style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)' }}>
+              className="capa-input">
               <option value="ALL">{t('capaFilterStatusAll')}</option>
               {(Object.keys(CAPA_STATUS_LABEL) as CapaStatus[]).map(s =>
                 <option key={s} value={s}>{CAPA_STATUS_LABEL[s][lang === 'ar' ? 'ar' : 'en']}</option>)}
@@ -241,7 +236,7 @@ export function CapaPage() {
           </div>}>
           {filtered.length === 0
             ? <EmptyState Icon={ListChecks} title={t('capaEmptyTitle')} sub={t('capaEmptyBody')} />
-            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+            : <div className="capa-row-list">
                 {filtered.map(c => (
                   <CapaRow key={c.id} c={c} onAdvance={() => quickAdvance(c)} onRca={() => setRcaTarget(c)} />
                 ))}
@@ -298,37 +293,25 @@ function CapaRow({ c, onAdvance, onRca }: { c: Capa; onAdvance: () => void; onRc
   const title = lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn;
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '120px 1fr 100px 90px 110px 130px 1fr 120px',
-      gap: 10,
-      padding: '12px 0',
-      borderBottom: '1px dashed var(--border)',
-      alignItems: 'center',
-    }}>
+    <div className="capa-row">
       <div>
-        <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)' }}>{c.code}</div>
+        <div className="mono capa-row__code">{c.code}</div>
         <Badge tone={c.type === 'PREVENTIVE' ? 'info' : 'primary'}>{c.type === 'PREVENTIVE' ? 'PA' : 'CA'}</Badge>
       </div>
 
-      <div style={{ minWidth: 0 }}>
+      <div className="capa-row__title-block">
         <Link to={`/capa/${c.id}`}
               title={t('capaDetailOpenLink')}
-              style={{
-                display: 'block',
-                fontSize: 13, fontWeight: 600, color: 'var(--ink-1)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                textDecoration: 'none',
-              }}>
+              className="capa-row__title-link">
           {title}
         </Link>
         {c.sourceRecordTitle && (
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-            {t('capaSourceLabel')}: <span style={{ color: 'var(--ink-2)' }}>{c.sourceRecordTitle}</span>
+          <div className="capa-row__source">
+            {t('capaSourceLabel')}: <span className="capa-row__source-target">{c.sourceRecordTitle}</span>
           </div>
         )}
         {c.parentCapaId && (
-          <div style={{ fontSize: 11, color: 'var(--warning-fg)', marginTop: 2 }}>
+          <div className="capa-row__recurrence">
             ↑ {t('capaRecurrenceOf')} {c.parentCapaId}
           </div>
         )}
@@ -345,25 +328,25 @@ function CapaRow({ c, onAdvance, onRca }: { c: Capa; onAdvance: () => void; onRc
       </div>
 
       <div>
-        <div className="mono" style={{ fontSize: 12, color: overdue ? 'var(--danger-fg)' : 'var(--ink-2)', fontWeight: overdue ? 700 : 500 }}>
+        <div className={`mono capa-row__due${overdue ? ' capa-row__due--overdue' : ''}`}>
           {c.dueDate}
         </div>
-        <div style={{ fontSize: 11, color: overdue ? 'var(--danger-fg)' : 'var(--ink-3)' }}>
+        <div className={`capa-row__remaining${overdue ? ' capa-row__remaining--overdue' : ''}`}>
           {overdue ? `${Math.abs(dueIn)}d ${t('capaOverdue')}` : c.status === 'CLOSED' ? t('capaClosed') : `${dueIn}d ${t('capaRemaining')}`}
         </div>
       </div>
 
-      <div style={{ minWidth: 0 }}>
+      <div className="capa-row__rca-block">
         {c.rcaMethod !== 'NONE' && c.rootCause
           ? <>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{t('capaRootCauseLabel')} · <Badge tone="neutral">{c.rcaMethod.replace('_', '-')}</Badge></div>
-              <div style={{ fontSize: 12, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.rootCause}</div>
+              <div className="capa-row__rca-label">{t('capaRootCauseLabel')} · <Badge tone="neutral">{c.rcaMethod.replace('_', '-')}</Badge></div>
+              <div className="capa-row__rca-text">{c.rootCause}</div>
             </>
           : <Button variant="ghost" size="sm" Icon={Network} onClick={onRca}>{t('capaStartRca')}</Button>
         }
       </div>
 
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+      <div className="capa-row__actions">
         {c.rcaMethod !== 'NONE' && <Button variant="ghost" size="sm" Icon={Network} onClick={onRca}>{t('capaViewRca')}</Button>}
         {CAPA_FORWARD_TRANSITIONS[c.status].length > 0 && (c.status !== 'CLOSED') && (
           <Button variant="primary" size="sm" Icon={Send} onClick={onAdvance}>{t('capaAdvance')}</Button>
@@ -384,22 +367,22 @@ function AgingTab({ items }: { items: Capa[] }) {
   const order: Array<keyof typeof buckets> = ['OVERDUE', '0-30', '31-60', '61-90', '90+'];
   return (
     <Card title={t('capaTabAging')} Icon={Hourglass}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+      <div className="capa-aging-grid">
         {order.map(b => (
-          <div key={b} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', padding: 12, border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div key={b} className="capa-bucket">
+            <div className="capa-bucket__head">
               <Badge tone={b === 'OVERDUE' ? 'danger' : b === '90+' ? 'warning' : b === '61-90' ? 'warning' : b === '31-60' ? 'info' : 'success'}>
                 {b === 'OVERDUE' ? t('capaAgingOverdue') : `${b} ${t('capaDaysSuffix')}`}
               </Badge>
-              <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink-1)' }}>{buckets[b].length}</span>
+              <span className="mono capa-bucket__count">{buckets[b].length}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="capa-bucket__list">
               {buckets[b].map(c => (
-                <div key={c.id} style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                  <span className="mono" style={{ color: 'var(--ink-2)', fontWeight: 600 }}>{c.code}</span> · {c.severity}
+                <div key={c.id} className="capa-bucket__item">
+                  <span className="mono capa-bucket__item-code">{c.code}</span> · {c.severity}
                 </div>
               ))}
-              {buckets[b].length === 0 && <span style={{ fontSize: 11, color: 'var(--ink-4)', fontStyle: 'italic' }}>—</span>}
+              {buckets[b].length === 0 && <span className="capa-bucket__empty">—</span>}
             </div>
           </div>
         ))}
@@ -419,27 +402,22 @@ function ParetoTab({ items }: { items: Capa[] }) {
       action={<Badge tone="primary">{withCause.length} {t('capaParetoCausedTotal')}</Badge>}>
       {top.length === 0
         ? <EmptyState Icon={BarChart3} title={t('capaParetoEmpty')} sub={t('capaParetoEmptyBody')} />
-        : <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 8 }}>
+        : <div className="capa-pareto-stack">
             {top.map(row => {
               const cat = ROOT_CAUSE_CATS.find(c => c.id === row.category);
               return (
-                <div key={row.category} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 80px', gap: 10, alignItems: 'center' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                <div key={row.category} className="capa-pareto-row">
+                  <div className="capa-pareto-label">
                     {cat ? (lang === 'ar' ? cat.ar : cat.en) : row.category}
                   </div>
-                  <div style={{ height: 18, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${(row.count / max) * 100}%`,
-                      background: 'var(--primary)',
-                      transition: 'width 200ms',
-                    }} />
+                  <div className="capa-pareto-bar">
+                    <div className="capa-pareto-fill" style={{ width: `${(row.count / max) * 100}%` }} />
                   </div>
-                  <div className="mono" style={{ fontSize: 12, fontWeight: 700, textAlign: 'end' }}>{row.count} ({row.pct}%)</div>
+                  <div className="mono capa-pareto-count">{row.count} ({row.pct}%)</div>
                 </div>
               );
             })}
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, padding: 8, borderTop: '1px solid var(--border)' }}>
+            <div className="capa-footnote">
               {t('capaParetoFootnote')}
             </div>
           </div>
@@ -454,35 +432,35 @@ function WorkflowTab({ items }: { items: Capa[] }) {
 
   return (
     <Card title={t('capaTabWorkflow')} Icon={Workflow}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, 1fr)`, gap: 8 }}>
+      <div className="capa-kanban-grid" style={{ gridTemplateColumns: `repeat(${stages.length}, 1fr)` }}>
         {stages.map(s => {
           const lane = items.filter(c => c.status === s);
           return (
-            <div key={s} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', padding: 10, border: '1px solid var(--border)', minHeight: 200 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div key={s} className="capa-kanban-lane">
+              <div className="capa-kanban-lane__head">
                 <Badge tone={CAPA_STATUS_TONE[s]} dot>{CAPA_STATUS_LABEL[s][lang === 'ar' ? 'ar' : 'en']}</Badge>
-                <span className="mono" style={{ fontSize: 12, fontWeight: 700 }}>{lane.length}</span>
+                <span className="mono capa-kanban-lane__count">{lane.length}</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="capa-kanban-list">
                 {lane.map(c => (
-                  <div key={c.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: 8 }}>
-                    <div className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-3)' }}>{c.code}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-1)', marginTop: 2, lineHeight: 1.3 }}>
+                  <div key={c.id} className="capa-kanban-card">
+                    <div className="mono capa-kanban-card__code">{c.code}</div>
+                    <div className="capa-kanban-card__title">
                       {(lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn).slice(0, 60)}
                     </div>
-                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    <div className="capa-kanban-card__badges">
                       <Badge tone={CAPA_SEVERITY_TONE[c.severity]}>{c.severity}</Badge>
                       <Badge tone={c.type === 'PREVENTIVE' ? 'info' : 'neutral'}>{c.type === 'PREVENTIVE' ? 'PA' : 'CA'}</Badge>
                     </div>
                   </div>
                 ))}
-                {lane.length === 0 && <div style={{ fontSize: 11, color: 'var(--ink-4)', fontStyle: 'italic' }}>—</div>}
+                {lane.length === 0 && <div className="capa-kanban-empty">—</div>}
               </div>
             </div>
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12 }}>
+      <div className="capa-footnote-plain capa-footnote--plain">
         {t('capaWorkflowFootnote')}
       </div>
     </Card>
@@ -538,31 +516,23 @@ function RcaModal({ c, onClose, update }: {
         <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
         <Button variant="primary" Icon={CheckCheck} onClick={save}>{t('actionSave')}</Button>
       </>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 'var(--r-sm)' }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('capaSubject')}</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginTop: 4 }}>
+      <div className="capa-modal-stack">
+        <div className="capa-subject-block">
+          <div className="capa-modal-eyebrow">{t('capaSubject')}</div>
+          <div className="capa-modal-title">
             {lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>
+          <div className="capa-modal-body">
             {lang === 'ar' && c.descriptionAr ? c.descriptionAr : c.descriptionEn}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaMethod')}</div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaMethod')}</div>
+          <div className="capa-pill-row">
             {(['FIVE_WHYS', 'FISHBONE', 'PARETO', 'NONE'] as RcaMethod[]).map(m => (
               <button key={m} onClick={() => setMethodAndSeed(m)}
-                style={{
-                  padding: '6px 10px', fontSize: 12,
-                  borderRadius: 'var(--r-sm)',
-                  border: method === m ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  background: method === m ? 'var(--primary-50)' : 'var(--surface-2)',
-                  color: method === m ? 'var(--primary)' : 'var(--ink-2)',
-                  cursor: 'pointer',
-                  fontWeight: method === m ? 600 : 500,
-                }}>
+                className={`capa-pill${method === m ? ' is-active' : ''}`}>
                 {m === 'FIVE_WHYS' ? t('capaRcaFiveWhys') :
                  m === 'FISHBONE' ? t('capaRcaFishbone') :
                  m === 'PARETO' ? t('capaRcaPareto') : t('capaRcaNone')}
@@ -573,14 +543,14 @@ function RcaModal({ c, onClose, update }: {
 
         {method === 'FIVE_WHYS' && (
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaFiveWhys')}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaFiveWhys')}</div>
+            <div className="capa-bucket__list">
               {steps.slice(0, 5).map((s, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: 8, alignItems: 'center' }}>
+                <div key={i} className="capa-why-row">
                   <Badge tone="primary">{t('capaRcaWhy')} {i + 1}</Badge>
                   <input value={s} onChange={e => setSteps(prev => prev.map((x, j) => j === i ? e.target.value : x))}
                     placeholder={t('capaRcaWhyPh')}
-                    style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+                    className="capa-input capa-input--full" />
                 </div>
               ))}
             </div>
@@ -589,18 +559,18 @@ function RcaModal({ c, onClose, update }: {
 
         {method === 'FISHBONE' && (
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaFishbone')} (6M)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaFishbone')} (6M)</div>
+            <div className="capa-fishbone-grid">
               {fishboneLabels.map((label, i) => (
                 <div key={i}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 4 }}>
+                  <div className="capa-fishbone-label">
                     {lang === 'ar' ? fishboneLabelsAr[i] : label}
                   </div>
                   <input value={steps[i] ?? ''} onChange={e => setSteps(prev => {
                       const next = [...prev]; while (next.length < 6) next.push(''); next[i] = e.target.value; return next;
                     })}
                     placeholder={t('capaRcaFishbonePh')}
-                    style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+                    className="capa-input capa-input--full" />
                 </div>
               ))}
             </div>
@@ -609,35 +579,27 @@ function RcaModal({ c, onClose, update }: {
 
         {method === 'PARETO' && (
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaPareto')}</div>
+            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaPareto')}</div>
             <textarea value={steps.join('\n')} onChange={e => setSteps(e.target.value.split('\n'))}
               placeholder={t('capaRcaParetoPh')}
               rows={6}
-              style={{ padding: 8, fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%', resize: 'vertical' }} />
+              className="capa-input capa-input--full capa-input--textarea" />
           </div>
         )}
 
         <div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRootCauseLabel')}</div>
+          <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRootCauseLabel')}</div>
           <input value={rootCause} onChange={e => setRootCause(e.target.value)}
             placeholder={t('capaRootCausePh')}
-            style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+            className="capa-input capa-input--full" />
         </div>
 
         <div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaRcaCategory')}</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaCategory')}</div>
+          <div className="capa-pill-row capa-pill-row--wrap">
             {ROOT_CAUSE_CATS.filter(c => c.id !== 'UNKNOWN').map(cat => (
               <button key={cat.id} onClick={() => setCategory(cat.id)}
-                style={{
-                  padding: '4px 10px', fontSize: 11,
-                  borderRadius: 'var(--r-sm)',
-                  border: category === cat.id ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  background: category === cat.id ? 'var(--primary-50)' : 'var(--surface-2)',
-                  color: category === cat.id ? 'var(--primary)' : 'var(--ink-2)',
-                  cursor: 'pointer',
-                  fontWeight: category === cat.id ? 600 : 500,
-                }}>
+                className={`capa-pill capa-pill--xs${category === cat.id ? ' is-active' : ''}`}>
                 {lang === 'ar' ? cat.ar : cat.en}
               </button>
             ))}
@@ -679,43 +641,36 @@ function TriggersTab({ triggers, onOpenPa }: { triggers: PaTrigger[]; onOpenPa: 
       action={<Badge tone={triggers.some(t => !t.alreadyCovered) ? 'warning' : 'success'}>
         {triggers.filter(t => !t.alreadyCovered).length} {t('capaTriggersOpen')}
       </Badge>}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '0 0 12px 0', borderBottom: '1px dashed var(--border)' }}>
+      <div className="capa-trigger-intro">
         {t('capaTriggersIntro')}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="capa-trigger-list">
         {triggers.map(trig => {
           const Icon = KIND_ICON[trig.kind] ?? Zap;
           return (
-            <div key={trig.id} style={{
-              display: 'grid',
-              gridTemplateColumns: '32px 130px 1fr 90px 110px 130px',
-              gap: 10,
-              padding: '14px 0',
-              borderBottom: '1px dashed var(--border)',
-              alignItems: 'center',
-            }}>
+            <div key={trig.id} className="capa-trigger-row">
               <Icon size={20} strokeWidth={1.8} color="var(--warning-fg)" />
               <Badge tone={trig.kind === 'KRI_BREACH' ? 'warning' : trig.kind === 'RISK_TREND' ? 'info' : 'accent'}>
                 {KIND_LABEL[trig.kind][lang === 'ar' ? 'ar' : 'en']}
               </Badge>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+              <div className="capa-trigger-main">
+                <div className="capa-trigger-title">
                   {lang === 'ar' ? trig.titleAr : trig.titleEn}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4, lineHeight: 1.4 }}>
+                <div className="capa-trigger-rationale">
                   {lang === 'ar' ? trig.rationaleAr : trig.rationaleEn}
                 </div>
-                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                <div className="capa-trigger-refs">
                   {trig.frameworkRefs.map(ref => <Badge key={ref} tone="neutral">{ref}</Badge>)}
                 </div>
               </div>
               <Badge tone={trig.suggestedSeverity === 'CRITICAL' ? 'danger' : trig.suggestedSeverity === 'HIGH' ? 'warning' : 'info'}>
                 {trig.suggestedSeverity}
               </Badge>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="mono capa-trigger-owner">
                 {trig.suggestedOwner}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div className="capa-trigger-actions">
                 {trig.alreadyCovered
                   ? <Badge tone="success" dot>{t('capaTriggerCovered')}</Badge>
                   : <Button variant="primary" size="sm" Icon={Plus} onClick={() => onOpenPa(trig)}>{t('capaTriggerOpenPa')}</Button>
@@ -725,7 +680,7 @@ function TriggersTab({ triggers, onOpenPa }: { triggers: PaTrigger[]; onOpenPa: 
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12, padding: 8 }}>
+      <div className="capa-footnote--plain">
         {t('capaTriggersFootnote')}
       </div>
     </Card>
@@ -774,15 +729,15 @@ function NewPaModal({ trig, onClose, onCreate }: {
         <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
         <Button variant="primary" Icon={Plus} onClick={submit}>{t('capaNewPaCreate')}</Button>
       </>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ background: 'var(--warning-bg)', padding: 12, borderRadius: 'var(--r-sm)', border: '1px solid var(--warning-fg)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--warning-fg)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+      <div className="capa-modal-stack capa-modal-stack--tight">
+        <div className="capa-trigger-banner">
+          <div className="capa-trigger-banner__head">
             <Zap size={14} /> {t('capaNewPaTriggerLabel')}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', marginTop: 4 }}>
+          <div className="capa-trigger-banner__title">
             {lang === 'ar' ? trig.titleAr : trig.titleEn}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.5 }}>
+          <div className="capa-trigger-banner__body">
             {lang === 'ar' ? trig.rationaleAr : trig.rationaleEn}
           </div>
         </div>
@@ -791,29 +746,21 @@ function NewPaModal({ trig, onClose, onCreate }: {
         <Field label={t('capaNewPaTitleAr')} value={titleAr} onChange={setTitleAr} />
         <Field label={t('capaNewPaDescription')} value={descriptionEn} onChange={setDescriptionEn} multiline />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        <div className="capa-three-col">
           <Field label={t('capaNewPaOwner')} value={owner} onChange={setOwner} />
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaNewPaSeverity')}</div>
-            <div style={{ display: 'flex', gap: 4 }}>
+            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaNewPaSeverity')}</div>
+            <div className="capa-severity-row">
               {(['LOW','MEDIUM','HIGH','CRITICAL'] as const).map(s =>
                 <button key={s} onClick={() => setSeverity(s)}
-                  style={{
-                    padding: '4px 8px', fontSize: 11,
-                    borderRadius: 'var(--r-sm)',
-                    border: severity === s ? '1px solid var(--primary)' : '1px solid var(--border)',
-                    background: severity === s ? 'var(--primary-50)' : 'var(--surface-2)',
-                    color: severity === s ? 'var(--primary)' : 'var(--ink-2)',
-                    cursor: 'pointer',
-                    fontWeight: severity === s ? 700 : 500,
-                  }}>{s}</button>
+                  className={`capa-pill capa-pill--xs${severity === s ? ' is-active' : ''}`}>{s}</button>
               )}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{t('capaNewPaDueDate')}</div>
+            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaNewPaDueDate')}</div>
             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-              style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+              className="capa-input capa-input--full" />
           </div>
         </div>
       </div>
@@ -824,12 +771,12 @@ function NewPaModal({ trig, onClose, onCreate }: {
 function Field({ label, value, onChange, multiline }: { label: string; value: string; onChange: (v: string) => void; multiline?: boolean }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+      <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{label}</div>
       {multiline
         ? <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
-            style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%', resize: 'vertical' }} />
+            className="capa-input capa-input--full capa-input--textarea" />
         : <input value={value} onChange={e => onChange(e.target.value)}
-            style={{ padding: '6px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--ink-1)', width: '100%' }} />
+            className="capa-input capa-input--full" />
       }
     </div>
   );
@@ -871,7 +818,7 @@ function CommitteeTab({ notifs, digest }: {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="capa-committee-stack">
       {/* Quarterly digest card */}
       <Card title={`${t('capaCommitteeDigest')} — ${digest.quarterLabel}`} Icon={Stamp}
         action={<Button variant="ghost" size="sm" Icon={FileText}
@@ -896,10 +843,10 @@ function CommitteeTab({ notifs, digest }: {
           }}>
           {t('capaCommitteeExport')}
         </Button>}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+        <div className="capa-committee-period">
           {t('capaCommitteeDigestPeriod')}: <span className="mono">{digest.quarterStart} → {digest.quarterEnd}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        <div className="capa-digest-grid">
           <DigestStat label={t('capaCommitteeOpened')}              value={digest.opened}            tone="info" />
           <DigestStat label={t('capaCommitteeClosed')}              value={digest.closed}            tone="success" />
           <DigestStat label={t('capaCommitteeInFlight')}            value={digest.inFlight}          tone="primary" />
@@ -910,16 +857,16 @@ function CommitteeTab({ notifs, digest }: {
           <DigestStat label={t('capaCommitteeCustomerDisclosures')} value={digest.customerDisclosures} tone={digest.customerDisclosures > 0 ? 'warning' : 'success'} />
         </div>
         {digest.topRootCauses.length > 0 && (
-          <div style={{ marginTop: 16, padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+          <div className="capa-roots-block">
+            <div className="capa-modal-eyebrow capa-roots-block__title">
               {t('capaCommitteeTopRootCauses')}
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div className="capa-roots-list">
               {digest.topRootCauses.map(rc => {
                 const lbl = ROOT_CAUSE_LABEL[rc.category];
                 return (
-                  <div key={rc.category} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--surface-1)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  <div key={rc.category} className="capa-root-chip">
+                    <span className="capa-root-chip__label">
                       {lbl ? (lang === 'ar' ? lbl.ar : lbl.en) : rc.category}
                     </span>
                     <Badge tone="primary">{rc.count} ({rc.pct}%)</Badge>
@@ -929,7 +876,7 @@ function CommitteeTab({ notifs, digest }: {
             </div>
           </div>
         )}
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12, padding: 8, borderTop: '1px solid var(--border)' }}>
+        <div className="capa-footnote">
           {t('capaCommitteeFootnote')}
         </div>
       </Card>
@@ -941,27 +888,20 @@ function CommitteeTab({ notifs, digest }: {
         </Badge>}>
         {notifs.length === 0
           ? <EmptyState Icon={ShieldCheck} title={t('capaCommitteeNoAlerts')} sub={t('capaCommitteeNoAlertsBody')} />
-          : <div style={{ display: 'flex', flexDirection: 'column' }}>
+          : <div className="capa-row-list">
               {notifs.map(n => (
-                <div key={n.id} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '110px 180px 1fr 160px 90px',
-                  gap: 10,
-                  padding: '10px 0',
-                  borderBottom: '1px dashed var(--border)',
-                  alignItems: 'center',
-                }}>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{n.firedAt}</span>
+                <div key={n.id} className="capa-stream-row">
+                  <span className="mono capa-stream-mono">{n.firedAt}</span>
                   <Badge tone={KIND_TONE[n.kind]}>
                     {KIND_LABEL[n.kind][lang === 'ar' ? 'ar' : 'en']}
                   </Badge>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)' }}>{n.capaCode}</div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-1)', marginTop: 2, lineHeight: 1.4 }}>
+                  <div className="capa-stream-main">
+                    <div className="mono capa-stream-code">{n.capaCode}</div>
+                    <div className="capa-stream-message">
                       {lang === 'ar' ? n.messageAr : n.messageEn}
                     </div>
                   </div>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{n.recipient}</span>
+                  <span className="mono capa-stream-recipient">{n.recipient}</span>
                   <Badge tone={n.severity === 'CRITICAL' ? 'danger' : n.severity === 'WARN' ? 'warning' : 'info'}>
                     {n.severity}
                   </Badge>
@@ -975,18 +915,10 @@ function CommitteeTab({ notifs, digest }: {
 }
 
 function DigestStat({ label, value, tone }: { label: string; value: number; tone: 'info' | 'success' | 'primary' | 'danger' | 'warning' | 'accent' }) {
-  const toneVar = {
-    info: 'var(--info-fg)', success: 'var(--success-fg)', primary: 'var(--primary)',
-    danger: 'var(--danger-fg)', warning: 'var(--warning-fg)', accent: 'var(--accent-700)',
-  }[tone];
-  const bgVar = {
-    info: 'var(--info-bg)', success: 'var(--success-bg)', primary: 'var(--primary-50)',
-    danger: 'var(--danger-bg)', warning: 'var(--warning-bg)', accent: 'var(--accent-50)',
-  }[tone];
   return (
-    <div style={{ background: bgVar, padding: 12, borderRadius: 'var(--r-sm)' }}>
-      <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: toneVar }}>{value}</div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{label}</div>
+    <div className="capa-digest-stat" data-tone={tone}>
+      <div className="mono capa-digest-stat__value">{value}</div>
+      <div className="capa-digest-stat__label">{label}</div>
     </div>
   );
 }

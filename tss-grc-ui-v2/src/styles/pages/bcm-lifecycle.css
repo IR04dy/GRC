@@ -1,0 +1,496 @@
+/* TSS GRC Platform — BcmLifecyclePage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-2).
+ * Every value resolves to a design token. RTL-safe (logical properties only).
+ */
+
+/* ─── KPI strip spacing ──────────────────────────────────────────── */
+.bcl-kpi-strip { margin-bottom: var(--sp-6); }
+
+/* ─── Tab buttons (top of page) ──────────────────────────────────── */
+.bcl-tab-row {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.bcl-tab-btn {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.bcl-tab-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* ─── Active invocation banner ───────────────────────────────────── */
+.bcl-active-banner {
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-6);
+  border-radius: var(--r-md);
+  border: 2px solid var(--warning-fg);
+  background: rgba(245, 158, 11, 0.06);
+}
+.bcl-active-banner[data-tone="invoked"] {
+  border-color: var(--danger-fg);
+  background: rgba(220, 38, 38, 0.06);
+}
+.bcl-active-banner__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+}
+.bcl-active-banner__main {
+  flex: 1;
+  min-width: 240px;
+}
+.bcl-active-banner__chips {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+.bcl-active-banner__id { font-size: var(--text-2xs); }
+.bcl-active-banner__title {
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+.bcl-active-banner__body {
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  margin-top: var(--sp-2);
+  line-height: 1.5;
+}
+.bcl-active-banner__meta {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-top: var(--sp-2);
+}
+.bcl-active-banner__actions {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.bcl-active-banner__notif {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+}
+.bcl-active-banner__notif-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--sp-3);
+}
+.bcl-active-banner__notif-list {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+/* ─── Card intro paragraph (used on every tab) ───────────────────── */
+.bcl-card-intro {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-5);
+  line-height: 1.5;
+}
+
+/* ─── Common table — full width for all .tbl in this page ───────── */
+.bcl-table-full { width: 100%; }
+
+/* ─── BIA tab cell styling ───────────────────────────────────────── */
+.bcl-bia-process-name { font-weight: 600; }
+.bcl-bia-process-id {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.bcl-bia-process-owner {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.bcl-bia-numeric {
+  font-size: var(--text-2xs);
+}
+.bcl-bia-impact-value {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+.bcl-bia-impact-text {
+  font-size: 10px;
+  color: var(--ink-3);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bcl-bia-expiry {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+}
+.bcl-bia-expiry--expired { color: var(--danger-fg); }
+.bcl-bia-expiry--soon { color: var(--warning-fg); }
+.bcl-bia-expiry__delta {
+  font-size: 9px;
+}
+
+/* ─── Strategy / drill / history cards ───────────────────────────── */
+.bcl-card {
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.bcl-card--md { padding: var(--sp-5); }
+.bcl-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.bcl-card-head__main { flex: 1; }
+.bcl-card-head__chips {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.bcl-card-id {
+  font-size: var(--text-2xs);
+  color: var(--primary);
+}
+.bcl-card-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin-bottom: var(--sp-2);
+}
+.bcl-card-sub {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.bcl-card-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+.bcl-card-scenario {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin-bottom: var(--sp-2);
+}
+.bcl-card-meta {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+/* Strategy site flow row */
+.bcl-site-flow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+}
+.bcl-site-flow__test {
+  margin-inline-start: auto;
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.bcl-field-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5);
+  font-size: var(--text-2xs);
+}
+.bcl-field-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--sp-2);
+}
+.bcl-field-value {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.bcl-field-badges {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* Drill RTO row */
+.bcl-rto-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  font-size: var(--text-2xs);
+}
+.bcl-rto-row__label { color: var(--ink-3); }
+.bcl-rto-row__actual {
+  font-weight: 700;
+  color: var(--danger-fg);
+}
+.bcl-rto-row__actual--met { color: var(--success-fg); }
+
+/* After-action narrative blocks */
+.bcl-aa-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+.bcl-aa-block {
+  padding: var(--sp-4);
+  border-radius: var(--r-xs);
+  border-inline-start: 3px solid var(--success);
+  background: rgba(16, 185, 129, 0.06);
+}
+.bcl-aa-block--warning {
+  border-inline-start-color: var(--warning);
+  background: rgba(245, 158, 11, 0.06);
+}
+.bcl-aa-block__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-bottom: var(--sp-2);
+}
+.bcl-aa-block__body {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+/* ─── Invocation tab — form select / chips ───────────────────────── */
+.bcl-input {
+  padding: var(--sp-4) var(--sp-5);
+  font-size: var(--text-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  min-width: 280px;
+}
+.bcl-section { margin-bottom: var(--sp-5); }
+.bcl-section-label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--sp-3);
+}
+.bcl-process-chip-row {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.bcl-process-chip {
+  padding: var(--sp-3) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-2xs);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  cursor: pointer;
+  font-weight: 600;
+}
+.bcl-process-chip.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+.bcl-declare-actions {
+  display: flex;
+  gap: var(--sp-4);
+}
+
+/* ─── Stage log (timeline) ──────────────────────────────────────── */
+.bcl-stage-list {
+  display: flex;
+  flex-direction: column;
+}
+.bcl-stage-row {
+  padding: var(--sp-4) 0;
+  border-bottom: 1px dashed var(--border);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-5);
+  align-items: center;
+}
+.bcl-stage-bullet {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+.bcl-stage-text { font-size: var(--text-xs); font-weight: 600; }
+.bcl-stage-role { font-size: 10px; color: var(--ink-3); }
+.bcl-stage-time {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+/* ─── Regulatory notifications ──────────────────────────────────── */
+.bcl-notif-section { margin-top: var(--sp-6); }
+.bcl-notif-row {
+  padding: var(--sp-4) 0;
+  border-bottom: 1px dashed var(--border);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-4);
+  align-items: center;
+}
+.bcl-notif-row__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-2);
+}
+.bcl-notif-ref {
+  font-size: 10px;
+  color: var(--ink-2);
+}
+.bcl-notif-body {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+.bcl-notif-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+.bcl-notif-input {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--text-2xs);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  width: 140px;
+}
+
+/* ─── History tab ────────────────────────────────────────────────── */
+.bcl-history-empty {
+  padding: var(--sp-7);
+  text-align: center;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.bcl-history-card {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.bcl-history-time {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.bcl-history-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.bcl-history-lessons {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+}
+.bcl-history-lessons__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-bottom: var(--sp-2);
+}
+
+/* ─── Packet tab ─────────────────────────────────────────────────── */
+.bcl-packet-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-6);
+}
+.bcl-packet-section { margin-bottom: var(--sp-6); }
+.bcl-packet-heading {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: var(--sp-4);
+}
+.bcl-packet-drill-row {
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-3);
+  font-size: var(--text-2xs);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+}
+.bcl-packet-drill-row__date { color: var(--ink-3); }
+.bcl-packet-drill-row__title { font-weight: 600; flex: 1; }
+.bcl-packet-hint {
+  margin-top: var(--sp-5);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+/* ─── Stat tile (Packet stat boxes) ──────────────────────────────── */
+.bcl-stat-tile {
+  padding: var(--sp-5);
+  border: 1px solid var(--primary);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.bcl-stat-tile[data-tone="success"] { border-color: var(--success-fg); }
+.bcl-stat-tile[data-tone="warning"] { border-color: var(--warning-fg); }
+.bcl-stat-tile[data-tone="danger"]  { border-color: var(--danger-fg); }
+.bcl-stat-tile[data-tone="info"]    { border-color: var(--ink-2); }
+.bcl-stat-tile__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.bcl-stat-tile__value {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: var(--sp-2);
+  color: var(--primary);
+}
+.bcl-stat-tile[data-tone="success"] .bcl-stat-tile__value { color: var(--success-fg); }
+.bcl-stat-tile[data-tone="warning"] .bcl-stat-tile__value { color: var(--warning-fg); }
+.bcl-stat-tile[data-tone="danger"]  .bcl-stat-tile__value { color: var(--danger-fg); }
+.bcl-stat-tile[data-tone="info"]    .bcl-stat-tile__value { color: var(--ink-2); }
+.bcl-stat-tile__unit {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}

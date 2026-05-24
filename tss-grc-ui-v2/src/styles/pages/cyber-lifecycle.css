@@ -1,0 +1,402 @@
+/* TSS GRC Platform — CyberLifecyclePage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-2).
+ * Every value resolves to a design token. RTL-safe (logical properties only).
+ */
+
+/* ─── KPI strip spacing ──────────────────────────────────────────── */
+.cyc-kpi-strip { margin-bottom: var(--sp-6); }
+
+/* ─── Tab row ────────────────────────────────────────────────────── */
+.cyc-tab-row {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.cyc-tab-btn {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.cyc-tab-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* ─── Common — card intro paragraph ──────────────────────────────── */
+.cyc-card-intro {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-5);
+  line-height: 1.5;
+}
+
+/* ─── ECC tab ────────────────────────────────────────────────────── */
+.cyc-ecc-action {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.cyc-ecc-summary {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-6);
+  align-items: center;
+}
+.cyc-ecc-maturity-tile {
+  text-align: center;
+  padding: var(--sp-6);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+.cyc-ecc-maturity-tile__hint {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.cyc-ecc-spoc { font-size: var(--text-xs); margin-bottom: var(--sp-4); }
+.cyc-ecc-reviewer {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-2);
+}
+.cyc-ecc-approver {
+  font-size: var(--text-2xs);
+  color: var(--success-fg);
+  margin-bottom: var(--sp-2);
+}
+.cyc-ecc-workflow {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+/* Per-domain score card */
+.cyc-domain-card {
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.cyc-domain-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.cyc-domain-main { flex: 1; }
+.cyc-domain-chips {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.cyc-domain-code {
+  font-size: var(--text-2xs);
+  color: var(--primary);
+}
+.cyc-domain-name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.cyc-domain-counts {
+  display: flex;
+  gap: var(--sp-4);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-3);
+}
+.cyc-domain-counts__evidenced { color: var(--success-fg); }
+.cyc-domain-counts__remediation { color: var(--warning-fg); }
+.cyc-domain-narrative {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.cyc-domain-maturity {
+  text-align: center;
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  min-width: 90px;
+}
+.cyc-domain-maturity__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.cyc-domain-maturity__value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+.cyc-domain-maturity__value[data-tone="success"] { color: var(--success-fg); }
+.cyc-domain-maturity__value[data-tone="warning"] { color: var(--warning-fg); }
+.cyc-domain-maturity__value[data-tone="neutral"] { color: var(--ink-3); }
+.cyc-domain-maturity__value[data-tone="default"] { color: var(--ink-1); }
+.cyc-domain-section { margin-top: var(--sp-6); }
+
+.cyc-bar-track {
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cyc-bar-fill {
+  height: 100%;
+}
+.cyc-bar-fill[data-tone="success"] { background: var(--success); }
+.cyc-bar-fill[data-tone="primary"] { background: var(--primary); }
+.cyc-bar-fill[data-tone="warning"] { background: var(--warning); }
+.cyc-bar-fill[data-tone="danger"]  { background: var(--danger); }
+
+/* ─── Tables (Vulns / Assets) ────────────────────────────────────── */
+.cyc-table-full { width: 100%; }
+.cyc-cell-id {
+  font-size: var(--text-2xs);
+}
+.cyc-cell-id-sub {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.cyc-cell-title {
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
+.cyc-cell-notes {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.cyc-cell-asset { font-size: var(--text-2xs); }
+.cyc-cell-asset-tier { font-size: 11px; }
+.cyc-cell-due {
+  font-size: var(--text-2xs);
+}
+.cyc-cell-due--overdue { color: var(--danger-fg); }
+.cyc-cell-due__sla {
+  font-size: 9px;
+}
+.cyc-asset-tier-select {
+  padding: 4px;
+  font-size: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+.cyc-asset-name {
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
+.cyc-asset-desc {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.cyc-cell-mono-11 {
+  font-size: 11px;
+}
+
+/* ─── Threats tab ────────────────────────────────────────────────── */
+.cyc-card {
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.cyc-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.cyc-card-main { flex: 1; }
+.cyc-card-chips {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.cyc-card-mono {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.cyc-card-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.cyc-threat-summary {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin-bottom: var(--sp-4);
+}
+.cyc-threat-affected {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+.cyc-threat-affected__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.cyc-threat-recommend {
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+}
+.cyc-threat-recommend__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-bottom: var(--sp-2);
+}
+.cyc-threat-actiontaken {
+  margin-top: var(--sp-3);
+  padding: var(--sp-4);
+  background: rgba(16, 185, 129, 0.06);
+  border-radius: var(--r-xs);
+  border-inline-start: 3px solid var(--success);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+}
+.cyc-threat-actiontaken__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin-bottom: var(--sp-2);
+}
+
+/* ─── SOC tab ────────────────────────────────────────────────────── */
+.cyc-soc-card {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.cyc-soc-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+.cyc-soc-card__main { flex: 1; }
+.cyc-soc-card__title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.cyc-soc-card__narrative {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin-top: var(--sp-2);
+}
+.cyc-soc-card__meta {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: var(--sp-2);
+}
+.cyc-card-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* ─── Pentest tab ────────────────────────────────────────────────── */
+.cyc-pt-card-id {
+  font-size: var(--text-2xs);
+  color: var(--primary);
+}
+.cyc-pt-card-vendor {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.cyc-pt-stats {
+  display: flex;
+  gap: var(--sp-4);
+}
+.cyc-pt-rem-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.cyc-pt-rem-row__label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.cyc-pt-rem-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cyc-pt-rem-fill {
+  height: 100%;
+}
+.cyc-pt-rem-fill[data-tone="success"] { background: var(--success); }
+.cyc-pt-rem-fill[data-tone="warning"] { background: var(--warning); }
+.cyc-pt-rem-fill[data-tone="danger"] { background: var(--danger); }
+.cyc-pt-rem-pct {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+.cyc-pt-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px dashed var(--border);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.cyc-pt-num {
+  padding: 4px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+.cyc-pt-num--w-50 { width: 50px; }
+.cyc-pt-num--w-60 { width: 60px; }
+
+/* Stat tile inside pentest */
+.cyc-stat-tile {
+  padding: var(--sp-3);
+  border: 1px solid var(--ink-2);
+  border-radius: var(--r-sm);
+  min-width: 50px;
+  text-align: center;
+}
+.cyc-stat-tile[data-tone="danger"]  { border-color: var(--danger-fg); }
+.cyc-stat-tile[data-tone="warning"] { border-color: var(--warning-fg); }
+.cyc-stat-tile[data-tone="info"]    { border-color: var(--ink-2); }
+.cyc-stat-tile__label {
+  font-size: 9px;
+  color: var(--ink-3);
+}
+.cyc-stat-tile__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.cyc-stat-tile[data-tone="danger"]  .cyc-stat-tile__value { color: var(--danger-fg); }
+.cyc-stat-tile[data-tone="warning"] .cyc-stat-tile__value { color: var(--warning-fg); }
+.cyc-stat-tile[data-tone="info"]    .cyc-stat-tile__value { color: var(--ink-2); }
