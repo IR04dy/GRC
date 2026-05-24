@@ -1,0 +1,241 @@
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ClipboardList, AlertTriangle, Clock3, CheckCircle2, Plus, Filter, Briefcase,
+  FileCheck2,
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Shell } from '../../components/layout/Shell';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Kpi } from '../../components/ui/Kpi';
+import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
+import { ApiError } from '../../lib/api';
+import {
+  listObligations,
+  getObligationKpis,
+  type Obligation,
+  type ObligationKpis,
+  type Regulator,
+  type LifecycleStage,
+  REGULATORS,
+  LIFECYCLE_STAGES,
+  REGULATOR_LABELS,
+  TYPE_LABELS,
+  FREQUENCY_LABELS,
+  SEVERITY_LABELS,
+  LIFECYCLE_LABELS,
+  lifecycleTone,
+  severityTone,
+  daysUntilDue,
+} from '../../lib/obligations';
+
+/**
+ * Sprint 11 — Regulatory Obligation Register landing page.
+ *
+ * <p>Saudi-native bilingual: "سجل الالتزامات الرقابية" (Regulatory
+ * Obligation Register). KPI tiles cover the four numbers the
+ * audit-committee actually asks for — active, overdue, due-this-month,
+ * attested-this-cycle — and the table below is filterable by
+ * regulator + lifecycle.
+ */
+export function ObligationsPage() {
+  const { lang } = useI18n();
+  const isAr = lang === 'ar';
+  const toast = useToast();
+
+  const [items, setItems] = useState<Obligation[]>([]);
+  const [kpis, setKpis] = useState<ObligationKpis | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [regulatorFilter, setRegulatorFilter] = useState<Regulator | ''>('');
+  const [stageFilter, setStageFilter] = useState<LifecycleStage | ''>('');
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [list, k] = await Promise.all([listObligations(), getObligationKpis()]);
+      setItems(Array.isArray(list) ? list : []);
+      setKpis(k);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل تحميل الالتزامات' : 'Failed to load obligations'));
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = useMemo(() => {
+    return items.filter(o =>
+      (regulatorFilter === '' || o.regulator === regulatorFilter)
+      && (stageFilter === '' || o.lifecycleStage === stageFilter));
+  }, [items, regulatorFilter, stageFilter]);
+
+  const fmtDate = (d?: string) =>
+    d ? new Date(d).toLocaleDateString(isAr ? 'ar-SA' : 'en-GB') : '—';
+
+  return (
+    <Shell>
+      <PageHeader
+        eyebrow={isAr ? 'الالتزام والامتثال' : 'Compliance'}
+        title={isAr ? 'سجل الالتزامات الرقابية' : 'Regulatory Obligation Register'}
+        sub={isAr
+          ? 'كل التزام رقابي متكرر للبنك في مكان واحد: المسؤول، التكرار، تاريخ الاستحقاق، والإقرار الدوري — وفق إطار الالتزام لمؤسسة النقد §3.2 وضوابط الهيئة الوطنية للأمن السيبراني ECC-2 1-1.'
+          : 'Every recurring regulatory obligation for the bank, in one place: owner, frequency, due date, periodic attestation — per SAMA Compliance Framework §3.2 and NCA ECC-2 1-1.'}
+        actions={
+          <div className="cluster" style={{ gap: 8 }}>
+            <Link to="/compliance/obligation-campaigns" className="btn btn-secondary">
+              <Briefcase size={14} style={{ marginInlineEnd: 4 }} />
+              {isAr ? 'حملات الإقرار' : 'Attestation campaigns'}
+            </Link>
+            <Button Icon={Plus} disabled>
+              {isAr ? 'التزام جديد' : 'New obligation'}
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+        <Kpi
+          Icon={ClipboardList}
+          label={isAr ? 'الالتزامات النشطة' : 'Active obligations'}
+          value={String(kpis?.activeCount ?? '—')}
+          tone="info"
+        />
+        <Kpi
+          Icon={AlertTriangle}
+          label={isAr ? 'متأخرات' : 'Overdue'}
+          value={String(kpis?.overdueCount ?? '—')}
+          tone={(kpis?.overdueCount ?? 0) > 0 ? 'danger' : 'neutral'}
+        />
+        <Kpi
+          Icon={Clock3}
+          label={isAr ? 'مستحقة هذا الشهر' : 'Due this month'}
+          value={String(kpis?.dueThisMonthCount ?? '—')}
+          tone={(kpis?.dueThisMonthCount ?? 0) > 0 ? 'warning' : 'neutral'}
+        />
+        <Kpi
+          Icon={CheckCircle2}
+          label={isAr ? 'مُقَرَّة هذه الدورة' : 'Attested this cycle'}
+          value={String(kpis?.attestedThisCycleCount ?? '—')}
+          tone="success"
+        />
+      </div>
+
+      <Card title={isAr ? 'سجل الالتزامات' : 'Obligation register'} Icon={FileCheck2}>
+        {/* Filter row */}
+        <div className="cluster" style={{ gap: 8, marginBottom: 'var(--space-md)' }}>
+          <Filter size={14} style={{ color: 'var(--ink-3)' }} />
+          <select
+            value={regulatorFilter}
+            onChange={e => setRegulatorFilter(e.target.value as Regulator | '')}
+            style={{ padding: '4px 8px', fontSize: 13 }}
+          >
+            <option value="">{isAr ? 'كل الجهات' : 'All regulators'}</option>
+            {REGULATORS.map(r => (
+              <option key={r} value={r}>
+                {isAr ? REGULATOR_LABELS[r].ar : REGULATOR_LABELS[r].en}
+              </option>
+            ))}
+          </select>
+          <select
+            value={stageFilter}
+            onChange={e => setStageFilter(e.target.value as LifecycleStage | '')}
+            style={{ padding: '4px 8px', fontSize: 13 }}
+          >
+            <option value="">{isAr ? 'كل الحالات' : 'All stages'}</option>
+            {LIFECYCLE_STAGES.map(s => (
+              <option key={s} value={s}>
+                {isAr ? LIFECYCLE_LABELS[s].ar : LIFECYCLE_LABELS[s].en}
+              </option>
+            ))}
+          </select>
+          <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+            {filtered.length === items.length
+              ? `${items.length} ${isAr ? 'التزام' : 'obligations'}`
+              : `${filtered.length} / ${items.length}`}
+          </span>
+        </div>
+
+        {loading && items.length === 0 ? (
+          <InlineEmpty text={isAr ? 'جارٍ التحميل…' : 'Loading…'} />
+        ) : filtered.length === 0 ? (
+          <InlineEmpty text={isAr ? 'لا توجد التزامات مطابقة.' : 'No matching obligations.'} />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="grc-table">
+              <thead>
+                <tr>
+                  <th>{isAr ? 'الرمز' : 'Code'}</th>
+                  <th>{isAr ? 'العنوان' : 'Title'}</th>
+                  <th>{isAr ? 'الجهة' : 'Regulator'}</th>
+                  <th>{isAr ? 'النوع' : 'Type'}</th>
+                  <th>{isAr ? 'التكرار' : 'Frequency'}</th>
+                  <th>{isAr ? 'الخطورة' : 'Severity'}</th>
+                  <th>{isAr ? 'تاريخ الاستحقاق' : 'Next due'}</th>
+                  <th>{isAr ? 'الحالة' : 'Stage'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(o => {
+                  const d = daysUntilDue(o.nextDueDate);
+                  const dueColor = d < 0 ? 'var(--danger)'
+                    : d <= 7 ? 'var(--warning)'
+                    : d <= 30 ? 'var(--info)'
+                    : 'var(--ink-2)';
+                  return (
+                    <tr key={o.id}>
+                      <td><code style={{ fontSize: 12 }}>{o.obligationCode}</code></td>
+                      <td>
+                        <Link to={`/compliance/obligations/${o.id}`} className="link">
+                          {isAr ? o.titleAr : o.titleEn}
+                        </Link>
+                        {o.businessUnitEn && (
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                            {isAr ? (o.businessUnitAr ?? o.businessUnitEn) : o.businessUnitEn}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: 13 }}>
+                        {isAr ? REGULATOR_LABELS[o.regulator].ar : REGULATOR_LABELS[o.regulator].en}
+                      </td>
+                      <td style={{ fontSize: 13 }}>
+                        {isAr ? TYPE_LABELS[o.obligationType].ar : TYPE_LABELS[o.obligationType].en}
+                      </td>
+                      <td style={{ fontSize: 13 }}>
+                        {isAr ? FREQUENCY_LABELS[o.frequency].ar : FREQUENCY_LABELS[o.frequency].en}
+                      </td>
+                      <td>
+                        <Badge tone={severityTone(o.severityIfMissed)}>
+                          {isAr ? SEVERITY_LABELS[o.severityIfMissed].ar : SEVERITY_LABELS[o.severityIfMissed].en}
+                        </Badge>
+                      </td>
+                      <td style={{ fontSize: 13, color: dueColor, fontVariantNumeric: 'tabular-nums' }}>
+                        {fmtDate(o.nextDueDate)}
+                        <div style={{ fontSize: 11, color: dueColor }}>
+                          {d < 0
+                            ? (isAr ? `متأخر ${-d} يوماً` : `${-d}d overdue`)
+                            : d === 0
+                              ? (isAr ? 'اليوم' : 'today')
+                              : (isAr ? `بعد ${d} يوماً` : `in ${d}d`)}
+                        </div>
+                      </td>
+                      <td>
+                        <Badge tone={lifecycleTone(o.lifecycleStage)}>
+                          {isAr ? LIFECYCLE_LABELS[o.lifecycleStage].ar : LIFECYCLE_LABELS[o.lifecycleStage].en}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </Shell>
+  );
+}

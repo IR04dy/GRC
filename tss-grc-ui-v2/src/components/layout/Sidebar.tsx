@@ -88,6 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'compliance', titleKey: 'navCompliancePolicy',
     items: [
       { id: 'compliance',   to: '/compliance',        Icon: ClipboardCheck, labelKey: 'modCompliance' },
+      { id: 'obligations',  to: '/compliance/obligations', Icon: FileCheck2, labelKey: 'obligationRegisterSidebar' },
       { id: 'reg-library',  to: '/regulatory/library', Icon: Landmark,      labelKey: 'regLibrarySidebar' },
       { id: 'ctrl-library', to: '/controls/library',   Icon: ShieldCheck,   labelKey: 'ctrlLibrarySidebar' },
       { id: 'posture-hub',  to: '/compliance/posture', Icon: BarChart3,     labelKey: 'postureHubSidebar' },

@@ -3342,6 +3342,12 @@ export const en = {
   vbcpSidebar: 'Vendor BCP attestation',
   vbcpTitle: 'Vendor BCP Attestation Campaigns',
   vbcpSub: 'Launch an annual or quarterly cycle to collect BCP attestations from critical third parties.',
+  // Sprint 11 — Regulatory Obligation Register + Periodic Attestation.
+  obligationRegisterSidebar: 'Obligation Register',
+  obligationRegisterTitle: 'Regulatory Obligation Register',
+  obligationRegisterSub: 'Every recurring regulatory obligation in one place: owner, frequency, due date, periodic attestation — per SAMA Compliance Framework §3.2 and NCA ECC-2 1-1.',
+  obligationCampaignsTitle: 'Obligation Attestation Campaigns',
+  obligationCampaignsSub: 'Launch a quarterly or annual cycle to collect attestations from obligation owners.',
   scenarioLibrarySidebar: 'Scenario Library',
   facilitatorConsoleSidebar: 'Facilitate Exercise',
   facilitatorConsoleTitle: 'Facilitator console',

@@ -114,6 +114,9 @@ const AarDetailPage             = lazy(() => import('./pages/bcm/AarDetailPage')
 const AiSuggestionsPage         = lazy(() => import('./pages/ai/AiSuggestionsPage').then(m => ({ default: m.AiSuggestionsPage })));
 const AiModelRegisterPage       = lazy(() => import('./pages/ai/AiModelRegisterPage').then(m => ({ default: m.AiModelRegisterPage })));
 const AiModelDetailPage         = lazy(() => import('./pages/ai/AiModelDetailPage').then(m => ({ default: m.AiModelDetailPage })));
+const ObligationsPage           = lazy(() => import('./pages/compliance/ObligationsPage').then(m => ({ default: m.ObligationsPage })));
+const ObligationDetailPage      = lazy(() => import('./pages/compliance/ObligationDetailPage').then(m => ({ default: m.ObligationDetailPage })));
+const ObligationCampaignsPage   = lazy(() => import('./pages/compliance/ObligationCampaignsPage').then(m => ({ default: m.ObligationCampaignsPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -246,6 +249,11 @@ export function App() {
               <Route path="/regulatory/library" element={<RegulatoryLibraryPage />} />
               <Route path="/controls/library"   element={<ControlLibraryPage />} />
               <Route path="/compliance/posture" element={<PosturePage />} />
+              {/* Sprint 11 — Obligation register + periodic attestation. */}
+              <Route path="/compliance/obligations"                element={<ObligationsPage />} />
+              <Route path="/compliance/obligations/:id"            element={<ObligationDetailPage />} />
+              <Route path="/compliance/obligation-campaigns"       element={<ObligationCampaignsPage />} />
+              <Route path="/compliance/obligation-campaigns/:id"   element={<ObligationCampaignsPage />} />
               <Route path="/bcm/dashboard"      element={<BcmDashboardPage />} />
               <Route path="/bcm/readiness"      element={<BcmReadinessPage />} />
               <Route path="/bcm/reports"        element={<BcmReportsPage />} />

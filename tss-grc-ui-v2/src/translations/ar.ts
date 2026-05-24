@@ -3326,6 +3326,14 @@ export const ar = {
   vbcpSidebar: 'شهادات استمرارية الموردين',
   vbcpTitle: 'حملة شهادات استمرارية الموردين',
   vbcpSub: 'إطلاق دورة سنوية أو ربعية لجمع شهادات استمرارية الأعمال من الموردين الجوهريين.',
+  // Sprint 11 — Regulatory Obligation Register + Periodic Attestation.
+  // Saudi-native: "سجل الالتزامات الرقابية" (NOT literal "سجل الواجبات").
+  // Periodic attestation = "إقرار دوري" (NOT literal "تصديق دوري").
+  obligationRegisterSidebar: 'سجل الالتزامات الرقابية',
+  obligationRegisterTitle: 'سجل الالتزامات الرقابية',
+  obligationRegisterSub: 'كل التزام رقابي متكرر للبنك في مكان واحد: المسؤول، التكرار، تاريخ الاستحقاق، والإقرار الدوري — وفق إطار الالتزام لمؤسسة النقد §3.2 وضوابط الهيئة الوطنية للأمن السيبراني ECC-2 1-1.',
+  obligationCampaignsTitle: 'حملات الإقرار الدوري للالتزامات',
+  obligationCampaignsSub: 'إطلاق دورة ربع سنوية أو سنوية لجمع الإقرارات من المسؤولين عن الالتزامات الرقابية.',
   scenarioLibrarySidebar: 'مكتبة السيناريوهات',
   facilitatorConsoleSidebar: 'إدارة التمرين الحيّ',
   facilitatorConsoleTitle: 'وحدة تحكم المُنسِّق',
