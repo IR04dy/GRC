@@ -87,6 +87,11 @@ const WorkflowSubmissionDetailPage = lazy(() => import('./pages/workflow/Workflo
 const ApprovalChainTemplatesPage    = lazy(() => import('./pages/workflow/ApprovalChainTemplatesPage').then(m => ({ default: m.ApprovalChainTemplatesPage })));
 const ApprovalChainInstanceDetailPage = lazy(() => import('./pages/workflow/ApprovalChainInstanceDetailPage').then(m => ({ default: m.ApprovalChainInstanceDetailPage })));
 const ApprovalChainPendingPage       = lazy(() => import('./pages/workflow/ApprovalChainPendingPage').then(m => ({ default: m.ApprovalChainPendingPage })));
+// ─── Sprint 13 — Internal Audit Annual Plan + Engagement workflow.
+const IaPlanListPage                 = lazy(() => import('./pages/audit-ia/IaPlanListPage').then(m => ({ default: m.IaPlanListPage })));
+const IaPlanDetailPage               = lazy(() => import('./pages/audit-ia/IaPlanDetailPage').then(m => ({ default: m.IaPlanDetailPage })));
+const IaUniversePage                 = lazy(() => import('./pages/audit-ia/IaUniversePage').then(m => ({ default: m.IaUniversePage })));
+const IaEngagementDetailPage         = lazy(() => import('./pages/audit-ia/IaEngagementDetailPage').then(m => ({ default: m.IaEngagementDetailPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
 //    Each wizard is its own chunk; the first time a user navigates to
 //    /workflows/* the relevant ~30 kB chunk is fetched. Reduces initial
@@ -409,6 +414,14 @@ export function App() {
 
               {/* Sprint 11 — Three Lines of Defense (IIA 2020 / SAMA CSF 1.1.1) */}
               <Route path="/governance/three-lines"                  element={<ThreeLinesOfDefensePage />} />
+
+              {/* Sprint 13 — Internal Audit Annual Plan + Engagement workflow.
+                  Static segments (/universe, /engagements) registered before
+                  any param routes so they match first. */}
+              <Route path="/audit/ia/plans"                          element={<IaPlanListPage />} />
+              <Route path="/audit/ia/universe"                       element={<IaUniversePage />} />
+              <Route path="/audit/ia/plans/:id"                      element={<IaPlanDetailPage />} />
+              <Route path="/audit/ia/engagements/:id"                element={<IaEngagementDetailPage />} />
 
               {/* Detail + admin pages for V115/V116 modules */}
               <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />
