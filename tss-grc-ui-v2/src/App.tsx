@@ -124,6 +124,9 @@ const CcmTestDetailPage         = lazy(() => import('./pages/ccm/CcmTestDetailPa
 // Sprint 11 — Audit Committee Dashboard (curation slice over every GRC stream).
 const AuditCommitteeDashboardPage = lazy(() => import('./pages/audit-committee/AuditCommitteeDashboardPage').then(m => ({ default: m.AuditCommitteeDashboardPage })));
 const AuditCommitteeSnapshotPage  = lazy(() => import('./pages/audit-committee/AuditCommitteeSnapshotPage').then(m => ({ default: m.AuditCommitteeSnapshotPage })));
+// Sprint 11 — Attack Surface Management (ASM).
+const AttackSurfacePage         = lazy(() => import('./pages/cyber/AttackSurfacePage').then(m => ({ default: m.AttackSurfacePage })));
+const AttackSurfaceAssetDetailPage = lazy(() => import('./pages/cyber/AttackSurfaceAssetDetailPage').then(m => ({ default: m.AttackSurfaceAssetDetailPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -400,6 +403,10 @@ export function App() {
               {/* Sprint 11 — Audit Committee Dashboard (curation slice). */}
               <Route path="/audit-committee/dashboard"               element={<AuditCommitteeDashboardPage />} />
               <Route path="/audit-committee/snapshots/:id"           element={<AuditCommitteeSnapshotPage />} />
+              {/* Sprint 11 — Attack Surface Management (ASM).
+                  Static segments registered before any param routes. */}
+              <Route path="/cyber/attack-surface"                              element={<AttackSurfacePage />} />
+              <Route path="/cyber/attack-surface/assets/:externalId"           element={<AttackSurfaceAssetDetailPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />

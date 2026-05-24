@@ -197,6 +197,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'cyber-dash', to: '/cyber/dashboard',  Icon: LayoutDashboard, labelKey: 'cyberDashSidebar' },
       { id: 'cyber',    to: '/cyber',              Icon: LockKeyhole, labelKey: 'modCyber' },
       { id: 'cyber-lc', to: '/cyber-lifecycle',    Icon: ShieldCheck, labelKey: 'cycSidebar' },
+      { id: 'asm',      to: '/cyber/attack-surface', Icon: Network,   labelKey: 'asmSidebar' },
       { id: 'fw-ctrls', to: '/framework-controls', Icon: BookOpen,    labelKey: 'fwcSidebar' },
       { id: 'assets',   to: '/assets',             Icon: Server,      labelKey: 'assetsSidebar' },
     ],

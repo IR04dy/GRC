@@ -2303,6 +2303,7 @@ export const ar = {
   regLibrarySidebar:      'مكتبة المرجعيات',
   ctrlLibrarySidebar:     'مكتبة الضوابط',
   ccmDashSidebar:         'المراقبة المستمرة للضوابط',
+  asmSidebar:             'سطح الهجوم',
   postureHubSidebar:      'وضع الامتثال',
   ermDashSidebar:         'لوحة المخاطر',
   bcmDashSidebar:         'لوحة الاستمرارية',

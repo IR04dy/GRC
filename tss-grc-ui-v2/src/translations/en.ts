@@ -2318,6 +2318,7 @@ export const en = {
   regLibrarySidebar:      'Regulatory library',
   ctrlLibrarySidebar:     'Control library',
   ccmDashSidebar:         'CCM dashboard',
+  asmSidebar:             'Attack Surface',
   postureHubSidebar:      'Compliance posture',
   ermDashSidebar:         'Risk dashboard',
   bcmDashSidebar:         'BCM dashboard',
