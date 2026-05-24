@@ -272,3 +272,453 @@ export function aggregateAi(models: ReadonlyArray<AiModel> = AI_MODELS): AiStats
     needsAudit,
   };
 }
+
+// ─── Sprint 11 — live API surface (AI/ML Model Registry) ───────────────────
+//
+// The original Sprint-6 mock above (AiModel + AI_MODELS demo list) stays in
+// place so the existing AiGovernancePage continues to render unchanged. The
+// live registry lives under a new MlModel* prefix talking to V183
+// `ai_governance.ml_model*` tables.
+//
+// Tri-track regulator surface:
+//   • SDAIA AI Ethics Principles (2023)
+//   • SAMA AI Governance Principles (Dec 2024)
+//   • EU AI Act Article 16 (for European subsidiaries)
+//
+// Lifecycle: PROPOSED → DEVELOPMENT → VALIDATION → APPROVED_FOR_PROD →
+//            IN_PRODUCTION → MONITORING ⇄ REVISION → DECOMMISSIONED
+
+import { api } from './api';
+
+export type MlModelType =
+  | 'CLASSIFICATION' | 'REGRESSION' | 'CLUSTERING' | 'NLP'
+  | 'COMPUTER_VISION' | 'RECOMMENDATION' | 'FORECASTING'
+  | 'LLM' | 'GENERATIVE' | 'RULE_BASED' | 'HYBRID';
+
+export type MlBusinessDomain =
+  | 'CREDIT_DECISION' | 'FRAUD_DETECTION' | 'AML_MONITORING'
+  | 'CUSTOMER_CHURN' | 'DOCUMENT_CLASSIFICATION' | 'KYC_OCR'
+  | 'CHATBOT' | 'RECOMMENDER' | 'RISK_SCORING'
+  | 'MARKETING_OPTIMIZATION' | 'OPERATIONS_AUTOMATION';
+
+export type MlRiskTier = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export type MlLifecycleStage =
+  | 'PROPOSED' | 'DEVELOPMENT' | 'VALIDATION' | 'APPROVED_FOR_PROD'
+  | 'IN_PRODUCTION' | 'MONITORING' | 'REVISION' | 'DECOMMISSIONED';
+
+export type MlFramework =
+  | 'TENSORFLOW' | 'PYTORCH' | 'SCIKIT_LEARN' | 'XGBOOST'
+  | 'LIGHTGBM' | 'HUGGINGFACE' | 'AZURE_ML' | 'AWS_SAGEMAKER'
+  | 'OPENAI_API' | 'CUSTOM' | 'HYBRID';
+
+export type MlHosting =
+  | 'ON_PREM' | 'AZURE_KSA' | 'AWS_MIDDLE_EAST' | 'GCP' | 'EDGE' | 'MIXED';
+
+export type MlComplianceStatus =
+  | 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT' | 'NOT_ASSESSED';
+
+export type MlAuditType =
+  | 'FAIRNESS' | 'BIAS' | 'EXPLAINABILITY' | 'ROBUSTNESS'
+  | 'PRIVACY' | 'SECURITY' | 'PERFORMANCE';
+
+export type MlAuditStatus =
+  | 'PASSED' | 'PASSED_WITH_CONDITIONS' | 'FAILED' | 'REMEDIATED';
+
+export type MlDriftType =
+  | 'DATA_DRIFT' | 'CONCEPT_DRIFT'
+  | 'PERFORMANCE_DEGRADATION' | 'FAIRNESS_REGRESSION';
+
+export type MlDriftSeverity = 'INFO' | 'MINOR' | 'MODERATE' | 'MAJOR' | 'CRITICAL';
+
+export interface MlModelResponse {
+  id: number;
+  externalId: string;
+  modelCode: string;
+  titleEn: string;
+  titleAr?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  modelType: MlModelType;
+  businessDomain: MlBusinessDomain;
+  riskTier: MlRiskTier;
+  lifecycleStage: MlLifecycleStage;
+  versionLabel?: string;
+  versionHistoryJson?: string;
+  modelOwnerUserId: number;
+  businessSponsorUserId: number;
+  validatorUserId?: number;
+  validationDate?: string;
+  productionDate?: string;
+  decommissionDate?: string;
+  decommissionReasonEn?: string;
+  decommissionReasonAr?: string;
+  trainingDataProvenanceEn?: string;
+  trainingDataProvenanceAr?: string;
+  trainingDataSizeRecords?: number;
+  trainingDataPeriodStart?: string;
+  trainingDataPeriodEnd?: string;
+  featureCount?: number;
+  externalDatasetUsed: boolean;
+  externalDatasetProvenance?: string;
+  framework?: MlFramework;
+  hosting?: MlHosting;
+  inferenceLatencyMs?: number;
+  trainingComputeHours?: number;
+  hasPdplDpia: boolean;
+  pdplDpiaId?: number;
+  hasFairnessAudit: boolean;
+  lastFairnessAuditDate?: string;
+  hasExplainabilityDoc: boolean;
+  isHighRiskEuAiAct: boolean;
+  sdaiaAiEthicsCompliance: MlComplianceStatus;
+  samaAiPrinciplesCompliance: MlComplianceStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MlModelRequest {
+  modelCode?: string;
+  titleEn: string;
+  titleAr?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  modelType: MlModelType;
+  businessDomain: MlBusinessDomain;
+  riskTier: MlRiskTier;
+  versionLabel?: string;
+  versionHistoryJson?: string;
+  modelOwnerUserId: number;
+  businessSponsorUserId: number;
+  validatorUserId?: number;
+  validationDate?: string;
+  productionDate?: string;
+  trainingDataProvenanceEn?: string;
+  trainingDataProvenanceAr?: string;
+  trainingDataSizeRecords?: number;
+  trainingDataPeriodStart?: string;
+  trainingDataPeriodEnd?: string;
+  featureCount?: number;
+  externalDatasetUsed?: boolean;
+  externalDatasetProvenance?: string;
+  framework?: MlFramework;
+  hosting?: MlHosting;
+  inferenceLatencyMs?: number;
+  trainingComputeHours?: number;
+  hasPdplDpia?: boolean;
+  pdplDpiaId?: number;
+  hasFairnessAudit?: boolean;
+  lastFairnessAuditDate?: string;
+  hasExplainabilityDoc?: boolean;
+  isHighRiskEuAiAct?: boolean;
+  sdaiaAiEthicsCompliance?: MlComplianceStatus;
+  samaAiPrinciplesCompliance?: MlComplianceStatus;
+}
+
+export interface LifecycleTransitionRequest { toStage: MlLifecycleStage }
+
+export interface DecommissionRequest {
+  reasonEn: string;
+  reasonAr?: string;
+  decommissionDate?: string;
+}
+
+export interface MlModelAuditResponse {
+  id: number;
+  externalId: string;
+  modelId: number;
+  auditType: MlAuditType;
+  auditDate: string;
+  auditorUserId?: number;
+  auditorExternalParty?: string;
+  methodologyEn?: string;
+  methodologyAr?: string;
+  findingsEn?: string;
+  findingsAr?: string;
+  status: MlAuditStatus;
+  metricsJson?: string;
+  capaTaskId?: number;
+  createdAt?: string;
+}
+
+export interface MlModelAuditRequest {
+  auditType: MlAuditType;
+  auditDate: string;
+  auditorUserId?: number;
+  auditorExternalParty?: string;
+  methodologyEn?: string;
+  methodologyAr?: string;
+  findingsEn?: string;
+  findingsAr?: string;
+  status: MlAuditStatus;
+  metricsJson?: string;
+  capaTaskId?: number;
+}
+
+export interface DriftObservationResponse {
+  id: number;
+  externalId: string;
+  modelId: number;
+  observedAt: string;
+  observationType: MlDriftType;
+  severity: MlDriftSeverity;
+  metricName: string;
+  metricValue: number;
+  baselineValue?: number;
+  driftThreshold?: number;
+  notesEn?: string;
+  notesAr?: string;
+  isAcknowledged: boolean;
+  acknowledgedAt?: string;
+  acknowledgedByUserId?: number;
+  triggeredIssueId?: number;
+  createdAt?: string;
+}
+
+export interface DriftObservationRequest {
+  observedAt?: string;
+  observationType: MlDriftType;
+  severity: MlDriftSeverity;
+  metricName: string;
+  metricValue: number;
+  baselineValue?: number;
+  driftThreshold?: number;
+  notesEn?: string;
+  notesAr?: string;
+}
+
+// ─── REST client ────────────────────────────────────────────────────────────
+
+export const mlModelApi = {
+  list:    () => api.get<MlModelResponse[]>('/api/v1/ai/models'),
+  get:     (externalId: string) => api.get<MlModelResponse>(`/api/v1/ai/models/${externalId}`),
+  highRiskWithoutFairness:
+           () => api.get<MlModelResponse[]>('/api/v1/ai/models/high-risk-without-fairness'),
+  create:  (body: MlModelRequest) => api.post<MlModelResponse>('/api/v1/ai/models', body),
+  update:  (externalId: string, body: MlModelRequest) =>
+              api.put<MlModelResponse>(`/api/v1/ai/models/${externalId}`, body),
+  transition: (externalId: string, toStage: MlLifecycleStage) =>
+              api.post<MlModelResponse>(`/api/v1/ai/models/${externalId}/transition`, { toStage }),
+  decommission: (externalId: string, body: DecommissionRequest) =>
+              api.post<MlModelResponse>(`/api/v1/ai/models/${externalId}/decommission`, body),
+
+  // Audits.
+  listAudits:  (externalId: string) =>
+              api.get<MlModelAuditResponse[]>(`/api/v1/ai/models/${externalId}/audits`),
+  recordAudit: (externalId: string, body: MlModelAuditRequest) =>
+              api.post<MlModelAuditResponse>(`/api/v1/ai/models/${externalId}/audits`, body),
+
+  // Drift.
+  listDrift:   (externalId: string) =>
+              api.get<DriftObservationResponse[]>(`/api/v1/ai/models/${externalId}/drift-observations`),
+  recordDrift: (externalId: string, body: DriftObservationRequest) =>
+              api.post<DriftObservationResponse>(`/api/v1/ai/models/${externalId}/drift-observations`, body),
+  acknowledgeDrift: (externalId: string, obsId: string) =>
+              api.post<DriftObservationResponse>(
+                `/api/v1/ai/models/${externalId}/drift-observations/${obsId}/acknowledge`),
+};
+
+// ─── Display constants ──────────────────────────────────────────────────────
+//
+// Saudi-native labels (not literal translations) — لاحظ مثلاً
+//   "في الإنتاج" (live in production) ≠ "في الإنتاج" literal
+//   "خارج الخدمة" (out of service) — the natural KSA phrasing
+//                 vs. literal "تم إيقاف التشغيل"
+//   "سجل نماذج الذكاء الاصطناعي" — the page heading, NOT literal
+//                 "نماذج التعلم الآلي"
+
+export const ML_STAGE_TONE: Record<MlLifecycleStage, 'neutral' | 'info' | 'accent' | 'warning' | 'success' | 'danger'> = {
+  PROPOSED:          'neutral',
+  DEVELOPMENT:       'info',
+  VALIDATION:        'accent',
+  APPROVED_FOR_PROD: 'accent',
+  IN_PRODUCTION:     'success',
+  MONITORING:        'success',
+  REVISION:          'warning',
+  DECOMMISSIONED:    'danger',
+};
+
+export const ML_STAGE_LABEL: Record<MlLifecycleStage, { en: string; ar: string }> = {
+  PROPOSED:          { en: 'Proposed',            ar: 'مُقترح' },
+  DEVELOPMENT:       { en: 'Development',         ar: 'قيد التطوير' },
+  VALIDATION:        { en: 'Validation',          ar: 'قيد التحقق' },
+  APPROVED_FOR_PROD: { en: 'Approved for prod',   ar: 'معتمد للإنتاج' },
+  IN_PRODUCTION:     { en: 'In production',       ar: 'في الإنتاج' },
+  MONITORING:        { en: 'Monitoring',          ar: 'تحت المراقبة' },
+  REVISION:          { en: 'Revision',            ar: 'قيد المراجعة' },
+  DECOMMISSIONED:    { en: 'Decommissioned',      ar: 'خارج الخدمة' },
+};
+
+export const ML_TIER_TONE: Record<MlRiskTier, 'success' | 'accent' | 'warning' | 'danger'> = {
+  LOW:      'success',
+  MEDIUM:   'accent',
+  HIGH:     'warning',
+  CRITICAL: 'danger',
+};
+
+export const ML_TIER_LABEL: Record<MlRiskTier, { en: string; ar: string }> = {
+  CRITICAL: { en: 'Critical', ar: 'حرج' },
+  HIGH:     { en: 'High',     ar: 'مرتفع' },
+  MEDIUM:   { en: 'Medium',   ar: 'متوسط' },
+  LOW:      { en: 'Low',      ar: 'منخفض' },
+};
+
+export const ML_DOMAIN_LABEL: Record<MlBusinessDomain, { en: string; ar: string }> = {
+  CREDIT_DECISION:         { en: 'Credit decision',          ar: 'قرارات التمويل' },
+  FRAUD_DETECTION:         { en: 'Fraud detection',          ar: 'كشف الاحتيال' },
+  AML_MONITORING:          { en: 'AML monitoring',           ar: 'مكافحة غسل الأموال' },
+  CUSTOMER_CHURN:          { en: 'Customer churn',           ar: 'تخارج العملاء' },
+  DOCUMENT_CLASSIFICATION: { en: 'Document classification',  ar: 'تصنيف المستندات' },
+  KYC_OCR:                 { en: 'KYC OCR',                  ar: 'استخراج وثائق اعرف عميلك' },
+  CHATBOT:                 { en: 'Chatbot',                  ar: 'روبوت محادثة' },
+  RECOMMENDER:             { en: 'Recommender',              ar: 'محرّك التوصيات' },
+  RISK_SCORING:            { en: 'Risk scoring',             ar: 'تسجيل المخاطر' },
+  MARKETING_OPTIMIZATION:  { en: 'Marketing optimisation',   ar: 'تحسين التسويق' },
+  OPERATIONS_AUTOMATION:   { en: 'Operations automation',    ar: 'أتمتة العمليات' },
+};
+
+export const ML_AUDIT_TYPE_LABEL: Record<MlAuditType, { en: string; ar: string }> = {
+  FAIRNESS:       { en: 'Fairness',       ar: 'عدالة' },
+  BIAS:           { en: 'Bias',           ar: 'تحيز' },
+  EXPLAINABILITY: { en: 'Explainability', ar: 'قابلية التفسير' },
+  ROBUSTNESS:     { en: 'Robustness',     ar: 'متانة' },
+  PRIVACY:        { en: 'Privacy',        ar: 'خصوصية' },
+  SECURITY:       { en: 'Security',       ar: 'أمان' },
+  PERFORMANCE:    { en: 'Performance',    ar: 'أداء' },
+};
+
+export const ML_AUDIT_STATUS_TONE: Record<MlAuditStatus, 'success' | 'accent' | 'warning' | 'danger'> = {
+  PASSED:                 'success',
+  PASSED_WITH_CONDITIONS: 'accent',
+  REMEDIATED:             'accent',
+  FAILED:                 'danger',
+};
+
+export const ML_AUDIT_STATUS_LABEL: Record<MlAuditStatus, { en: string; ar: string }> = {
+  PASSED:                 { en: 'Passed',                 ar: 'ناجح' },
+  PASSED_WITH_CONDITIONS: { en: 'Passed with conditions', ar: 'ناجح بشروط' },
+  FAILED:                 { en: 'Failed',                 ar: 'فاشل' },
+  REMEDIATED:             { en: 'Remediated',             ar: 'تمت المعالجة' },
+};
+
+export const ML_DRIFT_TYPE_LABEL: Record<MlDriftType, { en: string; ar: string }> = {
+  DATA_DRIFT:              { en: 'Data drift',              ar: 'انحراف البيانات' },
+  CONCEPT_DRIFT:           { en: 'Concept drift',           ar: 'انحراف المفاهيم' },
+  PERFORMANCE_DEGRADATION: { en: 'Performance degradation', ar: 'تراجع الأداء' },
+  FAIRNESS_REGRESSION:     { en: 'Fairness regression',     ar: 'تراجع العدالة' },
+};
+
+export const ML_DRIFT_SEVERITY_TONE: Record<MlDriftSeverity, 'success' | 'accent' | 'warning' | 'danger' | 'neutral'> = {
+  INFO:     'neutral',
+  MINOR:    'success',
+  MODERATE: 'accent',
+  MAJOR:    'warning',
+  CRITICAL: 'danger',
+};
+
+export const ML_DRIFT_SEVERITY_LABEL: Record<MlDriftSeverity, { en: string; ar: string }> = {
+  INFO:     { en: 'Info',     ar: 'معلوماتي' },
+  MINOR:    { en: 'Minor',    ar: 'طفيف' },
+  MODERATE: { en: 'Moderate', ar: 'متوسط' },
+  MAJOR:    { en: 'Major',    ar: 'مهم' },
+  CRITICAL: { en: 'Critical', ar: 'حرج' },
+};
+
+export const ML_COMPLIANCE_LABEL: Record<MlComplianceStatus, { en: string; ar: string }> = {
+  COMPLIANT:     { en: 'Compliant',     ar: 'مُمتثل' },
+  PARTIAL:       { en: 'Partial',       ar: 'امتثال جزئي' },
+  NON_COMPLIANT: { en: 'Non-compliant', ar: 'غير مُمتثل' },
+  NOT_ASSESSED:  { en: 'Not assessed',  ar: 'لم يُقيَّم' },
+};
+
+export const ML_COMPLIANCE_TONE: Record<MlComplianceStatus, 'success' | 'accent' | 'warning' | 'danger' | 'neutral'> = {
+  COMPLIANT:     'success',
+  PARTIAL:       'accent',
+  NON_COMPLIANT: 'danger',
+  NOT_ASSESSED:  'neutral',
+};
+
+// ─── Aggregate KPIs across the live registry ───────────────────────────────
+
+export interface MlRegistryStats {
+  total: number;
+  inProduction: number;             // IN_PRODUCTION + MONITORING
+  highOrCritical: number;
+  missingFairnessAudit: number;     // HIGH+ in prod-ish without fairness audit
+  unacknowledgedDrift: number;      // computed against pre-fetched drift list
+  euAiActHighRisk: number;
+  sdaiaCompliant: number;
+  samaCompliant: number;
+}
+
+export function aggregateMlRegistry(
+  models: ReadonlyArray<MlModelResponse>,
+  unacknowledgedDriftCount = 0,
+): MlRegistryStats {
+  const PROD_STAGES: ReadonlySet<MlLifecycleStage> = new Set(['IN_PRODUCTION', 'MONITORING']);
+  const PROD_OR_APPROVED: ReadonlySet<MlLifecycleStage> = new Set([
+    'APPROVED_FOR_PROD', 'IN_PRODUCTION', 'MONITORING',
+  ]);
+  let inProduction = 0;
+  let highOrCritical = 0;
+  let missingFairnessAudit = 0;
+  let euAiActHighRisk = 0;
+  let sdaiaCompliant = 0;
+  let samaCompliant = 0;
+  for (const m of models) {
+    if (PROD_STAGES.has(m.lifecycleStage)) inProduction++;
+    if (m.riskTier === 'CRITICAL' || m.riskTier === 'HIGH') {
+      highOrCritical++;
+      if (PROD_OR_APPROVED.has(m.lifecycleStage) && !m.hasFairnessAudit) {
+        missingFairnessAudit++;
+      }
+    }
+    if (m.isHighRiskEuAiAct) euAiActHighRisk++;
+    if (m.sdaiaAiEthicsCompliance === 'COMPLIANT') sdaiaCompliant++;
+    if (m.samaAiPrinciplesCompliance === 'COMPLIANT') samaCompliant++;
+  }
+  return {
+    total: models.length,
+    inProduction,
+    highOrCritical,
+    missingFairnessAudit,
+    unacknowledgedDrift: unacknowledgedDriftCount,
+    euAiActHighRisk,
+    sdaiaCompliant,
+    samaCompliant,
+  };
+}
+
+// ─── Lifecycle-gate preview (UI mirror of MlModelService gates) ────────────
+//
+// Mirrors the server-side approval gate at APPROVED_FOR_PROD for HIGH+ tier
+// models, so the detail page can disable the transition button + show a
+// readable reason. The server enforces this in MlModelService — this is a
+// pure UI helper that returns a list of missing prerequisite keys.
+
+export function approvalGateMissing(m: MlModelResponse): string[] {
+  if (m.riskTier !== 'CRITICAL' && m.riskTier !== 'HIGH') return [];
+  const missing: string[] = [];
+  if (!m.validatorUserId) missing.push('validator_user_id');
+  if (!m.validationDate) missing.push('validation_date');
+  if (!m.hasFairnessAudit) missing.push('has_fairness_audit');
+  if (!m.hasPdplDpia) missing.push('has_pdpl_dpia');
+  if (!m.hasExplainabilityDoc) missing.push('has_explainability_doc');
+  return missing;
+}
+
+/**
+ * Allowed next lifecycle stages from each current stage — mirrors the
+ * server-side state machine in {@code MlModelService}.
+ */
+export const ML_NEXT_STAGES: Record<MlLifecycleStage, MlLifecycleStage[]> = {
+  PROPOSED:          ['DEVELOPMENT', 'DECOMMISSIONED'],
+  DEVELOPMENT:       ['VALIDATION', 'DECOMMISSIONED'],
+  VALIDATION:        ['APPROVED_FOR_PROD', 'DEVELOPMENT', 'DECOMMISSIONED'],
+  APPROVED_FOR_PROD: ['IN_PRODUCTION', 'DECOMMISSIONED'],
+  IN_PRODUCTION:     ['MONITORING', 'REVISION', 'DECOMMISSIONED'],
+  MONITORING:        ['IN_PRODUCTION', 'REVISION', 'DECOMMISSIONED'],
+  REVISION:          ['VALIDATION', 'IN_PRODUCTION', 'DECOMMISSIONED'],
+  DECOMMISSIONED:    [],
+};
+

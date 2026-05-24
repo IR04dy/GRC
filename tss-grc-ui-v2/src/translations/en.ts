@@ -33,6 +33,8 @@ export const en = {
   navRisk:              'Risk Management',
   navCompliancePolicy:  'Compliance & Policy',
   navAudit:             'Audit',
+  navAiGovernance:      'AI Governance',
+  aiModelRegistrySidebar: 'AI/ML Model Registry',
   navPrivacy:           'Privacy',
   navBcm:               'Business Continuity',
   navThirdParty:        'Third-Party Risk',

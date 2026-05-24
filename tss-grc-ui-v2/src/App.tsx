@@ -112,6 +112,8 @@ const ControlTestWizard         = lazy(() => import('./pages/workflow/compliance
 const BoardPackWizard           = lazy(() => import('./pages/workflow/governance/BoardPackWizard').then(m => ({ default: m.BoardPackWizard })));
 const AarDetailPage             = lazy(() => import('./pages/bcm/AarDetailPage').then(m => ({ default: m.AarDetailPage })));
 const AiSuggestionsPage         = lazy(() => import('./pages/ai/AiSuggestionsPage').then(m => ({ default: m.AiSuggestionsPage })));
+const AiModelRegisterPage       = lazy(() => import('./pages/ai/AiModelRegisterPage').then(m => ({ default: m.AiModelRegisterPage })));
+const AiModelDetailPage         = lazy(() => import('./pages/ai/AiModelDetailPage').then(m => ({ default: m.AiModelDetailPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -367,6 +369,11 @@ export function App() {
               {/* Detail + admin pages for V115/V116 modules */}
               <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />
               <Route path="/ai/suggestions"                          element={<AiSuggestionsPage />} />
+              {/* Sprint 11 — AI/ML Model Registry. Static /ai/models segment
+                  registered before any param routes (none exist for /ai today
+                  but follow the same defensive pattern as bowtie above). */}
+              <Route path="/ai/models"                               element={<AiModelRegisterPage />} />
+              <Route path="/ai/models/:externalId"                   element={<AiModelDetailPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />

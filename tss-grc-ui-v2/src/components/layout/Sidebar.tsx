@@ -7,6 +7,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Sigma, Telescope, Landmark as LandmarkIcon,
          TrendingUp,
          Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell, Megaphone,
+         Bot,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -120,6 +121,20 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'audit-lc',  to: '/audit-lifecycle',   Icon: BookOpen,    labelKey: 'alcSidebar' },
       { id: 'ev-chain',  to: '/evidence-chain',    Icon: Fingerprint, labelKey: 'echSidebar' },
       { id: 'nca-ecc',   to: '/nca-ecc-export',    Icon: ShieldCheck, labelKey: 'ncaSidebar' },
+    ],
+  },
+
+  // ─── 4b. AI Governance ──────────────────────────────────────────────
+  // Sprint 11 strategic addition: tri-track regulator surface for every
+  // AI/ML model — SDAIA AI Ethics (2023), SAMA AI Governance Principles
+  // (Dec 2024), and EU AI Act Article 16 for European subsidiaries.
+  // Sits between Audit and Privacy because (a) it's an audit-committee
+  // surface in practice and (b) it cross-links into PDPL DPIA on the
+  // Privacy side.
+  {
+    id: 'ai-governance', titleKey: 'navAiGovernance',
+    items: [
+      { id: 'ai-models', to: '/ai/models', Icon: Bot, labelKey: 'aiModelRegistrySidebar' },
     ],
   },
 

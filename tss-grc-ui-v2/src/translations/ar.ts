@@ -31,6 +31,8 @@ export const ar = {
   navRisk:              'إدارة المخاطر',
   navCompliancePolicy:  'الامتثال والسياسات',
   navAudit:             'التدقيق الداخلي',
+  navAiGovernance:      'حوكمة الذكاء الاصطناعي',
+  aiModelRegistrySidebar: 'سجل نماذج الذكاء الاصطناعي',
   navPrivacy:           'الخصوصية',
   navBcm:               'استمرارية الأعمال',
   navThirdParty:        'مخاطر الأطراف الثالثة',
