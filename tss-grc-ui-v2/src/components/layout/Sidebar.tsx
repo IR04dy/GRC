@@ -44,6 +44,21 @@ interface NavGroup { id: string; titleKey: string; items: NavItem[]; }
  *   - Administration absorbs configuration + integrations + system settings
  */
 const NAV_GROUPS: NavGroup[] = [
+  // ─── 0. Audit Committee ─────────────────────────────────────────────
+  // Sprint 11 strategic addition: board-facing curation slice over every
+  // GRC stream. Sits at the top because the Audit Committee Chair +
+  // members are the primary consumers — they need the dashboard to be
+  // the first thing they see on the tablet during the quarterly meeting.
+  // SAMA Corporate Governance Regulations §6 + CMA Listed-Companies CG
+  // Code Article 54 — Audit Committee reporting on risk, controls,
+  // compliance, findings.
+  {
+    id: 'audit-committee', titleKey: 'navAuditCommittee',
+    items: [
+      { id: 'ac-dash',      to: '/audit-committee/dashboard',  Icon: LayoutDashboard, labelKey: 'acDashSidebar' },
+    ],
+  },
+
   // ─── 1. My Work ─────────────────────────────────────────────────────
   // Universal landing — what every authenticated user opens first.
   // Mirrors the industry pattern's "Workspace Manager" home + industry-standard tooling's "My Work".

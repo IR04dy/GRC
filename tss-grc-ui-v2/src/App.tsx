@@ -121,6 +121,9 @@ const ObligationCampaignsPage   = lazy(() => import('./pages/compliance/Obligati
 const CcmDashboardPage          = lazy(() => import('./pages/ccm/CcmDashboardPage').then(m => ({ default: m.CcmDashboardPage })));
 const CcmTestsPage              = lazy(() => import('./pages/ccm/CcmTestsPage').then(m => ({ default: m.CcmTestsPage })));
 const CcmTestDetailPage         = lazy(() => import('./pages/ccm/CcmTestDetailPage').then(m => ({ default: m.CcmTestDetailPage })));
+// Sprint 11 — Audit Committee Dashboard (curation slice over every GRC stream).
+const AuditCommitteeDashboardPage = lazy(() => import('./pages/audit-committee/AuditCommitteeDashboardPage').then(m => ({ default: m.AuditCommitteeDashboardPage })));
+const AuditCommitteeSnapshotPage  = lazy(() => import('./pages/audit-committee/AuditCommitteeSnapshotPage').then(m => ({ default: m.AuditCommitteeSnapshotPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -394,6 +397,9 @@ export function App() {
               <Route path="/ccm/dashboard"                           element={<CcmDashboardPage />} />
               <Route path="/ccm/tests"                               element={<CcmTestsPage />} />
               <Route path="/ccm/tests/:externalId"                   element={<CcmTestDetailPage />} />
+              {/* Sprint 11 — Audit Committee Dashboard (curation slice). */}
+              <Route path="/audit-committee/dashboard"               element={<AuditCommitteeDashboardPage />} />
+              <Route path="/audit-committee/snapshots/:id"           element={<AuditCommitteeSnapshotPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />

@@ -29,6 +29,8 @@ export const en = {
   kbSidebar:            'Knowledge Base',
   engSidebar:           'Audit Engagements',
   // 11-group sidebar structure: My Work + per-domain verticals + Tools + Admin
+  navAuditCommittee:    'Audit Committee',
+  acDashSidebar:        'Committee dashboard',
   navMyWork:            'My Work',
   navRisk:              'Risk Management',
   navCompliancePolicy:  'Compliance & Policy',

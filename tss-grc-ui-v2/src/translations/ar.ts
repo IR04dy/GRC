@@ -27,6 +27,8 @@ export const ar = {
   kbSidebar:            'قاعدة المعرفة',
   engSidebar:           'المهام التدقيقية',
   // الشريط الجانبي بـ 11 مجموعة: عملي + رؤوس الوحدات المختصة + الأدوات + الإدارة
+  navAuditCommittee:    'لجنة المراجعة',
+  acDashSidebar:        'لوحة لجنة المراجعة',
   navMyWork:            'عملي',
   navRisk:              'إدارة المخاطر',
   navCompliancePolicy:  'الامتثال والسياسات',
