@@ -139,6 +139,10 @@ const VulnSlaPolicyPage         = lazy(() => import('./pages/cyber/VulnSlaPolicy
 const SubprocessorsPage         = lazy(() => import('./pages/privacy/SubprocessorsPage').then(m => ({ default: m.SubprocessorsPage })));
 const SubprocessorDetailPage    = lazy(() => import('./pages/privacy/SubprocessorDetailPage').then(m => ({ default: m.SubprocessorDetailPage })));
 const PublicSubprocessorListPage = lazy(() => import('./pages/privacy/PublicSubprocessorListPage').then(m => ({ default: m.PublicSubprocessorListPage })));
+// Sprint 13 — KRI engine.
+const KriDashboardPage          = lazy(() => import('./pages/risk/KriDashboardPage').then(m => ({ default: m.KriDashboardPage })));
+const KriDetailPage             = lazy(() => import('./pages/risk/KriDetailPage').then(m => ({ default: m.KriDetailPage })));
+const KriAdminPage              = lazy(() => import('./pages/risk/KriAdminPage').then(m => ({ default: m.KriAdminPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -439,6 +443,11 @@ export function App() {
               <Route path="/privacy/public/subprocessors"   element={<PublicSubprocessorListPage />} />
               <Route path="/privacy/subprocessors"          element={<SubprocessorsPage />} />
               <Route path="/privacy/subprocessors/:externalId" element={<SubprocessorDetailPage />} />
+              {/* Sprint 13 — KRI engine. Static segments registered
+                  before any param routes. */}
+              <Route path="/risk/kri/dashboard"             element={<KriDashboardPage />} />
+              <Route path="/risk/kri/admin"                 element={<KriAdminPage />} />
+              <Route path="/risk/kri/:externalId"           element={<KriDetailPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               {/* Sprint 12 — Embedded Help admin */}
