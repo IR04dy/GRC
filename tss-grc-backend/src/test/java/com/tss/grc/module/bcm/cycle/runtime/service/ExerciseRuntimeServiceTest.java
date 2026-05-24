@@ -17,6 +17,8 @@ import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.TransitionRe
 import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRun;
 import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRunInject;
 import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRunResponse;
+import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObservationRepository;
+import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObserverAssignmentRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunInjectRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunResponseRepository;
@@ -82,6 +84,9 @@ class ExerciseRuntimeServiceTest {
     @Mock private ExerciseRunResponseRepository responseRepo;
     @Mock private BcmExerciseRepository exerciseRepo;
     @Mock private ExerciseScenarioInjectRepository scenarioInjectRepo;
+    // Slice 10-C — observer integration; empty by default so 10-B tests are unaffected.
+    @Mock private ExerciseObservationRepository observationRepo;
+    @Mock private ExerciseObserverAssignmentRepository observerAssignmentRepo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
     @Mock private RealtimeBroadcaster realtime;

@@ -41,6 +41,7 @@ const ExerciseScenarioLibraryPage = lazy(() => import('./pages/bcm/ExerciseScena
 const ExerciseScenarioDetailPage  = lazy(() => import('./pages/bcm/ExerciseScenarioDetailPage').then(m => ({ default: m.ExerciseScenarioDetailPage })));
 const FacilitatorConsolePage      = lazy(() => import('./pages/bcm/FacilitatorConsolePage').then(m => ({ default: m.FacilitatorConsolePage })));
 const ParticipantViewPage         = lazy(() => import('./pages/bcm/ParticipantViewPage').then(m => ({ default: m.ParticipantViewPage })));
+const ObserverDashboardPage       = lazy(() => import('./pages/bcm/ObserverDashboardPage').then(m => ({ default: m.ObserverDashboardPage })));
 const CrisisCommsTemplatesPage      = lazy(() => import('./pages/bcm/CrisisCommsTemplatesPage').then(m => ({ default: m.CrisisCommsTemplatesPage })));
 const CrisisCommsTemplateDetailPage = lazy(() => import('./pages/bcm/CrisisCommsTemplateDetailPage').then(m => ({ default: m.CrisisCommsTemplateDetailPage })));
 const CrisisCommsDispatchWizard     = lazy(() => import('./pages/bcm/CrisisCommsDispatchWizard').then(m => ({ default: m.CrisisCommsDispatchWizard })));
@@ -255,6 +256,8 @@ export function App() {
               <Route path="/bcm/scenarios/:id"    element={<ExerciseScenarioDetailPage />} />
               <Route path="/bcm/exercises/run/:runId/facilitate"  element={<FacilitatorConsolePage />} />
               <Route path="/bcm/exercises/run/:runId/participate" element={<ParticipantViewPage />} />
+              {/* Slice 10-C — read-only Observer Dashboard for auditors + CISO + regulator liaisons. */}
+              <Route path="/bcm/exercises/run/:runId/observe"     element={<ObserverDashboardPage />} />
               <Route path="/bcm/comms/templates"        element={<CrisisCommsTemplatesPage />} />
               <Route path="/bcm/comms/templates/:id"    element={<CrisisCommsTemplateDetailPage />} />
               <Route path="/bcm/comms/dispatch"         element={<CrisisCommsDispatchWizard />} />

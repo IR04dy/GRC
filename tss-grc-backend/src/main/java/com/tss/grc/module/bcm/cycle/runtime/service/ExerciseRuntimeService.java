@@ -17,6 +17,10 @@ import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.TransitionRe
 import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRun;
 import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRunInject;
 import com.tss.grc.module.bcm.cycle.runtime.entity.ExerciseRunResponse;
+import com.tss.grc.module.bcm.cycle.runtime.observer.entity.ExerciseObservation;
+import com.tss.grc.module.bcm.cycle.runtime.observer.entity.ExerciseObserverAssignment;
+import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObservationRepository;
+import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObserverAssignmentRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunInjectRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunResponseRepository;
@@ -43,6 +47,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Slice 10-B — Exercise Runtime service.
@@ -97,6 +102,14 @@ public class ExerciseRuntimeService {
     private final ExerciseRunResponseRepository responseRepo;
     private final BcmExerciseRepository exerciseRepo;
     private final ExerciseScenarioInjectRepository scenarioInjectRepo;
+    /**
+     * Slice 10-C — When a run ends, observer findings flagged for AAR are
+     * pulled into the after-action draft. Injected as a direct repository so
+     * we avoid a circular service dependency (the observer service depends
+     * on runtime entities, not the other way around).
+     */
+    private final ExerciseObservationRepository observationRepo;
+    private final ExerciseObserverAssignmentRepository observerAssignmentRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
     private final RealtimeBroadcaster realtime;
@@ -677,6 +690,13 @@ public class ExerciseRuntimeService {
             sb.append("…\n(").append(tl.entries().size() - max).append(" more entries truncated)\n");
         }
 
+        // Slice 10-C — append observer findings flagged for AAR. Grouped by
+        // observation_type for the report consumer.
+        String observerSection = buildObserverFindingsSection(orgId, run.getId());
+        if (!observerSection.isEmpty()) {
+            sb.append(observerSection);
+        }
+
         String prior = ex.getFindings();
         ex.setFindings(prior == null || prior.isBlank()
             ? sb.toString()
@@ -688,5 +708,58 @@ public class ExerciseRuntimeService {
             "runCode",        run.getRunCode(),
             "timelineEntries", String.valueOf(tl.entries().size())
         ));
+    }
+
+    /**
+     * Slice 10-C — Build the "Observer Findings" section of the AAR draft,
+     * pulling every observation where {@code is_flagged_for_aar = 1}, grouped
+     * by observation type (STRENGTH first, then GAP, RISK, …), with the
+     * observer's role annotated per row.
+     *
+     * <p>Returns the empty string when there are no flagged observations.
+     */
+    private String buildObserverFindingsSection(Long orgId, Long runId) {
+        List<ExerciseObservation> flagged = observationRepo
+            .findByOrganisationIdAndExerciseRunIdAndIsFlaggedForAarOrderByRecordedAtAsc(
+                orgId, runId, Boolean.TRUE);
+        if (flagged.isEmpty()) return "";
+
+        // role lookup so AAR rows can be annotated with the observer's role
+        Map<Long, String> roleByUser = observerAssignmentRepo
+            .findByOrganisationIdAndExerciseRunIdOrderByAssignedAtAsc(orgId, runId)
+            .stream().collect(Collectors.toMap(
+                ExerciseObserverAssignment::getObserverUserId,
+                ExerciseObserverAssignment::getObserverRole,
+                (a, b) -> a));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n== Observer Findings (flagged for AAR) ==\n");
+        sb.append("Total flagged observations: ").append(flagged.size()).append("\n\n");
+
+        // Stable type order matches the dashboard's filter rail.
+        List<String> typeOrder = List.of("STRENGTH", "GAP", "RISK", "COMMUNICATION",
+            "DECISION_QUALITY", "ESCALATION", "RECOVERY_TIME", "COMPLIANCE", "GENERAL");
+        for (String t : typeOrder) {
+            List<ExerciseObservation> bucket = flagged.stream()
+                .filter(o -> t.equals(o.getObservationType()))
+                .toList();
+            if (bucket.isEmpty()) continue;
+            sb.append("--- ").append(t)
+              .append(" (").append(bucket.size()).append(") ---\n");
+            for (ExerciseObservation o : bucket) {
+                String role = roleByUser.getOrDefault(o.getObserverUserId(), "OBSERVER");
+                sb.append("  [").append(o.getSeverity()).append("] ")
+                  .append("T+").append(o.getTimeOffsetMinutes()).append("m — ")
+                  .append("observer #").append(o.getObserverUserId())
+                  .append(" (").append(role).append("): ")
+                  .append(truncate(o.getObservationTextEn(), 280));
+                if (o.getRecommendationEn() != null && !o.getRecommendationEn().isBlank()) {
+                    sb.append("\n     Rec: ").append(truncate(o.getRecommendationEn(), 200));
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 }

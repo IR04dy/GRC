@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Send, Pause, Play, StopCircle, XCircle, Plus, Clock, AlertTriangle,
   CheckCircle2, Megaphone, Landmark, Info, Users, MessageSquare,
-  Activity, Sparkles,
+  Activity, Sparkles, ShieldCheck, UserPlus, Trash2,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -22,6 +22,11 @@ import {
   INJECT_TYPE_LABELS, INJECT_STATUS_LABELS, RUN_STATUS_LABELS,
   type RunDetail, type InjectView, type ResponseView, type InjectType,
 } from '../../lib/exerciseRuntime';
+import {
+  listObservers, assignObserver, removeObserver,
+  OBSERVER_ROLE_LABELS,
+  type AssignmentView, type ObserverRole,
+} from '../../lib/exerciseObserver';
 
 /**
  * Slice 10-B — Facilitator Console.
@@ -64,6 +69,12 @@ export function FacilitatorConsolePage() {
   const [customExpAr, setCustomExpAr] = useState('');
   const [customType, setCustomType] = useState<InjectType>('CUSTOM');
 
+  // Slice 10-C — observer roster + assignment modal
+  const [observers, setObservers] = useState<AssignmentView[]>([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignUserId, setAssignUserId] = useState('');
+  const [assignRole, setAssignRole] = useState<ObserverRole>('INTERNAL_AUDIT');
+
   // Tick the clock so the relative-time chips re-evaluate
   const [, setNow] = useState(Date.now());
   useEffect(() => {
@@ -92,6 +103,12 @@ export function FacilitatorConsolePage() {
   }
   useEffect(() => { void reload(); }, [runId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Slice 10-C — load the observer roster on mount + when the run id changes
+  useEffect(() => {
+    if (!Number.isFinite(runId)) return;
+    listObservers(runId).then(setObservers).catch(() => setObservers([]));
+  }, [runId]);
+
   // Load responses for the active inject
   useEffect(() => {
     if (!activeId || !Number.isFinite(runId)) { setResponses([]); return; }
@@ -117,6 +134,10 @@ export function FacilitatorConsolePage() {
       if (data.type === 'INJECT_DISPATCHED' || data.type === 'CUSTOM_INJECT_ADDED'
           || data.type === 'STATE_CHANGE' || data.type === 'RESPONSE_RECORDED') {
         getRun(runId).then(setDetail).catch(() => {/* noop */});
+      }
+      // Slice 10-C — refresh observer roster on assignment changes
+      if (data.type === 'OBSERVER_ASSIGNED' || data.type === 'OBSERVER_REMOVED') {
+        listObservers(runId).then(setObservers).catch(() => {/* noop */});
       }
     });
     return unsub;
@@ -200,6 +221,50 @@ export function FacilitatorConsolePage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'تعذّر إضافة الموقف الطارئ' : 'Failed to add custom inject'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ─── Slice 10-C — observer assignment ──────────────────────────────
+  async function onAssignObserver() {
+    if (!summary) return;
+    const uid = Number(assignUserId);
+    if (!Number.isFinite(uid) || uid <= 0) {
+      toast.warning(isAr ? 'يرجى إدخال معرّف المستخدم' : 'Please enter a user id');
+      return;
+    }
+    setBusy(true);
+    try {
+      await assignObserver(summary.id, { observerUserId: uid, observerRole: assignRole });
+      toast.success(isAr ? 'تمّ تعيين المراقب' : 'Observer assigned');
+      const list = await listObservers(summary.id);
+      setObservers(list);
+      setShowAssignModal(false);
+      setAssignUserId('');
+      setAssignRole('INTERNAL_AUDIT');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تعيين المراقب' : 'Failed to assign observer'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRemoveObserver(o: AssignmentView) {
+    if (!summary) return;
+    if (!window.confirm(isAr
+      ? `إزالة المراقب رقم #${o.observerUserId}؟`
+      : `Remove observer #${o.observerUserId}?`)) return;
+    setBusy(true);
+    try {
+      await removeObserver(summary.id, o.id);
+      toast.success(isAr ? 'تمّت الإزالة' : 'Observer removed');
+      const list = await listObservers(summary.id);
+      setObservers(list);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر الإزالة' : 'Remove failed'));
     } finally {
       setBusy(false);
     }
@@ -426,6 +491,83 @@ export function FacilitatorConsolePage() {
                     {isAr ? 'إطلاق الآن' : 'Dispatch now'}
                   </Button>
                   <Button variant="ghost" onClick={() => setShowCustomForm(false)}>
+                    {isAr ? 'إلغاء' : 'Cancel'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Slice 10-C — Observer roster + assignment */}
+          <Card>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-tx-strong flex items-center gap-2">
+                <ShieldCheck size={16} />
+                {isAr ? 'فريق المراقبين' : 'Observers'}
+                <Badge tone="neutral">
+                  {isAr ? toArabicDigits(observers.length) : observers.length}
+                </Badge>
+              </h3>
+              <Button size="sm" variant="secondary" Icon={UserPlus}
+                onClick={() => setShowAssignModal(true)}>
+                {isAr ? 'تعيين' : 'Assign'}
+              </Button>
+            </div>
+            {observers.length === 0 ? (
+              <div className="text-xs text-tx-muted">{isAr
+                ? 'لم يتم تعيين أيّ مراقب بعد.'
+                : 'No observers assigned yet.'}</div>
+            ) : (
+              <ul className="space-y-1.5 text-xs">
+                {observers.map(o => (
+                  <li key={o.id} className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium text-tx-strong">
+                        #{isAr ? toArabicDigits(o.observerUserId) : o.observerUserId}
+                      </span>
+                      <span className="text-tx-muted ml-1.5">
+                        {isAr ? OBSERVER_ROLE_LABELS[o.observerRole].ar
+                              : OBSERVER_ROLE_LABELS[o.observerRole].en}
+                      </span>
+                    </div>
+                    <button type="button"
+                      onClick={() => onRemoveObserver(o)}
+                      disabled={busy}
+                      className="text-danger-600 hover:text-danger-800 disabled:opacity-50"
+                      aria-label={isAr ? 'إزالة' : 'Remove'}>
+                      <Trash2 size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {showAssignModal && (
+              <div className="mt-3 pt-3 border-t border-bd-soft space-y-2">
+                <div className="text-xs font-semibold text-tx-strong">
+                  {isAr ? 'تعيين مراقب جديد' : 'Assign new observer'}
+                </div>
+                <input className="form-input w-full text-sm" type="number"
+                  placeholder={isAr ? 'معرّف المستخدم' : 'User id'}
+                  value={assignUserId} onChange={e => setAssignUserId(e.target.value)} />
+                <select className="form-select w-full text-sm"
+                  value={assignRole}
+                  onChange={e => setAssignRole(e.target.value as ObserverRole)}>
+                  {(['INTERNAL_AUDIT','EXTERNAL_AUDIT','COMPLIANCE_OBSERVER',
+                     'SAMA_LIAISON','NCA_LIAISON','BOARD_OBSERVER'] as const)
+                    .map(r => (
+                      <option key={r} value={r}>
+                        {isAr ? OBSERVER_ROLE_LABELS[r].ar : OBSERVER_ROLE_LABELS[r].en}
+                      </option>
+                    ))}
+                </select>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="primary" Icon={UserPlus}
+                    disabled={busy} onClick={onAssignObserver}>
+                    {isAr ? 'تعيين' : 'Assign'}
+                  </Button>
+                  <Button size="sm" variant="ghost"
+                    onClick={() => { setShowAssignModal(false); setAssignUserId(''); }}>
                     {isAr ? 'إلغاء' : 'Cancel'}
                   </Button>
                 </div>
