@@ -34,6 +34,7 @@ import {
   statusTone as binderStatusTone, languageLabel, fmtBytes,
   type BinderExport, type BinderLanguage,
 } from '../../lib/bcpBinder';
+import '../../styles/pages/bcp-builder.css';
 
 /**
  * BCP / DRP Builder page — audit T1.4b.
@@ -396,7 +397,7 @@ export function BcpBuilderPage() {
           </Button>}
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, marginBottom: 12 }}>
+        <div className="bcp-builder-kpis">
           <Kpi Icon={FileText} label={isAr ? 'BCP'      : 'BCP plans'}   value={items.filter(p => p.planType === 'BCP').length} tone="info" />
           <Kpi Icon={FileText} label={isAr ? 'DRP'      : 'DRP plans'}   value={items.filter(p => p.planType === 'DRP').length} tone="info" />
           <Kpi Icon={Wrench}   label={isAr ? 'منشورة'   : 'Published'}   value={stats.status_published ?? 0}                   tone="success" />
@@ -411,34 +412,34 @@ export function BcpBuilderPage() {
         </div>
 
         <Card title={isAr ? 'الخطط' : 'Plans'} action={
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div className="bcp-builder-toolbar">
             <Button variant="ghost" onClick={() => void runReviewSweep()}>
               {isAr ? 'تحديث حالات المراجعة' : 'Refresh review states'}
             </Button>
             <select value={planTypeFilter} onChange={e => setPlanTypeFilter(e.target.value as BcpPlanType | '')}
-                    style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)' }}>
+                    className="bcp-builder-filter-select">
               <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
               <option value="BCP">BCP</option>
               <option value="DRP">DRP</option>
             </select>
           </div>
         }>
-          {loading && <div className="text-muted" style={{ fontSize: 11 }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>}
+          {loading && <div className="text-muted bcp-builder-loading-line">{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>}
           {items.length === 0 ? (
             <InlineEmpty text={isAr ? 'لا توجد خطط بعد — ابدأ بـ "خطة جديدة" أو من تحليل أثر معتمد عبر صفحة الـBIA' : 'No plans yet — click "New plan" or generate from an approved BIA on the BIA page'} />
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
+            <div className="bcp-builder-table-scroll">
+              <table className="data-table bcp-builder-table">
                 <thead><tr>
-                  <th style={{ textAlign: 'start' }}>{isAr ? 'الكود' : 'Code'}</th>
-                  <th style={{ textAlign: 'start' }}>{isAr ? 'النوع' : 'Type'}</th>
-                  <th style={{ textAlign: 'start' }}>{isAr ? 'العنوان' : 'Title'}</th>
-                  <th style={{ textAlign: 'start' }}>{isAr ? 'الحالة' : 'Status'}</th>
-                  <th style={{ textAlign: 'start' }}>{isAr ? 'النسخة' : 'Version'}</th>
-                  <th style={{ textAlign: 'start' }}>RTO</th>
-                  <th style={{ textAlign: 'start' }}>RPO</th>
-                  <th style={{ textAlign: 'start' }}>{isAr ? 'المراجعة' : 'Review'}</th>
-                  <th style={{ textAlign: 'end' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
+                  <th className="bcp-builder-th-start">{isAr ? 'الكود' : 'Code'}</th>
+                  <th className="bcp-builder-th-start">{isAr ? 'النوع' : 'Type'}</th>
+                  <th className="bcp-builder-th-start">{isAr ? 'العنوان' : 'Title'}</th>
+                  <th className="bcp-builder-th-start">{isAr ? 'الحالة' : 'Status'}</th>
+                  <th className="bcp-builder-th-start">{isAr ? 'النسخة' : 'Version'}</th>
+                  <th className="bcp-builder-th-start">RTO</th>
+                  <th className="bcp-builder-th-start">RPO</th>
+                  <th className="bcp-builder-th-start">{isAr ? 'المراجعة' : 'Review'}</th>
+                  <th className="bcp-builder-th-end">{isAr ? 'إجراءات' : 'Actions'}</th>
                 </tr></thead>
                 <tbody>
                   {items.map(p => (
@@ -453,12 +454,12 @@ export function BcpBuilderPage() {
                       <td>
                         <Badge tone={reviewStateTone(p.reviewState)}>{p.reviewState ?? 'CURRENT'}</Badge>
                         {p.nextReviewDate && (
-                          <div className="text-muted mono" style={{ fontSize: 10, marginTop: 2 }}>
+                          <div className="text-muted mono bcp-builder-review-next">
                             {isAr ? 'القادمة' : 'next'}: {p.nextReviewDate}
                           </div>
                         )}
                       </td>
-                      <td style={{ textAlign: 'end' }}>
+                      <td className="bcp-builder-td-end">
                         <Button variant="ghost" onClick={() => void attestRow(p)}>
                           {isAr ? 'تأكيد المراجعة' : 'Attest'}
                         </Button>
@@ -525,10 +526,10 @@ export function BcpBuilderPage() {
         </>}
       />
 
-      <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="bcp-builder-badge-row">
         <Badge tone={planStatusTone(plan.status)}>{plan.status}</Badge>
         {isLocked && (
-          <span className="text-muted" style={{ fontSize: 12 }}>
+          <span className="text-muted bcp-builder-locked-hint">
             {isAr ? 'الخطة مقفلة. أعد الفتح للتحرير.' : 'Plan is locked. Reopen to edit.'}
           </span>
         )}
@@ -536,23 +537,19 @@ export function BcpBuilderPage() {
 
       <Tabs items={tabs} active={builderTab} onChange={setBuilderTab} />
 
-      <div style={{ marginTop: 12 }}>
+      <div className="bcp-builder-content">
         {builderTab === 'sections' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 12 }}>
+          <div className="bcp-builder-sections-grid">
             <Card title={isAr ? 'الأقسام' : 'Sections'}>
               {sections.length === 0
                 ? <InlineEmpty text={isAr ? 'لا أقسام' : 'No sections'} />
-                : <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 2 }}>
+                : <ul className="bcp-builder-section-list">
                     {sections.map(s => (
                       <li key={s.id}>
-                        <button onClick={() => setActiveSection(s)} style={{
-                          width: '100%', textAlign: 'start',
-                          padding: '6px 10px', borderRadius: 4, cursor: 'pointer',
-                          background: activeSection?.id === s.id ? 'var(--surface-2)' : 'transparent',
-                          border: '1px solid var(--border)', fontSize: 12,
-                        }}>
-                          <div style={{ fontWeight: 500 }}>{isAr ? (s.sectionTitleAr ?? s.sectionTitleEn) : s.sectionTitleEn}</div>
-                          <div className="text-muted mono" style={{ fontSize: 10 }}>{s.sectionKey}</div>
+                        <button onClick={() => setActiveSection(s)}
+                          className={`bcp-builder-section-btn${activeSection?.id === s.id ? ' is-active' : ''}`}>
+                          <div className="bcp-builder-section-title">{isAr ? (s.sectionTitleAr ?? s.sectionTitleEn) : s.sectionTitleEn}</div>
+                          <div className="text-muted mono bcp-builder-section-key">{s.sectionKey}</div>
                         </button>
                       </li>
                     ))}
@@ -570,13 +567,13 @@ export function BcpBuilderPage() {
           <Card title={isAr ? 'سجل النسخ' : 'Version history'}>
             {versions.length === 0
               ? <InlineEmpty text={isAr ? 'لا توجد نسخ معتمدة بعد. اعتمد الخطة لتسجيل نسخة.' : 'No approved versions yet. Approve the plan to record one.'} />
-              : <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
+              : <table className="data-table bcp-builder-table">
                   <thead><tr>
                     <th>{isAr ? 'النسخة' : 'Version'}</th>
                     <th>{isAr ? 'تاريخ الاعتماد' : 'Approved at'}</th>
                     <th>{isAr ? 'بواسطة' : 'By'}</th>
                     <th>{isAr ? 'ملخص' : 'Summary'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'مقارنة' : 'Compare'}</th>
+                    <th className="bcp-builder-th-end">{isAr ? 'مقارنة' : 'Compare'}</th>
                   </tr></thead>
                   <tbody>
                     {versions.map(v => (
@@ -585,7 +582,7 @@ export function BcpBuilderPage() {
                         <td className="mono">{v.approvedAt?.slice(0, 16) ?? '—'}</td>
                         <td>{v.approvedBy ?? '—'}</td>
                         <td>{v.changeSummary ?? '—'}</td>
-                        <td style={{ textAlign: 'end' }}>
+                        <td className="bcp-builder-td-end">
                           {versions.length > 1 && v.versionNumber !== versions[versions.length - 1].versionNumber && (
                             <Button variant="ghost"
                                     onClick={() => void loadDiff(versions[versions.length - 1].versionNumber, v.versionNumber)}>
@@ -604,14 +601,14 @@ export function BcpBuilderPage() {
           <Card title={diffFrom != null && diffTo != null ? `${isAr ? 'مقارنة' : 'Diff'} v${diffFrom} ↔ v${diffTo}` : (isAr ? 'مقارنة' : 'Diff')}>
             {!diffPayload
               ? <InlineEmpty text={isAr ? 'اختر نسختين من تبويب النسخ.' : 'Pick two versions on the Versions tab.'} />
-              : <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              : <div className="bcp-builder-diff-grid">
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>v{diffFrom}</div>
-                    <pre style={preStyle}>{diffPayload.fromJson}</pre>
+                    <div className="bcp-builder-diff-label">v{diffFrom}</div>
+                    <pre className="bcp-builder-diff-pre">{diffPayload.fromJson}</pre>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>v{diffTo}</div>
-                    <pre style={preStyle}>{diffPayload.toJson}</pre>
+                    <div className="bcp-builder-diff-label">v{diffTo}</div>
+                    <pre className="bcp-builder-diff-pre">{diffPayload.toJson}</pre>
                   </div>
                 </div>}
           </Card>
@@ -623,8 +620,7 @@ export function BcpBuilderPage() {
                   <Send size={14} /> {isAr ? 'توزيع جديد' : 'Distribute'}
                 </Button>}>
             {distStats && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))',
-                            gap: 8, marginBottom: 12 }}>
+              <div className="bcp-builder-dist-kpis">
                 <Kpi Icon={Send}    label={isAr ? 'إجمالي'    : 'Total'}        value={distStats.total}                          tone="info" />
                 <Kpi Icon={History} label={isAr ? 'بالانتظار' : 'Pending'}      value={distStats.pending}                        tone="warning" />
                 <Kpi Icon={History} label={isAr ? 'مُقَر'      : 'Acknowledged'} value={distStats.acknowledged}                   tone="success" />
@@ -635,29 +631,29 @@ export function BcpBuilderPage() {
             )}
             {acks.length === 0
               ? <InlineEmpty text={isAr ? 'لم تُوزَّع الخطة بعد.' : 'Plan has not been distributed yet.'} />
-              : <div style={{ overflowX: 'auto' }}>
-                  <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
+              : <div className="bcp-builder-table-scroll">
+                  <table className="data-table bcp-builder-table">
                     <thead><tr>
-                      <th style={{ textAlign: 'start' }}>{isAr ? 'النسخة' : 'Version'}</th>
-                      <th style={{ textAlign: 'start' }}>{isAr ? 'المستلم' : 'Recipient'}</th>
-                      <th style={{ textAlign: 'start' }}>{isAr ? 'الدور' : 'Role'}</th>
-                      <th style={{ textAlign: 'start' }}>{isAr ? 'القناة' : 'Channel'}</th>
-                      <th style={{ textAlign: 'start' }}>{isAr ? 'وُزِّعت' : 'Distributed'}</th>
-                      <th style={{ textAlign: 'start' }}>{isAr ? 'الحالة' : 'Status'}</th>
-                      <th style={{ textAlign: 'start' }}>{isAr ? 'أُقِرَّت' : 'Acked at'}</th>
-                      <th style={{ textAlign: 'end' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
+                      <th className="bcp-builder-th-start">{isAr ? 'النسخة' : 'Version'}</th>
+                      <th className="bcp-builder-th-start">{isAr ? 'المستلم' : 'Recipient'}</th>
+                      <th className="bcp-builder-th-start">{isAr ? 'الدور' : 'Role'}</th>
+                      <th className="bcp-builder-th-start">{isAr ? 'القناة' : 'Channel'}</th>
+                      <th className="bcp-builder-th-start">{isAr ? 'وُزِّعت' : 'Distributed'}</th>
+                      <th className="bcp-builder-th-start">{isAr ? 'الحالة' : 'Status'}</th>
+                      <th className="bcp-builder-th-start">{isAr ? 'أُقِرَّت' : 'Acked at'}</th>
+                      <th className="bcp-builder-th-end">{isAr ? 'إجراءات' : 'Actions'}</th>
                     </tr></thead>
                     <tbody>
                       {acks.map(a => (
                         <tr key={a.id}>
                           <td className="mono">v{a.planVersion}</td>
-                          <td>{a.recipientName}{a.recipientEmail ? <span className="text-muted" style={{ fontSize: 11 }}> &lt;{a.recipientEmail}&gt;</span> : null}</td>
+                          <td>{a.recipientName}{a.recipientEmail ? <span className="text-muted text-2xs"> &lt;{a.recipientEmail}&gt;</span> : null}</td>
                           <td className="text-muted">{a.recipientRole ?? '—'}</td>
-                          <td className="mono" style={{ fontSize: 11 }}>{a.distributionChannel}</td>
-                          <td className="mono" style={{ fontSize: 11 }}>{a.distributedAt?.slice(0, 16) ?? '—'}</td>
+                          <td className="mono text-2xs">{a.distributionChannel}</td>
+                          <td className="mono text-2xs">{a.distributedAt?.slice(0, 16) ?? '—'}</td>
                           <td><Badge tone={ackStatusTone(a.status)}>{statusLabel(a.status, lang)}</Badge></td>
-                          <td className="mono" style={{ fontSize: 11 }}>{a.acknowledgedAt?.slice(0, 16) ?? '—'}</td>
-                          <td style={{ textAlign: 'end' }}>
+                          <td className="mono text-2xs">{a.acknowledgedAt?.slice(0, 16) ?? '—'}</td>
+                          <td className="bcp-builder-td-end">
                             {a.status === 'PENDING' && (
                               <>
                                 <Button variant="ghost" onClick={() => void ackRow(a, 'ack')}>{isAr ? 'تأكيد' : 'Acknowledge'}</Button>
@@ -681,7 +677,7 @@ export function BcpBuilderPage() {
               </Button>}>
           {/* SAMA BCF Annex D context — explain WHY this exists so a
               first-time auditor / reviewer immediately understands. */}
-          <p className="text-muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 12 }}>
+          <p className="text-muted bcp-builder-hint">
             {isAr
               ? 'يُلبّي هذا الكتيّب اشتراط ساما (إطار استمرارية الأعمال — الملحق د) بإتاحة كل خطة استمرارية لخدمة حرجة كنسخة قابلة للطباعة دون اتصال بالمنصة.'
               : 'Each binder satisfies SAMA BCF Annex D — every critical-business-service BCP must be available off-line so the Crisis Room can fall back to paper.'}
@@ -690,19 +686,19 @@ export function BcpBuilderPage() {
             ? <InlineEmpty text={isAr
                 ? 'لا توجد كتيّبات بعد — اضغط "تصدير الكتيّب" لإنشاء أوّل نسخة.'
                 : 'No binders yet — click "Export binder" to generate the first version.'} />
-            : <div style={{ overflowX: 'auto' }}>
-                <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
+            : <div className="bcp-builder-table-scroll">
+                <table className="data-table bcp-builder-table">
                   <thead><tr>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'الكود' : 'Code'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'الإصدار' : 'Version'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'اللغة' : 'Language'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'الحالة' : 'Status'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'الصفحات' : 'Pages'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'الحجم' : 'Size'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'أُنشئ' : 'Generated'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'بواسطة' : 'By'}</th>
-                    <th style={{ textAlign: 'start' }}>{isAr ? 'التنزيلات' : 'Downloads'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'الكود' : 'Code'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'الإصدار' : 'Version'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'اللغة' : 'Language'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'الحالة' : 'Status'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'الصفحات' : 'Pages'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'الحجم' : 'Size'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'أُنشئ' : 'Generated'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'بواسطة' : 'By'}</th>
+                    <th className="bcp-builder-th-start">{isAr ? 'التنزيلات' : 'Downloads'}</th>
+                    <th className="bcp-builder-th-end">{isAr ? 'إجراءات' : 'Actions'}</th>
                   </tr></thead>
                   <tbody>
                     {binders.map(b => (
@@ -713,10 +709,10 @@ export function BcpBuilderPage() {
                         <td><Badge tone={binderStatusTone(b.status)}>{b.status}</Badge></td>
                         <td className="mono">{b.pageCount ?? '—'}</td>
                         <td className="mono">{fmtBytes(b.byteSize)}</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{b.generatedAt?.slice(0, 16) ?? '—'}</td>
+                        <td className="mono text-2xs">{b.generatedAt?.slice(0, 16) ?? '—'}</td>
                         <td>{b.generatedByName ?? '—'}</td>
                         <td className="mono">{b.downloadCount}</td>
-                        <td style={{ textAlign: 'end' }}>
+                        <td className="bcp-builder-td-end">
                           {b.status === 'READY' && (
                             <Button variant="ghost" onClick={() => void handleBinderDownload(b)}>
                               <Download size={12} /> {isAr ? 'تنزيل' : 'Download'}
@@ -777,42 +773,30 @@ function SectionEditor({ section, onSave, locked, isAr }: {
   useMemo(() => { setBodyEn(section.bodyEn ?? ''); setBodyAr(section.bodyAr ?? ''); }, [section.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
-      <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+    <div className="bcp-builder-editor">
+      <label className="bcp-builder-editor-field">
         <span className="text-muted">{isAr ? 'النص (إنجليزي)' : 'Body (EN)'}</span>
         <textarea value={bodyEn} disabled={locked}
                   onChange={e => setBodyEn(e.target.value)}
                   onBlur={() => onSave(bodyEn, bodyAr)}
-                  style={{ ...textareaStyle, minHeight: 180 }}
+                  className="bcp-builder-editor-textarea"
                   placeholder={isAr ? 'اكتب محتوى القسم هنا. يدعم Markdown البسيط.' : 'Write the section body here. Simple markdown supported.'} />
       </label>
-      <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+      <label className="bcp-builder-editor-field">
         <span className="text-muted">{isAr ? 'النص (عربي)' : 'Body (AR)'}</span>
         <textarea value={bodyAr} disabled={locked}
                   onChange={e => setBodyAr(e.target.value)}
                   onBlur={() => onSave(bodyEn, bodyAr)}
-                  style={{ ...textareaStyle, minHeight: 180, direction: 'rtl' }} />
+                  className="bcp-builder-editor-textarea bcp-builder-editor-textarea--rtl" />
       </label>
       {section.lastEditedBy && (
-        <div className="text-muted" style={{ fontSize: 11 }}>
+        <div className="text-muted bcp-builder-editor-meta">
           {isAr ? 'آخر تعديل' : 'Last edited'}: <span className="mono">{section.lastEditedAt?.slice(0, 16)}</span> {isAr ? 'بواسطة' : 'by'} {section.lastEditedBy}
         </div>
       )}
     </div>
   );
 }
-
-const textareaStyle: React.CSSProperties = {
-  padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 4,
-  fontSize: 13, fontFamily: 'inherit', background: 'var(--surface)', width: '100%',
-  lineHeight: 1.6, resize: 'vertical',
-};
-
-const preStyle: React.CSSProperties = {
-  background: 'var(--surface-2)', borderRadius: 4, padding: 10,
-  fontSize: 11, lineHeight: 1.5, overflow: 'auto', maxHeight: 600,
-  fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-};
 
 // ─── New-plan form definition ────────────────────────────────────
 //

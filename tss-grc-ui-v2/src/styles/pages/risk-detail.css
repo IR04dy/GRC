@@ -1,0 +1,259 @@
+/* TSS GRC Platform — RiskDetailPage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-4).
+ * Every value resolves to a design token. RTL-safe (uses logical properties).
+ */
+
+/* ─── Loading / error blocks ───────────────────────────────── */
+.risk-detail-loading {
+  padding: var(--sp-9);
+  text-align: center;
+  color: var(--ink-3);
+}
+.risk-detail-error {
+  padding: var(--sp-9);
+  text-align: center;
+  color: var(--danger-fg);
+}
+
+/* ─── KPI / score header strip ─────────────────────────────── */
+.risk-detail-score-strip {
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  margin-bottom: var(--sp-5);
+}
+
+/* ─── Card action group (badge + button) ───────────────────── */
+.risk-detail-card-action {
+  display: inline-flex;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+/* ─── List rows (assessments, treatments, kris, links, history) ── */
+.risk-detail-rows {
+  display: flex;
+  flex-direction: column;
+}
+.risk-detail-row-assessment {
+  display: grid;
+  grid-template-columns: 110px 1fr 80px 80px;
+  gap: var(--sp-5);
+  padding: var(--sp-5) 0;
+  border-bottom: 1px dashed var(--border);
+  align-items: center;
+}
+.risk-detail-row-kri {
+  display: grid;
+  grid-template-columns: 110px 1fr 100px 80px;
+  gap: var(--sp-5);
+  padding: var(--sp-5) 0;
+  border-bottom: 1px dashed var(--border);
+  align-items: center;
+}
+.risk-detail-row-history {
+  display: grid;
+  grid-template-columns: 160px 100px 1fr;
+  gap: var(--sp-5);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px dashed var(--border);
+  align-items: flex-start;
+}
+.risk-detail-row-treatment {
+  padding: var(--sp-5) 0;
+  border-bottom: 1px dashed var(--border);
+}
+.risk-detail-row-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px dashed var(--border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.risk-detail-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-2);
+}
+.risk-detail-row-head__group {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.risk-detail-row-meta {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  display: flex;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-2);
+}
+.risk-detail-row-meta-strong { color: var(--ink-2); }
+
+/* ─── Cell type helpers ────────────────────────────────────── */
+.risk-detail-cell-date {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.risk-detail-cell-id {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.risk-detail-cell-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-1);
+}
+.risk-detail-cell-title--bold {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.risk-detail-cell-sub {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.risk-detail-cell-kri-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.risk-detail-cell-kri-thresh {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.risk-detail-cell-kri-current {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--ink-1);
+}
+.risk-detail-cell-kri-unit {
+  font-size: 10px;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+.risk-detail-cell-empty {
+  color: var(--ink-4);
+}
+
+/* ─── Score pill (rounded pill with bg color) ─────────────── */
+.risk-detail-score-pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* ─── Tone background utilities for risk score pills ─────── */
+.risk-tone-vlow  { background: var(--risk-vlow); }
+.risk-tone-low   { background: var(--risk-low); }
+.risk-tone-med   { background: var(--risk-med); }
+.risk-tone-high  { background: var(--risk-high); }
+.risk-tone-vhigh { background: var(--risk-vhigh); }
+.risk-tone-crit  { background: var(--risk-crit); }
+
+/* ─── Inline progress bar (mock treatments) ──────────────── */
+.risk-detail-progress {
+  margin-top: var(--sp-3);
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.risk-detail-progress__fill {
+  height: 100%;
+}
+.risk-detail-progress__fill[data-tone="success"] { background: var(--success); }
+.risk-detail-progress__fill[data-tone="primary"] { background: var(--primary); }
+.risk-detail-progress__fill[data-tone="accent"]  { background: var(--accent); }
+
+/* ─── Treatment action button row ────────────────────────── */
+.risk-detail-treatment-actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* ─── History row sub-text ────────────────────────────────── */
+.risk-detail-history-msg {
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+}
+.risk-detail-history-actor {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+/* ─── Link row helpers ────────────────────────────────────── */
+.risk-detail-link-group {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+/* ─── History grid stack (timeline + automation + legacy) ── */
+.risk-detail-history-stack {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+/* ─── Generic Field component ─────────────────────────────── */
+.risk-detail-field {
+  margin-bottom: var(--sp-4);
+}
+.risk-detail-field__label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.risk-detail-field__value {
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  margin-top: 2px;
+}
+.risk-detail-field__value--bold   { font-weight: 600; }
+.risk-detail-field__value--medium { font-weight: 500; }
+.risk-detail-field__value--mono   { font-family: var(--font-mono); }
+.risk-detail-field__value--multiline { white-space: pre-wrap; }
+
+/* ─── Score / Field tiles ─────────────────────────────────── */
+.risk-detail-tile {
+  padding: var(--sp-5);
+}
+.risk-detail-tile__label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.risk-detail-tile__pill {
+  display: inline-block;
+  margin-top: var(--sp-3);
+  padding: 2px var(--sp-5);
+  color: #fff;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+}
+.risk-detail-tile__value {
+  margin-top: var(--sp-3);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--ink-1);
+}
+
+.risk-detail-quick-link {
+  font-size: var(--text-sm);
+  color: var(--primary);
+}

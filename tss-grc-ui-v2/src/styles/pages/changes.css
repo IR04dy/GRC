@@ -1,0 +1,330 @@
+/* TSS GRC Platform — ChangesPage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-4).
+ * Every value resolves to a design token. RTL-safe (uses logical properties).
+ */
+
+/* ─── Cell helpers (DataTable cells) ─────────────────────── */
+.changes-cell-mono-bold { font-weight: 600; }
+.changes-cell-title { font-weight: 600; }
+
+/* ─── Kanban (Changes) ─────────────────────────────────────── */
+.changes-kanban {
+  display: grid;
+  grid-auto-columns: minmax(220px, 1fr);
+  grid-auto-flow: column;
+  gap: var(--sp-5);
+  overflow-x: auto;
+}
+.changes-kanban__lane {
+  min-height: 320px;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+}
+.changes-kanban__lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3) var(--sp-4);
+}
+.changes-kanban__lane-title {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+}
+.changes-kanban__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.changes-kanban__card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--sp-4);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.changes-kanban__card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+.changes-kanban__card-code {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.changes-kanban__card-title {
+  font-weight: 600;
+  color: var(--ink-1);
+  margin-bottom: var(--sp-2);
+}
+.changes-kanban__card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.changes-kanban__card-date {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.changes-kanban__transition-btn {
+  margin-inline-start: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 10px;
+}
+
+/* ─── Workflow detail panel (list + main) ─────────────────── */
+.changes-workflow-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--sp-6);
+}
+.changes-list-pane {
+  max-height: 460px;
+  overflow-y: auto;
+}
+.changes-list-item {
+  display: block;
+  width: 100%;
+  text-align: start;
+  padding: var(--sp-5);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.changes-list-item.is-selected { background: var(--surface-2); }
+.changes-list-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.changes-list-item__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-top: 2px;
+  color: var(--ink-1);
+}
+
+.changes-detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.changes-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5);
+  font-size: var(--text-sm);
+}
+.changes-blocks {
+  margin-top: var(--sp-5);
+  display: grid;
+  gap: var(--sp-4);
+}
+.changes-actions-row {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-top: var(--sp-6);
+}
+
+/* ─── Approvals / tasks / comments rows ───────────────────── */
+.changes-approval-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.changes-approval-row__main { flex: 1; }
+.changes-approval-row__role { color: var(--ink-3); }
+.changes-approval-row__comments {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.changes-approval-row__time {
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
+}
+
+.changes-task-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+.changes-task-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+}
+.changes-task-btn[data-status="DONE"] { color: var(--success); }
+.changes-task-label {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+}
+.changes-task-label[data-done="true"] {
+  text-decoration: line-through;
+  color: var(--ink-3);
+}
+.changes-task-owner {
+  margin-inline-start: var(--sp-4);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.changes-task-del {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-3);
+}
+
+.changes-comments-scroll {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: var(--sp-5);
+}
+.changes-comment-item {
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+.changes-comment-meta {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.changes-comment-author { color: var(--ink-2); }
+.changes-comment-time { margin-inline-start: var(--sp-4); }
+.changes-comment-body {
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  margin-top: 2px;
+}
+.changes-comment-form {
+  display: flex;
+  gap: var(--sp-3);
+}
+.changes-comment-input {
+  flex: 1;
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-1);
+}
+
+/* ─── Field / Block helpers ───────────────────────────────── */
+.changes-field-label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.changes-field-value {
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  font-weight: 500;
+}
+.changes-block-label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--sp-2);
+}
+.changes-block-body {
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  white-space: pre-wrap;
+  background: var(--surface-2);
+  padding: var(--sp-4);
+  border-radius: var(--r-sm);
+}
+
+/* ─── Loading / empty ─────────────────────────────────────── */
+.changes-loading {
+  padding: var(--sp-9);
+  text-align: center;
+  color: var(--ink-3);
+}
+.changes-empty-note {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.changes-analytics-empty {
+  padding: var(--sp-7);
+  color: var(--ink-3);
+}
+
+/* ─── Hidden refresh poke (legacy) ────────────────────────── */
+.changes-refresh-hidden { display: none; }
+
+/* ─── Analytics grid ──────────────────────────────────────── */
+.changes-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-6);
+}
+
+/* ─── Integrations panel ──────────────────────────────────── */
+.changes-integration-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+.changes-integration-pill {
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.changes-integrations-list {
+  display: grid;
+  gap: var(--sp-3);
+}
+.changes-integration-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+}
+.changes-integration-row__id { font-size: var(--text-xs); }
+.changes-integration-row__notes {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.changes-integration-row__del {
+  margin-inline-start: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--danger-fg);
+}

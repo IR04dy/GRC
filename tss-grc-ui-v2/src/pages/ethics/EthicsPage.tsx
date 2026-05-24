@@ -40,6 +40,7 @@ import { ETHICS_ANCHORS as ETHICS_REG_ANCHORS } from '../../lib/moduleAnchors';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toEthicsCaseDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
+import '../../styles/pages/ethics.css';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'disclosures' | 'kyc' | 'aml' | 'analytics' | 'integrations';
 
@@ -222,11 +223,11 @@ export function EthicsPage() {
   }
 
   const cols: Column<EthicsCaseDto>[] = [
-    { header: t('ethicsFldCode'),     cell: c => <span className="mono" style={{ fontWeight: 600 }}>{c.caseCode ?? '—'}</span>, width: '130px' },
+    { header: t('ethicsFldCode'),     cell: c => <span className="mono ethics-mono-bold">{c.caseCode ?? '—'}</span>, width: '130px' },
     { header: t('colTitle'),          cell: c => (
       <div>
-        <div style={{ fontWeight: 600 }}>{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{ethicsProv.has(c.id) && <PromotedBadge sourceReferenceCode={ethicsProv.get(c.id)!} />}</div>
-        {c.isAnonymous && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--ink-3)' }}><EyeOff size={10} /> {t('ethicsAnonymous')}</span>}
+        <div className="ethics-cell-title">{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{ethicsProv.has(c.id) && <PromotedBadge sourceReferenceCode={ethicsProv.get(c.id)!} />}</div>
+        {c.isAnonymous && <span className="ethics-cell-anonymous"><EyeOff size={10} /> {t('ethicsAnonymous')}</span>}
       </div>
     ) },
     { header: t('ethicsFldCategory'), cell: c => <Badge tone="primary">{c.category.replace(/_/g, ' ')}</Badge>, width: '160px' },
@@ -345,34 +346,31 @@ function KanbanBoard({ items, onTransition, onOpen, t, lang }: {
   lang: string;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${KANBAN_LANES.length}, minmax(220px, 1fr))`, gap: 12, overflowX: 'auto' }}>
+    <div className="ethics-kanban">
       {KANBAN_LANES.map(lane => {
         const lst = items.filter(c => lane.statuses.includes(c.status));
         return (
-          <div key={lane.id} style={{ minHeight: 320, background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: 8, border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px 8px' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-2)' }}>{lane.id}</span>
+          <div key={lane.id} className="ethics-kanban__lane">
+            <div className="ethics-kanban__lane-head">
+              <span className="ethics-kanban__lane-title">{lane.id}</span>
               <Badge tone="neutral">{lst.length}</Badge>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="ethics-kanban__cards">
               {lst.map(c => (
-                <div key={c.id} onClick={() => onOpen(c.id)} style={{
-                  background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 'var(--r-sm)', padding: 8, cursor: 'pointer', fontSize: 12,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{c.caseCode ?? `#${c.id}`}</span>
+                <div key={c.id} onClick={() => onOpen(c.id)} className="ethics-kanban__card">
+                  <div className="ethics-kanban__card-head">
+                    <span className="mono ethics-kanban__card-code">{c.caseCode ?? `#${c.id}`}</span>
                     <Badge tone={SEVERITY_TONE[c.severity] ?? 'neutral'}>{c.severity}</Badge>
-                    {c.isAnonymous && <Lock size={10} style={{ color: 'var(--ink-3)' }} />}
+                    {c.isAnonymous && <Lock size={10} className="ethics-kanban__card-lock" />}
                   </div>
-                  <div style={{ fontWeight: 600, color: 'var(--ink-1)', marginBottom: 4 }}>
+                  <div className="ethics-kanban__card-title">
                     {lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <div className="ethics-kanban__card-meta">
                     <Badge tone="primary">{c.category.replace(/_/g, ' ')}</Badge>
                     <button onClick={(e) => { e.stopPropagation(); void onTransition(c); }}
                             disabled={!nextStatus(c)}
-                            style={{ marginInlineStart: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 10 }}>
+                            className="ethics-kanban__transition-btn">
                       {nextStatus(c) ? `→ ${nextStatus(c)?.replace(/_/g, ' ')}` : t('changeKanbanDone')}
                     </button>
                   </div>
@@ -427,18 +425,15 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
   return (
     <div className="rail-layout">
       <Card title={t('ethicsCaseList')} Icon={ListChecks} padded={false}>
-        <div style={{ maxHeight: 460, overflowY: 'auto' }}>
+        <div className="ethics-list-pane">
           {items.map(it => (
-            <button key={it.id} onClick={() => setDetailId(it.id)} style={{
-              display: 'block', width: '100%', textAlign: 'start', padding: 10,
-              background: it.id === detailId ? 'var(--surface-2)' : 'transparent',
-              border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+            <button key={it.id} onClick={() => setDetailId(it.id)}
+              className={`ethics-list-item${it.id === detailId ? ' is-selected' : ''}`}>
+              <div className="ethics-list-item__head">
                 <span className="mono">{it.caseCode ?? `#${it.id}`}</span>
                 <Badge tone={STATUS_TONE[it.status] ?? 'neutral'} dot>{it.status.replace(/_/g, ' ')}</Badge>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, color: 'var(--ink-1)' }}>
+              <div className="ethics-list-item__title">
                 {lang === 'ar' && it.titleAr ? it.titleAr : it.titleEn}
               </div>
             </button>
@@ -446,7 +441,7 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
         </div>
       </Card>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="ethics-detail-stack">
         <Card
           title={`${c.caseCode ?? '#' + c.id} · ${lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}`}
           Icon={ShieldAlert}
@@ -456,7 +451,7 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
             <Badge tone="primary">{c.category.replace(/_/g, ' ')}</Badge>
             {c.regulatorNotified && <Badge tone="danger" dot>{t('ethicsRegulatorNotified')}</Badge>}
           </>}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+          <div className="ethics-detail-grid">
             <Field label={t('ethicsFldChannel')} value={c.intakeChannel.replace(/_/g, ' ')} />
             <Field label={t('ethicsFldReporter')}
                    value={c.isAnonymous ? t('ethicsAnonymous') : (c.reporterName ?? '—')} />
@@ -465,12 +460,12 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
             <Field label={t('ethicsFldLocation')}     value={c.location ?? '—'} />
             <Field label={t('ethicsFldIncidentDate')} value={c.dateOfIncident ?? '—'} />
           </div>
-          <div style={{ marginTop: 12 }}>
+          <div className="ethics-blocks">
             <Block label={t('ethicsFldSubject')} body={c.subjectSummary} />
             <Block label={t('ethicsFldDescription')} body={c.description} />
             {c.outcomeSummary && <Block label={t('ethicsFldOutcomeSummary')} body={c.outcomeSummary} />}
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+          <div className="ethics-actions-row">
             {next && <Button variant="primary" Icon={ArrowRight} onClick={() => onTransition(c, next)}>{t('changeAdvanceTo')} {next.replace(/_/g, ' ')}</Button>}
             {c.status === 'INVESTIGATION' && (
               <>
@@ -489,16 +484,16 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
         <Card title={t('ethicsActionTimeline')} Icon={Activity}
               action={<Button variant="secondary" Icon={Plus} onClick={addAction}>{t('ethicsAddAction')}</Button>}>
           {actions.length === 0
-            ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>{t('ethicsNoActions')}</div>
+            ? <div className="ethics-empty-note">{t('ethicsNoActions')}</div>
             : actions.map(a => (
-                <div key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, fontSize: 12 }}>
+                <div key={a.id} className="ethics-action-timeline-item">
+                  <div className="ethics-action-timeline-head">
                     <Badge tone="info">{a.actionType.replace(/_/g, ' ')}</Badge>
-                    <span style={{ fontWeight: 600, color: 'var(--ink-1)' }}>{a.title}</span>
-                    {a.actionAt && <span className="mono" style={{ marginInlineStart: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>{new Date(a.actionAt).toLocaleString()}</span>}
+                    <span className="ethics-action-timeline-title">{a.title}</span>
+                    {a.actionAt && <span className="mono ethics-action-timeline-time">{new Date(a.actionAt).toLocaleString()}</span>}
                   </div>
-                  {a.description && <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>{a.description}</div>}
-                  {a.actorName && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>— {a.actorName}</div>}
+                  {a.description && <div className="ethics-action-timeline-desc">{a.description}</div>}
+                  {a.actorName && <div className="ethics-action-timeline-actor">— {a.actorName}</div>}
                 </div>
               ))
           }
@@ -510,24 +505,24 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, t, lang, to
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return <div>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-    <div style={{ fontSize: 13, color: 'var(--ink-1)', fontWeight: 500 }}>{value ?? '—'}</div>
+    <div className="ethics-field-label">{label}</div>
+    <div className="ethics-field-value">{value ?? '—'}</div>
   </div>;
 }
 function Block({ label, body }: { label: string; body?: string | null }) {
   if (!body) return null;
-  return <div style={{ marginTop: 8 }}>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
-    <div style={{ fontSize: 13, color: 'var(--ink-1)', whiteSpace: 'pre-wrap', background: 'var(--surface-2)', padding: 8, borderRadius: 'var(--r-sm)' }}>{body}</div>
+  return <div className="ethics-block">
+    <div className="ethics-block-label">{label}</div>
+    <div className="ethics-block-body">{body}</div>
   </div>;
 }
 
 // ─── Analytics ─────────────────────────────────────────────────────────────
 function AnalyticsPanel({ analytics, t }: { analytics: EthicsAnalyticsDto | null; t: (k: string) => string }) {
-  if (!analytics) return <Card><div style={{ padding: 20, color: 'var(--ink-3)' }}>{t('ethicsNoAnalytics')}</div></Card>;
+  if (!analytics) return <Card><div className="ethics-analytics-empty">{t('ethicsNoAnalytics')}</div></Card>;
   const max = (m: Record<string, number>) => Math.max(1, ...Object.values(m));
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+    <div className="ethics-analytics-grid">
       <Card title={t('ethicsAnalyticsStatus')} Icon={BarChart3}>
         {Object.entries(analytics.byStatus).filter(([, v]) => v > 0).map(([k, v]) => (
           <Progress key={k} label={`${k.replace(/_/g, ' ')} · ${v}`} value={Math.round((v / max(analytics.byStatus)) * 100)}
@@ -582,9 +577,9 @@ function IntegrationsPanel({ items, detailId, setDetailId, t, toast }: {
     return (
       <Card title={t('ethicsTabIntegrations')}>
         <EmptyState Icon={MessageSquare} title={t('ethicsIntegrationsSelectTitle')} sub={t('ethicsIntegrationsSelectSub')} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+        <div className="ethics-integration-tags">
           {items.slice(0, 12).map(it => (
-            <button key={it.id} onClick={() => setDetailId(it.id)} style={{ padding: '6px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-pill)', cursor: 'pointer', fontSize: 12 }}>
+            <button key={it.id} onClick={() => setDetailId(it.id)} className="ethics-integration-pill">
               {it.caseCode ?? `#${it.id}`}
             </button>
           ))}
@@ -598,15 +593,15 @@ function IntegrationsPanel({ items, detailId, setDetailId, t, toast }: {
           Icon={MessageSquare}
           action={<Button variant="primary" Icon={Plus} onClick={addLink}>{t('changeLinkAdd')}</Button>}>
       {links.length === 0
-        ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>{t('changeNoLinks')}</div>
+        ? <div className="ethics-empty-note">{t('changeNoLinks')}</div>
         : (
-          <div style={{ display: 'grid', gap: 6 }}>
+          <div className="ethics-integrations-list">
             {links.map(l => (
-              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
+              <div key={l.id} className="ethics-integration-row">
                 <Badge tone="primary">{l.entityType.replace(/_/g, ' ')}</Badge>
-                <span className="mono" style={{ fontSize: 12 }}>#{l.entityId}</span>
+                <span className="mono ethics-integration-row__id">#{l.entityId}</span>
                 <Badge tone="info">{l.linkType.replace(/_/g, ' ')}</Badge>
-                <button onClick={() => delLink(l)} title={t('deleteBtn')} style={{ marginInlineStart: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger-fg)' }}>
+                <button onClick={() => delLink(l)} title={t('deleteBtn')} className="ethics-integration-row__del">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -620,7 +615,7 @@ function IntegrationsPanel({ items, detailId, setDetailId, t, toast }: {
 
 function Loading() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <div className="ethics-loading">{t('riskLoading')}</div>;
 }
 
 // ─── AML transaction alerts (case management) ──────────────────────────────
@@ -746,11 +741,11 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   }
 
   const cols: Column<AmlAlertDto>[] = [
-    { header: t('amlFldCode'),     cell: a => <span className="mono" style={{ fontWeight: 600 }}>{a.alertCode ?? `#${a.id}`}</span>, width: '130px' },
+    { header: t('amlFldCode'),     cell: a => <span className="mono ethics-mono-bold">{a.alertCode ?? `#${a.id}`}</span>, width: '130px' },
     { header: t('colTitle'),       cell: a => (
       <div>
-        <div style={{ fontWeight: 600 }}>{lang === 'ar' && a.titleAr ? a.titleAr : a.titleEn}</div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+        <div className="ethics-cell-title">{lang === 'ar' && a.titleAr ? a.titleAr : a.titleEn}</div>
+        <div className="ethics-cell-sub">
           {a.alertType.replace(/_/g, ' ')}{a.ruleId && ` · ${a.ruleId}`}
         </div>
       </div>
@@ -782,7 +777,7 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   return (
     <>
       {analytics && (
-        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))', marginBottom: 12 }}>
+        <div className="ethics-kpi-5">
           <Kpi Icon={Activity}    label={t('amlKpiTotal')}     value={analytics.total}      tone="primary" />
           <Kpi Icon={AlertTriangle} label={t('amlKpiOpen')}    value={analytics.openAlerts} tone="warning" />
           <Kpi Icon={Flame}       label={t('amlKpiCritical')}  value={analytics.bySeverity?.CRITICAL ?? 0} tone="danger" />
@@ -790,8 +785,8 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
           <Kpi Icon={CheckCheck}  label={t('amlKpiCleared')}   value={analytics.byStatus?.CLEARED ?? 0} tone="success" />
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('amlDescription')}</div>
+      <div className="ethics-toolbar">
+        <div className="ethics-toolbar__hint">{t('amlDescription')}</div>
         <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('amlNew')}</Button>
       </div>
       <Card padded={false}>
@@ -948,16 +943,16 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   }
 
   const cols: Column<KycSubjectDto>[] = [
-    { header: t('kycFldCode'),    cell: s => <span className="mono" style={{ fontWeight: 600 }}>{s.subjectCode ?? '—'}</span>, width: '130px' },
+    { header: t('kycFldCode'),    cell: s => <span className="mono ethics-mono-bold">{s.subjectCode ?? '—'}</span>, width: '130px' },
     { header: t('kycFldFullName'), cell: s => (
       <div>
-        <div style={{ fontWeight: 600 }}>{lang === 'ar' && s.fullNameAr ? s.fullNameAr : s.fullName}</div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.subjectType.replace(/_/g, ' ')}{s.nationality && ` · ${s.nationality}`}</div>
+        <div className="ethics-cell-title">{lang === 'ar' && s.fullNameAr ? s.fullNameAr : s.fullName}</div>
+        <div className="ethics-cell-sub">{s.subjectType.replace(/_/g, ' ')}{s.nationality && ` · ${s.nationality}`}</div>
       </div>
     ) },
     { header: t('kycFldRisk'),    cell: s => <Badge tone={RISK_RATING_TONE[s.riskRating] ?? 'neutral'} dot>{s.riskRating}</Badge>, width: '120px' },
     { header: t('kycFldFlags'),   cell: s => (
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div className="ethics-cell-flags">
         {s.isPep && <Badge tone="warning">PEP</Badge>}
         {s.isSanctioned && <Badge tone="danger">SANCTIONED</Badge>}
         {s.eddRequired && <Badge tone="accent">EDD</Badge>}
@@ -988,7 +983,7 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   return (
     <>
       {analytics && (
-        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(120px, 1fr))', marginBottom: 12 }}>
+        <div className="ethics-kpi-5">
           <Kpi Icon={Activity}    label={t('kycKpiTotal')}      value={analytics.total}      tone="primary" />
           <Kpi Icon={CheckCheck}  label={t('kycKpiApproved')}   value={analytics.approved}   tone="success" />
           <Kpi Icon={Stamp}       label={t('kycKpiPep')}        value={analytics.peps}       tone="accent" />
@@ -996,8 +991,8 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
           <Kpi Icon={Lock}        label={t('kycKpiProhibited')} value={analytics.prohibited} tone="danger" />
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('kycDescription')}</div>
+      <div className="ethics-toolbar">
+        <div className="ethics-toolbar__hint">{t('kycDescription')}</div>
         <Button variant="primary" Icon={Plus} onClick={() => { setEditing(null); setModalOpen(true); }}>{t('kycNew')}</Button>
       </div>
       <Card padded={false}>
@@ -1008,22 +1003,22 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
               <>
                 <DataTable columns={cols} rows={items} empty={<EmptyState />} />
                 {expandedId != null && (
-                  <div style={{ borderTop: '1px solid var(--border)', padding: 12, background: 'var(--surface-2)' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--ink-2)' }}>
+                  <div className="ethics-kyc-expand">
+                    <div className="ethics-kyc-expand__title">
                       {t('kycHitsFor')} #{expandedId}
                     </div>
                     {(hits[expandedId] ?? []).length === 0
-                      ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('kycNoHits')}</div>
+                      ? <div className="ethics-kyc-expand__empty">{t('kycNoHits')}</div>
                       : (
-                        <div style={{ display: 'grid', gap: 6 }}>
+                        <div className="ethics-kyc-expand__hits">
                           {(hits[expandedId] ?? []).map(h => (
-                            <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, background: 'var(--surface)', borderRadius: 'var(--r-sm)', fontSize: 12 }}>
+                            <div key={h.id} className="ethics-kyc-hit">
                               <Badge tone="primary">{h.listSource.replace(/_/g, ' ')}</Badge>
-                              <span className="mono" style={{ fontSize: 11 }}>{h.matchScore}%</span>
+                              <span className="mono ethics-kyc-hit__score">{h.matchScore}%</span>
                               <Badge tone={h.disposition === 'TRUE_MATCH' ? 'danger' : h.disposition === 'FALSE_POSITIVE' ? 'success' : 'warning'}>{h.disposition.replace(/_/g, ' ')}</Badge>
                               {h.sarFiled && <Badge tone="accent">SAR {h.sarReference ? `· ${h.sarReference}` : ''}</Badge>}
-                              <span style={{ flex: 1, color: 'var(--ink-1)' }}>{h.matchSummary ?? '—'}</span>
-                              {h.decidedByName && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>— {h.decidedByName}</span>}
+                              <span className="ethics-kyc-hit__summary">{h.matchSummary ?? '—'}</span>
+                              {h.decidedByName && <span className="ethics-kyc-hit__decider">— {h.decidedByName}</span>}
                             </div>
                           ))}
                         </div>
@@ -1155,8 +1150,8 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   }
 
   const cols: Column<DisclosureDto>[] = [
-    { header: t('discFldCode'),    cell: d => <span className="mono" style={{ fontWeight: 600 }}>{d.disclosureCode ?? '—'}</span>, width: '130px' },
-    { header: t('colTitle'),       cell: d => <span style={{ fontWeight: 600 }}>{lang === 'ar' && d.titleAr ? d.titleAr : d.titleEn}</span> },
+    { header: t('discFldCode'),    cell: d => <span className="mono ethics-mono-bold">{d.disclosureCode ?? '—'}</span>, width: '130px' },
+    { header: t('colTitle'),       cell: d => <span className="ethics-cell-title">{lang === 'ar' && d.titleAr ? d.titleAr : d.titleEn}</span> },
     { header: t('discFldType'),    cell: d => <Badge tone="primary">{d.disclosureType.replace(/_/g, ' ')}</Badge>, width: '180px' },
     { header: t('discFldDiscloser'), cell: d => d.discloserName, width: '180px' },
     { header: t('discFldValue'),   cell: d => d.monetaryValue ? `${d.monetaryValue.toLocaleString()} ${d.currency ?? 'SAR'}` : '—', mono: true, width: '130px' },
@@ -1174,8 +1169,8 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+      <div className="ethics-toolbar">
+        <div className="ethics-toolbar__hint">
           {t('discDescription')}
         </div>
         {/* DD-79: route new disclosures through Services Center so they get

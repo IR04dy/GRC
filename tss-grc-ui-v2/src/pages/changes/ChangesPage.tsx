@@ -35,6 +35,7 @@ import { CommsPanel } from '../../components/comms/CommsPanel';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toChangeRequestDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
+import '../../styles/pages/changes.css';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations' | 'comms';
 
@@ -191,8 +192,8 @@ export function ChangesPage() {
 
   // Columns for register
   const cols: Column<ChangeRequestDto>[] = [
-    { header: t('changeFldCode'),   cell: c => <span className="mono" style={{ fontWeight: 600 }}>{c.changeCode ?? '—'}</span>, width: '130px' },
-    { header: t('colTitle'),        cell: c => <div style={{ fontWeight: 600 }}>{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{changeProv.has(c.id) && <PromotedBadge sourceReferenceCode={changeProv.get(c.id)!} />}</div> },
+    { header: t('changeFldCode'),   cell: c => <span className="mono changes-cell-mono-bold">{c.changeCode ?? '—'}</span>, width: '130px' },
+    { header: t('colTitle'),        cell: c => <div className="changes-cell-title">{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{changeProv.has(c.id) && <PromotedBadge sourceReferenceCode={changeProv.get(c.id)!} />}</div> },
     { header: t('changeFldType'),   cell: c => <Badge tone={TYPE_TONE[c.changeType] ?? 'neutral'}>{c.changeType}</Badge>, width: '120px' },
     { header: t('changeFldRisk'),   cell: c => c.riskLevel ? <Badge tone={RISK_TONE[c.riskLevel] ?? 'neutral'} dot>{c.riskLevel}</Badge> : '—', width: '110px' },
     { header: t('colStatus'),       cell: c => <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>, width: '170px' },
@@ -315,35 +316,31 @@ function KanbanBoard({ items, onTransition, onOpen, t, lang }: {
   lang: string;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${KANBAN_LANES.length}, minmax(220px, 1fr))`, gap: 12, overflowX: 'auto' }}>
+    <div className="changes-kanban">
       {KANBAN_LANES.map(lane => {
         const lst = items.filter(c => lane.statuses.includes(c.status));
         return (
-          <div key={lane.id} style={{ minHeight: 320, background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: 8, border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px 8px' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-2)' }}>{lane.id}</span>
+          <div key={lane.id} className="changes-kanban__lane">
+            <div className="changes-kanban__lane-head">
+              <span className="changes-kanban__lane-title">{lane.id}</span>
               <Badge tone="neutral">{lst.length}</Badge>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="changes-kanban__cards">
               {lst.map(c => (
-                <div key={c.id} onClick={() => onOpen(c.id)} style={{
-                  background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 'var(--r-sm)', padding: 8, cursor: 'pointer',
-                  fontSize: 12,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{c.changeCode ?? `#${c.id}`}</span>
+                <div key={c.id} onClick={() => onOpen(c.id)} className="changes-kanban__card">
+                  <div className="changes-kanban__card-head">
+                    <span className="mono changes-kanban__card-code">{c.changeCode ?? `#${c.id}`}</span>
                     <Badge tone={TYPE_TONE[c.changeType] ?? 'neutral'}>{c.changeType}</Badge>
                   </div>
-                  <div style={{ fontWeight: 600, color: 'var(--ink-1)', marginBottom: 4 }}>
+                  <div className="changes-kanban__card-title">
                     {lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <div className="changes-kanban__card-meta">
                     {c.riskLevel && <Badge tone={RISK_TONE[c.riskLevel] ?? 'neutral'} dot>{c.riskLevel}</Badge>}
-                    {c.scheduledStart && <span style={{ fontSize: 10, color: 'var(--ink-3)' }} className="mono">{new Date(c.scheduledStart).toLocaleDateString()}</span>}
+                    {c.scheduledStart && <span className="mono changes-kanban__card-date">{new Date(c.scheduledStart).toLocaleDateString()}</span>}
                     <button onClick={(e) => { e.stopPropagation(); void onTransition(c, nextStatus(c) ?? c.status); }}
                             disabled={!nextStatus(c)}
-                            style={{ marginInlineStart: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 10 }}>
+                            className="changes-kanban__transition-btn">
                       {nextStatus(c) ? `→ ${nextStatus(c)?.replace(/_/g, ' ')}` : t('changeKanbanDone')}
                     </button>
                   </div>
@@ -449,20 +446,17 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
   const next = nextStatus(change);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+    <div className="changes-workflow-grid">
       <Card title={t('changeWorkflowList')} Icon={ListChecks} padded={false}>
-        <div style={{ maxHeight: 460, overflowY: 'auto' }}>
+        <div className="changes-list-pane">
           {items.map(c => (
-            <button key={c.id} onClick={() => setDetailId(c.id)} style={{
-              display: 'block', width: '100%', textAlign: 'start', padding: 10,
-              background: c.id === detailId ? 'var(--surface-2)' : 'transparent',
-              border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+            <button key={c.id} onClick={() => setDetailId(c.id)}
+              className={`changes-list-item${c.id === detailId ? ' is-selected' : ''}`}>
+              <div className="changes-list-item__head">
                 <span className="mono">{c.changeCode ?? `#${c.id}`}</span>
                 <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, color: 'var(--ink-1)' }}>
+              <div className="changes-list-item__title">
                 {lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}
               </div>
             </button>
@@ -470,7 +464,7 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
         </div>
       </Card>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="changes-detail-stack">
         <Card title={`${change.changeCode ?? '#' + change.id} · ${lang === 'ar' && change.titleAr ? change.titleAr : change.titleEn}`}
               Icon={GitBranch}
               action={<>
@@ -478,7 +472,7 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
                 <Badge tone={TYPE_TONE[change.changeType] ?? 'neutral'}>{change.changeType}</Badge>
                 {change.riskLevel && <Badge tone={RISK_TONE[change.riskLevel] ?? 'neutral'}>{change.riskLevel}</Badge>}
               </>}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+          <div className="changes-detail-grid">
             <Field label={t('changeFldRequestedBy')} value={change.requestedByName} />
             <Field label={t('changeFldOwner')}       value={change.changeOwnerName} />
             <Field label={t('changeFldImplementer')} value={change.implementerName} />
@@ -486,14 +480,14 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
             <Field label={t('changeFldScheduledStart')} value={change.scheduledStart ? new Date(change.scheduledStart).toLocaleString() : '—'} />
             <Field label={t('changeFldScheduledEnd')}   value={change.scheduledEnd   ? new Date(change.scheduledEnd).toLocaleString()   : '—'} />
           </div>
-          <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+          <div className="changes-blocks">
             {change.descriptionEn && <Block label={t('changeFldDescription')} body={change.descriptionEn} />}
             {change.impactSummary && <Block label={t('changeFldImpact')} body={change.impactSummary} />}
             {change.rollbackPlan  && <Block label={t('changeFldRollback')} body={change.rollbackPlan} />}
             {change.testPlan      && <Block label={t('changeFldTestPlan')} body={change.testPlan} />}
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+          <div className="changes-actions-row">
             {next && <Button variant="primary" Icon={ArrowRight} onClick={() => onTransition(change, next)}>{t('changeAdvanceTo')} {next.replace(/_/g, ' ')}</Button>}
             {change.status === 'CAB_PENDING' && (
               <>
@@ -510,15 +504,15 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
 
         <Card title={t('changeApprovals')} Icon={Stamp}>
           {approvals.length === 0
-            ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>{t('changeNoApprovals')}</div>
+            ? <div className="changes-empty-note">{t('changeNoApprovals')}</div>
             : approvals.map(a => (
-                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                <div key={a.id} className="changes-approval-row">
                   <Badge tone={a.decision === 'APPROVE' ? 'success' : a.decision === 'REJECT' ? 'danger' : a.decision === 'DEFER' ? 'warning' : 'neutral'}>{a.decision}</Badge>
-                  <div style={{ flex: 1 }}>
-                    <strong>{a.approverName}</strong>{a.approverRole && <span style={{ color: 'var(--ink-3)' }}> · {a.approverRole}</span>}
-                    {a.comments && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{a.comments}</div>}
+                  <div className="changes-approval-row__main">
+                    <strong>{a.approverName}</strong>{a.approverRole && <span className="changes-approval-row__role"> · {a.approverRole}</span>}
+                    {a.comments && <div className="changes-approval-row__comments">{a.comments}</div>}
                   </div>
-                  {a.decidedAt && <span style={{ fontSize: 11, color: 'var(--ink-4)' }} className="mono">{new Date(a.decidedAt).toLocaleString()}</span>}
+                  {a.decidedAt && <span className="mono changes-approval-row__time">{new Date(a.decidedAt).toLocaleString()}</span>}
                 </div>
               ))
           }
@@ -527,19 +521,20 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
         <Card title={t('changeTasks')} Icon={ListChecks}
               action={<Button variant="secondary" Icon={Plus} onClick={addTask}>{t('changeAddTask')}</Button>}>
           {tasks.length === 0
-            ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>{t('changeNoTasks')}</div>
+            ? <div className="changes-empty-note">{t('changeNoTasks')}</div>
             : tasks.map(task => (
-                <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div key={task.id} className="changes-task-row">
                   <button onClick={() => flipTask(task)} title={t('changeTaskFlip')}
-                          style={{ background: 'transparent', border: '1px solid var(--border)', width: 22, height: 22, borderRadius: 'var(--r-sm)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: task.status === 'DONE' ? 'var(--success)' : 'var(--ink-3)' }}>
+                          data-status={task.status}
+                          className="changes-task-btn">
                     {task.status === 'DONE' ? <CheckCheck size={12} /> : task.status === 'IN_PROGRESS' ? <Activity size={12} /> : <Clock size={12} />}
                   </button>
-                  <span style={{ flex: 1, fontSize: 13, textDecoration: task.status === 'DONE' ? 'line-through' : 'none', color: task.status === 'DONE' ? 'var(--ink-3)' : 'var(--ink-1)' }}>
+                  <span className="changes-task-label" data-done={task.status === 'DONE' ? 'true' : 'false'}>
                     {lang === 'ar' && task.titleAr ? task.titleAr : task.titleEn}
-                    {task.ownerName && <span style={{ marginInlineStart: 8, fontSize: 11, color: 'var(--ink-3)' }}>· {task.ownerName}</span>}
+                    {task.ownerName && <span className="changes-task-owner">· {task.ownerName}</span>}
                   </span>
                   <Badge tone={task.status === 'DONE' ? 'success' : task.status === 'IN_PROGRESS' ? 'info' : task.status === 'BLOCKED' ? 'danger' : 'neutral'}>{task.status.replace(/_/g, ' ')}</Badge>
-                  <button onClick={() => deleteTask(task)} title={t('deleteBtn')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-3)' }}>
+                  <button onClick={() => deleteTask(task)} title={t('deleteBtn')} className="changes-task-del">
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -548,29 +543,29 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
         </Card>
 
         <Card title={t('changeComments')} Icon={MessageSquare}>
-          <div style={{ maxHeight: 240, overflowY: 'auto', marginBottom: 10 }}>
+          <div className="changes-comments-scroll">
             {comments.length === 0
-              ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>{t('changeNoComments')}</div>
+              ? <div className="changes-empty-note">{t('changeNoComments')}</div>
               : comments.map(c => (
-                  <div key={c.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                      <strong style={{ color: 'var(--ink-2)' }}>{c.authorName}</strong>
-                      {c.createdAt && <span className="mono" style={{ marginInlineStart: 8 }}>{new Date(c.createdAt).toLocaleString()}</span>}
+                  <div key={c.id} className="changes-comment-item">
+                    <div className="changes-comment-meta">
+                      <strong className="changes-comment-author">{c.authorName}</strong>
+                      {c.createdAt && <span className="mono changes-comment-time">{new Date(c.createdAt).toLocaleString()}</span>}
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--ink-1)', marginTop: 2 }}>{c.body}</div>
+                    <div className="changes-comment-body">{c.body}</div>
                   </div>
                 ))
             }
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="changes-comment-form">
             <input type="text" value={commentBody} onChange={e => setCommentBody(e.target.value)}
                    placeholder={t('changeCommentPlaceholder')}
-                   style={{ flex: 1, padding: 8, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface)', color: 'var(--ink-1)' }} />
+                   className="changes-comment-input" />
             <Button variant="primary" Icon={Send} onClick={postComment}>{t('changeCommentPost')}</Button>
           </div>
         </Card>
 
-        <button onClick={() => onChanged()} style={{ display: 'none' }}>refresh-poke</button>
+        <button onClick={() => onChanged()} className="changes-refresh-hidden">refresh-poke</button>
       </div>
     </div>
   );
@@ -578,24 +573,24 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return <div>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-    <div style={{ fontSize: 13, color: 'var(--ink-1)', fontWeight: 500 }}>{value ?? '—'}</div>
+    <div className="changes-field-label">{label}</div>
+    <div className="changes-field-value">{value ?? '—'}</div>
   </div>;
 }
 function Block({ label, body }: { label: string; body: string }) {
   return <div>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
-    <div style={{ fontSize: 13, color: 'var(--ink-1)', whiteSpace: 'pre-wrap', background: 'var(--surface-2)', padding: 8, borderRadius: 'var(--r-sm)' }}>{body}</div>
+    <div className="changes-block-label">{label}</div>
+    <div className="changes-block-body">{body}</div>
   </div>;
 }
 
 // ─── Analytics ─────────────────────────────────────────────────────────────
 function AnalyticsPanel({ analytics, t }: { analytics: ChangeAnalyticsDto | null; t: (k: string) => string }) {
-  if (!analytics) return <Card><div style={{ padding: 20, color: 'var(--ink-3)' }}>{t('changeAnalyticsNoData')}</div></Card>;
+  if (!analytics) return <Card><div className="changes-analytics-empty">{t('changeAnalyticsNoData')}</div></Card>;
   const status = analytics.byStatus, type = analytics.byType, outcome = analytics.byOutcome;
   const max = (m: Record<string, number>) => Math.max(1, ...Object.values(m));
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+    <div className="changes-analytics-grid">
       <Card title={t('changeAnalyticsStatus')} Icon={BarChart3}>
         {Object.entries(status).filter(([, v]) => v > 0).map(([k, v]) => (
           <Progress key={k} label={`${k.replace(/_/g, ' ')} · ${v}`} value={Math.round((v / max(status)) * 100)}
@@ -659,9 +654,9 @@ function IntegrationsPanel({ items, detailId, setDetailId, onChanged, t, toast }
     return (
       <Card title={t('changeTabIntegrations')}>
         <EmptyState Icon={Link2} title={t('changeIntegrationsSelectTitle')} sub={t('changeIntegrationsSelectSub')} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+        <div className="changes-integration-tags">
           {items.slice(0, 12).map(c => (
-            <button key={c.id} onClick={() => setDetailId(c.id)} style={{ padding: '6px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-pill)', cursor: 'pointer', fontSize: 12 }}>
+            <button key={c.id} onClick={() => setDetailId(c.id)} className="changes-integration-pill">
               {c.changeCode ?? `#${c.id}`}
             </button>
           ))}
@@ -675,16 +670,16 @@ function IntegrationsPanel({ items, detailId, setDetailId, onChanged, t, toast }
           Icon={Link2}
           action={<Button variant="primary" Icon={Plus} onClick={addLink}>{t('changeLinkAdd')}</Button>}>
       {links.length === 0
-        ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>{t('changeNoLinks')}</div>
+        ? <div className="changes-empty-note">{t('changeNoLinks')}</div>
         : (
-          <div style={{ display: 'grid', gap: 6 }}>
+          <div className="changes-integrations-list">
             {links.map(l => (
-              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
+              <div key={l.id} className="changes-integration-row">
                 <Badge tone="primary">{l.entityType.replace(/_/g, ' ')}</Badge>
-                <span className="mono" style={{ fontSize: 12 }}>#{l.entityId}</span>
+                <span className="mono changes-integration-row__id">#{l.entityId}</span>
                 <Badge tone="info">{l.linkType.replace(/_/g, ' ')}</Badge>
-                {l.notes && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{l.notes}</span>}
-                <button onClick={() => deleteLink(l)} title={t('deleteBtn')} style={{ marginInlineStart: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger-fg)' }}>
+                {l.notes && <span className="changes-integration-row__notes">{l.notes}</span>}
+                <button onClick={() => deleteLink(l)} title={t('deleteBtn')} className="changes-integration-row__del">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -698,5 +693,5 @@ function IntegrationsPanel({ items, detailId, setDetailId, onChanged, t, toast }
 
 function Loading() {
   const { t } = useI18n();
-  return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>;
+  return <div className="changes-loading">{t('riskLoading')}</div>;
 }

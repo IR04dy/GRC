@@ -27,12 +27,23 @@ import {
 import {
   listAssessments, recordAssessment,
   listTreatments, createTreatment, transitionTreatment, deleteTreatment,
-  scoreColor, treatmentTypeTone, treatmentStatusTone, nextTreatmentStatuses,
+  treatmentTypeTone, treatmentStatusTone, nextTreatmentStatuses,
   type RiskAssessment, type RiskTreatment, type RiskTreatmentType, type RiskTreatmentStatus,
 } from '../../lib/riskAdvanced';
 import { EmptyState } from '../../components/ui/EmptyState';
+import '../../styles/pages/risk-detail.css';
 
 type TabId = 'overview' | 'assessments' | 'treatments' | 'kris' | 'links' | 'history' | 'comms';
+
+/** Map a numeric risk score to a CSS class that paints the score pill with
+ *  the appropriate `--risk-*` token. Pure helper — no JSX. */
+function scoreToneClass(score: number): string {
+  if (score >= 16) return 'risk-tone-crit';
+  if (score >= 12) return 'risk-tone-vhigh';
+  if (score >= 8)  return 'risk-tone-high';
+  if (score >= 4)  return 'risk-tone-med';
+  return 'risk-tone-low';
+}
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   OPEN: 'danger', UNDER_ASSESSMENT: 'warning', TREATMENT_IN_PROGRESS: 'info',
@@ -183,12 +194,12 @@ export function RiskDetailPage() {
 
   if (loading) {
     return <Shell title={t('modRisk')} sub="ISO 31000 + COSO ERM">
-      <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('riskLoading')}</div>
+      <div className="risk-detail-loading">{t('riskLoading')}</div>
     </Shell>;
   }
   if (error || !risk) {
     return <Shell title={t('modRisk')} sub="ISO 31000 + COSO ERM">
-      <div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>{error ?? 'Not found'}</div>
+      <div className="risk-detail-error">{error ?? 'Not found'}</div>
     </Shell>;
   }
 
@@ -231,7 +242,7 @@ export function RiskDetailPage() {
       />
 
       {/* Score header strip */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))', marginBottom: 12 }}>
+      <div className="kpi-grid risk-detail-score-strip">
         <ScoreTile label={t('riskColInherent')} score={risk.inherentScore} />
         <ScoreTile label={t('riskColResidual')} score={risk.residualScore ?? 0} />
         <FieldTile label={t('riskColOwner')}    value={risk.ownerFullNameEn ?? risk.ownerName ?? '—'} />
@@ -272,7 +283,7 @@ export function RiskDetailPage() {
             subtitle="Authorities this risk threatens." />
           <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
           <Card title={t('detailQuickActions')} Icon={Edit}>
-            <Link to={`/risk?focus=${risk.id}`} style={{ fontSize: 13, color: 'var(--primary)' }}>{t('detailEditInRegister')}</Link>
+            <Link to={`/risk?focus=${risk.id}`} className="risk-detail-quick-link">{t('detailEditInRegister')}</Link>
           </Card>
         </>}
         main={<>
@@ -293,7 +304,7 @@ export function RiskDetailPage() {
         return (
           <Card title={t('detailTabAssessments')} Icon={Activity}
             action={
-              <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+              <div className="risk-detail-card-action">
                 <Badge tone="primary">{count}</Badge>
                 {useLive && <Button size="sm" variant="primary" Icon={Edit} onClick={onRecordAssessment}>
                   Record re-assessment
@@ -303,41 +314,37 @@ export function RiskDetailPage() {
             {count === 0
               ? <EmptyState Icon={Activity} title="No re-assessments yet" sub={t('detailAssessmentsHint')} />
               : useLive
-                ? <div style={{ display: 'flex', flexDirection: 'column' }}>
+                ? <div className="risk-detail-rows">
                     {live.map(a => (
-                      <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 80px 80px', gap: 12, padding: '10px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
-                        <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{a.assessmentDate}</span>
+                      <div key={a.id} className="risk-detail-row-assessment">
+                        <span className="mono risk-detail-cell-date">{a.assessmentDate}</span>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                          <div className="risk-detail-cell-title">
                             L={a.likelihood} · I={a.impact}
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 2 }}>
+                          <div className="risk-detail-cell-sub">
                             {a.assessmentNotesEn ?? '—'}
                           </div>
                         </div>
-                        <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                        <span className="mono risk-detail-cell-id">
                           #{a.id}
                         </span>
-                        <span style={{
-                          display: 'inline-block', padding: '2px 9px', borderRadius: 'var(--r-pill)',
-                          background: scoreColor(a.score),
-                          color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-                        }}>{a.score ?? a.likelihood * a.impact}</span>
+                        <span className={`risk-detail-score-pill ${scoreToneClass(a.score ?? a.likelihood * a.impact)}`}>{a.score ?? a.likelihood * a.impact}</span>
                       </div>
                     ))}
                   </div>
-                : <div style={{ display: 'flex', flexDirection: 'column' }}>
+                : <div className="risk-detail-rows">
                     {mockRows.map(a => (
-                      <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 80px 80px', gap: 12, padding: '10px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
-                        <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{a.date}</span>
+                      <div key={a.id} className="risk-detail-row-assessment">
+                        <span className="mono risk-detail-cell-date">{a.date}</span>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>{a.assessor}</div>
-                          <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 2 }}>{a.notes}</div>
+                          <div className="risk-detail-cell-title">{a.assessor}</div>
+                          <div className="risk-detail-cell-sub">{a.notes}</div>
                         </div>
-                        <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 'var(--r-pill)', background: scoreColor(a.inherentScore), color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700 }}>{a.inherentScore}</span>
+                        <span className={`risk-detail-score-pill ${scoreToneClass(a.inherentScore)}`}>{a.inherentScore}</span>
                         {a.residualScore != null
-                          ? <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 'var(--r-pill)', background: scoreColor(a.residualScore), color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700 }}>{a.residualScore}</span>
-                          : <span className="mono" style={{ color: 'var(--ink-4)' }}>—</span>}
+                          ? <span className={`risk-detail-score-pill ${scoreToneClass(a.residualScore)}`}>{a.residualScore}</span>
+                          : <span className="mono risk-detail-cell-empty">—</span>}
                       </div>
                     ))}
                   </div>
@@ -354,7 +361,7 @@ export function RiskDetailPage() {
         return (
           <Card title={t('detailTabTreatments')} Icon={ListChecks}
             action={
-              <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+              <div className="risk-detail-card-action">
                 <Badge tone="primary">{count}</Badge>
                 {useLive && <Button size="sm" variant="primary" Icon={Edit} onClick={onCreateTreatment}>
                   Add treatment
@@ -364,22 +371,22 @@ export function RiskDetailPage() {
             {count === 0
               ? <EmptyState Icon={ListChecks} title="No treatments planned" sub={t('detailTreatmentsHint')} />
               : useLive
-                ? <div style={{ display: 'flex', flexDirection: 'column' }}>
+                ? <div className="risk-detail-rows">
                     {live.map(tr => (
-                      <div key={tr.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div key={tr.id} className="risk-detail-row-treatment">
+                        <div className="risk-detail-row-head">
+                          <div className="risk-detail-row-head__group">
                             <Badge tone={treatmentTypeTone(tr.treatmentType)}>{tr.treatmentType}</Badge>
-                            <span style={{ fontSize: 13, fontWeight: 600 }}>{tr.descriptionEn}</span>
+                            <span className="risk-detail-cell-title--bold">{tr.descriptionEn}</span>
                           </div>
                           <Badge tone={treatmentStatusTone(tr.status)}>{tr.status.replace(/_/g, ' ')}</Badge>
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 12, marginBottom: 4 }}>
-                          <span>Owner: <strong style={{ color: 'var(--ink-2)' }}>{tr.ownerId ?? '—'}</strong></span>
+                        <div className="risk-detail-row-meta">
+                          <span>Owner: <strong className="risk-detail-row-meta-strong">{tr.ownerId ?? '—'}</strong></span>
                           <span>Due: <span className="mono">{tr.dueDate ?? '—'}</span></span>
                           {tr.completedAt && <span>Completed: <span className="mono">{tr.completedAt.substring(0, 10)}</span></span>}
                         </div>
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        <div className="risk-detail-treatment-actions">
                           {nextTreatmentStatuses(tr.status).map(next => (
                             <Button key={next} size="sm" variant="ghost"
                               onClick={() => onTransitionTreatment(tr, next)}>
@@ -395,25 +402,28 @@ export function RiskDetailPage() {
                       </div>
                     ))}
                   </div>
-                : <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {mockRows.map(tr => (
-                      <div key={tr.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                : <div className="risk-detail-rows">
+                    {mockRows.map(tr => {
+                      const progressTone = tr.progressPct >= 80 ? 'success' : tr.progressPct >= 40 ? 'primary' : 'accent';
+                      return (
+                      <div key={tr.id} className="risk-detail-row-treatment">
+                        <div className="risk-detail-row-head">
+                          <div className="risk-detail-row-head__group">
                             <Badge tone={tr.type === 'AVOID' ? 'danger' : tr.type === 'TRANSFER' ? 'accent' : tr.type === 'ACCEPT' ? 'warning' : 'primary'}>{tr.type}</Badge>
-                            <span style={{ fontSize: 13, fontWeight: 600 }}>{tr.action}</span>
+                            <span className="risk-detail-cell-title--bold">{tr.action}</span>
                           </div>
                           <Badge tone={tr.status === 'IMPLEMENTED' ? 'success' : tr.status === 'IN_PROGRESS' ? 'info' : tr.status === 'CANCELLED' ? 'neutral' : 'warning'}>{tr.status.replace(/_/g, ' ')}</Badge>
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 12 }}>
-                          <span>Owner: <strong style={{ color: 'var(--ink-2)' }}>{tr.owner}</strong></span>
+                        <div className="risk-detail-row-meta">
+                          <span>Owner: <strong className="risk-detail-row-meta-strong">{tr.owner}</strong></span>
                           <span>Due: <span className="mono">{tr.dueDate}</span></span>
                         </div>
-                        <div style={{ marginTop: 6, height: 6, background: 'var(--surface-3)', borderRadius: 'var(--r-pill)', overflow: 'hidden' }}>
-                          <div style={{ width: `${tr.progressPct}%`, height: '100%', background: tr.progressPct >= 80 ? 'var(--success)' : tr.progressPct >= 40 ? 'var(--primary)' : 'var(--accent)' }} />
+                        <div className="risk-detail-progress">
+                          <div className="risk-detail-progress__fill" data-tone={progressTone} style={{ width: `${tr.progressPct}%` }} />
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
             }
           </Card>
@@ -425,15 +435,15 @@ export function RiskDetailPage() {
           action={<Badge tone="primary">{(RISK_KRIS_BY_ID[risk.id] ?? []).length}</Badge>}>
           {(RISK_KRIS_BY_ID[risk.id] ?? []).length === 0
             ? <EmptyState Icon={Activity} title="No KRIs linked" sub={t('detailKrisHint')} />
-            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+            : <div className="risk-detail-rows">
                 {(RISK_KRIS_BY_ID[risk.id] ?? []).map(k => (
-                  <div key={k.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 100px 80px', gap: 12, padding: '10px 0', borderBottom: '1px dashed var(--border)', alignItems: 'center' }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{k.code}</span>
+                  <div key={k.id} className="risk-detail-row-kri">
+                    <span className="mono risk-detail-cell-id">{k.code}</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{k.nameEn}</div>
-                      <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>Green ≤ {k.greenMax} · Amber ≤ {k.amberMax} {k.unit}</div>
+                      <div className="risk-detail-cell-kri-name">{k.nameEn}</div>
+                      <div className="risk-detail-cell-kri-thresh">Green ≤ {k.greenMax} · Amber ≤ {k.amberMax} {k.unit}</div>
                     </div>
-                    <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-1)' }}>{k.current} <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 400 }}>{k.unit}</span></span>
+                    <span className="mono risk-detail-cell-kri-current">{k.current} <span className="risk-detail-cell-kri-unit">{k.unit}</span></span>
                     <Badge tone={k.band === 'RED' ? 'danger' : k.band === 'AMBER' ? 'warning' : k.band === 'GREEN' ? 'success' : 'neutral'} dot>{k.band}</Badge>
                   </div>
                 ))}
@@ -446,13 +456,13 @@ export function RiskDetailPage() {
           action={<Badge tone="primary">{(RISK_LINKS_BY_ID[risk.id] ?? []).length}</Badge>}>
           {(RISK_LINKS_BY_ID[risk.id] ?? []).length === 0
             ? <EmptyState Icon={Link2} title="No links" sub={t('detailLinksHint')} />
-            : <div style={{ display: 'flex', flexDirection: 'column' }}>
+            : <div className="risk-detail-rows">
                 {(RISK_LINKS_BY_ID[risk.id] ?? []).map(lk => (
-                  <Link key={lk.id} to={lk.href} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px dashed var(--border)', textDecoration: 'none', color: 'inherit' }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <Link key={lk.id} to={lk.href} className="risk-detail-row-link">
+                    <div className="risk-detail-link-group">
                       <Badge tone="info">{lk.type}</Badge>
-                      <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{lk.ref}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>{lk.title}</span>
+                      <span className="mono risk-detail-cell-id">{lk.ref}</span>
+                      <span className="risk-detail-cell-title--bold">{lk.title}</span>
                     </div>
                     {lk.status && <Badge tone={lk.status === 'IMPLEMENTED' ? 'success' : lk.status === 'AMBER' ? 'warning' : lk.status === 'RED' ? 'danger' : 'neutral'}>{lk.status}</Badge>}
                   </Link>
@@ -462,7 +472,7 @@ export function RiskDetailPage() {
       )}
 
       {tab === 'history' && (
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className="risk-detail-history-stack">
           {/* Real audit log + F8 rule runs — same reusable cards as
            *  /workflows/submissions/:id and /bcm/aars/:id (PR #29).
            *  Renders silently when there are no rows so a fresh risk
@@ -477,14 +487,14 @@ export function RiskDetailPage() {
             action={<Badge tone="primary">{(RISK_HISTORY_BY_ID[risk.id] ?? []).length}</Badge>}>
             {(RISK_HISTORY_BY_ID[risk.id] ?? []).length === 0
               ? <EmptyState Icon={MessageSquare} title="No history yet" sub={t('detailHistoryHint')} />
-              : <div style={{ display: 'flex', flexDirection: 'column' }}>
+              : <div className="risk-detail-rows">
                   {(RISK_HISTORY_BY_ID[risk.id] ?? []).map(h => (
-                    <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '160px 100px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
-                      <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.at.replace('T', ' ').slice(0, 16)}</span>
+                    <div key={h.id} className="risk-detail-row-history">
+                      <span className="mono risk-detail-cell-id">{h.at.replace('T', ' ').slice(0, 16)}</span>
                       <Badge tone={h.type === 'CREATED' ? 'primary' : h.type === 'STATUS_CHANGE' ? 'info' : h.type === 'SCORE_CHANGE' ? 'accent' : h.type === 'TREATMENT_ADDED' ? 'success' : h.type === 'REVIEW' ? 'warning' : 'neutral'}>{h.type.replace(/_/g, ' ')}</Badge>
                       <div>
-                        <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{h.message}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {h.actor}</div>
+                        <div className="risk-detail-history-msg">{h.message}</div>
+                        <div className="risk-detail-history-actor">by {h.actor}</div>
                       </div>
                     </div>
                   ))}
@@ -509,30 +519,26 @@ export function RiskDetailPage() {
 }
 
 function Field({ label, value, bold, mono, multiline }: { label: string; value: string; bold?: boolean; mono?: boolean; multiline?: boolean }) {
-  return <div style={{ marginBottom: 8 }}>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-    <div style={{
-      fontSize: 13,
-      color: 'var(--ink-1)',
-      fontWeight: bold ? 600 : 500,
-      fontFamily: mono ? 'var(--font-mono)' : undefined,
-      whiteSpace: multiline ? 'pre-wrap' : 'normal',
-      marginTop: 2,
-    }}>{value}</div>
+  const cls = ['risk-detail-field__value'];
+  cls.push(bold ? 'risk-detail-field__value--bold' : 'risk-detail-field__value--medium');
+  if (mono) cls.push('risk-detail-field__value--mono');
+  if (multiline) cls.push('risk-detail-field__value--multiline');
+  return <div className="risk-detail-field">
+    <div className="risk-detail-field__label">{label}</div>
+    <div className={cls.join(' ')}>{value}</div>
   </div>;
 }
 
 function ScoreTile({ label, score }: { label: string; score: number }) {
-  const tone = score >= 16 ? 'var(--risk-crit)' : score >= 12 ? 'var(--risk-vhigh)' : score >= 8 ? 'var(--risk-high)' : score >= 4 ? 'var(--risk-med)' : 'var(--risk-low)';
-  return <div className="kpi" style={{ padding: 12 }}>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</div>
-    <div style={{ display: 'inline-block', marginTop: 6, padding: '2px 12px', background: tone, color: '#fff', borderRadius: 'var(--r-pill)', fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 700 }}>{score}</div>
+  return <div className="kpi risk-detail-tile">
+    <div className="risk-detail-tile__label">{label}</div>
+    <div className={`risk-detail-tile__pill ${scoreToneClass(score)}`}>{score}</div>
   </div>;
 }
 
 function FieldTile({ label, value }: { label: string; value: string }) {
-  return <div className="kpi" style={{ padding: 12 }}>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</div>
-    <div style={{ marginTop: 6, fontSize: 18, fontWeight: 600, color: 'var(--ink-1)' }}>{value}</div>
+  return <div className="kpi risk-detail-tile">
+    <div className="risk-detail-tile__label">{label}</div>
+    <div className="risk-detail-tile__value">{value}</div>
   </div>;
 }
