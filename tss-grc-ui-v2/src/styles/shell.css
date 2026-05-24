@@ -269,3 +269,17 @@
  * highlights with the surface-2 tint without losing hover affordance. */
 .table-row--selected { background: var(--surface-2); }
 .table-row-clickable { cursor: pointer; }
+
+/* Inline margin utilities (RTL-safe: use logical properties). */
+.ms-xs { margin-inline-start: var(--sp-2); }
+.ms-sm { margin-inline-start: var(--sp-3); }
+.ms-md { margin-inline-start: var(--sp-4); }
+.ms-auto { margin-inline-start: auto; }
+.me-xs { margin-inline-end: var(--sp-2); }
+.me-sm { margin-inline-end: var(--sp-3); }
+.me-md { margin-inline-end: var(--sp-4); }
+
+/* Block margin utilities. */
+.mb-lg { margin-bottom: var(--sp-6); }
+.mb-xl { margin-bottom: var(--sp-7); }
+.mt-xl { margin-top: var(--sp-7); }

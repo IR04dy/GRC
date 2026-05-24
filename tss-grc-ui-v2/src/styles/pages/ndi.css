@@ -1,0 +1,461 @@
+/* TSS GRC Platform — NdiPage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-1).
+ * Every value resolves to a design token. RTL-safe.
+ */
+
+/* ─── Layout ─────────────────────────────────────────────────── */
+.ndi-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+/* ─── Inline cross-link banner (cycle deadlines → calendar) ─── */
+.ndi-calendar-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  margin-bottom: var(--sp-5);
+  background: var(--accent-50);
+  border: 1px solid var(--accent-300, var(--border));
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+}
+.ndi-calendar-banner__text { color: var(--ink-2); }
+.ndi-calendar-banner__link {
+  margin-inline-start: auto;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--accent-700);
+  text-decoration: none;
+}
+.ndi-calendar-banner__link:hover { text-decoration: underline; }
+
+/* ─── Tab strip (15-tab horizontal scroller) ────────────────── */
+.ndi-tab-strip {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.ndi-tab-btn {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--ink-1);
+}
+.ndi-tab-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* ─── Filter chip row ────────────────────────────────────────── */
+.ndi-filter-row {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.ndi-filter-btn {
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--ink-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.ndi-filter-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  color: var(--primary);
+}
+.ndi-filter-row__count {
+  margin-inline-start: auto;
+  align-self: center;
+}
+
+/* ─── Card descriptions / lead-ins ──────────────────────────── */
+.ndi-card-lede {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-5);
+  line-height: var(--leading-normal);
+}
+.ndi-card-lede--ink2 {
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+/* ─── Warning banner (placeholder framework, etc.) ──────────── */
+.ndi-warning-banner {
+  padding: var(--sp-5) var(--sp-6);
+  border-radius: var(--r-md);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border: 1px solid var(--warning);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-5);
+  align-items: center;
+}
+.ndi-warning-banner__body {
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* ─── Table cell helpers ─────────────────────────────────────── */
+.ndi-actions-cell {
+  text-align: end;
+}
+.ndi-actions-row {
+  display: inline-flex;
+  gap: var(--sp-3);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.ndi-actions-row--tight {
+  gap: var(--sp-2);
+}
+.ndi-cell-title {
+  font-weight: 600;
+}
+.ndi-cell-sub {
+  margin-top: 2px;
+}
+.ndi-cell-warn {
+  font-size: 10px;
+  color: var(--danger-fg);
+  margin-top: 2px;
+}
+.ndi-cell-warn--warning {
+  color: var(--warning);
+  margin-top: 2px;
+}
+
+/* ─── Header action group (inline-flex) ─────────────────────── */
+.ndi-actions-inline {
+  display: inline-flex;
+  gap: var(--sp-3);
+}
+.ndi-actions-inline--center {
+  display: inline-flex;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+/* ─── Cycle picker / form select inline (small) ─────────────── */
+.ndi-mini-select {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--text-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--ink-1);
+}
+.ndi-mini-select--w-220 { min-width: 220px; }
+.ndi-mini-select--w-140 { min-width: 140px; }
+.ndi-mini-select--w-130 { min-width: 130px; }
+.ndi-mini-select--w-110 { min-width: 110px; }
+
+/* ─── Plan / package selector chip-buttons ───────────────── */
+.ndi-plan-chip-row {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-5);
+}
+.ndi-plan-chip-row--no-mb {
+  margin-bottom: 0;
+}
+.ndi-plan-chip {
+  padding: var(--sp-3) var(--sp-5);
+  font-size: var(--text-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  cursor: pointer;
+}
+.ndi-plan-chip.is-active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ─── Inline status select (compact, inside table rows) ────── */
+.ndi-status-select {
+  padding: 2px var(--sp-3);
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--ink-1);
+}
+
+/* ─── Maturity level select (with colored leading border) ──── */
+.ndi-level-select {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-xs);
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--ink-1);
+}
+
+/* ─── Level / status badge buttons (compact toggles) ────────── */
+.ndi-level-btn {
+  padding: 2px var(--sp-3);
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ndi-level-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+/* ─── Inline progress bar (used by OPEX KPI + plan progress) ── */
+.ndi-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.ndi-progress-track {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 90px;
+}
+.ndi-progress-track--lg { width: 100px; }
+.ndi-progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.ndi-progress-label {
+  min-width: 80px;
+}
+.ndi-progress-label--sm { min-width: 40px; }
+
+/* ─── Domain rollup status pill row ─────────────────────────── */
+.ndi-status-strip {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.ndi-status-pill {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+/* ─── Border-left notice banners (preflight blockers / warnings) ── */
+.ndi-banner {
+  margin-top: var(--sp-5);
+  padding: var(--sp-5);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  border-radius: var(--r-sm);
+  color: var(--ink-1);
+}
+.ndi-banner--mt-sm { margin-top: var(--sp-4); }
+.ndi-banner--mt-md { margin-top: var(--sp-6); }
+.ndi-banner--danger {
+  background: var(--danger-bg, #fef2f2);
+  border-inline-start: 3px solid var(--danger);
+}
+.ndi-banner--warning {
+  background: var(--warning-bg, #fffbeb);
+  border-inline-start: 3px solid var(--warning);
+}
+.ndi-banner-list {
+  margin: var(--sp-3) 0 0;
+  padding-inline-start: 18px;
+}
+
+/* ─── Submission package — preflight ─────────────────────────── */
+.ndi-preflight-error {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-md);
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  border: 1px solid var(--danger);
+}
+.ndi-preflight-warning {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-md);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border: 1px solid var(--warning);
+}
+.ndi-preflight-list {
+  margin: var(--sp-3) 0 0;
+  padding-inline-start: 18px;
+}
+
+/* ─── Pre-formatted blocks (JSON dumps) ────────────────────── */
+.ndi-pre {
+  margin-top: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* ─── Stat & info chips ────────────────────────────────────── */
+.ndi-stat-chip {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: 2px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+}
+
+/* ─── Chip set for status / quick filters ──────────────────── */
+.ndi-chip-set {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-5);
+}
+.ndi-chip-set--row {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+  flex-wrap: wrap;
+}
+.ndi-chip {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--ink-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.ndi-chip.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+/* ─── Misc text helpers ──────────────────────────────────────── */
+.ndi-text-bold       { font-weight: 600; }
+.ndi-text-end        { text-align: end; }
+.ndi-text-meta-tiny  { font-size: 10px; color: var(--ink-3); }
+.ndi-text-danger     { color: var(--danger); }
+.ndi-text-rejected   { color: var(--danger); }
+.ndi-text-card-body  { font-size: var(--text-xs); color: var(--ink-2); line-height: 1.7; margin-top: var(--sp-5); }
+.ndi-text-card-body--mb { margin-bottom: var(--sp-4); }
+.ndi-text-card-body--mt-md { margin-top: var(--sp-5); }
+.ndi-text-card-hint {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: var(--sp-4);
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  line-height: 1.5;
+}
+.ndi-text-eyebrow-sm { font-size: var(--text-xs); color: var(--ink-2); margin-bottom: var(--sp-4); }
+
+/* Pre-blocks for audit log raw data */
+.ndi-pre-audit {
+  margin-top: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Audit row pre */
+.ndi-pre-block {
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* ─── Details/summary styling ────────────────────────────────── */
+.ndi-details-summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+/* ─── Truncated mono cell ────────────────────────────────────── */
+.ndi-trunc-mono {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Star/marker (inside level option button) ───────────────── */
+.ndi-marker { margin-inline-start: var(--sp-2); }
+
+/* ─── Misc widths used in table headers ─────────────────────── */
+.ndi-th-w-30  { width: 30px; }
+.ndi-th-w-50  { width: 50px; }
+.ndi-th-w-70  { width: 70px; }
+.ndi-th-w-130 { width: 130px; }
+.ndi-th-w-140 { width: 140px; }
+.ndi-th-w-180 { width: 180px; }
+.ndi-th-w-200 { width: 200px; }
+.ndi-th-w-220 { width: 220px; }
+
+/* ─── Expanded row container (sub-table inside gaps row) ───── */
+.ndi-expanded-cell {
+  background: var(--surface-2);
+  padding: 0;
+}
+.ndi-expanded-empty {
+  padding: var(--sp-5);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.ndi-expanded-table {
+  margin: 0;
+}
+
+/* ─── Footer note ───────────────────────────────────────────── */
+.ndi-footer-note {
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  margin-bottom: var(--sp-4);
+}

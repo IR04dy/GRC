@@ -1,0 +1,753 @@
+/* TSS GRC Platform — EsgPage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-1).
+ * Every value resolves to a design token. RTL-safe (uses logical properties).
+ */
+
+/* ─── Layout ─────────────────────────────────────────────────── */
+.esg-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+/* Top-of-page tab strip (14 tabs) */
+.esg-tab-strip {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.esg-tab-btn {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--ink-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.esg-tab-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* ─── KPI strip — overview ──────────────────────────────────── */
+.esg-kpi-strip { margin-bottom: var(--sp-6); }
+
+/* ─── Filter chip row (calculator, etc.) ───────────────────── */
+.esg-filter-row {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.esg-filter-row__count {
+  margin-inline-start: auto;
+  align-self: center;
+}
+
+/* Filter chip button (status, kind, etc.) */
+.esg-filter-btn {
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--ink-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.esg-filter-btn.is-active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+/* ─── Cell typography helpers ───────────────────────────────── */
+.esg-cell-title {
+  font-weight: 600;
+  color: var(--ink-1);
+  max-width: 360px;
+  line-height: 1.3;
+}
+.esg-cell-sub { margin-top: 2px; }
+.esg-cell-meta {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+/* ─── Inline actions group (table cell button cluster) ──────── */
+.esg-actions-row {
+  display: inline-flex;
+  gap: var(--sp-3);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.esg-actions-row--tight { gap: var(--sp-2); }
+.esg-actions-inline {
+  display: inline-flex;
+  gap: var(--sp-3);
+}
+.esg-actions-inline--center {
+  display: inline-flex;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+/* ─── Text helpers ──────────────────────────────────────────── */
+.esg-text-end    { text-align: end; }
+.esg-text-center { text-align: center; }
+.esg-text-strong { font-weight: 600; }
+.esg-text-bold   { font-weight: 700; }
+.esg-text-card-body {
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.esg-text-card-body--ink3 {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  line-height: 1.6;
+}
+.esg-text-eyebrow {
+  text-transform: uppercase;
+}
+
+.esg-text-eyebrow-sm {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-4);
+  line-height: 1.5;
+}
+.esg-text-footnote {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ─── Cost / hourglass inline-flex chips (climate row) ────── */
+.esg-cost-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-2);
+}
+.esg-time-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-3);
+}
+.esg-time-chip--offset { margin-inline-start: var(--sp-4); }
+
+/* Inline evidence link with paperclip icon */
+.esg-evidence-link {
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* ─── Overdue / due-soon date text ──────────────────────────── */
+.esg-date-overdue { color: var(--danger-fg); }
+.esg-date-due-soon { color: var(--warning-fg); }
+.esg-date-sub-overdue { color: var(--danger-fg); font-size: var(--text-2xs); }
+.esg-date-sub-due-soon { color: var(--warning-fg); font-size: var(--text-2xs); }
+.esg-date-sub-default { color: var(--ink-3); font-size: var(--text-2xs); }
+
+/* ─── Mini-select / form select inline (header actions) ──── */
+.esg-mini-select {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--text-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--ink-1);
+}
+.esg-mini-select--w-240 { min-width: 240px; }
+.esg-mini-select--w-220 { min-width: 220px; }
+.esg-mini-select--w-160 { min-width: 160px; }
+.esg-mini-select--w-140 { min-width: 140px; }
+
+/* ─── Inline progress bar ──────────────────────────────────── */
+.esg-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.esg-progress-track {
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  flex: 1;
+}
+.esg-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.esg-progress-label {
+  min-width: 50px;
+}
+.esg-progress-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+/* ─── Dashboard score / hero ───────────────────────────────── */
+.esg-score-hero {
+  display: flex;
+  gap: var(--sp-6);
+  align-items: center;
+}
+.esg-score-hero__main { flex: 1; }
+.esg-score-hero__hint {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: var(--sp-4);
+  line-height: 1.5;
+}
+.esg-score-hero__details {
+  margin-top: var(--sp-4);
+  font-size: 11px;
+}
+.esg-score-hero__details summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.esg-score-hero__table {
+  width: 100%;
+  margin-top: var(--sp-3);
+  font-size: 11px;
+}
+.esg-score-hero__table td:first-child {
+  color: var(--ink-3);
+  padding: 2px 0;
+}
+.esg-score-hero__big {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--ink-1);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+/* Smaller widget headline (sub-score cards) */
+.esg-widget-headline {
+  font-size: 24px;
+  font-weight: 800;
+}
+.esg-widget-headline--mb { margin-bottom: 4px; }
+.esg-widget-sub {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-bottom: var(--sp-4);
+}
+.esg-widget-sub-inline {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-weight: 400;
+}
+.esg-bar-h8 {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  margin-bottom: var(--sp-4);
+  overflow: hidden;
+}
+.esg-bar-fill-h8 {
+  height: 100%;
+  border-radius: 4px;
+}
+.esg-tile-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+  font-size: 11px;
+}
+.esg-tile-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+  font-size: 10px;
+}
+.esg-tile {
+  padding: var(--sp-4);
+  border-radius: var(--r-sm);
+  text-align: center;
+}
+.esg-tile--success { background: var(--success-bg); }
+.esg-tile--warning { background: var(--warning-bg); }
+.esg-tile--danger  { background: var(--danger-bg); }
+.esg-tile--info    { background: var(--info-bg); }
+.esg-tile--surface { background: var(--surface-2); }
+.esg-tile__value-lg {
+  font-weight: 700;
+  font-size: 16px;
+}
+.esg-tile__value-md {
+  font-weight: 700;
+  font-size: 13px;
+}
+.esg-tile__label {
+  color: var(--ink-3);
+}
+.esg-tile__label-tiny {
+  color: var(--ink-3);
+  font-size: 9px;
+  margin-top: 2px;
+}
+.esg-tile__value-success { color: var(--success-fg); }
+.esg-tile__value-warning { color: var(--warning-fg); }
+.esg-tile__value-danger  { color: var(--danger-fg); }
+.esg-score-hero__unit {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-top: var(--sp-2);
+}
+.esg-score-hero__yoy {
+  margin-top: var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--text-xs);
+}
+.esg-score-hero__yoy-positive { color: var(--success-fg); }
+.esg-score-hero__yoy-negative { color: var(--danger-fg); }
+.esg-score-hero__yoy-flat { color: var(--ink-3); }
+.esg-score-hero__alert {
+  margin-top: var(--sp-4);
+  font-size: 11px;
+  color: var(--warning-fg);
+}
+
+/* ─── Top-gaps list ─────────────────────────────────────────── */
+.esg-gaps-list {
+  margin: 0;
+  padding-inline-start: 18px;
+  font-size: var(--text-xs);
+  color: var(--ink-1);
+  line-height: 1.8;
+}
+.esg-gaps-list li { margin-bottom: var(--sp-3); }
+.esg-gaps-bullet--danger  { color: var(--danger-fg); }
+.esg-gaps-bullet--warning { color: var(--warning-fg); }
+
+.esg-icon-inline {
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-end: var(--sp-3);
+}
+.esg-icon-trailing {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ─── Status banner (success rule-met) ──────────────────────── */
+.esg-status-banner-success {
+  padding: var(--sp-5);
+  font-size: var(--text-xs);
+  color: var(--success-fg);
+  line-height: 1.5;
+}
+
+/* ─── Grids (TCFD/CMA pillars side-by-side, etc.) ─────────── */
+.esg-grid-2col {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.5fr);
+  gap: var(--sp-6);
+}
+.esg-grid-auto-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-6);
+}
+
+/* ─── Critical / warning hero banner (dashboard) ──────────── */
+.esg-hero-banner {
+  padding: var(--sp-5) var(--sp-6);
+  border-radius: var(--r-md);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-5);
+  align-items: center;
+}
+.esg-hero-banner--danger {
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  border: 1px solid var(--danger);
+}
+.esg-hero-banner--warning {
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border: 1px solid var(--warning);
+}
+.esg-hero-banner__body { line-height: 1.5; }
+.esg-hero-banner__title { font-weight: 700; font-size: var(--text-sm); }
+.esg-hero-banner__sub { font-size: var(--text-xs); margin-top: 2px; }
+
+/* ─── Banner notes (regulator hint, success rule-met) ──────── */
+.esg-banner {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.esg-banner--info {
+  background: var(--info-bg);
+  color: var(--info-fg);
+  border: 1px solid var(--info-border);
+}
+.esg-banner--info-block { font-weight: 700; font-size: var(--text-sm); }
+.esg-banner__body { line-height: 1.5; margin-top: 2px; }
+
+/* ─── KPI tone cards (Saudi grid / IPCC fuel / DEFRA travel) ── */
+.esg-kpi-card {
+  padding: var(--sp-5) var(--sp-6);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.esg-kpi-card__lede { font-size: 11px; color: var(--ink-3); }
+.esg-kpi-card__value { font-weight: 700; font-size: var(--text-md); color: var(--ink-1); }
+
+/* ─── Score rings / charts spacing inside cards ────────────── */
+.esg-card-flex {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+.esg-card-flex--row {
+  display: flex;
+  flex-direction: row;
+  gap: var(--sp-5);
+  align-items: center;
+}
+.esg-card-center {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  align-items: center;
+}
+
+/* ─── Survey page stats / form ─────────────────────────── */
+.esg-survey-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+.esg-survey-row-id {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.esg-survey-checkbox {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.esg-survey-input-90 { width: 90px; }
+.esg-survey-input-60 { width: 60px; }
+
+/* Stat tile (Survey + GHG) */
+.esg-stat-tile {
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.esg-stat-tile__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.esg-stat-tile__value {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.esg-stat-row {
+  display: flex;
+  flex-direction: column;
+}
+.esg-stat-row__label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Settings page sections ─────────────────────────── */
+.esg-settings-section { margin-bottom: 20px; }
+.esg-settings-section--last { margin-bottom: 4px; }
+.esg-settings-section__title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: var(--sp-4);
+}
+.esg-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-5);
+}
+
+/* Settings field label */
+.esg-field-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ink-1);
+}
+.esg-field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.esg-field-hint {
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+/* Setting card / box */
+.esg-setting-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* ─── SGI commitment card ────────────────────────────── */
+.esg-sgi-card {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.esg-sgi-card--achieved { background: var(--success-bg); }
+.esg-sgi-card--retired  { background: var(--surface-2); }
+.esg-sgi-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-3);
+  flex-wrap: wrap;
+}
+.esg-sgi-card__title { font-size: var(--text-sm); font-weight: 600; }
+.esg-sgi-card__meta {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.esg-sgi-card__actions {
+  display: inline-flex;
+  gap: var(--sp-3);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.esg-sgi-card__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+}
+.esg-sgi-card__progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.esg-sgi-card__progress-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+.esg-sgi-card__progress-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  min-width: 60px;
+  text-align: end;
+}
+.esg-sgi-card__values {
+  display: flex;
+  gap: var(--sp-5);
+  margin-top: var(--sp-4);
+  font-size: 11px;
+  color: var(--ink-3);
+  flex-wrap: wrap;
+}
+.esg-sgi-card__notes {
+  margin-top: var(--sp-4);
+  font-size: 11px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+}
+.esg-sgi-card__milestone {
+  margin-top: var(--sp-3);
+  font-size: 11px;
+  color: var(--info-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.esg-sgi-card__retired {
+  margin-top: var(--sp-4);
+  font-size: 11px;
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+/* ─── Calculator form grid ─────────────────────────────── */
+.esg-calc-form {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 2fr auto;
+  gap: var(--sp-4);
+  align-items: end;
+}
+.esg-calc-preview {
+  margin-top: var(--sp-5);
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+}
+.esg-calc-preview__meta {
+  color: var(--ink-3);
+  margin-bottom: 4px;
+}
+.esg-calc-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.esg-calc-row-mono { font-size: 11px; }
+.esg-calc-row-note { font-size: 11px; color: var(--ink-3); }
+.esg-calc-tbl { width: 100%; }
+
+/* ─── CMA / TCFD article groupings ────────────────────────── */
+.esg-cma-article { margin-bottom: 18px; }
+.esg-cma-pillar  { margin-bottom: 18px; }
+.esg-cma-pillar__title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin-bottom: var(--sp-4);
+  color: var(--primary);
+}
+.esg-disclosure-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px dashed var(--border);
+}
+.esg-disclosure-row__main { flex: 1; min-width: 0; }
+.esg-disclosure-row__head {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.esg-disclosure-row__code {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.esg-disclosure-row__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.esg-disclosure-row__desc {
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.esg-disclosure-row__evidence {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.esg-disclosure-row__gap {
+  margin-top: var(--sp-3);
+  font-size: 11px;
+  color: var(--warning-fg);
+  line-height: 1.5;
+}
+.esg-disclosure-row__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  align-items: flex-end;
+  min-width: 220px;
+}
+.esg-disclosure-row__btn-row {
+  display: inline-flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ─── Annex readiness gauge (semi-circle SVG) ────────── */
+.esg-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--sp-5) 0;
+}
+.esg-gauge-svg {
+  width: 100%;
+  max-width: 200px;
+}
+.esg-gauge-sub {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: -8px;
+  text-align: center;
+}
+
+/* ─── Verification ring (svg + center text) ────────────── */
+.esg-verify-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+.esg-verify-ring__svg { transform: rotate(-90deg); }
+.esg-verify-ring__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.esg-verify-ring__value { font-size: 18px; font-weight: 800; }
+.esg-verify-ring__label { font-size: 9px; color: var(--ink-3); }
+
+/* ─── Misc helpers ────────────────────────────────────────── */
+.esg-flex-shrink-0 { flex-shrink: 0; }
+.esg-line { line-height: 1.5; }
+.esg-line-bold { font-weight: 700; font-size: var(--text-sm); }
+.esg-line-sub  { font-size: var(--text-xs); margin-top: 2px; }
+.esg-th-center { text-align: center; }
+.esg-th-end    { text-align: end; }

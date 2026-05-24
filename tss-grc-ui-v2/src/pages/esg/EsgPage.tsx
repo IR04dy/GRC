@@ -107,6 +107,7 @@ import {
 } from '../../lib/esg';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
+import '../../styles/pages/esg.css';
 
 type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'materiality' | 'metrics' | 'evidence' | 'sgi' | 'ghg' | 'climate' | 'survey' | 'settings';
 
@@ -165,7 +166,7 @@ export function EsgPage() {
         actions={<Button variant="primary" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>}
       />
 
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+      <div className="kpi-grid esg-kpi-strip">
         <Kpi Icon={Leaf}          label={t('esgKpiTotal')}     value={`${(stats.totalEmissions / 1000).toFixed(1)}k`} tone="primary" />
         <Kpi Icon={TrendingDown}   label={t('esgKpiYoY')}        value={`${stats.yoyTotal.toFixed(1)}%`} tone={stats.yoyTotal < 0 ? 'success' : 'danger'} />
         <Kpi Icon={Leaf}            label={t('esgKpiScope1')}     value={`${(stats.scope1 / 1000).toFixed(1)}k`} tone="success" />
@@ -177,7 +178,7 @@ export function EsgPage() {
       </div>
 
       {/* Tab strip */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="esg-tab-strip">
         {([
           { id: 'overview',   labelKey: 'esgTabOverview',  Icon: Leaf },
           { id: 'annex',      labelKey: 'esgTabAnnex',     Icon: FileText },
@@ -195,12 +196,7 @@ export function EsgPage() {
           { id: 'settings',   labelKey: 'esgTabSettings',  Icon: Wrench },
         ] as { id: EsgTab; labelKey: string; Icon: typeof Leaf }[]).map(tabDef => (
           <button key={tabDef.id} onClick={() => setTab(tabDef.id)}
-            style={{
-              padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600,
-              border: `1px solid ${tab === tabDef.id ? 'var(--primary)' : 'var(--border)'}`,
-              background: tab === tabDef.id ? 'var(--primary-50)' : 'var(--surface-1)',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
+            className={`esg-tab-btn${tab === tabDef.id ? ' is-active' : ''}`}>
             <tabDef.Icon size={13} />
             {t(tabDef.labelKey)}
           </button>
@@ -348,7 +344,7 @@ function ClimateTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* KPI strip — risks vs opportunities + Rule-8 alert chip */}
       <div className="kpi-grid">
         <Kpi Icon={CloudLightning} label={t('cliKpiRisks')}    value={risks.length}         tone="warning" />
@@ -372,9 +368,9 @@ function ClimateTab() {
                     <th>{t('cliColKind')}</th>
                     <th>{t('cliColCategory')}</th>
                     <th>{t('cliColHorizon')}</th>
-                    <th style={{ textAlign: 'center' }}>{t('cliColScore')}</th>
+                    <th className="esg-th-center">{t('cliColScore')}</th>
                     <th>{t('cliColStatus')}</th>
-                    <th style={{ textAlign: 'end' }}>{t('cliColActions')}</th>
+                    <th className="esg-text-end">{t('cliColActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -385,20 +381,20 @@ function ClimateTab() {
                       <tr key={it.id}>
                         <td className="mono">{it.itemCode ?? `#${it.id}`}</td>
                         <td>
-                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                          <div className="esg-cell-title">
                             {isAr && it.titleAr ? it.titleAr : it.titleEn}
                           </div>
-                          {it.ownerName && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{it.ownerName}</div>}
+                          {it.ownerName && <div className="text-2xs text-muted esg-cell-sub">{it.ownerName}</div>}
                         </td>
                         <td><Badge tone={it.kind === 'RISK' ? 'danger' : 'success'}>{isAr ? (it.kind === 'RISK' ? 'مخاطرة' : 'فرصة') : it.kind}</Badge></td>
                         <td className="text-xs">{it.category}</td>
                         <td><Badge tone="neutral">{it.timeHorizon}</Badge></td>
-                        <td style={{ textAlign: 'center' }}>
+                        <td className="esg-text-center">
                           <Badge tone={tone}>{it.riskScore} · {band}</Badge>
                         </td>
                         <td><Badge tone={it.status === 'CLOSED' ? 'success' : it.status === 'RETIRED' ? 'neutral' : it.status === 'TREATED' ? 'info' : 'warning'}>{it.status}</Badge></td>
-                        <td style={{ textAlign: 'end' }}>
-                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <td className="esg-text-end">
+                          <div className="esg-actions-row">
                             {/* Rule 8: offer ERM link inline when score >= 15 and not yet linked */}
                             {shouldOfferErmLink(it) && (
                               <Button variant="primary" size="sm" Icon={Link2}
@@ -538,7 +534,7 @@ function CapaTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* KPI strip — live status counts + overdue alarm */}
       <div className="kpi-grid">
         <Kpi Icon={Wrench}        label={isAr ? 'مفتوحة' : 'Open'}          value={agg?.open ?? 0}        tone="warning" />
@@ -552,20 +548,14 @@ function CapaTab() {
       <Card title={isAr ? 'سجلّ الإجراءات التصحيحية للاستدامة' : 'Sustainability Corrective Actions'}
             Icon={Wrench}>
         {/* Status filter chips */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div className="esg-filter-row">
           {(['ALL', 'OPEN', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED', 'CLOSED', 'CANCELLED'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              style={{
-                padding: '4px 10px', fontSize: 11, fontWeight: 600,
-                border: `1px solid ${statusFilter === s ? 'var(--primary)' : 'var(--border)'}`,
-                background: statusFilter === s ? 'var(--primary-50)' : 'var(--surface-1)',
-                color: statusFilter === s ? 'var(--primary)' : 'var(--ink-2)',
-                borderRadius: 'var(--r-sm)', cursor: 'pointer',
-              }}>
+              className={`esg-filter-btn${statusFilter === s ? ' is-active' : ''}`}>
               {s === 'ALL' ? (isAr ? 'الكل' : 'All') : capaStatusLabel(s as CapaStatus, isAr ? 'ar' : 'en')}
             </button>
           ))}
-          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+          <span className="text-2xs text-muted esg-filter-row__count">
             {filtered.length} / {items.length}
           </span>
         </div>
@@ -575,7 +565,7 @@ function CapaTab() {
           : filtered.length === 0
             ? (
               <InlineEmpty>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                <div className="esg-card-center">
                   <span>{statusFilter === 'ALL'
                     ? (isAr ? 'لا توجد إجراءات تصحيحية بعد' : 'No corrective actions yet')
                     : (isAr ? 'لا توجد إجراءات بهذه الحالة' : 'No actions match this filter')}</span>
@@ -599,7 +589,7 @@ function CapaTab() {
                     <th>{isAr ? 'تاريخ الاستحقاق' : 'Due'}</th>
                     <th>{isAr ? 'الكلفة · المجهود' : 'Cost · Effort'}</th>
                     <th>{isAr ? 'المالك' : 'Owner'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    <th className="esg-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -616,13 +606,12 @@ function CapaTab() {
                       <tr key={a.id}>
                         <td className="mono text-2xs">{a.actionCode ?? `#${a.id}`}</td>
                         <td>
-                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                          <div className="esg-cell-title">
                             {isAr && a.titleAr ? a.titleAr : a.titleEn}
                           </div>
                           {a.evidenceRef && (
-                            <div className="text-2xs text-muted"
-                              style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <Paperclip size={11} style={{ flexShrink: 0 }} />
+                            <div className="text-2xs text-muted esg-evidence-link">
+                              <Paperclip size={11} className="esg-flex-shrink-0" />
                               <span>{isAr ? 'الدليل:' : 'Evidence:'}</span>
                               <span className="mono">{a.evidenceRef}</span>
                             </div>
@@ -631,17 +620,17 @@ function CapaTab() {
                         <td>
                           <Badge tone="neutral">{capaSourceLabel(a.sourceType, isAr ? 'ar' : 'en')}</Badge>
                           {a.sourceRef && (
-                            <div className="mono text-2xs text-muted" style={{ marginTop: 2 }}>{a.sourceRef}</div>
+                            <div className="mono text-2xs text-muted esg-cell-sub">{a.sourceRef}</div>
                           )}
                         </td>
                         <td><Badge tone={capaPriorityTone(a.priority)}>{capaPriorityLabel(a.priority, isAr ? 'ar' : 'en')}</Badge></td>
                         <td><Badge tone={capaStatusTone(a.status)}>{capaStatusLabel(a.status, isAr ? 'ar' : 'en')}</Badge></td>
                         <td className="mono text-2xs">
-                          <div style={{ color: overdue ? 'var(--danger-fg)' : dueSoon ? 'var(--warning-fg)' : undefined }}>
+                          <div className={overdue ? 'esg-date-overdue' : dueSoon ? 'esg-date-due-soon' : ''}>
                             {a.targetDate ?? '—'}
                           </div>
                           {dr !== null && a.status !== 'CLOSED' && a.status !== 'CANCELLED' && (
-                            <div className="text-2xs" style={{ color: overdue ? 'var(--danger-fg)' : dueSoon ? 'var(--warning-fg)' : 'var(--ink-3)' }}>
+                            <div className={overdue ? 'esg-date-sub-overdue' : dueSoon ? 'esg-date-sub-due-soon' : 'esg-date-sub-default'}>
                               {overdue
                                 ? (isAr ? `متأخّر ${Math.abs(dr)} يوماً` : `${Math.abs(dr)}d overdue`)
                                 : (isAr ? `${dr} يوماً متبقّياً` : `${dr}d left`)}
@@ -650,23 +639,23 @@ function CapaTab() {
                         </td>
                         <td className="text-2xs">
                           {showCost && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--ink-2)' }}
+                            <div className="esg-cost-chip"
                                  title={formatSarFull(a.costEstimateSar!, isAr ? 'ar' : 'en')}>
-                              <Coins size={11} style={{ flexShrink: 0 }} />
+                              <Coins size={11} className="esg-flex-shrink-0" />
                               <span className="mono">{formatSarCompact(a.costEstimateSar!, isAr ? 'ar' : 'en')}</span>
                             </div>
                           )}
                           {showEffort && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--ink-3)', marginInlineStart: showCost ? 8 : 0 }}>
-                              <Hourglass size={11} style={{ flexShrink: 0 }} />
+                            <div className={`esg-time-chip${showCost ? ' esg-time-chip--offset' : ''}`}>
+                              <Hourglass size={11} className="esg-flex-shrink-0" />
                               <span className="mono">{a.effortHours}{isAr ? ' س' : 'h'}</span>
                             </div>
                           )}
                           {!showCost && !showEffort && <span className="text-muted">—</span>}
                         </td>
                         <td className="text-xs">{a.ownerName ?? '—'}</td>
-                        <td style={{ textAlign: 'end' }}>
-                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <td className="esg-text-end">
+                          <div className="esg-actions-row">
                             {allowed.includes('IN_PROGRESS') && (
                               <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onStart(a.id!)}>
                                 {isAr ? 'بدء' : 'Start'}
@@ -780,24 +769,18 @@ function OverviewTab() {
     : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* Rule 14 — Low ESG-readiness banner */}
       {bannerTone && (
-        <div style={{
-          padding: '12px 16px', borderRadius: 'var(--r-md)',
-          background: bannerTone === 'danger' ? 'var(--danger-bg)' : 'var(--warning-bg)',
-          color:      bannerTone === 'danger' ? 'var(--danger-fg)' : 'var(--warning-fg)',
-          border: `1px solid ${bannerTone === 'danger' ? 'var(--danger)' : 'var(--warning)'}`,
-          display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'center',
-        }}>
+        <div className={`esg-hero-banner ${bannerTone === 'danger' ? 'esg-hero-banner--danger' : 'esg-hero-banner--warning'}`}>
           <AlertCircle size={20} />
-          <div style={{ lineHeight: 1.5 }}>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>
+          <div className="esg-hero-banner__body">
+            <div className="esg-hero-banner__title">
               {bannerTone === 'danger'
                 ? (isAr ? 'تحذير حرج — جاهزية الاستدامة منخفضة جداً' : 'Critical — ESG readiness severely below threshold')
                 : (isAr ? 'تحذير — جاهزية الاستدامة تحت العتبة' : 'Warning — ESG readiness below threshold')}
             </div>
-            <div style={{ fontSize: 12, marginTop: 2 }}>
+            <div className="esg-hero-banner__sub">
               {isAr
                 ? `الدرجة الحالية ${score}/100 — العتبة المعدّة ${bannerTone === 'danger' ? critThr : warnThr}/100. راجع أبرز الثغرات أدناه.`
                 : `Current score ${score}/100 — configured threshold ${bannerTone === 'danger' ? critThr : warnThr}/100. Review top gaps below.`}
@@ -810,34 +793,34 @@ function OverviewTab() {
       )}
 
       {/* ── Row 1: Hero — ESG Overall Score + Top Gaps ────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.5fr)', gap: 16 }}>
+      <div className="esg-grid-2col">
         <EsgOverallScoreWidget data={data} isAr={isAr} />
         <TopGapsWidget data={data} isAr={isAr} />
       </div>
 
       {/* ── Row 2: GHG cluster ───────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+      <div className="esg-grid-auto-fit">
         <GhgTotalWidget data={data} isAr={isAr} />
         <ScopeBreakdownWidget data={data} isAr={isAr} />
         <VerificationStatusWidget data={data} isAr={isAr} />
       </div>
 
       {/* ── Row 3: Regulatory readiness ──────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+      <div className="esg-grid-auto-fit">
         <SgiProgressWidget data={data} isAr={isAr} />
         <CmaReadinessWidget data={data} isAr={isAr} />
         <TcfdAlignmentWidget data={data} isAr={isAr} />
       </div>
 
       {/* ── Row 4: Operational tracking ──────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+      <div className="esg-grid-auto-fit">
         <ClimateRiskWidget data={data} isAr={isAr} />
         <CapaTrackerWidget data={data} isAr={isAr} />
         <EvidenceCompletenessWidget data={data} isAr={isAr} />
       </div>
 
       {/* ── Row 5: Annex readiness + Materiality matrix ──────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.5fr)', gap: 16 }}>
+      <div className="esg-grid-2col">
         <AnnexReadinessWidget data={data} isAr={isAr} />
         <MaterialityMatrixWidget data={data} isAr={isAr} />
       </div>
@@ -864,32 +847,30 @@ function EsgOverallScoreWidget({ data, isAr }: { data: DashboardPayload; isAr: b
 
   return (
     <Card title={isAr ? 'مؤشّر الاستدامة الشامل' : 'ESG Overall Score'} Icon={Target}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+      <div className="esg-score-hero">
         <svg width={160} height={160} viewBox="0 0 160 160">
           <circle cx={80} cy={80} r={radius} stroke="var(--surface-2)" strokeWidth={stroke} fill="none" />
           <circle cx={80} cy={80} r={radius} stroke={color} strokeWidth={stroke} fill="none"
                   strokeDasharray={`${dash} ${circ}`} strokeDashoffset={0}
                   strokeLinecap="round" transform="rotate(-90 80 80)" />
-          <text x={80} y={78} textAnchor="middle" style={{ fontSize: 32, fontWeight: 800, fill: 'var(--ink-1)' }}>{score}</text>
-          <text x={80} y={100} textAnchor="middle" style={{ fontSize: 11, fill: 'var(--ink-3)' }}>/ 100</text>
+          <text x={80} y={78} textAnchor="middle" fontSize="32" fontWeight="800" fill="var(--ink-1)">{score}</text>
+          <text x={80} y={100} textAnchor="middle" fontSize="11" fill="var(--ink-3)">/ 100</text>
         </svg>
-        <div style={{ flex: 1 }}>
+        <div className="esg-score-hero__main">
           <Badge tone={esgBandTone(band)}>{esgBandLabel(band, isAr ? 'ar' : 'en')}</Badge>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.5 }}>
+          <div className="esg-score-hero__hint">
             {isAr
               ? 'مؤشّر مركّب موزون (التحقّق من الانبعاثات + التزامات SGI + إفصاحات CMA + TCFD + الإجراءات التصحيحية + الأدلة + المخاطر المناخية).'
               : 'Weighted composite (GHG verification + SGI on-track + CMA + TCFD + corrective actions + evidence + climate risks).'}
           </div>
-          <details style={{ marginTop: 8, fontSize: 11 }}>
-            <summary style={{ cursor: 'pointer', color: 'var(--ink-2)', fontWeight: 600 }}>
-              {isAr ? 'تفاصيل الحساب' : 'Score breakdown'}
-            </summary>
-            <table style={{ width: '100%', marginTop: 6, fontSize: 11 }}>
+          <details className="esg-score-hero__details">
+            <summary>{isAr ? 'تفاصيل الحساب' : 'Score breakdown'}</summary>
+            <table className="esg-score-hero__table">
               <tbody>
                 {Object.entries(data.overall.breakdown).map(([k, v]) => (
                   <tr key={k}>
-                    <td style={{ color: 'var(--ink-3)', padding: '2px 0' }}>{k}</td>
-                    <td className="mono" style={{ textAlign: 'end' }}>{Number(v).toFixed(1)}%</td>
+                    <td>{k}</td>
+                    <td className="mono esg-text-end">{Number(v).toFixed(1)}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -905,15 +886,15 @@ function TopGapsWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }
   return (
     <Card title={isAr ? 'أبرز الثغرات التنفيذية' : 'Top ESG gaps'} Icon={AlertCircle}>
       {data.topGaps.length === 0 ? (
-        <div style={{ padding: 12, fontSize: 12, color: 'var(--success-fg)', lineHeight: 1.5 }}>
-          <CheckCircle2 size={14} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 6 }} />
+        <div className="esg-status-banner-success">
+          <CheckCircle2 size={14} className="esg-icon-inline" />
           {isAr ? 'لا توجد ثغرات تنفيذية ظاهرة في الدورة الحالية.' : 'No executive-level gaps detected for the current cycle.'}
         </div>
       ) : (
-        <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.8 }}>
+        <ul className="esg-gaps-list">
           {data.topGaps.map(g => (
-            <li key={g} style={{ marginBottom: 6 }}>
-              <span style={{ color: g.includes('OVERDUE') || g.includes('SCOPE_3') || g.includes('RESILIENCE') ? 'var(--danger-fg)' : 'var(--warning-fg)' }}>●</span>
+            <li key={g}>
+              <span className={g.includes('OVERDUE') || g.includes('SCOPE_3') || g.includes('RESILIENCE') ? 'esg-gaps-bullet--danger' : 'esg-gaps-bullet--warning'}>●</span>
               {' '}
               {topGapLabel(g, isAr ? 'ar' : 'en')}
             </li>
@@ -929,19 +910,19 @@ function GhgTotalWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean 
   const yoy = Number(data.ghgYoy.totalYoY);
   return (
     <Card title={isAr ? 'إجمالي الانبعاثات' : 'GHG total emissions'} Icon={Leaf}>
-      <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--ink-1)', lineHeight: 1, letterSpacing: '-0.025em' }}>
+      <div className="esg-score-hero__big">
         {total.toLocaleString()}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>tCO2e — {data.ghg.year}</div>
-      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-        <span style={{ color: yoy < 0 ? 'var(--success-fg)' : yoy > 0 ? 'var(--danger-fg)' : 'var(--ink-3)' }}>
-          {yoy < 0 ? <TrendingDown size={14} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : <TrendingUp size={14} style={{ display: 'inline-block', verticalAlign: 'middle' }} />}
+      <div className="esg-score-hero__unit">tCO2e — {data.ghg.year}</div>
+      <div className="esg-score-hero__yoy">
+        <span className={yoy < 0 ? 'esg-score-hero__yoy-positive' : yoy > 0 ? 'esg-score-hero__yoy-negative' : 'esg-score-hero__yoy-flat'}>
+          {yoy < 0 ? <TrendingDown size={14} className="esg-icon-trailing" /> : <TrendingUp size={14} className="esg-icon-trailing" />}
           {' '}{yoy > 0 ? '+' : ''}{yoy.toFixed(1)}% {isAr ? 'مقارنة بـ' : 'vs'} {data.ghgYoy.year - 1}
         </span>
       </div>
       {data.ghg.scope3PartialFlag && (
-        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--warning-fg)' }}>
-          <AlertCircle size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+        <div className="esg-score-hero__alert">
+          <AlertCircle size={11} className="esg-icon-inline" />
           {isAr ? 'تغطية النطاق 3 جزئية' : 'Scope 3 partial coverage'} ({Number(data.ghg.scope3Coverage).toFixed(0)}%)
         </div>
       )}
@@ -961,19 +942,19 @@ function ScopeBreakdownWidget({ data, isAr }: { data: DashboardPayload; isAr: bo
   ];
   return (
     <Card title={isAr ? 'توزيع النطاقات' : 'Scope breakdown'} Icon={Leaf}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="stack-sm">
         {rows.map(r => {
           const pct = total > 0 ? (r.value / total) * 100 : 0;
           return (
             <div key={r.label}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-                <span style={{ fontWeight: 600 }}>{r.label}</span>
+              <div className="esg-progress-row">
+                <span className="esg-text-strong">{r.label}</span>
                 <span className="mono">{r.value.toLocaleString()} ({pct.toFixed(0)}%)</span>
               </div>
-              <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${pct}%`, background: r.color, borderRadius: 3 }} />
+              <div className="esg-progress-track">
+                <div className="esg-progress-fill" style={{ width: `${pct}%`, background: r.color }} />
               </div>
-              <div className="text-2xs" style={{ marginTop: 2, color: r.yoy < 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
+              <div className={`text-2xs ${r.yoy < 0 ? 'esg-score-hero__yoy-positive' : 'esg-score-hero__yoy-negative'}`} style={{ marginTop: 2 }}>
                 YoY {r.yoy > 0 ? '+' : ''}{r.yoy.toFixed(1)}%
               </div>
             </div>
@@ -989,20 +970,20 @@ function VerificationStatusWidget({ data, isAr }: { data: DashboardPayload; isAr
   const verifRate = Number(data.overall.breakdown.ghgVerification);
   return (
     <Card title={isAr ? 'حالة التحقّق' : 'Verification status'} Icon={CheckCircle2}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ position: 'relative', width: 100, height: 100 }}>
-          <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+      <div className="esg-score-hero">
+        <div className="esg-verify-ring">
+          <svg viewBox="0 0 100 100" className="esg-verify-ring__svg">
             <circle cx={50} cy={50} r={40} stroke="var(--surface-2)" strokeWidth={12} fill="none" />
             <circle cx={50} cy={50} r={40} stroke="var(--success)" strokeWidth={12} fill="none"
                     strokeDasharray={`${(verifRate / 100) * 2 * Math.PI * 40} ${2 * Math.PI * 40}`}
                     strokeLinecap="round" />
           </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>{verifRate.toFixed(0)}%</div>
-            <div style={{ fontSize: 9, color: 'var(--ink-3)' }}>{isAr ? 'مُتحقَّق' : 'verified'}</div>
+          <div className="esg-verify-ring__center">
+            <div className="esg-verify-ring__value">{verifRate.toFixed(0)}%</div>
+            <div className="esg-verify-ring__label">{isAr ? 'مُتحقَّق' : 'verified'}</div>
           </div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5, flex: 1 }}>
+        <div className="esg-score-hero__main esg-score-hero__hint">
           {isAr
             ? `${data.ghg.recordCount} سجل انبعاثات إجمالاً. التحقّق الخارجي يدعم الإفصاحات الرئيسية.`
             : `${data.ghg.recordCount} GHG records total. External verification underpins the headline disclosures.`}
@@ -1019,21 +1000,21 @@ function SgiProgressWidget({ data, isAr }: { data: DashboardPayload; isAr: boole
   const total = onTrack + atRisk + delayed;
   return (
     <Card title={isAr ? 'التزامات SGI' : 'SGI commitments'} Icon={Target}>
-      <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>
-        {onTrack}/{total} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-3)' }}>{isAr ? 'على المسار' : 'on track'}</span>
+      <div className="esg-widget-headline esg-widget-headline--mb">
+        {onTrack}/{total} <span className="esg-widget-sub-inline">{isAr ? 'على المسار' : 'on track'}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 12, fontSize: 11 }}>
-        <div style={{ padding: 8, background: 'var(--success-bg)', borderRadius: 'var(--r-sm)' }}>
-          <div style={{ color: 'var(--success-fg)', fontWeight: 700, fontSize: 16 }}>{onTrack}</div>
-          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'على المسار' : 'On track'}</div>
+      <div className="esg-tile-grid-3">
+        <div className="esg-tile esg-tile--success">
+          <div className="esg-tile__value-lg esg-tile__value-success">{onTrack}</div>
+          <div className="esg-tile__label">{isAr ? 'على المسار' : 'On track'}</div>
         </div>
-        <div style={{ padding: 8, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)' }}>
-          <div style={{ color: 'var(--warning-fg)', fontWeight: 700, fontSize: 16 }}>{atRisk}</div>
-          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'مُعرَّض' : 'At risk'}</div>
+        <div className="esg-tile esg-tile--warning">
+          <div className="esg-tile__value-lg esg-tile__value-warning">{atRisk}</div>
+          <div className="esg-tile__label">{isAr ? 'مُعرَّض' : 'At risk'}</div>
         </div>
-        <div style={{ padding: 8, background: 'var(--danger-bg)', borderRadius: 'var(--r-sm)' }}>
-          <div style={{ color: 'var(--danger-fg)', fontWeight: 700, fontSize: 16 }}>{delayed}</div>
-          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'متأخّر' : 'Delayed'}</div>
+        <div className="esg-tile esg-tile--danger">
+          <div className="esg-tile__value-lg esg-tile__value-danger">{delayed}</div>
+          <div className="esg-tile__label">{isAr ? 'متأخّر' : 'Delayed'}</div>
         </div>
       </div>
     </Card>
@@ -1047,16 +1028,17 @@ function CmaReadinessWidget({ data, isAr }: { data: DashboardPayload; isAr: bool
   const evidenceReq = data.cma.byStatus.EVIDENCE_REQUIRED ?? 0;
   return (
     <Card title={isAr ? 'جاهزية إفصاحات CMA' : 'CMA disclosure readiness'} Icon={FileText}>
-      <div style={{ fontSize: 24, fontWeight: 800 }}>{pct}%</div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+      <div className="esg-widget-headline">{pct}%</div>
+      <div className="esg-widget-sub">
         {disclosed}/{data.cma.applicable} {isAr ? 'مُفصَح' : 'disclosed'}
       </div>
-      <div style={{ height: 8, background: 'var(--surface-2)', borderRadius: 4, marginBottom: 8 }}>
-        <div style={{ height: '100%', width: `${pct}%`,
+      <div className="esg-bar-h8">
+        <div className="esg-bar-fill-h8" style={{
+          width: `${pct}%`,
           background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)',
-          borderRadius: 4 }} />
+        }} />
       </div>
-      <div style={{ display: 'flex', gap: 6, fontSize: 10, flexWrap: 'wrap' }}>
+      <div className="row-tight">
         <Badge tone="warning">{partial} {isAr ? 'جزئي' : 'Partial'}</Badge>
         {evidenceReq > 0 && <Badge tone="danger">{evidenceReq} {isAr ? 'يتطلّب دليلاً' : 'Evidence req.'}</Badge>}
       </div>
@@ -1068,18 +1050,18 @@ function TcfdAlignmentWidget({ data, isAr }: { data: DashboardPayload; isAr: boo
   const pct = data.tcfd.alignmentPct;
   return (
     <Card title={isAr ? 'محاذاة TCFD' : 'TCFD alignment'} Icon={FileText}>
-      <div style={{ fontSize: 24, fontWeight: 800 }}>{pct}%</div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+      <div className="esg-widget-headline">{pct}%</div>
+      <div className="esg-widget-sub">
         {data.tcfd.byStatus.DISCLOSED}/{data.tcfd.applicable} {isAr ? 'مُفصَح' : 'disclosed'}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, fontSize: 10, marginBottom: 8 }}>
+      <div className="esg-tile-grid-4" style={{ marginBottom: 8 }}>
         {(['GOVERNANCE', 'STRATEGY', 'RISK_MGMT', 'METRICS_TARGETS'] as const).map(p => {
           const total = data.tcfd.byPillar[p] ?? 0;
           const ok = data.tcfd.disclosedByPillar[p] ?? 0;
           return (
-            <div key={p} style={{ padding: 6, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
-              <div style={{ fontWeight: 700, fontSize: 12 }}>{ok}/{total}</div>
-              <div style={{ color: 'var(--ink-3)', fontSize: 9, marginTop: 2 }}>
+            <div key={p} className="esg-tile esg-tile--surface">
+              <div className="esg-tile__value-md">{ok}/{total}</div>
+              <div className="esg-tile__label-tiny">
                 {p === 'GOVERNANCE' ? (isAr ? 'حوكمة' : 'Gov')
                  : p === 'STRATEGY' ? (isAr ? 'استراتيجية' : 'Strat')
                  : p === 'RISK_MGMT' ? (isAr ? 'مخاطر' : 'Risk')
@@ -1090,8 +1072,8 @@ function TcfdAlignmentWidget({ data, isAr }: { data: DashboardPayload; isAr: boo
         })}
       </div>
       {data.tcfd.strategyResilienceGap && (
-        <div style={{ fontSize: 10, color: 'var(--warning-fg)' }}>
-          <AlertCircle size={10} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+        <div className="esg-text-footnote esg-date-due-soon">
+          <AlertCircle size={10} className="esg-icon-inline" />
           {isAr ? 'القاعدة 7: ثغرة في صمود الاستراتيجية' : 'Rule 7: Strategy resilience gap'}
         </div>
       )}
@@ -1127,24 +1109,24 @@ function ClimateRiskWidget({ isAr }: { data: DashboardPayload; isAr: boolean }) 
 function CapaTrackerWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
   return (
     <Card title={isAr ? 'الإجراءات التصحيحية' : 'Corrective actions'} Icon={Wrench}>
-      <div style={{ fontSize: 24, fontWeight: 800 }}>{data.capa.activeTotal}</div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>{isAr ? 'نشطة' : 'active'}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, fontSize: 10 }}>
-        <div style={{ padding: 6, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.capa.open}</div>
-          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'مفتوحة' : 'Open'}</div>
+      <div className="esg-widget-headline">{data.capa.activeTotal}</div>
+      <div className="esg-widget-sub">{isAr ? 'نشطة' : 'active'}</div>
+      <div className="esg-tile-grid-4">
+        <div className="esg-tile esg-tile--warning">
+          <div className="esg-tile__value-md">{data.capa.open}</div>
+          <div className="esg-tile__label">{isAr ? 'مفتوحة' : 'Open'}</div>
         </div>
-        <div style={{ padding: 6, background: 'var(--info-bg)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.capa.inProgress}</div>
-          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'تنفيذ' : 'WIP'}</div>
+        <div className="esg-tile esg-tile--info">
+          <div className="esg-tile__value-md">{data.capa.inProgress}</div>
+          <div className="esg-tile__label">{isAr ? 'تنفيذ' : 'WIP'}</div>
         </div>
-        <div style={{ padding: 6, background: 'var(--success-bg)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{data.capa.verified}</div>
-          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'مُتحقَّق' : 'Verified'}</div>
+        <div className="esg-tile esg-tile--success">
+          <div className="esg-tile__value-md">{data.capa.verified}</div>
+          <div className="esg-tile__label">{isAr ? 'مُتحقَّق' : 'Verified'}</div>
         </div>
-        <div style={{ padding: 6, background: data.capa.overdue > 0 ? 'var(--danger-bg)' : 'var(--surface-2)', borderRadius: 'var(--r-sm)', textAlign: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: data.capa.overdue > 0 ? 'var(--danger-fg)' : undefined }}>{data.capa.overdue}</div>
-          <div style={{ color: 'var(--ink-3)' }}>{isAr ? 'متأخّرة' : 'Overdue'}</div>
+        <div className={`esg-tile ${data.capa.overdue > 0 ? 'esg-tile--danger' : 'esg-tile--surface'}`}>
+          <div className={`esg-tile__value-md${data.capa.overdue > 0 ? ' esg-tile__value-danger' : ''}`}>{data.capa.overdue}</div>
+          <div className="esg-tile__label">{isAr ? 'متأخّرة' : 'Overdue'}</div>
         </div>
       </div>
     </Card>
@@ -1157,16 +1139,19 @@ function EvidenceCompletenessWidget({ data, isAr }: { data: DashboardPayload; is
   const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
   return (
     <Card title={isAr ? 'اكتمال الأدلة' : 'Evidence completeness'} Icon={Paperclip}>
-      <div style={{ fontSize: 24, fontWeight: 800 }}>{pct}%</div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+      <div className="esg-widget-headline">{pct}%</div>
+      <div className="esg-widget-sub">
         {approved}/{total} {isAr ? 'معتمدة' : 'approved'}
       </div>
-      <div style={{ height: 8, background: 'var(--surface-2)', borderRadius: 4, marginBottom: 8 }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--info)' : 'var(--warning)', borderRadius: 4 }} />
+      <div className="esg-bar-h8">
+        <div className="esg-bar-fill-h8" style={{
+          width: `${pct}%`,
+          background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--info)' : 'var(--warning)',
+        }} />
       </div>
       {data.evidence.expiringSoon30d > 0 && (
-        <div style={{ fontSize: 11, color: 'var(--warning-fg)' }}>
-          <Clock size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+        <div className="esg-score-hero__alert">
+          <Clock size={11} className="esg-icon-inline" />
           {data.evidence.expiringSoon30d} {isAr ? 'تنتهي خلال 30 يوماً' : 'expiring in 30d'}
         </div>
       )}
@@ -1182,16 +1167,16 @@ function AnnexReadinessWidget({ data, isAr }: { data: DashboardPayload; isAr: bo
   const composite = Math.round((cma + tcfd + evidence) / 3);
   return (
     <Card title={isAr ? 'جاهزية الملحق السنوي' : 'Annex readiness gauge'} Icon={FileText}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0' }}>
-        <svg viewBox="0 0 200 110" style={{ width: '100%', maxWidth: 200 }}>
+      <div className="esg-gauge-wrap">
+        <svg viewBox="0 0 200 110" className="esg-gauge-svg">
           {/* Semi-circle gauge */}
           <path d="M 20 100 A 80 80 0 0 1 180 100" stroke="var(--surface-2)" strokeWidth={14} fill="none" />
           <path d={`M 20 100 A 80 80 0 0 1 ${20 + (160 * composite / 100)} ${100 - Math.sin(Math.PI * composite / 100) * 80}`}
                 stroke={composite >= 80 ? 'var(--success)' : composite >= 50 ? 'var(--warning)' : 'var(--danger)'}
                 strokeWidth={14} fill="none" strokeLinecap="round" />
-          <text x={100} y={88} textAnchor="middle" style={{ fontSize: 28, fontWeight: 800, fill: 'var(--ink-1)' }}>{composite}%</text>
+          <text x={100} y={88} textAnchor="middle" fontSize="28" fontWeight="800" fill="var(--ink-1)">{composite}%</text>
         </svg>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: -8, textAlign: 'center' }}>
+        <div className="esg-gauge-sub">
           {isAr ? 'المتوسّط الموزون لـ CMA + TCFD + الأدلة' : 'Weighted mean of CMA + TCFD + Evidence'}
         </div>
       </div>
@@ -1212,11 +1197,11 @@ function MaterialityMatrixWidget({ data, isAr }: { data: DashboardPayload; isAr:
           padding: 8, marginBottom: 6, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
           display: 'grid', gridTemplateColumns: '1fr auto', gap: 8,
         }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-1)' }}>
+          <div className="esg-text-strong">
             {isAr && t.topicAr ? t.topicAr : t.topicEn}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-            <span className="mono" style={{ fontWeight: 700 }}>{Number(t.materialityScore).toFixed(1)}</span>
+            <span className="mono esg-text-bold">{Number(t.materialityScore).toFixed(1)}</span>
             <span style={{
               width: 10, height: 10, borderRadius: '50%',
               background: t.priorityTier === 'CRITICAL' ? 'var(--danger)'
@@ -1242,7 +1227,7 @@ function EmissionsTrendChart({ isAr }: { isAr: boolean }) {
   const maxTotal = Math.max(...EMISSIONS_TIMESERIES.map(r => r.scope1 + r.scope2 + r.scope3));
   return (
     <>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+      <div className="esg-text-eyebrow-sm">
         {isAr ? 'الانبعاثات الإجمالية مكدّسة بالنطاقات عبر السنوات.' : 'Total emissions stacked by scope across years.'}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${EMISSIONS_TIMESERIES.length}, 1fr)`, gap: 12, alignItems: 'end', height: 220 }}>
@@ -1308,10 +1293,10 @@ function CalculatorTab({ entries, onAdd, onDelete }: {
   return (
     <>
       <Card title={t('esgCalcTitle')} Icon={Calculator}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {t('esgCalcSub')}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 2fr auto', gap: 8, alignItems: 'end' }}>
+        <div className="esg-calc-form">
           <Field label={t('esgCalcFactor')}>
             <select value={factorCode} onChange={e => setFactorCode(e.target.value)} style={inputStyle}>
               {EMISSION_FACTORS.map(f => (
@@ -1333,28 +1318,28 @@ function CalculatorTab({ entries, onAdd, onDelete }: {
           </Field>
           <Button variant="primary" onClick={submit}>{t('esgCalcAdd')}</Button>
         </div>
-        <div style={{ marginTop: 12, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 12 }}>
-          <div style={{ color: 'var(--ink-3)', marginBottom: 4 }}>
+        <div className="esg-calc-preview">
+          <div className="esg-calc-preview__meta">
             <b>{factor.kgCo2ePerUnit}</b> kgCO2e / {factor.unit} · {t('esgCalcSource')}: {factor.source}
           </div>
-          <div style={{ fontWeight: 600 }}>
+          <div className="esg-text-strong">
             {t('esgCalcPreview')}: <span className="mono">{computed.toFixed(2)}</span> kgCO2e
             ({(computed / 1000).toFixed(3)} tCO2e)
           </div>
         </div>
       </Card>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="mt-lg">
         <Card title={t('esgCalcLogTitle')} Icon={FileText}
           action={
             <Badge tone="primary">{(totalKg / 1000).toFixed(2)} tCO2e</Badge>
           }>
           {entries.length === 0
-            ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
+            ? <div className="esg-calc-empty">
                 {t('esgCalcEmpty')}
               </div>
             : (
-              <table className="tbl" style={{ width: '100%' }}>
+              <table className="tbl esg-calc-tbl">
                 <thead>
                   <tr>
                     <th>{t('esgCalcLogDate')}</th>
@@ -1362,7 +1347,7 @@ function CalculatorTab({ entries, onAdd, onDelete }: {
                     <th>{t('esgCalcLogAmount')}</th>
                     <th>{t('esgCalcLogResult')}</th>
                     <th>{t('esgCalcLogNote')}</th>
-                    <th style={{ width: 50 }}></th>
+                    <th style={{ width: 50 }} />
                   </tr>
                 </thead>
                 <tbody>
@@ -1370,16 +1355,16 @@ function CalculatorTab({ entries, onAdd, onDelete }: {
                     const f = EMISSION_FACTORS.find(x => x.code === entry.factorCode);
                     return (
                       <tr key={entry.id}>
-                        <td className="mono" style={{ fontSize: 11 }}>{entry.occurredAt}</td>
+                        <td className="mono esg-calc-row-mono">{entry.occurredAt}</td>
                         <td>
                           <Badge tone="info">Scope {f?.scope}</Badge>
-                          <span style={{ marginInlineStart: 6 }}>{f ? (lang === 'ar' ? f.nameAr : f.nameEn) : entry.factorCode}</span>
+                          <span className="ms-sm">{f ? (lang === 'ar' ? f.nameAr : f.nameEn) : entry.factorCode}</span>
                         </td>
                         <td className="mono">{entry.amount} {f?.unit}</td>
                         <td className="mono">
                           <b>{entry.computedKgCo2e.toFixed(2)}</b> kgCO2e
                         </td>
-                        <td style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                        <td className="esg-calc-row-note">
                           {entry.noteEn || entry.noteAr || '—'}
                         </td>
                         <td>
@@ -1536,7 +1521,7 @@ function CmaTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* Readiness KPI strip */}
       <div className="kpi-grid">
         <Kpi Icon={FileText}     label={isAr ? 'جاهزية الإفصاح' : 'Disclosure readiness'} value={`${readiness?.readinessPct ?? 0}%`}
@@ -1549,7 +1534,7 @@ function CmaTab() {
       </div>
 
       <Card title={isAr ? 'سجلّ إفصاحات المواد 91–94' : 'CMA Articles 91–94 disclosure matrix'} Icon={FileText}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'مصفوفة الإفصاحات الإلزامية لهيئة السوق المالية. الجزئي وغير المُفصَح يتطلّبان وصف فجوة (القاعدة 5). الإفصاحات المعتمدة بلا دليل تُعلَّم تلقائياً «يتطلّب دليلاً» (القاعدة 6).'
             : 'CMA mandatory disclosure matrix. Partial and Not-Disclosed states require a gap description (Rule 5). Disclosed items without evidence are auto-flagged Evidence Required (Rule 6).'}
@@ -1560,29 +1545,26 @@ function CmaTab() {
           : items.length === 0
             ? <InlineEmpty>{isAr ? 'لا توجد إفصاحات لهذه السنة' : 'No disclosures for this year'}</InlineEmpty>
             : Array.from(byArticle.entries()).map(([article, articleItems]) => (
-                <div key={article} style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>
+                <div key={article} className="esg-cma-article">
+                  <div className="esg-cma-pillar__title">
                     {isAr ? `المادة ${article}` : `Article ${article}`}
                   </div>
                   {articleItems.map(d => (
-                    <div key={d.id} style={{
-                      padding: '12px 0', borderBottom: '1px dashed var(--border)',
-                      display: 'grid', gridTemplateColumns: '1fr auto', gap: 10,
-                    }}>
-                      <div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    <div key={d.id} className="esg-disclosure-row">
+                      <div className="esg-disclosure-row__main">
+                        <div className="esg-disclosure-row__head">
+                          <span className="mono esg-disclosure-row__code">
                             {articleLabel(d, isAr ? 'ar' : 'en')}
                           </span>
-                          <span style={{ fontSize: 13, fontWeight: 600 }}>
+                          <span className="esg-disclosure-row__title">
                             {isAr && d.titleAr ? d.titleAr : d.titleEn}
                           </span>
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                        <div className="esg-disclosure-row__desc">
                           {isAr && d.requirementAr ? d.requirementAr : d.requirementEn}
                         </div>
                         {hasEvidence(d) && (
-                          <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <div className="esg-disclosure-row__evidence">
                             <Paperclip size={10} />
                             <span>{isAr ? 'الدليل:' : 'Evidence:'}</span>
                             <span className="mono">{d.evidenceRef}</span>
@@ -1590,17 +1572,16 @@ function CmaTab() {
                           </div>
                         )}
                         {hasGap(d) && (
-                          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--warning-fg)', lineHeight: 1.5,
-                              padding: 8, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)' }}>
-                            <AlertCircle size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+                          <div className="esg-disclosure-row__gap esg-banner esg-banner--warning">
+                            <AlertCircle size={11} className="esg-icon-inline" />
                             <strong>{isAr ? 'فجوة:' : 'Gap:'}</strong>{' '}
                             {isAr && d.gapDescriptionAr ? d.gapDescriptionAr : (d.gapDescriptionEn ?? d.gapDescriptionAr)}
                           </div>
                         )}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', minWidth: 220 }}>
+                      <div className="esg-disclosure-row__actions">
                         <Badge tone={cmaStatusTone(d.disclosureStatus)}>{cmaStatusLabel(d.disclosureStatus, isAr ? 'ar' : 'en')}</Badge>
-                        <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <div className="esg-disclosure-row__btn-row">
                           {d.disclosureStatus !== 'DISCLOSED' && (
                             <Button size="sm" variant="ghost" onClick={() => onMarkDisclosed(d)}>{isAr ? 'مُفصَح' : 'Disclosed'}</Button>
                           )}
@@ -1617,7 +1598,7 @@ function CmaTab() {
                             <Button size="sm" variant="ghost" onClick={() => onMarkNotApplicable(d)}>{isAr ? 'لا ينطبق' : 'N/A'}</Button>
                           )}
                         </div>
-                        <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <div className="esg-disclosure-row__btn-row">
                           <Button size="sm" variant="secondary" Icon={Paperclip} onClick={() => setEvidencingId(d.id!)}>
                             {isAr ? 'إرفاق دليل' : 'Attach'}
                           </Button>
@@ -1764,7 +1745,7 @@ function TcfdTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* Rule 7 banner — Strategy resilience recommendation is missing/partial */}
       {readiness?.strategyResilienceGap && (
         <div style={{
@@ -1773,7 +1754,7 @@ function TcfdTab() {
           fontSize: 12, lineHeight: 1.5,
           display: 'flex', gap: 8, alignItems: 'center',
         }}>
-          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <AlertCircle size={16} className="esg-flex-shrink-0" />
           <div>
             <strong>{isAr ? 'تنبيه القاعدة 7:' : 'Rule 7 alert:'}</strong>{' '}
             {isAr
@@ -1795,7 +1776,7 @@ function TcfdTab() {
       </div>
 
       <Card title={isAr ? 'مصفوفة المحاذاة مع TCFD' : 'TCFD alignment matrix'} Icon={FileText}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'إفصاحات TCFD الـ 11 الموزّعة على 4 ركائز (الحوكمة، الاستراتيجية، إدارة المخاطر، المقاييس والأهداف). نفس قواعد CMA (5 و 6) تنطبق هنا، بالإضافة إلى القاعدة 7 لتوصية صمود الاستراتيجية.'
             : 'TCFD’s 11 recommendations across the 4 pillars (Governance, Strategy, Risk Mgmt, Metrics & Targets). CMA Rules 5 + 6 apply here too, plus Rule 7 on the Strategy resilience recommendation.'}
@@ -1809,55 +1790,51 @@ function TcfdTab() {
                 const pillarItems = byPillar.get(pillar) ?? [];
                 if (pillarItems.length === 0) return null;
                 return (
-                  <div key={pillar} style={{ marginBottom: 18 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>
+                  <div key={pillar} className="esg-cma-pillar">
+                    <div className="esg-cma-pillar__title">
                       {tcfdPillarLabel(pillar, isAr ? 'ar' : 'en')}
                     </div>
                     {pillarItems.map(t => (
-                      <div key={t.id} style={{
-                        padding: '12px 0', borderBottom: '1px dashed var(--border)',
-                        display: 'grid', gridTemplateColumns: '1fr auto', gap: 10,
-                      }}>
-                        <div>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      <div key={t.id} className="esg-disclosure-row">
+                        <div className="esg-disclosure-row__main">
+                          <div className="esg-disclosure-row__head">
+                            <span className="mono esg-disclosure-row__code">
                               ({t.recommendationCode})
                             </span>
-                            <span style={{ fontSize: 13, fontWeight: 600 }}>
+                            <span className="esg-disclosure-row__title">
                               {isAr && t.titleAr ? t.titleAr : t.titleEn}
                             </span>
                           </div>
                           {(isAr ? t.recommendationAr : t.recommendationEn) && (
-                            <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                            <div className="esg-disclosure-row__desc">
                               {isAr && t.recommendationAr ? t.recommendationAr : t.recommendationEn}
                             </div>
                           )}
                           {hasTcfdEvidence(t) && (
-                            <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <div className="esg-disclosure-row__evidence">
                               <Paperclip size={10} />
                               <span>{isAr ? 'الدليل:' : 'Evidence:'}</span>
                               <span className="mono">{t.evidenceRef}</span>
                             </div>
                           )}
                           {hasTcfdGap(t) && (
-                            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--warning-fg)', lineHeight: 1.5,
-                                padding: 8, background: 'var(--warning-bg)', borderRadius: 'var(--r-sm)' }}>
-                              <AlertCircle size={11} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+                            <div className="esg-disclosure-row__gap esg-banner esg-banner--warning">
+                              <AlertCircle size={11} className="esg-icon-inline" />
                               <strong>{isAr ? 'فجوة:' : 'Gap:'}</strong>{' '}
                               {isAr && t.gapDescriptionAr ? t.gapDescriptionAr : (t.gapDescriptionEn ?? t.gapDescriptionAr)}
                             </div>
                           )}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', minWidth: 220 }}>
+                        <div className="esg-disclosure-row__actions">
                           <Badge tone={tcfdStatusTone(t.disclosureStatus)}>{tcfdStatusLabel(t.disclosureStatus, isAr ? 'ar' : 'en')}</Badge>
-                          <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <div className="esg-disclosure-row__btn-row">
                             {t.disclosureStatus !== 'DISCLOSED'     && <Button size="sm" variant="ghost" onClick={() => onMarkDisclosed(t)}>{isAr ? 'مُفصَح' : 'Disclosed'}</Button>}
                             {t.disclosureStatus !== 'PARTIAL'       && <Button size="sm" variant="ghost" onClick={() => onMarkPartial(t)}>{isAr ? 'جزئي' : 'Partial'}</Button>}
                             {t.disclosureStatus !== 'NOT_DISCLOSED' && <Button size="sm" variant="ghost" onClick={() => onMarkNotDisclosed(t)}>{isAr ? 'غير مُفصَح' : 'Not'}</Button>}
                             {t.disclosureStatus !== 'UNDER_REVIEW'  && <Button size="sm" variant="ghost" onClick={() => onMarkUnderReview(t)}>{isAr ? 'مراجعة' : 'Review'}</Button>}
                             {t.disclosureStatus !== 'NOT_APPLICABLE'&& <Button size="sm" variant="ghost" onClick={() => onMarkNotApplicable(t)}>{isAr ? 'لا ينطبق' : 'N/A'}</Button>}
                           </div>
-                          <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <div className="esg-disclosure-row__btn-row">
                             <Button size="sm" variant="secondary" Icon={Paperclip}   onClick={() => setEvidencingId(t.id!)}>{isAr ? 'إرفاق' : 'Attach'}</Button>
                             <Button size="sm" variant="secondary" Icon={AlertCircle} onClick={() => setGappingId({ id: t.id! })}>{isAr ? 'فجوة' : 'Gap'}</Button>
                           </div>
@@ -1984,7 +1961,7 @@ function MaterialityTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* KPI strip — tier counts + category counts */}
       <div className="kpi-grid">
         <Kpi Icon={Target}       label={isAr ? 'إجمالي الموضوعات' : 'Total topics'}     value={matrix?.total ?? 0} tone="primary" />
@@ -1996,23 +1973,17 @@ function MaterialityTab() {
       </div>
 
       <Card title={isAr ? 'مصفوفة تقييم الجوهرية المزدوجة' : 'Double-materiality assessment matrix'} Icon={Target}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'كل موضوع يحصل على درجتين على مقياس 1-5: الأهمية لأصحاب المصلحة والأثر على الأعمال. درجة الجوهرية = المتوسط. يُحدَّد المستوى تلقائياً عند الحفظ.'
             : 'Each topic is scored on two axes (1-5): stakeholder importance and business impact. Materiality score = mean. Priority tier is auto-bucketed on save.'}
         </div>
 
         {/* Category filter chips */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div className="esg-filter-row">
           {(['ALL', 'ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => (
             <button key={c} onClick={() => setCategoryFilter(c)}
-              style={{
-                padding: '4px 10px', fontSize: 11, fontWeight: 600,
-                border: `1px solid ${categoryFilter === c ? 'var(--primary)' : 'var(--border)'}`,
-                background: categoryFilter === c ? 'var(--primary-50)' : 'var(--surface-1)',
-                color: categoryFilter === c ? 'var(--primary)' : 'var(--ink-2)',
-                borderRadius: 'var(--r-sm)', cursor: 'pointer',
-              }}>
+              className={`esg-filter-btn${categoryFilter === c ? ' is-active' : ''}`}>
               {c === 'ALL' ? (isAr ? 'الكل' : 'All') : materialCategoryLabel(c as MaterialCategory, isAr ? 'ar' : 'en')}
             </button>
           ))}
@@ -2034,7 +2005,7 @@ function MaterialityTab() {
                     <th>{isAr ? 'الدرجة' : 'Score'}</th>
                     <th>{isAr ? 'المستوى' : 'Tier'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    <th className="esg-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2042,14 +2013,14 @@ function MaterialityTab() {
                     <tr key={t.id}>
                       <td className="mono text-2xs">{t.topicCode ?? `#${t.id}`}</td>
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                        <div className="esg-cell-title">
                           {isAr && t.topicAr ? t.topicAr : t.topicEn}
                         </div>
-                        {t.ownerName && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{t.ownerName}</div>}
+                        {t.ownerName && <div className="text-2xs text-muted esg-cell-sub">{t.ownerName}</div>}
                       </td>
                       <td><Badge tone="neutral">{materialCategoryLabel(t.category, isAr ? 'ar' : 'en')}</Badge></td>
-                      <td className="mono text-xs" style={{ textAlign: 'center' }}>{Number(t.stakeholderImportance).toFixed(1)}</td>
-                      <td className="mono text-xs" style={{ textAlign: 'center' }}>{Number(t.businessImpact).toFixed(1)}</td>
+                      <td className="mono text-xs esg-text-center">{Number(t.stakeholderImportance).toFixed(1)}</td>
+                      <td className="mono text-xs esg-text-center">{Number(t.businessImpact).toFixed(1)}</td>
                       <td className="mono text-xs" style={{ textAlign: 'center', fontWeight: 700 }}>
                         {t.materialityScore != null ? Number(t.materialityScore).toFixed(1) : '—'}
                       </td>
@@ -2057,8 +2028,8 @@ function MaterialityTab() {
                         {t.priorityTier && <Badge tone={materialTierTone(t.priorityTier)}>{materialTierLabel(t.priorityTier, isAr ? 'ar' : 'en')}</Badge>}
                       </td>
                       <td><Badge tone={materialStatusTone(t.status)}>{materialStatusLabel(t.status, isAr ? 'ar' : 'en')}</Badge></td>
-                      <td style={{ textAlign: 'end' }}>
-                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <td className="esg-text-end">
+                        <div className="esg-actions-row">
                           {t.status !== 'ARCHIVED' && (
                             <Button size="sm" variant="secondary" onClick={() => setScoringTopic(t)}>
                               {isAr ? 'تقييم' : 'Score'}
@@ -2218,7 +2189,7 @@ function MetricsTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* Per-pillar mean-progress strip */}
       <div className="kpi-grid">
         <Kpi Icon={TrendingDown} label={isAr ? 'إجمالي المؤشّرات' : 'Total metrics'}                value={agg?.total ?? 0} tone="primary" />
@@ -2234,27 +2205,21 @@ function MetricsTab() {
       </div>
 
       <Card title={isAr ? 'سجلّ مؤشّرات الاستدامة (E/S/G)' : 'ESG Metrics Register (E/S/G)'} Icon={TrendingDown}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'سجلّ موحَّد لمؤشّرات البيئة والاجتماع والحوكمة. التقدّم يُحسب وفق الاتجاه — يدعم أهداف الارتفاع («حصة المتجدّدة») وأهداف الانخفاض («LTIFR»).'
             : 'Unified register for Environmental, Social, and Governance metrics. Progress is direction-aware — supports both raise-to-target ("renewable share") and lower-to-target ("LTIFR").'}
         </div>
 
         {/* Category filter chips */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div className="esg-filter-row">
           {(['ALL', 'ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => (
             <button key={c} onClick={() => setCategoryFilter(c)}
-              style={{
-                padding: '4px 10px', fontSize: 11, fontWeight: 600,
-                border: `1px solid ${categoryFilter === c ? 'var(--primary)' : 'var(--border)'}`,
-                background: categoryFilter === c ? 'var(--primary-50)' : 'var(--surface-1)',
-                color: categoryFilter === c ? 'var(--primary)' : 'var(--ink-2)',
-                borderRadius: 'var(--r-sm)', cursor: 'pointer',
-              }}>
+              className={`esg-filter-btn${categoryFilter === c ? ' is-active' : ''}`}>
               {c === 'ALL' ? (isAr ? 'الكل' : 'All') : esgMetricCategoryLabel(c as MetricCategory, isAr ? 'ar' : 'en')}
             </button>
           ))}
-          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+          <span className="text-2xs text-muted esg-filter-row__count">
             {filtered.length} / {items.length}
           </span>
         </div>
@@ -2275,7 +2240,7 @@ function MetricsTab() {
                     <th>{isAr ? 'الهدف' : 'Target'}</th>
                     <th>{isAr ? 'التقدّم' : 'Progress'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    <th className="esg-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2285,42 +2250,42 @@ function MetricsTab() {
                       <tr key={m.id}>
                         <td className="mono text-2xs">{m.metricCode ?? `#${m.id}`}</td>
                         <td>
-                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 320, lineHeight: 1.3 }}>
+                          <div className="esg-cell-title">
                             {isAr && m.metricNameAr ? m.metricNameAr : m.metricNameEn}
                           </div>
-                          {m.ownerName && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{m.ownerName}</div>}
+                          {m.ownerName && <div className="text-2xs text-muted esg-cell-sub">{m.ownerName}</div>}
                         </td>
                         <td>
                           <Badge tone="neutral">{esgMetricCategoryLabel(m.category, isAr ? 'ar' : 'en')}</Badge>
-                          {m.subcategory && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{m.subcategory}</div>}
+                          {m.subcategory && <div className="text-2xs text-muted esg-cell-sub">{m.subcategory}</div>}
                         </td>
-                        <td className="mono text-xs" style={{ textAlign: 'end' }}>
+                        <td className="mono text-xs esg-text-end">
                           {m.baselineValue != null ? Number(m.baselineValue).toLocaleString() : '—'}
                           <div className="text-2xs text-muted">{m.unit}</div>
                         </td>
-                        <td className="mono text-xs" style={{ textAlign: 'end', fontWeight: 700 }}>
+                        <td className="mono text-xs esg-text-end esg-text-bold">
                           {m.currentValue != null ? Number(m.currentValue).toLocaleString() : '—'}
                           {m.currentValueAsOf && <div className="text-2xs text-muted">{m.currentValueAsOf}</div>}
                         </td>
-                        <td className="mono text-xs" style={{ textAlign: 'end' }}>
+                        <td className="mono text-xs esg-text-end">
                           {m.targetValue != null ? Number(m.targetValue).toLocaleString() : '—'}
                           {m.targetYear && <div className="text-2xs text-muted">→ {m.targetYear}</div>}
                         </td>
                         <td style={{ minWidth: 120 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ flex: 1, height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
-                              <div style={{
-                                height: '100%', width: `${Math.min(100, pct)}%`,
-                                background: pct >= 100 ? 'var(--success)' : pct >= 50 ? 'var(--primary)' : 'var(--warning)',
-                                borderRadius: 3,
-                              }} />
+                          <div className="esg-progress-wrap">
+                            <div className="esg-progress-track">
+                              <div className="esg-progress-fill"
+                                style={{
+                                  width: `${Math.min(100, pct)}%`,
+                                  background: pct >= 100 ? 'var(--success)' : pct >= 50 ? 'var(--primary)' : 'var(--warning)',
+                                }} />
                             </div>
-                            <span className="mono text-2xs" style={{ minWidth: 40, textAlign: 'end' }}>{pct.toFixed(0)}%</span>
+                            <span className="mono text-2xs esg-progress-label esg-text-end" style={{ minWidth: 40 }}>{pct.toFixed(0)}%</span>
                           </div>
                         </td>
                         <td><Badge tone={metricStatusTone(m.status)}>{metricStatusLabel(m.status, isAr ? 'ar' : 'en')}</Badge></td>
-                        <td style={{ textAlign: 'end' }}>
-                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <td className="esg-text-end">
+                          <div className="esg-actions-row">
                             {m.status !== 'ARCHIVED' && (
                               <Button size="sm" variant="secondary" onClick={() => setReadingMetric(m)}>
                                 {isAr ? 'تسجيل' : 'Record'}
@@ -2435,7 +2400,7 @@ function EvidenceTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* KPI strip */}
       <div className="kpi-grid">
         <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total evidence'}            value={agg?.total ?? 0} tone="primary" />
@@ -2453,27 +2418,21 @@ function EvidenceTab() {
                 {isAr ? 'فحص الانتهاء (القاعدة 9)' : 'Sweep expired (Rule 9)'}
               </Button>
             }>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'مستودع موحَّد للأدلة الداعمة لجميع كيانات الاستدامة. كل دليل له فترة صلاحية، ومراجعة، وحالة اعتماد. عند انتهاء valid_to يتم وسم الإفصاحات المرتبطة بـ EVIDENCE_REQUIRED (القاعدة 9).'
             : 'Unified repository for evidence supporting every sustainability entity. Each row has a validity window, reviewer, and approval state. When valid_to passes, linked disclosures are auto-flagged EVIDENCE_REQUIRED (Rule 9).'}
         </div>
 
         {/* Status filter chips */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div className="esg-filter-row">
           {(['ALL', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'SUPERSEDED'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              style={{
-                padding: '4px 10px', fontSize: 11, fontWeight: 600,
-                border: `1px solid ${statusFilter === s ? 'var(--primary)' : 'var(--border)'}`,
-                background: statusFilter === s ? 'var(--primary-50)' : 'var(--surface-1)',
-                color: statusFilter === s ? 'var(--primary)' : 'var(--ink-2)',
-                borderRadius: 'var(--r-sm)', cursor: 'pointer',
-              }}>
+              className={`esg-filter-btn${statusFilter === s ? ' is-active' : ''}`}>
               {s === 'ALL' ? (isAr ? 'الكل' : 'All') : evidenceStatusLabel(s as EvidenceApprovalStatus, isAr ? 'ar' : 'en')}
             </button>
           ))}
-          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+          <span className="text-2xs text-muted esg-filter-row__count">
             {filtered.length} / {items.length}
           </span>
         </div>
@@ -2494,7 +2453,7 @@ function EvidenceTab() {
                     <th>{isAr ? 'انتهاء الصلاحية' : 'Valid to'}</th>
                     <th>{isAr ? 'سرّية' : 'Confidentiality'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    <th className="esg-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2506,17 +2465,17 @@ function EvidenceTab() {
                       <tr key={e.id}>
                         <td className="mono text-2xs">{e.evidenceCode ?? `#${e.id}`}</td>
                         <td>
-                          <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 360, lineHeight: 1.3 }}>
+                          <div className="esg-cell-title">
                             {isAr && e.titleAr ? e.titleAr : e.titleEn}
                           </div>
                           {e.fileName && (
-                            <div className="text-2xs text-muted mono" style={{ marginTop: 2 }}>
-                              <Paperclip size={9} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 3 }} />
+                            <div className="text-2xs text-muted mono esg-cell-sub">
+                              <Paperclip size={9} className="esg-icon-inline" />
                               {e.fileName}
                             </div>
                           )}
                           {e.verificationStatus === 'EXTERNAL_VERIFIED' && e.verificationProvider && (
-                            <div className="text-2xs" style={{ marginTop: 2, color: 'var(--success-fg)' }}>
+                            <div className="text-2xs esg-cell-sub esg-score-hero__yoy-positive">
                               ✓ {isAr ? 'تحقّق خارجي:' : 'External verification:'} {e.verificationProvider}
                             </div>
                           )}
@@ -2527,7 +2486,7 @@ function EvidenceTab() {
                         <td className="mono text-2xs">
                           {e.validTo ?? '—'}
                           {days != null && e.approvalStatus === 'APPROVED' && (
-                            <div className="text-2xs" style={{ color: days < 0 ? 'var(--danger-fg)' : expiringSoon ? 'var(--warning-fg)' : 'var(--ink-3)' }}>
+                            <div className={`text-2xs ${days < 0 ? 'esg-date-overdue' : expiringSoon ? 'esg-date-due-soon' : ''}`}>
                               {days < 0
                                 ? (isAr ? `منتهي قبل ${Math.abs(days)} يوماً` : `${Math.abs(days)}d expired`)
                                 : (isAr ? `${days} يوماً متبقّياً` : `${days}d left`)}
@@ -2536,8 +2495,8 @@ function EvidenceTab() {
                         </td>
                         <td><Badge tone={evidenceConfidentialityTone(e.confidentiality)}>{evidenceConfidentialityLabel(e.confidentiality, isAr ? 'ar' : 'en')}</Badge></td>
                         <td><Badge tone={evidenceStatusTone(e.approvalStatus)}>{evidenceStatusLabel(e.approvalStatus, isAr ? 'ar' : 'en')}</Badge></td>
-                        <td style={{ textAlign: 'end' }}>
-                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <td className="esg-text-end">
+                          <div className="esg-actions-row">
                             {e.approvalStatus === 'PENDING_REVIEW' && (
                               <>
                                 <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => setApprovingId(e.id!)}>
@@ -2677,10 +2636,10 @@ function AnnexTab() {
   if (years.length === 0) return <InlineEmpty>{t('annexNoYears')}</InlineEmpty>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* Year picker strip */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className="text-2xs text-muted" style={{ textTransform: 'uppercase' }}>{t('annexYear')}</span>
+      <div className="row-gap-md" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="text-2xs text-muted esg-text-eyebrow">{t('annexYear')}</span>
         {years.map(y => (
           <button key={y.id} type="button" onClick={() => pickYear(y)}
             style={{
@@ -2701,7 +2660,7 @@ function AnnexTab() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div className="stat-tile">
               <div className="stat-tile-label">{t('annexEntity')}</div>
-              <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>
+              <div className="esg-text-strong">
                 {isAr && activeRy.reportingEntityAr ? activeRy.reportingEntityAr : activeRy.reportingEntityEn}
               </div>
             </div>
@@ -2761,7 +2720,7 @@ function AnnexTab() {
                   <th>{t('annexColVersion')}</th>
                   <th>{t('annexColGenerated')}</th>
                   <th>{t('annexColStatus')}</th>
-                  <th style={{ textAlign: 'end' }}>{t('annexColActions')}</th>
+                  <th className="esg-text-end">{t('annexColActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2772,8 +2731,8 @@ function AnnexTab() {
                     <td className="mono">{r.version}</td>
                     <td className="mono text-xs">{r.generatedAt?.slice(0, 16).replace('T', ' ')}</td>
                     <td><Badge tone={reportStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
-                    <td style={{ textAlign: 'end' }}>
-                      <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <td className="esg-text-end">
+                      <div className="esg-actions-row">
                         <Button variant="ghost"     size="sm" onClick={() => setPreviewId(r.id!)}>{t('annexActPreview')}</Button>
                         <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'md')}>MD</Button>
                         <Button variant="ghost"     size="sm" onClick={() => onExport(r.id!, 'html')}>HTML</Button>
@@ -2921,10 +2880,10 @@ function GhgInventoryTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* Year + scope filter strip */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className="text-2xs text-muted" style={{ textTransform: 'uppercase' }}>{t('ghgFilterYear')}</span>
+      <div className="row-gap-md" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="text-2xs text-muted esg-text-eyebrow">{t('ghgFilterYear')}</span>
         <select className="input" style={{ width: 'auto' }} value={year} onChange={e => setYear(Number(e.target.value))}>
           {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
@@ -2971,8 +2930,8 @@ function GhgInventoryTab() {
               { label: 'Scope 3', v: Number(yoy.scope3YoY) },
               { label: t('ghgYoyTotal'), v: Number(yoy.totalYoY) },
             ].map((it, i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span className="text-2xs text-muted" style={{ textTransform: 'uppercase' }}>{it.label}</span>
+              <div key={i} className="stack-xs">
+                <span className="text-2xs text-muted esg-text-eyebrow">{it.label}</span>
                 <Badge tone={it.v < 0 ? 'success' : it.v > 0 ? 'danger' : 'neutral'}>{pctChip(it.v)}</Badge>
               </div>
             ))}
@@ -2994,10 +2953,10 @@ function GhgInventoryTab() {
                     <th>{t('ghgColScope')}</th>
                     <th>{t('ghgColSource')}</th>
                     <th>{t('ghgColCategory')}</th>
-                    <th style={{ textAlign: 'end' }}>{t('ghgColValue')}</th>
-                    <th style={{ textAlign: 'center' }}>{t('ghgColCoverage')}</th>
+                    <th className="esg-text-end">{t('ghgColValue')}</th>
+                    <th className="esg-text-center">{t('ghgColCoverage')}</th>
                     <th>{t('ghgColStatus')}</th>
-                    <th style={{ textAlign: 'end' }}>{t('ghgColActions')}</th>
+                    <th className="esg-text-end">{t('ghgColActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3006,21 +2965,21 @@ function GhgInventoryTab() {
                       <td className="mono">{r.recordCode ?? `#${r.id}`}</td>
                       <td><Badge tone={r.scope === 1 ? 'success' : r.scope === 2 ? 'info' : 'warning'}>S{r.scope}</Badge></td>
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--ink-1)', maxWidth: 320, lineHeight: 1.3 }}>
+                        <div className="esg-cell-title">
                           {isAr && r.sourceNameAr ? r.sourceNameAr : r.sourceNameEn}
                         </div>
-                        {r.facility && <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{r.facility}</div>}
+                        {r.facility && <div className="text-2xs text-muted esg-cell-sub">{r.facility}</div>}
                       </td>
                       <td className="text-xs">{r.category}</td>
-                      <td style={{ textAlign: 'end' }} className="mono">{Number(r.emissionValueTco2e).toLocaleString()}</td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td className="mono esg-text-end">{Number(r.emissionValueTco2e).toLocaleString()}</td>
+                      <td className="esg-text-center">
                         <Badge tone={Number(r.coveragePercent) >= 90 ? 'success' : Number(r.coveragePercent) >= 70 ? 'info' : 'warning'}>
                           {Number(r.coveragePercent).toFixed(0)}%
                         </Badge>
                       </td>
                       <td><Badge tone={ghgStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
-                      <td style={{ textAlign: 'end' }}>
-                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <td className="esg-text-end">
+                        <div className="esg-actions-row">
                           {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onSubmit_(r.id!)}>{t('ghgActSubmit')}</Button>}
                           {r.status === 'SUBMITTED' && (
                             <Button variant="secondary" size="sm" Icon={CheckCircle2}
@@ -3146,7 +3105,7 @@ function SgiTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       {/* KPI strip — tier counts + lifecycle totals */}
       <div className="kpi-grid">
         <Kpi Icon={Target}       label={isAr ? 'الالتزامات النشطة' : 'Active commitments'} value={agg?.activeTotal ?? 0}   tone="primary" />
@@ -3161,7 +3120,7 @@ function SgiTab() {
       </div>
 
       <Card title={isAr ? 'التزامات المبادرة السعودية الخضراء' : 'Saudi Green Initiative commitments'} Icon={Target}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'سجلّ الالتزامات المحفوظ مع تتبّع التقدّم، المالك، الموعد التالي، والسجل المراجعي. الإنجاز يتطلّب الوصول للهدف؛ التقاعد يتطلّب سبباً موثّقاً.'
             : 'Registered commitments with progress tracking, owner, next milestone, and audit trail. Achievement requires the target to be met; retirement requires a documented reason.'}
@@ -3172,33 +3131,29 @@ function SgiTab() {
           : items.length === 0
             ? <InlineEmpty>{isAr ? 'لا توجد التزامات' : 'No commitments yet'}</InlineEmpty>
             : Array.from(bySector.entries()).map(([sector, sectorItems]) => (
-              <div key={sector} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <Leaf size={12} style={{ display: 'inline-block', verticalAlign: 'middle', marginInlineEnd: 4 }} />
+              <div key={sector} className="mb-lg">
+                <div className="esg-cma-pillar__title esg-text-eyebrow">
+                  <Leaf size={12} className="esg-icon-inline" />
                   {sgiSectorLabel(sector as 'ENERGY', isAr ? 'ar' : 'en')}
                 </div>
                 {sectorItems.map(c => {
                   const progressPct = computeProgressPct(c);
                   const isActive = c.status === 'ACTIVE';
                   return (
-                    <div key={c.id} style={{
-                      padding: 12, marginBottom: 8, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                      background: c.status === 'ACHIEVED' ? 'var(--success-bg)'
-                                : c.status === 'RETIRED'  ? 'var(--surface-2)' : undefined,
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                    <div key={c.id} className={`esg-sgi-card${c.status === 'ACHIEVED' ? ' esg-sgi-card--achieved' : c.status === 'RETIRED' ? ' esg-sgi-card--retired' : ''}`}>
+                      <div className="esg-sgi-card__head">
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>
+                          <div className="esg-sgi-card__title">
                             {isAr && c.titleAr ? c.titleAr : c.titleEn}
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                          <div className="esg-sgi-card__meta">
                             <span className="mono">{c.commitmentCode}</span>
                             {' · '}
                             {isAr ? 'الهدف' : 'Target'} {c.targetYear}
                             {c.ownerName && <> {' · '} {c.ownerName}</>}
                           </div>
                         </div>
-                        <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <div className="esg-sgi-card__actions">
                           <Badge tone={sgiStatusTone(c.status)}>{sgiStatusLabel(c.status, isAr ? 'ar' : 'en')}</Badge>
                           {isActive && (
                             <>
@@ -3215,39 +3170,38 @@ function SgiTab() {
                           )}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ flex: 1, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
-                          <div style={{
-                            height: '100%', width: `${Math.min(100, progressPct)}%`,
+                      <div className="esg-sgi-card__progress">
+                        <div className="esg-sgi-card__progress-bar">
+                          <div className="esg-sgi-card__progress-fill" style={{
+                            width: `${Math.min(100, progressPct)}%`,
                             background: progressPct >= 75 ? 'var(--success)'
                                        : progressPct >= 40 ? 'var(--primary)'
                                        : 'var(--warning)',
-                            borderRadius: 4,
                           }} />
                         </div>
-                        <div className="mono" style={{ fontSize: 12, fontWeight: 700, minWidth: 60, textAlign: 'end' }}>
+                        <div className="mono esg-sgi-card__progress-label">
                           {progressPct.toFixed(1)}%
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
+                      <div className="esg-sgi-card__values">
                         {c.baselineValue != null && <span>{isAr ? 'خط الأساس' : 'Baseline'}: <span className="mono">{Number(c.baselineValue).toLocaleString()}</span> {c.unit}</span>}
                         {c.currentValue != null && <span>{isAr ? 'الحالي' : 'Current'}: <span className="mono">{Number(c.currentValue).toLocaleString()}</span> {c.unit}</span>}
                         <span>{isAr ? 'الهدف' : 'Target'}: <span className="mono">{Number(c.targetValue).toLocaleString()}</span> {c.unit}</span>
                       </div>
                       {(isAr ? c.notesAr : c.notesEn) && (
-                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6, padding: 8, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
+                        <div className="esg-sgi-card__notes">
                           {isAr && c.notesAr ? c.notesAr : c.notesEn}
                         </div>
                       )}
                       {c.nextMilestoneDate && (
-                        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--info-fg)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <div className="esg-sgi-card__milestone">
                           <ArrowRight size={11} />
                           <span>{isAr ? 'المرحلة التالية' : 'Next milestone'} ({c.nextMilestoneDate}):</span>
                           <span>{isAr && c.nextMilestoneAr ? c.nextMilestoneAr : c.nextMilestoneEn}</span>
                         </div>
                       )}
                       {c.status === 'RETIRED' && c.retiredReason && (
-                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-2)', fontStyle: 'italic' }}>
+                        <div className="esg-sgi-card__retired">
                           {isAr ? 'سبب التقاعد:' : 'Retired:'} {c.retiredReason}
                         </div>
                       )}
@@ -3344,11 +3298,11 @@ function SettingsTab() {
                        help?: { en: string; ar: string } }) {
     const val = settings![key] as number | undefined;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-1)' }}>
+      <div className="stack-xs">
+        <label className="esg-field-label">
           {isAr ? label.ar : label.en}
         </label>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <div className="esg-field-row">
           <input
             type="number"
             min={opts.min} max={opts.max} step={opts.step ?? 1}
@@ -3360,10 +3314,10 @@ function SettingsTab() {
               background: 'var(--surface-1)', color: 'var(--ink-1)',
             }}
           />
-          {opts.unit && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{opts.unit}</span>}
+          {opts.unit && <span className="esg-field-hint">{opts.unit}</span>}
         </div>
         {opts.help && (
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+          <span className="esg-field-hint">
             {isAr ? opts.help.ar : opts.help.en}
           </span>
         )}
@@ -3375,8 +3329,8 @@ function SettingsTab() {
                 opts: { help?: { en: string; ar: string }; placeholder?: string }) {
     const val = settings![key] as string | undefined;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-1)' }}>
+      <div className="stack-xs">
+        <label className="esg-field-label">
           {isAr ? label.ar : label.en}
         </label>
         <input
@@ -3391,7 +3345,7 @@ function SettingsTab() {
           }}
         />
         {opts.help && (
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+          <span className="esg-field-hint">
             {isAr ? opts.help.ar : opts.help.en}
           </span>
         )}
@@ -3400,10 +3354,10 @@ function SettingsTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="esg-stack">
       <Card title={isAr ? 'إعدادات الاستدامة' : 'Sustainability settings'} Icon={Wrench}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="esg-actions-inline">
             <Button size="sm" variant="ghost" Icon={Trash2} onClick={onReset} disabled={saving}>
               {isAr ? 'إعادة للافتراضي' : 'Reset defaults'}
             </Button>
@@ -3412,18 +3366,18 @@ function SettingsTab() {
             </Button>
           </div>
         }>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 16, lineHeight: 1.5 }}>
+        <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'تُحدّد هذه العتبات سلوك القواعد 1 و 3 و 9 و 13 و 14 على مستوى المؤسسة. التغييرات تسري فوراً.'
             : 'These thresholds drive the runtime behaviour of Rules 1, 3, 9, 13 and 14 at the organisation level. Changes take effect immediately.'}
         </div>
 
         {/* Section: Rule 14 — ESG readiness bands */}
-        <div style={{ marginBottom: 20 }}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>
+        <div className="esg-settings-section">
+          <h4 className="esg-settings-section__title">
             {isAr ? 'القاعدة 14 — لافتة جاهزية الاستدامة' : 'Rule 14 — ESG readiness banner'}
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <div className="esg-settings-grid">
             {Num({ en: 'Warning threshold', ar: 'عتبة التحذير' }, 'esgReadinessWarningThreshold',
               { min: 0, max: 100, unit: '/ 100',
                 help: { en: 'Banner appears below this score.', ar: 'تظهر اللافتة دون هذه الدرجة.' } })}
@@ -3434,11 +3388,11 @@ function SettingsTab() {
         </div>
 
         {/* Section: Rule 1 — Scope 3 */}
-        <div style={{ marginBottom: 20 }}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>
+        <div className="esg-settings-section">
+          <h4 className="esg-settings-section__title">
             {isAr ? 'القاعدة 1 — تغطية النطاق 3' : 'Rule 1 — Scope 3 coverage'}
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <div className="esg-settings-grid">
             {Num({ en: 'Partial-coverage threshold', ar: 'عتبة التغطية الجزئية' }, 'scope3PartialCoverageThreshold',
               { min: 0, max: 100, step: 0.5, unit: '%',
                 help: { en: 'Below this weighted coverage, GHG aggregate flags Scope 3 as Partial.', ar: 'دون هذه التغطية الموزونة، يصنّف تجميع الانبعاثات النطاق 3 كجزئي.' } })}
@@ -3446,11 +3400,11 @@ function SettingsTab() {
         </div>
 
         {/* Section: Rule 3 — SGI at-risk */}
-        <div style={{ marginBottom: 20 }}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>
+        <div className="esg-settings-section">
+          <h4 className="esg-settings-section__title">
             {isAr ? 'القاعدة 3 — تصنيف "معرّض للخطر" لالتزامات SGI' : 'Rule 3 — SGI at-risk classification'}
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <div className="esg-settings-grid">
             {Num({ en: 'At-risk factor', ar: 'عامل الخطر' }, 'sgiAtRiskProgressFactor',
               { min: 0, max: 1, step: 0.05,
                 help: { en: 'Commitment is "at risk" when actual progress < expected × factor (e.g. 0.70 = 70%).', ar: 'الالتزام "معرّض للخطر" عندما يكون التقدّم الفعلي < المتوقّع × العامل (مثال 0.70 = 70%).' } })}
@@ -3458,11 +3412,11 @@ function SettingsTab() {
         </div>
 
         {/* Section: Rule 9 — Evidence expiry */}
-        <div style={{ marginBottom: 20 }}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>
+        <div className="esg-settings-section">
+          <h4 className="esg-settings-section__title">
             {isAr ? 'القاعدة 9 — انتهاء صلاحية الأدلة' : 'Rule 9 — Evidence expiry'}
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <div className="esg-settings-grid">
             {Num({ en: 'Warning window (days)', ar: 'نافذة التحذير (أيام)' }, 'evidenceExpiryWarningDays',
               { min: 0, max: 365, unit: isAr ? 'يوم' : 'days',
                 help: { en: 'Evidence within this window of expiry is flagged as "expiring soon".', ar: 'الأدلة التي تنتهي خلال هذه النافذة تُعلَّم "تنتهي قريباً".' } })}
@@ -3473,11 +3427,11 @@ function SettingsTab() {
         </div>
 
         {/* Section: Rule 13 — CAPA escalation */}
-        <div style={{ marginBottom: 4 }}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>
+        <div className="esg-settings-section esg-settings-section--last">
+          <h4 className="esg-settings-section__title">
             {isAr ? 'القاعدة 13 — تصعيد الإجراءات التصحيحية' : 'Rule 13 — Corrective-action escalation'}
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <div className="esg-settings-grid">
             {Num({ en: 'Owner-warning window (days)', ar: 'نافذة تحذير المالك (أيام)' }, 'capaOverdueWarningDays',
               { min: 0, max: 90, unit: isAr ? 'يوم' : 'days',
                 help: { en: 'Days past due before owner gets warned.', ar: 'الأيام بعد تاريخ الاستحقاق قبل تحذير المالك.' } })}
@@ -3536,15 +3490,15 @@ function SurveyTab({ surveys, onSubmit }: {
 
   return (
     <Card title={t('esgSurveyTitle')} Icon={Truck}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="esg-text-eyebrow-sm">
         {t('esgSurveySub')}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+      <div className="esg-survey-stats">
         <Stat label={t('esgSurveyKpiSpendCov')} value={`${spendCoveragePct}%`} />
         <Stat label={t('esgSurveyKpiReportedScope12')} value={`${(totalReportedScope12 / 1000).toFixed(1)}k tCO2e`} />
         <Stat label={t('esgSurveyKpiVendors')} value={`${surveys.filter(s => s.status === 'SUBMITTED').length} / ${surveys.length}`} />
       </div>
-      <table className="tbl" style={{ width: '100%' }}>
+      <table className="tbl esg-calc-tbl">
         <thead>
           <tr>
             <th>{t('esgSurveyVendor')}</th>
@@ -3562,7 +3516,7 @@ function SurveyTab({ surveys, onSubmit }: {
             <tr key={s.id}>
               <td>
                 <div style={{ fontWeight: 600 }}>{lang === 'ar' ? s.vendorNameAr : s.vendorNameEn}</div>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{s.id}</div>
+                <div className="mono esg-survey-row-id">{s.id}</div>
               </td>
               <td className="mono">{s.spendSarK.toLocaleString()}k SAR</td>
               <td>
@@ -3572,22 +3526,22 @@ function SurveyTab({ surveys, onSubmit }: {
                 <>
                   <td>
                     <input value={draftScope12} onChange={e => setDraftScope12(e.target.value)}
-                      type="number" placeholder="tCO2e" className="mono" style={{ ...inputStyle, width: 90 }} />
+                      type="number" placeholder="tCO2e" className="mono esg-survey-input-90" style={inputStyle} />
                   </td>
                   <td>
                     <input value={draftRenewable} onChange={e => setDraftRenewable(e.target.value)}
-                      type="number" placeholder="%" className="mono" style={{ ...inputStyle, width: 60 }} />
+                      type="number" placeholder="%" className="mono esg-survey-input-60" style={inputStyle} />
                   </td>
                   <td>
                     <input value={draftSaudization} onChange={e => setDraftSaudization(e.target.value)}
-                      type="number" placeholder="%" className="mono" style={{ ...inputStyle, width: 60 }} />
+                      type="number" placeholder="%" className="mono esg-survey-input-60" style={inputStyle} />
                   </td>
                   <td>
-                    <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <label className="esg-survey-checkbox">
                       <input type="checkbox" checked={draftIso} onChange={e => setDraftIso(e.target.checked)} />
                       ISO 14001
                     </label>
-                    <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <label className="esg-survey-checkbox">
                       <input type="checkbox" checked={draftNetZero} onChange={e => setDraftNetZero(e.target.checked)} />
                       {t('esgSurveyNetZero')}
                     </label>
@@ -3602,7 +3556,7 @@ function SurveyTab({ surveys, onSubmit }: {
                   <td className="mono">{s.renewablePct != null ? `${s.renewablePct}%` : '—'}</td>
                   <td className="mono">{s.saudizationPct != null ? `${s.saudizationPct}%` : '—'}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <div className="row-tight">
                       {s.iso14001 && <Badge tone="success">ISO</Badge>}
                       {s.hasNetZeroTarget && <Badge tone="info">NZ</Badge>}
                     </div>
@@ -3624,8 +3578,8 @@ function SurveyTab({ surveys, onSubmit }: {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+    <label className="stack-xs">
+      <span className="esg-stat-row__label">{label}</span>
       {children}
     </label>
   );
@@ -3633,12 +3587,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{
-      padding: 10, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-      background: 'var(--surface-2)',
-    }}>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>{value}</div>
+    <div className="esg-stat-tile">
+      <div className="esg-stat-tile__label">{label}</div>
+      <div className="esg-stat-tile__value">{value}</div>
     </div>
   );
 }

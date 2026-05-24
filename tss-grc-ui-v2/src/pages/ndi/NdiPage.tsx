@@ -104,6 +104,7 @@ import {
   searchAudit, auditAggregate, severityTone as auditSeverityTone,
   type NdiAuditEvent, type AuditAggregate, type AuditSeverity, type AuditAction,
 } from '../../lib/ndiAudit';
+import '../../styles/pages/ndi.css';
 
 /**
  * SDAIA National Data Index (NDI / نضيء) Management page.
@@ -155,31 +156,20 @@ export function NdiPage() {
           via the aggregator added in PR #62. Useful for a buyer who's
           looking at the cycles tab and wants to see the whole quarter's
           regulatory cadence at a glance. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '8px 12px', marginBottom: 12,
-        background: 'var(--accent-50)',
-        border: '1px solid var(--accent-300, var(--border))',
-        borderRadius: 'var(--r-sm)',
-        fontSize: 12,
-      }}>
+      <div className="ndi-calendar-banner">
         <Calendar size={14} color="var(--accent-700)" />
-        <span style={{ color: 'var(--ink-2)' }}>
+        <span className="ndi-calendar-banner__text">
           {isAr
             ? 'استحقاقات دورات نضيء تظهر تلقائياً في تقويم الالتزام مع تنبيهات يوم العمل السعودي.'
             : 'NDI cycle deadlines surface on the Compliance Calendar with Saudi-workday-aware reminders.'}
         </span>
-        <Link to="/calendar?types=REPORT_DEADLINE&v=agenda"
-          style={{
-            marginInlineStart: 'auto', fontSize: 12, fontWeight: 600,
-            color: 'var(--accent-700)', textDecoration: 'none',
-          }}>
+        <Link to="/calendar?types=REPORT_DEADLINE&v=agenda" className="ndi-calendar-banner__link">
           {isAr ? 'افتح التقويم →' : 'Open the calendar →'}
         </Link>
       </div>
 
       {/* Tab strip — 15 tabs matching the spec's menu order */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="ndi-tab-strip">
         {([
           { id: 'dashboard',   label: { en: 'Dashboard',          ar: 'لوحة المعلومات' },       Icon: Database },
           { id: 'cycles',      label: { en: 'Assessment cycles',  ar: 'دورات التقييم' },        Icon: ArrowRight },
@@ -198,12 +188,7 @@ export function NdiPage() {
           { id: 'audit',       label: { en: 'Audit trail',        ar: 'سجل التدقيق' },          Icon: FileText },
         ] as { id: NdiTab; label: { en: string; ar: string }; Icon: typeof Database }[]).map(td => (
           <button key={td.id} onClick={() => setTab(td.id)}
-            style={{
-              padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600,
-              border: `1px solid ${tab === td.id ? 'var(--primary)' : 'var(--border)'}`,
-              background: tab === td.id ? 'var(--primary-50)' : 'var(--surface-1)',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
+            className={`ndi-tab-btn${tab === td.id ? ' is-active' : ''}`}>
             <td.Icon size={13} />
             {isAr ? td.label.ar : td.label.en}
           </button>
@@ -356,7 +341,7 @@ function CyclesTab() {
   ], [isAr]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <div className="kpi-grid">
         <Kpi Icon={Database}      label={isAr ? 'إجمالي الدورات' : 'Total cycles'}      value={agg?.total ?? 0}  tone="primary" />
         <Kpi Icon={ArrowRight}    label={isAr ? 'دورات نشطة'    : 'Active cycles'}     value={agg?.active ?? 0} tone="info" />
@@ -371,7 +356,7 @@ function CyclesTab() {
             {isAr ? 'دورة جديدة' : 'New cycle'}
           </Button>
         }>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="ndi-card-lede">
           {isAr
             ? 'مصفوفة دورات جاهزية مؤشر نضيء. كل دورة تمر بـ 12 خطوة من المسودّة إلى التقديم لسدايا، مع 13 حالة لحظية مرصودة. الإطار والنضج والامتثال والأدلة سترتبط بهذه الدورات لاحقاً عبر الشرائح 2-14.'
             : 'NDI readiness cycles. Each cycle moves through 12 forward steps from Draft to Submitted, with 13 distinct statuses tracked. Framework / maturity / compliance / evidence will link to these cycles via slices 2-14.'}
@@ -392,7 +377,7 @@ function CyclesTab() {
                     <th>{isAr ? 'النتيجة الإجمالية' : 'Overall'}</th>
                     <th>{isAr ? 'الجاهزية' : 'Readiness'}</th>
                     <th>{isAr ? 'المالك' : 'Owner'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -403,11 +388,11 @@ function CyclesTab() {
                       <tr key={c.id}>
                         <td className="mono text-2xs">{c.cycleCode ?? `#${c.id}`}</td>
                         <td>
-                          <div style={{ fontWeight: 600 }}>
+                          <div className="ndi-cell-title">
                             {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn}
                           </div>
                           {c.entityNameEn && (
-                            <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                            <div className="text-2xs text-muted ndi-cell-sub">
                               {isAr && c.entityNameAr ? c.entityNameAr : c.entityNameEn}
                             </div>
                           )}
@@ -417,8 +402,8 @@ function CyclesTab() {
                         <td className="mono">{c.overallScore != null ? `${Number(c.overallScore).toFixed(0)} / 100` : '—'}</td>
                         <td><Badge tone={readinessTone(c.submissionReadinessStatus)}>{readinessLabel(c.submissionReadinessStatus, isAr ? 'ar' : 'en')}</Badge></td>
                         <td className="text-xs">{c.dataOfficeOwnerName ?? '—'}</td>
-                        <td style={{ textAlign: 'end' }}>
-                          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <td className="ndi-text-end">
+                          <div className="ndi-actions-row">
                             {next && !isTerminal && (
                               <Button size="sm" variant="secondary" Icon={ArrowRight}
                                 onClick={() => onTransition(c)}
@@ -550,7 +535,7 @@ function FrameworkTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <div className="kpi-grid">
         <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}   value={agg?.total ?? 0}            tone="primary" />
         <Kpi Icon={CheckCircle2} label={isAr ? 'بنود رسمية'   : 'Official'}      value={agg?.officialCount ?? 0}    tone="success" />
@@ -562,14 +547,9 @@ function FrameworkTab() {
       </div>
 
       {agg && agg.placeholderCount > 0 && (
-        <div style={{
-          padding: '12px 16px', borderRadius: 'var(--r-md)',
-          background: 'var(--warning-bg)', color: 'var(--warning-fg)',
-          border: '1px solid var(--warning)',
-          display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center',
-        }}>
+        <div className="ndi-warning-banner">
           <AlertCircle size={20} />
-          <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+          <div className="ndi-warning-banner__body">
             <strong>{isAr ? 'تنبيه:' : 'Notice:'}</strong>{' '}
             {isAr
               ? `${agg.placeholderCount} من أصل ${agg.total} عنصر مؤقت — يتطلب استيراد مكتبة الضوابط الرسمية من سدايا/نضيء قبل التقديم الرسمي.`
@@ -584,20 +564,14 @@ function FrameworkTab() {
             {isAr ? 'استيراد JSON' : 'Import JSON'}
           </Button>
         }>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div className="ndi-filter-row">
           {(['ALL', 'COMPLIANCE', 'MATURITY', 'OPERATIONAL_EXCELLENCE'] as const).map(c => (
             <button key={c} onClick={() => setFilterComponent(c)}
-              style={{
-                padding: '4px 10px', fontSize: 11, fontWeight: 600,
-                border: `1px solid ${filterComponent === c ? 'var(--primary)' : 'var(--border)'}`,
-                background: filterComponent === c ? 'var(--primary-50)' : 'var(--surface-1)',
-                color: filterComponent === c ? 'var(--primary)' : 'var(--ink-2)',
-                borderRadius: 'var(--r-sm)', cursor: 'pointer',
-              }}>
+              className={`ndi-filter-btn${filterComponent === c ? ' is-active' : ''}`}>
               {c === 'ALL' ? (isAr ? 'الكل' : 'All') : componentLabel(c as NdiComponent, isAr ? 'ar' : 'en')}
             </button>
           ))}
-          <span className="text-2xs text-muted" style={{ marginInlineStart: 'auto', alignSelf: 'center' }}>
+          <span className="text-2xs text-muted ndi-filter-row__count">
             {filtered.length} / {items.length}
           </span>
         </div>
@@ -617,7 +591,7 @@ function FrameworkTab() {
                     <th>{isAr ? 'الأولوية' : 'Priority'}</th>
                     <th>{isAr ? 'الإلزام' : 'Mandatory'}</th>
                     <th>{isAr ? 'المصدر' : 'Source'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -625,9 +599,9 @@ function FrameworkTab() {
                     <tr key={it.id}>
                       <td className="mono text-2xs">{it.requirementCode}</td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{isAr && it.titleAr ? it.titleAr : it.titleEn}</div>
+                        <div className="ndi-cell-title">{isAr && it.titleAr ? it.titleAr : it.titleEn}</div>
                         {it.subdomain && (
-                          <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{it.subdomain}</div>
+                          <div className="text-2xs text-muted ndi-cell-sub">{it.subdomain}</div>
                         )}
                       </td>
                       <td><Badge tone={componentTone(it.component)}>{componentLabel(it.component, isAr ? 'ar' : 'en')}</Badge></td>
@@ -639,8 +613,8 @@ function FrameworkTab() {
                           ? <Badge tone="success">{isAr ? 'رسمي' : 'Official'}</Badge>
                           : <Badge tone="warning">{isAr ? 'مؤقت' : 'Placeholder'}</Badge>}
                       </td>
-                      <td style={{ textAlign: 'end' }}>
-                        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <td className="ndi-text-end">
+                        <div className="ndi-actions-row">
                           {!it.isOfficialImport && (
                             <Button size="sm" variant="secondary" Icon={Check}
                               onClick={() => onMarkOfficial(it)}>
@@ -822,18 +796,14 @@ function MaturityTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'تقييم النضج' : 'Maturity assessment'} Icon={Target}
         action={
-          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          <div className="ndi-actions-inline--center">
             <select
               value={cycleId ?? ''}
               onChange={e => setCycleId(Number(e.target.value))}
-              style={{
-                padding: '6px 10px', fontSize: 12, minWidth: 240,
-                border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                background: 'var(--surface-1)', color: 'var(--ink-1)',
-              }}>
+              className="ndi-mini-select" style={{ minWidth: 240 }}>
               {cycles.map(c => (
                 <option key={c.id} value={c.id}>
                   {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -864,7 +834,7 @@ function MaturityTab() {
           ? <InlineEmpty>
               <div>
                 {isAr ? 'لا توجد بنود نضج في هذه الدورة بعد.' : 'No maturity items in this cycle yet.'}
-                <div style={{ marginTop: 8 }}>
+                <div className="mt-md">
                   <Button variant="primary" Icon={Plus} onClick={onStart}>
                     {isAr ? 'إنشاء من الإطار' : 'Generate from framework'}
                   </Button>
@@ -886,11 +856,11 @@ function MaturityTab() {
                     <thead>
                       <tr>
                         <th>{isAr ? 'البند' : 'Item'}</th>
-                        <th style={{ width: 130 }}>{isAr ? 'المستوى الحالي' : 'Current level'}</th>
-                        <th style={{ width: 130 }}>{isAr ? 'الهدف' : 'Target'}</th>
+                        <th className="ndi-th-w-130">{isAr ? 'المستوى الحالي' : 'Current level'}</th>
+                        <th className="ndi-th-w-130">{isAr ? 'الهدف' : 'Target'}</th>
                         <th>{isAr ? 'الحالة' : 'Status'}</th>
                         <th>{isAr ? 'الدليل' : 'Evidence'}</th>
-                        <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                        <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -911,12 +881,8 @@ function MaturityTab() {
                                 value={it.currentLevel ?? ''}
                                 disabled={isApproved}
                                 onChange={e => onLevelChange(it, 'currentLevel', Number(e.target.value))}
-                                style={{
-                                  padding: '4px 6px', fontSize: 12, width: '100%',
-                                  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                                  background: 'var(--surface-1)',
-                                  borderLeft: `4px solid ${levelColor(it.currentLevel)}`,
-                                }}>
+                                className="ndi-level-select"
+                                style={{ borderInlineStart: `4px solid ${levelColor(it.currentLevel)}` }}>
                                 <option value="">—</option>
                                 {[0, 1, 2, 3, 4, 5].map(l => (
                                   <option key={l} value={l}>{l} · {levelLabel(l, isAr ? 'ar' : 'en')}</option>
@@ -928,12 +894,8 @@ function MaturityTab() {
                                 value={it.targetLevel ?? ''}
                                 disabled={isApproved}
                                 onChange={e => onLevelChange(it, 'targetLevel', Number(e.target.value))}
-                                style={{
-                                  padding: '4px 6px', fontSize: 12, width: '100%',
-                                  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                                  background: 'var(--surface-1)',
-                                  borderLeft: `4px solid ${levelColor(it.targetLevel)}`,
-                                }}>
+                                className="ndi-level-select"
+                                style={{ borderInlineStart: `4px solid ${levelColor(it.targetLevel)}` }}>
                                 <option value="">—</option>
                                 {[0, 1, 2, 3, 4, 5].map(l => (
                                   <option key={l} value={l}>{l} · {levelLabel(l, isAr ? 'ar' : 'en')}</option>
@@ -944,13 +906,13 @@ function MaturityTab() {
                             <td className="text-xs">
                               {it.evidenceRef ?? <span className="text-muted">—</span>}
                               {it.currentLevel != null && it.currentLevel >= 4 && !it.evidenceRef && (
-                                <div style={{ fontSize: 10, color: 'var(--danger-fg)', marginTop: 2 }}>
+                                <div className="ndi-cell-warn">
                                   {isAr ? 'القاعدة 2: مطلوب' : 'Rule 2: required'}
                                 </div>
                               )}
                             </td>
-                            <td style={{ textAlign: 'end' }}>
-                              <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            <td className="ndi-text-end">
+                              <div className="ndi-actions-row">
                                 {!isApproved && (
                                   <Button size="sm" variant="ghost" onClick={() => setEditing(it)}>
                                     {isAr ? 'تعديل' : 'Edit'}
@@ -1162,18 +1124,14 @@ function ComplianceTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'تقييم الامتثال' : 'Compliance assessment'} Icon={CheckCircle2}
         action={
-          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          <div className="ndi-actions-inline--center">
             <select
               value={cycleId ?? ''}
               onChange={e => setCycleId(Number(e.target.value))}
-              style={{
-                padding: '6px 10px', fontSize: 12, minWidth: 240,
-                border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                background: 'var(--surface-1)', color: 'var(--ink-1)',
-              }}>
+              className="ndi-mini-select" style={{ minWidth: 240 }}>
               {cycles.map(c => (
                 <option key={c.id} value={c.id}>
                   {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -1205,7 +1163,7 @@ function ComplianceTab() {
           ? <InlineEmpty>
               <div>
                 {isAr ? 'لا توجد بنود امتثال في هذه الدورة بعد.' : 'No compliance items in this cycle yet.'}
-                <div style={{ marginTop: 8 }}>
+                <div className="mt-md">
                   <Button variant="primary" Icon={Plus} onClick={onStart}>
                     {isAr ? 'إنشاء من الإطار' : 'Generate from framework'}
                   </Button>
@@ -1227,10 +1185,10 @@ function ComplianceTab() {
                     <thead>
                       <tr>
                         <th>{isAr ? 'الكود' : 'Code'}</th>
-                        <th style={{ width: 220 }}>{isAr ? 'حالة الامتثال' : 'Compliance status'}</th>
+                        <th className="ndi-th-w-220">{isAr ? 'حالة الامتثال' : 'Compliance status'}</th>
                         <th>{isAr ? 'الدليل' : 'Evidence'}</th>
                         <th>{isAr ? 'مسار العمل' : 'Lifecycle'}</th>
-                        <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                        <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1242,7 +1200,7 @@ function ComplianceTab() {
                             <td className="mono text-2xs">
                               {it.requirementCode}
                               {it.subdomain && (
-                                <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{it.subdomain}</div>
+                                <div className="text-2xs text-muted ndi-cell-sub">{it.subdomain}</div>
                               )}
                               {it.needsGap && (
                                 <Badge tone="danger">{isAr ? 'فجوة' : 'Gap'}</Badge>
@@ -1253,18 +1211,14 @@ function ComplianceTab() {
                                 value={it.complianceStatus}
                                 disabled={isApproved}
                                 onChange={e => onStatusChange(it, e.target.value as NdiComplianceStatus)}
-                                style={{
-                                  padding: '4px 6px', fontSize: 12, width: '100%',
-                                  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                                  background: 'var(--surface-1)',
-                                }}>
+                                className="ndi-level-select">
                                 {(['COMPLIANT', 'PARTIAL', 'NON_COMPLIANT', 'NOT_APPLICABLE', 'EVIDENCE_REQUIRED', 'UNDER_REVIEW'] as NdiComplianceStatus[])
                                   .map(s => (
                                     <option key={s} value={s}>{complianceStatusLabel(s, isAr ? 'ar' : 'en')}</option>
                                   ))}
                               </select>
                               {it.complianceStatus === 'NOT_APPLICABLE' && it.naJustification && (
-                                <div className="text-2xs text-muted" style={{ marginTop: 4, lineHeight: 1.4 }}>
+                                <div className="text-2xs text-muted ndi-cell-sub" style={{ lineHeight: 1.4 }}>
                                   {isAr ? 'المبرّر:' : 'Justification:'} {it.naJustification.slice(0, 80)}{it.naJustification.length > 80 ? '…' : ''}
                                 </div>
                               )}
@@ -1272,14 +1226,14 @@ function ComplianceTab() {
                             <td className="text-xs">
                               {it.evidenceRef ?? <span className="text-muted">—</span>}
                               {!it.evidenceRef && (it.complianceStatus === 'COMPLIANT' || it.complianceStatus === 'PARTIAL') && (
-                                <div style={{ fontSize: 10, color: 'var(--danger-fg)', marginTop: 2 }}>
+                                <div className="ndi-cell-warn">
                                   {isAr ? 'القاعدة 3: مطلوب' : 'Rule 3: required'}
                                 </div>
                               )}
                             </td>
                             <td><Badge tone={lifecycleTone(it.lifecycleStatus)}>{lifecycleLabel(it.lifecycleStatus, isAr ? 'ar' : 'en')}</Badge></td>
-                            <td style={{ textAlign: 'end' }}>
-                              <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            <td className="ndi-text-end">
+                              <div className="ndi-actions-row">
                                 {!isApproved && (
                                   <Button size="sm" variant="ghost" Icon={Paperclip}
                                     onClick={() => setEvidencing(it)}>
@@ -1417,17 +1371,13 @@ function OpexTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'مؤشّرات التميز التشغيلي' : 'Operational excellence KPIs'} Icon={Target}
         action={
           <select
             value={cycleId ?? ''}
             onChange={e => setCycleId(Number(e.target.value))}
-            style={{
-              padding: '6px 10px', fontSize: 12, minWidth: 240,
-              border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-              background: 'var(--surface-1)', color: 'var(--ink-1)',
-            }}>
+            className="ndi-mini-select" style={{ minWidth: 240 }}>
             {cycles.map(c => (
               <option key={c.id} value={c.id}>
                 {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -1459,10 +1409,10 @@ function OpexTab() {
                     <tr>
                       <th>{isAr ? 'الكود' : 'Code'}</th>
                       <th>{isAr ? 'المؤشّر' : 'KPI'}</th>
-                      <th style={{ width: 220 }}>{isAr ? 'التقدّم' : 'Progress'}</th>
+                      <th className="ndi-th-w-220">{isAr ? 'التقدّم' : 'Progress'}</th>
                       <th>{isAr ? 'الحالة' : 'Status'}</th>
                       <th>{isAr ? 'آخر تحديث' : 'Last updated'}</th>
-                      <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                      <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1476,32 +1426,26 @@ function OpexTab() {
                         <tr key={k.id}>
                           <td className="mono text-2xs">{k.kpiCode ?? `#${k.id}`}</td>
                           <td>
-                            <div style={{ fontWeight: 600 }}>{isAr && k.indicatorNameAr ? k.indicatorNameAr : k.indicatorNameEn}</div>
-                            <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                            <div className="ndi-cell-title">{isAr && k.indicatorNameAr ? k.indicatorNameAr : k.indicatorNameEn}</div>
+                            <div className="text-2xs text-muted ndi-cell-sub">
                               {isAr ? 'الهدف' : 'Target'}: {k.target}{k.unit ?? ''}{' · '}
                               {isAr ? 'خط الأساس' : 'Baseline'}: {k.baseline ?? '—'}{k.unit ?? ''}
                             </div>
                           </td>
                           <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{
-                                width: 100, height: 8, background: 'var(--surface-2)',
-                                borderRadius: 4, overflow: 'hidden', flexShrink: 0,
-                              }}>
-                                <div style={{
-                                  width: `${Math.min(100, Math.max(0, pct))}%`,
-                                  height: '100%', background: barColor,
-                                  transition: 'width 0.3s ease',
-                                }} />
+                            <div className="ndi-progress-wrap">
+                              <div className="ndi-progress-track ndi-progress-track--lg">
+                                <div className="ndi-progress-fill"
+                                  style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: barColor }} />
                               </div>
-                              <span className="mono text-2xs" style={{ minWidth: 80 }}>
+                              <span className="mono text-2xs ndi-progress-label">
                                 {k.actual ?? '—'}{k.unit ?? ''} / {k.target}{k.unit ?? ''}
                               </span>
                             </div>
                           </td>
                           <td><Badge tone={kpiStatusTone(k.status)}>{kpiStatusLabel(k.status, isAr ? 'ar' : 'en')}</Badge></td>
                           <td className="text-xs">{k.lastActualAt ?? <span className="text-muted">—</span>}</td>
-                          <td style={{ textAlign: 'end' }}>
+                          <td className="ndi-text-end">
                             <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onUpdateActual(k)}>
                               {isAr ? 'تسجيل قراءة' : 'Record actual'}
                             </Button>
@@ -1646,17 +1590,13 @@ function DomainsTab() {
   const placeholderCount = domains.filter(d => d.isPlaceholder).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'مجالات حوكمة البيانات' : 'Data governance domains'} Icon={Database}
         action={
           <select
             value={cycleId ?? ''}
             onChange={e => setCycleId(Number(e.target.value))}
-            style={{
-              padding: '6px 10px', fontSize: 12, minWidth: 240,
-              border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-              background: 'var(--surface-1)', color: 'var(--ink-1)',
-            }}>
+            className="ndi-mini-select" style={{ minWidth: 240 }}>
             {cycles.map(c => (
               <option key={c.id} value={c.id}>
                 {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -1681,7 +1621,7 @@ function DomainsTab() {
 
       {placeholderCount > 0 && (
         <Card title={isAr ? 'تنبيه: مكتبة المجالات مؤقتة' : 'Heads-up: placeholder domain library'} Icon={AlertCircle}>
-          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+          <div className="ndi-card-lede--ink2">
             {isAr
               ? `يوجد ${placeholderCount} مجال مُعلَّم كـ "عنصر مؤقت — يتطلب استيراد مكتبة الضوابط الرسمية من سدايا/نضيء". لا تَدَّعِ الاكتمال الرسمي حتى يتم استيراد المكتبة الرسمية. بعد الاستيراد، علِّم كل مجال يدوياً عبر زر "تعليم كرسمي".`
               : `${placeholderCount} domain${placeholderCount === 1 ? ' is' : 's are'} flagged as "Placeholder — requires official SDAIA/NDI control library import". Do not claim official completeness until the official library is imported. After import, flip each domain to official via the "Mark official" action.`}
@@ -1691,17 +1631,14 @@ function DomainsTab() {
 
       {unmatched.length > 0 && (
         <Card title={isAr ? 'سلاسل بلا تخصيص' : 'Unmatched domain strings'} Icon={AlertCircle}>
-          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 8 }}>
+          <div className="ndi-card-lede--ink2 ndi-text-card-body--mb">
             {isAr
               ? 'هذه السلاسل تُستخدَم في تقييمات النضج أو الالتزام أو مؤشّرات التميز التشغيلي، لكنها لا تتطابق مع أي مجال في القائمة أعلاه. أضِفها إلى أسماء البدائل (aliases) في المجال المناسب.'
               : 'These strings are used by maturity, compliance or operational-excellence rows but match no domain in the catalog above. Add them to the appropriate domain\'s aliases.'}
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="ndi-status-strip">
             {unmatched.map(s => (
-              <span key={s} className="mono text-2xs" style={{
-                padding: '3px 8px', background: 'var(--surface-2)',
-                borderRadius: 'var(--r-sm)', color: 'var(--ink-2)',
-              }}>{s}</span>
+              <span key={s} className="mono text-2xs ndi-stat-chip">{s}</span>
             ))}
           </div>
         </Card>
@@ -1718,13 +1655,13 @@ function DomainsTab() {
               <tr>
                 <th>{isAr ? 'الكود' : 'Code'}</th>
                 <th>{isAr ? 'المجال' : 'Domain'}</th>
-                <th style={{ width: 70 }}>{isAr ? 'الوزن' : 'Weight'}</th>
+                <th className="ndi-th-w-70">{isAr ? 'الوزن' : 'Weight'}</th>
                 <th>{isAr ? 'نضج' : 'Maturity'}</th>
                 <th>{isAr ? 'التزام' : 'Compliance'}</th>
                 <th>{isAr ? 'تميز' : 'OpEx'}</th>
-                <th style={{ width: 200 }}>{isAr ? 'مجموع المجال' : 'Domain score'}</th>
+                <th className="ndi-th-w-200">{isAr ? 'مجموع المجال' : 'Domain score'}</th>
                 <th>{isAr ? 'الحالة' : 'Status'}</th>
-                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
@@ -1741,9 +1678,9 @@ function DomainsTab() {
                   <tr key={d.id}>
                     <td className="mono text-2xs">{d.code}</td>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{isAr && d.nameAr ? d.nameAr : d.nameEn}</div>
+                      <div className="ndi-cell-title">{isAr && d.nameAr ? d.nameAr : d.nameEn}</div>
                       {d.isPlaceholder && (
-                        <div className="text-2xs" style={{ color: 'var(--warning)', marginTop: 2 }}>
+                        <div className="text-2xs ndi-cell-warn--warning">
                           {isAr ? 'عنصر مؤقت — يتطلب استيراد مكتبة سدايا' : 'Placeholder — requires official SDAIA import'}
                         </div>
                       )}
@@ -1777,18 +1714,12 @@ function DomainsTab() {
                     </td>
                     <td>
                       {blended != null ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{
-                            width: 120, height: 8, background: 'var(--surface-2)',
-                            borderRadius: 4, overflow: 'hidden', flexShrink: 0,
-                          }}>
-                            <div style={{
-                              width: `${Math.min(100, Math.max(0, blended))}%`,
-                              height: '100%', background: barColor,
-                              transition: 'width 0.3s ease',
-                            }} />
+                        <div className="ndi-progress-wrap">
+                          <div className="ndi-progress-track" style={{ width: 120 }}>
+                            <div className="ndi-progress-fill"
+                              style={{ width: `${Math.min(100, Math.max(0, blended))}%`, background: barColor }} />
                           </div>
-                          <span className="mono text-2xs" style={{ minWidth: 40 }}>
+                          <span className="mono text-2xs ndi-progress-label--sm">
                             {blended.toFixed(0)}%
                           </span>
                         </div>
@@ -1802,8 +1733,8 @@ function DomainsTab() {
                         : tone === 'danger'  ? 'danger' : 'neutral'
                       }>{ndiScoreLabel(blended, isAr ? 'ar' : 'en')}</Badge>
                     </td>
-                    <td style={{ textAlign: 'end' }}>
-                      <div style={{ display: 'inline-flex', gap: 4 }}>
+                    <td className="ndi-text-end">
+                      <div className="ndi-actions-row ndi-actions-row--tight">
                         <Button size="sm" variant="ghost" Icon={Target} onClick={() => onEditWeight(d)}
                           title={isAr ? 'تعديل الوزن' : 'Edit weight'} />
                         {d.isPlaceholder
@@ -1972,10 +1903,10 @@ function EvidenceTab() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'مستودع الأدلة' : 'Evidence repository'} Icon={Paperclip}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="ndi-actions-inline">
             <Button size="sm" variant="ghost" Icon={Check} onClick={onRunExpiry}>
               {isAr ? 'تحقق من الانتهاء' : 'Check expiry'}
             </Button>
@@ -2029,20 +1960,16 @@ function EvidenceTab() {
 
       <Card title={isAr ? 'جميع الأدلة' : 'All evidence'} Icon={FileText}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="ndi-actions-inline">
             <select value={typeFilter}
               onChange={e => setTypeFilter(e.target.value as NdiEvidenceType | '')}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 140,
-                       border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                       background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-140">
               <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
               {(['POLICY','PROCEDURE','REPORT','SCREENSHOT','ATTESTATION','CERTIFICATE','AUDIT_LOG','DATASET','OTHER'] as NdiEvidenceType[])
                 .map(t => <option key={t} value={t}>{evidenceTypeLabel(t, isAr ? 'ar' : 'en')}</option>)}
             </select>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 140,
-                       border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                       background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-140">
               <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
               <option value="PENDING">{isAr ? 'قيد المراجعة' : 'Pending'}</option>
               <option value="ACTIVE">{isAr ? 'سارٍ' : 'Active'}</option>
@@ -2066,7 +1993,7 @@ function EvidenceTab() {
                 <th>{isAr ? 'سريان' : 'Effective'}</th>
                 <th>{isAr ? 'انتهاء' : 'Expiry'}</th>
                 <th>{isAr ? 'الحالة' : 'Status'}</th>
-                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
@@ -2074,9 +2001,9 @@ function EvidenceTab() {
                 <tr key={e.id}>
                   <td className="mono text-2xs">{e.evidenceCode ?? `#${e.id}`}</td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{isAr && e.titleAr ? e.titleAr : e.titleEn}</div>
+                    <div className="ndi-cell-title">{isAr && e.titleAr ? e.titleAr : e.titleEn}</div>
                     {e.fileRef && (
-                      <div className="text-2xs text-muted mono" style={{ marginTop: 2 }}>{e.fileRef}</div>
+                      <div className="text-2xs text-muted mono ndi-cell-sub">{e.fileRef}</div>
                     )}
                   </td>
                   <td className="text-xs">{evidenceTypeLabel(e.evidenceType, isAr ? 'ar' : 'en')}</td>
@@ -2085,8 +2012,8 @@ function EvidenceTab() {
                   <td className="text-xs">{e.effectiveDate ?? <span className="text-muted">—</span>}</td>
                   <td className="text-xs">{e.expiryDate ?? <span className="text-muted">—</span>}</td>
                   <td><Badge tone={evidenceStatusTone(e.status)}>{evidenceStatusLabel(e.status, isAr ? 'ar' : 'en')}</Badge></td>
-                  <td style={{ textAlign: 'end' }}>
-                    <div style={{ display: 'inline-flex', gap: 4 }}>
+                  <td className="ndi-text-end">
+                    <div className="ndi-actions-row ndi-actions-row--tight">
                       {e.status === 'PENDING' && (
                         <>
                           <Button size="sm" variant="ghost" Icon={Check} onClick={() => onApprove(e)}
@@ -2324,13 +2251,12 @@ function GapsTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'الفجوات والإجراءات التصحيحية' : 'Gaps & corrective actions'} Icon={AlertCircle}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="ndi-actions-inline">
             <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-220">
               {cycles.map(c => (
                 <option key={c.id} value={c.id}>
                   {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -2359,10 +2285,9 @@ function GapsTab() {
 
       <Card title={isAr ? 'تفاصيل الفجوات' : 'Gap details'} Icon={FileText}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="ndi-actions-inline">
             <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value as GapSeverity | '')}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 130, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-130">
               <option value="">{isAr ? 'كل الخطورات' : 'All severity'}</option>
               <option value="CRITICAL">{isAr ? 'حرج' : 'Critical'}</option>
               <option value="HIGH">{isAr ? 'مرتفع' : 'High'}</option>
@@ -2370,8 +2295,7 @@ function GapsTab() {
               <option value="LOW">{isAr ? 'منخفض' : 'Low'}</option>
             </select>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as GapStatus | '')}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 140, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-140">
               <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
               <option value="OPEN">{isAr ? 'مفتوح' : 'Open'}</option>
               <option value="IN_PROGRESS">{isAr ? 'قيد المعالجة' : 'In progress'}</option>
@@ -2387,15 +2311,15 @@ function GapsTab() {
           <table className="grc-table">
             <thead>
               <tr>
-                <th style={{ width: 30 }} />
+                <th className="ndi-th-w-30" />
                 <th>{isAr ? 'الكود' : 'Code'}</th>
                 <th>{isAr ? 'العنوان' : 'Title'}</th>
                 <th>{isAr ? 'الخطورة' : 'Severity'}</th>
                 <th>{isAr ? 'المالك' : 'Owner'}</th>
                 <th>{isAr ? 'الهدف' : 'Target'}</th>
-                <th style={{ width: 180 }}>{isAr ? 'التقدّم' : 'Progress'}</th>
+                <th className="ndi-th-w-180">{isAr ? 'التقدّم' : 'Progress'}</th>
                 <th>{isAr ? 'الحالة' : 'Status'}</th>
-                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
@@ -2414,8 +2338,8 @@ function GapsTab() {
                       </td>
                       <td className="mono text-2xs">{g.gapCode ?? `#${g.id}`}</td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{isAr && g.titleAr ? g.titleAr : g.titleEn}</div>
-                        <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                        <div className="ndi-cell-title">{isAr && g.titleAr ? g.titleAr : g.titleEn}</div>
+                        <div className="text-2xs text-muted ndi-cell-sub">
                           {g.domain ?? '—'} · {g.sourceType}
                         </div>
                       </td>
@@ -2423,9 +2347,9 @@ function GapsTab() {
                       <td className="text-xs">{g.ownerName ?? <span className="text-muted">—</span>}</td>
                       <td className="text-xs">{g.targetDate ?? <span className="text-muted">—</span>}</td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 90, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
-                            <div style={{ width: `${g.rollupProgress}%`, height: '100%', background: progColor, transition: 'width 0.3s ease' }} />
+                        <div className="ndi-progress-wrap">
+                          <div className="ndi-progress-track">
+                            <div className="ndi-progress-fill" style={{ width: `${g.rollupProgress}%`, background: progColor }} />
                           </div>
                           <span className="mono text-2xs">{g.rollupProgress}% · {g.capaCompletedCount}/{g.capaCount}</span>
                         </div>
@@ -2433,20 +2357,19 @@ function GapsTab() {
                       <td>
                         <select value={g.status}
                           onChange={e => onChangeGapStatus(g, e.target.value as GapStatus)}
-                          style={{ padding: '2px 6px', fontSize: 11, border: '1px solid var(--border)',
-                                   borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+                          className="ndi-status-select">
                           <option value="OPEN">{gapStatusLabel('OPEN', isAr ? 'ar' : 'en')}</option>
                           <option value="IN_PROGRESS">{gapStatusLabel('IN_PROGRESS', isAr ? 'ar' : 'en')}</option>
                           <option value="RESOLVED">{gapStatusLabel('RESOLVED', isAr ? 'ar' : 'en')}</option>
                           <option value="ACCEPTED_RISK">{gapStatusLabel('ACCEPTED_RISK', isAr ? 'ar' : 'en')}</option>
                           <option value="CLOSED">{gapStatusLabel('CLOSED', isAr ? 'ar' : 'en')}</option>
                         </select>
-                        <span style={{ marginInlineStart: 4 }}>
+                        <span className="ndi-marker">
                           <Badge tone={gapStatusTone(g.status)}>{gapStatusLabel(g.status, isAr ? 'ar' : 'en')}</Badge>
                         </span>
                       </td>
-                      <td style={{ textAlign: 'end' }}>
-                        <div style={{ display: 'inline-flex', gap: 4 }}>
+                      <td className="ndi-text-end">
+                        <div className="ndi-actions-row ndi-actions-row--tight">
                           <Button size="sm" variant="ghost" Icon={Plus} onClick={() => onAddCapa(g)}
                             title={isAr ? 'إضافة إجراء' : 'Add CAPA'} />
                           <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDeleteGap(g)}
@@ -2457,12 +2380,12 @@ function GapsTab() {
                     {open && (
                       <tr key={`${g.id}-capas`}>
                         <td />
-                        <td colSpan={8} style={{ background: 'var(--surface-2)', padding: 0 }}>
+                        <td colSpan={8} className="ndi-expanded-cell">
                           {childCapas.length === 0
-                            ? <div style={{ padding: 12, fontSize: 12, color: 'var(--ink-3)' }}>
+                            ? <div className="ndi-expanded-empty">
                                 {isAr ? 'لا توجد إجراءات تصحيحية بعد.' : 'No corrective actions yet.'}
                               </div>
-                            : <table className="grc-table" style={{ margin: 0 }}>
+                            : <table className="grc-table ndi-expanded-table">
                                 <thead>
                                   <tr>
                                     <th>{isAr ? 'الكود' : 'Code'}</th>
@@ -2472,7 +2395,7 @@ function GapsTab() {
                                     <th>{isAr ? 'الهدف' : 'Target'}</th>
                                     <th>{isAr ? 'التقدّم' : 'Progress'}</th>
                                     <th>{isAr ? 'الحالة' : 'Status'}</th>
-                                    <th style={{ textAlign: 'end' }}>{isAr ? '' : ''}</th>
+                                    <th className="ndi-text-end">{isAr ? '' : ''}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -2487,20 +2410,19 @@ function GapsTab() {
                                       <td>
                                         <select value={c.status}
                                           onChange={e => onChangeCapaStatus(c, e.target.value as CapaStatus)}
-                                          style={{ padding: '2px 6px', fontSize: 11, border: '1px solid var(--border)',
-                                                   borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+                                          className="ndi-status-select">
                                           <option value="NOT_STARTED">{capaStatusLabel('NOT_STARTED', isAr ? 'ar' : 'en')}</option>
                                           <option value="IN_PROGRESS">{capaStatusLabel('IN_PROGRESS', isAr ? 'ar' : 'en')}</option>
                                           <option value="BLOCKED">{capaStatusLabel('BLOCKED', isAr ? 'ar' : 'en')}</option>
                                           <option value="COMPLETED">{capaStatusLabel('COMPLETED', isAr ? 'ar' : 'en')}</option>
                                           <option value="DEFERRED">{capaStatusLabel('DEFERRED', isAr ? 'ar' : 'en')}</option>
                                         </select>
-                                        <span style={{ marginInlineStart: 4 }}>
+                                        <span className="ndi-marker">
                                           <Badge tone={capaStatusTone(c.status)}>{capaStatusLabel(c.status, isAr ? 'ar' : 'en')}</Badge>
                                         </span>
                                       </td>
-                                      <td style={{ textAlign: 'end' }}>
-                                        <div style={{ display: 'inline-flex', gap: 4 }}>
+                                      <td className="ndi-text-end">
+                                        <div className="ndi-actions-row ndi-actions-row--tight">
                                           <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => onUpdateCapaProgress(c)}
                                             title={isAr ? 'تحديث التقدّم' : 'Update progress'} />
                                           <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDeleteCapa(c)}
@@ -2732,13 +2654,12 @@ function ImprovementTab() {
     .reduce((s, it) => s + (it.allocatedBudget ?? 0), 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'خطة التحسين' : 'Improvement plan'} Icon={Target}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="ndi-actions-inline">
             <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-220">
               {cycles.map(c => (
                 <option key={c.id} value={c.id}>
                   {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -2753,18 +2674,11 @@ function ImprovementTab() {
         {plans.length === 0
           ? <InlineEmpty>{isAr ? 'لا توجد خطة لهذه الدورة بعد.' : 'No plan exists for this cycle yet.'}</InlineEmpty>
           : (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div className="ndi-plan-chip-row">
               {plans.map(p => (
                 <button key={p.id}
                   onClick={() => loadPlan(p)}
-                  style={{
-                    padding: '6px 12px', fontSize: 12,
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-sm)',
-                    background: currentPlan?.id === p.id ? 'var(--primary)' : 'var(--surface-1)',
-                    color: currentPlan?.id === p.id ? 'white' : 'var(--ink-1)',
-                    cursor: 'pointer',
-                  }}>
+                  className={`ndi-plan-chip${currentPlan?.id === p.id ? ' is-active' : ''}`}>
                   {p.planCode ?? '—'} · {isAr && p.nameAr ? p.nameAr : p.nameEn}
                 </button>
               ))}
@@ -2789,7 +2703,7 @@ function ImprovementTab() {
         )}
 
         {currentPlan && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+          <div className="ndi-chip-set--row">
             {currentPlan.status === 'DRAFT' && (
               <Button size="sm" variant="primary" Icon={Check} onClick={onApprove}>
                 {isAr ? 'اعتماد' : 'Approve'}
@@ -2816,14 +2730,14 @@ function ImprovementTab() {
               <table className="grc-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 50 }}>#</th>
+                    <th className="ndi-th-w-50">#</th>
                     <th>{isAr ? 'كود الإجراء' : 'CAPA code'}</th>
                     <th>{isAr ? 'الإجراء' : 'Action'}</th>
                     <th>{isAr ? 'الأولوية' : 'Priority'}</th>
                     <th>{isAr ? 'الميزانية' : 'Budget'}</th>
-                    <th style={{ width: 140 }}>{isAr ? 'التقدّم' : 'Progress'}</th>
+                    <th className="ndi-th-w-140">{isAr ? 'التقدّم' : 'Progress'}</th>
                     <th>{isAr ? 'حالة الإجراء' : 'CAPA status'}</th>
-                    <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                    <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2838,22 +2752,21 @@ function ImprovementTab() {
                         <td>
                           <select value={it.priority}
                             onChange={e => onUpdateItemPriority(it, e.target.value as NdiPlanItemPriority)}
-                            style={{ padding: '2px 6px', fontSize: 11, border: '1px solid var(--border)',
-                                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+                            className="ndi-status-select">
                             <option value="CRITICAL">{priorityLabelPlan('CRITICAL', isAr ? 'ar' : 'en')}</option>
                             <option value="HIGH">{priorityLabelPlan('HIGH', isAr ? 'ar' : 'en')}</option>
                             <option value="MEDIUM">{priorityLabelPlan('MEDIUM', isAr ? 'ar' : 'en')}</option>
                             <option value="LOW">{priorityLabelPlan('LOW', isAr ? 'ar' : 'en')}</option>
                           </select>
-                          <span style={{ marginInlineStart: 4 }}>
+                          <span className="ndi-marker">
                             <Badge tone={planPriorityTone(it.priority)}>{priorityLabelPlan(it.priority, isAr ? 'ar' : 'en')}</Badge>
                           </span>
                         </td>
                         <td className="mono text-2xs">{it.allocatedBudget?.toLocaleString() ?? '—'}</td>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 80, height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
-                              <div style={{ width: `${prog}%`, height: '100%', background: color, transition: 'width 0.3s ease' }} />
+                          <div className="ndi-progress-wrap">
+                            <div className="ndi-progress-track" style={{ width: 80 }}>
+                              <div className="ndi-progress-fill" style={{ width: `${prog}%`, background: color }} />
                             </div>
                             <span className="mono text-2xs">{prog}%</span>
                           </div>
@@ -2863,8 +2776,8 @@ function ImprovementTab() {
                             ? <Badge tone={capaStatusTone(it.capaStatus)}>{capaStatusLabel(it.capaStatus, isAr ? 'ar' : 'en')}</Badge>
                             : <span className="text-muted text-2xs">—</span>}
                         </td>
-                        <td style={{ textAlign: 'end' }}>
-                          <div style={{ display: 'inline-flex', gap: 4 }}>
+                        <td className="ndi-text-end">
+                          <div className="ndi-actions-row ndi-actions-row--tight">
                             <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => onUpdateItemQuarter(it)}
                               title={isAr ? 'تعديل الربع' : 'Edit quarter'} />
                             <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDeleteItem(it)}
@@ -3069,13 +2982,12 @@ function SubmissionTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'حزمة التقديم لسدايا' : 'SDAIA submission package'} Icon={Upload}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="ndi-actions-inline">
             <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-220">
               {cycles.map(c => (
                 <option key={c.id} value={c.id}>
                   {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -3107,25 +3019,17 @@ function SubmissionTab() {
           </div>
         )}
         {pf && pf.blockers.length > 0 && (
-          <div style={{
-            marginTop: 12, padding: 12, fontSize: 12, lineHeight: 1.6,
-            background: 'var(--danger-bg, #fef2f2)', borderLeft: '3px solid var(--danger)',
-            borderRadius: 'var(--r-sm)', color: 'var(--ink-1)',
-          }}>
+          <div className="ndi-banner ndi-banner--danger">
             <strong>{isAr ? 'حواجز قبل التجهيز:' : 'Blockers before finalize:'}</strong>
-            <ul style={{ margin: '6px 0 0', paddingInlineStart: 18 }}>
+            <ul className="ndi-banner-list">
               {pf.blockers.map((b, i) => <li key={i}>{b}</li>)}
             </ul>
           </div>
         )}
         {pf && pf.warnings.length > 0 && (
-          <div style={{
-            marginTop: 8, padding: 12, fontSize: 12, lineHeight: 1.6,
-            background: 'var(--warning-bg, #fffbeb)', borderLeft: '3px solid var(--warning)',
-            borderRadius: 'var(--r-sm)', color: 'var(--ink-1)',
-          }}>
+          <div className="ndi-banner ndi-banner--warning ndi-banner--mt-sm">
             <strong>{isAr ? 'تنبيهات (لا تمنع التجهيز):' : 'Warnings (do not block finalize):'}</strong>
-            <ul style={{ margin: '6px 0 0', paddingInlineStart: 18 }}>
+            <ul className="ndi-banner-list">
               {pf.warnings.map((w, i) => <li key={i}>{w}</li>)}
             </ul>
           </div>
@@ -3135,17 +3039,10 @@ function SubmissionTab() {
       {packages.length === 0
         ? <InlineEmpty>{isAr ? 'لا توجد حزمة لهذه الدورة بعد. اضغط "حزمة جديدة" لإنشاء أوّل لقطة.' : 'No package for this cycle yet. Click "New package" to create the first snapshot.'}</InlineEmpty>
         : (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="ndi-plan-chip-row ndi-plan-chip-row--no-mb">
             {packages.map(p => (
               <button key={p.id} onClick={() => setCurrent(p)}
-                style={{
-                  padding: '6px 12px', fontSize: 12,
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--r-sm)',
-                  background: current?.id === p.id ? 'var(--primary)' : 'var(--surface-1)',
-                  color: current?.id === p.id ? 'white' : 'var(--ink-1)',
-                  cursor: 'pointer',
-                }}>
+                className={`ndi-plan-chip${current?.id === p.id ? ' is-active' : ''}`}>
                 {p.packageCode ?? `#${p.id}`} · v{p.version} · {submissionStatusLabel(p.status, isAr ? 'ar' : 'en')}
               </button>
             ))}
@@ -3175,11 +3072,7 @@ function SubmissionTab() {
           </div>
 
           {current.isPlaceholder && (
-            <div style={{
-              marginTop: 12, padding: 12, fontSize: 12, lineHeight: 1.6,
-              background: 'var(--warning-bg, #fffbeb)', borderLeft: '3px solid var(--warning)',
-              borderRadius: 'var(--r-sm)', color: 'var(--ink-1)',
-            }}>
+            <div className="ndi-banner ndi-banner--warning">
               <strong>{isAr ? 'تنبيه: مكتبة مؤقتة' : 'Heads-up: placeholder content'}</strong><br/>
               {isAr
                 ? 'هذه الحزمة تستند إلى مجالات/إطار مُعلَّمة كـ "عنصر مؤقت — يتطلب استيراد مكتبة سدايا الرسمية". لا تَدَّعِ الاكتمال الرسمي حتى يتم استيراد المكتبة.'
@@ -3187,7 +3080,7 @@ function SubmissionTab() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 6, marginTop: 16, flexWrap: 'wrap' }}>
+          <div className="ndi-chip-set--row" style={{ marginTop: 16 }}>
             {(current.status === 'DRAFT' || current.status === 'READY') && (
               <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={onRegenerate}>
                 {isAr ? 'تحديث اللقطة' : 'Regenerate snapshot'}
@@ -3231,25 +3124,21 @@ function SubmissionTab() {
             )}
           </div>
 
-          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+          <div className="ndi-text-card-body">
             <div><strong>{isAr ? 'إعداد:' : 'Prepared:'}</strong> {current.preparerName ?? '—'}{current.preparedAt ? ` · ${current.preparedAt}` : ''}</div>
             {current.reviewedAt && <div><strong>{isAr ? 'مراجعة:' : 'Reviewed:'}</strong> {current.reviewedAt}</div>}
             {current.approvedAt && <div><strong>{isAr ? 'اعتماد:' : 'Approved:'}</strong> {current.approverName ?? '—'} · {current.approvedAt}</div>}
             {current.submittedAt && <div><strong>{isAr ? 'تقديم:' : 'Submitted:'}</strong> {current.submitterName ?? '—'} · {current.submittedAt}</div>}
             {current.acknowledgedAt && <div><strong>{isAr ? 'إقرار سدايا:' : 'SDAIA acknowledged:'}</strong> {current.sdaiaReference ?? '—'} · {current.acknowledgedAt}</div>}
-            {current.rejectionReason && <div style={{ color: 'var(--danger)' }}><strong>{isAr ? 'سبب الرفض:' : 'Rejection reason:'}</strong> {current.rejectionReason}</div>}
+            {current.rejectionReason && <div className="ndi-text-danger"><strong>{isAr ? 'سبب الرفض:' : 'Rejection reason:'}</strong> {current.rejectionReason}</div>}
           </div>
 
           {current.snapshotJson && (
-            <details style={{ marginTop: 16 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--ink-2)', fontWeight: 600 }}>
+            <details className="ndi-banner--mt-md">
+              <summary className="ndi-details-summary">
                 {isAr ? 'محتوى اللقطة (JSON)' : 'Snapshot JSON'}
               </summary>
-              <pre style={{
-                marginTop: 8, padding: 12, maxHeight: 320, overflow: 'auto',
-                background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
-                fontSize: 10, lineHeight: 1.5,
-              }}>{tryFormat(current.snapshotJson)}</pre>
+              <pre className="ndi-pre-block" style={{ maxHeight: 320, overflow: 'auto' }}>{tryFormat(current.snapshotJson)}</pre>
             </details>
           )}
         </Card>
@@ -3347,12 +3236,11 @@ function ReportsTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'التقارير' : 'Reports'} Icon={FileText}
         action={
           <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
-            style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
-                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+            className="ndi-mini-select ndi-mini-select--w-220">
             {cycles.map(c => (
               <option key={c.id} value={c.id}>
                 {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -3372,7 +3260,7 @@ function ReportsTab() {
                 <th>{isAr ? 'الصيغة' : 'Format'}</th>
                 <th>{isAr ? 'آخر تشغيل' : 'Last run'}</th>
                 <th>{isAr ? 'الحالة' : 'Status'}</th>
-                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
@@ -3389,8 +3277,8 @@ function ReportsTab() {
                       {d.lastRunStatus ?? (isAr ? 'لم يُشغَّل' : 'Not run')}
                     </Badge>
                   </td>
-                  <td style={{ textAlign: 'end' }}>
-                    <div style={{ display: 'inline-flex', gap: 4 }}>
+                  <td className="ndi-text-end">
+                    <div className="ndi-actions-row ndi-actions-row--tight">
                       <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onRun(d)}>
                         {isAr ? 'تشغيل' : 'Run'}
                       </Button>
@@ -3411,10 +3299,10 @@ function ReportsTab() {
       </Card>
 
       <Card title={isAr ? 'تشغيل تقرير عابر' : 'Ad-hoc report'} Icon={Target}>
-        <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 8 }}>
+        <div className="ndi-text-eyebrow-sm">
           {isAr ? 'اختر نوع التقرير وشغّله مباشرة دون حفظ التعريف.' : 'Pick a report type and run without saving a definition.'}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="ndi-status-strip">
           {(['NDI_EXECUTIVE_SUMMARY','DOMAIN_ROLLUP','GAP_REGISTER','CAPA_REGISTER','EVIDENCE_INVENTORY','OPEX_KPI_DASHBOARD','CYCLE_HISTORY'] as NdiReportType[])
             .map(t => (
               <Button key={t} size="sm" variant="secondary" Icon={ArrowRight} onClick={() => onRunAdHoc(t)}>
@@ -3427,7 +3315,7 @@ function ReportsTab() {
       {result && (
         <Card title={`${isAr ? 'النتيجة:' : 'Result:'} ${reportTypeLabel(result.reportType, isAr ? 'ar' : 'en')}`} Icon={FileText}
           action={
-            <div style={{ display: 'inline-flex', gap: 6 }}>
+            <div className="ndi-actions-inline">
               <Button size="sm" variant="secondary" Icon={FileText}
                 onClick={() => downloadAdHocReport(result.reportType, 'XLSX', result.cycleId).catch(e => toast.danger(String(e)))}>
                 XLSX
@@ -3442,24 +3330,22 @@ function ReportsTab() {
               </Button>
             </div>
           }>
-          <div className="text-xs text-muted" style={{ marginBottom: 8 }}>
+          <div className="text-xs text-muted ndi-footer-note">
             {isAr ? 'تاريخ التوليد' : 'Generated at'}: {result.generatedAt} · {result.rows.length} {isAr ? 'صف' : 'rows'}
           </div>
           <details>
-            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+            <summary className="ndi-details-summary">
               {isAr ? 'الملخص' : 'Summary'}
             </summary>
-            <pre style={{ marginTop: 6, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
-                          fontSize: 10, lineHeight: 1.5, maxHeight: 200, overflow: 'auto' }}>
+            <pre className="ndi-pre" style={{ maxHeight: 200 }}>
               {JSON.stringify(result.summary, null, 2)}
             </pre>
           </details>
-          <details style={{ marginTop: 8 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+          <details className="ndi-banner--mt-sm">
+            <summary className="ndi-details-summary">
               {isAr ? 'الصفوف' : 'Rows'}
             </summary>
-            <pre style={{ marginTop: 6, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
-                          fontSize: 10, lineHeight: 1.5, maxHeight: 320, overflow: 'auto' }}>
+            <pre className="ndi-pre" style={{ maxHeight: 320 }}>
               {JSON.stringify(result.rows, null, 2)}
             </pre>
           </details>
@@ -3517,12 +3403,11 @@ function DashboardTab() {
     : ndi >= 40 ? 'warning' : 'danger';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'نظرة عامة' : 'Overview'} Icon={Database}
         action={
           <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
-            style={{ padding: '6px 10px', fontSize: 12, minWidth: 220, border: '1px solid var(--border)',
-                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+            className="ndi-mini-select ndi-mini-select--w-220">
             {cycles.map(c => (
               <option key={c.id} value={c.id}>
                 {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
@@ -3580,9 +3465,9 @@ function DashboardTab() {
                   <tr key={d.code}>
                     <td className="mono text-2xs">{d.code}</td>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{isAr && d.nameAr ? d.nameAr : d.nameEn}</div>
+                      <div className="ndi-cell-title">{isAr && d.nameAr ? d.nameAr : d.nameEn}</div>
                       {d.isPlaceholder && (
-                        <div className="text-2xs" style={{ color: 'var(--warning)' }}>
+                        <div className="text-2xs ndi-cell-warn--warning">
                           {isAr ? 'عنصر مؤقت' : 'Placeholder'}
                         </div>
                       )}
@@ -3636,8 +3521,7 @@ function DashboardTab() {
 
       {Object.keys(snap.latestSubmission).length > 0 && (
         <Card title={isAr ? 'آخر حزمة تقديم' : 'Latest submission'} Icon={Upload}>
-          <pre style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
-                        fontSize: 11, lineHeight: 1.5, maxHeight: 220, overflow: 'auto' }}>
+          <pre className="ndi-pre-block" style={{ maxHeight: 220, overflow: 'auto' }}>
             {JSON.stringify(snap.latestSubmission, null, 2)}
           </pre>
         </Card>
@@ -3701,7 +3585,7 @@ function SettingsTab() {
   if (loading) return <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       {Object.entries(grouped).map(([category, items]) => (
         <Card key={category} title={settingCategoryLabel(category, isAr ? 'ar' : 'en')} Icon={Wrench}>
           <table className="grc-table">
@@ -3712,7 +3596,7 @@ function SettingsTab() {
                 <th>{isAr ? 'النوع' : 'Type'}</th>
                 <th>{isAr ? 'القيمة' : 'Value'}</th>
                 <th>{isAr ? 'الافتراضي' : 'Default'}</th>
-                <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                <th className="ndi-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
@@ -3720,20 +3604,20 @@ function SettingsTab() {
                 <tr key={s.id}>
                   <td className="mono text-2xs">{s.settingKey}</td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{isAr && s.nameAr ? s.nameAr : s.nameEn}</div>
+                    <div className="ndi-cell-title">{isAr && s.nameAr ? s.nameAr : s.nameEn}</div>
                     {(s.descriptionEn || s.descriptionAr) && (
-                      <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                      <div className="text-2xs text-muted ndi-cell-sub">
                         {isAr && s.descriptionAr ? s.descriptionAr : s.descriptionEn}
                       </div>
                     )}
                   </td>
                   <td className="text-xs">{s.valueType}</td>
-                  <td className="mono text-xs" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <td className="mono text-xs ndi-trunc-mono">
                     {s.valueText ?? <span className="text-muted">—</span>}
                   </td>
                   <td className="mono text-2xs text-muted">{s.defaultValue ?? '—'}</td>
-                  <td style={{ textAlign: 'end' }}>
-                    <div style={{ display: 'inline-flex', gap: 4 }}>
+                  <td className="ndi-text-end">
+                    <div className="ndi-actions-row ndi-actions-row--tight">
                       <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => onEdit(s)} disabled={s.isLocked} />
                       <Button size="sm" variant="ghost" Icon={ArchiveIcon} onClick={() => onReset(s)} disabled={s.isLocked} />
                     </div>
@@ -3784,7 +3668,7 @@ function AuditTab() {
   useEffect(() => { void reload(); }, [actionFilter, severityFilter, entityTypeFilter]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ndi-stack">
       <Card title={isAr ? 'مسار التدقيق' : 'Audit trail'} Icon={FileText}>
         {agg && (
           <div className="kpi-grid">
@@ -3802,22 +3686,19 @@ function AuditTab() {
 
       <Card title={isAr ? 'الأحداث' : 'Events'} Icon={FileText}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="ndi-actions-inline">
             <select value={entityTypeFilter} onChange={e => setEntityTypeFilter(e.target.value)}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 130, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-130">
               <option value="">{isAr ? 'كل الكيانات' : 'All entities'}</option>
               {agg && Object.keys(agg.byEntityType).map(et => <option key={et} value={et}>{et}</option>)}
             </select>
             <select value={actionFilter} onChange={e => setActionFilter(e.target.value as AuditAction | '')}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 130, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-130">
               <option value="">{isAr ? 'كل الإجراءات' : 'All actions'}</option>
               {agg && Object.keys(agg.byAction).map(a => <option key={a} value={a}>{a}</option>)}
             </select>
             <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value as AuditSeverity | '')}
-              style={{ padding: '6px 10px', fontSize: 12, minWidth: 110, border: '1px solid var(--border)',
-                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              className="ndi-mini-select ndi-mini-select--w-110">
               <option value="">{isAr ? 'كل المستويات' : 'All severity'}</option>
               <option value="INFO">INFO</option>
               <option value="WARN">WARN</option>
@@ -3879,13 +3760,12 @@ function NotYetShipped({ tab, isAr, t }: { tab: NdiTab; isAr: boolean; t: (k: st
   const slice = PENDING_SLICE[tab];
   return (
     <Card title={isAr ? 'هذه الواجهة قيد التطوير' : 'Tab not shipped yet'} Icon={Wrench}>
-      <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+      <div className="ndi-card-lede--ink2">
         {isAr
           ? `هذه الواجهة جزء من شريحة لاحقة (الشريحة ${slice}) في خطة إدارة نضيء. الشريحة 1 (دورات التقييم) هي الأساس وقد شُحنت بالكامل في هذا الإصدار.`
           : `This tab is part of a later slice (slice ${slice}) in the NDI module rollout plan. Slice 1 (Assessment cycles) is the foundation and is fully shipped in this commit.`}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, padding: 10,
-                    background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', lineHeight: 1.5 }}>
+      <div className="ndi-text-card-hint">
         <strong>{isAr ? 'ملاحظة' : 'Note'}:</strong>{' '}
         {isAr
           ? 'محتوى إطار نضيء الرسمي غير مستورَد بعد. كل ما يُعرَض هنا لاحقاً سيُصنَّف "عنصر مؤقت" حتى استيراد المكتبة الرسمية من سدايا.'

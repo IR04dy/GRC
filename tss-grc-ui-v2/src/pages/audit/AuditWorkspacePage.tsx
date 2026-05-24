@@ -44,6 +44,7 @@ import {
   complianceCheck, meetingsHeldThisYear,
 } from '../../lib/auditCommittee';
 import { Users, CalendarDays, AlertOctagon, Banknote, FileSignature, Gavel, Scale } from 'lucide-react';
+import '../../styles/pages/audit-workspace.css';
 
 type WsTabId = 'inbox' | 'plan' | 'auditors' | 'appointments' | 'committee';
 
@@ -156,7 +157,7 @@ export function AuditWorkspacePage() {
       </div>
 
       {/* Aging donut + Engagements row */}
-      <div className="dash-grid" style={{ marginTop: 12 }}>
+      <div className="dash-grid mt-md">
         <Card title={t('audwsAging')} Icon={Activity}
           action={<Badge tone={aging.escalated + aging.overdue > 0 ? 'danger' : 'success'}>
             {aging.onTrack + aging.atRisk + aging.overdue + aging.escalated} {t('audwsAgingCenterSub')}
@@ -175,37 +176,29 @@ export function AuditWorkspacePage() {
         <Card title={t('audwsEngagements')} Icon={Briefcase}
           action={
             myEngagements.length > 5
-              ? <Link to="/audit-workspace?tab=engagements"
-                  style={{ fontSize: 11, color: 'var(--primary)', textDecoration: 'none' }}>
+              ? <Link to="/audit-workspace?tab=engagements" className="audws-viewall-link">
                   {t('audwsEngagementsViewAll')} ({myEngagements.length}) →
                 </Link>
               : <Badge tone="primary">{myEngagements.length}</Badge>
           }>
           {myEngagements.length === 0
             ? <EmptyState Icon={Briefcase} title={t('audwsEngagementsEmpty')} />
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            : <div className="audws-row-list audws-row-list--gap-md">
                 {myEngagements.slice(0, 5).map(e => (
-                  <Link key={e.id} to={`/audit-workspace/engagement/${e.id}`} style={{
-                    padding: '6px 8px', borderBottom: '1px dashed var(--border)',
-                    textDecoration: 'none', color: 'inherit',
-                    transition: 'background var(--dur-fast) var(--ease-standard)',
-                  }}
-                    onMouseEnter={(ev) => (ev.currentTarget as HTMLElement).style.background = 'var(--primary-50)'}
-                    onMouseLeave={(ev) => (ev.currentTarget as HTMLElement).style.background = 'transparent'}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13,
-                                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <Link key={e.id} to={`/audit-workspace/engagement/${e.id}`} className="audws-row--engagement">
+                    <div className="audws-row__top">
+                      <div className="audws-row__main">
+                        <div className="audws-row__title">
                           {e.titleEn}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                        <div className="audws-row__sub">
                           {e.engagementCode} · {e.auditorFirm} · lead: {e.leadAuditor}
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 1 }} className="mono">
+                        <div className="audws-row__meta mono">
                           {e.fieldworkStartDate ?? '—'} → {e.fieldworkEndDate ?? '—'}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                      <div className="audws-row__badges">
                         <Badge tone="info">{e.auditType.replace(/_/g, ' ')}</Badge>
                         <Badge tone={e.status === 'PLANNED' ? 'info' : e.status === 'FIELDWORK' ? 'warning' : e.status === 'REPORT_ISSUED' ? 'accent' : 'success'}>
                           {e.status.replace(/_/g, ' ')}
@@ -223,35 +216,14 @@ export function AuditWorkspacePage() {
         action={<Badge tone={signoffQueue.length > 0 ? 'warning' : 'success'}>{signoffQueue.length} {t('audwsCapaAwaiting')}</Badge>}>
         {signoffQueue.length === 0
           ? <EmptyState Icon={ShieldCheck} title={t('audwsCapaInboxClear')} sub={t('audwsCapaInboxClearSub')} />
-          : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          : <div className="audws-row-list">
               {signoffQueue.map(f => (
-                <Link key={f.id} to={`/findings/${f.id}`} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto auto auto auto',
-                  gap: 10, alignItems: 'center',
-                  padding: '8px 10px',
-                  borderRadius: 'var(--r-sm)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface-1)',
-                  textDecoration: 'none', color: 'inherit',
-                  transition: 'border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard)',
-                }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget as HTMLElement;
-                    el.style.borderColor = 'var(--primary-300)';
-                    el.style.background  = 'var(--primary-50)';
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget as HTMLElement;
-                    el.style.borderColor = 'var(--border)';
-                    el.style.background  = 'var(--surface-1)';
-                  }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13,
-                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <Link key={f.id} to={`/findings/${f.id}`} className="audws-capa-row">
+                  <div className="audws-row__main">
+                    <div className="audws-row__title">
                       {f.title}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                    <div className="audws-row__sub">
                       {f.owner ?? '—'} · {f.clauseRef ?? '—'} · due {f.dueDate ?? '—'}
                     </div>
                   </div>
@@ -261,34 +233,29 @@ export function AuditWorkspacePage() {
                   <Badge tone={f.capaStage === 'AUDIT_SIGNED_OFF' ? 'accent' : 'primary'}>
                     {(f.capaStage ?? '').replace(/_/g, ' ')}
                   </Badge>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  <span className="mono audws-capa-row__result">
                     {f.independentTestResult ?? '—'}
                   </span>
-                  <ArrowRight size={14} style={{ color: 'var(--ink-3)' }} />
+                  <ArrowRight size={14} className="audws-capa-row__arrow" />
                 </Link>
               ))}
             </div>}
       </Card>
 
       {/* Document review queue: policies + evidence */}
-      <div className="dash-grid" style={{ marginTop: 12 }}>
+      <div className="dash-grid mt-md">
         <Card title={t('audwsPolicyQueue')} Icon={BookCopy}
           action={<Badge tone="info">{policyQueue.length}</Badge>}>
           {policyQueue.length === 0
             ? <EmptyState Icon={BookCopy} title={t('audwsPolicyEmpty')} />
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            : <div className="audws-row-list">
                 {policyQueue.map(p => (
-                  <Link key={p.id} to={`/policies/${p.id}`} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
-                    padding: '6px 8px', borderBottom: '1px dashed var(--border)',
-                    textDecoration: 'none', color: 'inherit',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13,
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <Link key={p.id} to={`/policies/${p.id}`} className="audws-row audws-row--link">
+                    <div className="audws-row__main">
+                      <div className="audws-row__title">
                         {p.titleEn}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      <div className="audws-row__sub">
                         {p.code} · v{p.version} · {p.category}
                       </div>
                     </div>
@@ -304,23 +271,19 @@ export function AuditWorkspacePage() {
           action={<Badge tone="accent">{evidencePending.length}</Badge>}>
           {evidencePending.length === 0
             ? <EmptyState Icon={FileCheck2} title={t('audwsEvEmpty')} />
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            : <div className="audws-row-list">
                 {evidencePending.map(e => (
-                  <div key={e.id} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
-                    padding: '6px 8px', borderBottom: '1px dashed var(--border)',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13,
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div key={e.id} className="audws-row">
+                    <div className="audws-row__main">
+                      <div className="audws-row__title">
                         {e.titleEn}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      <div className="audws-row__sub">
                         {e.evidenceCode} · {e.frameworkCode}
                       </div>
                     </div>
                     <Badge tone="warning">{(e.evidenceType ?? '').replace(/_/g, ' ')}</Badge>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+                    <span className="mono audws-text-meta-tiny">
                       due {e.expiryDate ?? '—'}
                     </span>
                   </div>
@@ -330,30 +293,26 @@ export function AuditWorkspacePage() {
       </div>
 
       {/* Open evidence requests + recent reviews */}
-      <div className="dash-grid" style={{ marginTop: 12 }}>
+      <div className="dash-grid mt-md">
         <Card title={t('audwsRequests')} Icon={ScrollText}
           action={<Badge tone="warning">{evidenceRequests.length}</Badge>}>
           {evidenceRequests.length === 0
             ? <EmptyState Icon={ScrollText} title={t('audwsRequestsEmpty')} />
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            : <div className="audws-row-list">
                 {evidenceRequests.slice(0, 6).map(r => (
-                  <div key={r.id} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
-                    padding: '6px 8px', borderBottom: '1px dashed var(--border)',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13,
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div key={r.id} className="audws-row">
+                    <div className="audws-row__main">
+                      <div className="audws-row__title">
                         {r.titleEn}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      <div className="audws-row__sub">
                         {r.subControlCode ?? '—'} · {r.frameworkCode ?? '—'} · {r.ownerName}
                       </div>
                     </div>
                     <Badge tone={r.status === 'OVERDUE' ? 'danger' : r.status === 'IN_PROGRESS' ? 'info' : 'warning'}>
                       {r.status}
                     </Badge>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{r.dueDate ?? '—'}</span>
+                    <span className="mono audws-text-meta-tiny">{r.dueDate ?? '—'}</span>
                   </div>
                 ))}
               </div>}
@@ -363,18 +322,14 @@ export function AuditWorkspacePage() {
           action={<Badge tone="success">{recentReviews.length}</Badge>}>
           {recentReviews.length === 0
             ? <EmptyState Icon={ClipboardCheck} title={t('audwsRecentEmpty')} />
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            : <div className="audws-row-list">
                 {recentReviews.slice(0, 6).map(r => (
-                  <div key={r.id} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
-                    padding: '6px 8px', borderBottom: '1px dashed var(--border)',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13,
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div key={r.id} className="audws-row">
+                    <div className="audws-row__main">
+                      <div className="audws-row__title">
                         {r.evidenceTitleEn ?? `Evidence #${r.evidenceId}`}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      <div className="audws-row__sub">
                         {r.reviewerName} · <span className="mono">{r.reviewDate ?? '—'}</span>
                       </div>
                     </div>
@@ -389,7 +344,7 @@ export function AuditWorkspacePage() {
 
       {/* Coverage donut */}
       <Card title={t('audwsCoverage')} Icon={BarChart3}>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
+        <div className="audws-coverage-hint">
           {t('audwsCoverageHint')}
         </div>
         <CoverageQuickLinks />
@@ -413,22 +368,22 @@ function PlanAndUniverseTab({ t, lang }: { t: (k: string) => string; lang: 'en' 
   const dueSoonCount  = universeSorted.filter(e => isAuditDueSoon(e) && monthsOverdue(e) <= 0).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="audws-tab-stack">
       {/* Plan summary */}
       <Card title={`${t('audwsPlanTitle')} ${activePlan.year}`} Icon={Compass}
         action={<Badge tone={PLAN_STATUS_TONE[activePlan.status]} dot>{PLAN_STATUS_LABEL[activePlan.status][lang === 'ar' ? 'ar' : 'en']}</Badge>}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}>
+        <div className="audws-plan-grid">
           <div>
-            <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+            <div className="audws-plan-summary">
               {lang === 'ar' ? activePlan.summaryAr : activePlan.summaryEn}
             </div>
             {activePlan.approvedAt && (
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+              <div className="audws-plan-meta">
                 {t('audwsPlanApprovedOn')} <span className="mono">{activePlan.approvedAt.slice(0, 10)}</span>
                 {activePlan.approvedMinuteRef && <> · <span className="mono">{activePlan.approvedMinuteRef}</span></>}
               </div>
             )}
-            <div className="kpi-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(5, 1fr)' }}>
+            <div className="kpi-grid audws-plan-kpis">
               <Kpi Icon={ClipboardCheck} label={t('audwsPlanCompleted')} value={cov.completed} tone="success" />
               <Kpi Icon={Activity}       label={t('audwsPlanInFlight')}  value={cov.inFlight}  tone="warning" />
               <Kpi Icon={Clock}          label={t('audwsPlanPlanned')}   value={cov.planned}   tone="info" />
@@ -451,37 +406,29 @@ function PlanAndUniverseTab({ t, lang }: { t: (k: string) => string; lang: 'en' 
 
       {/* Plan rows */}
       <Card title={`${t('audwsPlanRowsTitle')} (${activePlan.rows.length})`} Icon={Briefcase}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="audws-plan-rows">
           {activePlan.rows.map(r => {
             const universeEntity = AUDIT_UNIVERSE.find(u => u.code === r.universeCode);
             return (
-              <div key={r.id} style={{
-                display: 'grid',
-                gridTemplateColumns: '70px 1fr 110px 130px 80px 100px 110px',
-                gap: 10, alignItems: 'center',
-                padding: '8px 0', borderBottom: '1px dashed var(--border)',
-                fontSize: 12,
-              }}>
+              <div key={r.id} className="audws-plan-row-grid">
                 <Badge tone="primary">{r.plannedQuarter}</Badge>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--ink-1)',
-                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div className="audws-row__main">
+                  <div className="audws-text-strong audws-trim">
                     {universeEntity ? (lang === 'ar' ? universeEntity.nameAr : universeEntity.nameEn) : r.universeCode}
                   </div>
                   {r.rationaleEn && (
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{r.rationaleEn}</div>
+                    <div className="audws-row__sub">{r.rationaleEn}</div>
                   )}
                 </div>
                 <Badge tone="info">{r.framework.replace(/_/g, ' ')}</Badge>
-                <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>{r.plannedAuditor}</span>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.plannedDays}d</span>
+                <span className="audws-text-meta-2">{r.plannedAuditor}</span>
+                <span className="mono audws-text-meta">{r.plannedDays}d</span>
                 <Badge tone={PLAN_ROW_STATUS_TONE[r.status]} dot>{PLAN_ROW_STATUS_LABEL[r.status][lang === 'ar' ? 'ar' : 'en']}</Badge>
                 {r.linkedEngagementId
-                  ? <Link to={`/audit-workspace/engagement/${r.linkedEngagementId}`}
-                      style={{ fontSize: 11, color: 'var(--primary)', textDecoration: 'none' }}>
+                  ? <Link to={`/audit-workspace/engagement/${r.linkedEngagementId}`} className="audws-viewall-link">
                       {t('audwsPlanOpenEngagement')} →
                     </Link>
-                  : <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>}
+                  : <span className="audws-text-dim">—</span>}
               </div>
             );
           })}
@@ -491,32 +438,26 @@ function PlanAndUniverseTab({ t, lang }: { t: (k: string) => string; lang: 'en' 
       {/* Audit universe */}
       <Card title={`${t('audwsUniverseTitle')} (${AUDIT_UNIVERSE.length})`} Icon={Layers}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="audws-actions-inline">
             {overdueCount > 0 && <Badge tone="danger">{overdueCount} {t('audwsUniverseOverdue')}</Badge>}
             {dueSoonCount > 0 && <Badge tone="warning">{dueSoonCount} {t('audwsUniverseDueSoon')}</Badge>}
           </div>
         }>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="audws-plan-rows">
           {universeSorted.map(e => {
             const overdue = monthsOverdue(e);
             return (
-              <div key={e.code} style={{
-                display: 'grid',
-                gridTemplateColumns: '110px 1fr 130px 80px 100px 100px',
-                gap: 10, alignItems: 'center',
-                padding: '8px 0', borderBottom: '1px dashed var(--border)',
-                fontSize: 12,
-              }}>
+              <div key={e.code} className="audws-universe-row-grid">
                 <Badge tone="neutral">{e.type.replace(/_/g, ' ')}</Badge>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>
+                <div className="audws-row__main">
+                  <div className="audws-text-strong">
                     {lang === 'ar' ? e.nameAr : e.nameEn}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }} className="mono">{e.code}</div>
+                  <div className="audws-text-meta mono">{e.code}</div>
                 </div>
                 <Badge tone={RISK_TONE_UNIVERSE[e.riskRating]}>{e.riskRating}</Badge>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.cycleMonths}m {t('audwsUniverseCycle')}</span>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+                <span className="mono audws-text-meta">{e.cycleMonths}m {t('audwsUniverseCycle')}</span>
+                <span className="mono audws-text-meta-2">
                   {e.lastAuditedAt ?? '—'}
                 </span>
                 {overdue > 0
@@ -547,30 +488,19 @@ function CoverageQuickLinks() {
     counts.set(a.authorityCode, cur);
   }
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div className="audws-coverage-strip">
       {AUTHORITIES.filter(a => counts.has(a.code))
         .map(a => {
           const s = counts.get(a.code)!;
           const pct = Math.round((s.implemented / s.total) * 100);
           return (
-            <Link key={a.code} to={`/authority/${a.code}`} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 10px',
-              border: '1px solid var(--border)',
-              borderInlineStartWidth: 3, borderInlineStartColor: a.colorToken,
-              borderRadius: 'var(--r-sm)',
-              background: 'var(--surface-1)',
-              fontSize: 12,
-              textDecoration: 'none', color: 'inherit',
-              transition: 'background var(--dur-fast) var(--ease-standard)',
-            }}
-              onMouseEnter={(ev) => (ev.currentTarget as HTMLElement).style.background = 'var(--primary-50)'}
-              onMouseLeave={(ev) => (ev.currentTarget as HTMLElement).style.background = 'var(--surface-1)'}
-            >
-              <span style={{ fontWeight: 700, color: a.colorToken }}>{a.code}</span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{s.total} {t('audwsCites')}</span>
+            <Link key={a.code} to={`/authority/${a.code}`}
+              className="audws-coverage-chip"
+              style={{ borderInlineStartColor: a.colorToken }}>
+              <span className="audws-coverage-chip__code" style={{ color: a.colorToken }}>{a.code}</span>
+              <span className="mono audws-text-meta-2">{s.total} {t('audwsCites')}</span>
               <Badge tone={pct >= 80 ? 'success' : pct >= 60 ? 'primary' : pct >= 40 ? 'warning' : 'danger'}>
-                <Clock size={9} style={{ marginInlineEnd: 3, verticalAlign: 'middle' }} />
+                <Clock size={9} className="audws-coverage-chip__icon" />
                 {pct}%
               </Badge>
             </Link>
@@ -601,9 +531,9 @@ function AuditorsAndCalendarTab({ t, lang }: { t: (k: string) => string; lang: '
   const quarters = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="audws-tab-stack">
       {/* KPI strip */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+      <div className="kpi-grid audws-kpi-5">
         <Kpi Icon={Users}        label={t('audwsAuditorsTotal')}    value={AUDITORS.length} tone="primary" />
         <Kpi Icon={ShieldCheck}  label={t('audwsAuditorsExternal')} value={external}        tone="info" />
         <Kpi Icon={AlertOctagon} label={t('audwsAuditorsRotOverdue')} value={overdue.length} tone="danger" />
@@ -614,39 +544,33 @@ function AuditorsAndCalendarTab({ t, lang }: { t: (k: string) => string; lang: '
       {/* Auditor register */}
       <Card title={`${t('audwsAuditorsRegisterTitle')} (${AUDITORS.length})`} Icon={Users}
         action={
-          <div style={{ display: 'inline-flex', gap: 6 }}>
+          <div className="audws-actions-inline">
             {breaches.length > 0 && <Badge tone="danger">{breaches.length} {t('audwsAuditorsBreach')}</Badge>}
             {nasFlags.length > 0 && <Badge tone="warning">{nasFlags.length} {t('audwsAuditorsNAS')}</Badge>}
           </div>
         }>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="audws-plan-rows">
           {auditorsWithStatus.map(({ a, status, partnerYears, firmYears, rule }) => (
-            <div key={a.code} style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 130px 110px 110px 1fr 130px',
-              gap: 10, alignItems: 'center',
-              padding: '10px 0', borderBottom: '1px dashed var(--border)',
-              fontSize: 12,
-            }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+            <div key={a.code} className="audws-auditor-grid">
+              <div className="audws-row__main">
+                <div className="audws-text-name">
                   {lang === 'ar' ? a.firmAr : a.firmEn}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                <div className="audws-row__sub">
                   {a.leadPartner} · {t('audwsAuditorsCountry')}: {a.country}
                   {a.licenseRef && <> · <span className="mono">{a.licenseRef}</span></>}
                 </div>
                 {a.noteEn && (
-                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, fontStyle: 'italic' }}>
+                  <div className="audws-text-italic">
                     {a.noteEn}
                   </div>
                 )}
               </div>
               <Badge tone="info">{lang === 'ar' ? ROLE_LABEL[a.role].ar : ROLE_LABEL[a.role].en}</Badge>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+              <span className="mono audws-text-meta-2">
                 {t('audwsAuditorsPartnerY')}: {partnerYears}y / {rule.partnerYears}y
               </span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+              <span className="mono audws-text-meta-2">
                 {rule.firmYears != null ? `${t('audwsAuditorsFirmY')}: ${firmYears}y / ${rule.firmYears}y` : '—'}
               </span>
               <Badge tone={ROTATION_TONE[status]} dot>
@@ -662,40 +586,27 @@ function AuditorsAndCalendarTab({ t, lang }: { t: (k: string) => string; lang: '
 
       {/* Calendar (plan rows grouped by quarter) */}
       <Card title={`${t('audwsCalendarTitle')} ${activePlan.year}`} Icon={CalendarDays}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="audws-calendar-grid">
           {quarters.map(q => {
             const list = byQuarter.get(q) ?? [];
             return (
-              <div key={q} style={{
-                padding: '10px 12px',
-                borderRadius: 'var(--r-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--surface-1)',
-                minHeight: 200,
-              }}>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 700,
-                              textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8,
-                              display: 'flex', justifyContent: 'space-between' }}>
+              <div key={q} className="audws-calendar-col">
+                <div className="audws-calendar-head">
                   <span>{q} {activePlan.year}</span>
                   <span>{list.length}</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="audws-calendar-body">
                   {list.length === 0
-                    ? <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>
+                    ? <span className="audws-text-dim">—</span>
                     : list.map(r => (
-                      <div key={r.id} style={{
-                        padding: '6px 8px', borderRadius: 'var(--r-sm)',
-                        background: 'var(--surface-2)',
-                        borderInlineStartWidth: 3,
-                        borderInlineStartStyle: 'solid',
-                        borderInlineStartColor: r.status === 'COMPLETED' ? 'var(--success)' :
-                                                r.status === 'IN_FIELDWORK' ? 'var(--cat-2)' :
-                                                r.status === 'REPORT' ? 'var(--accent-700)' : 'var(--ink-4)',
-                      }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-1)' }}>
+                      <div key={r.id} className="audws-calendar-card"
+                        data-tone={r.status === 'COMPLETED' ? 'success' :
+                                   r.status === 'IN_FIELDWORK' ? 'warning' :
+                                   r.status === 'REPORT' ? 'report' : undefined}>
+                        <div className="audws-calendar-card__title">
                           {r.framework.replace(/_/g, ' ')}
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>
+                        <div className="audws-calendar-card__sub">
                           {r.plannedAuditor} · {r.plannedDays}d
                         </div>
                       </div>
@@ -721,8 +632,8 @@ function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: '
   const ratioPct = audit2026 > 0 ? Math.round((nonAudit2026 / audit2026) * 100) : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+    <div className="audws-tab-stack">
+      <div className="kpi-grid audws-kpi-5">
         <Kpi Icon={FileSignature} label={t('audwsAppActive')}     value={active}                     tone="success" />
         <Kpi Icon={Clock}         label={t('audwsAppInFlight')}   value={inFlight}                   tone="warning" />
         <Kpi Icon={Banknote}      label={t('audwsAppFeeTotal')}   value={`${(total2026 / 1_000_000).toFixed(2)}M`} tone="primary" />
@@ -731,40 +642,38 @@ function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: '
       </div>
 
       <Card title={`${t('audwsAppTitle')} (${AUDIT_APPOINTMENTS.length})`} Icon={FileSignature}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="audws-plan-rows">
           {AUDIT_APPOINTMENTS.map(a => (
-            <div key={a.id} style={{
-              padding: '10px 0', borderBottom: '1px dashed var(--border)',
-            }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 130px 90px 130px', gap: 10, alignItems: 'center' }}>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{a.appointmentCode}</span>
+            <div key={a.id} className="audws-appointment-wrap">
+              <div className="audws-appointment-grid">
+                <span className="mono audws-text-meta">{a.appointmentCode}</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  <div className="audws-text-name">
                     {lang === 'ar' ? a.titleAr : a.titleEn}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                  <div className="audws-row__sub">
                     {a.frameworks.join(' · ')} · {a.termYears}y · {a.candidates.length} {t('audwsAppCandidates')}
                   </div>
                   {a.noteEn && (
-                    <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, fontStyle: 'italic' }}>{a.noteEn}</div>
+                    <div className="audws-text-italic">{a.noteEn}</div>
                   )}
                 </div>
                 <Badge tone={APPOINTMENT_STATUS_TONE[a.status]} dot>{APPOINTMENT_STATUS_LABEL[a.status][lang === 'ar' ? 'ar' : 'en']}</Badge>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'end' }}>
+                <span className="mono audws-text-meta audws-text-end">
                   {a.contractedFeeSar ? `${(a.contractedFeeSar / 1_000_000).toFixed(2)}M SAR` : '—'}
                 </span>
-                <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>{a.selectedFirmCode ?? '—'}</span>
+                <span className="audws-text-meta-2">{a.selectedFirmCode ?? '—'}</span>
               </div>
               {a.candidates.length > 1 && (
-                <div style={{ marginTop: 6, paddingInlineStart: 10, fontSize: 11, color: 'var(--ink-3)' }}>
+                <div className="audws-appointment-candidates">
                   {a.candidates.map(c => (
-                    <span key={c.firmCode} style={{ display: 'inline-block', marginInlineEnd: 12 }}>
-                      <span className="mono" style={{ color: c.firmCode === a.selectedFirmCode ? 'var(--success-fg)' : 'var(--ink-3)', fontWeight: c.firmCode === a.selectedFirmCode ? 700 : 400 }}>
+                    <span key={c.firmCode} className="audws-candidate">
+                      <span className={`mono audws-candidate__code${c.firmCode === a.selectedFirmCode ? ' audws-candidate__code--selected' : ''}`}>
                         {c.firmCode}
                       </span>
                       {c.totalScore != null && <> · {c.totalScore}/100</>}
                       {' · '}{(c.feeBidSar / 1_000_000).toFixed(2)}M
-                      {c.independenceDeclared === false && <> · <span style={{ color: 'var(--danger-fg)' }}>{t('audwsAppIndepConcern')}</span></>}
+                      {c.independenceDeclared === false && <> · <span className="audws-candidate__danger">{t('audwsAppIndepConcern')}</span></>}
                     </span>
                   ))}
                 </div>
@@ -775,24 +684,18 @@ function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: '
       </Card>
 
       <Card title={`${t('audwsFeesTitle')} 2026`} Icon={Banknote}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="audws-plan-rows">
           {Array.from(fees2026.entries()).sort((a, b) => b[1].total - a[1].total).map(([firm, f]) => (
-            <div key={firm} style={{
-              display: 'grid',
-              gridTemplateColumns: '110px 1fr 110px 110px 110px',
-              gap: 10, alignItems: 'center',
-              padding: '8px 0', borderBottom: '1px dashed var(--border)',
-              fontSize: 12,
-            }}>
-              <span className="mono" style={{ fontWeight: 700 }}>{firm}</span>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div key={firm} className="audws-fees-grid">
+              <span className="mono audws-text-strong">{firm}</span>
+              <div className="row-gap-sm" style={{ alignItems: 'center' }}>
                 <Badge tone="success">{(f.audit / 1_000).toFixed(0)}k {t('audwsFeesAudit')}</Badge>
                 {f.nonAudit > 0 && <Badge tone="warning">{(f.nonAudit / 1_000).toFixed(0)}k {t('audwsFeesNonAudit')}</Badge>}
               </div>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)', textAlign: 'end' }}>
+              <span className="mono audws-text-meta-2 audws-text-end">
                 {(f.total / 1_000_000).toFixed(2)}M SAR
               </span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'end' }}>
+              <span className="mono audws-text-meta audws-text-end">
                 {f.ratio}% {t('audwsFeesRatioSuffix')}
               </span>
               {f.ratio > 30
@@ -803,7 +706,7 @@ function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: '
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 8, fontStyle: 'italic' }}>
+        <div className="audws-fees-note">
           {t('audwsFeesNote')}
         </div>
       </Card>
@@ -818,9 +721,9 @@ function CommitteeTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar'
   const upcoming = AUDIT_COMMITTEE_MEETINGS.filter(m => m.status === 'SCHEDULED').length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="audws-tab-stack">
       {/* KPI strip */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+      <div className="kpi-grid audws-kpi-5">
         <Kpi Icon={Users}        label={t('audwsCteMembers')}      value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role !== 'SECRETARY').length} tone="primary" />
         <Kpi Icon={Scale}        label={t('audwsCteIndependent')}  value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role === 'CHAIR' || m.role === 'INDEPENDENT_MEMBER').length} tone="info" />
         <Kpi Icon={ShieldCheck}  label={t('audwsCteCompliance')}   value={compliance.compliant ? '✓' : '✗'} tone={compliance.compliant ? 'success' : 'danger'} />
@@ -834,38 +737,30 @@ function CommitteeTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar'
           {compliance.compliant ? t('audwsCteCompliant') : t('audwsCteNonCompliant')}
         </Badge>}>
         {!compliance.compliant && (
-          <div style={{ padding: '8px 12px', borderRadius: 'var(--r-sm)',
-                        background: 'var(--danger-bg)', color: 'var(--danger-fg)',
-                        fontSize: 12, marginBottom: 10 }}>
+          <div className="audws-compliance-banner">
             {compliance.reasons.map((r, i) => <div key={i}>• {r}</div>)}
           </div>
         )}
         {AUDIT_COMMITTEE_MEMBERS.map(m => (
-          <div key={m.nameEn} style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 130px 130px 110px 80px',
-            gap: 10, alignItems: 'center',
-            padding: '8px 0', borderBottom: '1px dashed var(--border)',
-            fontSize: 12,
-          }}>
+          <div key={m.nameEn} className="audws-committee-grid">
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+              <div className="audws-text-name">
                 {lang === 'ar' ? m.nameAr : m.nameEn}
               </div>
               {m.noteEn && (
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{m.noteEn}</div>
+                <div className="audws-row__sub">{m.noteEn}</div>
               )}
             </div>
             <Badge tone={m.role === 'CHAIR' ? 'primary' : m.role === 'INDEPENDENT_MEMBER' ? 'info' : m.role === 'SECRETARY' ? 'neutral' : 'accent'}>
               {lang === 'ar' ? ROLE_LABEL_CTE[m.role].ar : ROLE_LABEL_CTE[m.role].en}
             </Badge>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            <span className="mono audws-text-meta">
               {m.appointedAt} → {m.termEndsAt}
             </span>
             {m.financialExpert
               ? <Badge tone="success">{t('audwsCteFinExpert')}</Badge>
-              : <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>—</span>}
-            <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.role === 'SECRETARY' ? t('audwsCteNonVoting') : t('audwsCteVoting')}</span>
+              : <span className="audws-text-dim">—</span>}
+            <span className="audws-text-meta">{m.role === 'SECRETARY' ? t('audwsCteNonVoting') : t('audwsCteVoting')}</span>
           </div>
         ))}
       </Card>
@@ -875,29 +770,29 @@ function CommitteeTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar'
         action={<Badge tone="info">
           {t('audwsCteApprovedOn')} {AUDIT_COMMITTEE_CHARTER.approvedByBoardOn}
         </Badge>}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="audws-charter-grid">
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 8 }}>
+            <div className="audws-charter-label">
               {t('audwsCteAuthority')}
             </div>
-            <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.6 }}>
+            <ul className="audws-charter-list">
               {(lang === 'ar' ? AUDIT_COMMITTEE_CHARTER.authorityAr : AUDIT_COMMITTEE_CHARTER.authorityEn).map((a, i) => (
                 <li key={i}>{a}</li>
               ))}
             </ul>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 8 }}>
+            <div className="audws-charter-label">
               {t('audwsCteResponsibilities')}
             </div>
-            <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.6 }}>
+            <ul className="audws-charter-list">
               {(lang === 'ar' ? AUDIT_COMMITTEE_CHARTER.responsibilitiesAr : AUDIT_COMMITTEE_CHARTER.responsibilitiesEn).map((r, i) => (
                 <li key={i}>{r}</li>
               ))}
             </ul>
           </div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 10 }}>
+        <div className="audws-charter-rules">
           {t('audwsCteRules')}: ≥{AUDIT_COMMITTEE_CHARTER.minMembers} {t('audwsCteMembersWord')} · ≥{Math.round(AUDIT_COMMITTEE_CHARTER.minIndependentRatio * 100)}% {t('audwsCteIndependentWord')} · ≥{AUDIT_COMMITTEE_CHARTER.minMeetingsPerYear} {t('audwsCteMeetingsPerYear')}
         </div>
       </Card>
@@ -905,32 +800,32 @@ function CommitteeTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar'
       {/* Meetings */}
       <Card title={`${t('audwsCteMeetingsTitle')} (${AUDIT_COMMITTEE_MEETINGS.length})`} Icon={CalendarDays}>
         {[...AUDIT_COMMITTEE_MEETINGS].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)).map(m => (
-          <div key={m.id} style={{ padding: '10px 0', borderBottom: '1px dashed var(--border)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 110px 1fr 110px 130px', gap: 10, alignItems: 'center' }}>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.meetingCode}</span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{m.scheduledAt.replace('T', ' ').slice(0, 16)}</span>
+          <div key={m.id} className="audws-meeting-wrap">
+            <div className="audws-meeting-grid">
+              <span className="mono audws-text-meta">{m.meetingCode}</span>
+              <span className="mono audws-text-meta-2">{m.scheduledAt.replace('T', ' ').slice(0, 16)}</span>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                <div className="audws-text-name">
                   {lang === 'ar' ? m.titleAr : m.titleEn}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                <div className="audws-row__sub" style={{ marginTop: 2 }}>
                   {m.attendeeCodes.length} {t('audwsCteAttendees')}
                   {m.minuteRef ? ' · ' + m.minuteRef : ''}
                 </div>
               </div>
               <Badge tone={MEETING_STATUS_TONE[m.status]} dot>{MEETING_STATUS_LABEL[m.status][lang === 'ar' ? 'ar' : 'en']}</Badge>
-              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.agenda.length} {t('audwsCteAgendaItems')}</span>
+              <span className="audws-text-meta">{m.agenda.length} {t('audwsCteAgendaItems')}</span>
             </div>
             {m.agenda.length > 0 && (
-              <div style={{ marginTop: 6, marginInlineStart: 170, fontSize: 11, color: 'var(--ink-2)' }}>
+              <div className="audws-meeting-agenda">
                 {m.agenda.map((a, i) => (
-                  <div key={i} style={{ padding: '4px 0', borderTop: i > 0 ? '1px dashed var(--border)' : 'none' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>
+                  <div key={i} className="audws-meeting-agenda-item">
+                    <div className="audws-text-strong">
                       {i + 1}. {lang === 'ar' ? a.titleAr : a.titleEn}
                       {a.ref && ' · ' + a.ref}
                     </div>
                     {(a.decisionEn ?? a.decisionAr) && (
-                      <div style={{ marginTop: 2, fontStyle: 'italic', color: 'var(--ink-3)' }}>
+                      <div className="audws-meeting-decision">
                         → {lang === 'ar' ? (a.decisionAr ?? a.decisionEn) : a.decisionEn}
                       </div>
                     )}
