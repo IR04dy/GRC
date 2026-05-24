@@ -84,6 +84,9 @@ const SocOpsDetailPage       = lazy(() => import('./pages/socops/SocOpsDetailPag
 const ThreeLinesOfDefensePage = lazy(() => import('./pages/governance/ThreeLinesOfDefensePage').then(m => ({ default: m.ThreeLinesOfDefensePage })));
 const NotificationInboxPage  = lazy(() => import('./pages/inbox/InboxPage').then(m => ({ default: m.InboxPage })));
 const WorkflowSubmissionDetailPage = lazy(() => import('./pages/workflow/WorkflowSubmissionDetailPage').then(m => ({ default: m.WorkflowSubmissionDetailPage })));
+const ApprovalChainTemplatesPage    = lazy(() => import('./pages/workflow/ApprovalChainTemplatesPage').then(m => ({ default: m.ApprovalChainTemplatesPage })));
+const ApprovalChainInstanceDetailPage = lazy(() => import('./pages/workflow/ApprovalChainInstanceDetailPage').then(m => ({ default: m.ApprovalChainInstanceDetailPage })));
+const ApprovalChainPendingPage       = lazy(() => import('./pages/workflow/ApprovalChainPendingPage').then(m => ({ default: m.ApprovalChainPendingPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
 //    Each wizard is its own chunk; the first time a user navigates to
 //    /workflows/* the relevant ~30 kB chunk is fetched. Reduces initial
@@ -340,6 +343,12 @@ export function App() {
               <Route path="/workflows"                              element={<WorkflowHubPage />} />
               <Route path="/workflows/submissions"                   element={<WorkflowSubmissionsPage />} />
               <Route path="/workflows/submissions/:id"               element={<WorkflowSubmissionDetailPage />} />
+
+              {/* Sprint 13 — Multi-step approval chains */}
+              <Route path="/workflows/chains"                        element={<ApprovalChainTemplatesPage />} />
+              <Route path="/workflows/chains/templates"              element={<ApprovalChainTemplatesPage />} />
+              <Route path="/workflows/chains/pending"                element={<ApprovalChainPendingPage />} />
+              <Route path="/workflows/chains/:id"                    element={<ApprovalChainInstanceDetailPage />} />
 
               {/* Compliance Calendar (PR #61) — Saudi-workdays-aware */}
               <Route path="/calendar"                                 element={<CalendarPage />} />
