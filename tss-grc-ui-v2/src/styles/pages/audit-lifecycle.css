@@ -1,0 +1,372 @@
+/* TSS GRC Platform — AuditLifecyclePage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-3).
+ * Every value resolves to a design token so dark-mode + tenant theming
+ * apply automatically. RTL-safe (uses logical properties).
+ */
+
+/* ─── Tab strip ────────────────────────────────────────────── */
+.alc-tab-row {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.alc-tab-btn {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.alc-tab-btn--on {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+
+/* ─── Engagement picker chips ──────────────────────────────── */
+.alc-pick-row {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.alc-pick-chip {
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-sm);
+  font-size: var(--text-2xs);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  cursor: pointer;
+  text-align: start;
+  max-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.alc-pick-chip--on {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+.alc-pick-chip-code {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.alc-pick-chip-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Plan header row ─────────────────────────────────────── */
+.alc-plan-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+.alc-plan-badges {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  margin-bottom: var(--sp-2);
+  flex-wrap: wrap;
+}
+.alc-plan-id {
+  font-size: var(--text-xs);
+  color: var(--primary);
+}
+.alc-plan-approved {
+  font-size: var(--text-2xs);
+  color: var(--success-fg);
+}
+.alc-plan-actions {
+  display: flex;
+  gap: var(--sp-3);
+}
+
+/* ─── AC notes block ──────────────────────────────────────── */
+.alc-ac-notes {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-6);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  border-inline-start: 3px solid var(--primary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-loose);
+}
+.alc-ac-notes-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--sp-2);
+}
+
+/* ─── Quarter grid ────────────────────────────────────────── */
+.alc-quarter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-4);
+}
+@media (max-width: 900px) {
+  .alc-quarter-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.alc-quarter-card {
+  padding: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+}
+.alc-quarter-title {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  margin-bottom: var(--sp-4);
+  color: var(--primary);
+}
+.alc-quarter-row {
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-2);
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  font-size: 10px;
+}
+.alc-quarter-row-code {
+  color: var(--ink-3);
+  font-size: 9px;
+}
+.alc-quarter-row-title {
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* ─── Section wrap (Wp / Findings / Capa / Packet) ────────── */
+.alc-section {
+  margin-top: var(--sp-6);
+}
+
+/* ─── Generic item card ───────────────────────────────────── */
+.alc-item {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.alc-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+.alc-item-main {
+  flex: 1;
+}
+.alc-item-badges {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.alc-item-code {
+  font-size: var(--text-2xs);
+  color: var(--primary);
+}
+.alc-item-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.alc-item-title--strong {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin-bottom: var(--sp-2);
+}
+.alc-item-sub {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.alc-item-sub--plain {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.alc-item-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+.alc-item-actions--wrap {
+  flex-wrap: wrap;
+}
+
+.alc-card-sub {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-5);
+  line-height: var(--leading-normal);
+}
+
+/* ─── 2-column field grid ─────────────────────────────────── */
+.alc-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5);
+  margin-top: var(--sp-4);
+}
+.alc-field-grid--mb {
+  margin-bottom: var(--sp-4);
+}
+.alc-field-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--sp-2);
+}
+.alc-field-value {
+  font-size: var(--text-2xs);
+  color: var(--ink-2);
+  line-height: var(--leading-loose);
+}
+
+/* ─── Controls chip strip ─────────────────────────────────── */
+.alc-controls-row {
+  margin-top: var(--sp-4);
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.alc-controls-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+/* ─── Crosswalk (findings) ────────────────────────────────── */
+.alc-crosswalk {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+/* ─── Mgmt response block ─────────────────────────────────── */
+.alc-mgmt-response {
+  padding: var(--sp-5);
+  background: var(--warning-bg);
+  border-radius: var(--r-xs);
+  border-inline-start: 3px solid var(--warning);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-loose);
+}
+.alc-mgmt-response[data-accepted="true"] {
+  background: var(--success-bg);
+  border-inline-start-color: var(--success);
+}
+.alc-mgmt-head {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+.alc-mgmt-head-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.alc-mgmt-head-author {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+/* ─── Packet tab grid + tile ─────────────────────────────── */
+.alc-packet-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-6);
+}
+@media (max-width: 900px) {
+  .alc-packet-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.alc-packet-head {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: var(--sp-4);
+}
+.alc-packet-tile {
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+}
+.alc-packet-tile-meta {
+  display: flex;
+  gap: var(--sp-5);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-top: var(--sp-4);
+}
+.alc-packet-overdue {
+  color: var(--danger-fg);
+}
+.alc-packet-section-head {
+  margin-top: var(--sp-6);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: var(--sp-4);
+}
+.alc-packet-plan {
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  font-size: var(--text-2xs);
+}
+.alc-packet-plan-row {
+  margin-top: var(--sp-2);
+}
+.alc-packet-plan-meta {
+  display: flex;
+  gap: var(--sp-5);
+  margin-top: var(--sp-3);
+  color: var(--ink-3);
+}
+.alc-packet-hint {
+  margin-top: var(--sp-5);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  line-height: var(--leading-normal);
+}
+
+/* ─── Tables ─────────────────────────────────────────────── */
+.tbl--full { width: 100%; }
+
+/* ─── Inline cell hints ──────────────────────────────────── */
+.alc-cell-strong {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.alc-cell-evidence {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.alc-cell-due-late {
+  color: var(--danger-fg);
+}
+.alc-cell-narrow {
+  max-width: 320px;
+}

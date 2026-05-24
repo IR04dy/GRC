@@ -35,6 +35,7 @@ import { chainFindingToRiskAndCapa } from '../../lib/lifecycleChains';
 import { AUDIT_ENGAGEMENTS } from '../compliance/mockCompliance';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
+import '../../styles/pages/audit-lifecycle.css';
 
 type AlcTab = 'pipeline' | 'plan' | 'workingpapers' | 'findings' | 'capa' | 'packet';
 
@@ -102,7 +103,7 @@ export function AuditLifecyclePage() {
         }
       />
 
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+      <div className="kpi-grid mb-lg">
         <Kpi Icon={Stamp}             label={t('alcKpiEngs')}           value={String(stats.totalEngagements)}     tone="primary" />
         <Kpi Icon={ClipboardCheck}     label={t('alcKpiInFlight')}        value={String(stats.engagementsInFlight)}  tone="info" />
         <Kpi Icon={FileText}           label={t('alcKpiWps')}             value={String(stats.workingPapersTotal)}   tone="info" />
@@ -114,7 +115,7 @@ export function AuditLifecyclePage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="alc-tab-row">
         {([
           { id: 'pipeline',      labelKey: 'lpcTabPipeline',     Icon: Activity },
           { id: 'plan',          labelKey: 'alcTabPlan',         Icon: Calendar },
@@ -124,12 +125,7 @@ export function AuditLifecyclePage() {
           { id: 'packet',        labelKey: 'alcTabPacket',       Icon: BookOpen },
         ] as { id: AlcTab; labelKey: string; Icon: typeof Stamp }[]).map(tabDef => (
           <button key={tabDef.id} onClick={() => setTab(tabDef.id)}
-            style={{
-              padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600,
-              border: `1px solid ${tab === tabDef.id ? 'var(--primary)' : 'var(--border)'}`,
-              background: tab === tabDef.id ? 'var(--primary-50)' : 'var(--surface-1)',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
+            className={`alc-tab-btn${tab === tabDef.id ? ' alc-tab-btn--on' : ''}`}>
             <tabDef.Icon size={13} />
             {t(tabDef.labelKey)}
           </button>
@@ -208,21 +204,15 @@ function EngagementPicker({ code, onChange }: { code: string; onChange: (c: stri
   const { t, lang } = useI18n();
   return (
     <Card title={t('alcPickEngagement')} Icon={Stamp}>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div className="alc-pick-row">
         {AUDIT_ENGAGEMENTS.slice(0, 8).map(e => {
           const isOn = e.engagementCode === code;
           const title = lang === 'ar' && e.titleAr ? e.titleAr : e.titleEn;
           return (
             <button key={e.engagementCode ?? String(e.id)} onClick={() => onChange(e.engagementCode ?? String(e.id))}
-              style={{
-                padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 11,
-                border: `1px solid ${isOn ? 'var(--primary)' : 'var(--border)'}`,
-                background: isOn ? 'var(--primary-50)' : 'var(--surface-1)',
-                cursor: 'pointer', textAlign: 'start', maxWidth: 240,
-                display: 'flex', flexDirection: 'column', gap: 2,
-              }}>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{e.engagementCode}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              className={`alc-pick-chip${isOn ? ' alc-pick-chip--on' : ''}`}>
+              <span className="mono alc-pick-chip-code">{e.engagementCode}</span>
+              <span className="alc-pick-chip-title">
                 {title}
               </span>
               <Badge tone={e.status === 'FIELDWORK' ? 'warning' : e.status === 'PLANNED' ? 'info' : e.status === 'CLOSED' ? 'success' : 'primary'}>
@@ -253,22 +243,22 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
   ];
   return (
     <Card title={t('alcPlanTitle')} Icon={Calendar}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="alc-plan-head">
         <div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-            <span className="mono" style={{ fontSize: 12, color: 'var(--primary)' }}>{plan.id}</span>
+          <div className="alc-plan-badges">
+            <span className="mono alc-plan-id">{plan.id}</span>
             <Badge tone={PLAN_STATUS_TONE[plan.status]}>{PLAN_STATUS_LABEL[plan.status][lang]}</Badge>
             <Badge tone="info">{plan.year}</Badge>
             <Badge tone="primary">{plan.budgetHours.toLocaleString()} {t('alcHours')}</Badge>
           </div>
           {plan.acApprovedBy && (
-            <div style={{ fontSize: 11, color: 'var(--success-fg)' }}>
+            <div className="alc-plan-approved">
               {t('alcApprovedBy')}: <b>{plan.acApprovedBy}</b>
               {plan.acApprovedAt && <> · <span className="mono">{plan.acApprovedAt.slice(0, 10)}</span></>}
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="alc-plan-actions">
           {plan.status === 'DRAFT' && <Button variant="primary" Icon={Send} onClick={onSubmitForReview}>{t('alcSubmitForAc')}</Button>}
           {plan.status === 'AC_REVIEW' && <Button variant="primary" Icon={ThumbsUp} onClick={onApprove}>{t('alcAcApprove')}</Button>}
           {plan.status === 'AC_APPROVED' && <Button variant="primary" onClick={onExecute}>{t('alcStartExec')}</Button>}
@@ -276,26 +266,18 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
       </div>
 
       {plan.acNotesEn && (
-        <div style={{
-          padding: 12, marginBottom: 16,
-          background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
-          borderInlineStart: '3px solid var(--primary)',
-          fontSize: 12, lineHeight: 1.6,
-        }}>
-          <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+        <div className="alc-ac-notes">
+          <div className="alc-ac-notes-label">
             {t('alcAcNotes')}
           </div>
           {lang === 'ar' ? plan.acNotesAr : plan.acNotesEn}
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+      <div className="alc-quarter-grid">
         {quarters.map(q => (
-          <div key={q.label} style={{
-            padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-            background: 'var(--surface-1)',
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--primary)' }}>{q.label} 2026</div>
+          <div key={q.label} className="alc-quarter-card">
+            <div className="alc-quarter-title">{q.label} 2026</div>
             {q.codes.length === 0
               ? <InlineEmpty>—</InlineEmpty>
               : q.codes.map(code => {
@@ -303,12 +285,9 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
                   if (!e) return null;
                   const title = lang === 'ar' && e.titleAr ? e.titleAr : e.titleEn;
                   return (
-                    <div key={code} style={{
-                      padding: 6, marginBottom: 4, background: 'var(--surface-2)', borderRadius: 4,
-                      fontSize: 10,
-                    }}>
-                      <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 9 }}>{code}</div>
-                      <div style={{ fontWeight: 600, marginTop: 2 }}>{title}</div>
+                    <div key={code} className="alc-quarter-row">
+                      <div className="mono alc-quarter-row-code">{code}</div>
+                      <div className="alc-quarter-row-title">{title}</div>
                     </div>
                   );
                 })}
@@ -331,34 +310,34 @@ function WpTab({ wps, engagementCode: _ec, onPeerReview, onApprove, onReject, on
 }) {
   const { t, lang } = useI18n();
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="alc-section">
       <Card title={t('alcWpTitle')} Icon={FileText}
         action={<Button size="sm" variant="primary" onClick={() => onCreate('TEST', 'New test working paper', 'ورقة عمل اختبار جديدة', 4)}>{t('alcWpCreate')}</Button>}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="alc-card-sub">
           {t('alcWpSub')}
         </div>
         {wps.length === 0
           ? <InlineEmpty>{t('alcWpEmpty')}</InlineEmpty>
           : wps.map(wp => (
-              <div key={wp.id} style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                      <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{wp.refNumber}</span>
+              <div key={wp.id} className="alc-item">
+                <div className="alc-item-head">
+                  <div className="alc-item-main">
+                    <div className="alc-item-badges">
+                      <span className="mono alc-item-code">{wp.refNumber}</span>
                       <Badge tone={WP_STATUS_TONE[wp.status]}>{wp.status}</Badge>
                       <Badge tone="info">{WP_TYPE_LABEL[wp.type][lang]}</Badge>
                       <Badge tone="neutral">{wp.hours}h</Badge>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div className="alc-item-title">
                       {lang === 'ar' ? wp.titleAr : wp.titleEn}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                    <div className="alc-item-sub">
                       {t('alcAuthor')}: <b>{wp.author}</b>
                       {wp.reviewer && <> · {t('alcReviewer')}: <b>{wp.reviewer}</b></>}
                       {wp.reviewedAt && <> · <span className="mono">{wp.reviewedAt.slice(0, 10)}</span></>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="alc-item-actions">
                     {wp.status === 'DRAFT' && <Button size="sm" variant="primary" Icon={Send} onClick={() => onPeerReview(wp)}>{t('alcWpSendReview')}</Button>}
                     {wp.status === 'PEER_REVIEW' && (
                       <>
@@ -368,27 +347,27 @@ function WpTab({ wps, engagementCode: _ec, onPeerReview, onApprove, onReject, on
                     )}
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
+                <div className="alc-field-grid">
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                    <div className="alc-field-label">
                       {t('alcWpProcedure')}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                    <div className="alc-field-value">
                       {lang === 'ar' ? wp.procedureAr : wp.procedureEn}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                    <div className="alc-field-label">
                       {t('alcWpConclusion')}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                    <div className="alc-field-value">
                       {lang === 'ar' ? wp.conclusionAr : wp.conclusionEn}
                     </div>
                   </div>
                 </div>
                 {wp.controlsCovered.length > 0 && (
-                  <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase' }}>{t('alcWpControls')}:</span>
+                  <div className="alc-controls-row">
+                    <span className="alc-controls-label">{t('alcWpControls')}:</span>
                     {wp.controlsCovered.map(c => <Badge key={c} tone="info">{c}</Badge>)}
                   </div>
                 )}
@@ -411,34 +390,34 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
 }) {
   const { t, lang } = useI18n();
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="alc-section">
       <Card title={t('alcFindingTitle')} Icon={AlertTriangle}
         action={<Button size="sm" variant="primary" onClick={() => onCreate('New finding', 'ملاحظة جديدة', 'MEDIUM', 'Condition observed during fieldwork.', 'حالة مرصودة أثناء العمل الميداني.')}>{t('alcFindingCreate')}</Button>}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="alc-card-sub">
           {t('alcFindingSub')}
         </div>
         {findings.length === 0
           ? <InlineEmpty>{t('alcFindingEmpty')}</InlineEmpty>
           : findings.map(f => (
-              <div key={f.id} style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                      <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{f.refNumber}</span>
+              <div key={f.id} className="alc-item">
+                <div className="alc-item-head">
+                  <div className="alc-item-main">
+                    <div className="alc-item-badges">
+                      <span className="mono alc-item-code">{f.refNumber}</span>
                       <Badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
                       <Badge tone={f.status === 'CLOSED' ? 'success' : f.status === 'OPEN' ? 'danger' : 'warning'}>
                         {FINDING_STATUS_LABEL[f.status][lang]}
                       </Badge>
                       {f.targetDate && <Badge tone="info">{t('alcDue')}: <span className="mono">{f.targetDate}</span></Badge>}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                    <div className="alc-item-title--strong">
                       {lang === 'ar' ? f.titleAr : f.titleEn}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    <div className="alc-item-sub--plain">
                       {f.ownerRole && <>{t('alcOwner')}: <b>{f.ownerRole}</b></>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <div className="alc-item-actions alc-item-actions--wrap">
                     {f.status === 'OPEN' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'MGMT_RESPONSE')}>{t('alcAwaitMgmt')}</Button>}
                     {f.status === 'MGMT_RESPONSE' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'IN_REMEDIATION')}>{t('alcStartRemediation')}</Button>}
                     {f.status === 'IN_REMEDIATION' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'AWAITING_VERIFICATION')}>{t('alcAwaitVerif')}</Button>}
@@ -451,8 +430,8 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
 
                 {/* Crosswalk */}
                 {f.controlCrosswalk.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase' }}>{t('alcCrosswalk')}:</span>
+                  <div className="alc-crosswalk">
+                    <span className="alc-controls-label">{t('alcCrosswalk')}:</span>
                     {f.controlCrosswalk.map(c => (
                       <Badge key={c.controlCode} tone="info">{c.framework}/{c.controlCode}</Badge>
                     ))}
@@ -460,7 +439,7 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
                 )}
 
                 {/* Condition / Criteria / Cause / Recommendation */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+                <div className="alc-field-grid alc-field-grid--mb">
                   <FieldBlock label={t('alcCondition')} en={f.conditionEn} ar={f.conditionAr} lang={lang} />
                   <FieldBlock label={t('alcCriteria')}  en={f.criteriaEn}  ar={f.criteriaAr}  lang={lang} />
                   <FieldBlock label={t('alcCause')}     en={f.causeEn}     ar={f.causeAr}     lang={lang} />
@@ -469,19 +448,15 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
 
                 {/* Mgmt response */}
                 {f.mgmtResponseEn && (
-                  <div style={{
-                    padding: 10, background: f.mgmtAccepts ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.06)',
-                    borderRadius: 4, borderInlineStart: `3px solid ${f.mgmtAccepts ? 'var(--success)' : 'var(--warning)'}`,
-                    fontSize: 11, lineHeight: 1.6,
-                  }}>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-                      <span style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div className="alc-mgmt-response" data-accepted={String(!!f.mgmtAccepts)}>
+                    <div className="alc-mgmt-head">
+                      <span className="alc-mgmt-head-label">
                         {t('alcMgmtResponse')}
                       </span>
                       <Badge tone={f.mgmtAccepts ? 'success' : 'warning'}>
                         {f.mgmtAccepts ? t('alcAccepted') : t('alcDisagreed')}
                       </Badge>
-                      {f.mgmtResponseAuthor && <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>· <b>{f.mgmtResponseAuthor}</b></span>}
+                      {f.mgmtResponseAuthor && <span className="alc-mgmt-head-author">· <b>{f.mgmtResponseAuthor}</b></span>}
                     </div>
                     {lang === 'ar' ? f.mgmtResponseAr : f.mgmtResponseEn}
                   </div>
@@ -497,8 +472,8 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
 function FieldBlock({ label, en, ar, lang }: { label: string; en: string; ar: string; lang: 'en' | 'ar' }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+      <div className="alc-field-label">{label}</div>
+      <div className="alc-field-value">
         {lang === 'ar' ? ar : en}
       </div>
     </div>
@@ -518,15 +493,15 @@ function CapaTab({ findings, allCapas, onTransition }: {
   const relevantCapas = allCapas.filter(c => findingIds.has(c.findingId));
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="alc-section">
       <Card title={t('alcCapaTitle')} Icon={Wrench}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="alc-card-sub">
           {t('alcCapaSub')}
         </div>
         {relevantCapas.length === 0
           ? <InlineEmpty>{t('alcCapaEmpty')}</InlineEmpty>
           : (
-            <table className="tbl" style={{ width: '100%' }}>
+            <table className="tbl tbl--full">
               <thead>
                 <tr>
                   <th>{t('alcCapaId')}</th>
@@ -543,18 +518,18 @@ function CapaTab({ findings, allCapas, onTransition }: {
                   const overdue = new Date(c.targetDate) < new Date() && c.status !== 'CLOSED';
                   return (
                     <tr key={c.id}>
-                      <td className="mono" style={{ fontSize: 11 }}>{c.id}</td>
+                      <td className="mono alc-cell-evidence">{c.id}</td>
                       <td>
                         <Badge tone={c.kind === 'CORRECTIVE' ? 'warning' : 'info'}>
                           {c.kind === 'CORRECTIVE' ? t('alcCorrective') : t('alcPreventive')}
                         </Badge>
                       </td>
-                      <td style={{ maxWidth: 320 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{lang === 'ar' ? c.titleAr : c.titleEn}</div>
-                        {c.evidenceRef && <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{c.evidenceRef}</div>}
+                      <td className="alc-cell-narrow">
+                        <div className="alc-cell-strong">{lang === 'ar' ? c.titleAr : c.titleEn}</div>
+                        {c.evidenceRef && <div className="mono alc-cell-evidence">{c.evidenceRef}</div>}
                       </td>
-                      <td style={{ fontSize: 11 }}>{c.ownerRole}</td>
-                      <td className="mono" style={{ fontSize: 11, color: overdue ? 'var(--danger-fg)' : undefined }}>
+                      <td className="alc-item-sub--plain">{c.ownerRole}</td>
+                      <td className={`mono alc-item-sub--plain${overdue ? ' alc-cell-due-late' : ''}`}>
                         {c.targetDate}
                       </td>
                       <td>
@@ -587,16 +562,16 @@ function PacketTab({ plan, findings, capas: _capas, stats }: { plan: AnnualPlan;
     count: findings.filter(f => f.severity === s).length,
   }));
   return (
-    <div style={{ marginTop: 16 }}>
+    <div className="alc-section">
       <Card title={t('alcPacketTitle')} Icon={BookOpen}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 16, lineHeight: 1.5 }}>
+        <div className="alc-card-sub">
           {t('alcPacketSub')}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="alc-packet-grid">
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>{t('alcPacketSevSection')}</div>
-            <table className="tbl" style={{ width: '100%' }}>
+            <div className="alc-packet-head">{t('alcPacketSevSection')}</div>
+            <table className="tbl tbl--full">
               <thead>
                 <tr><th>{t('alcSev')}</th><th>{t('alcCount')}</th></tr>
               </thead>
@@ -606,22 +581,21 @@ function PacketTab({ plan, findings, capas: _capas, stats }: { plan: AnnualPlan;
                     <td>
                       <Badge tone={s.sev === 'CRITICAL' || s.sev === 'HIGH' ? 'danger' : s.sev === 'MEDIUM' ? 'warning' : 'info'}>{s.sev}</Badge>
                     </td>
-                    <td className="mono" style={{ fontWeight: 700 }}>{s.count}</td>
+                    <td className="mono alc-cell-strong">{s.count}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>{t('alcPacketCapaSection')}</div>
-            <div className={`stat-tile stat-tile-${stats.closureRate >= 80 ? 'success' : 'warning'}`}
-                 style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)' }}>
+            <div className="alc-packet-head">{t('alcPacketCapaSection')}</div>
+            <div className={`stat-tile stat-tile-${stats.closureRate >= 80 ? 'success' : 'warning'} alc-packet-tile`}>
               <div className="stat-tile-label">{t('alcCapaClosureRate')}</div>
               <div className="stat-tile-value">{stats.closureRate}%</div>
-              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>
+              <div className="alc-packet-tile-meta">
                 <span>{t('alcCapaClosed')}: <b>{stats.capaClosed}</b></span>
                 <span>{t('alcCapaTotal')}: <b>{stats.capaTotal}</b></span>
-                <span style={{ color: stats.capaOverdue > 0 ? 'var(--danger-fg)' : undefined }}>
+                <span className={stats.capaOverdue > 0 ? 'alc-packet-overdue' : undefined}>
                   {t('alcCapaOverdueLabel')}: <b>{stats.capaOverdue}</b>
                 </span>
               </div>
@@ -629,11 +603,11 @@ function PacketTab({ plan, findings, capas: _capas, stats }: { plan: AnnualPlan;
           </div>
         </div>
 
-        <div style={{ marginTop: 16, fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>{t('alcPacketPlanSection')}</div>
-        <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 11 }}>
+        <div className="alc-packet-section-head">{t('alcPacketPlanSection')}</div>
+        <div className="alc-packet-plan">
           <div><b>{plan.id}</b> · <Badge tone={PLAN_STATUS_TONE[plan.status]}>{PLAN_STATUS_LABEL[plan.status][lang]}</Badge></div>
-          {plan.acApprovedBy && <div style={{ marginTop: 4 }}>{t('alcApprovedBy')}: {plan.acApprovedBy}</div>}
-          <div style={{ display: 'flex', gap: 12, marginTop: 6, color: 'var(--ink-3)' }}>
+          {plan.acApprovedBy && <div className="alc-packet-plan-row">{t('alcApprovedBy')}: {plan.acApprovedBy}</div>}
+          <div className="alc-packet-plan-meta">
             <span>Q1: {plan.q1.length}</span>
             <span>Q2: {plan.q2.length}</span>
             <span>Q3: {plan.q3.length}</span>
@@ -642,7 +616,7 @@ function PacketTab({ plan, findings, capas: _capas, stats }: { plan: AnnualPlan;
           </div>
         </div>
 
-        <div style={{ marginTop: 12, fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+        <div className="alc-packet-hint">
           {t('alcPacketHint')}
         </div>
       </Card>

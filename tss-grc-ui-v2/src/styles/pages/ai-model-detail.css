@@ -1,0 +1,235 @@
+/* TSS GRC Platform — AiModelDetailPage page-level styles.
+ *
+ * Migrated from inline style={{...}} props (PR design-system-migration-batch-3).
+ * Every value resolves to a design token so dark-mode + tenant theming
+ * apply automatically. RTL-safe (uses logical properties).
+ */
+
+/* ─── Back nav above title ─────────────────────────────── */
+.aimd-back {
+  margin-bottom: var(--sp-4);
+}
+
+/* ─── Drift dashboard tile ─────────────────────────────── */
+.aimd-drift-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-4);
+}
+.aimd-drift-head-title {
+  font-weight: 700;
+}
+.aimd-drift-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.aimd-drift-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--warning-bg);
+  border-radius: var(--r-xs);
+  font-size: var(--text-sm);
+}
+.aimd-drift-code {
+  background: var(--surface);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.aimd-drift-notes {
+  flex: 1;
+  color: var(--ink-3);
+}
+
+/* ─── Tab bar (in card) ────────────────────────────────── */
+.aimd-tabs {
+  display: flex;
+  gap: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-6);
+}
+.aimd-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-6);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-2);
+  font-weight: 400;
+  font-size: var(--text-sm);
+}
+.aimd-tab-btn--on {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.aimd-tab-count {
+  font-size: var(--text-2xs);
+  padding: 1px 6px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  color: var(--ink-3);
+}
+
+/* ─── Activity tab empty state ─────────────────────────── */
+.aimd-activity-empty {
+  padding: var(--sp-8);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* ─── Overview tab ─────────────────────────────────────── */
+.aimd-overview-grid {
+  display: grid;
+  gap: var(--sp-6);
+  grid-template-columns: 2fr 1fr;
+}
+@media (max-width: 900px) {
+  .aimd-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.aimd-h3 {
+  margin-top: 0;
+}
+.aimd-desc {
+  white-space: pre-wrap;
+}
+.aimd-muted {
+  color: var(--ink-3);
+}
+.aimd-trans-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.aimd-gate-warn {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4);
+  font-size: var(--text-xs);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--r-xs);
+}
+.aimd-gate-list {
+  margin: var(--sp-2) 0 0 var(--sp-6);
+  padding-inline-start: var(--sp-6);
+}
+
+/* ─── Provenance + field rows ──────────────────────────── */
+.aimd-field-row {
+  display: flex;
+  gap: var(--sp-5);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.aimd-field-label {
+  min-width: 160px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.aimd-field-value {
+  font-size: var(--text-sm);
+}
+
+/* ─── Compliance tab ───────────────────────────────────── */
+.aimd-comp-grid {
+  display: grid;
+  gap: var(--sp-6);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.aimd-comp-eyebrow {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.aimd-comp-badge {
+  margin-top: var(--sp-4);
+}
+
+/* ─── Audits / Drift tables ───────────────────────────── */
+.aimd-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.aimd-table thead tr {
+  background: var(--surface-2);
+  text-align: start;
+}
+.aimd-table th,
+.aimd-table td {
+  padding: var(--sp-4);
+}
+.aimd-table tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+.aimd-cell-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.aimd-cell-text {
+  font-size: var(--text-sm);
+}
+
+.aimd-audits-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-5);
+}
+.aimd-audits-head-title {
+  margin: 0;
+}
+
+/* ─── Modal — form rows ───────────────────────────────── */
+.aimd-form {
+  display: grid;
+  gap: var(--sp-5);
+}
+.aimd-form-row {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: flex-start;
+}
+.aimd-form-label {
+  min-width: 160px;
+  font-size: var(--text-xs);
+  padding-top: var(--sp-3);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.aimd-input {
+  flex: 1;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--ink-1);
+  font-size: var(--text-sm);
+}
+.aimd-textarea {
+  font-family: inherit;
+}
+.aimd-textarea--mono {
+  font-family: var(--font-mono);
+}
+.aimd-metrics-wrap {
+  flex: 1;
+}
+.aimd-metrics-hint {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  margin-top: var(--sp-2);
+}
+.aimd-metrics-key {
+  margin-inline-end: var(--sp-3);
+}

@@ -30,6 +30,7 @@ import {
   type DriftObservationResponse,
 } from '../../lib/aiGovernance';
 import type { LucideIcon } from 'lucide-react';
+import '../../styles/pages/ai-model-detail.css';
 
 /**
  * AI/ML Model detail page — Sprint 11.
@@ -121,7 +122,7 @@ export function AiModelDetailPage() {
 
   return (
     <Shell title={`${model.modelCode} — ${lang === 'ar' && model.titleAr ? model.titleAr : model.titleEn}`}>
-      <div style={{ marginBottom: 8 }}>
+      <div className="aimd-back">
         <Button variant="ghost" size="sm" Icon={ArrowLeft} onClick={() => navigate('/ai/models')}>
           {lang === 'ar' ? 'الرجوع إلى السجل' : 'Back to registry'}
         </Button>
@@ -150,29 +151,25 @@ export function AiModelDetailPage() {
       {/* Drift dashboard tile */}
       {unackDrift.length > 0 && (
         <Card padded>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <div className="aimd-drift-head">
             <BadgeAlert size={18} color="var(--warning-fg)" />
-            <div style={{ fontWeight: 700 }}>
+            <div className="aimd-drift-head-title">
               {lang === 'ar'
                 ? `${unackDrift.length} ملاحظة انحراف لم تُقَر`
                 : `${unackDrift.length} unacknowledged drift observation${unackDrift.length === 1 ? '' : 's'}`}
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="aimd-drift-list">
             {unackDrift.slice(0, 3).map(d => (
-              <div key={d.externalId} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '8px 12px', background: 'var(--warning-bg)',
-                borderRadius: 4, fontSize: 13,
-              }}>
+              <div key={d.externalId} className="aimd-drift-row">
                 <Badge tone={ML_DRIFT_SEVERITY_TONE[d.severity]} dot>
                   {ML_DRIFT_SEVERITY_LABEL[d.severity][lang === 'ar' ? 'ar' : 'en']}
                 </Badge>
                 <span>{ML_DRIFT_TYPE_LABEL[d.observationType][lang === 'ar' ? 'ar' : 'en']}</span>
-                <code style={{ background: 'var(--surface)', padding: '2px 6px', borderRadius: 3 }}>
+                <code className="aimd-drift-code">
                   {d.metricName} = {String(d.metricValue)}
                 </code>
-                <span style={{ flex: 1, color: 'var(--text-muted)' }}>
+                <span className="aimd-drift-notes">
                   {lang === 'ar' && d.notesAr ? d.notesAr : (d.notesEn ?? '')}
                 </span>
                 <Button size="sm" variant="primary" onClick={() => ackDrift(d)}>
@@ -186,7 +183,7 @@ export function AiModelDetailPage() {
 
       {/* Tabs */}
       <Card padded>
-        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 16 }}>
+        <div className="aimd-tabs">
           <TabButton id="overview"   label={lang === 'ar' ? 'نظرة عامة' : 'Overview'}        active={tab} setActive={setTab} Icon={ListChecks} />
           <TabButton id="provenance" label={lang === 'ar' ? 'المصدر' : 'Provenance'}         active={tab} setActive={setTab} Icon={Database} />
           <TabButton id="compliance" label={lang === 'ar' ? 'الامتثال' : 'Compliance'}        active={tab} setActive={setTab} Icon={ShieldAlert} />
@@ -207,7 +204,7 @@ export function AiModelDetailPage() {
           <DriftTab drift={drift} lang={lang} onAck={ackDrift} />
         )}
         {tab === 'activity' && (
-          <div style={{ padding: 24, color: 'var(--text-muted)', textAlign: 'center' }}>
+          <div className="aimd-activity-empty">
             {lang === 'ar'
               ? 'سجل النشاط (F7) متاح في صفحة سجل التدقيق العام.'
               : 'Activity timeline (F7 audit log) available on the platform audit log page.'}
@@ -250,22 +247,12 @@ function TabButton({ id, label, active, setActive, Icon, count }: TabButtonProps
     <button
       type="button"
       onClick={() => setActive(id)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 14px', cursor: 'pointer',
-        background: 'transparent', border: 'none',
-        borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-        color: isActive ? 'var(--accent)' : 'var(--text)',
-        fontWeight: isActive ? 600 : 400, fontSize: 13,
-      }}
+      className={`aimd-tab-btn${isActive ? ' aimd-tab-btn--on' : ''}`}
     >
       <Icon size={14} />
       {label}
       {count != null && (
-        <span style={{
-          fontSize: 11, padding: '1px 6px',
-          background: 'var(--surface-2)', borderRadius: 8, color: 'var(--text-muted)',
-        }}>{count}</span>
+        <span className="aimd-tab-count">{count}</span>
       )}
     </button>
   );
@@ -283,12 +270,12 @@ interface OverviewProps {
 function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) {
   const nextStages = ML_NEXT_STAGES[model.lifecycleStage];
   return (
-    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: '2fr 1fr' }}>
+    <div className="aimd-overview-grid">
       <div>
-        <h3 style={{ marginTop: 0 }}>
+        <h3 className="aimd-h3">
           {lang === 'ar' ? 'وصف النموذج' : 'Model description'}
         </h3>
-        <p style={{ whiteSpace: 'pre-wrap' }}>
+        <p className="aimd-desc">
           {lang === 'ar' && model.descriptionAr ? model.descriptionAr : (model.descriptionEn ?? '—')}
         </p>
         <Field label={lang === 'ar' ? 'نوع النموذج' : 'Model type'} value={model.modelType} />
@@ -298,15 +285,15 @@ function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) 
         <Field label={lang === 'ar' ? 'زمن الاستدلال (مللي ثانية)' : 'Inference latency (ms)'} value={model.inferenceLatencyMs?.toString() ?? '—'} />
       </div>
       <div>
-        <h3 style={{ marginTop: 0 }}>
+        <h3 className="aimd-h3">
           {lang === 'ar' ? 'الانتقال إلى مرحلة' : 'Transition'}
         </h3>
         {nextStages.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)' }}>
+          <p className="aimd-muted">
             {lang === 'ar' ? 'لا توجد انتقالات متاحة من هذه المرحلة.' : 'No transitions available from this stage.'}
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="aimd-trans-col">
             {nextStages.map(s => {
               const blocked = s === 'APPROVED_FOR_PROD' && gateMissing.length > 0;
               return (
@@ -320,24 +307,20 @@ function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) 
                     : undefined}
                 >
                   → {ML_STAGE_LABEL[s][lang === 'ar' ? 'ar' : 'en']}
-                  {blocked && <AlertTriangle size={12} style={{ marginInlineStart: 6 }} />}
+                  {blocked && <AlertTriangle size={12} className="ms-xs" />}
                 </Button>
               );
             })}
           </div>
         )}
         {gateMissing.length > 0 && (
-          <div style={{
-            marginTop: 12, padding: 10, fontSize: 12,
-            background: 'var(--warning-bg)', color: 'var(--warning-fg)',
-            border: '1px solid var(--warning-border)', borderRadius: 4,
-          }}>
+          <div className="aimd-gate-warn">
             <strong>{lang === 'ar' ? 'بوابة الاعتماد:' : 'Approval gate:'}</strong>
             <br />
             {lang === 'ar'
               ? `النماذج ذات الخطورة ${ML_TIER_LABEL[model.riskTier].ar} لا يمكن اعتمادها للإنتاج حتى تكتمل:`
               : `${ML_TIER_LABEL[model.riskTier].en}-tier models cannot enter APPROVED_FOR_PROD until you complete:`}
-            <ul style={{ margin: '4px 0 0 16px', paddingInlineStart: 16 }}>
+            <ul className="aimd-gate-list">
               {gateMissing.map(k => <li key={k}><code>{k}</code></li>)}
             </ul>
           </div>
@@ -349,9 +332,9 @@ function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) 
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-      <div style={{ minWidth: 160, color: 'var(--text-muted)', fontSize: 12 }}>{label}</div>
-      <div style={{ fontSize: 13 }}>{value}</div>
+    <div className="aimd-field-row">
+      <div className="aimd-field-label">{label}</div>
+      <div className="aimd-field-value">{value}</div>
     </div>
   );
 }
@@ -361,10 +344,10 @@ function Field({ label, value }: { label: string; value: string }) {
 function ProvenanceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | 'ar' }) {
   return (
     <div>
-      <h3 style={{ marginTop: 0 }}>
+      <h3 className="aimd-h3">
         {lang === 'ar' ? 'مصدر بيانات التدريب' : 'Training data provenance'}
       </h3>
-      <p style={{ whiteSpace: 'pre-wrap' }}>
+      <p className="aimd-desc">
         {lang === 'ar' && model.trainingDataProvenanceAr
           ? model.trainingDataProvenanceAr
           : (model.trainingDataProvenanceEn ?? '—')}
@@ -391,7 +374,7 @@ function ProvenanceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | '
 
 function ComplianceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | 'ar' }) {
   return (
-    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+    <div className="aimd-comp-grid">
       <ComplianceCard
         title="SDAIA AI Ethics (2023)"
         status={model.sdaiaAiEthicsCompliance}
@@ -401,7 +384,7 @@ function ComplianceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | '
         status={model.samaAiPrinciplesCompliance}
         lang={lang} />
       <div>
-        <h3 style={{ marginTop: 0 }}>{lang === 'ar' ? 'الأعلام التنظيمية' : 'Regulatory flags'}</h3>
+        <h3 className="aimd-h3">{lang === 'ar' ? 'الأعلام التنظيمية' : 'Regulatory flags'}</h3>
         <Field label={lang === 'ar' ? 'تقييم الأثر PDPL' : 'PDPL DPIA'}
                value={model.hasPdplDpia ? '✓' : '—'} />
         <Field label={lang === 'ar' ? 'تدقيق العدالة' : 'Fairness audit'}
@@ -418,10 +401,10 @@ function ComplianceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | '
 function ComplianceCard({ title, status, lang }: { title: string; status: MlModelResponse['sdaiaAiEthicsCompliance']; lang: 'en' | 'ar' }) {
   return (
     <Card padded>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+      <div className="aimd-comp-eyebrow">
         {title}
       </div>
-      <div style={{ marginTop: 8 }}>
+      <div className="aimd-comp-badge">
         <Badge tone={ML_COMPLIANCE_TONE[status]} dot>
           {ML_COMPLIANCE_LABEL[status][lang === 'ar' ? 'ar' : 'en']}
         </Badge>
@@ -439,8 +422,8 @@ function AuditsTab({ audits, lang, onAdd }: {
 }) {
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>
+      <div className="aimd-audits-head">
+        <h3 className="aimd-audits-head-title">
           {lang === 'ar' ? 'تدقيقات النموذج' : 'Model audits'}
         </h3>
         <Button variant="primary" onClick={onAdd}>
@@ -452,33 +435,33 @@ function AuditsTab({ audits, lang, onAdd }: {
             title={lang === 'ar' ? 'لا توجد تدقيقات بعد' : 'No audits yet'}
             sub={lang === 'ar' ? 'سجّل أول تدقيق عدالة أو قابلية تفسير.' : 'Record the first fairness or explainability audit.'} />
         : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="aimd-table">
             <thead>
-              <tr style={{ background: 'var(--surface-2)', textAlign: 'start' }}>
-                <th style={{ padding: 8 }}>{lang === 'ar' ? 'النوع' : 'Type'}</th>
-                <th style={{ padding: 8 }}>{lang === 'ar' ? 'التاريخ' : 'Date'}</th>
-                <th style={{ padding: 8 }}>{lang === 'ar' ? 'النتيجة' : 'Status'}</th>
-                <th style={{ padding: 8 }}>{lang === 'ar' ? 'المنهجية' : 'Methodology'}</th>
-                <th style={{ padding: 8 }}>CAPA</th>
+              <tr>
+                <th>{lang === 'ar' ? 'النوع' : 'Type'}</th>
+                <th>{lang === 'ar' ? 'التاريخ' : 'Date'}</th>
+                <th>{lang === 'ar' ? 'النتيجة' : 'Status'}</th>
+                <th>{lang === 'ar' ? 'المنهجية' : 'Methodology'}</th>
+                <th>CAPA</th>
               </tr>
             </thead>
             <tbody>
               {audits.map(a => (
-                <tr key={a.externalId} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: 8 }}>
+                <tr key={a.externalId}>
+                  <td>
                     <Badge tone="info">{ML_AUDIT_TYPE_LABEL[a.auditType][lang === 'ar' ? 'ar' : 'en']}</Badge>
                   </td>
-                  <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>{a.auditDate}</td>
-                  <td style={{ padding: 8 }}>
+                  <td className="aimd-cell-mono">{a.auditDate}</td>
+                  <td>
                     <Badge tone={ML_AUDIT_STATUS_TONE[a.status]} dot>
                       {ML_AUDIT_STATUS_LABEL[a.status][lang === 'ar' ? 'ar' : 'en']}
                     </Badge>
                   </td>
-                  <td style={{ padding: 8, fontSize: 13 }}>
+                  <td className="aimd-cell-text">
                     {(lang === 'ar' && a.methodologyAr ? a.methodologyAr : a.methodologyEn ?? '').slice(0, 80)}
                     {((lang === 'ar' && a.methodologyAr ? a.methodologyAr : a.methodologyEn ?? '').length > 80) ? '…' : ''}
                   </td>
-                  <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>
+                  <td className="aimd-cell-mono">
                     {a.capaTaskId ?? '—'}
                   </td>
                 </tr>
@@ -504,42 +487,42 @@ function DriftTab({ drift, lang, onAck }: {
       sub={lang === 'ar' ? 'تظهر ملاحظات الانحراف هنا تلقائياً عند رصدها.' : 'Drift observations appear here automatically when detected.'} />;
   }
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <table className="aimd-table">
       <thead>
-        <tr style={{ background: 'var(--surface-2)', textAlign: 'start' }}>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'وقت الرصد' : 'Observed'}</th>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'النوع' : 'Type'}</th>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'الشدة' : 'Severity'}</th>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'المقياس' : 'Metric'}</th>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'القيمة' : 'Value'}</th>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'الأساس' : 'Baseline'}</th>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'الحدّ' : 'Threshold'}</th>
-          <th style={{ padding: 8 }}>{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+        <tr>
+          <th>{lang === 'ar' ? 'وقت الرصد' : 'Observed'}</th>
+          <th>{lang === 'ar' ? 'النوع' : 'Type'}</th>
+          <th>{lang === 'ar' ? 'الشدة' : 'Severity'}</th>
+          <th>{lang === 'ar' ? 'المقياس' : 'Metric'}</th>
+          <th>{lang === 'ar' ? 'القيمة' : 'Value'}</th>
+          <th>{lang === 'ar' ? 'الأساس' : 'Baseline'}</th>
+          <th>{lang === 'ar' ? 'الحدّ' : 'Threshold'}</th>
+          <th>{lang === 'ar' ? 'الحالة' : 'Status'}</th>
         </tr>
       </thead>
       <tbody>
         {drift.map(d => (
-          <tr key={d.externalId} style={{ borderBottom: '1px solid var(--border)' }}>
-            <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>
+          <tr key={d.externalId}>
+            <td className="aimd-cell-mono">
               {d.observedAt?.slice(0, 16)}
             </td>
-            <td style={{ padding: 8 }}>
+            <td>
               {ML_DRIFT_TYPE_LABEL[d.observationType][lang === 'ar' ? 'ar' : 'en']}
             </td>
-            <td style={{ padding: 8 }}>
+            <td>
               <Badge tone={ML_DRIFT_SEVERITY_TONE[d.severity]} dot>
                 {ML_DRIFT_SEVERITY_LABEL[d.severity][lang === 'ar' ? 'ar' : 'en']}
               </Badge>
             </td>
-            <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>{d.metricName}</td>
-            <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>{String(d.metricValue)}</td>
-            <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>
+            <td className="aimd-cell-mono">{d.metricName}</td>
+            <td className="aimd-cell-mono">{String(d.metricValue)}</td>
+            <td className="aimd-cell-mono">
               {d.baselineValue == null ? '—' : String(d.baselineValue)}
             </td>
-            <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>
+            <td className="aimd-cell-mono">
               {d.driftThreshold == null ? '—' : String(d.driftThreshold)}
             </td>
-            <td style={{ padding: 8 }}>
+            <td>
               {d.isAcknowledged ? (
                 <Badge tone="success">{lang === 'ar' ? 'مُقَر' : 'Acknowledged'}</Badge>
               ) : (
@@ -614,7 +597,7 @@ function RecordAuditModal({ modelExternalId, onClose, onSaved }: {
           {lang === 'ar' ? 'حفظ' : 'Save'}
         </Button>
       </>}>
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div className="aimd-form">
         <Row>
           <Label>{lang === 'ar' ? 'نوع التدقيق' : 'Audit type'}</Label>
           <Select value={auditType} onChange={v => setAuditType(v as MlAuditType)}
@@ -625,7 +608,7 @@ function RecordAuditModal({ modelExternalId, onClose, onSaved }: {
         <Row>
           <Label>{lang === 'ar' ? 'التاريخ' : 'Date'}</Label>
           <input type="date" value={auditDate} onChange={e => setAuditDate(e.target.value)}
-            style={inputStyle} />
+            className="aimd-input" />
         </Row>
         <Row>
           <Label>{lang === 'ar' ? 'النتيجة' : 'Status'}</Label>
@@ -639,25 +622,25 @@ function RecordAuditModal({ modelExternalId, onClose, onSaved }: {
           <input value={auditorExternalParty}
             onChange={e => setAuditorExternalParty(e.target.value)}
             placeholder={lang === 'ar' ? '(اختياري) — KPMG / EY / …' : '(optional) — KPMG / EY / …'}
-            style={inputStyle} />
+            className="aimd-input" />
         </Row>
         <Row>
           <Label>{lang === 'ar' ? 'المنهجية' : 'Methodology'}</Label>
           <textarea value={methodologyEn} onChange={e => setMethodologyEn(e.target.value)}
-            rows={3} style={{ ...inputStyle, fontFamily: 'inherit' }} />
+            rows={3} className="aimd-input aimd-textarea" />
         </Row>
         <Row>
           <Label>{lang === 'ar' ? 'النتائج' : 'Findings'}</Label>
           <textarea value={findingsEn} onChange={e => setFindingsEn(e.target.value)}
-            rows={3} style={{ ...inputStyle, fontFamily: 'inherit' }} />
+            rows={3} className="aimd-input aimd-textarea" />
         </Row>
         <Row>
           <Label>{lang === 'ar' ? 'المقاييس (JSON)' : 'Metrics (JSON)'}</Label>
-          <div style={{ flex: 1 }}>
+          <div className="aimd-metrics-wrap">
             <textarea value={metricsJson} onChange={e => setMetricsJson(e.target.value)}
-              rows={4} style={{ ...inputStyle, fontFamily: 'monospace' }} />
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              {lang === 'ar' ? 'مفاتيح شائعة:' : 'Common keys:'} {helpers.map(h => <code key={h} style={{ marginInlineEnd: 6 }}>{h}</code>)}
+              rows={4} className="aimd-input aimd-textarea--mono" />
+            <div className="aimd-metrics-hint">
+              {lang === 'ar' ? 'مفاتيح شائعة:' : 'Common keys:'} {helpers.map(h => <code key={h} className="aimd-metrics-key">{h}</code>)}
             </div>
           </div>
         </Row>
@@ -709,20 +692,20 @@ function DecommissionModal({ modelExternalId, onClose, onSaved }: {
           {lang === 'ar' ? 'تأكيد الإخراج' : 'Confirm decommission'}
         </Button>
       </>}>
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div className="aimd-form">
         <Row>
           <Label>{lang === 'ar' ? 'تاريخ الإخراج' : 'Decommission date'}</Label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="aimd-input" />
         </Row>
         <Row>
           <Label>{lang === 'ar' ? 'السبب (EN)' : 'Reason (EN)'} *</Label>
           <textarea value={reasonEn} onChange={e => setReasonEn(e.target.value)}
-            rows={3} style={{ ...inputStyle, fontFamily: 'inherit' }} />
+            rows={3} className="aimd-input aimd-textarea" />
         </Row>
         <Row>
           <Label>{lang === 'ar' ? 'السبب (AR)' : 'Reason (AR)'}</Label>
           <textarea value={reasonAr} onChange={e => setReasonAr(e.target.value)}
-            rows={3} style={{ ...inputStyle, fontFamily: 'inherit' }} />
+            rows={3} className="aimd-input aimd-textarea" />
         </Row>
       </div>
     </Modal>
@@ -731,25 +714,12 @@ function DecommissionModal({ modelExternalId, onClose, onSaved }: {
 
 // ─── Tiny form primitives ─────────────────────────────────────────
 
-const inputStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '6px 8px',
-  border: '1px solid var(--border)',
-  borderRadius: 4,
-  background: 'var(--surface)',
-  color: 'var(--text)',
-  fontSize: 13,
-};
-
 function Row({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>{children}</div>;
+  return <div className="aimd-form-row">{children}</div>;
 }
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      minWidth: 160, fontSize: 12, paddingTop: 6,
-      color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4,
-    }}>{children}</div>
+    <div className="aimd-form-label">{children}</div>
   );
 }
 function Select({ value, onChange, options }: {
@@ -758,7 +728,7 @@ function Select({ value, onChange, options }: {
   options: { value: string; label: string }[];
 }) {
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} style={inputStyle}>
+    <select value={value} onChange={e => onChange(e.target.value)} className="aimd-input">
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );

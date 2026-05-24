@@ -24,6 +24,7 @@ import {
   type SafeguardMechanism, type DsrType,
 } from '../../lib/privacyLifecycle';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
+import '../../styles/pages/privacy-lifecycle.css';
 
 type PrcTab = 'pipeline' | 'ropa' | 'dpia' | 'cbt' | 'dsr';
 
@@ -54,7 +55,7 @@ export function PrivacyLifecyclePage() {
         sub={t('prcPageSub')}
       />
 
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+      <div className="kpi-grid mb-lg">
         <Kpi Icon={Files}          label={t('prcKpiRopa')}          value={`${stats.ropaApproved} / ${stats.ropaTotal}`} tone="primary" />
         <Kpi Icon={ShieldAlert}    label={t('prcKpiDpiaHighRisk')}  value={String(stats.dpiaHighRisk)} tone={stats.dpiaHighRisk > 0 ? 'warning' : 'success'} />
         <Kpi Icon={Globe}          label={t('prcKpiCbt')}            value={`${stats.cbtAdequate} / ${stats.cbtTotal}`} tone="info" />
@@ -64,7 +65,7 @@ export function PrivacyLifecyclePage() {
         <Kpi Icon={Clock}          label={t('prcKpiAvgDays')}        value={`${stats.dsrCloseAvgDays}d`} tone="info" />
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="prc-tab-row">
         {([
           { id: 'pipeline', labelKey: 'lpcTabPipeline', Icon: Activity },
           { id: 'ropa', labelKey: 'prcTabRopa', Icon: Files },
@@ -73,12 +74,7 @@ export function PrivacyLifecyclePage() {
           { id: 'dsr',  labelKey: 'prcTabDsr',  Icon: UserCheck },
         ] as { id: PrcTab; labelKey: string; Icon: typeof Files }[]).map(tabDef => (
           <button key={tabDef.id} onClick={() => setTab(tabDef.id)}
-            style={{
-              padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600,
-              border: `1px solid ${tab === tabDef.id ? 'var(--primary)' : 'var(--border)'}`,
-              background: tab === tabDef.id ? 'var(--primary-50)' : 'var(--surface-1)',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
+            className={`prc-tab-btn${tab === tabDef.id ? ' prc-tab-btn--on' : ''}`}>
             <tabDef.Icon size={13} />
             {t(tabDef.labelKey)}
           </button>
@@ -167,25 +163,25 @@ function RopaTab({ ropa, onCreate, onApprove }: {
   return (
     <Card title={t('prcRopaTitle')} Icon={Files}
       action={<Button size="sm" variant="secondary" onClick={onCreate}>{t('prcRopaCreate')}</Button>}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="prc-card-sub">
         {t('prcRopaSub')}
       </div>
       {ropa.map(r => {
         const hr = detectHighRisk(r);
         return (
-          <div key={r.id} style={{ padding: 14, marginBottom: 10, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{r.id}</span>
+          <div key={r.id} className="prc-item">
+            <div className="prc-item-head">
+              <div className="prc-item-main">
+                <div className="prc-item-badges">
+                  <span className="mono prc-item-code">{r.id}</span>
                   <Badge tone={ROPA_STATUS_TONE[r.status]}>{ROPA_STATUS_LABEL[r.status][lang]}</Badge>
                   <Badge tone="info">{LAWFUL_BASIS_LABEL[r.lawfulBasis][lang]}</Badge>
                   {hr.isHigh && <Badge tone="warning"><AlertTriangle size={11} /> {t('prcHighRisk')}</Badge>}
                   {r.dpiaId && <Badge tone="primary">{r.dpiaId}</Badge>}
                   {r.cbtId && <Badge tone="primary">{r.cbtId}</Badge>}
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{lang === 'ar' ? r.nameAr : r.nameEn}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                <div className="prc-item-title">{lang === 'ar' ? r.nameAr : r.nameEn}</div>
+                <div className="prc-item-owner">
                   {t('prcRopaOwner')}: <b>{r.owner || '—'}</b>
                 </div>
               </div>
@@ -193,7 +189,7 @@ function RopaTab({ ropa, onCreate, onApprove }: {
             </div>
 
             {/* Article 22 9-field grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11 }}>
+            <div className="prc-ropa-grid">
               <FieldRow label={t('prcRopaPurposes')} value={lang === 'ar' ? r.purposesAr : r.purposesEn} />
               <FieldRow label={t('prcRopaRecipients')} value={lang === 'ar' ? r.recipientsAr : r.recipientsEn} />
               <FieldRow label={t('prcRopaDataCats')} value={r.dataCategories.join(', ') || '—'} />
@@ -204,11 +200,11 @@ function RopaTab({ ropa, onCreate, onApprove }: {
             </div>
 
             {hr.isHigh && (
-              <div style={{ marginTop: 8, padding: 8, background: 'rgba(245,158,11,0.06)', borderRadius: 4, borderInlineStart: '3px solid var(--warning)' }}>
-                <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 4 }}>
+              <div className="prc-risk-banner">
+                <div className="prc-risk-banner-label">
                   {t('prcArticle25')}
                 </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <div className="prc-risk-banner-chips">
                   {hr.triggers.map((t_, i) => (
                     <Badge key={i} tone="warning">{lang === 'ar' ? t_.ar : t_.en}</Badge>
                   ))}
@@ -224,11 +220,11 @@ function RopaTab({ ropa, onCreate, onApprove }: {
 
 function FieldRow({ label, value, colspan }: { label: string; value: string; colspan?: number }) {
   return (
-    <div style={{ gridColumn: colspan ? `span ${colspan}` : undefined }}>
-      <div style={{ fontSize: 9, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>
+    <div className={colspan === 2 ? 'prc-field--span2' : undefined}>
+      <div className="prc-field-label">
         {label}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.5 }}>{value}</div>
+      <div className="prc-field-value">{value}</div>
     </div>
   );
 }
@@ -248,60 +244,60 @@ function DpiaTab({ dpias, ropa, onCreate, onTransition }: {
       action={candidates.length > 0
         ? <Button size="sm" variant="primary" onClick={() => onCreate(candidates[0].id)}>{t('prcDpiaCreate')} ({candidates.length})</Button>
         : null}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="prc-card-sub">
         {t('prcDpiaSub')}
       </div>
       {dpias.length === 0
-        ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
+        ? <div className="prc-empty">
             {t('prcDpiaEmpty')}
           </div>
         : dpias.map(d => {
             const r = ropa.find(x => x.id === d.ropaId);
             return (
-              <div key={d.id} style={{ padding: 14, marginBottom: 10, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                      <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{d.id}</span>
+              <div key={d.id} className="prc-item">
+                <div className="prc-item-head">
+                  <div className="prc-item-main">
+                    <div className="prc-item-badges">
+                      <span className="mono prc-item-code">{d.id}</span>
                       <Badge tone={d.status === 'APPROVED' ? 'success' : d.status === 'CONSULTATION' ? 'warning' : 'info'}>
                         {d.status}
                       </Badge>
                       {d.isHighRisk && <Badge tone="warning"><AlertTriangle size={11} /> {t('prcHighRisk')}</Badge>}
                       {d.needsSdaiaConsultation && <Badge tone="danger">SDAIA consultation</Badge>}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div className="prc-item-title--sm">
                       {r ? (lang === 'ar' ? r.nameAr : r.nameEn) : d.ropaId}
                     </div>
                     {d.dpoSignedBy && (
-                      <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2 }}>
+                      <div className="prc-dpo-sign">
                         {t('prcDpoSign')}: {d.dpoSignedBy}
                       </div>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div className="prc-item-stats">
                     <Stat label={t('prcDpiaInherent')} value={String(d.riskScore)} tone={d.riskScore > 12 ? 'danger' : 'warning'} />
                     <Stat label={t('prcDpiaResidual')} value={String(d.residualScore)} tone={d.residualScore > 6 ? 'warning' : 'success'} />
                   </div>
                 </div>
                 {/* Transition buttons */}
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                <div className="prc-dpia-trans-row">
                   {d.status === 'DRAFT' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'RISK_ASSESSMENT')}>{t('prcDpiaToRiskAssess')}</Button>}
                   {d.status === 'RISK_ASSESSMENT' && d.needsSdaiaConsultation && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'CONSULTATION')}>{t('prcDpiaToSdaiaConsult')}</Button>}
                   {(d.status === 'RISK_ASSESSMENT' || d.status === 'CONSULTATION') && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'APPROVED')}>{t('prcDpiaDpoApprove')}</Button>}
                   {d.status === 'APPROVED' && <Button size="sm" variant="ghost" onClick={() => onTransition(d, 'REJECTED')}>{t('prcDpiaReject')}</Button>}
                 </div>
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 4 }}>
+                <div className="prc-section-mb">
+                  <div className="prc-section-label">
                     {t('prcDpiaTriggers')}
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <div className="prc-section-chips">
                     {(lang === 'ar' ? d.triggersAr : d.triggersEn).map((trg, i) => (
                       <Badge key={i} tone="warning">{trg}</Badge>
                     ))}
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6, padding: 8, background: 'var(--surface-2)', borderRadius: 4 }}>
-                  <div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 4 }}>
+                <div className="prc-mitigations">
+                  <div className="prc-section-label">
                     {t('prcDpiaMitigations')}
                   </div>
                   {lang === 'ar' ? d.mitigationsAr : d.mitigationsEn}
@@ -325,41 +321,41 @@ function CbtTab({ cbts, ropa, onTransition, onUpgradeSafeguard }: {
   return (
     <>
       <Card title={t('prcCbtTitle')} Icon={Globe}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="prc-card-sub">
           {t('prcCbtSub')}
         </div>
         {cbts.map(c => {
           const r = ropa.find(x => x.id === c.ropaId);
           return (
-            <div key={c.id} style={{ padding: 14, marginBottom: 10, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{c.id}</span>
+            <div key={c.id} className="prc-item">
+              <div className="prc-item-head">
+                <div className="prc-item-main">
+                  <div className="prc-item-badges">
+                    <span className="mono prc-item-code">{c.id}</span>
                     <Badge tone={ADEQUACY_TONE[c.adequacy]}>{ADEQUACY_LABEL[c.adequacy][lang]}</Badge>
                     <Badge tone="info">{SAFEGUARD_LABEL[c.safeguard][lang]}</Badge>
                     <Badge tone="primary">{c.destinationCountry}</Badge>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  <div className="prc-item-title--sm">
                     {r ? (lang === 'ar' ? r.nameAr : r.nameEn) : c.ropaId}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.6 }}>
+                  <div className="prc-cbt-purpose">
                     {lang === 'ar' ? c.purposeAr : c.purposeEn}
                   </div>
                   {c.nextReviewAt && (
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                    <div className="prc-cbt-review">
                       {t('prcCbtNextReview')}: <span className="mono">{c.nextReviewAt}</span>
                       {' · '} {t('prcCbtInterval')}: {c.reviewIntervalMonths}m
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="prc-item-stats">
                   <Stat label={t('prcCbtPreRisk')} value={String(c.preRiskScore)} tone="warning" />
                   <Stat label={t('prcCbtPostRisk')} value={String(c.postRiskScore)} tone={c.postRiskScore <= 6 ? 'success' : 'warning'} />
                 </div>
               </div>
               {/* Action row */}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', paddingTop: 8, borderTop: '1px dashed var(--border)' }}>
+              <div className="prc-cbt-actions">
                 {c.status === 'DRAFT' && <Button size="sm" variant="primary" onClick={() => onTransition(c, 'ASSESSING')}>{t('prcCbtStartAssess')}</Button>}
                 {c.status === 'ASSESSING' && c.adequacy !== 'PROHIBITED' && <Button size="sm" variant="primary" onClick={() => onTransition(c, 'APPROVED')}>{t('prcCbtApprove')}</Button>}
                 {c.status === 'ASSESSING' && c.adequacy === 'PROHIBITED' && <Button size="sm" variant="danger" onClick={() => onTransition(c, 'BLOCKED')}>{t('prcCbtBlock')}</Button>}
@@ -368,7 +364,7 @@ function CbtTab({ cbts, ropa, onTransition, onUpgradeSafeguard }: {
                   <select
                     onChange={e => { if (e.target.value) onUpgradeSafeguard(c, e.target.value as SafeguardMechanism); }}
                     defaultValue=""
-                    style={{ padding: '4px 8px', fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
+                    className="prc-cbt-select">
                     <option value="">{t('prcCbtUpgradeSelect')}</option>
                     {(['STANDARD_CLAUSES','BINDING_CORPORATE_RULES','CERTIFICATION','EXPLICIT_CONSENT'] as SafeguardMechanism[])
                       .filter(s => s !== c.safeguard)
@@ -384,18 +380,18 @@ function CbtTab({ cbts, ropa, onTransition, onUpgradeSafeguard }: {
         })}
       </Card>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="prc-section-mt">
         <Card title={t('prcAdequacyTitle')} Icon={Globe}>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+          <div className="prc-card-sub">
             {t('prcAdequacySub')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          <div className="prc-adequacy-grid">
             {(['ADEQUATE', 'CONDITIONAL', 'NOT_ADEQUATE', 'PROHIBITED'] as const).map(level => (
-              <div key={level} style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-                <div style={{ marginBottom: 6 }}>
+              <div key={level} className="prc-adequacy-card">
+                <div className="prc-adequacy-card-head">
                   <Badge tone={ADEQUACY_TONE[level]}>{ADEQUACY_LABEL[level][lang]}</Badge>
                 </div>
-                <ul style={{ margin: 0, paddingInlineStart: 14, fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+                <ul className="prc-adequacy-list">
                   {Object.entries(ADEQUACY_BY_COUNTRY)
                     .filter(([, l]) => l === level)
                     .map(([country]) => <li key={country}>{country}</li>)}
@@ -431,70 +427,69 @@ function DsrTab({ dsrs, onCreate, onTransition, onExtend }: {
   return (
     <Card title={t('prcDsrTitle')} Icon={UserCheck}
       action={<Button size="sm" variant="secondary" onClick={() => setShowForm(s => !s)}>{showForm ? t('prcDsrCancelNew') : t('prcDsrNewBtn')}</Button>}>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="prc-card-sub">
         {t('prcDsrSub')}
       </div>
       {showForm && (
-        <div style={{ padding: 12, marginBottom: 12, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
-          <select value={newType} onChange={e => setNewType(e.target.value as DsrType)} style={{ padding: 6, fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }}>
+        <div className="prc-dsr-form">
+          <select value={newType} onChange={e => setNewType(e.target.value as DsrType)} className="prc-dsr-input">
             {(['ACCESS', 'RECTIFICATION', 'ERASURE', 'OBJECTION', 'RESTRICTION', 'PORTABILITY', 'WITHDRAW_CONSENT'] as DsrType[]).map(tp =>
               <option key={tp} value={tp}>{DSR_TYPE_LABEL[tp][lang]}</option>
             )}
           </select>
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t('prcDsrFormName')} style={{ padding: 6, fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }} />
-          <input value={newId} onChange={e => setNewId(e.target.value)} placeholder={t('prcDsrFormId')} maxLength={4} className="mono" style={{ padding: 6, fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }} />
-          <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder={t('prcDsrFormEmail')} type="email" style={{ padding: 6, fontSize: 11, border: '1px solid var(--border)', borderRadius: 4 }} />
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t('prcDsrFormName')} className="prc-dsr-input" />
+          <input value={newId} onChange={e => setNewId(e.target.value)} placeholder={t('prcDsrFormId')} maxLength={4} className="mono prc-dsr-input" />
+          <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder={t('prcDsrFormEmail')} type="email" className="prc-dsr-input" />
           <Button size="sm" variant="primary" onClick={submit}>{t('prcDsrFormSubmit')}</Button>
         </div>
       )}
       {dsrs.map(d => {
         const sla = dsrSlaRemaining(d);
         return (
-          <div key={d.id} style={{ padding: 14, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--primary)' }}>{d.id}</span>
+          <div key={d.id} className="prc-dsr-card">
+            <div className="prc-item-head">
+              <div className="prc-item-main">
+                <div className="prc-item-badges">
+                  <span className="mono prc-item-code">{d.id}</span>
                   <Badge tone={DSR_STATUS_TONE[d.status]}>{DSR_STATUS_LABEL[d.status][lang]}</Badge>
                   <Badge tone="info">{DSR_TYPE_LABEL[d.type][lang]}</Badge>
                   {d.verificationMethod && <Badge tone="primary">{d.verificationMethod}</Badge>}
                   {d.extended && <Badge tone="warning">{t('prcDsrExtendedBadge')}</Badge>}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                <div className="prc-item-title--sm">
                   {d.subjectName} · National ID …{d.nationalIdLast4}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)' }} className="mono">
+                <div className="mono prc-dsr-subject-email">
                   {d.contactEmail}
                 </div>
                 {d.dataSummaryEn && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-2)', lineHeight: 1.6, padding: 6, background: 'var(--surface-2)', borderRadius: 4 }}>
+                  <div className="prc-dsr-summary">
                     {lang === 'ar' ? d.dataSummaryAr : d.dataSummaryEn}
                   </div>
                 )}
                 {d.extensionReasonEn && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--warning-fg)', lineHeight: 1.6, padding: 6, background: 'rgba(245,158,11,0.06)', borderRadius: 4 }}>
+                  <div className="prc-dsr-extension">
                     {lang === 'ar' ? d.extensionReasonAr : d.extensionReasonEn}
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', minWidth: 200 }}>
+              <div className="prc-dsr-sla-col">
                 {/* SLA bar */}
-                <div style={{ width: 200 }}>
-                  <div style={{ fontSize: 10, color: sla.isOverdue ? 'var(--danger-fg)' : 'var(--ink-3)', textAlign: 'end', marginBottom: 2 }}>
+                <div className="prc-dsr-sla-wrap">
+                  <div className={`prc-dsr-sla-time${sla.isOverdue ? ' prc-dsr-sla-time--late' : ''}`}>
                     {sla.isOverdue ? t('prcDsrOverdue') : `${sla.hoursRemaining}h ${t('prcDsrRemaining')}`}
                   </div>
-                  <div style={{ height: 8, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${sla.pctElapsed}%`,
-                      background: sla.isOverdue ? 'var(--danger)' : sla.pctElapsed > 80 ? 'var(--warning)' : 'var(--success)',
-                    }} />
+                  <div className="prc-dsr-sla-bar">
+                    <div className="prc-dsr-sla-fill"
+                      data-tone={sla.isOverdue ? 'danger' : sla.pctElapsed > 80 ? 'warning' : 'success'}
+                      style={{ width: `${sla.pctElapsed}%` }} />
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--ink-3)', textAlign: 'end', marginTop: 2 }}>
+                  <div className="prc-dsr-sla-foot">
                     {t('prcDsrDeadline')}: <span className="mono">{d.slaDeadline}</span>
                   </div>
                 </div>
                 {/* Action buttons */}
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="prc-dsr-actions">
                   {d.status === 'INTAKE' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'VERIFYING_IDENTITY')}>{t('prcDsrVerify')}</Button>}
                   {d.status === 'VERIFYING_IDENTITY' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'COLLECTING')}>{t('prcDsrCollect')}</Button>}
                   {d.status === 'COLLECTING' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'REDACTING')}>{t('prcDsrRedact')}</Button>}
@@ -506,7 +501,7 @@ function DsrTab({ dsrs, onCreate, onTransition, onExtend }: {
               </div>
             </div>
             {/* Workflow stages */}
-            <div style={{ display: 'flex', gap: 0, marginTop: 8, fontSize: 10 }}>
+            <div className="prc-dsr-stages">
               {[
                 { code: 'INTAKE',             label: t('prcDsrSt1'), at: d.filedAt },
                 { code: 'VERIFYING_IDENTITY', label: t('prcDsrSt2'), at: d.identityVerifiedAt },
@@ -516,24 +511,18 @@ function DsrTab({ dsrs, onCreate, onTransition, onExtend }: {
               ].map((s, i, arr) => {
                 const done = !!s.at;
                 return (
-                  <div key={s.code} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      background: done ? 'var(--success)' : 'var(--surface-2)',
-                      color: done ? 'white' : 'var(--ink-3)',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 10, fontWeight: 700,
-                    }}>
+                  <div key={s.code} className="prc-dsr-stage">
+                    <div className={`prc-dsr-stage-dot${done ? ' prc-dsr-stage-dot--done' : ''}`}>
                       {done ? <CheckCircle2 size={10} /> : i + 1}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: 'var(--ink-2)', fontWeight: 600 }}>{s.label}</div>
-                      <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 9 }}>
+                    <div className="prc-dsr-stage-text">
+                      <div className="prc-dsr-stage-label">{s.label}</div>
+                      <div className="mono prc-dsr-stage-date">
                         {s.at ? s.at.slice(0, 10) : '—'}
                       </div>
                     </div>
                     {i < arr.length - 1 && (
-                      <div style={{ width: 16, height: 1, background: 'var(--border)' }} />
+                      <div className="prc-dsr-stage-sep" />
                     )}
                   </div>
                 );
@@ -549,14 +538,10 @@ function DsrTab({ dsrs, onCreate, onTransition, onExtend }: {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function Stat({ label, value, tone }: { label: string; value: string; tone: 'primary' | 'warning' | 'danger' | 'success' }) {
-  const colour = tone === 'danger' ? 'var(--danger-fg)' : tone === 'warning' ? 'var(--warning-fg)' : tone === 'success' ? 'var(--success-fg)' : 'var(--primary)';
   return (
-    <div style={{
-      padding: 8, border: `1px solid ${colour}`, borderRadius: 'var(--r-sm)',
-      background: 'var(--surface-2)', minWidth: 70, textAlign: 'center',
-    }}>
-      <div style={{ fontSize: 9, color: 'var(--ink-3)', textTransform: 'uppercase' }}>{label}</div>
-      <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: colour }}>{value}</div>
+    <div className="prc-stat" data-tone={tone === 'primary' ? undefined : tone}>
+      <div className="prc-stat-label">{label}</div>
+      <div className="mono prc-stat-value">{value}</div>
     </div>
   );
 }
