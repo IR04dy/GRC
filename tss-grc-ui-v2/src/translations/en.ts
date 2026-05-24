@@ -5442,6 +5442,9 @@ export const en = {
   dsaEmpty:          'No data sharing agreements',
   dsaEmptyHint:      'Create an agreement to formalise a disclosure to a regulator, credit bureau or partner.',
 
+  // ─── Sub-processor tracking (Sprint 11 — PDPL Article 30) ──────────────
+  subpSidebar:       'Sub-processor register',
+
   // ─── Processor due diligence (gap #3) ───────────────────────────────────
   procSidebar:       'Processor due diligence',
   procPageTitle:     'Processor due diligence',

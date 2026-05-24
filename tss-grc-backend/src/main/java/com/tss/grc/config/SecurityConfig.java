@@ -96,6 +96,9 @@ public class SecurityConfig {
                 // portal hardening (rate-limit, MFA bind, full audit) is a follow-up.
                 .requestMatchers(HttpMethod.GET,  "/api/v1/tprm/bcp-attestations/by-token/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/tprm/bcp-attestations/by-token/**").permitAll()
+                // Sprint 11 — PDPL Article 12 transparency: public list of
+                // APPROVED sub-processors with internal fields stripped.
+                .requestMatchers(HttpMethod.GET, "/api/v1/privacy/subprocessors/public").permitAll()
                 .anyRequest().authenticated()
             )
 

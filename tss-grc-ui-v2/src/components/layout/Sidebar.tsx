@@ -173,6 +173,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'cyb-pdpl',   to: '/cyber-pdpl-bridge', Icon: Workflow,    labelKey: 'cpbSidebar' },
       { id: 'dsa',        to: '/data-sharing',         Icon: Share2,         labelKey: 'dsaSidebar' },
       { id: 'proc-dd',    to: '/processor-assessments', Icon: ClipboardCheck, labelKey: 'procSidebar' },
+      { id: 'subp',       to: '/privacy/subprocessors', Icon: Share2,         labelKey: 'subpSidebar' },
     ],
   },
 

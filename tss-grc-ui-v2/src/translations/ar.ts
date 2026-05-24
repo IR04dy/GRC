@@ -5422,6 +5422,9 @@ export const ar = {
   dsaEmpty:          'لا توجد اتفاقيات مشاركة بيانات',
   dsaEmptyHint:      'أنشئ اتفاقية لتوثيق إفصاح لجهة تنظيمية أو مكتب ائتمان أو شريك.',
 
+  // ─── Sub-processor tracking (Sprint 11 — PDPL Article 30) ──────────────
+  subpSidebar:       'معالجو البيانات الفرعيون',
+
   // ─── Processor due diligence (gap #3) ───────────────────────────────────
   procSidebar:       'فحص المعالجين',
   procPageTitle:     'فحص العناية الواجبة للمعالجين',

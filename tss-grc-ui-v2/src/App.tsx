@@ -130,6 +130,10 @@ const AttackSurfaceAssetDetailPage = lazy(() => import('./pages/cyber/AttackSurf
 // Sprint 11 — Risk-Based Vulnerability SLA engine.
 const VulnSlaDashboardPage      = lazy(() => import('./pages/cyber/VulnSlaDashboardPage').then(m => ({ default: m.VulnSlaDashboardPage })));
 const VulnSlaPolicyPage         = lazy(() => import('./pages/cyber/VulnSlaPolicyPage').then(m => ({ default: m.VulnSlaPolicyPage })));
+// Sprint 11 — PDPL Sub-processor Tracking.
+const SubprocessorsPage         = lazy(() => import('./pages/privacy/SubprocessorsPage').then(m => ({ default: m.SubprocessorsPage })));
+const SubprocessorDetailPage    = lazy(() => import('./pages/privacy/SubprocessorDetailPage').then(m => ({ default: m.SubprocessorDetailPage })));
+const PublicSubprocessorListPage = lazy(() => import('./pages/privacy/PublicSubprocessorListPage').then(m => ({ default: m.PublicSubprocessorListPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -413,6 +417,11 @@ export function App() {
               {/* Sprint 11 — Risk-Based Vulnerability SLA engine. */}
               <Route path="/cyber/vuln-sla/dashboard"                          element={<VulnSlaDashboardPage />} />
               <Route path="/cyber/vuln-sla/policies"                           element={<VulnSlaPolicyPage />} />
+              {/* Sprint 11 — PDPL Sub-processor Tracking. Public route
+                  registered first so /public is matched before /:externalId. */}
+              <Route path="/privacy/public/subprocessors"   element={<PublicSubprocessorListPage />} />
+              <Route path="/privacy/subprocessors"          element={<SubprocessorsPage />} />
+              <Route path="/privacy/subprocessors/:externalId" element={<SubprocessorDetailPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />
