@@ -42,6 +42,31 @@ public class DataBreach {
     @Column(name = "pdpc_notified_at")
     private LocalDateTime pdpcNotifiedAt;
 
+    /**
+     * SDAIA notification workflow status (Open Issue #006).
+     *
+     * <p>PDPL Article 31 requires notification of personal-data breaches to
+     * SDAIA (formerly PDPC) within 72 hours of awareness. SDAIA has no
+     * machine-readable API — the workflow is manual through the SDAIA portal
+     * at {@code https://www.sdaia.gov.sa/}. This field tracks the state of
+     * that manual submission.
+     *
+     * <p>Values: {@code NOT_REPORTED | IN_PREPARATION | SUBMITTED | ACKNOWLEDGED}.
+     */
+    @Column(name = "sdaia_notification_status", nullable = false, length = 40)
+    private String sdaiaNotificationStatus = "NOT_REPORTED";
+
+    /** Reference number returned by the SDAIA portal acknowledgement. */
+    @Column(name = "sdaia_submission_ref", length = 255)
+    private String sdaiaSubmissionRef;
+
+    /**
+     * Timestamp the submission was posted to SDAIA. Discharges the PDPL
+     * Article 31 72-hour clock measured from {@link #discoveredAt}.
+     */
+    @Column(name = "sdaia_submitted_at")
+    private LocalDateTime sdaiaSubmittedAt;
+
     @Column(name = "status", nullable = false, length = 50)
     private String status = "OPEN";
 

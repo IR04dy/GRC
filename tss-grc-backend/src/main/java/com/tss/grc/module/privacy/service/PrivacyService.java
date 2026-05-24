@@ -28,6 +28,14 @@ public class PrivacyService {
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
+
+    /** Open Issue #006 — optional F7 audit sink for the SDAIA submission flow. */
+    @Autowired(required = false)
+    private com.tss.grc.module.platform.auditlog.service.AuditLogService auditLog;
+
+    /** Open Issue #006 — optional F8 publisher for the SDAIA submission flow. */
+    @Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     private void emitBreach(DataBreach b) {
         if (bcast != null) bcast.entity(b.getOrganisationId(), "data_breach", b.getId(), b);
     }
@@ -77,6 +85,116 @@ public class PrivacyService {
         DataBreach b = getBreach(id);
         b.setIsDeleted(true);
         breachRepo.save(b);
+    }
+
+    // ── SDAIA Notification Workflow (Open Issue #006) ─────────────────────────
+    //
+    // PDPL Article 31 (Implementing Regulations Art. 40) — the controller
+    // must notify SDAIA within 72 hours of awareness for material personal-data
+    // breaches. SDAIA has no machine-readable API; submission is via the SDAIA
+    // portal (https://www.sdaia.gov.sa/) and the DPO records the outcome here.
+    //
+    // The workflow is a simple state machine:
+    //   NOT_REPORTED  → IN_PREPARATION | SUBMITTED
+    //   IN_PREPARATION → SUBMITTED | NOT_REPORTED
+    //   SUBMITTED     → ACKNOWLEDGED
+    //   ACKNOWLEDGED  (terminal)
+
+    /** Valid SDAIA notification states. */
+    private static final java.util.Set<String> SDAIA_STATES = java.util.Set.of(
+        "NOT_REPORTED", "IN_PREPARATION", "SUBMITTED", "ACKNOWLEDGED");
+
+    /**
+     * Record a manual SDAIA submission outcome (Open Issue #006).
+     *
+     * <p>Called by the DPO (or CISO/PLATFORM_ADMIN) after they have posted the
+     * breach report via the SDAIA portal. Transitions the breach to status
+     * {@code SUBMITTED} (or {@code ACKNOWLEDGED} when SDAIA returns a reference),
+     * stamps the submission reference and timestamp, and emits an F7 audit row
+     * + F8 trigger {@code BREACH_REPORTED_TO_SDAIA}. The PDPL Article 31 72-hour
+     * clock is discharged when {@code sdaia_submitted_at} is set.
+     */
+    @Transactional
+    public DataBreach recordSdaiaSubmission(Long id,
+                                            String submissionRef,
+                                            java.time.LocalDateTime submittedAt,
+                                            String targetStatus) {
+        DataBreach breach = getBreach(id);
+        String resolvedStatus = targetStatus == null ? "SUBMITTED" : targetStatus.toUpperCase();
+        if (!SDAIA_STATES.contains(resolvedStatus)) {
+            throw new IllegalArgumentException(
+                "Invalid SDAIA status: " + targetStatus +
+                " (allowed: NOT_REPORTED, IN_PREPARATION, SUBMITTED, ACKNOWLEDGED)");
+        }
+        String prior = breach.getSdaiaNotificationStatus() == null
+            ? "NOT_REPORTED" : breach.getSdaiaNotificationStatus();
+        // Guard: ACKNOWLEDGED is terminal — re-opening would lose the regulator
+        // closure record. Only an explicit re-classification (handled outside
+        // this endpoint, via the privacy admin path) can roll it back.
+        if ("ACKNOWLEDGED".equals(prior) && !"ACKNOWLEDGED".equals(resolvedStatus)) {
+            throw new IllegalStateException(
+                "Breach " + id + " already ACKNOWLEDGED by SDAIA — cannot move to " + resolvedStatus);
+        }
+        breach.setSdaiaNotificationStatus(resolvedStatus);
+        if (submissionRef != null && !submissionRef.isBlank()) {
+            breach.setSdaiaSubmissionRef(submissionRef);
+        }
+        if (submittedAt != null) {
+            breach.setSdaiaSubmittedAt(submittedAt);
+        } else if ("SUBMITTED".equals(resolvedStatus) && breach.getSdaiaSubmittedAt() == null) {
+            // No explicit timestamp provided — stamp now (DPO submitted "just now").
+            breach.setSdaiaSubmittedAt(java.time.LocalDateTime.now());
+        }
+        DataBreach saved = breachRepo.save(breach);
+        emitBreach(saved);
+
+        // F7 audit + F8 event
+        try {
+            if (auditLog != null) {
+                auditLog.log("BREACH_REPORTED_TO_SDAIA", "DataBreach", saved.getId(),
+                    String.format("SDAIA status: %s -> %s (ref=%s)", prior, resolvedStatus,
+                        saved.getSdaiaSubmissionRef() == null ? "-" : saved.getSdaiaSubmissionRef()));
+            }
+        } catch (Exception ignored) {
+            // Audit failures must not block the regulator-discharge path.
+        }
+        try {
+            if (eventPublisher != null) {
+                java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                payload.put("breachId",       saved.getId());
+                payload.put("priorStatus",    prior);
+                payload.put("newStatus",      resolvedStatus);
+                payload.put("submissionRef",  saved.getSdaiaSubmissionRef());
+                payload.put("submittedAt",
+                    saved.getSdaiaSubmittedAt() == null ? null : saved.getSdaiaSubmittedAt().toString());
+                eventPublisher.publishEvent(new com.tss.grc.module.platform.automation.event.DomainEvent(
+                    saved.getOrganisationId(),
+                    "BREACH_REPORTED_TO_SDAIA",
+                    "DataBreach",
+                    saved.getId(),
+                    null,
+                    payload));
+            }
+        } catch (Exception ignored) {
+            // Event-bus failure must not block the regulator-discharge path.
+        }
+
+        return saved;
+    }
+
+    /** Returns the submitted state of the breach for the SDAIA status DTO. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getSdaiaStatus(Long id) {
+        DataBreach b = getBreach(id);
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("breachId",                 b.getId());
+        out.put("discoveredAt",             b.getDiscoveredAt());
+        out.put("sdaiaNotificationStatus",  b.getSdaiaNotificationStatus());
+        out.put("sdaiaSubmissionRef",       b.getSdaiaSubmissionRef());
+        out.put("sdaiaSubmittedAt",         b.getSdaiaSubmittedAt());
+        out.put("pdplArticle31DeadlineAt",
+            b.getDiscoveredAt() == null ? null : b.getDiscoveredAt().plusHours(72));
+        return out;
     }
 
     // ── Breach workflow (PDPL Article 20 — 72-hour notification) ──────────────

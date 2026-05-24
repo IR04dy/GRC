@@ -1,5 +1,6 @@
 package com.tss.grc.module.auth;
 
+import com.tss.grc.module.auth.refresh_token.service.RefreshTokenStoreService;
 import com.tss.grc.security.GrcUserDetails;
 import com.tss.grc.security.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +41,12 @@ public class AuthController {
 
     private final AuthenticationManager authManager;
     private final JwtTokenProvider      tokenProvider;
+    /**
+     * Optional — server-side refresh-token store (Open Issue #002). When the
+     * bean isn't on the classpath (e.g. in slim test slices) the controller
+     * falls back to the legacy stateless refresh path.
+     */
+    private final org.springframework.beans.factory.ObjectProvider<RefreshTokenStoreService> refreshStoreProvider;
 
     @Value("${grc.jwt.refresh-token-expiry-ms:604800000}")
     private long refreshTokenExpiryMs;
@@ -48,19 +55,52 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate with username and password")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest,
+                                   HttpServletRequest request,
                                    HttpServletResponse response) {
         Authentication auth;
         try {
             auth = authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+                new UsernamePasswordAuthenticationToken(loginRequest.username(), loginRequest.password()));
         } catch (AuthenticationException ex) {
             return ResponseEntity.status(401).body(Map.of("message", "Invalid username or password"));
         }
 
         GrcUserDetails principal   = (GrcUserDetails) auth.getPrincipal();
         String          accessToken = tokenProvider.generateAccessToken(auth);
-        String          refreshToken = tokenProvider.generateRefreshToken(auth);
+
+        // Open Issue #002 — if the refresh-token store is available, mint the
+        // refresh token with a server-generated jti and persist it BEFORE
+        // emitting the cookie. Falls back to a stateless refresh token only
+        // when the store bean is absent (slim test slices).
+        RefreshTokenStoreService store = refreshStoreProvider.getIfAvailable();
+        String refreshToken;
+        if (store != null) {
+            String jti = store.newJti();
+            refreshToken = tokenProvider.generateRefreshTokenWithJti(auth, jti);
+            try {
+                java.time.LocalDateTime expiresAt = tokenProvider.getExpiresAtFromToken(refreshToken);
+                String ua = request.getHeader("User-Agent");
+                String ip = extractIp(request);
+                // Set TenantContext so the audit row gets the right org_id —
+                // login() runs before JwtAuthenticationFilter has a chance.
+                com.tss.grc.common.tenant.TenantContext.setCurrentTenant(principal.getOrganisationId());
+                try {
+                    store.recordIssuance(principal.getUserId(), principal.getUsername(),
+                        jti, expiresAt, ua, ip);
+                } finally {
+                    com.tss.grc.common.tenant.TenantContext.clear();
+                }
+            } catch (Exception ex) {
+                // If persistence fails, the refresh token would be unverifiable
+                // — fail closed so the user gets a clean 500 rather than a
+                // silently broken session.
+                return ResponseEntity.status(500).body(Map.of(
+                    "message", "Unable to record refresh token — please retry."));
+            }
+        } else {
+            refreshToken = tokenProvider.generateRefreshToken(auth);
+        }
 
         // Refresh token → HttpOnly, Secure, SameSite=Strict cookie
         setRefreshTokenCookie(response, refreshToken);
@@ -90,12 +130,53 @@ public class AuthController {
 
         Long userId = tokenProvider.getUserIdFromToken(refreshToken);
         Long orgId  = tokenProvider.getOrganisationIdFromToken(refreshToken);
+        String oldJti = tokenProvider.getJtiFromToken(refreshToken);
+
+        // Open Issue #002 — server-side verify before signature trust + rolling
+        // revocation of the old jti. The signature was already checked above
+        // via validateToken(); now ensure the row still exists and is active.
+        RefreshTokenStoreService store = refreshStoreProvider.getIfAvailable();
+        if (store != null) {
+            try {
+                store.assertValid(oldJti);
+            } catch (RefreshTokenStoreService.InvalidRefreshTokenException ex) {
+                return ResponseEntity.status(401).body(Map.of(
+                    "message", "Refresh token revoked or unknown — please sign in again."));
+            }
+        }
 
         // Build a minimal authentication for token generation
         String newAccessToken = tokenProvider.generateAccessTokenFromClaims(userId, orgId);
 
-        // Roll the refresh token (rotation)
-        String newRefreshToken = tokenProvider.generateRefreshTokenFromClaims(userId, orgId);
+        // Roll the refresh token (rotation). When the store is wired, mint
+        // the new token with a fresh server-generated jti, persist it, and
+        // revoke the previous jti — a captured-then-replayed old token will
+        // fail on the next refresh because its row is now revoked.
+        String newRefreshToken;
+        if (store != null) {
+            String newJti = store.newJti();
+            newRefreshToken = tokenProvider.generateRefreshTokenFromClaimsWithJti(userId, orgId, newJti);
+            try {
+                java.time.LocalDateTime expiresAt = tokenProvider.getExpiresAtFromToken(newRefreshToken);
+                String ua = request.getHeader("User-Agent");
+                String ip = extractIp(request);
+                com.tss.grc.common.tenant.TenantContext.setCurrentTenant(orgId);
+                try {
+                    store.recordIssuance(userId, /*username unknown here*/ null,
+                        newJti, expiresAt, ua, ip);
+                    if (oldJti != null && !oldJti.isBlank()) {
+                        store.revoke(oldJti, userId, RefreshTokenStoreService.REASON_ROLLING_REFRESH);
+                    }
+                } finally {
+                    com.tss.grc.common.tenant.TenantContext.clear();
+                }
+            } catch (Exception ex) {
+                return ResponseEntity.status(500).body(Map.of(
+                    "message", "Unable to rotate refresh token — please retry."));
+            }
+        } else {
+            newRefreshToken = tokenProvider.generateRefreshTokenFromClaims(userId, orgId);
+        }
         setRefreshTokenCookie(response, newRefreshToken);
 
         return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
@@ -105,7 +186,27 @@ public class AuthController {
 
     @PostMapping("/logout")
     @Operation(summary = "Invalidate the refresh token cookie")
-    public ResponseEntity<Void> logout(HttpServletResponse response) {
+    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        // Open Issue #002 — server-side revoke of the refresh token jti, so
+        // a stolen cookie can't survive logout. Best-effort: if the cookie is
+        // already absent or malformed we still clear the cookie below.
+        RefreshTokenStoreService store = refreshStoreProvider.getIfAvailable();
+        if (store != null) {
+            String refreshToken = extractRefreshCookie(request);
+            if (refreshToken != null) {
+                String jti = tokenProvider.getJtiFromToken(refreshToken);
+                if (jti != null && !jti.isBlank()) {
+                    try {
+                        Long userId = tokenProvider.getUserIdFromToken(refreshToken);
+                        store.revoke(jti, userId, RefreshTokenStoreService.REASON_USER_LOGOUT);
+                    } catch (Exception ignored) {
+                        // Token may already be expired/malformed — clearing
+                        // the cookie below is still the right outcome.
+                    }
+                }
+            }
+        }
+
         // Send a single, fully-attributed Set-Cookie matching the
         // login-time cookie so the browser clears it. The Cookie API
         // doesn't expose SameSite pre-Java 21 / Servlet 6, so we
@@ -114,6 +215,16 @@ public class AuthController {
         response.addHeader("Set-Cookie",
             "grc_refresh=; HttpOnly; Secure; Path=/api/auth/refresh; SameSite=Strict; Max-Age=0");
         return ResponseEntity.noContent().build();
+    }
+
+    /** Best-effort client IP — honours X-Forwarded-For when behind nginx. */
+    private static String extractIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            return (comma < 0 ? xff : xff.substring(0, comma)).trim();
+        }
+        return req.getRemoteAddr();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

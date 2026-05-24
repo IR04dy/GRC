@@ -9,6 +9,8 @@ Files in this folder are referenced by the **Operations Lead** during install + 
 | `jwt-secret-rotation.md` | JWT signing key generation, 90-day rotation cadence, 24h overlap window via `JWT_SECRET_PREVIOUS`, emergency revocation procedure | Issue #001 |
 | `sqlexpress-size-monitor.md` | 10 GB Express cap monitor — WARN (70%) / ALERT (90%) / HALT (95%) thresholds, F8 event payload, operator playbook, emergency drop list | Issue #004 |
 | `mfa-totp-selection.md` | TOTP library decision record (`dev.samstevens.totp:totp:1.7.1`), enrollment & verification flow, backup-code strategy, MFA enforcement policy | Issue #008 |
+| `sdaia-breach-notification-workflow.md` | PDPL Article 31 72-hour SDAIA submission runbook — state machine, channels, required content, F8 hooks, Saudi cross-notification rules (SAMA / NCA) | Issue #006 |
+| `ldap-ad-integration-guide.md` | Per-customer LDAP/AD integration recipe — `application-prod.yml` shape under `spring.ldap` + `grc.iam.ldap`, attribute mapping table, AD nested-group filters, transport security, troubleshooting matrix | Issue #009 |
 
 ## Related docs elsewhere
 

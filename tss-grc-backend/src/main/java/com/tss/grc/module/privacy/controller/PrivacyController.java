@@ -59,6 +59,42 @@ public class PrivacyController {
         privacyService.deleteBreach(id);
     }
 
+    // ── SDAIA Submission Workflow (Open Issue #006) ───────────────────────────
+    //
+    // PDPL Article 31 — 72-hour SDAIA notification workflow. The DPO submits
+    // through the SDAIA portal manually (no machine-readable API), then records
+    // the outcome here. See docs/operations/sdaia-breach-notification-workflow.md.
+
+    @GetMapping("/breaches/{id}/sdaia-submission")
+    @PreAuthorize("hasPermission('PRIVACY', 'READ')")
+    public Map<String, Object> getSdaiaStatus(@PathVariable Long id) {
+        return privacyService.getSdaiaStatus(id);
+    }
+
+    @PostMapping("/breaches/{id}/sdaia-submission")
+    @PreAuthorize("hasAnyRole('DPO','CISO','PLATFORM_ADMIN')")
+    public DataBreach recordSdaiaSubmission(@PathVariable Long id,
+                                            @RequestBody SdaiaSubmissionRequest body) {
+        return privacyService.recordSdaiaSubmission(
+            id,
+            body.submissionRef(),
+            body.submittedAt(),
+            body.status());
+    }
+
+    /**
+     * Payload for {@code POST /api/v1/privacy/breaches/{id}/sdaia-submission}.
+     *
+     * @param status         target state: SUBMITTED (default) | IN_PREPARATION | ACKNOWLEDGED
+     * @param submissionRef  SDAIA portal reference number from the acknowledgement
+     * @param submittedAt    when the submission was posted (null = stamp now)
+     */
+    public record SdaiaSubmissionRequest(
+        String status,
+        String submissionRef,
+        java.time.LocalDateTime submittedAt
+    ) {}
+
     // ── DSR ───────────────────────────────────────────────────────────────────
 
     @GetMapping("/dsrs")

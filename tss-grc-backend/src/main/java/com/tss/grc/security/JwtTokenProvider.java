@@ -140,15 +140,27 @@ public class JwtTokenProvider {
 
     public String generateAccessToken(Authentication authentication) {
         GrcUserDetails principal = (GrcUserDetails) authentication.getPrincipal();
-        return buildToken(principal, accessTokenExpiryMs);
+        return buildToken(principal, accessTokenExpiryMs, null);
     }
 
     public String generateRefreshToken(Authentication authentication) {
         GrcUserDetails principal = (GrcUserDetails) authentication.getPrincipal();
-        return buildToken(principal, refreshTokenExpiryMs);
+        return buildToken(principal, refreshTokenExpiryMs, null);
     }
 
-    private String buildToken(GrcUserDetails principal, long expiryMs) {
+    /**
+     * Generate a refresh token with an explicit server-issued {@code jti} claim
+     * — used by the Open Issue #002 server-side refresh-token store. The
+     * caller persists the jti via {@code RefreshTokenStoreService.recordIssuance}
+     * BEFORE returning the token to the client so that the first /refresh call
+     * has a row to look up.
+     */
+    public String generateRefreshTokenWithJti(Authentication authentication, String jti) {
+        GrcUserDetails principal = (GrcUserDetails) authentication.getPrincipal();
+        return buildToken(principal, refreshTokenExpiryMs, jti);
+    }
+
+    private String buildToken(GrcUserDetails principal, long expiryMs, String jti) {
         Date now    = new Date();
         Date expiry = new Date(now.getTime() + expiryMs);
 
@@ -156,7 +168,7 @@ public class JwtTokenProvider {
                 .map(GrantedAuthority::getAuthority)
                 .toList();
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(String.valueOf(principal.getUserId()))
                 .claim("usr",             principal.getUsername())
                 .claim("org",             String.valueOf(principal.getOrganisationId()))
@@ -165,8 +177,12 @@ public class JwtTokenProvider {
                 .claim("lod_band",        lodBandsFor(principal.getUserId()))
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(secretKey)
-                .compact();
+                .signWith(secretKey);
+
+        if (jti != null && !jti.isBlank()) {
+            builder.id(jti);
+        }
+        return builder.compact();
     }
 
     /**
@@ -221,25 +237,59 @@ public class JwtTokenProvider {
 
     /** Generate an access token directly from stored claims (used in refresh flow). */
     public String generateAccessTokenFromClaims(Long userId, Long organisationId) {
-        return buildTokenFromIds(userId, organisationId, accessTokenExpiryMs);
+        return buildTokenFromIds(userId, organisationId, accessTokenExpiryMs, null);
     }
 
     /** Generate a refresh token directly from stored claims (token rotation). */
     public String generateRefreshTokenFromClaims(Long userId, Long organisationId) {
-        return buildTokenFromIds(userId, organisationId, refreshTokenExpiryMs);
+        return buildTokenFromIds(userId, organisationId, refreshTokenExpiryMs, null);
     }
 
-    private String buildTokenFromIds(Long userId, Long organisationId, long expiryMs) {
+    /**
+     * Rolling-refresh path: mint a new refresh token from the previous token's
+     * claims plus a fresh server-issued {@code jti}. Caller must persist the
+     * new jti via {@code RefreshTokenStoreService.recordIssuance} BEFORE
+     * returning the token to the client.
+     */
+    public String generateRefreshTokenFromClaimsWithJti(Long userId, Long organisationId, String jti) {
+        return buildTokenFromIds(userId, organisationId, refreshTokenExpiryMs, jti);
+    }
+
+    private String buildTokenFromIds(Long userId, Long organisationId, long expiryMs, String jti) {
         Date now    = new Date();
         Date expiry = new Date(now.getTime() + expiryMs);
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("org",             String.valueOf(organisationId))
                 .claim("enabled_modules", enabledModulesAsList(organisationId))
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(secretKey)
-                .compact();
+                .signWith(secretKey);
+        if (jti != null && !jti.isBlank()) {
+            builder.id(jti);
+        }
+        return builder.compact();
+    }
+
+    /**
+     * Read the {@code jti} claim from a token without throwing on signature or
+     * expiry failures (those are the caller's responsibility). Returns {@code null}
+     * if the claim is absent. Used by the refresh-token-store verify path which
+     * needs the jti to perform its server-side lookup BEFORE the signature check.
+     */
+    public String getJtiFromToken(String token) {
+        try {
+            return parseClaims(token).getId();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    /** Compute the expiry timestamp of a token (for store persistence). */
+    public java.time.LocalDateTime getExpiresAtFromToken(String token) {
+        Date exp = parseClaims(token).getExpiration();
+        if (exp == null) return null;
+        return exp.toInstant().atZone(java.time.ZoneOffset.UTC).toLocalDateTime();
     }
 
     /**
