@@ -140,6 +140,7 @@ import { ScmPage } from './pages/scm/ScmPage';
 // ─── Off-critical-path admin/detail/portal/lifecycle pages — lazy. ───
 const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 const LicensingPage          = lazy(() => import('./pages/admin/LicensingPage').then(m => ({ default: m.LicensingPage })));
+const HelpTopicsAdminPage    = lazy(() => import('./pages/admin/HelpTopicsAdminPage').then(m => ({ default: m.HelpTopicsAdminPage })));
 const WorkflowsPage          = lazy(() => import('./pages/workflow/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })));
 const ChangesPage            = lazy(() => import('./pages/changes/ChangesPage').then(m => ({ default: m.ChangesPage })));
 const EthicsPage             = lazy(() => import('./pages/ethics/EthicsPage').then(m => ({ default: m.EthicsPage })));
@@ -424,6 +425,8 @@ export function App() {
               <Route path="/privacy/subprocessors/:externalId" element={<SubprocessorDetailPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
+              {/* Sprint 12 — Embedded Help admin */}
+              <Route path="/admin/help-topics" element={<HelpTopicsAdminPage />} />
               <Route path="/scm"        element={<ScmPage />} />
               <Route path="/supplier-resilience" element={<SupplierResiliencePage />} />
               <Route path="/workflows"  element={<WorkflowsPage />} />

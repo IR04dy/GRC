@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { CommandPalette } from '../search/CommandPalette';
+import { HelpButton } from '../HelpButton';
 
 export function Shell({ title, sub, children }: { title?: string; sub?: string; children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -53,6 +54,10 @@ export function Shell({ title, sub, children }: { title?: string; sub?: string; 
         <div className="page">{children}</div>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      {/* Sprint 12 — Embedded contextual help. Mounted once at shell
+          level so every authenticated page surfaces the floating
+          "?" button without page-by-page opt-in. */}
+      <HelpButton />
     </div>
   );
 }
