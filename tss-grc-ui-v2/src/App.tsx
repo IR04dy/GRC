@@ -124,6 +124,8 @@ const CcmTestDetailPage         = lazy(() => import('./pages/ccm/CcmTestDetailPa
 // Sprint 11 — Audit Committee Dashboard (curation slice over every GRC stream).
 const AuditCommitteeDashboardPage = lazy(() => import('./pages/audit-committee/AuditCommitteeDashboardPage').then(m => ({ default: m.AuditCommitteeDashboardPage })));
 const AuditCommitteeSnapshotPage  = lazy(() => import('./pages/audit-committee/AuditCommitteeSnapshotPage').then(m => ({ default: m.AuditCommitteeSnapshotPage })));
+// Sprint 11 — Risk-Control-Finding Pivot (cross-module aggregation slice).
+const RiskControlFindingPivotPage = lazy(() => import('./pages/governance/RiskControlFindingPivotPage').then(m => ({ default: m.RiskControlFindingPivotPage })));
 // Sprint 11 — Attack Surface Management (ASM).
 const AttackSurfacePage         = lazy(() => import('./pages/cyber/AttackSurfacePage').then(m => ({ default: m.AttackSurfacePage })));
 const AttackSurfaceAssetDetailPage = lazy(() => import('./pages/cyber/AttackSurfaceAssetDetailPage').then(m => ({ default: m.AttackSurfaceAssetDetailPage })));
@@ -411,6 +413,11 @@ export function App() {
               {/* Sprint 11 — Audit Committee Dashboard (curation slice). */}
               <Route path="/audit-committee/dashboard"               element={<AuditCommitteeDashboardPage />} />
               <Route path="/audit-committee/snapshots/:id"           element={<AuditCommitteeSnapshotPage />} />
+              {/* Sprint 11 — Risk-Control-Finding Pivot. Three lens routes
+                  share a single page component; useParams picks the focal entity. */}
+              <Route path="/governance/pivot/risk/:riskId"           element={<RiskControlFindingPivotPage />} />
+              <Route path="/governance/pivot/control/:controlId"     element={<RiskControlFindingPivotPage />} />
+              <Route path="/governance/pivot/finding/:findingId"     element={<RiskControlFindingPivotPage />} />
               {/* Sprint 11 — Attack Surface Management (ASM).
                   Static segments registered before any param routes. */}
               <Route path="/cyber/attack-surface"                              element={<AttackSurfacePage />} />

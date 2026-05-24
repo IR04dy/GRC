@@ -31,6 +31,7 @@ export const en = {
   // 11-group sidebar structure: My Work + per-domain verticals + Tools + Admin
   navAuditCommittee:    'Audit Committee',
   acDashSidebar:        'Committee dashboard',
+  rcfPivotSidebar:      'Risk-Control-Finding Pivot',
   navMyWork:            'My Work',
   navRisk:              'Risk Management',
   navCompliancePolicy:  'Compliance & Policy',

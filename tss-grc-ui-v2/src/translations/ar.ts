@@ -29,6 +29,7 @@ export const ar = {
   // الشريط الجانبي بـ 11 مجموعة: عملي + رؤوس الوحدات المختصة + الأدوات + الإدارة
   navAuditCommittee:    'لجنة المراجعة',
   acDashSidebar:        'لوحة لجنة المراجعة',
+  rcfPivotSidebar:      'محور المخاطر والضوابط والنتائج',
   navMyWork:            'عملي',
   navRisk:              'إدارة المخاطر',
   navCompliancePolicy:  'الامتثال والسياسات',

@@ -56,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'audit-committee', titleKey: 'navAuditCommittee',
     items: [
       { id: 'ac-dash',      to: '/audit-committee/dashboard',  Icon: LayoutDashboard, labelKey: 'acDashSidebar' },
+      { id: 'rcf-pivot',    to: '/governance/pivot/risk/1',    Icon: GitBranch,       labelKey: 'rcfPivotSidebar' },
     ],
   },
 

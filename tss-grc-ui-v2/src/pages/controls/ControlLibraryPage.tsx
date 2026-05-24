@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Shield, Wrench, Layers } from 'lucide-react';
+import { Shield, Wrench, Layers, GitBranch } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -171,9 +171,23 @@ export function ControlLibraryPage() {
         {selected ? (
           <Card title={`${selected.controlCode} — ${isAr && selected.titleAr ? selected.titleAr : selected.titleEn}`}
             action={
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <Badge tone={controlStatusTone(selected.status)}>{selected.status}</Badge>
                 <Badge tone={controlTypeTone(selected.controlType)}>{selected.controlType}</Badge>
+                {/* Sprint 11 — open Risk-Control-Finding pivot for this control. */}
+                <button
+                  onClick={() => window.open(`/governance/pivot/control/${selected.id}`, '_blank')}
+                  title={isAr ? 'محور المخاطر والضوابط والنتائج' : 'Open pivot view'}
+                  style={{
+                    padding: '4px 8px', fontSize: 12,
+                    border: '1px solid var(--border)', borderRadius: 6,
+                    background: 'var(--surface)', cursor: 'pointer',
+                    color: 'var(--text)', display: 'inline-flex',
+                    alignItems: 'center', gap: 4,
+                  }}>
+                  <GitBranch size={12} />
+                  {isAr ? 'فتح المحور' : 'Pivot'}
+                </button>
               </div>
             }>
             {detailLoading

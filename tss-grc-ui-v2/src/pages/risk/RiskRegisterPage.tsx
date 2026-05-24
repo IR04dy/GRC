@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon } from 'lucide-react';
+import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon, GitBranch } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
@@ -335,9 +335,16 @@ export function RiskRegisterPage() {
         ) : <span style={{ color: 'var(--ink-4)' }} className="mono">—</span>,
       align: 'center', width: '110px' },
     { header: t('riskColStatus'),cell: r => <Badge tone={STATUS_TONES[r.status] ?? 'neutral'} dot>{i18nStatusLabel(r.status, lang)}</Badge>, width: '130px' },
-    { header: '', align: 'end', width: '180px',
+    { header: '', align: 'end', width: '200px',
       cell: r => {
         const extras: Array<{ Icon: typeof Send; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        // Sprint 11 — open the Risk-Control-Finding pivot view in a new tab.
+        extras.push({
+          Icon: GitBranch,
+          onClick: () => window.open(`/governance/pivot/risk/${r.id}`, '_blank'),
+          title: lang === 'ar' ? 'محور المخاطر والضوابط والنتائج' : 'Open pivot view',
+          tone: 'accent',
+        });
         if (r.status === 'OPEN')         extras.push({ Icon: Send,       onClick: () => submitForReview(r), title: t('riskActSubmitReview'), tone: 'primary' });
         if (r.status === 'UNDER_REVIEW') extras.push({ Icon: CheckCheck, onClick: () => approveRisk(r),     title: t('riskActApprove'),      tone: 'success' });
         if (r.status === 'OPEN' || r.status === 'UNDER_REVIEW')

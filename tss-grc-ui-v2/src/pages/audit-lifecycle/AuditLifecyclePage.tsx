@@ -3,7 +3,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Stamp, Calendar, FileText, ClipboardCheck, AlertTriangle,
   CheckCircle2, Download, ThumbsUp, Send, Eye, BookOpen,
-  Wrench, Activity, AlertOctagon,
+  Wrench, Activity, AlertOctagon, GitBranch,
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
 import { printPacket, textToSection } from '../../lib/packetPrint';
@@ -418,6 +418,11 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
                     </div>
                   </div>
                   <div className="alc-item-actions alc-item-actions--wrap">
+                    {/* Sprint 11 — open the Risk-Control-Finding pivot view in a new tab. */}
+                    <Button size="sm" variant="ghost" Icon={GitBranch}
+                            onClick={() => window.open(`/governance/pivot/finding/${f.id}`, '_blank')}>
+                      {lang === 'ar' ? 'محور' : 'Pivot'}
+                    </Button>
                     {f.status === 'OPEN' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'MGMT_RESPONSE')}>{t('alcAwaitMgmt')}</Button>}
                     {f.status === 'MGMT_RESPONSE' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'IN_REMEDIATION')}>{t('alcStartRemediation')}</Button>}
                     {f.status === 'IN_REMEDIATION' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'AWAITING_VERIFICATION')}>{t('alcAwaitVerif')}</Button>}
