@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Placeholder logo for light themes — Open Issue #010.
+  Replace with final TSS-supplied logo-light.svg prior to go-live.
+  Wordmark color: var(--primary) #0E5E5E.
+  See public/brand/README.md for the full spec.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 240 64"
+     width="240"
+     height="64"
+     role="img"
+     aria-label="TSS GRC">
+  <title>TSS GRC</title>
+  <desc>TSS GRC platform wordmark placeholder, primary teal-petrol on transparent.</desc>
+
+  <!-- Square mark on the left: rounded teal tile with "T" cutout. -->
+  <rect x="4" y="8" width="48" height="48" rx="10" ry="10" fill="#0E5E5E"/>
+  <path d="M16 20 H40 V26 H30 V46 H26 V26 H16 Z" fill="#FFFFFF"/>
+
+  <!-- Wordmark to the right of the mark. -->
+  <text x="64" y="40"
+        font-family="'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="24"
+        font-weight="800"
+        fill="#0E5E5E"
+        letter-spacing="0.5">
+    TSS GRC
+  </text>
+
+  <!-- Subtle baseline accent stroke. -->
+  <line x1="64" y1="48" x2="180" y2="48" stroke="#E8B547" stroke-width="2" stroke-linecap="round"/>
+</svg>

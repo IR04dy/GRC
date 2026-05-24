@@ -36,6 +36,13 @@
         <springdoc.version>2.8.6</springdoc.version>
         <caffeine.version>3.2.0</caffeine.version>    <!-- was 3.1.8 -->
         <jjwt.version>0.12.6</jjwt.version>
+        <!--
+            TOTP MFA library — selected per Open Issue #008 decision doc
+            (docs/operations/mfa-totp-selection.md). dev.samstevens.totp 1.7.x
+            chosen for active maintenance, small footprint, base32 secrets +
+            QR code generation. Pulls bouncycastle + zxing transitively.
+        -->
+        <samstevens-totp.version>1.7.1</samstevens-totp.version>
     </properties>
 
     <dependencies>
@@ -173,6 +180,25 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-ldap</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- ── TOTP MFA (Open Issue #008) ─────────────────────────────── -->
+        <!--
+            RFC 6238 TOTP — used by Google Authenticator, Microsoft
+            Authenticator, Authy, 1Password. See docs/operations/mfa-totp-selection.md
+            for the library comparison. The MFA enrollment flow itself is
+            Sprint 13 — for now, com.tss.grc.module.iam.mfa.TotpService is
+            a stub that throws UnsupportedOperationException so the API
+            surface is wired and callers can compile.
+
+            Saudi context: SDAIA mandates "strong authentication for any
+            privileged GRC role" — TOTP qualifies as strong authentication
+            under NCA ECC-2 control 2-2 (identity & access management).
+        -->
+        <dependency>
+            <groupId>dev.samstevens.totp</groupId>
+            <artifactId>totp</artifactId>
+            <version>${samstevens-totp.version}</version>
         </dependency>
 
         <!-- ── WebSocket / STOMP (Sprint 4 §2.7) ─────────────────────── -->

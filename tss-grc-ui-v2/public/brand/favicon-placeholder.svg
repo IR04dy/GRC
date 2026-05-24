@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Placeholder favicon — Open Issue #010.
+  Replace with final TSS-supplied favicon.svg prior to go-live.
+  Designed to remain legible at 16×16 pixel rendering.
+  See public/brand/README.md for the full spec.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 32 32"
+     width="32"
+     height="32"
+     role="img"
+     aria-label="TSS">
+  <title>TSS</title>
+
+  <!-- Rounded teal tile background. -->
+  <rect x="0" y="0" width="32" height="32" rx="6" ry="6" fill="#0E5E5E"/>
+
+  <!-- "TSS" wordmark, condensed for legibility at favicon scale. -->
+  <text x="16" y="22"
+        font-family="'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="14"
+        font-weight="800"
+        fill="#FFFFFF"
+        text-anchor="middle"
+        letter-spacing="0.5">
+    TSS
+  </text>
+</svg>

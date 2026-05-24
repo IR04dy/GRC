@@ -55,6 +55,18 @@ import java.util.Set;
 public class JwtTokenProvider {
 
     private final SecretKey secretKey;
+    /**
+     * Optional previous-generation key used <b>only for verification</b>, never for signing.
+     * Populated from {@code grc.jwt.secret-previous} (env {@code JWT_SECRET_PREVIOUS}).
+     * Enables the 24-hour overlap window during scheduled key rotation — see
+     * {@code docs/operations/jwt-secret-rotation.md} (Open Issue #001).
+     *
+     * <p>When non-null, {@link #parseClaims(String)} first attempts verification against
+     * {@link #secretKey}; on signature failure it falls back to this key. All freshly
+     * signed tokens use {@link #secretKey} only, so the previous key naturally ages out
+     * as old tokens expire.
+     */
+    private final SecretKey previousSecretKey;
     private final long accessTokenExpiryMs;
     private final long refreshTokenExpiryMs;
     private final ObjectProvider<LicensingService>    licensingProvider;
@@ -62,18 +74,38 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(
             @Value("${grc.jwt.secret:}") String secret,
+            @Value("${grc.jwt.secret-previous:}") String previousSecret,
             @Value("${grc.jwt.access-token-expiry-ms:900000}") long accessTokenExpiryMs,
             @Value("${grc.jwt.refresh-token-expiry-ms:604800000}") long refreshTokenExpiryMs,
             ObjectProvider<LicensingService>  licensingProvider,
             ObjectProvider<ThreeLinesService> threeLinesProvider) {
         validateSecret(secret);
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
+        this.previousSecretKey = loadPreviousSecret(previousSecret);
         this.accessTokenExpiryMs = accessTokenExpiryMs;
         this.refreshTokenExpiryMs = refreshTokenExpiryMs;
         this.licensingProvider  = licensingProvider;
         this.threeLinesProvider = threeLinesProvider;
-        log.info("JwtTokenProvider initialised: access={}ms refresh={}ms keyBytes={}",
-                accessTokenExpiryMs, refreshTokenExpiryMs, secret.getBytes().length);
+        log.info("JwtTokenProvider initialised: access={}ms refresh={}ms keyBytes={} previousKey={}",
+                accessTokenExpiryMs, refreshTokenExpiryMs, secret.getBytes().length,
+                previousSecretKey == null ? "absent" : "present (rotation grace window active)");
+    }
+
+    /**
+     * Load the optional previous-generation secret. Returns {@code null} when the
+     * env var is unset/blank — the normal steady state. Applies the same strength
+     * checks as the primary key when present, so a misconfigured rotation can't
+     * silently install a weak fallback.
+     */
+    static SecretKey loadPreviousSecret(String previousSecret) {
+        if (previousSecret == null || previousSecret.isBlank()) {
+            return null;
+        }
+        // Re-use the same validation rules — a placeholder/short value here would
+        // make rotation trivially break, and a *signed by us* token must always be
+        // signed by something at least as strong as the primary.
+        validateSecret(previousSecret);
+        return Keys.hmacShaKeyFor(previousSecret.getBytes());
     }
 
     /**
@@ -239,11 +271,38 @@ public class JwtTokenProvider {
         return false;
     }
 
+    /**
+     * Verify the token signature and return its claims.
+     *
+     * <p>Tries the current {@link #secretKey} first; if that fails with a
+     * signature-related error <em>and</em> a {@link #previousSecretKey} is configured,
+     * retries with the previous key. This implements the 24-hour overlap window
+     * described in {@code docs/operations/jwt-secret-rotation.md}: an operator sets
+     * {@code JWT_SECRET_PREVIOUS} to the outgoing key, sets {@code JWT_SECRET} to the
+     * new one, restarts the backend — and existing sessions stay valid until they
+     * naturally expire, after which {@code JWT_SECRET_PREVIOUS} can be cleared.
+     *
+     * <p>Expiry, malformed-token, and unsupported-token errors are <em>not</em>
+     * retried with the previous key — they're not signature problems and retrying
+     * would only mask the real cause.
+     */
     private Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        try {
+            return Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (io.jsonwebtoken.security.SignatureException sigEx) {
+            if (previousSecretKey == null) throw sigEx;
+            // Rotation grace window — try the previous key.
+            Claims claims = Jwts.parser()
+                    .verifyWith(previousSecretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            log.debug("JWT verified via previous-generation key (rotation grace window).");
+            return claims;
+        }
     }
 }

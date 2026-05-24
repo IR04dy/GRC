@@ -126,6 +126,11 @@ grc:
     # No default — JwtTokenProvider.@PostConstruct fails fast if missing/weak.
     # Provide via JWT_SECRET env var; minimum 32 chars; must not start with placeholder text.
     secret: ${JWT_SECRET:}
+    # Optional rotation overlap key — see docs/operations/jwt-secret-rotation.md.
+    # During the 24h rotation window: set this to the OLD value of JWT_SECRET, set
+    # JWT_SECRET to the new value, restart. Clear after the window. Verification
+    # only — never used for signing.
+    secret-previous: ${JWT_SECRET_PREVIOUS:}
     access-token-expiry-ms: ${JWT_ACCESS_EXPIRY_MS:900000}        # 15 minutes
     refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY_MS:604800000}   # 7 days
 
@@ -241,3 +246,13 @@ grc:
   bcm:
     roi:
       discount-rate: ${GRC_BCM_ROI_DISCOUNT_RATE:8.00}
+
+  # Platform health checks
+  # See docs/operations/sqlexpress-size-monitor.md for the runbook and
+  # the F8 trigger DB_SIZE_THRESHOLD_BREACHED emitted on breach.
+  health:
+    db-size:
+      warn-mb: ${GRC_DB_SIZE_WARN_MB:7168}        # 70% of 10 GB Express cap
+      alert-mb: ${GRC_DB_SIZE_ALERT_MB:9216}       # 90%
+      halt-mb: ${GRC_DB_SIZE_HALT_MB:9728}         # 95% — defensive cushion
+      check-cron: ${GRC_DB_SIZE_CHECK_CRON:0 0 */6 * * *}   # every 6h on the hour

@@ -2,6 +2,9 @@ package com.tss.grc.security;
 
 import org.junit.jupiter.api.Test;
 
+import javax.crypto.SecretKey;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -77,5 +80,42 @@ class JwtTokenProviderTest {
         assertThatThrownBy(() -> JwtTokenProvider.validateSecret(
                 "this-is-a-placeholder-secret-and-should-be-rejected-by-the-validator"))
             .isInstanceOf(IllegalStateException.class);
+    }
+
+    // ─────────── Rotation overlap key (issue #001 follow-up) ───────────
+
+    @Test
+    void loadPreviousSecret_returns_null_for_null_input() {
+        SecretKey k = JwtTokenProvider.loadPreviousSecret(null);
+        assertThat(k).isNull();
+    }
+
+    @Test
+    void loadPreviousSecret_returns_null_for_blank_input() {
+        assertThat(JwtTokenProvider.loadPreviousSecret("")).isNull();
+        assertThat(JwtTokenProvider.loadPreviousSecret("   ")).isNull();
+    }
+
+    @Test
+    void loadPreviousSecret_returns_key_for_strong_secret() {
+        SecretKey k = JwtTokenProvider.loadPreviousSecret(VALID_32);
+        assertThat(k).isNotNull();
+    }
+
+    @Test
+    void loadPreviousSecret_rejects_weak_previous_secret() {
+        // A misconfigured rotation that pointed JWT_SECRET_PREVIOUS at a short
+        // value would silently install a weak fallback verifier — block at boot.
+        assertThatThrownBy(() -> JwtTokenProvider.loadPreviousSecret("a".repeat(31)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("32 characters");
+    }
+
+    @Test
+    void loadPreviousSecret_rejects_placeholder_previous_secret() {
+        assertThatThrownBy(() -> JwtTokenProvider.loadPreviousSecret(
+                "change-this-to-a-256-bit-secret-key-in-production"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("placeholder");
     }
 }
