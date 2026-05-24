@@ -252,6 +252,8 @@ export const en = {
 
   // ── Ethics & Compliance module ─────────────────────────
   modEthics:                  'Ethics & Compliance',
+  // Sprint 13 — Whistleblower hotline sidebar entry.
+  whistleblowerSidebar:       'Whistleblower Hotline',
   ethicsEyebrow:              'Anti-bribery · AML · Code of Conduct',
   ethicsTitle:                'Ethics & Compliance Cases',
   ethicsSub:                  'Confidential whistleblower hotline + investigation workflow with regulator-ready audit trail.',

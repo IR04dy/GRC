@@ -99,6 +99,14 @@ public class SecurityConfig {
                 // Sprint 11 — PDPL Article 12 transparency: public list of
                 // APPROVED sub-processors with internal fields stripped.
                 .requestMatchers(HttpMethod.GET, "/api/v1/privacy/subprocessors/public").permitAll()
+                // Sprint 13 — Whistleblower / Ethics Hotline public portal.
+                // SAMA CG Art.28 + CMA CG Art.87 require a confidential
+                // reporting channel; the submission_token IS the credential
+                // for status check + reporter reply. Reporter IP is NOT
+                // logged in the audit ledger (see WhistleblowerCaseService).
+                .requestMatchers(HttpMethod.POST, "/api/v1/ethics/whistleblower/public/submit").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/v1/ethics/whistleblower/public/status/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/ethics/whistleblower/public/reply/**").permitAll()
                 .anyRequest().authenticated()
             )
 

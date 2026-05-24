@@ -158,6 +158,11 @@ const HelpTopicsAdminPage    = lazy(() => import('./pages/admin/HelpTopicsAdminP
 const WorkflowsPage          = lazy(() => import('./pages/workflow/WorkflowsPage').then(m => ({ default: m.WorkflowsPage })));
 const ChangesPage            = lazy(() => import('./pages/changes/ChangesPage').then(m => ({ default: m.ChangesPage })));
 const EthicsPage             = lazy(() => import('./pages/ethics/EthicsPage').then(m => ({ default: m.EthicsPage })));
+// Sprint 13 — Whistleblower / Ethics Hotline.
+const WhistleblowerSubmitPublicPage = lazy(() => import('./pages/ethics/WhistleblowerSubmitPublicPage').then(m => ({ default: m.WhistleblowerSubmitPublicPage })));
+const WhistleblowerStatusPage = lazy(() => import('./pages/ethics/WhistleblowerStatusPage').then(m => ({ default: m.WhistleblowerStatusPage })));
+const WhistleblowerCasesPage = lazy(() => import('./pages/ethics/WhistleblowerCasesPage').then(m => ({ default: m.WhistleblowerCasesPage })));
+const WhistleblowerCaseDetailPage = lazy(() => import('./pages/ethics/WhistleblowerCaseDetailPage').then(m => ({ default: m.WhistleblowerCaseDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -470,6 +475,12 @@ export function App() {
               <Route path="/workflows"  element={<WorkflowsPage />} />
               <Route path="/changes"    element={<ChangesPage />} />
               <Route path="/ethics"     element={<EthicsPage />} />
+              {/* Sprint 13 — Whistleblower / Ethics Hotline.
+                  Public surfaces are wired permitAll in backend SecurityConfig. */}
+              <Route path="/ethics/whistleblower/submit"         element={<WhistleblowerSubmitPublicPage />} />
+              <Route path="/ethics/whistleblower/status/:token"  element={<WhistleblowerStatusPage />} />
+              <Route path="/ethics/whistleblower/cases"          element={<WhistleblowerCasesPage />} />
+              <Route path="/ethics/whistleblower/cases/:id"      element={<WhistleblowerCaseDetailPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE

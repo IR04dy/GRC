@@ -118,6 +118,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'evidence',     to: '/evidence',          Icon: Files,          labelKey: 'evidenceTitle' },
       { id: 'attestations', to: '/attestations',      Icon: FileCheck2,     labelKey: 'campaignsTitle' },
       { id: 'ethics',       to: '/ethics',            Icon: ShieldAlert,    labelKey: 'modEthics' },
+      { id: 'wb-cases',     to: '/ethics/whistleblower/cases', Icon: Megaphone, labelKey: 'whistleblowerSidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },
