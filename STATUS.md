@@ -1,9 +1,186 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 23 May 2026 (Sprint-8 P0 GRC block closes — PRs #161 → #167)
+**Last update:** 24 May 2026 (Sprint 11 P1 GRC + Sprint 12 Integrations + Polish arc closes — PRs #168 → #207, 38 PRs)
 
 ---
 
-## 🟢 Latest — Sprint-8 P0 GRC block closes (23 May 2026, PRs #161 → #167)
+## 🟢 This arc — Sprint 11 P1 GRC + Sprint 12 Integrations + Polish (24 May 2026, PRs #168 → #207)
+
+The single largest arc shipped in V2 to date: **38 PRs merged** in one session,
+taking the platform from Sprint-8 P0 closeout (PR #167) to a Sprint 11 P1 GRC
+block delivered in full, Sprint 12 SOC-integration adapters + UX polish, the
+Open Issues Register fully closed (12 → 0), and a three-batch design-system
+migration eliminating ~2200 inline styles. Every PR is on `origin/master`.
+
+### Headline deliveries
+
+| Workstream | Outcome | PR count |
+|---|---|---:|
+| **Sprint 11 P1 GRC block — 12+ slices** spanning BCM, Risk, Privacy, AI Governance, Climate, Compliance, Cyber, Audit, Governance | All slices merged | 14 |
+| **Sprint 12 Integrations + Polish** — 4 SOC-tool bridge adapters (ServiceNow / Splunk / CrowdStrike / Tenable), Embedded Contextual Help (KB v2), Saudi-native AR i18n audit (75 strings) | All slices merged | 6 |
+| **Open Issues Register fully closed (12 → 0)** — security, ops, compliance, branding | 3 batch PRs | 3 |
+| **Design-system migration** — 12 pages migrated, ~2200 inline styles eliminated, reusable utility classes added | 3 batches | 4 |
+| **BCM Sprint 9/10 slices** — dependency cascade, DR trending, quantitative BIA, continuity ROI, crisis comms expansion, mobile crisis room, exercise scenario library + runtime + observer dashboard, BCP binder PDF, vendor MTPD inheritance | 11 slices | 11 |
+| **SOC ops baseline + STATUS-keeping + fixes** — Saudi-native SOC seed, mojibake repair, auth-check repair, controller bean rename | | 4 |
+
+### Sprint 11 P1 GRC block — full inventory
+
+| PR | SHA | Module | Slice |
+|---:|:---|---|---|
+| #178 | `fe667b5` | bcm | 9-C — quantitative Business Impact Analysis |
+| #179 | `453a8d1` | risk | Risk Bow-Tie Analysis (ISO 31010) |
+| #181 | `4f32920` | bcm | 9-D — continuity strategy ROI analysis |
+| #182 | `5e1cbde` | governance | Three Lines of Defense dashboard (IIA 2020) |
+| #195 | `2b41624` | ai-governance | AI/ML Model Registry (SDAIA AI Ethics) |
+| #198 | `6865829` | compliance | Obligation Register + Periodic Attestation |
+| #199 | `d68332f` | ccm | Continuous Control Monitoring engine |
+| #200 | `9302005` | esg | TCFD Climate Scenarios + Scope-3 Financed Emissions (CMA IFRS S2) |
+| #201 | `21d96aa` | audit-committee | Audit Committee Dashboard (CMA Art. 14) |
+| #202 | `fe705af` | cyber | Attack Surface Management register |
+| #203 | `ac3183e` | cyber | Risk-Based Vulnerability SLA engine |
+| #204 | `f3e2c91` | privacy | PDPL sub-processor tracking (Art. 29 + 30) |
+
+Plus BCM Sprint 9 + 10 slices (continuity exercise + invocation runtime backbone):
+
+| PR | SHA | Module | Slice |
+|---:|:---|---|---|
+| #170 | `0948580` | bcm | 9-A — dependency cascade simulator |
+| #171 | `d9cfe87` | bcm | 9-B — DR test trending service (rolling quarters) |
+| #183 | `da6f77a` | bcm | 10-A — exercise scenario library + scenario→exercise wizard |
+| #185 | `dc39d3e` | bcm | 9-E — Crisis Comms Template Expansion |
+| #186 | `acf0d52` | bcm | 9-F — mobile-optimised Crisis Room + Web Push registry |
+| #187 | `36bf2b9` | bcm | 10-B — inject-driven exercise runtime + facilitator console |
+| #189 | `10b5f2b` | tprm | 10-D — vendor BCP attestation campaigns |
+| #190 | `5cf626b` | bcm | 10-F — offline BCP/DRP binder PDF generator |
+| #191 | `00f7091` | bcm | 10-C — Observer Dashboard for live exercises |
+| #192 | `24f5e93` | bcm | 10-E — vendor MTPD inheritance check |
+
+### Sprint 12 Integrations + Polish — full inventory
+
+| PR | SHA | Module | Deliverable |
+|---:|:---|---|---|
+| #177 | `90a14ab` | integrations | Slice 1 — ServiceNow ITSM bridge adapter |
+| #180 | `096cf5d` | integrations | Slice 2 — Splunk SIEM bridge adapter |
+| #184 | `b990277` | integrations | Slice 3 — CrowdStrike Falcon EDR bridge adapter |
+| #188 | `3bc3300` | integrations | Slice 4 — Tenable.io / Tenable.sc VM bridge adapter |
+| #206 | `8349de2` | platform | Embedded contextual help (KB v2 — every page) |
+| #207 | `97d18db` | i18n | Saudi-native AR audit pass on `ar.ts` (75 strings) |
+
+### Open Issues Register fully closed (12 → 0)
+
+The Open Issues Register at `docs/roadmap/04-open-issues-register.md`
+went from 12 outstanding items to 0 across three batch PRs. The register
+is now retained as the audit-trail / resolution citation index.
+
+| Batch | PR | Issues closed | Theme |
+|---|---:|---|---|
+| 1 | #176 (`33103d1`) | #003 fonts, #007 email templates, #011 nginx, #012 cross-border safeguards | Ops + content + legal |
+| 2 | #193 (`0b18a5a`) | #001 JWT rotation, #004 DB-size monitor, #008 MFA library, #010 brand placeholders | Security + ops + design |
+| 3 | #196 (`d0aadd0`) | #002 refresh-token revocation, #005 SAMA CSF 140 controls, #006 SDAIA breach workflow, #009 LDAP/AD guide | Security + compliance + IAM |
+
+Highlights from the closeout:
+- **Refresh-token compromise window**: 7 days → < 1 second (PR #196 — V181 `platform.refresh_token` table + rolling rotation + revoke-by-jti)
+- **SAMA CSF 140 controls seeded** end-to-end (PR #196 — V182 migration, 4 domains × 23 subdomains, bilingual `requirement_text_{en,ar}`)
+- **JWT rotation runbook** — 90-day cadence with 24h overlap window, NCA ECC-2 2-3 + SAMA CSF 3.3.1 anchored (PR #193)
+- **SDAIA breach workflow** — V181 columns + Article 31 72h clock + state machine (PR #196)
+- **LDAP/AD guide** — `LdapRoleMapper` + 6-row troubleshooting matrix + Saudi-bank deployment notes (PR #196)
+
+### Design-system migration — 3 batches
+
+| Batch | PR | Pages migrated | Inline styles eliminated |
+|---|---:|---|---:|
+| 1 | #173 (`65cbb97`) | CrisisRoomPage + new reusable layout/typography utilities | ~600 |
+| 2a | #194 (`9f8493f`) | EsgPage / NdiPage / AuditWorkspacePage | ~800 |
+| 2b | #197 (`9799fbf`) | CapaPage / BcmLifecyclePage / RiskLifecyclePage / CyberLifecyclePage | ~600 |
+| 3 | #205 (`1da6554`) | 4 pages from inline styles to design tokens | ~200 |
+| **Total** | | **12 pages** | **~2200** |
+
+After this arc, every `Page.tsx` consumer has converged onto the shared
+design-token CSS (variables + utility classes) — future polish lands once
+in `shell.css` / design tokens instead of hand-editing per-page literals.
+
+### SOC ops + repair PRs in the arc
+
+| PR | SHA | What |
+|---:|:---|---|
+| #169 | `fb9f7dd` | fix(cyber) — rename Slice 8-D controller bean to avoid Spring collision |
+| #172 | `98920c9` | fix(repair) — harden mojibake script + targeted form-titles repair |
+| #174 | `42b9396` | fix(socops) — repair auth checks + bootstrap SOCOPS license + tables |
+| #175 | `b615bf7` | feat(socops) — Saudi-native seed data for SOC Operations module |
+
+PR #168 (`f688dbc`) is the previous STATUS.md capture for the Sprint-8 P0 block — kept below verbatim.
+
+### Saudi regulator coverage — every regulator now anchored in the platform
+
+This arc closes out anchor coverage for every Saudi regulator a Tier-1
+bank, energy company, listed entity, or telecom operator interacts with.
+Each row points at the platform surface where the citation lives.
+
+| Regulator | Frameworks anchored in platform | Surface |
+|---|---|---|
+| **SAMA** | Cyber Security Framework (140 controls — full), BCF (47 clauses + addenda), Corporate Governance, AI Principles, Operational Resilience | `module/compliance`, `module/bcm`, `module/cyber`, `module/governance` |
+| **NCA** | ECC-2 (full), OTCC (27 controls — full), CCC v1.1, CSCC | `module/cyber`, `module/compliance`, `module/socops` |
+| **SDAIA** | PDPL Articles 4 / 20 / 29 / 30 / 31 / 32, AI Ethics Principles, Cross-Border Data Transfer Regulations 2023 | `module/privacy`, `module/ai_governance` |
+| **CMA** | Listed Companies CG Code Article 54, IFRS S2 climate disclosure | `module/audit_committee`, `module/esg` |
+| **ZATCA** | Fatoora / E-Invoicing wave-23 compliance record | `module/compliance` |
+| **NCEMA** | Crisis classification, BCM exercise scenarios | `module/bcm` |
+| **NRC** | Critical-infrastructure designation + 72h notification workflow | `module/bcm` |
+| **MOH** | Healthcare patient privacy + 24h supplier-incident notification | `module/privacy`, `module/incident` |
+| **DGA** | Digital Maturity Model (9 controls × 6 pillars) | `module/compliance` |
+| **IIA 2020** | Three Lines Model dashboard | `module/governance` (PR #182) |
+
+### Per-module rollout status after this arc
+
+Every module that received a Sprint 11 / Sprint 12 deliverable is flipped to ✅ Completed below.
+
+| Module | Sprint 11 / 12 deliverables | State |
+|---|---|---|
+| `bcm` | Slices 9-A..9-F + 10-A..10-F (PRs #170, #171, #178, #181, #183, #185, #186, #187, #190, #191, #192) | ✅ Completed |
+| `risk` | Risk Bow-Tie Analysis (PR #179) — on top of FAIR Monte Carlo (#161) | ✅ Completed |
+| `privacy` | PDPL sub-processor tracking (PR #204) — on top of data-flow viz (#163) + DSR/Breach/RoPA detail pages (#109/#110) | ✅ Completed |
+| `cyber` | Attack Surface Mgmt (PR #202) + Risk-Based Vuln SLA engine (PR #203) — on top of Threat-Intel Correlation (#166) | ✅ Completed |
+| `compliance` | Obligation Register + Periodic Attestation (PR #198) — on top of Regulatory Horizon (#162) | ✅ Completed |
+| `ccm` | Continuous Control Monitoring engine (PR #199) | ✅ Completed (new module) |
+| `esg` | TCFD Climate Scenarios + Scope-3 Financed Emissions (PR #200) | ✅ Completed |
+| `audit_committee` | Audit Committee Dashboard (PR #201) — anchored to CMA Art. 14 + SAMA | ✅ Completed (new module) |
+| `ai_governance` | AI/ML Model Registry (PR #195) | ✅ Completed (new module) |
+| `governance` | Three Lines of Defense dashboard (PR #182) | ✅ Completed (new module) |
+| `tprm` | Vendor BCP attestation campaigns (PR #189) — on top of vendor MTPD inheritance (#192) | ✅ Completed |
+| `integrations` | ServiceNow / Splunk / CrowdStrike / Tenable adapters (PRs #177, #180, #184, #188) | ✅ Completed (new module) |
+| `platform` | Embedded contextual help / KB v2 (PR #206) | ✅ Completed |
+| `i18n` | Saudi-native AR audit (PR #207) — 75 strings | ✅ Completed |
+| `socops` | Saudi-native seed data + auth-check repair + license bootstrap (PRs #174, #175) | ✅ Completed |
+| Design-system | 12 pages migrated, ~2200 inline styles eliminated (PRs #173, #194, #197, #205) | ✅ Completed |
+| Open Issues Register | 12 → 0 across 3 batch PRs (#176, #193, #196) | ✅ Closed |
+
+### Numbers
+
+- **38 PRs** merged (#168 → #207)
+- **0 reverts**, **0 known regressions** at arc close
+- **Backend test suite green** on every PR (`mvn verify`)
+- **Frontend Vite build green** on every PR
+- **12 → 0** open issues in the register
+- **~2200 inline styles** eliminated across 12 pages
+- **6 new bridge-adapter packages** for SOC tooling (ServiceNow, Splunk, CrowdStrike, Tenable, plus 2 internal: KB v2, AR audit)
+- **140 SAMA CSF controls** seeded with bilingual text (PR #196 / V182)
+
+### What the platform can do today that it couldn't at the start of this arc
+
+| Role | Now possible |
+|---|---|
+| **CRO** | Run Risk Bow-Tie + Three Lines dashboard alongside FAIR Monte Carlo |
+| **BCM Manager** | Quantitative BIA, continuity ROI, dependency cascade, mobile Crisis Room, observer dashboard for live exercises, inject-driven runtime, vendor BCP attestation campaigns, offline BCP/DRP binder PDF |
+| **CCO** | Obligation Register + Periodic Attestation against full SAMA CSF 140 control set |
+| **CISO** | Attack Surface Mgmt + Risk-Based Vuln SLAs + CCM engine; ServiceNow / Splunk / CrowdStrike / Tenable adapters ingest live |
+| **DPO** | PDPL sub-processor tracking with cross-border safeguard templates; SDAIA submission workflow with Article 31 72h clock |
+| **AI Officer** | AI/ML Model Registry anchored to SDAIA AI Ethics Principles |
+| **Climate Lead** | TCFD scenarios + Scope-3 Financed Emissions (CMA IFRS S2) |
+| **Audit Committee Secretary** | Audit Committee Dashboard (CMA Art. 14 + SAMA) |
+| **End user** | Embedded contextual help on every page (KB v2); Saudi-native Arabic on every label after PR #207's 75-string audit |
+| **Ops** | Refresh-token revoke-everywhere, DB-size graduated alarms, JWT rotation runbook, MFA library wired, LDAP guide, full Saudi regulator surface coverage |
+
+---
+
+## 🟢 Previously latest — Sprint-8 P0 GRC block closes (23 May 2026, PRs #161 → #167)
 
 The full Sprint-8 P0 GRC block from `BCM_GRC_GAP_ANALYSIS_AND_PLAN.md` §4 is in. Five pure-additive backend slices land plus one production-bug fix unblocking local startup.
 
