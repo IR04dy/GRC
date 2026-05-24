@@ -127,6 +127,9 @@ const AuditCommitteeSnapshotPage  = lazy(() => import('./pages/audit-committee/A
 // Sprint 11 — Attack Surface Management (ASM).
 const AttackSurfacePage         = lazy(() => import('./pages/cyber/AttackSurfacePage').then(m => ({ default: m.AttackSurfacePage })));
 const AttackSurfaceAssetDetailPage = lazy(() => import('./pages/cyber/AttackSurfaceAssetDetailPage').then(m => ({ default: m.AttackSurfaceAssetDetailPage })));
+// Sprint 11 — Risk-Based Vulnerability SLA engine.
+const VulnSlaDashboardPage      = lazy(() => import('./pages/cyber/VulnSlaDashboardPage').then(m => ({ default: m.VulnSlaDashboardPage })));
+const VulnSlaPolicyPage         = lazy(() => import('./pages/cyber/VulnSlaPolicyPage').then(m => ({ default: m.VulnSlaPolicyPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -407,6 +410,9 @@ export function App() {
                   Static segments registered before any param routes. */}
               <Route path="/cyber/attack-surface"                              element={<AttackSurfacePage />} />
               <Route path="/cyber/attack-surface/assets/:externalId"           element={<AttackSurfaceAssetDetailPage />} />
+              {/* Sprint 11 — Risk-Based Vulnerability SLA engine. */}
+              <Route path="/cyber/vuln-sla/dashboard"                          element={<VulnSlaDashboardPage />} />
+              <Route path="/cyber/vuln-sla/policies"                           element={<VulnSlaPolicyPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />

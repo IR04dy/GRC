@@ -2319,6 +2319,8 @@ export const en = {
   ctrlLibrarySidebar:     'Control library',
   ccmDashSidebar:         'CCM dashboard',
   asmSidebar:             'Attack Surface',
+  vulnSlaDashSidebar:     'Vuln SLA Dashboard',
+  vulnSlaPolicySidebar:   'SLA Policies',
   postureHubSidebar:      'Compliance posture',
   ermDashSidebar:         'Risk dashboard',
   bcmDashSidebar:         'BCM dashboard',

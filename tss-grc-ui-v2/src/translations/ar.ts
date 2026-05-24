@@ -2304,6 +2304,8 @@ export const ar = {
   ctrlLibrarySidebar:     'مكتبة الضوابط',
   ccmDashSidebar:         'المراقبة المستمرة للضوابط',
   asmSidebar:             'سطح الهجوم',
+  vulnSlaDashSidebar:     'لوحة اتفاقيات الثغرات',
+  vulnSlaPolicySidebar:   'سياسات الاتفاقيات',
   postureHubSidebar:      'وضع الامتثال',
   ermDashSidebar:         'لوحة المخاطر',
   bcmDashSidebar:         'لوحة الاستمرارية',
