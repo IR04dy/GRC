@@ -173,6 +173,9 @@ const BcmDependencyPage      = lazy(() => import('./pages/bcm-dependency/BcmDepe
 const BcmDependencyGraphPage = lazy(() => import('./pages/bcm/BcmDependencyGraphPage').then(m => ({ default: m.BcmDependencyGraphPage })));
 const RopaPage               = lazy(() => import('./pages/ropa/RopaPage').then(m => ({ default: m.RopaPage })));
 const EsgPage                = lazy(() => import('./pages/esg/EsgPage').then(m => ({ default: m.EsgPage })));
+const TcfdScenariosPage      = lazy(() => import('./pages/esg/TcfdScenariosPage').then(m => ({ default: m.TcfdScenariosPage })));
+const FinancedEmissionsPage  = lazy(() => import('./pages/esg/FinancedEmissionsPage').then(m => ({ default: m.FinancedEmissionsPage })));
+const ClimateAnnualReportPage = lazy(() => import('./pages/esg/ClimateAnnualReportPage').then(m => ({ default: m.ClimateAnnualReportPage })));
 const NdiPage                = lazy(() => import('./pages/ndi/NdiPage').then(m => ({ default: m.NdiPage })));
 const WorkflowVersionsPage   = lazy(() => import('./pages/workflow-versions/WorkflowVersionsPage').then(m => ({ default: m.WorkflowVersionsPage })));
 const CrisisManagementPage   = lazy(() => import('./pages/crisis/CrisisManagementPage').then(m => ({ default: m.CrisisManagementPage })));
@@ -467,6 +470,11 @@ export function App() {
               {/* ESG / Saudi Green Initiative — C2 */}
               <Route path="/esg"                element={<EsgPage />} />
               <Route path="/ndi"                element={<NdiPage />} />
+
+              {/* Sprint 11 — TCFD scenarios + Scope-3 financed emissions */}
+              <Route path="/esg/tcfd-scenarios"     element={<TcfdScenariosPage />} />
+              <Route path="/esg/financed-emissions" element={<FinancedEmissionsPage />} />
+              <Route path="/esg/climate-report"     element={<ClimateAnnualReportPage />} />
 
               {/* Workflow versioning — A3 */}
               <Route path="/workflow-versions"  element={<WorkflowVersionsPage />} />

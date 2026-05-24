@@ -8,6 +8,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          TrendingUp,
          Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell, Megaphone,
          Bot,
+         CloudLightning, Factory, FileSearch,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -102,6 +103,9 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'attestations', to: '/attestations',      Icon: FileCheck2,     labelKey: 'campaignsTitle' },
       { id: 'ethics',       to: '/ethics',            Icon: ShieldAlert,    labelKey: 'modEthics' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
+      { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
+      { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },
+      { id: 'climate-rpt',  to: '/esg/climate-report',     Icon: FileSearch,     labelKey: 'climateReportSidebar' },
       { id: 'ndi',          to: '/ndi',               Icon: Database,       labelKey: 'ndiSidebar' },
     ],
   },

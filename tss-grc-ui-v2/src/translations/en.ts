@@ -1469,6 +1469,10 @@ export const en = {
 
   // ESG / Saudi Green Initiative — C2.
   esgSidebar:              'ESG',
+  // Sprint 11 — TCFD + Scope-3 financed emissions.
+  tcfdScenariosSidebar:    'TCFD Climate Scenarios',
+  financedEmissionsSidebar: 'Financed Emissions',
+  climateReportSidebar:    'Annual Climate Report',
   ndiSidebar:              'NDI · نضيء',
   esgTitle:                'ESG · Saudi Green Initiative',
   esgSub:                  'TCFD-aligned · CMA ESG annex · Vision 2030.',

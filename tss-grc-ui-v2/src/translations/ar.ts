@@ -1466,6 +1466,10 @@ export const ar = {
 
   // الاستدامة / المبادرة السعودية الخضراء — C2.
   esgSidebar:              'الاستدامة',
+  // Sprint 11 — TCFD + الانبعاثات المُموَّلة.
+  tcfdScenariosSidebar:    'تحليل سيناريوهات المناخ TCFD',
+  financedEmissionsSidebar: 'الانبعاثات المُموَّلة',
+  climateReportSidebar:    'التقرير المناخي السنوي',
   ndiSidebar:              'نضيء',
   esgTitle:                'الاستدامة · المبادرة السعودية الخضراء',
   esgSub:                  'متوافق مع TCFD · ملحق ESG لهيئة السوق · رؤية 2030.',
