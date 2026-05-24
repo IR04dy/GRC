@@ -117,6 +117,10 @@ const AiModelDetailPage         = lazy(() => import('./pages/ai/AiModelDetailPag
 const ObligationsPage           = lazy(() => import('./pages/compliance/ObligationsPage').then(m => ({ default: m.ObligationsPage })));
 const ObligationDetailPage      = lazy(() => import('./pages/compliance/ObligationDetailPage').then(m => ({ default: m.ObligationDetailPage })));
 const ObligationCampaignsPage   = lazy(() => import('./pages/compliance/ObligationCampaignsPage').then(m => ({ default: m.ObligationCampaignsPage })));
+// Sprint 11 — Continuous Control Monitoring Engine.
+const CcmDashboardPage          = lazy(() => import('./pages/ccm/CcmDashboardPage').then(m => ({ default: m.CcmDashboardPage })));
+const CcmTestsPage              = lazy(() => import('./pages/ccm/CcmTestsPage').then(m => ({ default: m.CcmTestsPage })));
+const CcmTestDetailPage         = lazy(() => import('./pages/ccm/CcmTestDetailPage').then(m => ({ default: m.CcmTestDetailPage })));
 // ─── Module landing pages remaining (eager): /scm sidebar landing. ───
 import { ScmPage } from './pages/scm/ScmPage';
 
@@ -382,6 +386,11 @@ export function App() {
                   but follow the same defensive pattern as bowtie above). */}
               <Route path="/ai/models"                               element={<AiModelRegisterPage />} />
               <Route path="/ai/models/:externalId"                   element={<AiModelDetailPage />} />
+              {/* Sprint 11 — Continuous Control Monitoring engine.
+                  Static segments registered before any param routes. */}
+              <Route path="/ccm/dashboard"                           element={<CcmDashboardPage />} />
+              <Route path="/ccm/tests"                               element={<CcmTestsPage />} />
+              <Route path="/ccm/tests/:externalId"                   element={<CcmTestDetailPage />} />
               <Route path="/admin"      element={<AdminPage />} />
               <Route path="/admin/licensing" element={<LicensingPage />} />
               <Route path="/scm"        element={<ScmPage />} />

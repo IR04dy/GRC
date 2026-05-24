@@ -2296,6 +2296,7 @@ export const ar = {
   polMgmtSidebar:         'إدارة السياسات',
   regLibrarySidebar:      'مكتبة المرجعيات',
   ctrlLibrarySidebar:     'مكتبة الضوابط',
+  ccmDashSidebar:         'المراقبة المستمرة للضوابط',
   postureHubSidebar:      'وضع الامتثال',
   ermDashSidebar:         'لوحة المخاطر',
   bcmDashSidebar:         'لوحة الاستمرارية',

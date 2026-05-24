@@ -2311,6 +2311,7 @@ export const en = {
   polMgmtSidebar:         'Policy management',
   regLibrarySidebar:      'Regulatory library',
   ctrlLibrarySidebar:     'Control library',
+  ccmDashSidebar:         'CCM dashboard',
   postureHubSidebar:      'Compliance posture',
   ermDashSidebar:         'Risk dashboard',
   bcmDashSidebar:         'BCM dashboard',
