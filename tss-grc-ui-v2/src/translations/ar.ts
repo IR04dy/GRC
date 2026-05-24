@@ -5582,4 +5582,21 @@ export const ar = {
   errorStateBootstrapTitle:     'الوحدة لم يتم تجهيز قاعدة بياناتها',
   errorStateBootstrapHint:      'جداول قاعدة بيانات هذه الوحدة لم تُنشأ بعد. شغّل سكربت التجهيز الخاص بالوحدة من مجلد المشروع.',
   errorStateBootstrapCmdLabel:  'نفّذ الأمر التالي من مجلد المشروع:',
+
+  // ── الشريحة ١٠-و · كتيّب خطة الاستمرارية للطباعة دون اتصال ──────
+  bcpBinderTab:                 'الكتيّب',
+  bcpBinderExport:              'تصدير الكتيّب',
+  bcpBinderGenerate:            'إنشاء PDF',
+  bcpBinderGenerating:          'جارٍ الإنشاء…',
+  bcpBinderReady:               'جاهز',
+  bcpBinderDownload:            'تنزيل',
+  bcpBinderArchive:             'أرشفة',
+  bcpBinderVersion:             'الإصدار',
+  bcpBinderLanguage:            'اللغة',
+  bcpBinderLangBilingual:       'ثنائي اللغة (الموصى به)',
+  bcpBinderLangEn:              'إنجليزي',
+  bcpBinderLangAr:              'عربي',
+  bcpBinderEmpty:               'لا توجد كتيّبات بعد — اضغط «تصدير الكتيّب» لإنشاء أوّل نسخة.',
+  bcpBinderWatermark:           'محكوم — غير قابل للتوزيع',
+  bcpBinderSamaNotice:          'يُلبّي هذا الكتيّب اشتراط ساما (إطار استمرارية الأعمال — الملحق د) بإتاحة كل خطة استمرارية لخدمة حرجة كنسخة قابلة للطباعة دون اتصال بالمنصة.',
 } as const;

@@ -5604,4 +5604,21 @@ export const en = {
   errorStateBootstrapTitle:     'Module not yet bootstrapped',
   errorStateBootstrapHint:      'This module’s database tables aren’t created yet. Run the per-module setup script from the repo root.',
   errorStateBootstrapCmdLabel:  'Run this from the repo root:',
+
+  // ── Slice 10-F · Offline BCP binder PDF ─────────────────────────
+  bcpBinderTab:                 'Binder',
+  bcpBinderExport:              'Export Binder',
+  bcpBinderGenerate:            'Generate PDF',
+  bcpBinderGenerating:          'Generating…',
+  bcpBinderReady:               'Ready',
+  bcpBinderDownload:            'Download',
+  bcpBinderArchive:             'Archive',
+  bcpBinderVersion:             'Version',
+  bcpBinderLanguage:            'Language',
+  bcpBinderLangBilingual:       'Bilingual (recommended)',
+  bcpBinderLangEn:              'English only',
+  bcpBinderLangAr:              'Arabic only',
+  bcpBinderEmpty:               'No binders yet — click "Export binder" to generate the first version.',
+  bcpBinderWatermark:           'Controlled — Not for Distribution',
+  bcpBinderSamaNotice:          'Each binder satisfies SAMA BCF Annex D — every critical-business-service BCP must be available off-line so the Crisis Room can fall back to paper.',
 } as const;

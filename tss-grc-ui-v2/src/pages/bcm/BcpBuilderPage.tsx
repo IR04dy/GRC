@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Wrench, FileText, ChevronLeft, History, GitCompare, Plus, ListOrdered, Send, Download } from 'lucide-react';
+import { Wrench, FileText, ChevronLeft, History, GitCompare, Plus, ListOrdered, Send, Download, BookOpen, Trash2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -29,6 +29,11 @@ import {
 import {
   attestPlan, reviewStateTone, sweepReview,
 } from '../../lib/planReview';
+import {
+  generateBinder, listBindersForPlan, downloadBinder, archiveBinder,
+  statusTone as binderStatusTone, languageLabel, fmtBytes,
+  type BinderExport, type BinderLanguage,
+} from '../../lib/bcpBinder';
 
 /**
  * BCP / DRP Builder page — audit T1.4b.
@@ -52,7 +57,7 @@ import {
  * SUPERSEDED / CANCELLED — the backend enforces; the UI greys out controls.
  */
 type Mode = 'register' | 'builder';
-type BuilderTab = 'sections' | 'versions' | 'diff' | 'distribution';
+type BuilderTab = 'sections' | 'versions' | 'diff' | 'distribution' | 'binder';
 
 const NEXT_STATUS: Record<BcpPlanStatus, BcpPlanStatus[]> = {
   DRAFT:        ['UNDER_REVIEW', 'CANCELLED'],
@@ -96,6 +101,15 @@ export function BcpBuilderPage() {
   const [acks, setAcks] = useState<PlanAcknowledgement[]>([]);
   const [distStats, setDistStats] = useState<DistributionStats | null>(null);
   const [distOpen, setDistOpen] = useState(false);  // distribute-modal
+
+  // Slice 10-F — offline BCP binder PDFs. The list is loaded lazily on
+  // first switch to the Binder tab. binderOpen drives the language-picker
+  // modal; binderBusy gates the submit button while the (synchronous)
+  // generate API call is in flight.
+  const [binders, setBinders] = useState<BinderExport[]>([]);
+  const [bindersLoaded, setBindersLoaded] = useState(false);
+  const [binderOpen, setBinderOpen] = useState(false);
+  const [binderBusy, setBinderBusy] = useState(false);
 
   // ── Register loaders ──
   async function reload() {
@@ -303,6 +317,67 @@ export function BcpBuilderPage() {
     }
   }
 
+  // ── Slice 10-F binder ──
+  async function reloadBinders() {
+    if (!plan) return;
+    const list = await listBindersForPlan(plan.id).catch(() => [] as BinderExport[]);
+    setBinders(Array.isArray(list) ? list : []);
+    setBindersLoaded(true);
+  }
+  useEffect(() => {
+    if (builderTab === 'binder' && plan && !bindersLoaded) {
+      void reloadBinders();
+    }
+  }, [builderTab, plan, bindersLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function submitBinder(v: BinderForm) {
+    if (!plan) return;
+    setBinderBusy(true);
+    try {
+      const out = await generateBinder(plan.id, (v.language || 'BILINGUAL') as BinderLanguage);
+      if (out.status === 'READY') {
+        toast.success(isAr
+          ? `تم إنشاء الكتيّب ${out.exportCode}`
+          : `Binder ${out.exportCode} ready`);
+      } else if (out.status === 'FAILED') {
+        toast.danger(isAr
+          ? `فشل الإنشاء: ${out.errorMessage ?? '—'}`
+          : `Generation failed: ${out.errorMessage ?? '—'}`);
+      } else {
+        toast.info(isAr ? 'جارٍ الإنشاء…' : 'Generating…');
+      }
+      setBinderOpen(false);
+      await reloadBinders();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل إنشاء الكتيّب' : 'Binder generation failed'));
+    } finally {
+      setBinderBusy(false);
+    }
+  }
+
+  async function handleBinderDownload(b: BinderExport) {
+    try {
+      await downloadBinder(b.id, b.exportCode);
+      // Counter is incremented server-side; refresh so the UI reflects it.
+      await reloadBinders();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل التنزيل' : 'Download failed'));
+    }
+  }
+
+  async function handleBinderArchive(b: BinderExport) {
+    try {
+      await archiveBinder(b.id);
+      toast.success(isAr ? 'تمت الأرشفة' : 'Archived');
+      await reloadBinders();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل الأرشفة' : 'Archive failed'));
+    }
+  }
+
   const isLocked = plan != null && (plan.status === 'APPROVED' || plan.status === 'PUBLISHED'
     || plan.status === 'ARCHIVED' || plan.status === 'SUPERSEDED' || plan.status === 'CANCELLED');
 
@@ -418,6 +493,7 @@ export function BcpBuilderPage() {
     { id: 'versions',     label: isAr ? `النسخ (${versions.length})`   : `Versions (${versions.length})`,   Icon: History },
     { id: 'diff',         label: isAr ? 'المقارنة'                     : 'Diff',                            Icon: GitCompare },
     { id: 'distribution', label: isAr ? `التوزيع (${acks.length})`     : `Distribution (${acks.length})`,   Icon: Send },
+    { id: 'binder',       label: isAr ? `الكتيّب (${binders.length})`   : `Binder (${binders.length})`,      Icon: BookOpen },
   ];
 
   return (
@@ -432,6 +508,9 @@ export function BcpBuilderPage() {
           </Button>
           <Button variant="ghost" onClick={() => void downloadPlanPdf(plan.id, plan.planCode)}>
             <Download size={14} /> {isAr ? 'تنزيل PDF' : 'Download PDF'}
+          </Button>
+          <Button variant="ghost" onClick={() => setBinderOpen(true)}>
+            <BookOpen size={14} /> {isAr ? 'تصدير الكتيّب' : 'Export binder'}
           </Button>
           {(plan.status === 'APPROVED' || plan.status === 'UNDER_REVIEW') && (
             <Button variant="ghost" onClick={() => void handleReopen()}>
@@ -595,6 +674,68 @@ export function BcpBuilderPage() {
         )}
       </div>
 
+      {builderTab === 'binder' && (
+        <Card title={isAr ? 'كتيّب الخطة للطباعة دون اتصال' : 'Offline plan binder'}
+              action={<Button variant="primary" onClick={() => setBinderOpen(true)}>
+                <BookOpen size={14} /> {isAr ? 'تصدير الكتيّب' : 'Export binder'}
+              </Button>}>
+          {/* SAMA BCF Annex D context — explain WHY this exists so a
+              first-time auditor / reviewer immediately understands. */}
+          <p className="text-muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 12 }}>
+            {isAr
+              ? 'يُلبّي هذا الكتيّب اشتراط ساما (إطار استمرارية الأعمال — الملحق د) بإتاحة كل خطة استمرارية لخدمة حرجة كنسخة قابلة للطباعة دون اتصال بالمنصة.'
+              : 'Each binder satisfies SAMA BCF Annex D — every critical-business-service BCP must be available off-line so the Crisis Room can fall back to paper.'}
+          </p>
+          {binders.length === 0
+            ? <InlineEmpty text={isAr
+                ? 'لا توجد كتيّبات بعد — اضغط "تصدير الكتيّب" لإنشاء أوّل نسخة.'
+                : 'No binders yet — click "Export binder" to generate the first version.'} />
+            : <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
+                  <thead><tr>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'الكود' : 'Code'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'الإصدار' : 'Version'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'اللغة' : 'Language'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'الحالة' : 'Status'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'الصفحات' : 'Pages'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'الحجم' : 'Size'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'أُنشئ' : 'Generated'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'بواسطة' : 'By'}</th>
+                    <th style={{ textAlign: 'start' }}>{isAr ? 'التنزيلات' : 'Downloads'}</th>
+                    <th style={{ textAlign: 'end' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
+                  </tr></thead>
+                  <tbody>
+                    {binders.map(b => (
+                      <tr key={b.id}>
+                        <td className="mono">{b.exportCode}</td>
+                        <td className="mono">{b.versionLabel ?? '—'}</td>
+                        <td><Badge tone="neutral">{languageLabel(b.language, isAr)}</Badge></td>
+                        <td><Badge tone={binderStatusTone(b.status)}>{b.status}</Badge></td>
+                        <td className="mono">{b.pageCount ?? '—'}</td>
+                        <td className="mono">{fmtBytes(b.byteSize)}</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{b.generatedAt?.slice(0, 16) ?? '—'}</td>
+                        <td>{b.generatedByName ?? '—'}</td>
+                        <td className="mono">{b.downloadCount}</td>
+                        <td style={{ textAlign: 'end' }}>
+                          {b.status === 'READY' && (
+                            <Button variant="ghost" onClick={() => void handleBinderDownload(b)}>
+                              <Download size={12} /> {isAr ? 'تنزيل' : 'Download'}
+                            </Button>
+                          )}
+                          {b.status !== 'ARCHIVED' && (
+                            <Button variant="ghost" onClick={() => void handleBinderArchive(b)}>
+                              <Trash2 size={12} /> {isAr ? 'أرشفة' : 'Archive'}
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>}
+        </Card>
+      )}
+
       <FormModal<DistributeForm>
         open={distOpen}
         title={isAr ? 'توزيع الخطة' : 'Distribute plan'}
@@ -604,6 +745,19 @@ export function BcpBuilderPage() {
         initial={emptyDistribute()}
         onClose={() => setDistOpen(false)}
         onSubmit={submitDistribute}
+      />
+
+      <FormModal<BinderForm>
+        open={binderOpen}
+        title={isAr ? 'تصدير كتيّب الخطة' : 'Export plan binder'}
+        size="sm"
+        submitLabel={binderBusy
+          ? (isAr ? 'جارٍ الإنشاء…' : 'Generating…')
+          : (isAr ? 'إنشاء PDF' : 'Generate PDF')}
+        fields={binderFields(isAr)}
+        initial={emptyBinder()}
+        onClose={() => setBinderOpen(false)}
+        onSubmit={submitBinder}
       />
     </Shell>
   );
@@ -739,6 +893,24 @@ function parseRecipient(line: string): { name: string; email?: string; role?: st
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(head)) return { name: head, email: head, role };
   // Otherwise treat the line as a plain name.
   return { name: head, role };
+}
+
+// ─── Slice 10-F binder form ──────────────────────────────────────
+
+interface BinderForm {
+  language: string;
+}
+function emptyBinder(): BinderForm { return { language: 'BILINGUAL' }; }
+function binderFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'select', key: 'language', span: 12, required: true,
+      label: isAr ? 'اللغة' : 'Language',
+      options: [
+        { value: 'BILINGUAL', label: isAr ? 'ثنائي اللغة (الموصى به)' : 'Bilingual (recommended)' },
+        { value: 'EN',        label: isAr ? 'إنجليزي'                  : 'English only' },
+        { value: 'AR',        label: isAr ? 'عربي'                     : 'Arabic only' },
+      ] },
+  ];
 }
 
 function newPlanFields(isAr: boolean): FieldDef[] {
