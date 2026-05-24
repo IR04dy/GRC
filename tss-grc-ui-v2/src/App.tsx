@@ -92,6 +92,12 @@ const IaPlanListPage                 = lazy(() => import('./pages/audit-ia/IaPla
 const IaPlanDetailPage               = lazy(() => import('./pages/audit-ia/IaPlanDetailPage').then(m => ({ default: m.IaPlanDetailPage })));
 const IaUniversePage                 = lazy(() => import('./pages/audit-ia/IaUniversePage').then(m => ({ default: m.IaUniversePage })));
 const IaEngagementDetailPage         = lazy(() => import('./pages/audit-ia/IaEngagementDetailPage').then(m => ({ default: m.IaEngagementDetailPage })));
+// ─── Sprint 13 — Sanctions Screening engine (AML / CFT).
+const SanctionsDashboardPage         = lazy(() => import('./pages/aml-sanctions/SanctionsDashboardPage').then(m => ({ default: m.SanctionsDashboardPage })));
+const SanctionsListsPage             = lazy(() => import('./pages/aml-sanctions/SanctionsListsPage').then(m => ({ default: m.SanctionsListsPage })));
+const SanctionsChecksPage            = lazy(() => import('./pages/aml-sanctions/SanctionsChecksPage').then(m => ({ default: m.SanctionsChecksPage })));
+const SanctionsCheckDetailPage       = lazy(() => import('./pages/aml-sanctions/SanctionsCheckDetailPage').then(m => ({ default: m.SanctionsCheckDetailPage })));
+const SanctionsScreenPage            = lazy(() => import('./pages/aml-sanctions/SanctionsScreenPage').then(m => ({ default: m.SanctionsScreenPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
 //    Each wizard is its own chunk; the first time a user navigates to
 //    /workflows/* the relevant ~30 kB chunk is fetched. Reduces initial
@@ -427,6 +433,15 @@ export function App() {
               <Route path="/audit/ia/universe"                       element={<IaUniversePage />} />
               <Route path="/audit/ia/plans/:id"                      element={<IaPlanDetailPage />} />
               <Route path="/audit/ia/engagements/:id"                element={<IaEngagementDetailPage />} />
+
+              {/* Sprint 13 — Sanctions Screening engine. Static segments
+                  (/dashboard, /lists, /checks, /screen) registered before
+                  the param route so they match first. */}
+              <Route path="/aml/sanctions/dashboard"                 element={<SanctionsDashboardPage />} />
+              <Route path="/aml/sanctions/lists"                     element={<SanctionsListsPage />} />
+              <Route path="/aml/sanctions/checks"                    element={<SanctionsChecksPage />} />
+              <Route path="/aml/sanctions/screen"                    element={<SanctionsScreenPage />} />
+              <Route path="/aml/sanctions/checks/:id"                element={<SanctionsCheckDetailPage />} />
 
               {/* Detail + admin pages for V115/V116 modules */}
               <Route path="/bcm/aars/:id"                            element={<AarDetailPage />} />

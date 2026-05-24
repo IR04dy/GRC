@@ -5758,4 +5758,16 @@ export const ar = {
   helpAdminColModule:           'الوحدة',
   helpAdminColSeverity:         'الأهمية',
   helpAdminColScope:            'النطاق',
+
+  // ─── Sprint 13 — Sanctions Screening engine ──────────────────────
+  sanctionsSidebar:                  'الفحص ضد قوائم العقوبات',
+  sanctionsEyebrow:                  'مكافحة غسل الأموال وتمويل الإرهاب · المرحلة ١٣',
+  sanctionsDashboardTitle:           'لوحة الفحص ضد قوائم العقوبات',
+  sanctionsDashboardSub:             'منصة الفحص في الزمن الحقيقي ضد OFAC SDN والأمم المتحدة والاتحاد الأوروبي وقائمة الإرهاب لساما والقائمة الوطنية السعودية',
+  sanctionsListsTitle:               'قوائم العقوبات',
+  sanctionsListsSub:                 'قوائم نشطة لمحرّك الفحص ضد قوائم العقوبات',
+  sanctionsChecksTitle:              'سجلّ الفحوصات',
+  sanctionsChecksSub:                'سجلّ كامل لفحوصات الفحص ضد قوائم العقوبات لعملاء البنك ومعاملاته',
+  sanctionsScreenTitle:              'فحص يدوي',
+  sanctionsScreenSub:                'فحص فوري لاسم أو طرف ضد قوائم العقوبات النشطة',
 } as const;

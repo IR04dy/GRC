@@ -5778,4 +5778,16 @@ export const en = {
   helpAdminColModule:           'Module',
   helpAdminColSeverity:         'Severity',
   helpAdminColScope:            'Scope',
+
+  // ─── Sprint 13 — Sanctions Screening engine ──────────────────────
+  sanctionsSidebar:                  'Sanctions screening',
+  sanctionsEyebrow:                  'AML / CFT · Sprint 13',
+  sanctionsDashboardTitle:           'Sanctions screening dashboard',
+  sanctionsDashboardSub:             'Real-time screening against OFAC SDN, UN, EU, SAMA local terror, and the KSA National watchlist',
+  sanctionsListsTitle:               'Sanctions lists',
+  sanctionsListsSub:                 'Active sanctions lists driving the screening engine',
+  sanctionsChecksTitle:              'Screening check log',
+  sanctionsChecksSub:                'Audit-grade log of every sanctions screening check',
+  sanctionsScreenTitle:              'Manual screening',
+  sanctionsScreenSub:                'Quick lookup of a name or party against active sanctions lists',
 } as const;

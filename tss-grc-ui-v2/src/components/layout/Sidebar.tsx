@@ -9,6 +9,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell, Megaphone, Sliders,
          Bot,
          CloudLightning, Factory, FileSearch,
+         ScanSearch,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -106,6 +107,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'compliance',   to: '/compliance',        Icon: ClipboardCheck, labelKey: 'modCompliance' },
       { id: 'obligations',  to: '/compliance/obligations', Icon: FileCheck2, labelKey: 'obligationRegisterSidebar' },
+      { id: 'sanctions',    to: '/aml/sanctions/dashboard', Icon: ScanSearch, labelKey: 'sanctionsSidebar' },
       { id: 'reg-library',  to: '/regulatory/library', Icon: Landmark,      labelKey: 'regLibrarySidebar' },
       { id: 'ctrl-library', to: '/controls/library',   Icon: ShieldCheck,   labelKey: 'ctrlLibrarySidebar' },
       { id: 'ccm-dash',     to: '/ccm/dashboard',     Icon: Activity,      labelKey: 'ccmDashSidebar' },
