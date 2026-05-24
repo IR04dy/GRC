@@ -3310,6 +3310,16 @@ export const ar = {
   biaWizardSidebar: 'معالج تحليل الأثر',
   biaQuantSidebar: 'تحليل الأثر — كمي',
   strategyRoiSidebar: 'العائد على استراتيجيات الاستمرارية',
+  // Slice 10-E — Saudi-native: «وراثة المهلة القصوى» NOT literal calque.
+  mtpdInhSidebar: 'وراثة المهلة القصوى',
+  mtpdInhTitle: 'وراثة المهلة القصوى للاضطراب من الموردين',
+  mtpdInhSub: 'تحقق آلي من أن المهلة المُقَرّة من كل مورد جوهري لا تتجاوز مهلة العملية المعتمدة عليه — وفق إطار استمرارية الأعمال (مؤسسة النقد §3.4) والمواصفة ISO 22301 §8.2.',
+  mtpdInhComputeNew: 'حساب التقييم',
+  mtpdInhPublishForAudit: 'نشر للجهات الرقابية',
+  mtpdInhBreach: 'خرق',
+  mtpdInhWarning: 'تحذير',
+  mtpdInhNoAttestation: 'غياب الإقرار',
+  mtpdInhProcessDeps: 'اعتمادات العمليات على الموردين',
   // Slice 10-D — Saudi-native phrasing, NOT literal "حملة BCP للموردين" calque.
   vbcpSidebar: 'شهادات استمرارية الموردين',
   vbcpTitle: 'حملة شهادات استمرارية الموردين',

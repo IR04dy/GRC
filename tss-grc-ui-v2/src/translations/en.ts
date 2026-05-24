@@ -3326,6 +3326,16 @@ export const en = {
   biaWizardSidebar: 'BIA wizard',
   biaQuantSidebar: 'BIA — quantitative',
   strategyRoiSidebar: 'Strategy ROI',
+  // Slice 10-E — Vendor MTPD inheritance check.
+  mtpdInhSidebar: 'MTPD Inheritance',
+  mtpdInhTitle: 'Vendor MTPD Inheritance',
+  mtpdInhSub: 'Live check that each critical vendor\'s attested MTPD does not exceed the bank\'s own MTPD for any dependent process — SAMA BCF §3.4, ISO 22301 §8.2.',
+  mtpdInhComputeNew: 'Compute new',
+  mtpdInhPublishForAudit: 'Publish for audit',
+  mtpdInhBreach: 'Breach',
+  mtpdInhWarning: 'Warning',
+  mtpdInhNoAttestation: 'No attestation',
+  mtpdInhProcessDeps: 'Process Dependencies',
   // Slice 10-D — Vendor BCP attestation campaigns.
   vbcpSidebar: 'Vendor BCP attestation',
   vbcpTitle: 'Vendor BCP Attestation Campaigns',

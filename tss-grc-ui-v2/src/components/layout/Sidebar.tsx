@@ -186,6 +186,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'bia-wizard',      to: '/bcm/bia',           Icon: ClipboardCheck, labelKey: 'biaWizardSidebar' },
       { id: 'bia-quantitative', to: '/bcm/bia-quantitative', Icon: Sigma,         labelKey: 'biaQuantSidebar' },
       { id: 'strategy-roi',    to: '/bcm/strategy-roi',  Icon: TrendingUp,     labelKey: 'strategyRoiSidebar' },
+      { id: 'mtpd-inh',        to: '/bcm/mtpd-inheritance', Icon: GitBranch,    labelKey: 'mtpdInhSidebar' },
       { id: 'scenario-library', to: '/bcm/scenarios',    Icon: BookOpen,       labelKey: 'scenarioLibrarySidebar' },
       { id: 'bcp-builder',     to: '/bcm/plans',         Icon: FileText,       labelKey: 'bcpBuilderSidebar' },
       { id: 'dr-plans',        to: '/dr-plans',          Icon: Server,         labelKey: 'drpSidebar' },

@@ -34,6 +34,8 @@ const MobileCrisisRoomPage   = lazy(() => import('./pages/bcm/MobileCrisisRoomPa
 const BiaWizardPage          = lazy(() => import('./pages/bcm/BiaWizardPage').then(m => ({ default: m.BiaWizardPage })));
 const QuantitativeBiaPage    = lazy(() => import('./pages/bcm/QuantitativeBiaPage').then(m => ({ default: m.QuantitativeBiaPage })));
 const StrategyRoiPage        = lazy(() => import('./pages/bcm/StrategyRoiPage').then(m => ({ default: m.StrategyRoiPage })));
+const MtpdInheritancePage    = lazy(() => import('./pages/bcm/MtpdInheritancePage').then(m => ({ default: m.MtpdInheritancePage })));
+const MtpdInheritanceDetailPage = lazy(() => import('./pages/bcm/MtpdInheritanceDetailPage').then(m => ({ default: m.MtpdInheritanceDetailPage })));
 const VendorBcpCampaignsPage = lazy(() => import('./pages/tprm/VendorBcpCampaignsPage').then(m => ({ default: m.VendorBcpCampaignsPage })));
 const VendorBcpCampaignDetailPage = lazy(() => import('./pages/tprm/VendorBcpCampaignDetailPage').then(m => ({ default: m.VendorBcpCampaignDetailPage })));
 const VendorAttestationSubmitPage = lazy(() => import('./pages/tprm/VendorAttestationSubmitPage').then(m => ({ default: m.VendorAttestationSubmitPage })));
@@ -252,6 +254,9 @@ export function App() {
               <Route path="/bcm/bia"            element={<BiaWizardPage />} />
               <Route path="/bcm/bia-quantitative" element={<QuantitativeBiaPage />} />
               <Route path="/bcm/strategy-roi"     element={<StrategyRoiPage />} />
+              {/* Slice 10-E — Vendor MTPD inheritance check. */}
+              <Route path="/bcm/mtpd-inheritance"          element={<MtpdInheritancePage />} />
+              <Route path="/bcm/mtpd-inheritance/:assessmentId" element={<MtpdInheritanceDetailPage />} />
               <Route path="/bcm/scenarios"        element={<ExerciseScenarioLibraryPage />} />
               <Route path="/bcm/scenarios/:id"    element={<ExerciseScenarioDetailPage />} />
               <Route path="/bcm/exercises/run/:runId/facilitate"  element={<FacilitatorConsolePage />} />
