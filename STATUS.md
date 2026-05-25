@@ -1,9 +1,98 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 25 May 2026 (Sprint 16 Mandatory Regulatory Reporting Calendar arc closes — PRs #239 → #242, 4 PRs)
+**Last update:** 25 May 2026 (Sprint 17 Recovery & Resolution Plan arc closes — PRs #245 → #248, 4 PRs + COI/Complaints DB bootstrap fix #244)
 
 ---
 
-## 🟢 This arc — Sprint 16 Mandatory Regulatory Reporting Calendar (25 May 2026, PRs #239 → #242)
+## 🟢 This arc — Sprint 17 Recovery & Resolution Plan (25 May 2026, PRs #245 → #248)
+
+Sprint 17 lands the **Recovery & Resolution Plan (RRP)** module — the
+SAMA D-SIB mandatory annual planning surface. Every D-SIB and now every
+Tier-2/Tier-3 bank under the **SAMA Recovery Planning Rules (2022)** must
+lodge an annual RRP. This module is the first platform tool that ties
+the four operational catalogs the regulator expects — critical functions,
+recovery options, recovery indicators, stress scenarios — into a single
+Board-facing workspace, plus a **live, year-round RAG-band engine** that
+fires the F8 `RRP_INDICATOR_THRESHOLD_BREACHED` trigger on worsening
+crossings only.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **RRP backend** — 5 entities (cycle / recovery_option / critical_function / indicator / event), 7-state cycle lifecycle, RAG-band engine with HIGHER/LOWER direction handling, 17 REST endpoints, F7+F8 emit on 7 triggers, Python DB bootstrap (5 tables + 6 indexes) | Merged | 1 |
+| **F8 automation rules AR-221..AR-230** — cycle kickoff NOTIFY, Board Risk + Audit Committee pack, 5-BD lodge-prep handoff, evidence vault 10-year cross-log, worsening-only indicator escalation (CRO 1h SLA), RED-band Board Risk Chair + Critical CAPA, CAPITAL/LIQUIDITY AMBER → CFO+Treasury same-hour, capacity-drift watch, BCM Manager critical-function review, closed-cycle IA archive | Merged | 1 |
+| **Frontend slice** — Dashboard (KPIs + RAG roll-up + recovery capacity + status breakdown) + Cycles register with inline wizard + Cycle workspace with state-machine action panel + 4 tabs (Options / Critical Functions / Indicators with per-row Measure / Timeline) + dedicated Submit / Acknowledge / Reject / Exempt modals + sidebar entry under Audit | Merged | 1 |
+| **Saudi-realistic seed** — 5 cycles + 32 recovery options + 46 critical functions + 31 indicators across 3 tenants (TSS GRC full Saudi-bank stack, Aramco Trading CMA-listed, STC Bank digital-bank) with 1 deliberate AMBER on TSS GRC FY26 LCR to demo AR-225 + AR-227 on the next measurement | Merged | 1 |
+
+### Sprint 17 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #245 | `merged` | rrp | **Backend module** (5 entities + 17 REST + 7-state lifecycle + RAG-band engine + F8) | SAMA Recovery Planning Rules 2022; D-SIB designation; Basel III Pillar 3 |
+| #246 | `merged` | platform | **F8 automation rules AR-221..AR-230** | SAMA early-warning indicators; Board Risk Committee escalation chains |
+| #247 | `merged` | rrp (UI) | **Frontend slice** (dashboard + cycles + workspace + sidebar) | Board-facing CRO + CFO + BCM Manager workflow |
+| #248 | `merged` | rrp (seed) | **Saudi-realistic seed** (5 cycles + 32 options + 46 CFs + 31 indicators × 3 tenants) | SAMA D-SIB scenario rehearsals; commodity-trading + digital-bank profiles |
+
+### Sprint 17 — Cycle lifecycle (state machine)
+
+```
+DRAFT → IN_PREPARATION → BOARD_REVIEW → APPROVED →
+SUBMITTED → ACKNOWLEDGED → CLOSED
+    ↪ BOARD_REVIEW → IN_PREPARATION (sent back)
+    ↪ APPROVED → IN_PREPARATION (last-mile fix)
+```
+
+Plus the live, year-round (cycle-status-independent) `RRP_INDICATOR_THRESHOLD_BREACHED` trigger that fires on every RAG-band crossing, with `worsening=true|false` payload set by `RrpService.bandWorseThan` so F8 rules can selectively escalate only on worsening. RED-band crossings are always board-reportable regardless of worsening flag.
+
+### Sprint 17 — 10 F8 automation rules (AR-221..AR-230)
+
+- **AR-221** `RRP_CYCLE_OPENED` → NOTIFY CRO + CFO + BCM Manager + Board Secretary (4-6 month prep kickoff)
+- **AR-222** `STATE→BOARD_REVIEW` → NOTIFY Board Risk + Audit Committee members (2-week pack)
+- **AR-223** `STATE→APPROVED` → NOTIFY CRO + Compliance + Treasury (5-BD lodge-prep handoff)
+- **AR-224** `CYCLE_SUBMITTED` → CREATE_RECORD evidence vault entry, 10-year retention
+- **AR-225** `INDICATOR worsening=true` → ESCALATE CRO within 1h
+- **AR-226** `INDICATOR bandAfter=RED` → ESCALATE Board Risk Chair + open CRITICAL CAPA
+- **AR-227** `INDICATOR AMBER` + category in [CAPITAL, LIQUIDITY] + worsening → NOTIFY CFO + Treasury same-hour (ALCO playbook trigger)
+- **AR-228** `OPTION_CAPACITY_CHANGED` → NOTIFY CRO + CFO (capacity-drift watch)
+- **AR-229** `CRITICAL_FUNCTION_ADDED` → NOTIFY BCM Manager (BCP/DRP cross-link review)
+- **AR-230** `CYCLE_CLOSED` → NOTIFY Internal Audit + Board Secretary (cross-cycle archive)
+
+### Sprint 17 — Saudi-native AR throughout
+
+- **Sidebar**: `الاستعادة والحلّ`
+- **Status labels**: مسودّة / قيد الإعداد / مراجعة المجلس / مُعتمَدة / مُقدَّمة / مُستلَمة / مغلقة
+- **Option categories**: رأس المال / السيولة / بيع الأصول / خطّ النشاط / خفض المصروفات
+- **Indicator categories**: رأس المال / السيولة / الربحيّة / جودة الأصول / ثقة السوق / تشغيليّة
+- **RAG bands**: أخضر / كهرماني / أحمر
+- **Operator terms**: خطّة الاستعادة والحلّ, الوظائف الحيوية, مؤشّرات الاستعادة, خيارات الاستعادة, طاقة الخيار, زمن التنفيذ, تجاوز نطاق الإنذار, تدوير مفاتيح HSM, محاولات انتحال البصمة الصوتية
+- **Reference format**: `RRP-FY2026-001`
+
+### Sprint 17 — verified end-to-end
+
+- Backend `mvn clean package -DskipTests` green (~1413 source files, ~30s, Spring Boot repackage clean)
+- Frontend `npm run build` green (vite 7.17s)
+- Schema: 5 tables (`rrp.rrp_cycle`, `rrp_recovery_option`, `rrp_critical_function`, `rrp_indicator`, `rrp_event`) + 6 indexes bootstrapped via `setup_rrp_db.py`
+- 10 F8 rules visible: `SELECT * FROM platform.automation_rules WHERE rule_code BETWEEN 'AR-221' AND 'AR-230'` returns 10
+- Seed: **5 cycles + 32 options + 46 critical functions + 31 indicators** (30 GREEN + 1 AMBER on TSS GRC FY26 LCR drift) — poised to fire AR-225 + AR-227 on the next measurement
+- Backend boots: `Started GrcApplication in 24.096 seconds`
+- Sprint 13/14/15/16/17 endpoint sweep: **13/13 green** (RRP dashboard + cycles + reginspect + regreporting + opres + fraud + KRI + IA + whistleblower + sanctions + outsourcing + COI + complaints)
+
+### Sprint 17 — operational pattern recap
+
+This arc completes the **regulator-facing daily-ops quartet** that ties together the platform's heaviest annual cycles:
+
+| Module | Cadence | Trigger code prefix | Saudi-native AR |
+|---|---|---|---|
+| Op-Res (Sprint 14) | Annual maturity self-assessment | `OPRES_*` | الصمود التشغيلي |
+| Reg Inspection (Sprint 15) | Reactive — on-site visits | `REG_INSPECTION_*` | التفتيش الرقابي |
+| Reg Reporting (Sprint 16) | Recurring statutory returns | `REG_REPORT_*` | تقويم البلاغات |
+| **RRP (Sprint 17)** | **Annual mandatory plan + live indicators** | `RRP_*` | **الاستعادة والحلّ** |
+
+All four share the same Saudi-native AR conventions, same F7/F8 wiring pattern, same Python-bootstrapped multi-tenant schema, and the same CRO + Compliance Officer + BCM Manager + Board Secretary role mesh.
+
+---
+
+## 🟢 Previous arc — Sprint 16 Mandatory Regulatory Reporting Calendar (25 May 2026, PRs #239 → #242)
 
 Sprint 16 lands the **Mandatory Regulatory Reporting Calendar** — the
 day-to-day operational tool for the 40-100+ recurring statutory returns
