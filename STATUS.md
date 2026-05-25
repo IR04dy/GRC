@@ -1,9 +1,86 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 25 May 2026 (Sprint 14 Operational Resilience arc closes — PRs #229 → #232, 4 PRs)
+**Last update:** 25 May 2026 (Sprint 15 Regulatory Inspection Workspace arc closes — PRs #234 → #237, 4 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 14 Operational Resilience block (25 May 2026, PRs #229 → #232)
+## 🟢 This arc — Sprint 15 Regulatory Inspection Workspace (25 May 2026, PRs #234 → #237)
+
+Sprint 15 opens with the **Regulatory Inspection Workspace** — the platform's
+first day-to-day operational tool for managing on-site visits by Saudi regulators
+(SAMA, NCA, CMA, SDAIA, NCEMA). Every Saudi bank gets a SAMA on-site every 12-18
+months; until now teams ran them out of spreadsheets and SharePoint. This module
+brings the full inspection lifecycle into the platform with state machine, SLA
+tracking, document-request register, timeline audit trail, F7 audit + F8 events
+on 5 trigger codes, 10 automation rules, and Saudi-realistic seed for 3 tenants.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **RegInspect backend** — 3 entities (Inspection / DocumentRequest / Update), 10 REST endpoints, 6-state forward-only inspection lifecycle, DR sub-lifecycle with computed OVERDUE, F7+F8 audit/events on 5 triggers, Python DB bootstrap (3 tables + 6 indexes) | Merged | 1 |
+| **F8 automation rules AR-201..AR-210** — kickoff NOTIFY, regulator-specific routing (NCA→CISO, CMA→IR+Legal), DR 24h-before-due reminder, overdue submission → CAPA, ENTRY/EXIT/RESPONSE transition handoffs, closure → Internal Audit | Merged | 1 |
+| **Frontend slice** — Dashboard (KPIs + recent inspections) + Register (with inline new-inspection wizard) + Workspace detail (status-aware action panel + DR inbox with submit modal + timeline) + sidebar under Audit | Merged | 1 |
+| **Saudi-realistic seed** — 5 inspections + 28 DRs across 3 tenants. Per-tenant business profile content (TSS GRC SAMA cyber+AML, Aramco Trading CMA listing, STC Bank NCA OTCC + SAMA dual oversight) | Merged | 1 |
+
+### Sprint 15 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #234 | `merged` | reginspect | **Workspace backend module** (3 entities + 10 REST + state machine + F8 events) | SAMA on-site inspections; NCA OTCC; CMA listing audits |
+| #235 | `merged` | platform | **F8 reginspect automation rules AR-201..AR-210** | SAMA SLA 3-5d; regulator-specific cross-team routing |
+| #236 | `merged` | reginspect (UI) | **Frontend slice** (dashboard + register + workspace detail + sidebar) | SAMA / NCA / CMA / SDAIA / NCEMA |
+| #237 | `merged` | reginspect (seed) | **Saudi-realistic seed** (5 inspections + 28 DRs × 3 tenants) | SAMA Cyber 2017, AML/CFT 2018, Op-Res 2024, CMA Listing, NCA OTCC |
+
+### Sprint 15 — Inspection lifecycle (state machine)
+
+```
+PLANNED → ENTRY_MEETING → FIELDWORK → EXIT_MEETING →
+RESPONSE_DRAFTING → CLOSED
+```
+
+Forward-only, with shortcut to CLOSED from any state (abandoned inspections / consolidations).
+
+Document request sub-lifecycle:
+
+```
+OPEN → IN_PROGRESS → SUBMITTED
+                  ↘ OVERDUE (computed when status != SUBMITTED AND dueDate < today)
+```
+
+### Sprint 15 — 10 F8 automation rules (AR-201..AR-210)
+
+- **AR-201** `REG_INSPECTION_CREATED` → NOTIFY CRO + Compliance + Board Secretary
+- **AR-202** `REG_INSPECTION_CREATED` (regulator = NCA) → NOTIFY CISO + Cyber Incident Responder
+- **AR-203** `REG_INSPECTION_CREATED` (regulator = CMA) → NOTIFY Investor Relations + Legal
+- **AR-204** `REG_INSPECTION_TRANSITIONED` (to = ENTRY_MEETING) → readiness pack notification
+- **AR-205** `REG_DOCUMENT_REQUEST_OPENED` → NOTIFY assignee + 24h-before-due reminder
+- **AR-206** `REG_DOCUMENT_REQUEST_SUBMITTED` → NOTIFY Compliance Officer (confirmation + evidence log)
+- **AR-207** `REG_DOCUMENT_REQUEST_SUBMITTED` (overdue = true) → CREATE_RECORD CAPA root-cause
+- **AR-208** `REG_INSPECTION_TRANSITIONED` (to = EXIT_MEETING) → NOTIFY 48h response-drafting kickoff
+- **AR-209** `REG_INSPECTION_TRANSITIONED` (to = RESPONSE_DRAFTING) → NOTIFY response coordinator
+- **AR-210** `REG_INSPECTION_CLOSED` → NOTIFY Internal Audit + Compliance (annual-plan input)
+
+### Sprint 15 — Saudi-native AR throughout
+
+- **Sidebar**: "التفتيش الرقابي" (not literal: "التفتيش التنظيمي")
+- **Status labels**: مخطّطة / اجتماع الافتتاح / العمل الميداني / اجتماع الإغلاق / صياغة الردود / مغلقة
+- **Regulator labels**: ساما / هيئة الأمن السيبراني / هيئة السوق المالية / سدايا / الهيئة الوطنية لإدارة الطوارئ
+- **External reference format**: `SAMA-OSI-2026-Q2-001` (regulator + on-site inspection + year + quarter + ordinal)
+- **DR reference format**: `<inspection-ref>-DR-001`
+- **Seed terminology**: حماية أموال المحفظة الجوّالة, مكتبة قواعد مراقبة معاملات غسل الأموال, وحدة الأجهزة الأمنية, احتيال تبديل شريحة الاتصال, خطاب التكليف الرسمي
+
+### Sprint 15 — verified end-to-end
+
+- Backend boots clean in 19.9s with new module
+- `GET /api/v1/reginspect/pillars` → 5 SAMA pillars (Op-Res arc, still working)
+- Full inspection lifecycle: PLANNED → ENTRY_MEETING → FIELDWORK + 3 DRs → … → CLOSED. State machine forward-only, OVERDUE computed correctly
+- Frontend `npm run build` clean in 7.1s, 3 new chunks
+- 10 F8 rules visible in `platform.automation_rules` (AR-201..AR-210)
+- Seed: 5 inspections + 28 DRs visible via `GET /reginspect/dashboard` for admin (org=1) — closed FY2025 + active FY2026
+
+---
+
+## 🟢 Previous arc — Sprint 14 Operational Resilience block (25 May 2026, PRs #229 → #232)
 
 Sprint 14 lands the **Operational Resilience self-assessment** workbench for the
 SAMA Operational Resilience Framework (Sept 2024) — banks must publish an annual
