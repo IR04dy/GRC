@@ -1,9 +1,88 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 25 May 2026 (Sprint 15 Regulatory Inspection Workspace arc closes — PRs #234 → #237, 4 PRs)
+**Last update:** 25 May 2026 (Sprint 16 Mandatory Regulatory Reporting Calendar arc closes — PRs #239 → #242, 4 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 15 Regulatory Inspection Workspace (25 May 2026, PRs #234 → #237)
+## 🟢 This arc — Sprint 16 Mandatory Regulatory Reporting Calendar (25 May 2026, PRs #239 → #242)
+
+Sprint 16 lands the **Mandatory Regulatory Reporting Calendar** — the
+day-to-day operational tool for the 40-100+ recurring statutory returns
+every Saudi-licensed firm runs across SAMA, CMA, NCA, SDAIA, ZATCA, NCEMA
+at cadences from daily liquidity through monthly capital adequacy through
+quarterly directors' dealings through annual PDPL compliance statements.
+Until now teams have run that out of Excel + Outlook reminders — this
+module turns it into a first-class operational calendar with a 9-state
+filing lifecycle, F7 audit + F8 reminders & escalations on 7 trigger codes,
+10 automation rules covering regulator-specific routing, and Saudi-realistic
+seed for 3 tenants exercising every supported state.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **RegReporting backend** — 3 entities (Obligation / Filing / Event), 14 REST endpoints, 9-state filing lifecycle, frequency-driven period + reference generation, Saudi-workweek-aware business-day arithmetic, F7+F8 on 7 triggers, Python DB bootstrap (3 tables + 6 indexes) | Merged | 1 |
+| **F8 automation rules AR-211..AR-220** — catalog onboarding, T-7/T-3/T-1 reminder ladder, second-line review handoff, CFO signoff, late-filing CAPA + CRO escalation, SAMA evidence-vault cross-log, REJECTED critical escalation, EXEMPTED audit-committee notification, ZATCA tax + treasury cash-positioning, CLOSED IA archive | Merged | 1 |
+| **Frontend slice** — Dashboard (KPIs + countdown badges + in-flight breakdown by regulator + by status + upcoming + overdue lists) + Obligations catalog (inline new-obligation wizard) + Filings register + Filing workspace detail (state-machine action panel + dedicated submit/ack/reject/exempt modals + bilingual timeline) + sidebar entry under Audit | Merged | 1 |
+| **Saudi-realistic seed** — 13 obligations + 26 filings across 3 tenants. Every supported state exercised (CLOSED, SCHEDULED, ACKNOWLEDGED, SUBMITTED, APPROVED, IN_REVIEW, IN_PREPARATION, REJECTED, EXEMPTED). Per-tenant business profile (TSS GRC full Saudi-bank stack, Aramco Trading CMA listed-co, STC Bank digital-bank + NCA cyber) | Merged | 1 |
+
+### Sprint 16 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #239 | `merged` | regreporting | **Calendar backend module** (3 entities + 14 REST + 9-state lifecycle + F8 events) | SAMA daily/monthly/quarterly/annual; CMA listing; NCA OTCC; ZATCA Fatoora; SDAIA PDPL |
+| #240 | `merged` | platform | **F8 regreporting automation rules AR-211..AR-220** | SAMA Tier-1 supervisory observations; ZATCA hard 15th-of-month lock; CMA Tadawul same-day cutoff |
+| #241 | `merged` | regreporting (UI) | **Frontend slice** (dashboard + obligations + filings + workspace + sidebar) | SAMA / NCA / CMA / SDAIA / ZATCA / NCEMA |
+| #242 | `merged` | regreporting (seed) | **Saudi-realistic seed** (13 obligations + 26 filings × 3 tenants) | SAMA Capital Adequacy / AML/CFT 2018 / Anti-Fraud 2018 / Consumer Protection; CMA Continuing Obligations Art.56 / Listing Rules Art.41; ZATCA VAT Art.62; SDAIA PDPL Art.35; NCA OTCC Annex H |
+
+### Sprint 16 — Filing lifecycle (state machine)
+
+```
+SCHEDULED → IN_PREPARATION → IN_REVIEW → APPROVED →
+SUBMITTED → ACKNOWLEDGED → CLOSED
+
+    ↪ REJECTED  (regulator pushback → IN_PREPARATION)
+    ↪ EXEMPTED  (formal waiver, terminal)
+```
+
+- **Forward-only on the happy path**, with `IN_REVIEW → IN_PREPARATION` rework loop and `APPROVED → IN_PREPARATION` last-mile fix.
+- **Dedicated REST endpoints** for submit (captures ack ref), acknowledge, reject (captures reason), exempt (captures justification + reference) — generic `/transition` excludes those to keep state moves explicit.
+- **Saudi-workweek-aware** `addBusinessDays()` skips Friday + Saturday for both due-date and internal-target-date computation.
+- **Frequency-driven `nextPeriodEnd()`** + `buildReference()` — `SAMA-DLR-2026-05-21` (daily), `SAMA-MCR-2026-04` (monthly), `CMA-INTL-2026-Q2` (quarterly), `SAMA-ABF-2025` (annual).
+
+### Sprint 16 — 10 F8 automation rules (AR-211..AR-220)
+
+- **AR-211** `REG_REPORT_OBLIGATION_CREATED` → NOTIFY Compliance Officer + owner role + reviewer role
+- **AR-212** `REG_REPORT_FILING_SCHEDULED` → NOTIFY preparer + arm T-7/T-3/T-1 reminder ladder
+- **AR-213** `REG_REPORT_FILING_STATE_CHANGED` (to = IN_REVIEW) → NOTIFY reviewer (second-line bottleneck)
+- **AR-214** `REG_REPORT_FILING_STATE_CHANGED` (to = APPROVED) → NOTIFY approver + CFO (final signoff)
+- **AR-215** `REG_REPORT_FILING_SUBMITTED` (late = true) → CREATE_RECORD CAPA + escalate to CRO
+- **AR-216** `REG_REPORT_FILING_SUBMITTED` (regulator = SAMA) → CREATE_RECORD evidence vault, 7-year retention
+- **AR-217** `REG_REPORT_FILING_REJECTED` → ESCALATE CRO + Board Secretary + open CRITICAL CAPA
+- **AR-218** `REG_REPORT_FILING_EXEMPTED` → NOTIFY Audit Committee + Compliance + Internal Audit
+- **AR-219** `REG_REPORT_FILING_SCHEDULED` (regulator = ZATCA) → NOTIFY Tax + Treasury + CFO (cash positioning)
+- **AR-220** `REG_REPORT_FILING_CLOSED` → NOTIFY Internal Audit + Compliance (cross-cycle archive)
+
+### Sprint 16 — Saudi-native AR throughout
+
+- **Sidebar**: `تقويم البلاغات` (not literal: `التقويم التنظيمي`)
+- **Status labels**: مجدوَل / قيد الإعداد / قيد المراجعة / مُعتمَد / مُقدَّم / مُستلَم / مغلق / مرفوض / مُعفى
+- **Regulator labels**: ساما / هيئة الأمن السيبراني / هيئة السوق المالية / سدايا / زاتكا
+- **Frequency labels**: يومي / أسبوعي / شهري / ربع‑سنوي / نصف‑سنوي / سنوي
+- **Operator terms**: التقرير المُلزم, دورة التقديم, رقم إقرار الاستلام, متأخر التقديم, إعفاء رسمي
+- **Reference formats**: `SAMA-DLR-2026-05-21`, `CMA-DDIR-2026-Q1`, `ZATCA-VAT-2026-04`, `SAMA-ABF-2025`
+- **Seed terminology**: تسوية ضريبة المدخلات والمخرجات, مدفوعات بتسعة خانات تُجوّع سيولة اليوم نفسه, تدوير مفاتيح HSM, محاولات انتحال البصمة الصوتية, خطاب التكليف الرسمي
+
+### Sprint 16 — verified end-to-end
+
+- Backend `mvn clean compile` green (1392 source files, 21.2s)
+- Frontend `npm run build` green (vite 7.10s)
+- Schema: 3 tables (`regreporting.regreport_obligation`, `regreport_filing`, `regreport_event`) + 6 indexes (unique code/reference, due-date, status, obligation-period, event timeline) bootstrapped via `setup_regreporting_db.py`
+- 10 F8 rules visible: `SELECT * FROM platform.automation_rules WHERE rule_code BETWEEN 'AR-211' AND 'AR-220'` returns 10 rows
+- Seed: 13 obligations + 26 filings exercising **all 9 lifecycle states** including REJECTED + EXEMPTED edge cases
+
+---
+
+## 🟢 Previous arc — Sprint 15 Regulatory Inspection Workspace (25 May 2026, PRs #234 → #237)
 
 Sprint 15 opens with the **Regulatory Inspection Workspace** — the platform's
 first day-to-day operational tool for managing on-site visits by Saudi regulators
