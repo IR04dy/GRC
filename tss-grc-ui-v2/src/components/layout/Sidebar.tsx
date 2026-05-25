@@ -251,6 +251,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'scm-dash',      to: '/scm/dashboard',         Icon: LayoutDashboard, labelKey: 'scmDashSidebar' },
       { id: 'tprm',          to: '/tprm',                  Icon: Workflow,    labelKey: 'modThirdParty' },
+      { id: 'outsourcing',   to: '/tprm/outsourcing',      Icon: Briefcase,   labelKey: 'outsourcingSidebar' },
       { id: 'vendor-bcp',    to: '/tprm/bcp-campaigns',    Icon: ClipboardCheck, labelKey: 'vbcpSidebar' },
       { id: 'vendor-portal', to: '/portal/vendor',         Icon: Briefcase,   labelKey: 'vpSidebar' },
       { id: 'scm',           to: '/scm',                   Icon: Truck,       labelKey: 'scmEyebrow' },

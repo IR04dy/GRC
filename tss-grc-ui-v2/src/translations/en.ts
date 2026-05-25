@@ -3412,6 +3412,8 @@ export const en = {
   mtpdInhWarning: 'Warning',
   mtpdInhNoAttestation: 'No attestation',
   mtpdInhProcessDeps: 'Process Dependencies',
+  // Sprint 13 — Outsourcing arrangement register.
+  outsourcingSidebar: 'Outsourcing register',
   // Slice 10-D — Vendor BCP attestation campaigns.
   vbcpSidebar: 'Vendor BCP attestation',
   vbcpTitle: 'Vendor BCP Attestation Campaigns',

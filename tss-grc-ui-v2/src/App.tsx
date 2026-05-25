@@ -39,6 +39,9 @@ const MtpdInheritanceDetailPage = lazy(() => import('./pages/bcm/MtpdInheritance
 const VendorBcpCampaignsPage = lazy(() => import('./pages/tprm/VendorBcpCampaignsPage').then(m => ({ default: m.VendorBcpCampaignsPage })));
 const VendorBcpCampaignDetailPage = lazy(() => import('./pages/tprm/VendorBcpCampaignDetailPage').then(m => ({ default: m.VendorBcpCampaignDetailPage })));
 const VendorAttestationSubmitPage = lazy(() => import('./pages/tprm/VendorAttestationSubmitPage').then(m => ({ default: m.VendorAttestationSubmitPage })));
+const OutsourcingRegisterPage = lazy(() => import('./pages/outsourcing/OutsourcingRegisterPage').then(m => ({ default: m.OutsourcingRegisterPage })));
+const OutsourcingDetailPage = lazy(() => import('./pages/outsourcing/OutsourcingDetailPage').then(m => ({ default: m.OutsourcingDetailPage })));
+const OutsourcingSamaPendingPage = lazy(() => import('./pages/outsourcing/OutsourcingSamaPendingPage').then(m => ({ default: m.OutsourcingSamaPendingPage })));
 const ExerciseScenarioLibraryPage = lazy(() => import('./pages/bcm/ExerciseScenarioLibraryPage').then(m => ({ default: m.ExerciseScenarioLibraryPage })));
 const ExerciseScenarioDetailPage  = lazy(() => import('./pages/bcm/ExerciseScenarioDetailPage').then(m => ({ default: m.ExerciseScenarioDetailPage })));
 const FacilitatorConsolePage      = lazy(() => import('./pages/bcm/FacilitatorConsolePage').then(m => ({ default: m.FacilitatorConsolePage })));
@@ -335,6 +338,9 @@ export function App() {
               {/* Slice 10-D — Vendor BCP attestation campaigns. */}
               <Route path="/tprm/bcp-campaigns"        element={<VendorBcpCampaignsPage />} />
               <Route path="/tprm/bcp-campaigns/:id"    element={<VendorBcpCampaignDetailPage />} />
+              <Route path="/tprm/outsourcing"                  element={<OutsourcingRegisterPage />} />
+              <Route path="/tprm/outsourcing/admin/sama-pending" element={<OutsourcingSamaPendingPage />} />
+              <Route path="/tprm/outsourcing/:id"              element={<OutsourcingDetailPage />} />
               {/* Public vendor-portal stub — token IS the credential. */}
               <Route path="/tprm/attestations/:token/submit" element={<VendorAttestationSubmitPage />} />
               <Route path="/incidents"  element={<IncidentsPage />} />

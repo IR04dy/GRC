@@ -3396,6 +3396,8 @@ export const ar = {
   mtpdInhWarning: 'تحذير',
   mtpdInhNoAttestation: 'غياب الإقرار',
   mtpdInhProcessDeps: 'اعتمادات العمليات على الموردين',
+  // Sprint 13 — Saudi-native "Outsourcing register" — NOT literal calque "سجل الاستعانة بمصادر خارجية"
+  outsourcingSidebar: 'سجل ترتيبات الإسناد',
   // Slice 10-D — Saudi-native phrasing, NOT literal "حملة BCP للموردين" calque.
   vbcpSidebar: 'شهادات استمرارية الموردين',
   vbcpTitle: 'حملة شهادات استمرارية الموردين',
