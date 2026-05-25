@@ -6,7 +6,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Newspaper, Briefcase, Activity, Leaf, Database, Layers, Compass, BookOpen, PenLine, Microscope,
          Sigma, Telescope, Landmark as LandmarkIcon,
          TrendingUp,
-         Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell, Megaphone, Sliders,
+         Network, Share2, Bug, BarChart3, KeyRound, Siren, Bell, Megaphone, MessageSquare, Sliders,
          Bot,
          CloudLightning, Factory, FileSearch,
          ScanSearch,
@@ -123,6 +123,11 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'ethics',       to: '/ethics',            Icon: ShieldAlert,    labelKey: 'modEthics' },
       { id: 'wb-cases',     to: '/ethics/whistleblower/cases', Icon: Megaphone, labelKey: 'whistleblowerSidebar' },
       { id: 'coi-register', to: '/ethics/coi',         Icon: Scale,          labelKey: 'coi.title' },
+      // Sprint 13 — Customer Complaints (SAMA Banking Consumer Protection).
+      // Slotted next to the whistleblower hotline because both are
+      // consumer-protection grievance surfaces — operators expect them
+      // adjacent in the navigation.
+      { id: 'complaints',   to: '/complaints',        Icon: MessageSquare,  labelKey: 'complaints.sidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },

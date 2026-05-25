@@ -95,6 +95,11 @@ const IaPlanListPage                 = lazy(() => import('./pages/audit-ia/IaPla
 const IaPlanDetailPage               = lazy(() => import('./pages/audit-ia/IaPlanDetailPage').then(m => ({ default: m.IaPlanDetailPage })));
 const IaUniversePage                 = lazy(() => import('./pages/audit-ia/IaUniversePage').then(m => ({ default: m.IaUniversePage })));
 const IaEngagementDetailPage         = lazy(() => import('./pages/audit-ia/IaEngagementDetailPage').then(m => ({ default: m.IaEngagementDetailPage })));
+// ─── Sprint 13 — Customer Complaints Management (SAMA Consumer Protection).
+const ComplaintsRegisterPage         = lazy(() => import('./pages/consumer/ComplaintsRegisterPage').then(m => ({ default: m.ComplaintsRegisterPage })));
+const ComplaintDetailPage            = lazy(() => import('./pages/consumer/ComplaintDetailPage').then(m => ({ default: m.ComplaintDetailPage })));
+const PublicComplaintSubmissionPage  = lazy(() => import('./pages/consumer/PublicComplaintSubmissionPage').then(m => ({ default: m.PublicComplaintSubmissionPage })));
+const PublicComplaintTrackingPage    = lazy(() => import('./pages/consumer/PublicComplaintTrackingPage').then(m => ({ default: m.PublicComplaintTrackingPage })));
 // ─── Sprint 13 — Sanctions Screening engine (AML / CFT).
 const SanctionsDashboardPage         = lazy(() => import('./pages/aml-sanctions/SanctionsDashboardPage').then(m => ({ default: m.SanctionsDashboardPage })));
 const SanctionsListsPage             = lazy(() => import('./pages/aml-sanctions/SanctionsListsPage').then(m => ({ default: m.SanctionsListsPage })));
@@ -442,6 +447,20 @@ export function App() {
               <Route path="/audit/ia/universe"                       element={<IaUniversePage />} />
               <Route path="/audit/ia/plans/:id"                      element={<IaPlanDetailPage />} />
               <Route path="/audit/ia/engagements/:id"                element={<IaEngagementDetailPage />} />
+
+              {/* Sprint 13 — Customer Complaints Management.
+                  Two surfaces: authenticated register/detail (gated
+                  server-side to PLATFORM_ADMIN /
+                  CONSUMER_PROTECTION_OFFICER / COMPLIANCE_OFFICER), and
+                  two PUBLIC routes — these MUST stay reachable WITHOUT
+                  login per SAMA Banking Consumer Protection Principles
+                  (submit + track). The public surfaces use PublicShell
+                  (no sidebar) and call /api/v1/complaints/public/* with
+                  anonymous=true so no JWT is attached. */}
+              <Route path="/complaints"                              element={<ComplaintsRegisterPage />} />
+              <Route path="/complaints/:id"                          element={<ComplaintDetailPage />} />
+              <Route path="/public/complaint"                        element={<PublicComplaintSubmissionPage />} />
+              <Route path="/public/track-complaint"                  element={<PublicComplaintTrackingPage />} />
 
               {/* Sprint 13 — Sanctions Screening engine. Static segments
                   (/dashboard, /lists, /checks, /screen) registered before
