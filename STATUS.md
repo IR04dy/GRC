@@ -1,9 +1,106 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 25 May 2026 (Sprint 13 GRC governance arc closes — PRs #211 → #220, 10 PRs)
+**Last update:** 25 May 2026 (Sprint 14 Fraud Risk Management arc closes — PRs #222 → #226, 5 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 13 GRC governance block (25 May 2026, PRs #211 → #220)
+## 🟢 This arc — Sprint 14 Fraud Risk Management block (25 May 2026, PRs #222 → #226)
+
+Sprint 14 lands a complete end-to-end **Fraud Risk Management** module
+closing the SAMA Anti-Fraud Framework 2018 (Art.4-9) gap that the platform
+had carried since day one. Plus six Spring boot-time wiring fixes that
+unblocked everyone trying to run the app on a fresh checkout after Sprint
+13's two duplicate-classname repositories tipped Spring into strict-mode
+failure. ~3,700 lines, ten Saudi-bank ops automation rules, twelve seeded
+fraud typologies, full bilingual Saudi-native Arabic throughout.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **Boot stability** — 6 Spring wiring conflicts (bean-name + entity-name + multi-constructor) + dev-profile `allow-bean-definition-overriding` guardrail | Merged | 1 |
+| **Fraud backend** — 3 entities, 10 REST endpoints, 12 Saudi typologies, F7 audit + F8 events on 9 trigger codes, Python DB bootstrap | Merged | 1 |
+| **Fraud frontend** — Dashboard (5 KPIs) + Cases register (filterable + paginated) + Case detail (2-column with status-aware action panel + timeline) + sidebar entry + bilingual EN+AR | Merged | 1 |
+| **F8 automation rules** — AR-181..AR-190: NOTIFY Fraud Officer / ESCALATE to CEO+AC / CREATE_RECORD Incident+CAPA+LessonsLearned / FLAG legal-hold / cross-team CISO+HR routing | Merged | 1 |
+| **Intake wizard** — `/fraud/cases/new` page with typology summary card (auto-rendered after select) + EN+AR subject/narrative + detection source + loss + customer impact | Open (CI) | 1 |
+
+### Sprint 14 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #222 | `59549a2` | platform | **Boot-stability sweep** (6 wiring bugs + YAML guardrail) | — |
+| #223 | `7fcb497` | fraud | **Fraud Risk Management backend** (typology + case + timeline + dashboard endpoints) | SAMA Anti-Fraud Framework 2018 Art.4-9 |
+| #224 | `ed69d8d` | fraud | **Fraud Risk Management frontend** (dashboard + register + detail + lib + routes + sidebar) | SAMA Anti-Fraud Framework 2018 |
+| #225 | `107ca14` | platform | **F8 fraud automation rules AR-181..AR-190** | SAMA Anti-Fraud Art.7 + AML/CFT Art.25 STR + Cyber Sub-domain 3.3.13 |
+| #226 | — | fraud | **Case intake wizard** at `/fraud/cases/new` | SAMA Anti-Fraud Framework 2018 |
+
+### Sprint 14 — 12 seeded Saudi-bank fraud typologies
+
+Each typology carries a SAMA category code, perpetrator origin, primary
+channel, typical severity, STR-required flag, and full bilingual
+description that uses **Saudi-native Arabic** (operator-natural wording, not
+literal translation). The dropdown surfaces these in the intake wizard so
+the Fraud Officer picks the right one at case open:
+
+| Code | EN name | SAMA category | Typical severity | STR? |
+|---|---|---|---:|:---:|
+| `BEC` | Business Email Compromise | CYBER | HIGH | ✓ |
+| `ATM_SKIMMING` | ATM Card Skimming | CARD | MEDIUM | ✓ |
+| `PUSH_PAYMENT` | SADAD/IPS Push-Payment Fraud | PAYMENT | HIGH | ✓ |
+| `ACCOUNT_TAKEOVER` | Account Takeover (ATO) | CYBER | HIGH | ✓ |
+| `INTERNAL_EMBEZZLEMENT` | Internal Embezzlement | INTERNAL | CRITICAL | ✓ |
+| `CARD_NOT_PRESENT` | Card-Not-Present (CNP) Fraud | CARD | MEDIUM | — |
+| `LOAN_APPLICATION` | Loan Application Fraud | EXTERNAL | HIGH | — |
+| `WIRE_TRANSFER` | Wire Transfer Fraud (SWIFT MT103) | PAYMENT | CRITICAL | ✓ |
+| `INVOICE_FRAUD` | Invoice Redirection Fraud | CYBER | HIGH | ✓ |
+| `INSIDER_TRADING` | Insider Trading | INTERNAL | CRITICAL | ✓ |
+| `MONEY_MULE` | Money Mule Account | EXTERNAL | HIGH | ✓ |
+| `PHISHING_VISHING` | Phishing / Vishing | CYBER | MEDIUM | — |
+
+### Sprint 14 — 10 F8 automation rules (AR-181..AR-190)
+
+Each rule encodes one Saudi-bank ops convention so the platform reacts
+automatically instead of relying on operator memory:
+
+- **AR-181** `FRAUD_CASE_CREATED` + severity in (CRITICAL, HIGH) → **NOTIFY** Fraud Officer + CRO (SAMA Anti-Fraud Art.7 escalation channel)
+- **AR-182** `FRAUD_CASE_CREATED` + estLoss > SAR 1M → **ESCALATE** to CEO + Audit Committee Chair (SAMA quarterly mandatory-reporting threshold)
+- **AR-183** `FRAUD_CASE_CREATED` + affectedCustomerCount > 100 → **CREATE_RECORD** Incident (mass-customer-impact = operational incident)
+- **AR-184** `FRAUD_CASE_CONFIRMED` → **NOTIFY** Board Secretary (SAMA CG Art.6 — material control failure)
+- **AR-185** `FRAUD_CASE_CONFIRMED` + confirmedLoss > SAR 500k → **CREATE_RECORD** CAPA (material loss = control gap)
+- **AR-186** `FRAUD_STR_FILED` → **NOTIFY** MLRO + Compliance Officer (AML/CFT Art.25)
+- **AR-187** `FRAUD_LAW_ENFORCEMENT_NOTIFIED` → **FLAG** legal-hold on case (CID/MHRSD/Public Prosecution evidentiary integrity)
+- **AR-188** `FRAUD_CASE_CONFIRMED` + typology = INTERNAL_EMBEZZLEMENT → **NOTIFY** Head of HR + Internal Audit + Compliance (parallel Saudi Labour Law disciplinary track)
+- **AR-189** `FRAUD_CASE_CREATED` + samaCategory = CYBER → **NOTIFY** CISO + Cyber Incident Responder (SAMA Cyber 3.3.13 cross-team)
+- **AR-190** `FRAUD_CASE_CLOSED` + priorStatus = CONFIRMED → **CREATE_RECORD** LessonsLearned (highest-signal training data)
+
+### Sprint 14 — boot fixes that unblocked the build
+
+PR #222 surgically resolved six Spring boot-time wiring failures that
+Sprint 13's last two PRs introduced via duplicate repository class-names:
+
+| Fix | Component | Conflict | Resolution |
+|---|---|---|---|
+| 1 | `ethics/repository/ScreeningHitRepository` | `BeanDefinitionOverrideException` vs Sprint 13 `aml/sanctions` ScreeningHit repo | `@Repository("ethicsScreeningHitRepository")` qualifier |
+| 2 | `risk/repository/KriDefinitionRepository` | Bean collision vs Sprint 13 `risk/kri` repo (wrong-type injection caused `UnsatisfiedDependencyException`) | `@Repository("legacyKriDefinitionRepository")` qualifier |
+| 3 | `risk/entity/KriDefinition` | Hibernate two `@Entity` classes sharing simple name `KriDefinition` | `@Entity(name = "LegacyKriDefinition")` |
+| 4 | `ethics/entity/ScreeningHit` | Same vs `aml/sanctions/entity/ScreeningHit` | `@Entity(name = "EthicsScreeningHit")` |
+| 5 | `ccm/runner/LdapGroupMembershipRunner` | Two ctors (production + test seam), no `@Autowired` → falls back to non-existent default ctor | Explicit `@Autowired` on production ctor |
+| 6 | `tprm/.../VendorBcpCampaignService` | `@RequiredArgsConstructor` + manual ctor → two candidates → falls back to non-existent default | Removed `@RequiredArgsConstructor`, kept manual ctor |
+
+Plus `application-dev.yml` got `spring.main.allow-bean-definition-overriding: true` as a defensive guardrail for the 10 known duplicate-classname repo pairs (tech debt: rename each pair properly so this flag can come back off).
+
+### Verified end-to-end on dev
+
+- Backend boots in 19.7s with 0 ERROR lines
+- `GET /actuator/health` → `200 {"status":"UP"}`
+- `POST /api/auth/login` (admin / Admin@12345) → `200` with valid JWT (20 enabled_modules in claims)
+- `GET /api/v1/fraud/typologies` → 12 rows
+- `POST /api/v1/fraud/cases` (BEC, SAR 4.2M wire request) → `FR-2026-05-0001` opened DETECTED, severity HIGH
+- Full lifecycle exercised: triage → INVESTIGATING (severity bumped CRITICAL) → outcome CONFIRMED → close. Timeline returned 4 rows in reverse chronological order. Dashboard aggregated counts + YTD loss correctly.
+- All 10 F8 rules visible in `platform.automation_rules` with correct trigger event values
+
+---
+
+## 🟢 Previous arc — Sprint 13 GRC governance block (25 May 2026, PRs #211 → #220)
 
 Sprint 13 lands 8 new Saudi-bank-grade governance modules plus 2 frontend slices —
 all merged to `origin/master` in one session. The arc completes the GRC governance
