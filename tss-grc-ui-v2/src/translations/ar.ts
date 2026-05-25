@@ -5794,6 +5794,8 @@ export const ar = {
   'cpty.sidebar':                      'سجل الأطراف المقابلة',
   // Sprint 19 — SAMA Open Banking Compliance (OBF v2).
   'ob.sidebar':                        'المصرفية المفتوحة',
+  // Sprint 20 — Sharia Governance & Audit (SAMA Implementing Reg + AAOIFI GSIFI + IFSB-10).
+  'sharia.sidebar':                    'الحوكمة الشرعية',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',

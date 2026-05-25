@@ -5814,6 +5814,8 @@ export const en = {
   'cpty.sidebar':                      'Counterparty Registry',
   // Sprint 19 — SAMA Open Banking Compliance (OBF v2).
   'ob.sidebar':                        'Open Banking',
+  // Sprint 20 — Sharia Governance & Audit (SAMA Implementing Reg + AAOIFI GSIFI + IFSB-10).
+  'sharia.sidebar':                    'Sharia Governance',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

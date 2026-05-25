@@ -212,6 +212,13 @@ const ObTppsPage        = lazy(() => import('./pages/openbanking/ObTppsPage').th
 const ObTppDetailPage   = lazy(() => import('./pages/openbanking/ObTppDetailPage').then(m => ({ default: m.ObTppDetailPage })));
 const ObConsentsPage    = lazy(() => import('./pages/openbanking/ObConsentsPage').then(m => ({ default: m.ObConsentsPage })));
 const ObIncidentsPage   = lazy(() => import('./pages/openbanking/ObIncidentsPage').then(m => ({ default: m.ObIncidentsPage })));
+// Sprint 20 — Sharia Governance & Audit Workflow.
+const ShariaDashboardPage     = lazy(() => import('./pages/sharia/ShariaDashboardPage').then(m => ({ default: m.ShariaDashboardPage })));
+const ShariaScholarsPage      = lazy(() => import('./pages/sharia/ShariaScholarsPage').then(m => ({ default: m.ShariaScholarsPage })));
+const ShariaResolutionsPage   = lazy(() => import('./pages/sharia/ShariaResolutionsPage').then(m => ({ default: m.ShariaResolutionsPage })));
+const ShariaAuditFindingsPage = lazy(() => import('./pages/sharia/ShariaAuditFindingsPage').then(m => ({ default: m.ShariaAuditFindingsPage })));
+const ShariaNcEventsPage      = lazy(() => import('./pages/sharia/ShariaNcEventsPage').then(m => ({ default: m.ShariaNcEventsPage })));
+const ShariaProductsPage      = lazy(() => import('./pages/sharia/ShariaProductsPage').then(m => ({ default: m.ShariaProductsPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -597,6 +604,14 @@ export function App() {
               <Route path="/openbanking/tpps/:id"                 element={<ObTppDetailPage />} />
               <Route path="/openbanking/consents"                 element={<ObConsentsPage />} />
               <Route path="/openbanking/incidents"                element={<ObIncidentsPage />} />
+
+              {/* Sprint 20 — Sharia Governance & Audit Workflow. */}
+              <Route path="/sharia/dashboard"                     element={<ShariaDashboardPage />} />
+              <Route path="/sharia/scholars"                      element={<ShariaScholarsPage />} />
+              <Route path="/sharia/resolutions"                   element={<ShariaResolutionsPage />} />
+              <Route path="/sharia/audit-findings"                element={<ShariaAuditFindingsPage />} />
+              <Route path="/sharia/nc-events"                     element={<ShariaNcEventsPage />} />
+              <Route path="/sharia/products"                      element={<ShariaProductsPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

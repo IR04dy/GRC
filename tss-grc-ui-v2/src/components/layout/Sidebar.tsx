@@ -11,7 +11,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          CloudLightning, Factory, FileSearch,
          ScanSearch,
          Scale,
-         ShieldX, Shield, ClipboardList, CalendarDays, Banknote,
+         ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -141,6 +141,12 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'fraud',        to: '/fraud/dashboard',   Icon: ShieldX,        labelKey: 'fraud.sidebar' },
       // Sprint 19 — SAMA Open Banking Compliance (OBF v2 — AISP/PISP/CBPII/VRP).
       { id: 'openbanking',  to: '/openbanking/dashboard', Icon: Banknote,   labelKey: 'ob.sidebar' },
+      // Sprint 20 — Sharia Governance (SAMA Implementing Reg + AAOIFI GSIFI 1-5 + IFSB-10).
+      // Sits next to Open Banking under Compliance because the Sharia Officer +
+      // Compliance Officer jointly own the SSB pipeline, the SAMA Sharia-governance
+      // section 7 annual report cadence runs alongside the OBF v2 cadence, and external
+      // Sharia auditors increasingly inspect ASPSP-side flows for Islamic-banking units.
+      { id: 'sharia',       to: '/sharia/dashboard',     Icon: Moon,        labelKey: 'sharia.sidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },
