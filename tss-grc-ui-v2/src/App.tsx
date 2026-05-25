@@ -172,6 +172,9 @@ const WhistleblowerSubmitPublicPage = lazy(() => import('./pages/ethics/Whistleb
 const WhistleblowerStatusPage = lazy(() => import('./pages/ethics/WhistleblowerStatusPage').then(m => ({ default: m.WhistleblowerStatusPage })));
 const WhistleblowerCasesPage = lazy(() => import('./pages/ethics/WhistleblowerCasesPage').then(m => ({ default: m.WhistleblowerCasesPage })));
 const WhistleblowerCaseDetailPage = lazy(() => import('./pages/ethics/WhistleblowerCaseDetailPage').then(m => ({ default: m.WhistleblowerCaseDetailPage })));
+// Sprint 13 — Conflict of Interest (COI) Disclosure Register.
+const CoiRegisterPage         = lazy(() => import('./pages/ethics/coi/CoiRegisterPage').then(m => ({ default: m.CoiRegisterPage })));
+const CoiCampaignDetailPage   = lazy(() => import('./pages/ethics/coi/CoiCampaignDetailPage').then(m => ({ default: m.CoiCampaignDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -502,6 +505,9 @@ export function App() {
               <Route path="/ethics/whistleblower/status/:token"  element={<WhistleblowerStatusPage />} />
               <Route path="/ethics/whistleblower/cases"          element={<WhistleblowerCasesPage />} />
               <Route path="/ethics/whistleblower/cases/:id"      element={<WhistleblowerCaseDetailPage />} />
+              {/* Sprint 13 — Conflict of Interest Disclosure Register. */}
+              <Route path="/ethics/coi"                          element={<CoiRegisterPage />} />
+              <Route path="/ethics/coi/campaigns/:id"            element={<CoiCampaignDetailPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE
