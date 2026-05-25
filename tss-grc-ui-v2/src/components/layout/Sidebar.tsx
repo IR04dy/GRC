@@ -11,7 +11,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          CloudLightning, Factory, FileSearch,
          ScanSearch,
          Scale,
-         ShieldX,
+         ShieldX, Shield,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -253,6 +253,13 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'bcm-remediation', to: '/bcm/remediation',   Icon: AlertOctagon,   labelKey: 'bcmRemediationSidebar' },
       { id: 'bcm-compliance',  to: '/bcm/compliance',    Icon: Stamp,          labelKey: 'bcmComplianceSidebar' },
       { id: 'bcm-reports',     to: '/bcm/reports',       Icon: BarChart3,      labelKey: 'bcmReportsSidebar' },
+      // Sprint 14 — Operational Resilience self-assessment (SAMA Op-Res 2024).
+      // Grouped with BCM because it is BCM's annual maturity submission to SAMA;
+      // the BCM Manager owns the workbench and the CRO signs it off. Co-locating
+      // with BCM exercises + plans matches how Saudi-bank op-res teams actually
+      // work — the assessment cells reference the same IBS catalogue + tolerance
+      // documents BCM already manages.
+      { id: 'opres-dash',      to: '/opres/dashboard',   Icon: Shield,         labelKey: 'opres.sidebar' },
     ],
   },
 

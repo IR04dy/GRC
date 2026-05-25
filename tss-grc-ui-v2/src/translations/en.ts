@@ -5802,6 +5802,8 @@ export const en = {
   // SAMA Anti-Fraud Framework 2018 Art.4-9 — typology catalog, case
   // investigation, STR/law-enforcement workflow, recovery tracking.
   'fraud.sidebar':                     'Fraud Risk Management',
+  // Sprint 14 — Operational Resilience self-assessment (SAMA Op-Res 2024).
+  'opres.sidebar':                     'Operational Resilience',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

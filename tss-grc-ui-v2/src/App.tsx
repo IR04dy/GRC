@@ -185,6 +185,10 @@ const FraudDashboardPage      = lazy(() => import('./pages/fraud/FraudDashboardP
 const FraudCasesPage          = lazy(() => import('./pages/fraud/FraudCasesPage').then(m => ({ default: m.FraudCasesPage })));
 const FraudCaseDetailPage     = lazy(() => import('./pages/fraud/FraudCaseDetailPage').then(m => ({ default: m.FraudCaseDetailPage })));
 const FraudCaseNewPage        = lazy(() => import('./pages/fraud/FraudCaseNewPage').then(m => ({ default: m.FraudCaseNewPage })));
+// Sprint 14 — Operational Resilience self-assessment (SAMA Op-Res 2024).
+const OpResDashboardPage         = lazy(() => import('./pages/opres/OpResDashboardPage').then(m => ({ default: m.OpResDashboardPage })));
+const OpResAssessmentsPage       = lazy(() => import('./pages/opres/OpResAssessmentsPage').then(m => ({ default: m.OpResAssessmentsPage })));
+const OpResAssessmentDetailPage  = lazy(() => import('./pages/opres/OpResAssessmentDetailPage').then(m => ({ default: m.OpResAssessmentDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -537,6 +541,11 @@ export function App() {
               <Route path="/fraud/cases"                         element={<FraudCasesPage />} />
               <Route path="/fraud/cases/new"                     element={<FraudCaseNewPage />} />
               <Route path="/fraud/cases/:id"                     element={<FraudCaseDetailPage />} />
+
+              {/* Sprint 14 — Operational Resilience self-assessment. */}
+              <Route path="/opres/dashboard"                     element={<OpResDashboardPage />} />
+              <Route path="/opres/assessments"                   element={<OpResAssessmentsPage />} />
+              <Route path="/opres/assessments/:id"               element={<OpResAssessmentDetailPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE
