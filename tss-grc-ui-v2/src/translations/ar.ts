@@ -5788,6 +5788,8 @@ export const ar = {
   'reginspect.sidebar':                'التفتيش الرقابي',
   // Sprint 16 — Mandatory Regulatory Reporting Calendar.
   'regreporting.sidebar':              'تقويم البلاغات',
+  // Sprint 17 — Recovery & Resolution Plan.
+  'rrp.sidebar':                       'الاستعادة والحلّ',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',

@@ -198,6 +198,10 @@ const RegReportingDashboardPage    = lazy(() => import('./pages/regreporting/Reg
 const RegReportingObligationsPage  = lazy(() => import('./pages/regreporting/RegReportingObligationsPage').then(m => ({ default: m.RegReportingObligationsPage })));
 const RegReportingFilingsPage      = lazy(() => import('./pages/regreporting/RegReportingFilingsPage').then(m => ({ default: m.RegReportingFilingsPage })));
 const RegReportingFilingDetailPage = lazy(() => import('./pages/regreporting/RegReportingFilingDetailPage').then(m => ({ default: m.RegReportingFilingDetailPage })));
+// Sprint 17 — Recovery & Resolution Plan.
+const RrpDashboardPage   = lazy(() => import('./pages/rrp/RrpDashboardPage').then(m => ({ default: m.RrpDashboardPage })));
+const RrpCyclesPage      = lazy(() => import('./pages/rrp/RrpCyclesPage').then(m => ({ default: m.RrpCyclesPage })));
+const RrpCycleDetailPage = lazy(() => import('./pages/rrp/RrpCycleDetailPage').then(m => ({ default: m.RrpCycleDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -566,6 +570,11 @@ export function App() {
               <Route path="/regreporting/obligations"             element={<RegReportingObligationsPage />} />
               <Route path="/regreporting/filings"                 element={<RegReportingFilingsPage />} />
               <Route path="/regreporting/filings/:id"             element={<RegReportingFilingDetailPage />} />
+
+              {/* Sprint 17 — Recovery & Resolution Plan. */}
+              <Route path="/rrp/dashboard"                        element={<RrpDashboardPage />} />
+              <Route path="/rrp/cycles"                           element={<RrpCyclesPage />} />
+              <Route path="/rrp/cycles/:id"                       element={<RrpCycleDetailPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

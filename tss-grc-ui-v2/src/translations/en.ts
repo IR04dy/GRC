@@ -5808,6 +5808,8 @@ export const en = {
   'reginspect.sidebar':                'Regulatory Inspection',
   // Sprint 16 — Mandatory Regulatory Reporting Calendar.
   'regreporting.sidebar':              'Reporting Calendar',
+  // Sprint 17 — Recovery & Resolution Plan.
+  'rrp.sidebar':                       'Recovery & Resolution',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

@@ -272,6 +272,12 @@ const NAV_GROUPS: NavGroup[] = [
       // work — the assessment cells reference the same IBS catalogue + tolerance
       // documents BCM already manages.
       { id: 'opres-dash',      to: '/opres/dashboard',   Icon: Shield,         labelKey: 'opres.sidebar' },
+      // Sprint 17 — Recovery & Resolution Plan (SAMA D-SIB mandatory).
+      // Sits next to Op-Res because both are annual mandatory submissions to
+      // SAMA. CRO + BCM Manager + CFO share ownership; RRP's critical-functions
+      // inventory + recovery options menu cross-link directly to BCM continuity
+      // strategies and Op-Res tolerance documents.
+      { id: 'rrp-dash',        to: '/rrp/dashboard',     Icon: ShieldAlert,    labelKey: 'rrp.sidebar' },
     ],
   },
 
