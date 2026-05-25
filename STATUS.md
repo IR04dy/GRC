@@ -1,9 +1,141 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 26 May 2026 (Sprint 19 Open Banking Compliance arc closes — PRs #255 → #258, 4 PRs)
+**Last update:** 26 May 2026 (Sprint 20 Sharia Governance & Audit Workflow arc closes — PRs #260 → #263, 4 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 19 Open Banking Compliance (26 May 2026, PRs #255 → #258)
+## 🟢 This arc — Sprint 20 Sharia Governance & Audit Workflow (26 May 2026, PRs #260 → #263)
+
+Sprint 20 lands the **Sharia Governance & Audit Workflow** module —
+the Sharia-compliance spine SAMA's **Implementing Regulation on
+Sharia Governance for Banks (Aug 2020)** and **AAOIFI Governance
+Standards GSIFI 1-5** expect every Saudi Islamic-window operating
+bank to maintain. Brings the **SSB scholar register** with 3-year
+terms + annual COI, **formal fatwa lifecycle** with Quran/Sunnah/Ijma/
+Qiyas rationale fields, **internal Sharia audit findings** with
+severity-tiered Board Audit Committee SLAs, **Sharia non-compliance
+income (SNCI) tracking with mandatory charity purification**, and the
+**Islamic-product approval pipeline** (Murabaha / Ijara / Tawarruq /
+Sukuk / Mudaraba / Musharaka / Salam / Istisna) into the platform
+under unified F7 audit + F8 event emission. The arc closes with a
+deliberate **material SNCI breach (SAR 750k Tawarruq broker-spread
+anomaly)** wired into the seed so AR-255 — material-threshold (>500k
+SAR) Board Risk Committee Chair + external Sharia auditor engagement
+— can be demoed end-to-end against real Saudi Islamic-window data.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **Sharia backend** — 6 entities (sharia_scholar with 5 SSB roles + term-expiry tracking + COI register; sharia_resolution with 9 subject areas + 6-state fatwa machine + supersession chain; sharia_audit_finding with HIGH/MEDIUM/LOW severity + remediation-due tracking; sharia_nc_event with SNCI amount + charity-purification audit trail; sharia_product_approval with 9 Islamic structures + 7-state approval pipeline; sharia_event chronological timeline), ~20 REST endpoints, F7+F8 emit on 10 triggers, 4 state-machine `Map<String, Set<String>> ALLOWED` blocks (resolution / finding / nc / product), Python DB bootstrap (6 tables + 14 indexes) | Merged | 1 |
+| **F8 automation rules AR-251..AR-260** — SSB review NOTIFY on resolution submit + reject CAPA, HIGH-severity finding **30-day Board Audit Committee SLA (SAMA §5.7)**, NC-event detected **90-day purification SLA (SAMA §6.4 + AAOIFI FAS 1)**, **material SNCI >500k SAR → Board Risk Chair + external Sharia auditor (SAMA §6.5)**, product submit NOTIFY + launched **CREATE_RECORD evidence vault 7yr** + reject NOTIFY chain, scholar **COI declared CREATE_RECORD 7yr (SAMA §3.5 + AAOIFI GSIFI 1)**, scholar **term-expiring T-90 / T-30 reminder ladder (SAMA §3.4 3-year terms)** | Merged | 1 |
+| **Frontend slice** — Dashboard (6 KPIs: active scholars / active resolutions / HIGH findings / SNCI pending purification / SNCI outstanding SAR / products in review + 3 breakdown panels + recent resolutions + HIGH-finding panel + open NC events panel) + Scholars register with inline new-scholar wizard + per-row **COI declaration action** + Resolutions register with full fatwa wizard (subject area + title/body/rationale EN/AR with Quran/Sunnah/Ijma/Qiyas fields + signing scholars + effective date) + state-machine transition + Audit Findings register with raise wizard (severity / root cause / remediation plan / product line / due date) + NC Events register with detect wizard + **inline Purify flow** (charity destination + receipt ref + purified date) + 90-day SLA reminder + Products register with submit wizard + transition (APPROVED_FINAL requires linkedResolutionId guard) + sidebar entry under Compliance vertical with **Moon icon** | Merged | 1 |
+| **Saudi-realistic seed** — 5 SSB members (Chairman + 3 Members + Secretary) for org=1 with **AAOIFI / Hai'at Kibar Al-Ulama / OIC Fiqh Academy / IRTI credentials** + annual COI declarations + **one Member's term expiring in ~80 days (primes AR-260 T-90 ladder)**. 5 fatwas: SUPERSEDED Tawarruq → ACTIVE Tawarruq (with full Al-Baqarah:275 + Sunnah + OIC Fiqh Academy Resolution 179 rationale), ACTIVE Personal Vehicle Murabaha, ACTIVE Home Ijara Muntahia Bittamleek, DRAFT Sukuk Mudaraba. 3 findings (1 HIGH primes AR-253, 1 MEDIUM OPEN, 1 LOW REMEDIATION). 2 SNCI events: **SAR 18,500 INVESTIGATION (primes AR-254 90d) + SAR 750,000 material DETECTED (primes AR-255 >500k threshold)**. 5 products: LAUNCHED Vehicle Murabaha + APPROVED_FINAL Home Ijara + APPROVED_PROVISIONAL Tawarruq + SSB_REVIEW Sukuk + **REJECTED interest-tracking deposit re-skinned as Mudaraba (SSB caught it on first review)** | Merged | 1 |
+
+### Sprint 20 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #260 | `merged` | sharia | **Backend module** (6 entities + ~20 REST + 4 state machines + F8) | SAMA Implementing Regulation on Sharia Governance for Banks (Aug 2020) §3-§7; AAOIFI Governance Standards GSIFI 1-5; AAOIFI FAS 1; IFSB-10 |
+| #261 | `merged` | platform | **F8 automation rules AR-251..AR-260** | SAMA §3.4 3-yr terms; §3.5 annual COI; §3.6 ≥4 SSB meetings/yr; §4.2 product approval gate; §5.7 30-day Board Audit; §6.4 90-day SNCI purification; §6.5 material SNCI Board Risk; AAOIFI FAS 1 |
+| #262 | `merged` | sharia (UI) | **Frontend slice** (dashboard + 5 register pages + Purify flow + state-machine transitions) | Sharia Officer + Internal Sharia Audit + SSB Secretary + Product Owner joint workspace |
+| #263 | `merged` | sharia (seed) | **Saudi-realistic seed** (5 scholars + 5 fatwas + 3 findings + 2 SNCI + 5 products on org=1 Islamic-window bank) | Real Saudi Sharia-governance landscape (AAOIFI / Hai'at Kibar Al-Ulama / IRTI / OIC Fiqh Academy citations; Al-Baqarah:275; Sharia Standards 8/9/13/17/30; OIC Fiqh Academy Resolutions 41/110/179) |
+
+### Sprint 20 — state machines (4 in one module)
+
+```
+Scholar:     ACTIVE → TERM_EXPIRING → TERM_EXPIRED → (re-appointment cycle restarts ACTIVE)
+                ↓                                ↑
+              RESIGNED / REMOVED ────────────────┘  (terminal until re-appointment)
+
+Resolution:  DRAFT → SSB_REVIEW → APPROVED → ACTIVE → SUPERSEDED
+                              ↓
+                            REJECTED (terminal)
+
+Finding:     OPEN → REMEDIATION → VERIFIED → CLOSED
+              ↓                          ↑
+              └────── (HIGH/MED only) ────┘  (rare fast-track close)
+
+NC Event:    DETECTED → INVESTIGATION → INCOME_PURIFIED → CLOSED
+                                              ↑
+                              (CHARITY transfer receipt logged)
+
+Product:     SUBMITTED → SSB_REVIEW → APPROVED_PROVISIONAL → APPROVED_FINAL → LAUNCHED → DECOMMISSIONED
+                              ↓                                    ↓
+                          REJECTED                              (linkedResolutionId required for APPROVED_FINAL)
+```
+
+The **APPROVED_FINAL gate requires `linkedResolutionId`** — service-
+layer guard prevents promotion to APPROVED_FINAL without a fatwa
+reference tying the product to a specific ACTIVE SSB resolution
+(SAMA §4.2 Product Approval Gate).
+
+### Sprint 20 — 10 F8 automation rules (AR-251..AR-260)
+
+- **AR-251** `SHARIA_RESOLUTION_SUBMITTED` → NOTIFY Sharia Officer + SSB Secretary + Compliance (review kickoff)
+- **AR-252** `SHARIA_RESOLUTION_REJECTED` → MEDIUM CAPA on the originator (re-draft loop)
+- **AR-253** `SHARIA_AUDIT_FINDING_RAISED severity=HIGH` → 30-day Board Audit Committee SLA (SAMA §5.7) + CAPA
+- **AR-254** `SHARIA_NC_EVENT_DETECTED` → 90-day CRITICAL CAPA (SAMA §6.4 + AAOIFI FAS 1 mandatory purification)
+- **AR-255** `SHARIA_NC_EVENT_DETECTED snciAmountSar>500000` → ESCALATE Board Risk Chair + external Sharia auditor (SAMA §6.5 material SNCI threshold)
+- **AR-256** `SHARIA_PRODUCT_SUBMITTED` → NOTIFY Product Owner + SSB pipeline (kickoff)
+- **AR-257** `SHARIA_PRODUCT_LAUNCHED` → CREATE_RECORD evidence vault 7-yr (SAMA audit + external Sharia auditor trail)
+- **AR-258** `SHARIA_PRODUCT_REJECTED` → NOTIFY Product Owner + Marketing + Ops (kill-channel)
+- **AR-259** `SHARIA_SCHOLAR_COI_DECLARED` → CREATE_RECORD 7-yr (SAMA §3.5 annual COI + AAOIFI GSIFI 1)
+- **AR-260** `SHARIA_SCHOLAR_TERM_EXPIRING` → T-90 / T-30 reminder ladder (SAMA §3.4 3-year terms)
+
+### Sprint 20 — Saudi-native AR throughout
+
+- **Sidebar**: `الحوكمة الشرعية`
+- **SSB role labels**: رئيس الهيئة / عضو / أمين السرّ / مستشار خارجي
+- **Scholar status labels**: نشط / مدّة قارَبت الانتهاء / مدّة منتهية / مستقيل / مُستبعَد
+- **Subject area labels**: مرابحة / إجارة / تورّق / صكوك / مضاربة / مشاركة / معاملة / تشغيلي / أخرى
+- **Resolution status labels**: مسوّدة / قيد مراجعة الهيئة / مُعتمدة / نافذة / مُستبدَلة / مرفوضة
+- **NC status labels**: مرصودة / قيد التحقيق / تم تطهير الدخل / مغلقة
+- **Product structure labels**: مرابحة / إجارة / تورّق / صكوك / مضاربة / مشاركة / سَلَم / استصناع / أخرى
+- **Operator terms**: الهيئة الشرعية, قرار شرعي, دخل عدم الالتزام الشرعي, تطهير الدخل, إجارة منتهية بالتمليك, التورّق المنظَّم, إقرار تضارب المصالح, المعيار الشرعي
+- **Rationale citation patterns**: ﴿وأحلَّ اللهُ البيعَ وحرَّم الربا﴾ [البقرة:٢٧٥], قرار مجمع الفقه الإسلامي الدولي رقم ١٧٩, المعيار الشرعي رقم ٣٠ (الأيوفي)
+
+### Sprint 20 — Real Saudi Sharia governance seeded
+
+- **org=1 TSS GRC (Islamic window)**:
+  - **5 SSB members**: Chairman with PhD Imam Muhammad bin Saud Islamic University + AAOIFI Sharia Board, Member from IRTI (Islamic Development Bank), Member specialising in Murabaha/Ijara with **term expiring in 80 days** (AR-260 priming), Member with PhD Umm Al-Qura in modern contracts, Secretary CSAA-certified from INCEIF Malaysia
+  - **5 fatwas**: revised Tawarruq broker-rotation spec (RES-2025-014 ACTIVE supersedes RES-2024-007), Personal Vehicle Murabaha (RES-2025-022 ACTIVE), Home Ijara Muntahia Bittamleek (RES-2025-031 ACTIVE), Sukuk Mudaraba (RES-2026-002 DRAFT) — all with full Quran (Al-Baqarah:275 + others) + Sunnah + AAOIFI Sharia Standards (8/9/13/17/30) + OIC Fiqh Academy resolutions (41/110/179)
+  - **HIGH finding SAUD-2026-Q1-007**: Personal Vehicle Murabaha margin allocation deviation on 7/50 contracts — core-banking parameter not re-pointed to new RES-2025-022 template; 26-day SLA remaining
+  - **MEDIUM finding SAUD-2026-Q1-012**: Tawarruq broker-rotation evidence retention at 84% (need ≥7yr); OPEN
+  - **LOW finding SAUD-2025-Q4-031**: Home Ijara pamphlet missing takaful footnote; REMEDIATION
+  - **SNCI-2026-003 SAR 18,500 INVESTIGATION**: 22 late-payment penalty postings mis-routed to bank income on Personal Murabaha (Mar-2026); AR-254 90-day purification SLA counting
+  - **SNCI-2026-004 SAR 750,000 DETECTED material**: Tawarruq commodity-broker undisclosed 0.8% spread anomaly across 2,400 contracts in Q1 2026; AR-255 fires Board Risk Chair + external Sharia auditor
+  - **Products**: LAUNCHED Personal Vehicle Murabaha (160 days in production), APPROVED_FINAL Home Ijara (pending launch), APPROVED_PROVISIONAL Tawarruq Salary Advance pilot in 12 branches, SSB_REVIEW Sukuk Mudaraba SAR 1.5bn proposed issuance, REJECTED Floating-Rate Term Deposit dressed up as Mudaraba (SSB caught capital guarantee + benchmark-tracked return = conventional deposit re-skin)
+- **org=2 Aramco Trading** & **org=3 STC Bank**: intentionally **no Sharia data** — neither is an Islamic-window operating bank under current scope
+
+### Sprint 20 — verified end-to-end
+
+- Backend `mvn clean compile` green; Frontend `npx tsc -b` + `npx vite build` green with 6 Sharia chunks emitted (ShariaDashboardPage / ShariaScholarsPage / ShariaResolutionsPage / ShariaAuditFindingsPage / ShariaNcEventsPage / ShariaProductsPage)
+- Schema: 6 tables (`sharia.sharia_scholar` / `sharia_resolution` / `sharia_audit_finding` / `sharia_nc_event` / `sharia_product_approval` / `sharia_event`) + 14 indexes (incl. unique reference per org, term-end ladder, NC status descending, product status descending)
+- 10 F8 rules visible: `SELECT * FROM platform.automation_rules WHERE rule_code BETWEEN 'AR-251' AND 'AR-260'` returns 10
+- Seed: **5 scholars + 5 resolutions + 3 findings + 2 NC events + 5 products + 11 timeline events** with 1 term-expiring scholar + 1 HIGH finding + 1 material SNCI + 1 rejected product
+
+### Sprint 20 — Saudi-banking surface recap
+
+This arc completes the **Sharia-compliance spine** for the Saudi
+Islamic-window operating bank — Sprint 20 sits alongside Sprint 19's
+Open Banking ASPSP surface, Sprint 18's counterparty book, Sprint
+17's RRP cycles, Sprint 16's regulatory-reporting calendar, and
+Sprint 15's inspection workspace. All six share the same F7 audit +
+F8 event pattern, the same Python-bootstrapped multi-tenant schema,
+and the same Saudi-native AR conventions:
+
+| Surface | Cadence | Trigger code prefix | AR label |
+|---|---|---|---|
+| Reg Inspection (Sprint 15) | Episodic on-site visits | `REGINSPECT_*` | التفتيش الرقابي |
+| Reg Reporting (Sprint 16) | Recurring statutory returns | `REG_REPORT_*` | تقويم البلاغات |
+| RRP (Sprint 17) | Annual mandatory plan + live indicators | `RRP_*` | الاستعادة والحلّ |
+| Counterparty (Sprint 18) | Live credit-risk + large exposures | `COUNTERPARTY_*` / `LARGE_EXPOSURE_LIMIT_*` | سجل الأطراف المقابلة |
+| Open Banking (Sprint 19) | Live ASPSP — TPPs + consents + incidents + 24h SAMA | `OB_TPP_*` / `OB_CONSENT_*` / `OB_INCIDENT_*` | المصرفية المفتوحة |
+| **Sharia (Sprint 20)** | **Live SSB + fatwa + SNCI purification + product gate** | `SHARIA_SCHOLAR_*` / `SHARIA_RESOLUTION_*` / `SHARIA_AUDIT_FINDING_*` / `SHARIA_NC_EVENT_*` / `SHARIA_PRODUCT_*` | **الحوكمة الشرعية** |
+
+---
+
+## 🟢 Previous arc — Sprint 19 Open Banking Compliance (26 May 2026, PRs #255 → #258)
 
 Sprint 19 lands the **SAMA Open Banking Compliance** module — the
 ASPSP-side governance surface every Saudi bank now operates under the
