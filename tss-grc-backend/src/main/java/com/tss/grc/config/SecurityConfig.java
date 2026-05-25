@@ -107,6 +107,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/ethics/whistleblower/public/submit").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/v1/ethics/whistleblower/public/status/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/ethics/whistleblower/public/reply/**").permitAll()
+                // Sprint 13 — Customer Complaints Management public portal.
+                // SAMA Banking Consumer Protection Principles 2021 +
+                // CMA Investor Complaints Regulation require an open
+                // intake channel; the submission_token is the credential
+                // for the public tracking endpoint, which returns a
+                // PII-stripped view (no phone/email/national-ID).
+                .requestMatchers(HttpMethod.POST, "/api/v1/complaints/public").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/v1/complaints/public/track/**").permitAll()
                 .anyRequest().authenticated()
             )
 
