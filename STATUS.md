@@ -1,9 +1,107 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 24 May 2026 (Sprint 11 P1 GRC + Sprint 12 Integrations + Polish arc closes — PRs #168 → #207, 38 PRs)
+**Last update:** 25 May 2026 (Sprint 13 GRC governance arc closes — PRs #211 → #220, 10 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 11 P1 GRC + Sprint 12 Integrations + Polish (24 May 2026, PRs #168 → #207)
+## 🟢 This arc — Sprint 13 GRC governance block (25 May 2026, PRs #211 → #220)
+
+Sprint 13 lands 8 new Saudi-bank-grade governance modules plus 2 frontend slices —
+all merged to `origin/master` in one session. The arc completes the GRC governance
+layer the platform was missing: approval chains, KRI breach engine, internal-audit
+annual planning, ethics hotline, sanctions screening, outsourcing register,
+conflict-of-interest declarations, and SAMA-compliant customer-complaints
+management. Per-layer commit checkpoints (commit → push after each slice)
+became the new agent default this arc — adopted after two earlier 529-Overloaded
+losses; once enforced, the pattern survived every subsequent agent failure.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **Sprint 13 backend modules** — 8 new modules covering SAMA CG / NCA / CMA / SDAIA / FATF / IIA 2020 governance gaps | All merged | 8 |
+| **Sprint 13 frontend slices** — COI Register UI (3 tabs + detail) + Customer Complaints UI (internal triage + 2 public unauthenticated pages) | All merged | 2 |
+
+### Sprint 13 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #211 | `d9d79d3` | workflow | Multi-step **Approval Chains** | NCA ECC-2 governance |
+| #212 | `8f5b8a9` | risk | **Key Risk Indicator (KRI) engine** + breach alerts | SAMA Risk Mgmt Reg |
+| #213 | `6f34655` | audit | **Internal Audit Annual Plan + Engagement** workflow | IIA Standards 2020 |
+| #214 | `e84a86e` | ethics | **Whistleblower / Ethics Hotline** (token-based anonymous) | SAMA CG Art. 25 |
+| #215 | `e63dd48` | aml | **Sanctions Screening** engine + hit triage (Arabic harakat-stripping fuzzy match) | FATF Rec 5/6/7 |
+| #216 | `913a1f3` | tprm | **Outsourcing Arrangement Register** | SAMA Outsourcing Reg |
+| #217 | `e291db4` | ethics | **Conflict of Interest Disclosure Register** backend | SAMA CG Art. 30 + CMA Art. 88 |
+| #218 | `020ff31` | consumer | **Customer Complaints Management** backend (`SaudiWorkdayUtil` + 9-state lifecycle + PII-safe public tracking) | SAMA Banking Consumer Protection (2021) |
+| #219 | `613e825` | ui | **COI Register** frontend (3 tabs + Campaign Detail with review form) | — |
+| #220 | `23427d3` | ui | **Customer Complaints** frontend (internal triage + 2 public unauthenticated pages) | — |
+
+### Saudi-native Arabic strings — operator-natural, never literal
+
+The arc adds **~60 new AR strings** across both new modules. Examples:
+
+| EN | AR (Saudi-native, NOT literal) |
+|---|---|
+| Conflict of Interest | تضارب المصالح |
+| Annual Declaration | إقرار سنوي |
+| Recusal | تنحٍّ |
+| Suspected conflict — recusal required | اشتباه في تضارب — يستوجب التنحّي |
+| Customer Complaints Management | إدارة شكاوى العملاء |
+| Tracking code | رمز التتبّع |
+| Escalated to SAMA | مُحالة إلى ساما |
+| Acknowledgement SLA breached | تجاوز مدة الإقرار |
+| Five working days | خمسة أيام عمل |
+| Fraud / unauthorised transaction | احتيال أو معاملة غير مصرّح بها |
+| Tawarruq early settlement (case seed) | نزاع على رسوم سداد مبكر لعقد تورّق |
+
+### Real-world Saudi-bank seed data
+
+| Migration | Seed |
+|---|---|
+| V192 approval_chains | 4 tables in `workflow` |
+| V193 kri_engine | 15 seeded KRIs (credit, liquidity, ops, market) |
+| V194 ia_annual_plan | 4 tables in `audit_lc` (IIA-aligned) |
+| V195 whistleblower_hotline | 3 tables + token-based anonymous tracking |
+| V196 sanctions_screening | 4 tables in `aml` + harakat-stripping fuzzy match |
+| V197 outsourcing_register | 4 tables in `tprm` |
+| V198 coi_register | 4 tables in `ethics` + 1 campaign `COI-2026-ANNUAL` + 8 Saudi-named board declarations + 12 disclosed items + 3 recusal events tied to real committee codes |
+| V199 customer_complaints | 3 tables in new `consumer` schema + **12 realistic Saudi-bank complaints** (Turkey card fraud, SARIE delay for Hajj, Riyadh airport ATM short-disburse, mada Pay TPS, Tawarruq early settlement, SAMA-escalated case) + 1 Q4-2025 aggregate report |
+
+### Auto-flag + state-machine policy depth (SME judgment, not literal mapping)
+
+- **COI auto-flag rules** — `RECUSAL_REQUIRED` if any active item is `RELATED_PARTY` / `FAMILY_RELATIONSHIP` / `POLITICAL_OFFICE` OR `financial_value_sar >= 100,000`; `MITIGATION_REQUIRED` if any active item is `DIRECTORSHIP` / `OUTSIDE_EMPLOYMENT` OR value >= SAR 50,000.
+- **Complaints 9-state lifecycle** — RECEIVED → ACKNOWLEDGED → UNDER_INVESTIGATION → AWAITING_CUSTOMER / RESOLVED / ESCALATED_TO_SAMA / CLOSED / REOPENED / REJECTED. Invalid transitions throw `IllegalTransitionException` → HTTP 409.
+- **`SaudiWorkdayUtil`** — `addBusinessDays(start, 5)` for ack SLA, `addBusinessDays(start, 20)` for resolution SLA, skipping Friday + Saturday (Saudi weekend, not Sat+Sun).
+- **Public submission PII safety** — `PublicTrackingResponse` returns ONLY initials + status + customer-visible timeline; reflection test asserts zero phone/email/national-ID/account fields ever leak.
+
+### Per-layer commit checkpoint pattern (new agent default)
+
+Two earlier retry attempts at COI + Complaints hit `API 529 Overloaded` after
+~30 minutes each and lost ALL work — agents had only committed at the end.
+Fix: every Sprint 13 backend agent committed + pushed after each of 7-8
+layers (migration → entity → repo → DTO → service → controller → tests).
+The pattern survived every subsequent failure and is now baked into the
+agent operating instructions.
+
+### F7 audit + F8 automation parity arc
+
+Every new mutation in Sprint 13 emits an audit-log row (F7) and an
+automation event (F8) via the existing `AuditLogService` + Spring
+`ApplicationEventPublisher`. New event types include:
+`COI_CAMPAIGN_OPENED`, `COI_DECLARATION_SUBMITTED`, `COI_AUTO_FLAGGED_RECUSAL`,
+`COI_AUTO_FLAGGED_MITIGATION`, `COI_RECUSAL_RECORDED`, `COMPLAINT_RECEIVED`,
+`COMPLAINT_ACKNOWLEDGED`, `COMPLAINT_TRANSITIONED`, `COMPLAINT_ESCALATED_TO_SAMA`,
+`COMPLAINT_REOPENED`, plus the events emitted by the 6 earlier Sprint 13 modules.
+
+### Pre-existing arc (Sprint 11 + 12 — see below)
+
+The arc directly preceding this one delivered 38 PRs (#168 → #207) across
+Sprint 11 P1 GRC and Sprint 12 Integrations + Polish — captured in detail
+in the next section.
+
+---
+
+## 🟢 Previous arc — Sprint 11 P1 GRC + Sprint 12 Integrations + Polish (24 May 2026, PRs #168 → #207)
 
 The single largest arc shipped in V2 to date: **38 PRs merged** in one session,
 taking the platform from Sprint-8 P0 closeout (PR #167) to a Sprint 11 P1 GRC
