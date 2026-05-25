@@ -1,4 +1,4 @@
-// Arabic dictionary — parallel keys to en.ts.
+﻿// Arabic dictionary — parallel keys to en.ts.
 export const ar = {
   brandName: 'منصة TSS GRC',
   brandSub: 'الإصدار ٢٫٠ · الرياض',
@@ -5792,6 +5792,8 @@ export const ar = {
   'rrp.sidebar':                       'الاستعادة والحلّ',
   // Sprint 18 — Counterparty Credit Rating Registry.
   'cpty.sidebar':                      'سجل الأطراف المقابلة',
+  // Sprint 19 — SAMA Open Banking Compliance (OBF v2).
+  'ob.sidebar':                        'المصرفية المفتوحة',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',

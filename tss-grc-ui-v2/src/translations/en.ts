@@ -1,4 +1,4 @@
-// English dictionary. Keys must stay flat strings — see ar.ts for the parallel file.
+﻿// English dictionary. Keys must stay flat strings — see ar.ts for the parallel file.
 export const en = {
   // Brand
   brandName: 'TSS GRC Platform',
@@ -5812,6 +5812,8 @@ export const en = {
   'rrp.sidebar':                       'Recovery & Resolution',
   // Sprint 18 — Counterparty Credit Rating Registry.
   'cpty.sidebar':                      'Counterparty Registry',
+  // Sprint 19 — SAMA Open Banking Compliance (OBF v2).
+  'ob.sidebar':                        'Open Banking',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

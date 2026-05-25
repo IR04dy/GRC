@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+﻿import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { I18nProvider } from './lib/i18n';
 import { ToastProvider } from './lib/toast';
@@ -206,6 +206,12 @@ const RrpCycleDetailPage = lazy(() => import('./pages/rrp/RrpCycleDetailPage').t
 const CptyDashboardPage           = lazy(() => import('./pages/cpty/CptyDashboardPage').then(m => ({ default: m.CptyDashboardPage })));
 const CptyCounterpartiesPage      = lazy(() => import('./pages/cpty/CptyCounterpartiesPage').then(m => ({ default: m.CptyCounterpartiesPage })));
 const CptyCounterpartyDetailPage  = lazy(() => import('./pages/cpty/CptyCounterpartyDetailPage').then(m => ({ default: m.CptyCounterpartyDetailPage })));
+// Sprint 19 — SAMA Open Banking Compliance.
+const ObDashboardPage   = lazy(() => import('./pages/openbanking/ObDashboardPage').then(m => ({ default: m.ObDashboardPage })));
+const ObTppsPage        = lazy(() => import('./pages/openbanking/ObTppsPage').then(m => ({ default: m.ObTppsPage })));
+const ObTppDetailPage   = lazy(() => import('./pages/openbanking/ObTppDetailPage').then(m => ({ default: m.ObTppDetailPage })));
+const ObConsentsPage    = lazy(() => import('./pages/openbanking/ObConsentsPage').then(m => ({ default: m.ObConsentsPage })));
+const ObIncidentsPage   = lazy(() => import('./pages/openbanking/ObIncidentsPage').then(m => ({ default: m.ObIncidentsPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -584,6 +590,13 @@ export function App() {
               <Route path="/cpty/dashboard"                       element={<CptyDashboardPage />} />
               <Route path="/cpty/counterparties"                  element={<CptyCounterpartiesPage />} />
               <Route path="/cpty/counterparties/:id"              element={<CptyCounterpartyDetailPage />} />
+
+              {/* Sprint 19 — SAMA Open Banking Compliance. */}
+              <Route path="/openbanking/dashboard"                element={<ObDashboardPage />} />
+              <Route path="/openbanking/tpps"                     element={<ObTppsPage />} />
+              <Route path="/openbanking/tpps/:id"                 element={<ObTppDetailPage />} />
+              <Route path="/openbanking/consents"                 element={<ObConsentsPage />} />
+              <Route path="/openbanking/incidents"                element={<ObIncidentsPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

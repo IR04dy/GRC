@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
@@ -11,7 +11,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          CloudLightning, Factory, FileSearch,
          ScanSearch,
          Scale,
-         ShieldX, Shield, ClipboardList, CalendarDays,
+         ShieldX, Shield, ClipboardList, CalendarDays, Banknote,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -139,6 +139,8 @@ const NAV_GROUPS: NavGroup[] = [
       // are investigation-case surfaces operators triage together; co-location
       // matches the way most Saudi-bank fraud officers work in practice.
       { id: 'fraud',        to: '/fraud/dashboard',   Icon: ShieldX,        labelKey: 'fraud.sidebar' },
+      // Sprint 19 — SAMA Open Banking Compliance (OBF v2 — AISP/PISP/CBPII/VRP).
+      { id: 'openbanking',  to: '/openbanking/dashboard', Icon: Banknote,   labelKey: 'ob.sidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },
