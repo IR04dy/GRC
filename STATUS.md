@@ -1,9 +1,115 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 25 May 2026 (Sprint 17 Recovery & Resolution Plan arc closes — PRs #245 → #248, 4 PRs + COI/Complaints DB bootstrap fix #244)
+**Last update:** 25 May 2026 (Sprint 18 Counterparty Credit Rating Registry arc closes — PRs #250 → #253, 4 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 17 Recovery & Resolution Plan (25 May 2026, PRs #245 → #248)
+## 🟢 This arc — Sprint 18 Counterparty Credit Rating Registry (25 May 2026, PRs #250 → #253)
+
+Sprint 18 lands the **Counterparty Credit Rating Registry** module —
+the credit-risk spine SAMA's **Credit Risk Management Standards**
+expect every Saudi bank to maintain. Brings counterparty inventory,
+internal + external ratings, watchlist + downgrade actions, large-
+exposure limits with **live RAG-band utilisation tracking**, and a
+chronological credit-life timeline into the platform under unified
+F7 audit + F8 event emission. The arc closes with a deliberate
+BREACH (Saudi Binladin Group at 105% limit utilisation) wired into
+the seed so AR-238 — SAMA-reportable large-exposure event — can be
+demoed end-to-end against real Saudi counterparty data.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **Cpty backend** — 5 entities (counterparty with sector taxonomy + GRE/sovereign/FI flags + parent-group ref; credit_rating with INTERNAL PD/LGD/EAD or EXTERNAL agency; rating_action with 8 action types; large_exposure_limit with RAG-band engine; cpty_event timeline), 14 REST endpoints, F7+F8 emit on 9 triggers, Python DB bootstrap (5 tables + 7 indexes) | Merged | 1 |
+| **F8 automation rules AR-231..AR-240** — onboarding NOTIFY, 1h-SLA downgrade escalation, DEFAULT top-line + Critical CAPA, watchlist weekly review, **sovereign/GRE downgrade Board Risk Chair routing**, AMBER/RED/BREACH band escalation chains with worsening-only filtering, group-scope aggregate visibility, **external-agency downgrade comms pre-wire** (IR + Legal brief before market hears) | Merged | 1 |
+| **Frontend slice** — Dashboard (KPIs + sector/grade/band breakdowns + top-utilised limits) + Counterparties register with inline new-counterparty wizard (LEI + flags) + Detail page with 4 tabs (Ratings with PD/LGD/EAD modal; Actions covering 8 action types; Limits with per-row Record-utilisation + COUNTERPARTY/GROUP scope modal; Timeline) + sidebar entry in Risk vertical | Merged | 1 |
+| **Saudi-realistic seed** — 33 counterparties + 54 ratings + 3 rating actions + 37 limits × 3 tenants. Real Saudi corporate names (KSA sovereign, Aramco, SABIC, PIF, REDF, SEC, STC, Saudia, SNB, Al Rajhi, Riyad, ANB, Olayan, Almarai, Zamil, Binladin, Mobily, Zain SA, IsDB, Tamara, Tabby, Jahez, GOSI). **1 BREACH (Binladin 105% limit) + 5 RED + 29 AMBER + 2 GREEN** plus 4 group-scope limits (ARAMCO/SABIC/BINLADIN/OLAYAN) | Merged | 1 |
+
+### Sprint 18 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #250 | `merged` | cpty | **Backend module** (5 entities + 14 REST + RAG-band engine + F8) | SAMA Credit Risk Management Standards; Basel III IRB approach; large-exposure framework |
+| #251 | `merged` | platform | **F8 automation rules AR-231..AR-240** | SAMA single-name 25% Tier-1 reporting; sovereign/GRE escalation paths; external-agency pre-wire comms |
+| #252 | `merged` | cpty (UI) | **Frontend slice** (dashboard + register + detail with 4 tabs) | Board-facing CRO + Credit Officer workflow |
+| #253 | `merged` | cpty (seed) | **Saudi-realistic seed** (33 counterparties + 54 ratings + 37 limits × 3 tenants, 1 deliberate BREACH) | Real Saudi credit landscape (Aramco / SABIC / PIF / REDF / GRE / family conglomerates / BNPL fintechs / multilateral) |
+
+### Sprint 18 — Limit band engine
+
+```
+GREEN  ≤ 70% utilised        — capacity room healthy
+AMBER  70 - 90% utilised     — capacity room watch
+                                (AR-236 NOTIFY Credit Officer + RM)
+                                (AR-227-equivalent CFO+Treasury fast-track on CAPITAL/LIQUIDITY)
+RED    > 90% utilised        — freeze new credit
+                                (AR-237 ESCALATE CRO + Credit Committee Chair)
+BREACH > 100% utilised       — SAMA-reportable same business day
+                                (AR-238 CRITICAL CAPA + CRO + CFO + IA + Compliance + Board Risk Chair)
+```
+
+Band changes fire `LARGE_EXPOSURE_LIMIT_AMBER|RED|BREACH` with a
+`worsening` payload flag so recovery transitions (RED → AMBER → GREEN)
+record on the timeline without paging anyone. BREACH crossings
+always escalate regardless of worsening direction because BREACH is
+unconditionally SAMA-reportable.
+
+### Sprint 18 — 10 F8 automation rules (AR-231..AR-240)
+
+- **AR-231** `COUNTERPARTY_REGISTERED` → NOTIFY Credit Officer + RM (onboarding kickoff)
+- **AR-232** `COUNTERPARTY_RATING_DOWNGRADED` → ESCALATE CRO + RM + Credit Committee Chair within 1h (IFRS 9 staging shift)
+- **AR-233** `COUNTERPARTY_DEFAULTED` → ESCALATE CRO + CFO + Audit Committee Chair + CRITICAL CAPA for Stage 3 staging
+- **AR-234** `COUNTERPARTY_WATCHLIST_NEGATIVE` → NOTIFY RM + Credit Risk + weekly review reminder
+- **AR-235** `DOWNGRADED sovereignFlag=true AND greFlag=true` → ESCALATE Board Risk Committee Chair (Aramco/SABIC/PIF/REDF systemic)
+- **AR-236** `LIMIT_AMBER worsening=true` → NOTIFY Credit Officer + RM (capacity room watch)
+- **AR-237** `LIMIT_RED worsening=true` → ESCALATE CRO + freeze new credit (Credit Committee + Head Corporate Banking)
+- **AR-238** `LIMIT_BREACH` → ESCALATE CRO + CFO + Compliance + IA + Board Risk Chair + CRITICAL CAPA (SAMA same-day notification)
+- **AR-239** `LIMIT_AMBER scope=GROUP` → NOTIFY CRO + CFO + Head Corporate Banking (aggregate group-level visibility)
+- **AR-240** `DOWNGRADED triggerSource=EXTERNAL_AGENCY` → NOTIFY Compliance + IR + CRO + CFO + Legal (pre-wire market-watching event)
+
+### Sprint 18 — Saudi-native AR throughout
+
+- **Sidebar**: `سجل الأطراف المقابلة`
+- **Status labels**: نشط / قائمة المراقبة / متعثّر / مُسوّى / خامل
+- **Sector labels**: سيادي / جهة حكومية مرتبطة / مؤسّسة مالية / شركة كبرى / منشأة صغيرة ومتوسطة / أفراد / متعدّد الأطراف
+- **Band labels**: أخضر / كهرماني / أحمر / تجاوز
+- **Action types**: مراقبة سلبية / مراقبة إيجابية / إزالة مراقبة / خفض / رفع / تعثّر / تعافٍ / تغيير النظرة
+- **Operator terms**: سجل الأطراف المقابلة, التصنيف الائتماني, قائمة المراقبة, خفض التصنيف, التعثّر, حدّ التعرّض الكبير, تجاوز الحدّ, احتمال التعثّر / PD, الخسارة عند التعثّر / LGD, التعرّض عند التعثّر / EAD
+
+### Sprint 18 — Saudi corporate names seeded (org=1 TSS GRC)
+
+- **Sovereign + GRE**: المملكة العربية السعودية (السيادي), أرامكو السعودية, سابك, صندوق الاستثمارات العامة (PIF), صندوق التنمية العقاري (REDF), الشركة السعودية للكهرباء (SEC), شركة الاتصالات السعودية (STC), الخطوط الجوية العربية السعودية (Saudia)
+- **Saudi banks (FI)**: البنك الأهلي السعودي (SNB), مصرف الراجحي, بنك الرياض, البنك العربي الوطني (ANB)
+- **Family conglomerates**: شركة العليان للتمويل (Olayan), شركة المراعي, الزامل للاستثمار الصناعي, مجموعة بن لادن السعودية, موبايلي السعودية, زين السعودية
+- **Multilateral**: البنك الإسلامي للتنمية (IsDB)
+
+### Sprint 18 — verified end-to-end
+
+- Backend `mvn clean compile` green in 22.6s
+- Frontend `npm run build` green in 7.16s
+- Schema: 5 tables (`cpty.counterparty`, `credit_rating`, `rating_action`, `large_exposure_limit`, `cpty_event`) + 7 indexes
+- 10 F8 rules visible: `SELECT * FROM platform.automation_rules WHERE rule_code BETWEEN 'AR-231' AND 'AR-240'` returns 10
+- Seed: **33 counterparties + 54 ratings + 37 limits** (29 AMBER + 5 RED + 2 GREEN + **1 BREACH on Binladin** poised to fire AR-238)
+- 4 group-scope limits including BINLADIN_GROUP at 94% RED priming AR-239
+
+### Sprint 18 — credit-risk pattern recap
+
+This arc completes the **credit-risk core** that ties together SAMA's
+expectations for Saudi banks:
+
+| Surface | Cadence | Trigger code prefix |
+|---|---|---|
+| Counterparty register | Continuous | `COUNTERPARTY_*` |
+| Rating actions | Live (per event) | `COUNTERPARTY_RATING_*` |
+| Limit utilisation | Daily refresh | `LARGE_EXPOSURE_LIMIT_*` |
+
+All three feed the IFRS 9 ECL staging cycle, the SAMA quarterly
+large-exposure return, and the Risk Committee's quarterly credit
+review pack. Same F7/F8 wiring + Python-bootstrapped multi-tenant
+schema + Saudi-native AR conventions as Sprints 14-17.
+
+---
+
+## 🟢 Previous arc — Sprint 17 Recovery & Resolution Plan (25 May 2026, PRs #245 → #248)
 
 Sprint 17 lands the **Recovery & Resolution Plan (RRP)** module — the
 SAMA D-SIB mandatory annual planning surface. Every D-SIB and now every
