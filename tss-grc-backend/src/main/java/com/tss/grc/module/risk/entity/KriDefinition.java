@@ -14,7 +14,11 @@ import java.util.UUID;
  * direction = HIGHER_IS_WORSE: green ≤ green_max < amber ≤ amber_max < red
  * direction = LOWER_IS_WORSE:  green ≥ green_max > amber ≥ amber_max > red
  */
-@Entity
+// Qualified entity name avoids collision with the Sprint 13 KRI engine entity
+// at com.tss.grc.module.risk.kri.entity.KriDefinition (PR #212). Two @Entity
+// classes named KriDefinition in different packages share the same JPA entity
+// name unless qualified.
+@Entity(name = "LegacyKriDefinition")
 @Table(schema = "risk", name = "kri_definitions")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.module.ccm.entity.ControlTestDefinition;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -38,7 +39,14 @@ public class LdapGroupMembershipRunner implements ControlTestRunner {
     /** Strategy seam for unit testing — production path uses {@link #lookupGroupMemberCount}. */
     private final GroupLookup lookup;
 
-    /** Production constructor (Spring autowires this). */
+    /**
+     * Production constructor (Spring autowires this).
+     *
+     * <p>The {@code @Autowired} is explicit because the class has two
+     * constructors — without it Spring can't disambiguate and fails with
+     * "No default constructor found".
+     */
+    @Autowired
     public LdapGroupMembershipRunner(@Value("${grc.ccm.ldap.enabled:false}") boolean enabled) {
         this(enabled, LdapGroupMembershipRunner::lookupGroupMemberCount);
     }

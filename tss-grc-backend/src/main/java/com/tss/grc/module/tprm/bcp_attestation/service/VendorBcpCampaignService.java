@@ -54,8 +54,11 @@ import java.util.UUID;
  *   CANCELLED   (terminal)
  * </pre>
  */
+// NOTE: @RequiredArgsConstructor removed — the manual constructor below has
+// custom logic (building channelsByType from the injected channel list).
+// Having BOTH the Lombok-generated and the manual constructor caused Spring
+// to see two candidates and fall back to a non-existent default ctor.
 @Service
-@RequiredArgsConstructor
 public class VendorBcpCampaignService {
 
     private static final Logger log = LoggerFactory.getLogger(VendorBcpCampaignService.class);

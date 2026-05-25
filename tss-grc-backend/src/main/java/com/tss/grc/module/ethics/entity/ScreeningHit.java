@@ -5,7 +5,11 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Entity
+// Qualified entity name avoids collision with the Sprint 13 AML sanctions
+// screening entity at com.tss.grc.module.aml.sanctions.entity.ScreeningHit
+// (PR #215). Two @Entity classes named ScreeningHit in different packages
+// share the same JPA entity name unless qualified.
+@Entity(name = "EthicsScreeningHit")
 @Table(schema = "ethics", name = "screening_hits")
 @Getter @Setter @NoArgsConstructor
 public class ScreeningHit {

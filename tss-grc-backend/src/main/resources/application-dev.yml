@@ -4,6 +4,12 @@
 # ============================================================================
 
 spring:
+  # 10 repository class-name duplicates currently exist across modules
+  # (Audit/CAPA/Control/Vendor/Vulnerability legacy vs new package homes,
+  # plus Sprint 13 KRI + Sanctions). Override lets Spring pick the last-loaded
+  # bean per name. Tech-debt: rename or @Repository("legacy*") on each pair.
+  main:
+    allow-bean-definition-overriding: true
   autoconfigure:
     # Disable unused auto-configs in dev to avoid health check noise
     exclude:
