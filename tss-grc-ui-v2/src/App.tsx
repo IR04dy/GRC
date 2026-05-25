@@ -184,6 +184,7 @@ const CoiCampaignDetailPage   = lazy(() => import('./pages/ethics/coi/CoiCampaig
 const FraudDashboardPage      = lazy(() => import('./pages/fraud/FraudDashboardPage').then(m => ({ default: m.FraudDashboardPage })));
 const FraudCasesPage          = lazy(() => import('./pages/fraud/FraudCasesPage').then(m => ({ default: m.FraudCasesPage })));
 const FraudCaseDetailPage     = lazy(() => import('./pages/fraud/FraudCaseDetailPage').then(m => ({ default: m.FraudCaseDetailPage })));
+const FraudCaseNewPage        = lazy(() => import('./pages/fraud/FraudCaseNewPage').then(m => ({ default: m.FraudCaseNewPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -534,6 +535,7 @@ export function App() {
               {/* Sprint 14 — Fraud Risk Management. */}
               <Route path="/fraud/dashboard"                     element={<FraudDashboardPage />} />
               <Route path="/fraud/cases"                         element={<FraudCasesPage />} />
+              <Route path="/fraud/cases/new"                     element={<FraudCaseNewPage />} />
               <Route path="/fraud/cases/:id"                     element={<FraudCaseDetailPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
