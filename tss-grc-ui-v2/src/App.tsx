@@ -202,6 +202,10 @@ const RegReportingFilingDetailPage = lazy(() => import('./pages/regreporting/Reg
 const RrpDashboardPage   = lazy(() => import('./pages/rrp/RrpDashboardPage').then(m => ({ default: m.RrpDashboardPage })));
 const RrpCyclesPage      = lazy(() => import('./pages/rrp/RrpCyclesPage').then(m => ({ default: m.RrpCyclesPage })));
 const RrpCycleDetailPage = lazy(() => import('./pages/rrp/RrpCycleDetailPage').then(m => ({ default: m.RrpCycleDetailPage })));
+// Sprint 18 — Counterparty Credit Rating Registry.
+const CptyDashboardPage           = lazy(() => import('./pages/cpty/CptyDashboardPage').then(m => ({ default: m.CptyDashboardPage })));
+const CptyCounterpartiesPage      = lazy(() => import('./pages/cpty/CptyCounterpartiesPage').then(m => ({ default: m.CptyCounterpartiesPage })));
+const CptyCounterpartyDetailPage  = lazy(() => import('./pages/cpty/CptyCounterpartyDetailPage').then(m => ({ default: m.CptyCounterpartyDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -575,6 +579,11 @@ export function App() {
               <Route path="/rrp/dashboard"                        element={<RrpDashboardPage />} />
               <Route path="/rrp/cycles"                           element={<RrpCyclesPage />} />
               <Route path="/rrp/cycles/:id"                       element={<RrpCycleDetailPage />} />
+
+              {/* Sprint 18 — Counterparty Credit Rating Registry. */}
+              <Route path="/cpty/dashboard"                       element={<CptyDashboardPage />} />
+              <Route path="/cpty/counterparties"                  element={<CptyCounterpartiesPage />} />
+              <Route path="/cpty/counterparties/:id"              element={<CptyCounterpartyDetailPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

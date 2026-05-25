@@ -5810,6 +5810,8 @@ export const en = {
   'regreporting.sidebar':              'Reporting Calendar',
   // Sprint 17 — Recovery & Resolution Plan.
   'rrp.sidebar':                       'Recovery & Resolution',
+  // Sprint 18 — Counterparty Credit Rating Registry.
+  'cpty.sidebar':                      'Counterparty Registry',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

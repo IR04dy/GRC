@@ -96,6 +96,11 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'incidents', to: '/incidents',      Icon: AlertOctagon,  labelKey: 'incidentsTitle' },
       { id: 'rca',       to: '/rca',            Icon: Microscope,    labelKey: 'rcaSidebar' },
       { id: 'changes',   to: '/changes',        Icon: GitBranch,     labelKey: 'modChanges' },
+      // Sprint 18 — Counterparty Credit Rating Registry.
+      // SAMA Credit Risk Management Standards + Basel III large-exposure
+      // framework. CRO + Credit Officer own this surface; ratings + limits
+      // feed IFRS 9 staging and the bank's overall credit-risk posture.
+      { id: 'cpty',      to: '/cpty/dashboard', Icon: Users,         labelKey: 'cpty.sidebar' },
     ],
   },
 
