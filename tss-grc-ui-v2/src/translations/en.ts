@@ -5797,6 +5797,11 @@ export const en = {
   // SAMA Banking Consumer Protection Principles — bank-grade complaint
   // intake, lifecycle workflow, SAMA escalation, quarterly reporting.
   'complaints.sidebar':                'Customer complaints',
+
+  // ─── Sprint 14 — Fraud Risk Management ───────────────────────────
+  // SAMA Anti-Fraud Framework 2018 Art.4-9 — typology catalog, case
+  // investigation, STR/law-enforcement workflow, recovery tracking.
+  'fraud.sidebar':                     'Fraud Risk Management',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

@@ -11,6 +11,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          CloudLightning, Factory, FileSearch,
          ScanSearch,
          Scale,
+         ShieldX,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -128,6 +129,11 @@ const NAV_GROUPS: NavGroup[] = [
       // consumer-protection grievance surfaces — operators expect them
       // adjacent in the navigation.
       { id: 'complaints',   to: '/complaints',        Icon: MessageSquare,  labelKey: 'complaints.sidebar' },
+      // Sprint 14 — Fraud Risk Management (SAMA Anti-Fraud Framework 2018).
+      // Grouped here alongside Whistleblower / COI / Complaints because all four
+      // are investigation-case surfaces operators triage together; co-location
+      // matches the way most Saudi-bank fraud officers work in practice.
+      { id: 'fraud',        to: '/fraud/dashboard',   Icon: ShieldX,        labelKey: 'fraud.sidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },

@@ -180,6 +180,10 @@ const WhistleblowerCaseDetailPage = lazy(() => import('./pages/ethics/Whistleblo
 // Sprint 13 — Conflict of Interest (COI) Disclosure Register.
 const CoiRegisterPage         = lazy(() => import('./pages/ethics/coi/CoiRegisterPage').then(m => ({ default: m.CoiRegisterPage })));
 const CoiCampaignDetailPage   = lazy(() => import('./pages/ethics/coi/CoiCampaignDetailPage').then(m => ({ default: m.CoiCampaignDetailPage })));
+// Sprint 14 — Fraud Risk Management (SAMA Anti-Fraud Framework 2018).
+const FraudDashboardPage      = lazy(() => import('./pages/fraud/FraudDashboardPage').then(m => ({ default: m.FraudDashboardPage })));
+const FraudCasesPage          = lazy(() => import('./pages/fraud/FraudCasesPage').then(m => ({ default: m.FraudCasesPage })));
+const FraudCaseDetailPage     = lazy(() => import('./pages/fraud/FraudCaseDetailPage').then(m => ({ default: m.FraudCaseDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -527,6 +531,10 @@ export function App() {
               {/* Sprint 13 — Conflict of Interest Disclosure Register. */}
               <Route path="/ethics/coi"                          element={<CoiRegisterPage />} />
               <Route path="/ethics/coi/campaigns/:id"            element={<CoiCampaignDetailPage />} />
+              {/* Sprint 14 — Fraud Risk Management. */}
+              <Route path="/fraud/dashboard"                     element={<FraudDashboardPage />} />
+              <Route path="/fraud/cases"                         element={<FraudCasesPage />} />
+              <Route path="/fraud/cases/:id"                     element={<FraudCaseDetailPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE
