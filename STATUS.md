@@ -1,9 +1,79 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 25 May 2026 (Sprint 14 Fraud Risk Management arc closes — PRs #222 → #226, 5 PRs)
+**Last update:** 25 May 2026 (Sprint 14 Operational Resilience arc closes — PRs #229 → #232, 4 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 14 Fraud Risk Management block (25 May 2026, PRs #222 → #226)
+## 🟢 This arc — Sprint 14 Operational Resilience block (25 May 2026, PRs #229 → #232)
+
+Sprint 14 lands the **Operational Resilience self-assessment** workbench for the
+SAMA Operational Resilience Framework (Sept 2024) — banks must publish an annual
+maturity self-assessment across 5 pillars, and this module is where they author,
+sign off, and close that submission inside the platform. ~2,100 lines across
+backend (module/opres/), frontend (3 lazy-loaded pages with maturity heatmap +
+cell editor), 10 F8 automation rules (AR-191..AR-200), and Saudi-realistic seed
+data for 3 tenants × 2 fiscal cycles. Saudi-native bilingual EN+AR throughout.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **OpRes backend** — 3 entities (Pillar / Assessment / AssessmentCell), 9 REST endpoints, state machine (DRAFT→IN_PROGRESS→APPROVED→CLOSED), aggregate scoring, maturity-gap event emission | Merged | 1 |
+| **F8 automation rules** — AR-191..AR-200: kickoff NOTIFY, auto-CAPA on gap≥2, GOVERNANCE→Board Secretary, TOLERANCES→Risk+BCM, MAPPING→severe-but-plausible exercise, SUBMITTED→CRO+BoardSec sign-off, low-maturity FLAG, APPROVED→SAMA Liaison Officer filing, high-maturity board pack milestone, CLOSED→Internal Audit notify | Merged | 1 |
+| **Frontend slice** — `/opres/dashboard` heatmap + `/opres/assessments` register + `/opres/assessments/:id` cell editor with inline maturity rubric + sidebar entry under BCM + bilingual EN+AR | Merged | 1 |
+| **Seed data** — 3 tenants × 2 FY cycles (FY2024 CLOSED with full lifecycle + exec summary, FY2025 IN_PROGRESS partial fill); Saudi-bank-realistic per-tenant content (TSS GRC top-quartile, Aramco Trading energy+SCADA, STC Bank telco-banking) | Open (CI) | 1 |
+
+### Sprint 14 OpRes — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #229 | `merged` | opres | **OpRes backend** (3 entities + 3 repos + 9 REST + state machine + gap-event emission) | SAMA Op-Res §3.2 / §4.1 / §4.3 / §5 / §6 |
+| #230 | `merged` | platform | **F8 OpRes automation rules AR-191..AR-200** | SAMA Op-Res 2024 |
+| #231 | `merged` | opres (UI) | **Frontend slice** (dashboard + register + cell editor + heatmap + sidebar) | SAMA Op-Res 2024 |
+| #232 | — | opres (seed) | **Saudi-realistic seed** (6 assessments + 21 cells across 3 tenants × 2 FY) | SAMA Op-Res 2024 |
+
+### Sprint 14 OpRes — 5 SAMA pillars seeded
+
+Each pillar carries bilingual EN+AR description, a `samaReference` (e.g. §3.2),
+and a 5-level maturity rubric stored as JSON. The frontend renders the rubric
+inline in the cell editor so operators can pick a score against the actual SAMA
+expectation, not generic CMMI language:
+
+| Code | EN name | AR name | SAMA ref |
+|---|---|---|---|
+| `GOVERNANCE` | Governance & Strategy | الحوكمة والاستراتيجية | §3.2 |
+| `IBS_MAPPING` | Important Business Services | الخدمات التجارية المهمّة | §4.1 |
+| `TOLERANCES` | Impact Tolerances | حدود التحمّل | §4.3 |
+| `MAPPING_TESTING` | Resource Mapping & Testing | الربط والاختبار | §5.1-5.4 |
+| `LESSONS` | Lessons & Management Action | الدروس والإجراءات الإدارية | §6 |
+
+The maturity ladder uses operator-natural Saudi Arabic, not literal translation:
+**مبدئي** (Initial) → **قيد التطوير** (Developing) → **محدّد** (Defined) →
+**مُدار** (Managed) → **مُحسَّن** (Optimising).
+
+### Sprint 14 OpRes — 10 F8 automation rules (AR-191..AR-200)
+
+- **AR-191** `OPRES_ASSESSMENT_CREATED` → NOTIFY CRO + BCM Manager (annual-cycle kickoff)
+- **AR-192** `OPRES_PILLAR_GAP` + gap ≥ 2 → CREATE_RECORD CAPA task (HIGH priority — concrete plan item, not monitoring finding)
+- **AR-193** `OPRES_PILLAR_GAP` + pillar = GOVERNANCE → NOTIFY Board Secretary + Risk Manager (board-level concern)
+- **AR-194** `OPRES_PILLAR_GAP` + pillar = TOLERANCES → NOTIFY Risk Manager + BCM Manager (foundational gap — no severe-but-plausible has meaning until tolerances quantified)
+- **AR-195** `OPRES_PILLAR_GAP` + pillar = MAPPING_TESTING → CREATE_RECORD BCM_EXERCISE (severe-but-plausible) — only practical exercise closes a mapping/testing gap
+- **AR-196** `OPRES_ASSESSMENT_SUBMITTED` → NOTIFY CRO + Board Secretary (sign-off slot in risk committee)
+- **AR-197** `OPRES_ASSESSMENT_SUBMITTED` + avgCurrent < 3 → FLAG executive review before regulator filing (below SAMA expectation for a domestically systemic bank)
+- **AR-198** `OPRES_ASSESSMENT_APPROVED` → NOTIFY SAMA Liaison Officer + Compliance (regulator filing — 30-day clock starts on board sign-off)
+- **AR-199** `OPRES_ASSESSMENT_APPROVED` + avgCurrent ≥ 4 → CREATE_RECORD board-pack item (success milestone — programme gets visible credit)
+- **AR-200** `OPRES_ASSESSMENT_CLOSED` → NOTIFY Internal Audit + Compliance (terminal — archive reference needed for IA annual plan + SAMA on-site inspection)
+
+### Sprint 14 OpRes — verified end-to-end
+
+- Backend boots clean in 19s; `GET /api/v1/opres/pillars` → 5 rows
+- Full lifecycle: open assessment (DRAFT, completeness 0/5) → upsert 5 cells (auto IN_PROGRESS, avgCur=2.2, avgTgt=3.2, completeness 5/5, gap events fired) → submit (APPROVED, submittedAt set) → approve (approvedByUserId=1) → close (CLOSED, closedAt set)
+- Frontend `npm run build` clean in 7.0s, 3 new chunks under 25kb each gzip
+- F8 rules: 10 rows in `platform.automation_rules` (AR-191..AR-200), trigger codes match emitted events
+- Seed: 6 assessments + 21 cells across 3 tenants, REST returns FY2024 CLOSED + FY2025 IN_PROGRESS for admin/org=1
+
+---
+
+## 🟢 Previous arc — Sprint 14 Fraud Risk Management block (25 May 2026, PRs #222 → #226)
 
 Sprint 14 lands a complete end-to-end **Fraud Risk Management** module
 closing the SAMA Anti-Fraud Framework 2018 (Art.4-9) gap that the platform
