@@ -5804,6 +5804,8 @@ export const en = {
   'fraud.sidebar':                     'Fraud Risk Management',
   // Sprint 14 — Operational Resilience self-assessment (SAMA Op-Res 2024).
   'opres.sidebar':                     'Operational Resilience',
+  // Sprint 15 — Regulatory Inspection Workspace.
+  'reginspect.sidebar':                'Regulatory Inspection',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

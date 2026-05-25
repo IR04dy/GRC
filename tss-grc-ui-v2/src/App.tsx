@@ -189,6 +189,10 @@ const FraudCaseNewPage        = lazy(() => import('./pages/fraud/FraudCaseNewPag
 const OpResDashboardPage         = lazy(() => import('./pages/opres/OpResDashboardPage').then(m => ({ default: m.OpResDashboardPage })));
 const OpResAssessmentsPage       = lazy(() => import('./pages/opres/OpResAssessmentsPage').then(m => ({ default: m.OpResAssessmentsPage })));
 const OpResAssessmentDetailPage  = lazy(() => import('./pages/opres/OpResAssessmentDetailPage').then(m => ({ default: m.OpResAssessmentDetailPage })));
+// Sprint 15 — Regulatory Inspection Workspace.
+const RegInspectDashboardPage       = lazy(() => import('./pages/reginspect/RegInspectDashboardPage').then(m => ({ default: m.RegInspectDashboardPage })));
+const RegInspectInspectionsPage     = lazy(() => import('./pages/reginspect/RegInspectInspectionsPage').then(m => ({ default: m.RegInspectInspectionsPage })));
+const RegInspectWorkspaceDetailPage = lazy(() => import('./pages/reginspect/RegInspectWorkspaceDetailPage').then(m => ({ default: m.RegInspectWorkspaceDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -546,6 +550,11 @@ export function App() {
               <Route path="/opres/dashboard"                     element={<OpResDashboardPage />} />
               <Route path="/opres/assessments"                   element={<OpResAssessmentsPage />} />
               <Route path="/opres/assessments/:id"               element={<OpResAssessmentDetailPage />} />
+
+              {/* Sprint 15 — Regulatory Inspection Workspace. */}
+              <Route path="/reginspect/dashboard"                 element={<RegInspectDashboardPage />} />
+              <Route path="/reginspect/inspections"               element={<RegInspectInspectionsPage />} />
+              <Route path="/reginspect/inspections/:id"           element={<RegInspectWorkspaceDetailPage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE

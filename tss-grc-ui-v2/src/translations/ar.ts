@@ -5784,6 +5784,8 @@ export const ar = {
   'fraud.sidebar':                     'إدارة مخاطر الاحتيال',
   // Sprint 14 — Operational Resilience self-assessment (SAMA Op-Res 2024).
   'opres.sidebar':                     'الصمود التشغيلي',
+  // Sprint 15 — Regulatory Inspection Workspace.
+  'reginspect.sidebar':                'التفتيش الرقابي',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',

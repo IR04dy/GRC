@@ -11,7 +11,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          CloudLightning, Factory, FileSearch,
          ScanSearch,
          Scale,
-         ShieldX, Shield,
+         ShieldX, Shield, ClipboardList,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -159,6 +159,12 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'audit-lc',  to: '/audit-lifecycle',   Icon: BookOpen,    labelKey: 'alcSidebar' },
       { id: 'ev-chain',  to: '/evidence-chain',    Icon: Fingerprint, labelKey: 'echSidebar' },
       { id: 'nca-ecc',   to: '/nca-ecc-export',    Icon: ShieldCheck, labelKey: 'ncaSidebar' },
+      // Sprint 15 — Regulatory Inspection Workspace (SAMA/NCA/CMA/SDAIA on-site).
+      // Slotted under Audit because the Compliance Officer + Internal Audit
+      // run inspection responses jointly; sitting next to /audit-lifecycle
+      // also makes the cross-link to closed-finding patterns obvious to
+      // operators planning next year's audit universe.
+      { id: 'reginspect', to: '/reginspect/dashboard', Icon: ClipboardList, labelKey: 'reginspect.sidebar' },
     ],
   },
 
