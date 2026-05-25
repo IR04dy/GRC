@@ -1,9 +1,120 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 25 May 2026 (Sprint 18 Counterparty Credit Rating Registry arc closes — PRs #250 → #253, 4 PRs)
+**Last update:** 26 May 2026 (Sprint 19 Open Banking Compliance arc closes — PRs #255 → #258, 4 PRs)
 
 ---
 
-## 🟢 This arc — Sprint 18 Counterparty Credit Rating Registry (25 May 2026, PRs #250 → #253)
+## 🟢 This arc — Sprint 19 Open Banking Compliance (26 May 2026, PRs #255 → #258)
+
+Sprint 19 lands the **SAMA Open Banking Compliance** module — the
+ASPSP-side governance surface every Saudi bank now operates under the
+**SAMA Open Banking Framework v2** (Phase 1 AIS Live 2022; Phase 2 PIS
+Live 2024; Phase 3 VRP + CBPII rolling 2025-2026). Brings the **TPP
+register**, **FAPI 2.0 + mTLS audit trail**, **customer-consent governance**,
+**OB-specific incident workflow**, and a wired **24h SAMA notification
+window** for material incidents into the platform under unified F7/F8.
+The arc also covers the cross-cutting **PDPL Article 25 SDAIA 72h
+breach window** that fires in parallel for data-leak incidents.
+
+### Headline deliveries
+
+| Workstream | Outcome | PRs |
+|---|---|---|
+| **Open Banking backend** — 5 entities (ob_tpp with KYB lifecycle + role mix AISP/PISP/CBPII; ob_consent with 6 consent types + revocation tracking by CUSTOMER/BANK/TPP; ob_api_call append-only audit log; ob_incident with 9 incident types + SAMA-reportable flag; ob_event timeline), 14 REST endpoints, F7+F8 emit on 11 triggers, **BULK_REVOCATION_THRESHOLD = 100 revokes/h auto fraud signal**, auto-cascade consent revocation on TPP suspend/revoke, denormalised active_consent_count + open_incident_count, Python DB bootstrap (5 tables + 9 indexes) | Merged | 1 |
+| **F8 automation rules AR-241..AR-250** — TPP onboarding NOTIFY, 1h-SLA suspension/revocation ESCALATE, consent grant PDPL Art.6 evidence vault, **bulk-revocation fraud signal** CISO+Fraud, CRITICAL incident 1h ESCALATE, **samaReportable 24h notification ladder**, API-abuse HIGH CAPA, **certificate-expiring T-90/T-30/T-7 ladder**, **DATA_LEAK cross-cutting** DPO+CRITICAL CAPA (PDPL Art.25 72h ∥ SAMA OBF 24h) | Merged | 1 |
+| **Frontend slice** — Dashboard (6 KPIs + tppsByStatus + consentsByType + API health 24h + recent TPPs + open incidents) + TPP register with inline KYB onboarding wizard (SAMA-OB licence, FAPI client_id, mTLS cert SHA256, role checkboxes) + TPP workspace with state-machine action panel (PENDING_KYB→ACTIVE→SUSPENDED→REVOKED) + bilingual reason capture + tabs for Consents/Timeline + flat consent register with revoke flow + incident register with raise + transition (OPEN→INVESTIGATING→CONTAINED→RESOLVED→CLOSED) + inline notify-SAMA action + sidebar entry under Compliance vertical | Merged | 1 |
+| **Saudi-realistic seed** — 11 real Saudi-OB TPPs (Lean, Tarabut, Drahim, Malaa, Hala, Tweeq, Geidea, Surge, HyperPay) × 3 tenants + 19 consents (AIS/PIS/VRP) + 12 API-call samples + 3 incidents including **1 CRITICAL DATA_LEAK with samaReportable=true** (1,847 customers affected, 18h SAMA SLA remaining, AR-247 + AR-250 both firing) + bulk-revocation batch on suspended Hala feeding AR-245 fraud-signal context | Merged | 1 |
+
+### Sprint 19 — full inventory
+
+| PR | SHA | Module | Slice | Regulatory hook |
+|---:|:---|---|---|---|
+| #255 | `merged` | openbanking | **Backend module** (5 entities + 14 REST + state machine + F8 + bulk-revocation engine) | SAMA Open Banking Framework v2 (AIS Live 2022 / PIS Live 2024 / VRP+CBPII 2025-2026); FAPI 2.0; mTLS; OBF §11.4 24h notification |
+| #256 | `merged` | platform | **F8 automation rules AR-241..AR-250** | SAMA OBF §11.4 24h SAMA notification; PDPL Art.25 SDAIA 72h breach window; PDPL Art.6 lawful basis evidence; certificate-expiry ladder |
+| #257 | `merged` | openbanking (UI) | **Frontend slice** (dashboard + 4 register pages + state-machine action panels + notify-SAMA flow) | Compliance Officer + OB Officer + CISO joint workspace |
+| #258 | `merged` | openbanking (seed) | **Saudi-realistic seed** (11 TPPs + 19 consents + 12 API calls + 3 incidents × 3 tenants, 1 CRITICAL DATA_LEAK demo) | Real Saudi OB landscape (Lean / Tarabut / Drahim / Hala / Tweeq / STC ecosystem / Aramco corp / Geidea / HyperPay) |
+
+### Sprint 19 — TPP + Incident state machines
+
+```
+TPP:        PENDING_KYB → ACTIVE → SUSPENDED → REVOKED
+                             ↑          ↓
+                             ←──────────┘  (reinstate after audit)
+                                     ↓
+                             REVOKED (terminal)
+
+Incident:   OPEN → INVESTIGATING → CONTAINED → RESOLVED → CLOSED
+              ↓                                   ↑
+              └─────────────── RESOLVED ──────────┘  (skip CONTAINED if fix in flight)
+```
+
+Auto-cascade: on TPP SUSPENDED or REVOKED, every active consent tied
+to that TPP is auto-revoked with `revokedBy=BANK`, a bilingual reason
+referencing the source action, and a CONSENT_REVOKED event on each.
+Bulk-revoke threshold (100 revokes within 1h) fires AR-245 fraud signal
+to CISO + Fraud Officer.
+
+### Sprint 19 — 10 F8 automation rules (AR-241..AR-250)
+
+- **AR-241** `TPP_ONBOARDED` → NOTIFY Compliance + OB Officer + CISO + IR
+- **AR-242** `TPP_SUSPENDED` → ESCALATE within 1h (impacts active consents — cascade)
+- **AR-243** `TPP_REVOKED` → top-line ESCALATE + CRITICAL CAPA (post-mortem mandatory)
+- **AR-244** `CONSENT_GRANTED` → CREATE_RECORD in evidence vault (PDPL Art.6 lawful-basis evidence)
+- **AR-245** `OB_CONSENT_BULK_REVOCATION` → ESCALATE CISO + Fraud Officer + CRITICAL CAPA (potential mass-fraud signal)
+- **AR-246** `OB_INCIDENT_RAISED severity=CRITICAL` → 1h ESCALATE chain (OB Officer + CISO + CRO + Compliance)
+- **AR-247** `OB_INCIDENT_RAISED samaReportable=true` → 24h SAMA notification reminder ladder (T-23h / T-12h / T-2h)
+- **AR-248** `OB_API_ABUSE_DETECTED` → NOTIFY OB Officer + CISO + HIGH CAPA (anomalous call pattern)
+- **AR-249** `OB_CERT_EXPIRING` → T-90 / T-30 / T-7 reminder ladder to AM + Compliance + TPP contact
+- **AR-250** `OB_INCIDENT_RAISED incidentType=DATA_LEAK` → ESCALATE DPO + CRITICAL CAPA (PDPL Art.25 72h cross-cuts with SAMA OBF 24h)
+
+### Sprint 19 — Saudi-native AR throughout
+
+- **Sidebar**: `المصرفية المفتوحة`
+- **TPP status labels**: قيد التحقّق / نشط / موقوف / مُلغى
+- **Consent status labels**: مصرَّح / نشطة / منتهية / مسحوبة
+- **Consent type labels**: معلومات الحساب (AIS) / الأرصدة (AIS) / العمليات (AIS) / دفعة (PIS) / دورية (VRP) / التحقّق من الرصيد (CBPII)
+- **Incident type labels**: خرق الموافقة / تجاوز النطاق / سوء استخدام الشهادة / احتيال بين المزوّدين / إساءة استخدام الواجهة / تسرّب بيانات / إشارة سحب جماعي / انقطاع / أخرى
+- **SAMA-notify badge**: بلاغ ساما / تمّ الإبلاغ
+- **Operator terms**: مزوّد الخدمة, واجهات برمجة التطبيقات (APIs), موافقة العميل, شهادة mTLS, ترخيص ساما, نطاق الموافقة, السحب الجماعي للموافقات
+
+### Sprint 19 — Real Saudi TPPs seeded
+
+- **org=1 TSS GRC ASPSP**: Lean Technologies KSA (AISP+PISP — Phase-1 pilot), Tarabut Gateway (cert expires in 22 days — AR-249 priming), Drahim Financial Solutions (budgeting AISP), Malaa Wealth Aggregator, **Hala Payments (SUSPENDED after scope-creep OBI-2026-001)**, Tweeq (PENDING_KYB)
+- **org=2 Aramco Trading**: Tarabut Gateway (corporate profile for cash mgmt), Geidea B2B Payments (vendor-payment VRP)
+- **org=3 STC Bank**: Lean Technologies (STC Bank partner), Surge Fintech (PISP with **OPEN CONSENT_VIOLATION OBI-2026-101**), HyperPay Recurring (VRP for SaaS billing)
+
+### Sprint 19 — demo-grade incidents
+
+- **OBI-2026-002** DATA_LEAK CRITICAL INVESTIGATING **samaReportable=true** on Lean (org=1) — cache-key collision exposed 1,847 customers via `/v3.1/aisp/transactions` for 19 minutes during deploy. Detected 6h ago → AR-247 24h SAMA notification ladder ticking (18h remaining) + AR-250 cross-cuts to PDPL Art.25 SDAIA 72h (66h remaining). CISO triaging + Splunk forensic capture.
+- **OBI-2026-001** SCOPE_CREEP HIGH CONTAINED on Hala (org=1) — 312 out-of-scope balance reads on consent CN-HALA-2024-7791. Drove Hala suspension + cascade consent revocation.
+- **OBI-2026-101** CONSENT_VIOLATION HIGH OPEN on Surge (org=3) — token-validation cache TTL bug allowed 4 payments on a revoked token (~SAR 31,400 at risk).
+
+### Sprint 19 — verified end-to-end
+
+- Backend `mvn clean compile` green; Frontend `npm run build` + `tsc -b` green
+- Schema: 5 tables (`openbanking.ob_tpp`, `ob_consent`, `ob_api_call`, `ob_incident`, `ob_event`) + 9 indexes (incl. unique reference, cert-expiry, incident severity)
+- 10 F8 rules visible: `SELECT * FROM platform.automation_rules WHERE rule_code BETWEEN 'AR-241' AND 'AR-250'` returns 10
+- Seed: **11 TPPs + 19 consents + 12 API calls + 3 incidents** with 1 SAMA-reportable open + 1 cert expiring < 30d + 1 SUSPENDED TPP with bilingual reason
+
+### Sprint 19 — Saudi-banking surface recap
+
+This arc completes the **bank-as-ASPSP** spine — Sprint 19's TPP + consent
+registers sit alongside Sprint 18's counterparty book, Sprint 17's RRP
+cycles, Sprint 16's regulatory-reporting calendar, and Sprint 15's
+inspection workspace. All five share the same F7 audit + F8 event
+pattern, the same Python-bootstrapped multi-tenant schema, and the
+same Saudi-native AR conventions:
+
+| Surface | Cadence | Trigger code prefix | AR label |
+|---|---|---|---|
+| Reg Inspection (Sprint 15) | Episodic on-site visits | `REGINSPECT_*` | التفتيش الرقابي |
+| Reg Reporting (Sprint 16) | Recurring statutory returns | `REG_REPORT_*` | تقويم البلاغات |
+| RRP (Sprint 17) | Annual mandatory plan + live indicators | `RRP_*` | الاستعادة والحلّ |
+| Counterparty (Sprint 18) | Live credit-risk + large exposures | `COUNTERPARTY_*` / `LARGE_EXPOSURE_LIMIT_*` | سجل الأطراف المقابلة |
+| **Open Banking (Sprint 19)** | **Live ASPSP — TPPs + consents + incidents + 24h SAMA** | `OB_TPP_*` / `OB_CONSENT_*` / `OB_INCIDENT_*` | **المصرفية المفتوحة** |
+
+---
+
+## 🟢 Previous arc — Sprint 18 Counterparty Credit Rating Registry (25 May 2026, PRs #250 → #253)
 
 Sprint 18 lands the **Counterparty Credit Rating Registry** module —
 the credit-risk spine SAMA's **Credit Risk Management Standards**
