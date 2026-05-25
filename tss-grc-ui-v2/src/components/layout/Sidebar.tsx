@@ -11,7 +11,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          CloudLightning, Factory, FileSearch,
          ScanSearch,
          Scale,
-         ShieldX, Shield, ClipboardList,
+         ShieldX, Shield, ClipboardList, CalendarDays,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -165,6 +165,12 @@ const NAV_GROUPS: NavGroup[] = [
       // also makes the cross-link to closed-finding patterns obvious to
       // operators planning next year's audit universe.
       { id: 'reginspect', to: '/reginspect/dashboard', Icon: ClipboardList, labelKey: 'reginspect.sidebar' },
+      // Sprint 16 — Mandatory Regulatory Reporting Calendar.
+      // Sits next to /reginspect because both are regulator-facing daily ops
+      // owned by the Compliance Officer — the Calendar drives recurring
+      // returns (filings), the Inspection Workspace handles on-site visits.
+      // Same team, same dashboard rhythm.
+      { id: 'regreporting', to: '/regreporting/dashboard', Icon: CalendarDays, labelKey: 'regreporting.sidebar' },
     ],
   },
 

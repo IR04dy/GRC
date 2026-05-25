@@ -5786,6 +5786,8 @@ export const ar = {
   'opres.sidebar':                     'الصمود التشغيلي',
   // Sprint 15 — Regulatory Inspection Workspace.
   'reginspect.sidebar':                'التفتيش الرقابي',
+  // Sprint 16 — Mandatory Regulatory Reporting Calendar.
+  'regreporting.sidebar':              'تقويم البلاغات',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',

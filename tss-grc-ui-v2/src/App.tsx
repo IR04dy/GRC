@@ -193,6 +193,11 @@ const OpResAssessmentDetailPage  = lazy(() => import('./pages/opres/OpResAssessm
 const RegInspectDashboardPage       = lazy(() => import('./pages/reginspect/RegInspectDashboardPage').then(m => ({ default: m.RegInspectDashboardPage })));
 const RegInspectInspectionsPage     = lazy(() => import('./pages/reginspect/RegInspectInspectionsPage').then(m => ({ default: m.RegInspectInspectionsPage })));
 const RegInspectWorkspaceDetailPage = lazy(() => import('./pages/reginspect/RegInspectWorkspaceDetailPage').then(m => ({ default: m.RegInspectWorkspaceDetailPage })));
+// Sprint 16 — Mandatory Regulatory Reporting Calendar.
+const RegReportingDashboardPage    = lazy(() => import('./pages/regreporting/RegReportingDashboardPage').then(m => ({ default: m.RegReportingDashboardPage })));
+const RegReportingObligationsPage  = lazy(() => import('./pages/regreporting/RegReportingObligationsPage').then(m => ({ default: m.RegReportingObligationsPage })));
+const RegReportingFilingsPage      = lazy(() => import('./pages/regreporting/RegReportingFilingsPage').then(m => ({ default: m.RegReportingFilingsPage })));
+const RegReportingFilingDetailPage = lazy(() => import('./pages/regreporting/RegReportingFilingDetailPage').then(m => ({ default: m.RegReportingFilingDetailPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -555,6 +560,13 @@ export function App() {
               <Route path="/reginspect/dashboard"                 element={<RegInspectDashboardPage />} />
               <Route path="/reginspect/inspections"               element={<RegInspectInspectionsPage />} />
               <Route path="/reginspect/inspections/:id"           element={<RegInspectWorkspaceDetailPage />} />
+
+              {/* Sprint 16 — Mandatory Regulatory Reporting Calendar. */}
+              <Route path="/regreporting/dashboard"               element={<RegReportingDashboardPage />} />
+              <Route path="/regreporting/obligations"             element={<RegReportingObligationsPage />} />
+              <Route path="/regreporting/filings"                 element={<RegReportingFilingsPage />} />
+              <Route path="/regreporting/filings/:id"             element={<RegReportingFilingDetailPage />} />
+
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE
