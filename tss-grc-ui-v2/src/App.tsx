@@ -223,6 +223,9 @@ const ShariaProductsPage      = lazy(() => import('./pages/sharia/ShariaProducts
 const OutsourcingDashboardPage      = lazy(() => import('./pages/outsourcing/OutsourcingDashboardPage').then(m => ({ default: m.OutsourcingDashboardPage })));
 const OutsourcingArrangementsPage   = lazy(() => import('./pages/outsourcing/OutsourcingArrangementsPage').then(m => ({ default: m.OutsourcingArrangementsPage })));
 const OutsourcingCloudServicesPage  = lazy(() => import('./pages/outsourcing/OutsourcingCloudServicesPage').then(m => ({ default: m.OutsourcingCloudServicesPage })));
+// Sprint 31 — AI/ML Model Lifecycle.
+const AiLifecycleDashboardPage         = lazy(() => import('./pages/aiLifecycle/AiLifecycleDashboardPage').then(m => ({ default: m.AiLifecycleDashboardPage })));
+const AiLifecycleRecertificationsPage  = lazy(() => import('./pages/aiLifecycle/AiLifecycleRecertificationsPage').then(m => ({ default: m.AiLifecycleRecertificationsPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -621,6 +624,10 @@ export function App() {
               <Route path="/outsourcing/dashboard"                element={<OutsourcingDashboardPage />} />
               <Route path="/outsourcing/arrangements"             element={<OutsourcingArrangementsPage />} />
               <Route path="/outsourcing/cloud-services"           element={<OutsourcingCloudServicesPage />} />
+
+              {/* Sprint 31 — AI/ML Model Lifecycle. */}
+              <Route path="/ai-lifecycle/dashboard"               element={<AiLifecycleDashboardPage />} />
+              <Route path="/ai-lifecycle/recertifications"        element={<AiLifecycleRecertificationsPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

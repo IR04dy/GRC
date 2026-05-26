@@ -5818,6 +5818,8 @@ export const en = {
   'sharia.sidebar':                    'Sharia Governance',
   // Sprint 30 — Outsourcing & Cloud Governance (SAMA Outsourcing Reg + Cloud Framework).
   'outsourcingCloud.sidebar':          'Outsourcing & Cloud',
+  // Sprint 31 — AI/ML Model Lifecycle (SDAIA AI Ethics + PDPL Art.4 + EU AI Act).
+  'aiLifecycle.sidebar':               'AI Model Lifecycle',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

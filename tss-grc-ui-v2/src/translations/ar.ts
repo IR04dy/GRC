@@ -5798,6 +5798,8 @@ export const ar = {
   'sharia.sidebar':                    'الحوكمة الشرعية',
   // Sprint 30 — Outsourcing & Cloud Governance (SAMA Outsourcing Reg + Cloud Framework).
   'outsourcingCloud.sidebar':          'حوكمة الإسناد والسحابة',
+  // Sprint 31 — AI/ML Model Lifecycle (SDAIA AI Ethics + PDPL Art.4 + EU AI Act).
+  'aiLifecycle.sidebar':               'دورة حياة نماذج الذكاء الاصطناعي',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',

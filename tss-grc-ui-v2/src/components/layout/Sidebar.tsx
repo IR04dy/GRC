@@ -153,6 +153,10 @@ const NAV_GROUPS: NavGroup[] = [
       // Compliance Officer co-owns the 60-day SAMA notification window with
       // the Risk Officer + CISO for cloud residency.
       { id: 'outsourcing-cloud', to: '/outsourcing/dashboard', Icon: Cloud, labelKey: 'outsourcingCloud.sidebar' },
+      // Sprint 31 — AI/ML Model Lifecycle. SDAIA AI Ethics + PDPL Art.4 +
+      // EU AI Act risk tiers. Lives under Compliance because the DPO co-
+      // owns the annual ethics attestation (AR-280) with Model Validator.
+      { id: 'ai-lifecycle', to: '/ai-lifecycle/dashboard', Icon: Bot, labelKey: 'aiLifecycle.sidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },
