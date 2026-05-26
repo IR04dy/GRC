@@ -226,6 +226,10 @@ const OutsourcingCloudServicesPage  = lazy(() => import('./pages/outsourcing/Out
 // Sprint 31 — AI/ML Model Lifecycle.
 const AiLifecycleDashboardPage         = lazy(() => import('./pages/aiLifecycle/AiLifecycleDashboardPage').then(m => ({ default: m.AiLifecycleDashboardPage })));
 const AiLifecycleRecertificationsPage  = lazy(() => import('./pages/aiLifecycle/AiLifecycleRecertificationsPage').then(m => ({ default: m.AiLifecycleRecertificationsPage })));
+// Sprint 32 — Data Classification + NDMO.
+const DataclassDashboardPage    = lazy(() => import('./pages/dataclass/DataclassDashboardPage').then(m => ({ default: m.DataclassDashboardPage })));
+const DataclassAssetsPage       = lazy(() => import('./pages/dataclass/DataclassAssetsPage').then(m => ({ default: m.DataclassAssetsPage })));
+const DataclassFlowsPage        = lazy(() => import('./pages/dataclass/DataclassFlowsPage').then(m => ({ default: m.DataclassFlowsPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -628,6 +632,11 @@ export function App() {
               {/* Sprint 31 — AI/ML Model Lifecycle. */}
               <Route path="/ai-lifecycle/dashboard"               element={<AiLifecycleDashboardPage />} />
               <Route path="/ai-lifecycle/recertifications"        element={<AiLifecycleRecertificationsPage />} />
+
+              {/* Sprint 32 — Data Classification + NDMO. */}
+              <Route path="/dataclass/dashboard"                  element={<DataclassDashboardPage />} />
+              <Route path="/dataclass/assets"                     element={<DataclassAssetsPage />} />
+              <Route path="/dataclass/flows"                      element={<DataclassFlowsPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

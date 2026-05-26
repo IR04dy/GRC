@@ -5800,6 +5800,8 @@ export const ar = {
   'outsourcingCloud.sidebar':          'حوكمة الإسناد والسحابة',
   // Sprint 31 — AI/ML Model Lifecycle (SDAIA AI Ethics + PDPL Art.4 + EU AI Act).
   'aiLifecycle.sidebar':               'دورة حياة نماذج الذكاء الاصطناعي',
+  // Sprint 32 — Data Classification + NDMO (PDPL Art.4/6/7 + NDMO 4-level).
+  'dataclass.sidebar':                 'تصنيف البيانات',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',

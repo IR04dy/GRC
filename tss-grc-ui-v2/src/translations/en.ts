@@ -5820,6 +5820,8 @@ export const en = {
   'outsourcingCloud.sidebar':          'Outsourcing & Cloud',
   // Sprint 31 — AI/ML Model Lifecycle (SDAIA AI Ethics + PDPL Art.4 + EU AI Act).
   'aiLifecycle.sidebar':               'AI Model Lifecycle',
+  // Sprint 32 — Data Classification + NDMO (PDPL Art.4/6/7 + NDMO 4-level).
+  'dataclass.sidebar':                 'Data Classification',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

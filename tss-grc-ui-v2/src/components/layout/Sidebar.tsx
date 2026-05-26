@@ -157,6 +157,11 @@ const NAV_GROUPS: NavGroup[] = [
       // EU AI Act risk tiers. Lives under Compliance because the DPO co-
       // owns the annual ethics attestation (AR-280) with Model Validator.
       { id: 'ai-lifecycle', to: '/ai-lifecycle/dashboard', Icon: Bot, labelKey: 'aiLifecycle.sidebar' },
+      // Sprint 32 — Data Classification + NDMO. NDMO Data Classification
+      // Policy (4-level) + PDPL Art.4 special-category + Art.7 cross-
+      // border gate. The DPO owns this surface; Compliance + CISO co-own
+      // the cross-border review.
+      { id: 'dataclass', to: '/dataclass/dashboard', Icon: Database, labelKey: 'dataclass.sidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },
