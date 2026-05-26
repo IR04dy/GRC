@@ -5816,6 +5816,8 @@ export const en = {
   'ob.sidebar':                        'Open Banking',
   // Sprint 20 — Sharia Governance & Audit (SAMA Implementing Reg + AAOIFI GSIFI + IFSB-10).
   'sharia.sidebar':                    'Sharia Governance',
+  // Sprint 30 — Outsourcing & Cloud Governance (SAMA Outsourcing Reg + Cloud Framework).
+  'outsourcingCloud.sidebar':          'Outsourcing & Cloud',
   'complaints.title':                  'Customer Complaints',
   'complaints.sub':                    'SAMA-compliant complaint intake, triage, lifecycle, and SAMA escalation register',
   'complaints.eyebrow':                'Consumer Protection · Sprint 13',

@@ -12,6 +12,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          ScanSearch,
          Scale,
          ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
+         Cloud,
          type LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -147,6 +148,11 @@ const NAV_GROUPS: NavGroup[] = [
       // section 7 annual report cadence runs alongside the OBF v2 cadence, and external
       // Sharia auditors increasingly inspect ASPSP-side flows for Islamic-banking units.
       { id: 'sharia',       to: '/sharia/dashboard',     Icon: Moon,        labelKey: 'sharia.sidebar' },
+      // Sprint 30 — Outsourcing & Cloud Governance. SAMA Outsourcing Reg §3-§8
+      // + SAMA Cloud Computing Framework. Lives under Compliance because the
+      // Compliance Officer co-owns the 60-day SAMA notification window with
+      // the Risk Officer + CISO for cloud residency.
+      { id: 'outsourcing-cloud', to: '/outsourcing/dashboard', Icon: Cloud, labelKey: 'outsourcingCloud.sidebar' },
       { id: 'esg',          to: '/esg',               Icon: Leaf,           labelKey: 'esgSidebar' },
       { id: 'tcfd-scn',     to: '/esg/tcfd-scenarios',     Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions', Icon: Factory,        labelKey: 'financedEmissionsSidebar' },

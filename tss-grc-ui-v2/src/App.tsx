@@ -219,6 +219,10 @@ const ShariaResolutionsPage   = lazy(() => import('./pages/sharia/ShariaResoluti
 const ShariaAuditFindingsPage = lazy(() => import('./pages/sharia/ShariaAuditFindingsPage').then(m => ({ default: m.ShariaAuditFindingsPage })));
 const ShariaNcEventsPage      = lazy(() => import('./pages/sharia/ShariaNcEventsPage').then(m => ({ default: m.ShariaNcEventsPage })));
 const ShariaProductsPage      = lazy(() => import('./pages/sharia/ShariaProductsPage').then(m => ({ default: m.ShariaProductsPage })));
+// Sprint 30 — Outsourcing & Cloud Governance.
+const OutsourcingDashboardPage      = lazy(() => import('./pages/outsourcing/OutsourcingDashboardPage').then(m => ({ default: m.OutsourcingDashboardPage })));
+const OutsourcingArrangementsPage   = lazy(() => import('./pages/outsourcing/OutsourcingArrangementsPage').then(m => ({ default: m.OutsourcingArrangementsPage })));
+const OutsourcingCloudServicesPage  = lazy(() => import('./pages/outsourcing/OutsourcingCloudServicesPage').then(m => ({ default: m.OutsourcingCloudServicesPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -612,6 +616,11 @@ export function App() {
               <Route path="/sharia/audit-findings"                element={<ShariaAuditFindingsPage />} />
               <Route path="/sharia/nc-events"                     element={<ShariaNcEventsPage />} />
               <Route path="/sharia/products"                      element={<ShariaProductsPage />} />
+
+              {/* Sprint 30 — Outsourcing & Cloud Governance. */}
+              <Route path="/outsourcing/dashboard"                element={<OutsourcingDashboardPage />} />
+              <Route path="/outsourcing/arrangements"             element={<OutsourcingArrangementsPage />} />
+              <Route path="/outsourcing/cloud-services"           element={<OutsourcingCloudServicesPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

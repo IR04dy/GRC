@@ -5796,6 +5796,8 @@ export const ar = {
   'ob.sidebar':                        'المصرفية المفتوحة',
   // Sprint 20 — Sharia Governance & Audit (SAMA Implementing Reg + AAOIFI GSIFI + IFSB-10).
   'sharia.sidebar':                    'الحوكمة الشرعية',
+  // Sprint 30 — Outsourcing & Cloud Governance (SAMA Outsourcing Reg + Cloud Framework).
+  'outsourcingCloud.sidebar':          'حوكمة الإسناد والسحابة',
   'complaints.title':                  'إدارة شكاوى العملاء',
   'complaints.sub':                    'استلام شكاوى العملاء، فرزها، ومتابعة دورة حياتها وفقاً لمبادئ حماية عملاء المصارف الصادرة عن ساما',
   'complaints.eyebrow':                'حماية العملاء · المرحلة ١٣',
