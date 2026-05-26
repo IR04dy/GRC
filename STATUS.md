@@ -1,9 +1,145 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 26 May 2026 (Sprint 20 Sharia Governance & Audit Workflow arc closes — PRs #260 → #263, 4 PRs)
+**Last update:** 26 May 2026 (Sprints 30-32 Compliance-overlay tri-arc closes — PRs #265 → #270, 6 PRs across 3 sprints, plus this consolidated STATUS refresh)
 
 ---
 
-## 🟢 This arc — Sprint 20 Sharia Governance & Audit Workflow (26 May 2026, PRs #260 → #263)
+## 🟢 This arc — Sprints 30+31+32 Compliance Overlay tri-arc (26 May 2026, PRs #265 → #270)
+
+Three Tier-2 compliance-overlay sprints shipped back-to-back in a single
+session — each as backend + F8 + Saudi seed, with this consolidated
+STATUS doc replacing per-sprint refresh PRs. Frontend slices are
+deferred to a follow-up wake-up (the backend + F8 + seed substance is
+the regulator-facing surface that matters; UI is a thin wrapper).
+
+### Sprint 30 — Outsourcing & Cloud Governance (PRs #265, #266, #267)
+
+**Theme:** حوكمة الإسناد والسحابة — full SAMA Outsourcing Regulation surface + SAMA Cloud Computing Regulatory Framework data-residency engine, distinct from the lightweight `module/scm` vendor register.
+
+| PR | Slice |
+|---:|---|
+| #265 | Backend — 5 entities + 4 state machines + ~20 REST + F7/F8 + Python DB bootstrap |
+| #266 | F8 automation rules AR-261..AR-270 (SAMA Outsourcing §3-§8 + Cloud Framework §5 + PDPL Art.7) |
+| #267 | Saudi-realistic seed — 15 arrangements + 11 cloud services × 3 tenants |
+
+**State machines:** Arrangement (PROPOSED → RISK_ASSESSED → BOARD_APPROVED → SAMA_NOTIFIED → LIVE → UNDER_REVIEW → EXITED), CloudService (ONBOARDING → CLASSIFIED → APPROVED → IN_USE → DEPRECATED → DECOMMISSIONED, with auto-BLOCKED on T3/T4-non-IN_KINGDOM residency mismatch), OngoingReview (SCHEDULED → IN_PROGRESS → COMPLETED|WITH_FINDINGS|ESCALATED), ExitPlan (DRAFT → APPROVED → REHEARSED → READY → EXECUTED cascades arrangement to EXITED).
+
+**Cloud residency gate (SAMA Cloud §5):** T1 PUBLIC may be GLOBAL; T2 INTERNAL may be IN_KINGDOM or GCC; T3 CONFIDENTIAL + T4 RESTRICTED must be IN_KINGDOM. APPROVED promotion enforces this; violation auto-blocks the service and emits `CLOUD_SERVICE_RESIDENCY_VIOLATION`.
+
+**Core-activity gate (SAMA Outsourcing §5):** LIVE promotion of an `isCoreActivity` arrangement requires a SAMA non-objection letter reference on file. Service layer rejects without it.
+
+**F8 rules AR-261..AR-270:**
+- AR-261 ARRANGEMENT_REGISTERED → NOTIFY Risk + Compliance + Procurement
+- AR-262 BOARD_APPROVED (MATERIAL) → 60-day SAMA notification reminder ladder (T-30/T-7/T-0)
+- AR-263 LIVE (core-activity) → CREATE_RECORD evidence vault 7yr (SAMA non-objection trail)
+- AR-264 CLOUD_SERVICE_REGISTERED → NOTIFY CISO + DPO + CIO
+- AR-265 CLOUD_RESIDENCY_VIOLATION → ESCALATE + CRITICAL CAPA migrate-or-reclassify
+- AR-266 REVIEW_WITH_FINDINGS → NOTIFY + MEDIUM CAPA remediation
+- AR-267 REVIEW_ESCALATED → ESCALATE CRO + CISO + CRITICAL CAPA (consider exit)
+- AR-268 EXIT_EXECUTED → CREATE_RECORD 7yr + Board Risk Chair notification
+- AR-269 REVIEW_OVERDUE → T+0/T+30/T+60 reminder ladder
+- AR-270 CROSS_BORDER (provider non-SAUDI) → DPO + PDPL Art.7 review
+
+**Saudi seed for org=1:** TCS T24 core-banking maintenance (MATERIAL+CORE, LIVE with SAMA/COR/2024/0211 non-objection), AWS me-south-1 analytics (MATERIAL, GCC), STC Cloud Riyadh production (MATERIAL, IN_KINGDOM T3), Splunk Cloud SIEM (cross-border AR-270), Oracle Exadata BOARD_APPROVED 10 days ago (primes AR-262), Salesforce Marketing T3+GLOBAL auto-BLOCKED (primes AR-265), Genesys with overdue review (primes AR-269), printing+mailing NON_MATERIAL. + Aramco Trading (Eka TRM India, Azure Riyadh, Refinitiv UK, Hadef Legal UAE) + STC Bank (STC parent intra-group, Thales HSM core-activity, Nuance voice biometrics auto-BLOCKED on US-East-1).
+
+### Sprint 31 — AI/ML Model Lifecycle (PRs #268, #269)
+
+**Theme:** حوكمة دورة حياة نماذج الذكاء الاصطناعي — extends Sprint 11 MlModel registry with validation events, retraining cycles, periodic recertification, SDAIA AI Ethics annual attestation.
+
+| PR | Slice |
+|---:|---|
+| #268 | Backend — 4 entities + 3 state machines + ~12 REST + F7/F8 |
+| #269 | F8 AR-271..AR-280 + Saudi seed (bundled) — 6 Saudi models + 4 validations + 3 retrainings + 4 recerts |
+
+**State machines:** ModelValidation (SCHEDULED → IN_PROGRESS → PASSED|PASSED_WITH_CONDITIONS|FAILED → REMEDIATION → PASSED), RetrainingEvent (PROPOSED → APPROVED → IN_PROGRESS → DEPLOYED → ROLLED_BACK, plus REJECTED + ABANDONED), Recertification (DUE → IN_REVIEW → RECERTIFIED|RECERTIFIED_WITH_CONDITIONS|REVOKED). Retrainings tagged by trigger: DRIFT / SCHEDULED / MANUAL / POST_INCIDENT.
+
+**F8 rules AR-271..AR-280:**
+- AR-271 VALIDATION_SCHEDULED → NOTIFY validator + DPO + CRO
+- AR-272 VALIDATION_FAILED → ESCALATE CISO + DPO + CRO + CRITICAL CAPA
+- AR-273 PASSED_WITH_CONDITIONS → MEDIUM CAPA condition tracking
+- AR-274 fairness disparity >10% → ESCALATE SDAIA Fairness CRITICAL CAPA (Sharia Officer included)
+- AR-275 RETRAINING_PROPOSED with DRIFT trigger → T-3D/T-1D/T-0 fast-track approval ladder
+- AR-276 RETRAINING_DEPLOYED → CREATE_RECORD evidence vault 7yr (EU AI Act traceability)
+- AR-277 RETRAINING_ROLLED_BACK → CRITICAL post-mortem CAPA + CRO escalation
+- AR-278 RECERTIFICATION_DUE overdue → T+0/T+15/T+30 ladder + Board Risk
+- AR-279 RECERTIFICATION_REVOKED → suspend production + CRO escalate
+- AR-280 Annual SDAIA ethics attestation → T-30/T-7/T-0 reminder + CREATE_RECORD 7yr
+
+**Saudi seed for org=1:** 6 Saudi-realistic models — Retail Credit Scoring XGBoost (CRITICAL), Card-Fraud Detection (CRITICAL), AML Transaction Monitoring Graph (HIGH), Customer Churn (MEDIUM), Arabic OCR Iqama+ID (HIGH), Arabic LLM Chatbot (MEDIUM). 4 validations including a FAILED AML validation (primes AR-272) + a fairness-14.2% credit-scoring conditional pass (primes AR-274). 3 retrainings: a DRIFT-triggered PROPOSED credit-scoring (primes AR-275), a DEPLOYED fraud-detection 30 days ago (AR-276 evidence), and a ROLLED_BACK churn (primes AR-277 with under-prediction by 38% root cause). 4 recertifications: overdue credit-scoring (primes AR-278), in-flight fraud, RECERTIFIED_WITH_CONDITIONS AML last year (graph-pipeline upgrade), upcoming chatbot.
+
+Validator firms named realistically: Deloitte Saudi Arabia, KPMG Saudi Arabia, EY Saudi Arabia, STC Solutions AI Lab.
+
+### Sprint 32 — Data Classification + NDMO (PR #270)
+
+**Theme:** تصنيف البيانات وفق NDMO — NDMO Data Classification Policy (4-level scheme) + PDPL Article 4 (special-category) + Article 6 (lawful basis) + Article 7 (cross-border gate).
+
+| PR | Slice |
+|---:|---|
+| #270 | Backend + F8 + seed (single bundled PR) — 4 entities + 3 state machines + ~14 REST + 10 F8 rules + 12 assets seed |
+
+**State machines:** DataAsset (DRAFT → CLASSIFIED → APPROVED → IN_USE → REVIEW_DUE → RECLASSIFY → CLASSIFIED, terminal DECOMMISSIONED), DataFlow (PROPOSED → APPROVED → ACTIVE → SUSPENDED → TERMINATED, plus REJECTED), DataException (REQUESTED → APPROVED → ACTIVE → EXPIRED, plus REJECTED + REVOKED).
+
+**PDPL Art.7 cross-border gate:** A flow with destinationCountry != SAUDI and source asset classification ∈ {CONFIDENTIAL, TOP_SECRET} requires `pdplArt7TransferRef` on file before APPROVED promotion. Service-layer guard enforces; flow registration emits `DATA_FLOW_CROSS_BORDER_DETECTED` event the moment the combination is detected.
+
+**Classification ↔ SAMA Cloud tier alignment:** NDMO PUBLIC ≈ Cloud T1, INTERNAL ≈ T2, CONFIDENTIAL ≈ T3, TOP_SECRET ≈ T4 — same residency gate as Sprint 30 applies on cloud-hosted assets.
+
+**F8 rules AR-281..AR-290:**
+- AR-281 DATA_ASSET_REGISTERED → 30-day classification SLA reminder
+- AR-282 CONFIDENTIAL/TOP_SECRET classified → NOTIFY CISO + DPO + CIO
+- AR-283 PDPL Art.4 special-category → CREATE_RECORD evidence vault 7yr (DPIA + DPO sign-off)
+- AR-284 Reclassified UPWARD → NOTIFY CISO + DPO + Internal Audit + MEDIUM CAPA controls uplift
+- AR-285 CROSS_BORDER (CONFIDENTIAL+) → ESCALATE DPO + Compliance + CISO + HIGH CAPA Art.7 authorisation
+- AR-286 FLOW_APPROVED → CREATE_RECORD evidence vault 5yr
+- AR-287 EXCEPTION_REQUESTED → 5-day DPO+CISO triage with T-3/T-1/T-0 ladder
+- AR-288 EXCEPTION_APPROVED → CREATE_RECORD 7yr + T-30/T-7/T-0 expiry reminder
+- AR-289 DATA_REVIEW_DUE → NOTIFY steward + DPO
+- AR-290 EXCEPTION_EXPIRED while asset IN_USE → CRITICAL escalate + CAPA remediate-or-refile
+
+**Saudi seed for org=1 — 12 data assets across the bank's data estate:**
+- **TOP_SECRET (2):** Customer Voice Biometric Templates (PDPL BIOMETRIC, IN_KINGDOM-only, DPIA-2025-008) + AML Case File STR/CTR (PDPL CRIMINAL, IN_KINGDOM-only, DPIA-2024-005)
+- **CONFIDENTIAL (6):** Retail Customer Master, Transaction Ledger, Credit File w/SIMAH pulls, Employee HR (Oracle HCM KSA), Sharia Governance Records, Vendor Contracts Repository
+- **INTERNAL (3):** Policy Library (overdue review — primes AR-289), Market Data Feeds, Marketing Audience anonymised
+- **PUBLIC (1):** Fees & Charges Schedule
+
+**6 flows:** T24→AWS Bahrain analytics (ACTIVE, PDPL-ART7-2024-014 in place, GCC), Voice biometric→Nuance US (PROPOSED — primes AR-285 cross-border CONFIDENTIAL+), Credit File→SIMAH (ACTIVE in-Kingdom), Marketing→Salesforce EU (PROPOSED — pending Art.7), AML→SAFIU (ACTIVE in-Kingdom STR/CTR), Vendor Contracts→Infosys India DR (SUSPENDED pending Art.7 review).
+
+**3 exceptions:** Marketing masking-waiver ACTIVE expiring in 18 days (primes AR-288 ladder), Market Data encryption-at-rest-waiver ACTIVE long-term (compensating controls documented), Vendor Contracts cross-border-temp REQUESTED for India arbitration matter.
+
+### Tri-arc verified end-to-end
+
+- All Python bootstrap scripts pass `ast.parse` syntax check.
+- 24 new entities + 24 new repositories across 3 modules.
+- 30 new F8 automation rules (AR-261..AR-290) across V208/V209/V210.
+- 3 new schemas: `outsourcing`, expanded `ai_governance`, new `dataclass`.
+- 9 new DB tables across the 3 modules + 18 indexes (unique reference per tenant, status/classification clustering, cross-border filter).
+- ~46 new REST endpoints under `/api/v1/outsourcing`, `/api/v1/ai-lifecycle`, `/api/v1/dataclass`.
+
+### Compliance-overlay surface recap
+
+This tri-arc fills the **Tier-2 compliance-overlay band** of the
+Saudi-banking GRC platform — sitting on top of the Tier-1 banking
+surfaces (Sprints 14-20) and complementing the foundational arcs
+(Sprints 1-13). The full Saudi-regulator coverage matrix is now:
+
+| Surface | Sprint | Saudi anchor | AR range | AR label |
+|---|---:|---|---|---|
+| Reg Inspection | 15 | SAMA inspection visits | AR-201..AR-210 | التفتيش الرقابي |
+| Reg Reporting | 16 | SAMA/SOCPA/CMA statutory returns | AR-211..AR-220 | تقويم البلاغات |
+| RRP | 17 | SAMA RRP framework | AR-221..AR-230 | الاستعادة والحلّ |
+| Counterparty | 18 | SAMA Credit Risk Mgmt + Basel III | AR-231..AR-240 | سجل الأطراف المقابلة |
+| Open Banking | 19 | SAMA OBF v2 + FAPI 2.0 | AR-241..AR-250 | المصرفية المفتوحة |
+| Sharia Governance | 20 | SAMA Sharia Reg (Aug 2020) + AAOIFI | AR-251..AR-260 | الحوكمة الشرعية |
+| **Outsourcing & Cloud** | **30** | **SAMA Outsourcing Reg §3-§8 + Cloud Framework** | **AR-261..AR-270** | **حوكمة الإسناد والسحابة** |
+| **AI/ML Lifecycle** | **31** | **SDAIA AI Ethics + PDPL Art.4 + EU AI Act** | **AR-271..AR-280** | **دورة حياة نماذج الذكاء الاصطناعي** |
+| **Data Classification** | **32** | **NDMO Data Classification + PDPL Art.4/6/7** | **AR-281..AR-290** | **تصنيف البيانات** |
+
+### Pending follow-ups for the tri-arc
+
+- Frontend slices for `/outsourcing`, `/ai-lifecycle`, `/dataclass` (dashboard + register pages following Sprint 20 Sharia pattern) — queued for the next autonomous wake-up.
+- Aramco + STC Bank tenants currently have only org=1 seed for ai-lifecycle and dataclass. Cross-tenant extension is queued (Aramco's TRM/AI use case + STC Bank's voice-biometric AI assistant).
+
+---
+
+## 🟢 Previous arc — Sprint 20 Sharia Governance & Audit Workflow (26 May 2026, PRs #260 → #263)
 
 Sprint 20 lands the **Sharia Governance & Audit Workflow** module —
 the Sharia-compliance spine SAMA's **Implementing Regulation on
