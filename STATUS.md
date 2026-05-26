@@ -1,5 +1,40 @@
 # TSS GRC Platform — Version 2 Status
-**Last update:** 26 May 2026 (Sprints 30-32 Compliance-overlay tri-arc closes — PRs #265 → #270, 6 PRs across 3 sprints, plus this consolidated STATUS refresh)
+**Last update:** 26 May 2026 (Sprints 30-32 Compliance-overlay tri-arc frontend closeout — PRs #272, #273, #274 add the dashboard + register UI slices for the three modules)
+
+---
+
+## 🟢 Tri-arc frontend closeout — Sprints 30+31+32 (26 May 2026, PRs #272-#274)
+
+The three modules' frontend slices ship as 3 PRs following the established
+Sprint 20 Sharia frontend pattern (lib + dashboard + register pages +
+sidebar entry + bilingual translations):
+
+| Sprint | PR | Surface |
+|---:|---:|---|
+| 30 | #272 | `lib/outsourcingCloud.ts` + Dashboard + Arrangements + CloudServices, sidebar entry حوكمة الإسناد والسحابة under Compliance |
+| 31 | #273 | `lib/aiLifecycle.ts` + Dashboard + Recertifications, sidebar entry دورة حياة نماذج الذكاء الاصطناعي with Bot icon |
+| 32 | #274 | `lib/dataclass.ts` + Dashboard + Assets + Flows, sidebar entry تصنيف البيانات with Database icon |
+
+Each dashboard surfaces the 8-KPI strip + 3 breakdown panels + recent
+items + the "primed AR" panel (overdue reviews for AR-269, overdue
+recerts for AR-278, cross-border flows for AR-285) following the same
+visual rhythm the Saudi bank operator gets across every module.
+
+Saudi-native bilingual labels are end-to-end:
+
+- **Sprint 30:** الفئة ١-٤ classification + داخل المملكة residency labels + مُبلَّغ ساما / نشاط جوهري flags
+- **Sprint 31:** SDAIA fairness disparity colour-coded badge (≤5% success / ≤10% warning / >10% danger, primes AR-274) + RECERT_STATUS_LABEL covering مستحقّ / قيد المراجعة / مُعاد اعتماده / مُعاد اعتماده بشروط / مُلغى
+- **Sprint 32:** PDPL Art.4 special-category badging (صحية / بصمات حيوية / وراثية / دينية / عرقية / سياسية / سوابق جنائية) + PDPL Art.7 cross-border ref Missing-tag (primes AR-285)
+
+After this closeout, the Saudi-banking GRC platform surface count is
+**29 modules**, with the three Tier-2 compliance-overlay modules
+(Outsourcing & Cloud, AI/ML Lifecycle, Data Classification) now fully
+operator-accessible from the Compliance vertical of the sidebar.
+
+`npx tsc -b` clean across all 3 sprints. Each frontend slice emits its
+own lazy chunk on `npx vite build`.
+
+---
 
 ---
 
