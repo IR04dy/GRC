@@ -169,8 +169,8 @@ surfaces (Sprints 14-20) and complementing the foundational arcs
 
 ### Pending follow-ups for the tri-arc
 
-- Frontend slices for `/outsourcing`, `/ai-lifecycle`, `/dataclass` (dashboard + register pages following Sprint 20 Sharia pattern) — queued for the next autonomous wake-up.
-- Aramco + STC Bank tenants currently have only org=1 seed for ai-lifecycle and dataclass. Cross-tenant extension is queued (Aramco's TRM/AI use case + STC Bank's voice-biometric AI assistant).
+- ~~Frontend slices for `/outsourcing`, `/ai-lifecycle`, `/dataclass`~~ ✅ DONE — shipped as PRs #272-#274 (dashboard + register pages following the Sprint 20 Sharia pattern).
+- ~~Aramco + STC Bank tenants currently have only org=1 seed for ai-lifecycle and dataclass~~ ✅ DONE (1 Jun 2026) — `setup_ai_lifecycle_seed.py` + `setup_dataclass_seed.py` extended with `seed_org2()` (Aramco Trading — Eka TRM commodity-trading AI book: price-forecasting / trade-surveillance / counterparty-default / freight models + energy-trading data estate incl. Honeywell SCADA telemetry) and `seed_org3()` (STC Bank — voice-biometric / Arabic-LLM-chatbot / SIM-swap-fraud / thin-file-scoring AI book + telco-banking data estate incl. TOP_SECRET voice templates). Primed cross-tenant: org2 counterparty-default validation FAILED (AR-272) + org2 CONFIDENTIAL→India flow SUSPENDED (AR-285); org3 thin-file scoring 11.6% fairness disparity (AR-274) + org3 TOP_SECRET voice→US flow PROPOSED (AR-285). All inserts idempotent; per-org counts ai-lifecycle org2/org3 = 4 models·3 validations·2 retrainings·2 recerts each; dataclass org2/org3 = 7 assets·3 flows·2 exceptions each.
 
 ---
 

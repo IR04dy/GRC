@@ -271,10 +271,201 @@ def seed_org1():
         due=TODAY + timedelta(days=30))
 
 
+def seed_org2():
+    """Aramco Trading Company — energy + commodity-trading AI book (Eka TRM)."""
+    print(">>> org=2 Aramco Trading — commodity-trading AI/ML lifecycle book")
+
+    m = {}
+    m['price'] = ensure_model(2, "MDL-ATC-PRC-001",
+        title_en="Crude & Refined-Products Price Forecasting",
+        title_ar="التنبّؤ بأسعار النفط الخام والمنتجات المكرّرة",
+        mtype="FORECASTING", domain="RISK_SCORING", tier="HIGH",
+        version="v2.4.0")
+    m['surv'] = ensure_model(2, "MDL-ATC-SRV-002",
+        title_en="Trade Surveillance & Market-Abuse Detection",
+        title_ar="مراقبة التداول وكشف إساءة استخدام السوق",
+        mtype="CLASSIFICATION", domain="FRAUD_DETECTION", tier="CRITICAL",
+        version="v1.6.2")
+    m['cpty'] = ensure_model(2, "MDL-ATC-CPT-003",
+        title_en="Counterparty Credit-Default Scoring (TRM)",
+        title_ar="تسجيل تعثّر الأطراف المقابلة (إدارة مخاطر التداول)",
+        mtype="CLASSIFICATION", domain="CREDIT_DECISION", tier="HIGH",
+        version="v1.3.0")
+    m['freight'] = ensure_model(2, "MDL-ATC-FRT-004",
+        title_en="Freight & Demurrage Cost Optimisation",
+        title_ar="تحسين تكاليف الشحن وغرامات التأخير (Demurrage)",
+        mtype="REGRESSION", domain="OPERATIONS_AUTOMATION", tier="MEDIUM",
+        version="v1.0.3")
+
+    # ─── Validations ──────────────────────────────────────────────────
+
+    # Surveillance — PASSED_WITH_CONDITIONS (spoofing false-positive rate)
+    ins_val(2, m['surv'], "VAL-2026-ATC-SRV",
+        "PASSED_WITH_CONDITIONS",
+        validator_label="Protiviti — Trading & Treasury Controls",
+        scheduled=TODAY - timedelta(days=50),
+        started=NOW - timedelta(days=45), completed=NOW - timedelta(days=20),
+        disparity=0.0,
+        findings_en="Spoofing/layering recall 0.92 on replayed 2025 order-book; false-positive rate 6.4% (target ≤ 4%). Elevated alerts cluster on illiquid Murban dated-Brent spreads where the venue micro-structure mimics layering.",
+        findings_ar="استذكار كشف التلاعب بالأوامر (Spoofing/Layering) ٠.٩٢ على دفتر أوامر ٢٠٢٥ المُعاد تشغيله؛ معدّل الإنذارات الكاذبة ٦.٤٪ (المستهدف ≤ ٤٪). تتركّز الإنذارات الزائدة على فروق مربان/برنت المؤجّل قليلة السيولة حيث تُحاكي بنية السوق الدقيقة نمط التلاعب.",
+        conditions_en="(1) Add venue-liquidity feature to suppress illiquid-spread false positives. (2) Tune alert threshold per instrument-liquidity band. (3) Re-validate within 90 days. (4) Compliance Surveillance sign-off.",
+        conditions_ar="(١) إضافة سمة سيولة المنصّة لكبح الإنذارات الكاذبة على الفروق قليلة السيولة. (٢) معايرة عتبة الإنذار حسب نطاق سيولة الأداة. (٣) إعادة التحقّق خلال ٩٠ يوماً. (٤) اعتماد مراقبة الالتزام.")
+
+    # Price forecasting — PASSED
+    ins_val(2, m['price'], "VAL-2026-ATC-PRC",
+        "PASSED",
+        validator_label="KPMG Saudi Arabia — Quantitative Risk",
+        scheduled=TODAY - timedelta(days=95),
+        started=NOW - timedelta(days=90), completed=NOW - timedelta(days=78),
+        disparity=0.0,
+        findings_en="Directional accuracy 0.71 on 1-day horizon, MAPE 3.8% on 5-day refined-products forecast over the Q4-2025 hold-out. Back-test Sharpe within trading-desk risk tolerance.",
+        findings_ar="الدقّة الاتجاهية ٠.٧١ على أفق يوم واحد، ونسبة الخطأ المطلق المئوي ٣.٨٪ على توقّع المنتجات المكرّرة لخمسة أيام عبر عيّنة الربع الرابع ٢٠٢٥. نسبة شارب في الاختبار الرجعي ضمن تحمّل مخاطر طاولة التداول.")
+
+    # Counterparty default — FAILED (primes AR-272)
+    ins_val(2, m['cpty'], "VAL-2026-ATC-CPT",
+        "FAILED",
+        validator_label="PwC Saudi Arabia — Credit Risk Modelling",
+        scheduled=TODAY - timedelta(days=28),
+        started=NOW - timedelta(days=24), completed=NOW - timedelta(days=3),
+        disparity=0.0,
+        findings_en="Default-detection recall dropped to 0.74 on the 2025 trading-counterparty hold-out (target ≥ 0.85). Model under-weights single-name commodity-trader concentration after the Trafigura-style structured-prepayment exposures entered the book. PD calibration stale vs current rating migrations.",
+        findings_ar="انخفض استذكار كشف التعثّر إلى ٠.٧٤ على عيّنة الأطراف المقابلة للتداول ٢٠٢٥ (المستهدف ≥ ٠.٨٥). يقلّل النموذج من وزن تركّز تجّار السلع أحاديّي الاسم بعد دخول تعرّضات الدفع المُسبق المُهيكل إلى الدفتر. معايرة احتمال التعثّر قديمة مقابل هجرات التصنيف الحالية.")
+
+    # ─── Retrainings ──────────────────────────────────────────────────
+
+    # Price — DRIFT-triggered PROPOSED (oil-price regime shift, primes AR-275)
+    ins_ret(2, m['price'], "RTR-2026-ATC-PRC-001",
+        "PROPOSED",
+        trigger="DRIFT",
+        rationale_en="Concept drift detected — OPEC+ Q1-2026 production-quota shift moved the crude term-structure into backwardation. Feature importances for time-spread and freight-rate inputs have decoupled from the training regime. Retraining proposed on the trailing 24 months.",
+        rationale_ar="رُصد انحراف مفاهيمي — تحوّل حصص إنتاج أوبك+ في الربع الأول ٢٠٢٦ نقل البنية الزمنية للخام إلى التراجع السعري (Backwardation). تباعدت أهمّية سمات الفارق الزمني وأسعار الشحن عن نظام التدريب. تُقترح إعادة التدريب على آخر ٢٤ شهراً.",
+        from_v="v2.4.0", to_v="v2.5.0")
+
+    # Surveillance — DEPLOYED 25 days ago (AR-276 record)
+    ins_ret(2, m['surv'], "RTR-2026-ATC-SRV-001",
+        "DEPLOYED",
+        trigger="SCHEDULED",
+        rationale_en="Quarterly surveillance-model refresh. Added 2025 CMA market-conduct typologies + 1,100 newly labelled alert dispositions. Precision improved 0.88 → 0.91.",
+        rationale_ar="تحديث فصلي لنموذج المراقبة. أُضيفت أنماط سلوك السوق من هيئة السوق المالية ٢٠٢٥ و١,١٠٠ تصرّف إنذار مُصنَّف حديثاً. تحسّن الإحكام من ٠.٨٨ إلى ٠.٩١.",
+        from_v="v1.6.1", to_v="v1.6.2",
+        approved=NOW - timedelta(days=48), started=NOW - timedelta(days=42),
+        deployed=TODAY - timedelta(days=25))
+
+    # ─── Recertifications ─────────────────────────────────────────────
+
+    # Surveillance — overdue (primes AR-278)
+    ins_rec(2, m['surv'], "REC-2026-ATC-SRV",
+        "DUE", cycle="Annual 2026",
+        due=TODAY - timedelta(days=12))
+
+    # Price — upcoming
+    ins_rec(2, m['price'], "REC-2026-ATC-PRC",
+        "DUE", cycle="Annual 2026",
+        due=TODAY + timedelta(days=55))
+
+
+def seed_org3():
+    """STC Bank — telco-banking digital-bank AI book (voice biometrics, USSD)."""
+    print(">>> org=3 STC Bank — telco-banking AI/ML lifecycle book")
+
+    m = {}
+    m['voice'] = ensure_model(3, "MDL-STCB-VOI-001",
+        title_en="Voice Biometric Speaker Verification",
+        title_ar="التحقّق من المتحدّث بالبصمة الصوتية",
+        mtype="CLASSIFICATION", domain="KYC_OCR", tier="CRITICAL",
+        version="v3.0.1")
+    m['chat'] = ensure_model(3, "MDL-STCB-CHT-002",
+        title_en="Arabic-Dialect Customer Assistant (LLM)",
+        title_ar="مساعد العملاء باللهجة العربية (نموذج لغوي)",
+        mtype="LLM", domain="CHATBOT", tier="MEDIUM",
+        version="v0.8.4")
+    m['sim'] = ensure_model(3, "MDL-STCB-SIM-003",
+        title_en="SIM-Swap & USSD (*900#) Fraud Detection",
+        title_ar="كشف احتيال تبديل الشريحة وخدمة *900#",
+        mtype="CLASSIFICATION", domain="FRAUD_DETECTION", tier="CRITICAL",
+        version="v2.2.0")
+    m['score'] = ensure_model(3, "MDL-STCB-SCR-004",
+        title_en="Telco Alternative-Data Thin-File Credit Scoring",
+        title_ar="تسجيل ائتماني بالبيانات البديلة لعملاء الاتصالات",
+        mtype="CLASSIFICATION", domain="CREDIT_DECISION", tier="HIGH",
+        version="v1.1.5")
+
+    # ─── Validations ──────────────────────────────────────────────────
+
+    # Voice biometric — PASSED_WITH_CONDITIONS (false-accept on synthetic-voice)
+    ins_val(3, m['voice'], "VAL-2026-STCB-VOI",
+        "PASSED_WITH_CONDITIONS",
+        validator_label="STC Solutions AI Lab — independent validation",
+        scheduled=TODAY - timedelta(days=44),
+        started=NOW - timedelta(days=40), completed=NOW - timedelta(days=16),
+        disparity=0.0,
+        findings_en="Equal-error rate 1.8%; genuine-accept 98.4%. False-accept rate against synthetic/replayed voice (deepfake TTS) measured at 2.3% — above the 1% security target. Anti-spoofing liveness layer required before unconditional sign-off.",
+        findings_ar="معدّل الخطأ المتساوي ١.٨٪؛ القبول الصحيح ٩٨.٤٪. معدّل القبول الخاطئ أمام الصوت المُصطنَع/المُعاد تشغيله (تزييف عميق) بلغ ٢.٣٪ — أعلى من المستهدف الأمني ١٪. تُشترَط طبقة كشف الحيويّة المضادّة للانتحال قبل الاعتماد غير المشروط.",
+        conditions_en="(1) Deploy anti-spoofing liveness detection (challenge-response phrase). (2) Cap retries at 3 before step-up to OTP. (3) Re-validate within 60 days. (4) CISO + DPO sign-off (PDPL Art.4 biometric).",
+        conditions_ar="(١) تفعيل كشف الحيويّة المضادّ للانتحال (عبارة تحدٍّ واستجابة). (٢) تقييد المحاولات بثلاث قبل التصعيد لرمز التحقّق لمرة واحدة. (٣) إعادة التحقّق خلال ٦٠ يوماً. (٤) اعتماد مسؤول أمن المعلومات والحامي (المادة ٤ بصمات حيوية).")
+
+    # Thin-file credit scoring — PASSED_WITH_CONDITIONS, fairness 11.6% (primes AR-274)
+    ins_val(3, m['score'], "VAL-2026-STCB-SCR",
+        "PASSED_WITH_CONDITIONS",
+        validator_label="Deloitte Saudi Arabia — Model Validation Practice",
+        scheduled=TODAY - timedelta(days=36),
+        started=NOW - timedelta(days=32), completed=NOW - timedelta(days=8),
+        disparity=11.6,
+        findings_en="Approval-rate disparity 11.6% between under-25 thin-file applicants and the over-35 segment (target ≤ 5%). Alternative-data features (top-up recency, roaming pattern) proxy for age. AUC 0.79.",
+        findings_ar="تفاوت معدّل القبول ١١.٦٪ بين متقدّمي الملفّات الرقيقة دون ٢٥ عاماً وشريحة فوق ٣٥ عاماً (المستهدف ≤ ٥٪). تعمل سمات البيانات البديلة (حداثة التعبئة، نمط التجوال) كوكيلٍ للعمر. مساحة تحت المنحنى ٠.٧٩.",
+        conditions_en="(1) Remove age-proxy alternative-data features or apply reject-option post-processing. (2) Add fairness constraint to training objective. (3) Re-validate within 90 days. (4) SAMA Responsible-Lending + DPO sign-off.",
+        conditions_ar="(١) إزالة سمات البيانات البديلة الوكيلة للعمر أو تطبيق معالجة بعديّة بخيار الرفض. (٢) إضافة قيد العدالة لهدف التدريب. (٣) إعادة التحقّق خلال ٩٠ يوماً. (٤) اعتماد الإقراض المسؤول لدى ساما والحامي.")
+
+    # SIM-swap fraud — PASSED
+    ins_val(3, m['sim'], "VAL-2026-STCB-SIM",
+        "PASSED",
+        validator_label="EY Saudi Arabia — Fraud Analytics",
+        scheduled=TODAY - timedelta(days=70),
+        started=NOW - timedelta(days=66), completed=NOW - timedelta(days=58),
+        disparity=0.0,
+        findings_en="Precision 0.96, recall 0.94 on Q4-2025 SIM-swap + USSD-takeover hold-out. SS7/SIGTRAN velocity features stable. Within fraud-model risk tolerance.",
+        findings_ar="الإحكام ٠.٩٦، الاستذكار ٠.٩٤ على عيّنة تبديل الشريحة واستيلاء *900# للربع الرابع ٢٠٢٥. سمات سرعة SS7/SIGTRAN مستقرّة. ضمن تحمّل مخاطر نموذج الاحتيال.")
+
+    # ─── Retrainings ──────────────────────────────────────────────────
+
+    # SIM-swap — DEPLOYED 20 days ago (AR-276 record)
+    ins_ret(3, m['sim'], "RTR-2026-STCB-SIM-001",
+        "DEPLOYED",
+        trigger="SCHEDULED",
+        rationale_en="Quarterly fraud-model refresh. Added 3,800 newly confirmed SIM-swap + USSD-takeover cases from Q4-2025. Recall improved 0.91 → 0.94.",
+        rationale_ar="تحديث فصلي لنموذج الاحتيال. أُضيفت ٣,٨٠٠ حالة مؤكَّدة جديدة لتبديل الشريحة واستيلاء *900# من الربع الرابع ٢٠٢٥. تحسّن الاستذكار من ٠.٩١ إلى ٠.٩٤.",
+        from_v="v2.1.0", to_v="v2.2.0",
+        approved=NOW - timedelta(days=40), started=NOW - timedelta(days=34),
+        deployed=TODAY - timedelta(days=20))
+
+    # Chatbot — MANUAL retraining IN_PROGRESS (dialect coverage)
+    ins_ret(3, m['chat'], "RTR-2026-STCB-CHT-001",
+        "IN_PROGRESS",
+        trigger="MANUAL",
+        rationale_en="Manual retraining to expand Gulf/Najdi/Hejazi dialect coverage and reduce hallucination on tariff queries. Adds 42k curated bilingual support transcripts + RAG grounding on the live product catalogue.",
+        rationale_ar="إعادة تدريب يدوية لتوسيع تغطية اللهجات الخليجية والنجدية والحجازية وتقليل الهلوسة في استفسارات التعرفة. تضيف ٤٢ ألف محادثة دعم ثنائية اللغة منسَّقة + تأريض الاسترجاع على كتالوج المنتجات الحيّ.",
+        from_v="v0.8.4", to_v="v0.9.0",
+        approved=NOW - timedelta(days=12), started=NOW - timedelta(days=6))
+
+    # ─── Recertifications ─────────────────────────────────────────────
+
+    # Voice biometric — overdue (primes AR-278)
+    ins_rec(3, m['voice'], "REC-2026-STCB-VOI",
+        "DUE", cycle="Annual 2026",
+        due=TODAY - timedelta(days=9))
+
+    # Thin-file scoring — upcoming
+    ins_rec(3, m['score'], "REC-2026-STCB-SCR",
+        "DUE", cycle="Annual 2026",
+        due=TODAY + timedelta(days=38))
+
+
 def main():
     print(">>> Sprint 31 PR #4 — Saudi-realistic AI/ML lifecycle seed")
     try:
         seed_org1()
+        seed_org2()
+        seed_org3()
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -286,8 +477,11 @@ def main():
         ("ai_governance.retraining_event", "retrainings"),
         ("ai_governance.recertification", "recertifications"),
     ]:
-        cur.execute(f"SELECT COUNT(*) FROM {tbl} WHERE is_deleted = 0")
-        print(f"+ {label:<20s}: {cur.fetchone()[0]}")
+        cur.execute(
+            f"SELECT organisation_id, COUNT(*) FROM {tbl} WHERE is_deleted = 0 "
+            "GROUP BY organisation_id ORDER BY organisation_id")
+        by_org = " ".join(f"org{r[0]}={r[1]}" for r in cur.fetchall())
+        print(f"+ {label:<20s}: {by_org}")
     print(">>> done.")
 
 
