@@ -1,5 +1,6 @@
 package com.tss.grc.module.evidence.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.evidence.dto.*;
 import com.tss.grc.module.evidence.entity.*;
@@ -15,12 +16,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -31,9 +35,24 @@ public class EvidenceItemService {
     private final EvidenceControlRepository controlRepository;
     private final EvidenceFrameworkRepository frameworkRepository;
     private final EvidenceLinkRepository linkRepository;
+    private final EvidenceRequestRepository requestRepository;
     private final UserRepository userRepository;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
+    private final EvidenceStorageService storage;
+
+    // ── Item lifecycle state machine ──────────────────────────────────────────
+    static final Set<String> ITEM_STATUSES =
+        Set.of("DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "NEEDS_REVISION", "EXPIRED");
+
+    private static final Map<String, Set<String>> ITEM_TRANSITIONS = Map.of(
+        "DRAFT",          Set.of("PENDING_REVIEW"),
+        "PENDING_REVIEW", Set.of("APPROVED", "REJECTED", "NEEDS_REVISION"),
+        "NEEDS_REVISION", Set.of("PENDING_REVIEW", "DRAFT"),
+        "REJECTED",       Set.of("PENDING_REVIEW", "DRAFT"),
+        "APPROVED",       Set.of("EXPIRED", "PENDING_REVIEW"),
+        "EXPIRED",        Set.of("PENDING_REVIEW", "DRAFT")
+    );
 
     // ── F8 payload + emit ─────────────────────────────────────────────────────
     //
@@ -163,6 +182,11 @@ public class EvidenceItemService {
     }
 
     @Transactional
+    public EvidenceItemResponse requestRevision(Long id) {
+        return transitionStatus(id, "NEEDS_REVISION");
+    }
+
+    @Transactional
     public void delete(Long id) {
         Long orgId = TenantContext.getCurrentTenant();
         EvidenceItem item = itemRepository.findById(id)
@@ -173,6 +197,71 @@ public class EvidenceItemService {
         audit.log("DELETE", "EvidenceItem", item.getId(),
             "Evidence soft-deleted: " + nullSafe(item.getTitleEn()));
         emit("EVIDENCE_DELETED", item, null);
+    }
+
+    /**
+     * System-level nightly sweep (runs with no tenant context). Flips
+     * APPROVED items whose validTo has passed to EXPIRED, emits
+     * EVIDENCE_EXPIRED, and re-opens the originating request so the gap
+     * re-surfaces in the coverage rollup. Returns the count expired.
+     * Driven by {@link EvidenceExpiryScheduler}.
+     */
+    @Transactional
+    public int expireStaleEvidence() {
+        List<EvidenceItem> stale = itemRepository.findApprovedExpiredAllOrgs(LocalDate.now());
+        int expired = 0;
+        for (EvidenceItem item : stale) {
+            TenantContext.setCurrentTenant(item.getOrganisationId());
+            try {
+                String previousStatus = item.getStatus();
+                item.setStatus("EXPIRED");
+                itemRepository.save(item);
+                audit.log("TRANSITION", "EvidenceItem", item.getId(),
+                    "Auto-expired: " + previousStatus + " → EXPIRED (validTo " + item.getValidTo() + ")");
+                emit("EVIDENCE_EXPIRED", item, previousStatus);
+                if (item.getRequestId() != null) {
+                    requestRepository.findById(item.getRequestId()).ifPresent(r -> {
+                        if (!"CLOSED".equals(r.getStatus())) {
+                            r.setStatus("OPEN");
+                            r.setFulfilledAt(null);
+                            r.setFulfilledById(null);
+                            requestRepository.save(r);
+                        }
+                    });
+                }
+                expired++;
+            } finally {
+                TenantContext.clear();
+            }
+        }
+        return expired;
+    }
+
+    /**
+     * Attach a binary document to an evidence item. Stores the bytes via
+     * {@link EvidenceStorageService} (size + type validated, path-traversal
+     * safe), records the SHA-256 into the chain-of-custody hash, and stamps
+     * file metadata + collectedAt. Backs POST /items/{id}/file (multipart).
+     */
+    @Transactional
+    public EvidenceItemResponse attachFile(Long id, MultipartFile file) {
+        Long orgId = TenantContext.getCurrentTenant();
+        EvidenceItem item = itemRepository.findById(id)
+                .filter(e -> e.getOrganisationId().equals(orgId))
+                .orElseThrow(() -> new EntityNotFoundException("Evidence not found: " + id));
+        EvidenceStorageService.StoredFile stored = storage.store(orgId, file);
+        item.setFileName(stored.originalName());
+        item.setFilePath(stored.relativePath());
+        item.setFileSize(stored.size());
+        item.setMimeType(stored.mimeType());
+        item.setEvidenceHash(stored.sha256());
+        item.setCollectedAt(LocalDateTime.now());
+        item = itemRepository.save(item);
+        audit.log("UPLOAD", "EvidenceItem", item.getId(),
+            "File attached: " + nullSafe(stored.originalName())
+                + " (" + stored.size() + " bytes, sha256 " + stored.sha256().substring(0, 12) + "…)");
+        emit("EVIDENCE_FILE_ATTACHED", item, item.getStatus());
+        return toResponse(item);
     }
 
     @Transactional
@@ -194,6 +283,7 @@ public class EvidenceItemService {
                 .filter(e -> e.getOrganisationId().equals(orgId))
                 .orElseThrow(() -> new EntityNotFoundException("Evidence not found: " + id));
         String previousStatus = item.getStatus();
+        validateTransition(previousStatus, newStatus);
         item.setStatus(newStatus);
         item = itemRepository.save(item);
         audit.log("TRANSITION", "EvidenceItem", item.getId(),
@@ -207,10 +297,49 @@ public class EvidenceItemService {
             case "PENDING_REVIEW" -> "EVIDENCE_SUBMITTED";
             case "APPROVED"       -> "EVIDENCE_APPROVED";
             case "REJECTED"       -> "EVIDENCE_REJECTED";
+            case "NEEDS_REVISION" -> "EVIDENCE_REVISION_REQUESTED";
+            case "EXPIRED"        -> "EVIDENCE_EXPIRED";
             default               -> "EVIDENCE_TRANSITIONED";
         };
         emit(trigger, item, previousStatus);
+        // Close the collect→fulfil loop: an APPROVED item that was raised
+        // against a request stamps that request as fulfilled.
+        if ("APPROVED".equals(newStatus) && item.getRequestId() != null) {
+            fulfilRequest(item, orgId);
+        }
         return toResponse(item);
+    }
+
+    /**
+     * State-machine guard. Unknown destination statuses are a client error
+     * (400 via IllegalArgumentException); known-but-illegal moves are a
+     * conflict (409 via IllegalTransitionException). A no-op same-status
+     * transition is allowed so callers stay idempotent.
+     */
+    private void validateTransition(String from, String to) {
+        if (!ITEM_STATUSES.contains(to)) {
+            throw new IllegalArgumentException(
+                "Unknown evidence status: '" + to + "'. Valid statuses: " + ITEM_STATUSES);
+        }
+        if (to.equals(from)) return;
+        Set<String> allowed = ITEM_TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(to)) {
+            throw new IllegalTransitionException(from, to, allowed);
+        }
+    }
+
+    /** Stamp the originating request as fulfilled when its evidence is approved. */
+    private void fulfilRequest(EvidenceItem item, Long orgId) {
+        requestRepository.findById(item.getRequestId())
+            .filter(r -> r.getOrganisationId().equals(orgId))
+            .ifPresent(r -> {
+                r.setFulfilledById(item.getOwnerId());
+                r.setFulfilledAt(LocalDateTime.now());
+                if (!"CLOSED".equals(r.getStatus()) && !"APPROVED".equals(r.getStatus())) {
+                    r.setStatus("SUBMITTED");
+                }
+                requestRepository.save(r);
+            });
     }
 
     private void applyRequest(EvidenceItem item, EvidenceItemCreateRequest req) {
@@ -218,6 +347,7 @@ public class EvidenceItemService {
         item.setTitleAr(req.titleAr());
         item.setDescriptionEn(req.descriptionEn());
         item.setSubControlId(req.subControlId());
+        item.setRequestId(req.requestId());
         item.setEvidenceType(req.evidenceType());
         item.setSourceModule(req.sourceModule());
         item.setSourceEntityId(req.sourceEntityId());

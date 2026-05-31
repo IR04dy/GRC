@@ -11,8 +11,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -76,6 +78,14 @@ public class EvidenceItemController {
     public EvidenceItemResponse update(@PathVariable Long id,
                                         @Valid @RequestBody EvidenceItemCreateRequest request) {
         return evidenceItemService.update(id, request);
+    }
+
+    @PostMapping(value = "/{id}/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
+    @Operation(summary = "Upload a binary document file for an evidence item (multipart)")
+    public EvidenceItemResponse uploadFile(@PathVariable Long id,
+                                           @RequestParam("file") MultipartFile file) {
+        return evidenceItemService.attachFile(id, file);
     }
 
     @PostMapping("/{id}/submit")

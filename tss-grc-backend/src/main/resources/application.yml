@@ -88,6 +88,11 @@ server:
       charset: UTF-8
       enabled: true
       force: true
+    multipart:
+      # Evidence-item binary uploads (POST /api/v1/evidence/items/{id}/file).
+      # Default is 1MB which is too small for real evidence documents.
+      max-file-size: 50MB
+      max-request-size: 55MB
   error:
     include-message: on_param
     include-binding-errors: on_param

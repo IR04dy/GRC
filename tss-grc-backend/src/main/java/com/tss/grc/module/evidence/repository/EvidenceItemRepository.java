@@ -26,6 +26,12 @@ public interface EvidenceItemRepository extends JpaRepository<EvidenceItem, Long
            "AND e.validTo IS NOT NULL AND e.validTo < :today")
     List<EvidenceItem> findExpired(@Param("orgId") Long orgId, @Param("today") LocalDate today);
 
+    /** Cross-org: APPROVED items whose validTo has passed — driven by the
+     *  nightly auto-expiry scheduler (runs outside any tenant context). */
+    @Query("SELECT e FROM EvidenceItem e WHERE e.status = 'APPROVED' " +
+           "AND e.validTo IS NOT NULL AND e.validTo < :today")
+    List<EvidenceItem> findApprovedExpiredAllOrgs(@Param("today") LocalDate today);
+
     @Query("SELECT e FROM EvidenceItem e WHERE e.organisationId = :orgId " +
            "AND e.subControlId = :subControlId")
     List<EvidenceItem> findBySubControl(@Param("orgId") Long orgId, @Param("subControlId") Long subControlId);
