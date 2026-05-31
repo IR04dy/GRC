@@ -1,0 +1,541 @@
+[
+{
+"id": 165,
+"code": "1-1-1",
+"name_en": "Board-Approved Cybersecurity Strategy",
+"name_ar": "استراتيجية أمن سيبراني معتمدة من مجلس الإدارة",
+"en": "Board resolution approving the cybersecurity strategy for critical systems; strategy document with sign-off date; annual review minutes; alignment mapping to national cybersecurity strategy objectives"
+},
+{
+"id": 166,
+"code": "1-1-2",
+"name_en": "Cybersecurity Budget and Resource Allocation for Critical Systems",
+"name_ar": "ميزانية الأمن السيبراني وتخصيص الموارد للأنظمة الحساسة",
+"en": "Approved annual cybersecurity budget line item; headcount plan for critical-system security roles; evidence that budget requests align to risk register priorities; board/executive approval of allocation"
+},
+{
+"id": 167,
+"code": "1-1-3",
+"name_en": "Cybersecurity Objectives and KPIs for Critical Systems",
+"name_ar": "أهداف ومؤشرات أداء الأمن السيبراني للأنظمة الحساسة",
+"en": "KPI dashboard with baseline, target, and actual metrics for critical systems; quarterly review reports presented to senior management; evidence of corrective actions where targets are missed"
+},
+{
+"id": 168,
+"code": "1-2-1",
+"name_en": "Cybersecurity Management Roles and Accountability",
+"name_ar": "أدوار إدارة الأمن السيبراني والمساءلة",
+"en": "Organizational chart showing CISO/cybersecurity function; role descriptions for all critical-system security roles; documented delegation of authority; evidence of security steering committee or equivalent governance body"
+},
+{
+"id": 169,
+"code": "1-2-2",
+"name_en": "Cybersecurity Reporting to Executive Management",
+"name_ar": "تقارير الأمن السيبراني لإدارة الوحدة التنظيمية",
+"en": "Management pack templates used for executive reporting; samples of quarterly cybersecurity reports including critical-system KPIs; board/executive sign-off or acknowledgement records"
+},
+{
+"id": 170,
+"code": "1-2-3",
+"name_en": "Integration with Enterprise Risk Management",
+"name_ar": "التكامل مع إدارة مخاطر المؤسسة",
+"en": "Risk register entries for critical systems visible in the enterprise risk register; evidence of risk escalation and treatment decisions; mapping between cyber risks and operational/strategic risks"
+},
+{
+"id": 171,
+"code": "1-3-1",
+"name_en": "Policy Framework Covering Critical Systems",
+"name_ar": "إطار السياسات الذي يشمل الأنظمة الحساسة",
+"en": "Policy inventory listing all applicable policies for critical systems with version, owner, and next-review date; approval records; evidence of annual review cycle completion"
+},
+{
+"id": 172,
+"code": "1-3-2",
+"name_en": "Policy Exception and Waiver Management",
+"name_ar": "إدارة الاستثناءات والإعفاءات من السياسات",
+"en": "Exception/waiver register for critical-system policy deviations; risk acceptance approvals at appropriate authority level; compensating control documentation; time-bounded waiver records with closure evidence"
+},
+{
+"id": 173,
+"code": "1-3-3",
+"name_en": "Policy Compliance Monitoring",
+"name_ar": "رصد الامتثال للسياسات",
+"en": "Compliance monitoring schedule and reports; evidence of automated policy checks (e.g., SIEM rules, configuration audits); non-compliance findings log with remediation tracking"
+},
+{
+"id": 174,
+"code": "1-4-1",
+"name_en": "Defined Cybersecurity Roles for Critical Systems",
+"name_ar": "تحديد أدوار الأمن السيبراني للأنظمة الحساسة",
+"en": "Job descriptions/role profiles for all cybersecurity positions covering critical systems; RACI matrix for critical-system security functions; evidence of role-based training completion"
+},
+{
+"id": 175,
+"code": "1-4-2",
+"name_en": "Separation of Duties for Critical Systems",
+"name_ar": "فصل المهام للأنظمة الحساسة",
+"en": "Separation-of-duties matrix for critical-system administrative functions; evidence of access reviews confirming no conflicting role assignments; compensating monitoring controls where SoD conflicts cannot be eliminated"
+},
+{
+"id": 176,
+"code": "1-5-1",
+"name_en": "Critical System Asset Risk Assessment",
+"name_ar": "تقييم مخاطر أصول الأنظمة الحساسة",
+"en": "Risk assessment methodology document; completed risk assessments for all critical systems with likelihood/impact ratings; risk treatment plans with owners and due dates; evidence of risk acceptance sign-offs"
+},
+{
+"id": 177,
+"code": "1-5-2",
+"name_en": "Threat Intelligence Integration into Risk Management",
+"name_ar": "دمج المعلومات الاستخباراتية عن التهديدات في إدارة المخاطر",
+"en": "Threat intelligence subscriptions or NCA/CERT feeds evidence; documented process for translating threat intel into risk register updates; board-pack sections referencing current threat landscape for critical systems"
+},
+{
+"id": 178,
+"code": "1-5-3",
+"name_en": "Risk Acceptance and Residual Risk Sign-off",
+"name_ar": "قبول المخاطر والموافقة على المخاطر المتبقية",
+"en": "Residual risk register with formal acceptance records signed by asset owners and senior management; evidence that accepted risks are reviewed at least annually; escalation records for risks exceeding appetite"
+},
+{
+"id": 179,
+"code": "1-6-1",
+"name_en": "Security Review Gate in Change Management",
+"name_ar": "بوابة مراجعة أمنية في إدارة التغييرات",
+"en": "Change management policy/procedure showing mandatory security review step; CAB minutes evidencing security sign-off for critical-system changes; rejected change records where security review failed; change-freeze calendar and approval records"
+},
+{
+"id": 180,
+"code": "1-6-2",
+"name_en": "Security Requirements in Project Lifecycles",
+"name_ar": "متطلبات الأمن السيبراني في دورات حياة المشاريع",
+"en": "Project charter templates showing mandatory security requirements section; security architecture review records for projects touching critical systems; penetration test reports before go-live; lessons-learned security entries"
+},
+{
+"id": 181,
+"code": "1-6-3",
+"name_en": "Post-Implementation Security Review",
+"name_ar": "مراجعة أمنية بعد التنفيذ",
+"en": "Post-implementation review (PIR) reports for critical-system changes including security findings; evidence that identified gaps are tracked in the risk/remediation register; baseline configuration snapshots taken post-implementation"
+},
+{
+"id": 182,
+"code": "1-7-1",
+"name_en": "Annual Internal Cybersecurity Audit of Critical Systems",
+"name_ar": "التدقيق الداخلي السنوي للأمن السيبراني للأنظمة الحساسة",
+"en": "Internal audit plan covering critical systems; completed audit reports with findings and risk ratings; management responses and remediation plans; evidence of closure verification for high/critical findings"
+},
+{
+"id": 183,
+"code": "1-7-2",
+"name_en": "Independent Third-Party Cybersecurity Assessment",
+"name_ar": "تقييم مستقل من طرف ثالث للأمن السيبراني",
+"en": "Engagement letter and scope for third-party assessment; assessment report with independent findings; management action plan and executive summary presented to board/senior management; evidence of at least bi-annual independent assessment"
+},
+{
+"id": 184,
+"code": "1-7-3",
+"name_en": "Compliance Review Against NCA Requirements",
+"name_ar": "مراجعة الامتثال لمتطلبات الهيئة الوطنية للأمن السيبراني",
+"en": "NCA CCC compliance self-assessment workbook; evidence of completion and submission/reporting as required; gap analysis and remediation roadmap; version-controlled compliance tracking register"
+},
+{
+"id": 185,
+"code": "1-8-1",
+"name_en": "Pre-Employment Background Screening for Critical-System Staff",
+"name_ar": "الفحص الأمني للموظفين قبل التوظيف للعاملين على الأنظمة الحساسة",
+"en": "HR screening policy referencing critical systems; background check completion records for all staff with access to critical systems; evidence of enhanced screening (criminal, financial, national security) for privileged roles; vendor/contractor screening evidence"
+},
+{
+"id": 186,
+"code": "1-8-2",
+"name_en": "Security Obligations in Employment Contracts and NDAs",
+"name_ar": "الالتزامات الأمنية في عقود العمل واتفاقيات السرية",
+"en": "Sample employment contract and NDA referencing cybersecurity obligations for critical-system access; evidence all critical-system staff have signed current NDA; disciplinary policy referencing security violations"
+},
+{
+"id": 187,
+"code": "1-8-3",
+"name_en": "Timely Access Revocation on Termination or Role Change",
+"name_ar": "إلغاء الوصول في الوقت المناسب عند انهاء الخدمة أو تغيير المهام",
+"en": "Offboarding checklist showing same-day or immediate revocation of critical-system access on termination; IAM evidence of account disablement timestamps relative to HR termination dates; periodic leavers reconciliation report"
+},
+{
+"id": 188,
+"code": "1-9-1",
+"name_en": "Mandatory Cybersecurity Awareness for Critical-System Users",
+"name_ar": "التوعية الإلزامية بالأمن السيبراني لمستخدمي الأنظمة الحساسة",
+"en": "Annual awareness training completion reports showing 100% of critical-system users; training content covering threats relevant to critical national infrastructure; phishing simulation results and trend tracking; non-completion escalation evidence"
+},
+{
+"id": 189,
+"code": "1-9-2",
+"name_en": "Specialist Cybersecurity Training for Critical-System Security Staff",
+"name_ar": "تدريب متخصص في الأمن السيبراني لموظفي أمن الأنظمة الحساسة",
+"en": "Training plans for cybersecurity roles; certification records (e.g., CISSP, CISM, CEH, or NCA-approved); CPD hours tracked per security professional; specialist training budget evidence"
+},
+{
+"id": 190,
+"code": "1-9-3",
+"name_en": "Social Engineering and Targeted Attack Awareness",
+"name_ar": "التوعية بالهندسة الاجتماعية والهجمات الموجهة",
+"en": "Targeted awareness content for privileged users on spear-phishing, vishing, and supply-chain social engineering; evidence of recurring simulations with privileged-user targeting; results reported to management"
+},
+{
+"id": 191,
+"code": "2-1-1",
+"name_en": "Comprehensive Critical-System Asset Inventory",
+"name_ar": "جرد شامل لأصول الأنظمة الحساسة",
+"en": "Asset management system export showing all critical-system hardware and software assets with owner, classification, location, and lifecycle status; evidence of automated discovery tool output reconciled against manual inventory; quarterly reconciliation reports"
+},
+{
+"id": 192,
+"code": "2-1-2",
+"name_en": "Asset Classification and Criticality Rating",
+"name_ar": "تصنيف الأصول وتقييم الأهمية الحساسة",
+"en": "Asset classification policy defining criticality tiers; classification labels/tags applied in asset register; evidence of criticality rating reviews; alignment mapping between asset criticality and protective control selection"
+},
+{
+"id": 193,
+"code": "2-1-3",
+"name_en": "Unauthorised Asset Detection and Response",
+"name_ar": "اكتشاف الأصول غير المصرح بها والاستجابة لها",
+"en": "Network Access Control (NAC) or 802.1X configuration evidence; alerts/logs for unauthorised device attempts on critical-system networks; documented response procedure for rogue asset detection; CMDB discrepancy reports and resolution records"
+},
+{
+"id": 194,
+"code": "2-2-1",
+"name_en": "Privileged Access Management (PAM) for Critical Systems",
+"name_ar": "إدارة الوصول المميز للأنظمة الحساسة",
+"en": "PAM solution deployment evidence (e.g., CyberArk, BeyondTrust vault screenshots); privileged account inventory showing all admin/service accounts for critical systems; session recording configuration and sample session logs; just-in-time access provisioning records"
+},
+{
+"id": 195,
+"code": "2-2-2",
+"name_en": "Multi-Factor Authentication for Critical-System Access",
+"name_ar": "المصادقة متعددة العوامل للوصول إلى الأنظمة الحساسة",
+"en": "MFA policy requiring MFA for all remote and privileged access to critical systems; IAM system configuration showing MFA enforcement; MFA exception register with risk acceptance; authentication logs confirming MFA events"
+},
+{
+"id": 196,
+"code": "2-2-3",
+"name_en": "Least-Privilege Access Reviews for Critical Systems",
+"name_ar": "مراجعات الوصول بمبدأ الامتياز الأدنى للأنظمة الحساسة",
+"en": "Semi-annual access review reports for all critical systems showing approvals, revocations, and escalations; evidence of recertification workflow completion; comparison of access granted vs. access required (role alignment analysis)"
+},
+{
+"id": 197,
+"code": "2-2-4",
+"name_en": "Service and Application Account Governance",
+"name_ar": "حوكمة حسابات الخدمات والتطبيقات",
+"en": "Inventory of all service/application accounts with documented owners and business justification; evidence of strong unique passwords or managed secrets for service accounts; periodic review of service account privileges; decommission evidence for stale service accounts"
+},
+{
+"id": 198,
+"code": "2-3-1",
+"name_en": "Hardened Golden Image Baseline Management",
+"name_ar": "إدارة صور النظام المعززة الأساسية",
+"en": "Golden image library with version history and approval records; CIS Benchmark or equivalent hardening guide applied; comparison report between deployed systems and golden-image baseline (configuration drift report); process for updating and re-approving golden images"
+},
+{
+"id": 199,
+"code": "2-3-2",
+"name_en": "Endpoint Detection and Response (EDR) for Critical Systems",
+"name_ar": "الكشف عن التهديدات والاستجابة لها على الأجهزة الطرفية للأنظمة الحساسة",
+"en": "EDR solution deployment report showing coverage percentage of critical-system endpoints; EDR policy configuration (real-time protection, isolation capability); sample detections and response actions; exclusion register reviewed for appropriateness"
+},
+{
+"id": 200,
+"code": "2-3-3",
+"name_en": "Application Whitelisting on Critical Systems",
+"name_ar": "القائمة البيضاء للتطبيقات على الأنظمة الحساسة",
+"en": "Application control policy and approved software inventory for critical systems; application whitelist configuration evidence (e.g., AppLocker, WDAC policies); block event logs showing enforcement; process for adding new approved applications"
+},
+{
+"id": 201,
+"code": "2-3-4",
+"name_en": "Patch and Vulnerability Remediation for Critical Systems",
+"name_ar": "تصحيح الثغرات ومعالجتها للأنظمة الحساسة",
+"en": "Patch management policy with critical-system SLAs (e.g., critical patches within 72 hours); patch compliance dashboards for critical systems; vulnerability scan reports with remediation tracking; exception/risk-acceptance records for deferred patches"
+},
+{
+"id": 202,
+"code": "2-4-1",
+"name_en": "Network Segregation Architecture for Critical Systems",
+"name_ar": "هيكل عزل الشبكات للأنظمة الحساسة",
+"en": "Network architecture diagrams (as-built, dated, approved) showing critical-system zones, DMZs, and isolation from corporate/internet networks; firewall rule-sets reviewed against the approved architecture; data-flow diagrams justifying every approved inter-zone communication"
+},
+{
+"id": 203,
+"code": "2-4-2",
+"name_en": "Firewall and Access Control List Management",
+"name_ar": "إدارة جدران الحماية وقوائم التحكم في الوصول",
+"en": "Firewall/ACL rule-set review reports (at least annual); evidence of rule-set against least-privilege principle (no any/any rules on critical-system interfaces); change records for firewall rules with business justification and security sign-off; unused rule identification and removal evidence"
+},
+{
+"id": 204,
+"code": "2-4-3",
+"name_en": "Out-of-Band Management Network",
+"name_ar": "شبكة الإدارة خارج النطاق",
+"en": "Network diagram showing dedicated out-of-band (OOB) management network separated from production traffic; OOB access logs showing management sessions; evidence that production and management traffic do not share the same network path; physical or cryptographic separation evidence"
+},
+{
+"id": 205,
+"code": "2-4-4",
+"name_en": "Intrusion Detection and Prevention on Critical Networks",
+"name_ar": "الكشف عن التسلل والوقاية منه على الشبكات الحساسة",
+"en": "IDS/IPS deployment evidence on critical-system network segments; signature/rule update cadence logs; SIEM integration confirming IDS/IPS alert ingestion; tuning documentation and false-positive management records; sample high-severity alert handling records"
+},
+{
+"id": 206,
+"code": "2-5-1",
+"name_en": "Data Classification Policy and Labelling",
+"name_ar": "سياسة تصنيف البيانات والتسمية",
+"en": "Data classification framework document with tier definitions (e.g., Public, Confidential, Restricted, Top Secret for national systems); data inventory/catalog for critical systems showing applied classifications; labelling configuration in DLP tools; evidence of classification reviews"
+},
+{
+"id": 207,
+"code": "2-5-2",
+"name_en": "Data Loss Prevention (DLP) Controls for Critical Systems",
+"name_ar": "ضوابط منع فقدان البيانات للأنظمة الحساسة",
+"en": "DLP solution deployment scope showing coverage of critical-system data channels (email, USB, cloud upload, print); DLP policy configuration for critical-data-type detection; incident reports for DLP violations; quarterly DLP effectiveness reviews"
+},
+{
+"id": 208,
+"code": "2-5-3",
+"name_en": "Secure Data Disposal and Media Sanitisation",
+"name_ar": "التخلص الآمن من البيانات وتعقيم الوسائط",
+"en": "Media sanitisation policy citing NIST SP 800-88 or equivalent; destruction/sanitisation records for critical-system storage media; third-party certificate of destruction where applicable; evidence of degaussing or secure overwrite for reused media"
+},
+{
+"id": 209,
+"code": "2-6-1",
+"name_en": "Encryption of Data at Rest for Critical Systems",
+"name_ar": "تشفير البيانات المخزنة للأنظمة الحساسة",
+"en": "Encryption policy specifying approved algorithms (AES-256 minimum) for critical-system data at rest; storage encryption configuration evidence (full-disk, database TDE, or file-level); key management documentation; encryption compliance scan results"
+},
+{
+"id": 210,
+"code": "2-6-2",
+"name_en": "Encryption of Data in Transit for Critical Systems",
+"name_ar": "تشفير البيانات أثناء النقل للأنظمة الحساسة",
+"en": "TLS policy requiring TLS 1.2+ for all critical-system communications; certificate inventory with expiry tracking; scan results confirming no cleartext protocols (Telnet, FTP, HTTP) on critical-system interfaces; inter-system encryption configuration evidence"
+},
+{
+"id": 211,
+"code": "2-6-3",
+"name_en": "Cryptographic Key Management",
+"name_ar": "إدارة المفاتيح التشفيرية",
+"en": "Key management policy covering generation, distribution, rotation, revocation, and destruction; HSM deployment evidence for critical-system keys; key rotation schedule and completion records; key custodian role assignments and dual-control evidence"
+},
+{
+"id": 212,
+"code": "2-7-1",
+"name_en": "Backup Policy and Coverage for Critical Systems",
+"name_ar": "سياسة النسخ الاحتياطي وتغطيتها للأنظمة الحساسة",
+"en": "Backup policy defining RTO/RPO for each critical system; backup job completion logs showing consistent success; coverage report confirming all critical-system data is in scope; backup encryption evidence"
+},
+{
+"id": 213,
+"code": "2-7-2",
+"name_en": "Offline and Air-Gapped Backup Copies",
+"name_ar": "النسخ الاحتياطية غير المتصلة بالشبكة والمعزولة",
+"en": "Offline/air-gapped backup policy and architecture diagram; evidence of regular transfer to offline media (tape rotation logs, off-site vault receipts, or air-gapped cloud bucket policy); custody chain records; ransomware-resilience test results confirming offline copy integrity"
+},
+{
+"id": 214,
+"code": "2-7-3",
+"name_en": "Backup Restoration Testing for Critical Systems",
+"name_ar": "اختبار استعادة النسخ الاحتياطية للأنظمة الحساسة",
+"en": "Annual restoration test plans and results for all critical systems; documented RTO/RPO achievement evidence from tests; business sign-off on test results; discrepancies and improvement actions tracked"
+},
+{
+"id": 215,
+"code": "2-8-1",
+"name_en": "Regular Vulnerability Scanning of Critical Systems",
+"name_ar": "الفحص الدوري للثغرات الأمنية للأنظمة الحساسة",
+"en": "Authenticated vulnerability scan reports for critical systems (at least monthly); scan coverage report; CVSS scoring and business criticality-adjusted prioritisation; scan tool credentials evidence of authenticated scanning"
+},
+{
+"id": 216,
+"code": "2-8-2",
+"name_en": "Vulnerability Remediation SLAs for Critical Systems",
+"name_ar": "مستويات خدمة معالجة الثغرات للأنظمة الحساسة",
+"en": "Vulnerability remediation SLA policy (e.g., Critical: 24h, High: 7 days, Medium: 30 days for critical systems); remediation tracking dashboard for critical systems; SLA breach records and escalation evidence; risk acceptance for deferred critical findings"
+},
+{
+"id": 217,
+"code": "2-8-3",
+"name_en": "Vulnerability Intelligence and Zero-Day Response",
+"name_ar": "معلومات الثغرات والاستجابة لثغرات اليوم صفر",
+"en": "Subscription evidence for NCA CERT advisories and CVE feeds; documented zero-day response procedure; evidence of emergency patching or compensating controls deployed within defined hours for critical-system zero-days; tabletop exercise records covering zero-day scenario"
+},
+{
+"id": 218,
+"code": "2-9-1",
+"name_en": "Annual Penetration Testing of Critical Systems",
+"name_ar": "اختبار الاختراق السنوي للأنظمة الحساسة",
+"en": "Engagement scope document and tester qualifications (OSCP, CEH, or equivalent); penetration test report with methodology, findings, and risk ratings; management remediation plan; re-test confirmation for critical/high findings"
+},
+{
+"id": 219,
+"code": "2-9-2",
+"name_en": "Red Team and Adversarial Simulation Exercises",
+"name_ar": "تمارين الفريق الأحمر ومحاكاة الهجمات",
+"en": "Red team exercise scope and rules of engagement; exercise report with attack paths, indicators of compromise, and detection capability assessment; purple team debrief records; improvements to detection and response capability documented and tracked"
+},
+{
+"id": 220,
+"code": "2-9-3",
+"name_en": "Penetration Test Finding Remediation Tracking",
+"name_ar": "تتبع معالجة نتائج اختبار الاختراق",
+"en": "Penetration test finding register with status tracking from discovery to verified closure; evidence of security team and asset owner collaboration on remediation; escalation records for overdue critical findings; trend analysis across test cycles"
+},
+{
+"id": 221,
+"code": "2-10-1",
+"name_en": "Comprehensive Logging of Critical-System Events",
+"name_ar": "تسجيل شامل لأحداث الأنظمة الحساسة",
+"en": "Logging policy defining mandatory log sources for critical systems (authentication, privilege use, configuration changes, network flows, application errors); SIEM ingestion evidence for all mandatory sources; log completeness audit report; NTP synchronisation evidence for all log sources"
+},
+{
+"id": 222,
+"code": "2-10-2",
+"name_en": "Extended Log Retention for Critical Systems",
+"name_ar": "الاحتفاظ الموسع بسجلات الأنظمة الحساسة",
+"en": "Log retention policy specifying minimum 12-month online retention and 36-month archive for critical systems (exceeding ECC baseline); SIEM/log storage capacity plan; archived log retrieval test records; log integrity verification evidence (hash/WORM storage)"
+},
+{
+"id": 223,
+"code": "2-10-3",
+"name_en": "24/7 SOC Monitoring for Critical Systems",
+"name_ar": "مراقبة مركز العمليات الأمنية على مدار الساعة للأنظمة الحساسة",
+"en": "SOC operational model documentation (in-house/MSSP/hybrid); SLA or OLA for critical-system alert response times; evidence of 24/7 analyst coverage; escalation runbooks for critical-system alert types; monthly SOC performance reports"
+},
+{
+"id": 224,
+"code": "2-10-4",
+"name_en": "SIEM Use-Case and Detection Rule Management",
+"name_ar": "إدارة حالات الاستخدام وقواعد الكشف في نظام إدارة المعلومات والأحداث الأمنية",
+"en": "SIEM use-case library covering critical-system specific attack scenarios (lateral movement, privilege escalation, data exfiltration); use-case review and update records; false-positive tuning documentation; threat-intelligence-driven rule additions evidenced"
+},
+{
+"id": 225,
+"code": "2-11-1",
+"name_en": "Incident Response Plan for Critical Systems",
+"name_ar": "خطة الاستجابة للحوادث الأمنية للأنظمة الحساسة",
+"en": "Incident response plan document specific to critical systems; playbooks for top threat scenarios (ransomware, DDoS, insider threat, supply-chain attack); tested escalation tree; evidence of annual tabletop exercise; NCA/relevant authority notification procedure"
+},
+{
+"id": 226,
+"code": "2-11-2",
+"name_en": "Mandatory NCA Incident Reporting",
+"name_ar": "الإبلاغ الإلزامي عن الحوادث إلى الهيئة الوطنية للأمن السيبراني",
+"en": "Incident classification matrix defining reportable incidents for critical systems; evidence of notification submissions to NCA within mandated timeframes for any qualifying incidents; notification templates and contact directory; drill records for notification procedure"
+},
+{
+"id": 227,
+"code": "2-11-3",
+"name_en": "Post-Incident Review and Lessons Learned",
+"name_ar": "مراجعة ما بعد الحادث والدروس المستفادة",
+"en": "Post-incident review (PIR) reports for all significant critical-system incidents; lessons-learned action log with owners and due dates; evidence of updates to playbooks, controls, or configurations based on PIR findings; trend analysis across incidents"
+},
+{
+"id": 228,
+"code": "2-12-1",
+"name_en": "Physical Access Control to Critical-System Facilities",
+"name_ar": "التحكم في الوصول المادي إلى مرافق الأنظمة الحساسة",
+"en": "Physical security policy for critical-system data centres and control rooms; multi-factor physical access records (card + PIN or biometric); visitor access logs and escort records; physical access review reports (at least semi-annual); tailgating prevention evidence (mantrap/turnstile)"
+},
+{
+"id": 229,
+"code": "2-12-2",
+"name_en": "CCTV and Environmental Monitoring",
+"name_ar": "الدوائر التلفزيونية المغلقة ورصد البيئة",
+"en": "CCTV coverage map for critical-system facilities showing no blind spots; footage retention policy (minimum 90 days for critical facilities); environmental monitoring alerts (temperature, humidity, water, smoke) with evidence of 24/7 alerting; alarm response records"
+},
+{
+"id": 230,
+"code": "2-12-3",
+"name_en": "Physical Media and Equipment Security",
+"name_ar": "أمن الوسائط المادية والمعدات",
+"en": "Asset tracking for all physical media and equipment within critical-system facilities; locked cabinet/cage evidence for removable media storage; movement log for equipment leaving the facility; decommissioning checklist including physical media sanitisation"
+},
+{
+"id": 231,
+"code": "3-1-1",
+"name_en": "Cyber-Resilience and BCP/DRP for Critical Systems",
+"name_ar": "الصمود السيبراني وخطط الاستمرارية والتعافي للأنظمة الحساسة",
+"en": "BCP/DRP documents explicitly addressing cyber disruption scenarios for each critical system; RTO/RPO targets for cyber incidents vs. physical incidents; evidence of BCM/DRP review at least annually and after major incidents; linkage to crisis management framework"
+},
+{
+"id": 232,
+"code": "3-1-2",
+"name_en": "Cyber-Specific BCP/DRP Testing",
+"name_ar": "اختبار خطط الاستمرارية والتعافي بسيناريوهات سيبرانية",
+"en": "Annual BCP/DRP test plan and results for critical systems including cyber-scenario exercises (e.g., ransomware, total system compromise); test evidence showing RTO/RPO achievement; gaps identified and tracked to closure; senior management sign-off on test results"
+},
+{
+"id": 233,
+"code": "3-1-3",
+"name_en": "Redundancy and Failover for Critical Systems",
+"name_ar": "التكرار وآليات تجاوز الفشل للأنظمة الحساسة",
+"en": "Architecture diagrams showing redundancy and failover design for critical systems; failover test records (at least annual) with documented RTO evidence; high-availability configuration review; single-point-of-failure assessment and remediation tracking"
+},
+{
+"id": 234,
+"code": "3-1-4",
+"name_en": "Crisis Management Integration for Cyber Incidents",
+"name_ar": "تكامل إدارة الأزمات لحوادث الأمن السيبراني",
+"en": "Crisis management plan referencing cyber scenarios; communication templates for national authorities, board, and public; evidence of crisis management exercises involving cyber scenarios; documented escalation triggers from cyber incident to crisis status"
+},
+{
+"id": 235,
+"code": "4-1-1",
+"name_en": "Third-Party Cybersecurity Due Diligence",
+"name_ar": "العناية الواجبة في الأمن السيبراني للأطراف الثالثة",
+"en": "Third-party cybersecurity assessment questionnaire/methodology; completed assessments for all suppliers with critical-system access; risk tiering of suppliers; evidence of assessment results influencing contract decisions; reassessment schedule and completion records"
+},
+{
+"id": 236,
+"code": "4-1-2",
+"name_en": "Contractual Cybersecurity Requirements for Critical-System Suppliers",
+"name_ar": "المتطلبات التعاقدية للأمن السيبراني لموردي الأنظمة الحساسة",
+"en": "Contract templates and signed agreements including cybersecurity clauses (right to audit, incident notification, data protection, NCA compliance obligations); evidence of clause review and legal sign-off; evidence of supplier obligations communicated and acknowledged"
+},
+{
+"id": 237,
+"code": "4-1-3",
+"name_en": "Third-Party Access Control to Critical Systems",
+"name_ar": "التحكم في وصول الأطراف الثالثة إلى الأنظمة الحساسة",
+"en": "Third-party access provisioning process requiring business justification and CISO/security approval; PAM-managed or time-limited access tokens for vendor access; session recording logs for third-party privileged sessions; access removal confirmation after engagement end"
+},
+{
+"id": 238,
+"code": "4-1-4",
+"name_en": "Ongoing Third-Party Cybersecurity Monitoring",
+"name_ar": "الرصد المستمر للأمن السيبراني للأطراف الثالثة",
+"en": "Annual third-party reassessment schedule and completion evidence; evidence of monitoring third-party security incidents or breaches affecting critical systems; supplier security performance KPIs tracked; escalation records for underperforming suppliers"
+},
+{
+"id": 239,
+"code": "4-2-1",
+"name_en": "Cloud Adoption Restrictions and Approvals for Critical Systems",
+"name_ar": "قيود اعتماد الحوسبة السحابية والموافقات للأنظمة الحساسة",
+"en": "Cloud policy defining prohibited, restricted, and permitted cloud services for critical-system data; evidence of NCA/regulatory approval for any cloud hosting of critical systems; data residency compliance evidence (Saudi Arabia geolocation of processing/storage); cloud risk assessment records"
+},
+{
+"id": 240,
+"code": "4-2-2",
+"name_en": "Cloud Security Controls and Shared Responsibility",
+"name_ar": "ضوابط أمن السحابة والمسؤولية المشتركة",
+"en": "Shared responsibility matrix for each cloud provider used for critical systems; Cloud Security Posture Management (CSPM) tool deployment evidence; cloud configuration compliance reports (CIS Cloud Benchmark); evidence of customer-side controls compensating for provider limitations"
+},
+{
+"id": 241,
+"code": "4-2-3",
+"name_en": "Cloud Exit Strategy for Critical Systems",
+"name_ar": "استراتيجية الخروج من الحوسبة السحابية للأنظمة الحساسة",
+"en": "Cloud exit plan per critical-system cloud workload; evidence of data portability testing; contractual data-return and deletion clauses; exit strategy reviewed at least annually; evidence of senior management approval of exit plan"
+}
+]

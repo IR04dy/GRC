@@ -65,3 +65,20 @@ desktop.ini
 .claude/settings.local.json
 .claude/launch.json
 .claude/start-dev.cmd
+.claude/scheduled_tasks.lock
+
+# ─── Local E2E / API response scratch dumps (not source) ───────────────
+# Throwaway curl/API response captures from manual E2E testing.
+/.pr-body.md
+/AYMANGithubClaude-GRC-2login_resp.json
+/case.json
+/close.json
+/closed.json
+/confirmed.json
+/dash.json
+/fraud_case.json
+/outcome.json
+/timeline.json
+/triage.json
+/triaged.json
+/typ.json

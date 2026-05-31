@@ -8,4 +8,5 @@ import java.util.List;
 public interface EvidenceSubControlRepository extends JpaRepository<EvidenceSubControl, Long> {
     List<EvidenceSubControl> findByControlIdAndIsActiveTrue(Long controlId);
     List<EvidenceSubControl> findByControlIdIn(java.util.Collection<Long> controlIds);
+    List<EvidenceSubControl> findByControlIdInAndIsActiveTrue(java.util.Collection<Long> controlIds);
 }

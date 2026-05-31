@@ -43,15 +43,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OutsourcingService {
 
-    private static final Map<String, Set<String>> ARRANGEMENT_ALLOWED = Map.of(
-            "PROPOSED",       Set.of("RISK_ASSESSED", "REJECTED"),
-            "RISK_ASSESSED",  Set.of("BOARD_APPROVED", "REJECTED"),
-            "BOARD_APPROVED", Set.of("SAMA_NOTIFIED", "LIVE"),
-            "SAMA_NOTIFIED",  Set.of("LIVE"),
-            "LIVE",           Set.of("UNDER_REVIEW", "EXITED"),
-            "UNDER_REVIEW",   Set.of("LIVE", "EXITED"),
-            "EXITED",         Set.of(),
-            "REJECTED",       Set.of()
+    private static final Map<String, Set<String>> ARRANGEMENT_ALLOWED = Map.ofEntries(
+            Map.entry("PROPOSED",       Set.of("RISK_ASSESSED", "REJECTED")),
+            Map.entry("RISK_ASSESSED",  Set.of("BOARD_APPROVED", "REJECTED")),
+            Map.entry("BOARD_APPROVED", Set.of("SAMA_NOTIFIED", "LIVE")),
+            Map.entry("SAMA_NOTIFIED",  Set.of("LIVE")),
+            Map.entry("LIVE",           Set.of("UNDER_REVIEW", "SUSPENDED", "EXITED")),
+            Map.entry("UNDER_REVIEW",   Set.of("LIVE", "SUSPENDED", "EXITED")),
+            Map.entry("SUSPENDED",      Set.of("LIVE", "EXITED")),
+            Map.entry("EXITED",         Set.of()),
+            Map.entry("REJECTED",       Set.of())
     );
 
     private static final Map<String, Set<String>> CLOUD_ALLOWED = Map.of(
@@ -159,6 +160,7 @@ public class OutsourcingService {
                     a.setNextReviewDue(LocalDate.now().plusMonths(a.getReviewCadenceMonths()));
                 }
             }
+            case "SUSPENDED" -> a.setSuspendedAt(LocalDateTime.now());
             case "EXITED" -> a.setExitedAt(LocalDate.now());
             case "REJECTED" -> {
                 a.setRejectedAt(now);
@@ -558,7 +560,7 @@ public class OutsourcingService {
                 a.getStatus(), a.getRiskRating(),
                 a.getRiskAssessedAt(), a.getBoardApprovedAt(),
                 a.getSamaNotifiedAt(), a.getSamaNonObjectionRef(),
-                a.getLiveAt(), a.getExitedAt(), a.getRejectedAt(),
+                a.getLiveAt(), a.getExitedAt(), a.getSuspendedAt(), a.getRejectedAt(),
                 a.getRejectionReasonEn(), a.getRejectionReasonAr(),
                 a.getContractStart(), a.getContractEnd(),
                 a.getRenewalNoticeDays(), a.getAnnualSpendSar(),

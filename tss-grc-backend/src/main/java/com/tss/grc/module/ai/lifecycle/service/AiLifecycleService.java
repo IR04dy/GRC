@@ -45,11 +45,12 @@ public class AiLifecycleService {
     );
 
     private static final Map<String, Set<String>> REC_ALLOWED = Map.of(
-            "DUE",                          Set.of("IN_REVIEW"),
+            "DUE",                          Set.of("IN_REVIEW", "EXPIRED"),
             "IN_REVIEW",                    Set.of("RECERTIFIED", "RECERTIFIED_WITH_CONDITIONS", "REVOKED"),
             "RECERTIFIED",                  Set.of(),
             "RECERTIFIED_WITH_CONDITIONS",  Set.of("RECERTIFIED"),
-            "REVOKED",                      Set.of()
+            "REVOKED",                      Set.of(),
+            "EXPIRED",                      Set.of()
     );
 
     private final ModelValidationRepository validationRepo;
@@ -207,6 +208,11 @@ public class AiLifecycleService {
         LocalDateTime now = LocalDateTime.now();
         switch (req.toStatus()) {
             case "IN_REVIEW" -> c.setStartedAt(now);
+            case "EXPIRED" -> {
+                c.setDecidedAt(now);
+                if (req.decisionRationaleEn() != null) c.setDecisionRationaleEn(req.decisionRationaleEn());
+                if (req.decisionRationaleAr() != null) c.setDecisionRationaleAr(req.decisionRationaleAr());
+            }
             case "RECERTIFIED", "RECERTIFIED_WITH_CONDITIONS", "REVOKED" -> {
                 c.setDecidedAt(now);
                 if (req.decisionRationaleEn() != null) c.setDecisionRationaleEn(req.decisionRationaleEn());

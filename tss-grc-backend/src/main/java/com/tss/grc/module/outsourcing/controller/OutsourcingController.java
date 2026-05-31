@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /** REST surface for Sprint 30 Outsourcing &amp; Cloud Governance. */
-@RestController
+@RestController("outsourcingCloudController")
 @RequestMapping("/api/v1/outsourcing")
 @RequiredArgsConstructor
 public class OutsourcingController {

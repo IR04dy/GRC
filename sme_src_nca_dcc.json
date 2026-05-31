@@ -1,0 +1,282 @@
+[
+{
+"id": 242,
+"code": "1-1-1",
+"name_en": "Data Owner Assignment",
+"name_ar": "تعيين مالك البيانات",
+"en": "Board-approved data ownership policy; RACI matrix mapping each data domain to a named owner; signed owner-acceptance letters; annual review evidence."
+},
+{
+"id": 243,
+"code": "1-1-2",
+"name_en": "Data Governance Committee Charter",
+"name_ar": "ميثاق لجنة حوكمة البيانات",
+"en": "Signed committee charter; meeting minutes (at least quarterly); terms-of-reference document; escalation log for data governance issues."
+},
+{
+"id": 244,
+"code": "1-1-3",
+"name_en": "Data Governance Policy & Procedures",
+"name_ar": "سياسة وإجراءات حوكمة البيانات",
+"en": "Published data governance policy version-controlled in the document management system; evidence of annual review and CISO/board approval; staff-acknowledgement records."
+},
+{
+"id": 245,
+"code": "1-1-4",
+"name_en": "Data Asset Inventory",
+"name_ar": "سجل جرد أصول البيانات",
+"en": "Automated or manually maintained data asset register showing asset name, owner, classification, location, and retention class; last-updated timestamp; reconciliation with CMDB."
+},
+{
+"id": 246,
+"code": "2-1-1",
+"name_en": "Classification Scheme Definition",
+"name_ar": "تعريف مخطط التصنيف",
+"en": "Approved classification policy with tier definitions (Public, Internal, Confidential, Restricted); mapping to PDPL personal-data categories and NCA classification levels; board sign-off record."
+},
+{
+"id": 247,
+"code": "2-1-2",
+"name_en": "Automated Classification Tooling",
+"name_ar": "أدوات التصنيف الآلي",
+"en": "DLP/classification tool configuration screenshots; regex/pattern library; scan coverage reports showing % of repositories classified; exception report for unclassified assets."
+},
+{
+"id": 248,
+"code": "2-1-3",
+"name_en": "Labelling Enforcement & Label Samples",
+"name_ar": "تطبيق الملصقات وعيناتها",
+"en": "Sample labelled documents/emails/database column metadata; DLP policy configured to block unlabelled sensitive data transmission; label-stripping alert logs."
+},
+{
+"id": 249,
+"code": "2-1-4",
+"name_en": "User Classification Awareness Training",
+"name_ar": "تدريب الموظفين على تصنيف البيانات",
+"en": "Training completion records (LMS extract) for all staff handling Confidential/Restricted data; awareness poster/communications; annual refresher attendance log."
+},
+{
+"id": 250,
+"code": "2-1-5",
+"name_en": "Classification Review & Reclassification Process",
+"name_ar": "مراجعة التصنيف وإعادة التصنيف",
+"en": "Documented reclassification request form; approval workflow evidence; audit trail of classification changes with justification; quarterly review report from data owner."
+},
+{
+"id": 251,
+"code": "3-1-1",
+"name_en": "Encryption at Rest for Sensitive Data",
+"name_ar": "تشفير البيانات الساكنة",
+"en": "Encryption configuration evidence (TDE enabled on SQL Server, BitLocker/LUKS on endpoints, S3/Blob encryption policy); key management system inventory; algorithm compliance (AES-256); vulnerability scan confirming no unencrypted sensitive data stores."
+},
+{
+"id": 252,
+"code": "3-1-2",
+"name_en": "Encryption in Transit",
+"name_ar": "تشفير البيانات أثناء النقل",
+"en": "TLS configuration review (minimum TLS 1.2; TLS 1.3 preferred); certificate inventory and expiry monitoring dashboard; network scan confirming no clear-text sensitive data channels; API gateway TLS enforcement policy."
+},
+{
+"id": 253,
+"code": "3-1-3",
+"name_en": "Key Management & Lifecycle Controls",
+"name_ar": "إدارة مفاتيح التشفير ودورة حياتها",
+"en": "KMS/HSM inventory; key rotation schedule and evidence of last rotation; key custodian assignment records; key ceremony documentation; access control list for cryptographic keys; HSM audit log samples."
+},
+{
+"id": 254,
+"code": "3-1-4",
+"name_en": "Tokenisation of Payment & High-Risk Data",
+"name_ar": "ترميز بيانات الدفع والبيانات عالية الخطورة",
+"en": "Tokenisation solution architecture diagram; scope of tokenised fields (PAN, national ID, etc.); de-tokenisation access control policy; audit logs of de-tokenisation events; PCI-DSS/SAMA alignment evidence where applicable."
+},
+{
+"id": 255,
+"code": "3-1-5",
+"name_en": "Data Loss Prevention (DLP) Policy & Rules",
+"name_ar": "سياسة منع تسرب البيانات وقواعدها",
+"en": "DLP tool configuration baseline; content-inspection rule set (covering SSN/national ID, IBAN, credit card patterns, classification labels); policy exceptions log with approvals; monthly DLP incident summary report."
+},
+{
+"id": 256,
+"code": "3-1-6",
+"name_en": "DLP Alert Triage & Incident Response",
+"name_ar": "فرز تنبيهات DLP والاستجابة للحوادث",
+"en": "DLP alert queue records; triage SLA evidence (time-to-review per severity); escalation tickets raised; false-positive tuning log; monthly metric report (alerts raised, confirmed incidents, blocked events)."
+},
+{
+"id": 257,
+"code": "3-1-7",
+"name_en": "Access Control for Sensitive Data Stores",
+"name_ar": "التحكم في الوصول إلى مخازن البيانات الحساسة",
+"en": "RBAC/ABAC matrix for sensitive databases and file repositories; privileged-access review records (semi-annual); PAM tool audit logs; database activity monitoring (DAM) alerts; need-to-know justification for Restricted data access grants."
+},
+{
+"id": 258,
+"code": "4-1-1",
+"name_en": "De-identification Standard & Approved Techniques",
+"name_ar": "معيار إخفاء الهوية والأساليب المعتمدة",
+"en": "Approved de-identification methodology document (referencing ISO 29101 or NIST SP 800-188); list of approved techniques (pseudonymisation, k-anonymity, differential privacy); risk-assessment for re-identification for each technique tier."
+},
+{
+"id": 259,
+"code": "4-1-2",
+"name_en": "Test & Development Data Masking",
+"name_ar": "إخفاء بيانات بيئات الاختبار والتطوير",
+"en": "Data masking tool configuration; evidence that production Confidential/Restricted data is masked before loading into non-production environments; sample masked-dataset schema comparison; developer environment access control policy."
+},
+{
+"id": 260,
+"code": "4-1-3",
+"name_en": "Analytics & Reporting Data Anonymisation",
+"name_ar": "إخفاء هوية البيانات في التحليلات والتقارير",
+"en": "Privacy impact assessment for analytics use cases involving personal data; anonymisation process documentation; evidence of k-anonymity threshold applied; published-data review checklist before external report release."
+},
+{
+"id": 261,
+"code": "4-1-4",
+"name_en": "Re-identification Risk Assessment",
+"name_ar": "تقييم مخاطر إعادة التعرف على الهوية",
+"en": "Documented re-identification risk assessment methodology; assessments performed for each de-identified dataset release or major schema change; residual risk acceptance sign-off by data owner; remediation log where risk exceeded threshold."
+},
+{
+"id": 262,
+"code": "5-1-1",
+"name_en": "Data Sharing Agreement (DSA) Framework",
+"name_ar": "إطار اتفاقيات مشاركة البيانات",
+"en": "Master DSA template approved by legal/DPO; executed DSA register with parties, purpose, data categories, and expiry dates; annual review evidence; PDPL Art.29 compliance checklist embedded in DSA approval workflow."
+},
+{
+"id": 263,
+"code": "5-1-2",
+"name_en": "Cross-Border Data Transfer Controls",
+"name_ar": "ضوابط النقل العابر للحدود للبيانات",
+"en": "Register of cross-border data flows including destination country, legal basis, and adequacy decision or safeguard type; PDPL-compliant transfer mechanism documentation (SDAIA adequacy list reference or contractual clauses); transfer impact assessments for high-risk destinations."
+},
+{
+"id": 264,
+"code": "5-1-3",
+"name_en": "Data Residency Classification & Mapping",
+"name_ar": "تصنيف البيانات ورسم خرائط متطلبات الإقامة",
+"en": "Data residency requirement register cross-referenced with asset inventory; evidence of sovereign/critical data hosted only in KSA-domiciled infrastructure; cloud storage region enforcement policy; periodic residency audit report."
+},
+{
+"id": 265,
+"code": "5-1-4",
+"name_en": "Secure File Transfer Mechanisms",
+"name_ar": "آليات النقل الآمن للملفات",
+"en": "SFTP/FTPS/HTTPS configuration standards; MFT platform inventory; encryption-in-transit coverage evidence; access log samples for file transfer events; prohibition of FTP/email for Restricted data without compensating controls."
+},
+{
+"id": 266,
+"code": "5-1-5",
+"name_en": "Third-Party Data Recipient Due Diligence",
+"name_ar": "العناية الواجبة لمستقبلي البيانات من الأطراف الثالثة",
+"en": "Third-party security assessment questionnaire results; contractual data-protection clauses evidence; onboarding checklist for new data recipients; annual review of existing recipients; right-to-audit clause in active DSAs."
+},
+{
+"id": 267,
+"code": "6-1-1",
+"name_en": "Data Retention Schedule",
+"name_ar": "جدول الاحتفاظ بالبيانات",
+"en": "Board-approved retention schedule covering all data classes; mapping to regulatory mandates (SAMA, PDPL, NCA, SOCPA); last review date and approving authority; exceptions register with legal-hold justifications."
+},
+{
+"id": 268,
+"code": "6-1-2",
+"name_en": "Automated Retention Enforcement",
+"name_ar": "تطبيق الاحتفاظ بالبيانات آلياً",
+"en": "Retention policy configuration in EDRMS/archiving system; scheduled purge job logs; evidence of automated archiving after primary retention period; exception report for overdue purge items."
+},
+{
+"id": 269,
+"code": "6-1-3",
+"name_en": "Legal Hold Process",
+"name_ar": "إجراءات الحجز القانوني للبيانات",
+"en": "Legal hold issuance log with matter reference, custodians in scope, and data categories preserved; legal hold notice templates; suspension of scheduled purge evidence; hold release authorisation records."
+},
+{
+"id": 270,
+"code": "6-1-4",
+"name_en": "Retention Compliance Audit",
+"name_ar": "مراجعة الامتثال للاحتفاظ بالبيانات",
+"en": "Annual retention compliance audit report; sample testing of purge completion against schedule; findings and remediation tracker; Internal Audit sign-off."
+},
+{
+"id": 271,
+"code": "7-1-1",
+"name_en": "Secure Erasure Standards & Methods",
+"name_ar": "معايير المسح الآمن وأساليبه",
+"en": "Approved secure-erasure standard (NIST SP 800-88, DoD 5220.22-M equivalent); tool qualification list; configuration baseline for overwrite passes; verification method documentation (read-back verification)."
+},
+{
+"id": 272,
+"code": "7-1-2",
+"name_en": "Physical Media Destruction",
+"name_ar": "الإتلاف المادي للوسائط",
+"en": "Certified destruction vendor contract and current accreditation certificate (ISO/IEC 21964 or equivalent); destruction manifest records with asset serial numbers; witnessed destruction log or video evidence; certificate-of-destruction files."
+},
+{
+"id": 273,
+"code": "7-1-3",
+"name_en": "Cloud & Virtual Storage Purge",
+"name_ar": "تطهير مساحات التخزين السحابية والافتراضية",
+"en": "Cloud storage deletion policy; evidence of cryptographic erasure (key deletion) or verified data deletion for decommissioned cloud volumes; cloud provider data-deletion confirmation records; decommission checklist for virtual machine images."
+},
+{
+"id": 274,
+"code": "7-1-4",
+"name_en": "Disposal Certificates & Audit Trail",
+"name_ar": "شهادات التخلص ومسار التدقيق",
+"en": "Centralised disposal register linking asset tags to destruction method, date, certifying officer, and certificate reference; quarterly reconciliation against asset inventory; 3-year retention of disposal records."
+},
+{
+"id": 275,
+"code": "7-1-5",
+"name_en": "End-of-Contract Data Return & Destruction for Third Parties",
+"name_ar": "إعادة البيانات وإتلافها عند انتهاء العقود مع الأطراف الثالثة",
+"en": "Contractual data-return/destruction clause samples; contractor-provided destruction certificates on contract termination; verification checklist for data return completeness; time-bound destruction deadline enforcement log."
+},
+{
+"id": 276,
+"code": "8-1-1",
+"name_en": "SIEM Integration for Data Leakage Events",
+"name_ar": "تكامل SIEM مع أحداث تسرب البيانات",
+"en": "SIEM use-case documentation for data leakage scenarios (bulk downloads, after-hours access, USB transfer); alert rule configuration screenshots; correlation rule testing evidence; SIEM coverage of DLP, DAM, and proxy event sources."
+},
+{
+"id": 277,
+"code": "8-1-2",
+"name_en": "User & Entity Behaviour Analytics (UEBA) for Insider Threats",
+"name_ar": "تحليلات سلوك المستخدمين والكيانات للكشف عن التهديدات الداخلية",
+"en": "UEBA tool deployment scope documentation; baseline behaviour model configuration; high-risk user watchlist process; alert escalation records; quarterly insider-threat review report."
+},
+{
+"id": 278,
+"code": "8-1-3",
+"name_en": "Network Data Flow Monitoring",
+"name_ar": "مراقبة تدفق البيانات على الشبكة",
+"en": "Network DLP (NDLP) or NetFlow inspection coverage map; policies blocking exfiltration via HTTP/S, email, FTP, and cloud storage; monthly exfiltration attempt report; blocked-channel evidence logs."
+},
+{
+"id": 279,
+"code": "8-1-4",
+"name_en": "Endpoint DLP Monitoring",
+"name_ar": "مراقبة منع تسرب البيانات على الأجهزة الطرفية",
+"en": "Endpoint DLP agent deployment coverage report (% of managed endpoints); USB and removable-media block/alert policy; screen-capture and clipboard monitoring policy for Restricted data; agent health dashboard."
+},
+{
+"id": 280,
+"code": "8-1-5",
+"name_en": "Data Leakage Incident Response Playbook",
+"name_ar": "دليل الاستجابة لحوادث تسرب البيانات",
+"en": "Documented data-leakage incident response playbook; tabletop exercise record (annual); incident closure reports with root-cause analysis; notification workflow for PDPL-reportable breaches (72-hour SDAIA timeline evidence)."
+},
+{
+"id": 281,
+"code": "8-1-6",
+"name_en": "Dark Web & Leaked Credential Monitoring",
+"name_ar": "مراقبة الويب المظلم وبيانات الاعتماد المسربة",
+"en": "Dark-web monitoring service subscription evidence; alert records for organisational data detected in breach repositories; response workflow for leaked credentials (force-reset timeline); quarterly threat intelligence report."
+}
+]

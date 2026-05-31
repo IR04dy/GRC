@@ -2,10 +2,12 @@ package com.tss.grc.module.outsourcing.repository;
 
 import com.tss.grc.module.outsourcing.entity.CloudService;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository("outsourcingCloudServiceRepository")
 public interface CloudServiceRepository extends JpaRepository<CloudService, Long> {
 
     List<CloudService> findByOrganisationIdOrderByCreatedAtDesc(Long organisationId);

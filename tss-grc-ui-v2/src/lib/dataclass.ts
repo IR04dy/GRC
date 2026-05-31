@@ -213,17 +213,141 @@ export interface DashboardResponse {
   recentCrossBorderFlows: FlowResponse[];
 }
 
+// ─── Write requests ──────────────────────────────────────────────
+
+export interface CreateAssetRequest {
+  reference: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  domain?: AssetDomain;
+  hostSystemLabel?: string;
+  pdplSpecialCategory?: SpecialCategory;
+  pdplLawfulBasis?: string;
+  ownerRole?: string;
+  ownerUserId?: number;
+  retentionYears?: number;
+  encryptionAtRest?: boolean;
+  encryptionInTransit?: boolean;
+  maskingRequired?: boolean;
+  rowCountApprox?: number;
+  linkedDpiaRef?: string;
+}
+
+export interface ClassifyAssetRequest {
+  classification: Classification;
+  pdplSpecialCategory?: SpecialCategory;
+  pdplLawfulBasis?: string;
+  nextReviewDue?: string;
+}
+
+export interface TransitionAssetRequest {
+  toStatus: AssetStatus;
+  reasonEn?: string;
+  reasonAr?: string;
+}
+
+export interface CreateFlowRequest {
+  dataAssetId: number;
+  reference: string;
+  sourceSystemLabel?: string;
+  destinationSystemLabel?: string;
+  destinationCountry?: string;
+  destinationAdequacy?: DestinationAdequacy;
+  transferMode?: string;
+  purposeEn?: string;
+  purposeAr?: string;
+  pdplArt7TransferRef?: string;
+}
+
+export interface TransitionFlowRequest {
+  toStatus: FlowStatus;
+  reasonEn?: string;
+  reasonAr?: string;
+  pdplArt7TransferRef?: string;
+}
+
+export interface CreateExceptionRequest {
+  reference: string;
+  dataAssetId?: number;
+  dataFlowId?: number;
+  exceptionType: ExceptionType;
+  justificationEn?: string;
+  justificationAr?: string;
+  compensatingControlsEn?: string;
+  compensatingControlsAr?: string;
+  validFrom?: string;
+  validUntil?: string;
+}
+
+export interface TransitionExceptionRequest {
+  toStatus: ExceptionStatus;
+  rejectionReasonEn?: string;
+  rejectionReasonAr?: string;
+}
+
+// ─── State-machine helpers ───────────────────────────────────────
+
+export function nextAssetStatuses(s: AssetStatus): AssetStatus[] {
+  switch (s) {
+    case 'DRAFT':       return ['CLASSIFIED', 'DECOMMISSIONED'];
+    case 'CLASSIFIED':  return ['APPROVED', 'RECLASSIFY'];
+    case 'APPROVED':    return ['IN_USE', 'RECLASSIFY'];
+    case 'IN_USE':      return ['REVIEW_DUE', 'RECLASSIFY', 'DECOMMISSIONED'];
+    case 'REVIEW_DUE':  return ['RECLASSIFY', 'IN_USE', 'DECOMMISSIONED'];
+    case 'RECLASSIFY':  return ['CLASSIFIED', 'DECOMMISSIONED'];
+    default:            return [];
+  }
+}
+
+export function nextFlowStatuses(s: FlowStatus): FlowStatus[] {
+  switch (s) {
+    case 'PROPOSED':  return ['APPROVED', 'REJECTED'];
+    case 'APPROVED':  return ['ACTIVE', 'REJECTED'];
+    case 'ACTIVE':    return ['SUSPENDED', 'TERMINATED'];
+    case 'SUSPENDED': return ['ACTIVE', 'TERMINATED'];
+    default:          return [];
+  }
+}
+
+export function nextExceptionStatuses(s: ExceptionStatus): ExceptionStatus[] {
+  switch (s) {
+    case 'REQUESTED': return ['APPROVED', 'REJECTED'];
+    case 'APPROVED':  return ['ACTIVE', 'REVOKED'];
+    case 'ACTIVE':    return ['EXPIRED', 'REVOKED'];
+    default:          return [];
+  }
+}
+
 // ─── REST client ─────────────────────────────────────────────────
 
 const BASE = '/api/v1/dataclass';
 
 export const dataclassApi = {
   dashboard: () => api.get<DashboardResponse>(`${BASE}/dashboard`),
+
   listAssets: () => api.get<AssetResponse[]>(`${BASE}/assets`),
   getAsset: (id: number) => api.get<AssetResponse>(`${BASE}/assets/${id}`),
+  createAsset: (req: CreateAssetRequest) =>
+    api.post<AssetResponse>(`${BASE}/assets`, req),
+  classifyAsset: (id: number, req: ClassifyAssetRequest) =>
+    api.post<AssetResponse>(`${BASE}/assets/${id}/classify`, req),
+  transitionAsset: (id: number, req: TransitionAssetRequest) =>
+    api.post<AssetResponse>(`${BASE}/assets/${id}/transition`, req),
+
   listFlows: (assetId?: number) => {
     const q = assetId ? `?assetId=${assetId}` : '';
     return api.get<FlowResponse[]>(`${BASE}/flows${q}`);
   },
+  createFlow: (req: CreateFlowRequest) =>
+    api.post<FlowResponse>(`${BASE}/flows`, req),
+  transitionFlow: (id: number, req: TransitionFlowRequest) =>
+    api.post<FlowResponse>(`${BASE}/flows/${id}/transition`, req),
+
   listExceptions: () => api.get<ExceptionResponse[]>(`${BASE}/exceptions`),
+  createException: (req: CreateExceptionRequest) =>
+    api.post<ExceptionResponse>(`${BASE}/exceptions`, req),
+  transitionException: (id: number, req: TransitionExceptionRequest) =>
+    api.post<ExceptionResponse>(`${BASE}/exceptions/${id}/transition`, req),
 };

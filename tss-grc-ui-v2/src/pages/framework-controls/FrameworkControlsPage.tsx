@@ -11,9 +11,9 @@ import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import {
-  listFrameworks, listAllControls,
+  listFrameworks, listAllControls, listSubControlsByControl,
   CTRL_IMPL_TONE, CTRL_MATURITY_TONE,
-  type CyberFramework, type CyberControl,
+  type CyberFramework, type CyberControl, type CyberSubControl,
 } from '../../lib/frameworkControls';
 
 type TabId = 'ALL' | 'ECC' | 'CSCC' | 'CCC' | 'OTCC' | 'SAMA_CYBER' | 'ISO27001' | 'ISO22301' | 'PCIDSS';
@@ -207,6 +207,7 @@ export function FrameworkControlsPage() {
                                     <strong>{t('fwcReviewFrequency')}:</strong> {c.reviewFrequency ?? '—'}
                                   </p>
                                 )}
+                                <SubControlList controlId={c.id} lang={lang} />
                               </div>
                             </td>
                           </tr>
@@ -220,5 +221,52 @@ export function FrameworkControlsPage() {
         }
       </Card>
     </Shell>
+  );
+}
+
+// ─── Lazy-loaded sub-controls for an expanded control ─────────────────────────
+
+function SubControlList({ controlId, lang }: { controlId: number; lang: string }) {
+  const ar = lang === 'ar';
+  const [subs, setSubs] = useState<CyberSubControl[] | null>(null);
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setSubs(null); setErr(false);
+    listSubControlsByControl(controlId)
+      .then(d => { if (alive) setSubs(d); })
+      .catch(() => { if (alive) setErr(true); });
+    return () => { alive = false; };
+  }, [controlId]);
+
+  if (err) return <p style={{ opacity: 0.6, marginTop: 8 }}>{ar ? 'تعذّر تحميل الضوابط الفرعية' : 'Could not load sub-controls'}</p>;
+  if (subs === null) return <p style={{ opacity: 0.6, marginTop: 8 }}>{ar ? 'جارٍ التحميل…' : 'Loading…'}</p>;
+  if (subs.length === 0) return <p style={{ opacity: 0.6, marginTop: 8 }}>{ar ? 'لا توجد ضوابط فرعية' : 'No sub-controls'}</p>;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>
+        {ar ? 'الضوابط الفرعية' : 'Sub-controls'} ({subs.length})
+      </div>
+      <table className="grc-table" style={{ width: '100%' }}>
+        <thead>
+          <tr>
+            <th style={{ width: 90 }}>{ar ? 'الرقم' : 'No.'}</th>
+            <th>{ar ? 'العنوان' : 'Title'}</th>
+            <th>{ar ? 'الدليل الموصى به' : 'Recommended evidence'}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {subs.map(s => (
+            <tr key={s.id}>
+              <td className="mono">{s.subControlNumber ?? '—'}</td>
+              <td>{ar && s.titleAr ? s.titleAr : s.titleEn}</td>
+              <td style={{ fontSize: 12, opacity: 0.85 }}>{(ar && s.descriptionAr ? s.descriptionAr : s.descriptionEn) ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -18,7 +18,7 @@ import { api } from './api';
 
 export type ArrangementStatus =
   | 'PROPOSED' | 'RISK_ASSESSED' | 'BOARD_APPROVED' | 'SAMA_NOTIFIED'
-  | 'LIVE' | 'UNDER_REVIEW' | 'EXITED' | 'REJECTED';
+  | 'LIVE' | 'UNDER_REVIEW' | 'SUSPENDED' | 'EXITED' | 'REJECTED';
 
 export type Materiality = 'MATERIAL' | 'NON_MATERIAL';
 
@@ -53,6 +53,7 @@ export const ARRANGEMENT_STATUS_LABEL: Record<ArrangementStatus, { en: string; a
   SAMA_NOTIFIED:  { en: 'SAMA notified',    ar: 'مُبلَّغ ساما' },
   LIVE:           { en: 'Live',             ar: 'نافذ' },
   UNDER_REVIEW:   { en: 'Under review',     ar: 'قيد المراجعة' },
+  SUSPENDED:      { en: 'Suspended',        ar: 'مُعلَّق' },
   EXITED:         { en: 'Exited',           ar: 'مُنتهٍ' },
   REJECTED:       { en: 'Rejected',         ar: 'مرفوض' },
 };
@@ -60,7 +61,7 @@ export const ARRANGEMENT_STATUS_LABEL: Record<ArrangementStatus, { en: string; a
 export const ARRANGEMENT_STATUS_TONE: Record<ArrangementStatus, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   PROPOSED: 'neutral', RISK_ASSESSED: 'info', BOARD_APPROVED: 'info',
   SAMA_NOTIFIED: 'info', LIVE: 'success', UNDER_REVIEW: 'warning',
-  EXITED: 'neutral', REJECTED: 'danger',
+  SUSPENDED: 'danger', EXITED: 'neutral', REJECTED: 'danger',
 };
 
 export const MATERIALITY_LABEL: Record<Materiality, { en: string; ar: string }> = {
@@ -123,8 +124,9 @@ export function nextArrangementStatuses(s: ArrangementStatus): ArrangementStatus
     case 'RISK_ASSESSED':  return ['BOARD_APPROVED', 'REJECTED'];
     case 'BOARD_APPROVED': return ['SAMA_NOTIFIED', 'LIVE'];
     case 'SAMA_NOTIFIED':  return ['LIVE'];
-    case 'LIVE':           return ['UNDER_REVIEW', 'EXITED'];
-    case 'UNDER_REVIEW':   return ['LIVE', 'EXITED'];
+    case 'LIVE':           return ['UNDER_REVIEW', 'SUSPENDED', 'EXITED'];
+    case 'UNDER_REVIEW':   return ['LIVE', 'SUSPENDED', 'EXITED'];
+    case 'SUSPENDED':      return ['LIVE', 'EXITED'];
     default:               return [];
   }
 }

@@ -1,0 +1,303 @@
+[
+{
+"id": 318,
+"code": "1-1-1",
+"name_en": "OT Cybersecurity Policy Issuance",
+"name_ar": "إصدار سياسة الأمن السيبراني للتقنيات التشغيلية",
+"en": "Board-approved OT cybersecurity policy document (dated, signed); policy distribution records to OT staff; annual review evidence"
+},
+{
+"id": 319,
+"code": "1-1-2",
+"name_en": "OT Cybersecurity Roles & Responsibilities",
+"name_ar": "تحديد الأدوار والمسؤوليات السيبرانية للتقنيات التشغيلية",
+"en": "RACI matrix for OT security roles; job descriptions for OT security lead and OT SOC staff; delegation-of-authority records"
+},
+{
+"id": 320,
+"code": "1-1-3",
+"name_en": "OT Cybersecurity Risk Programme",
+"name_ar": "برنامج إدارة مخاطر الأمن السيبراني للتقنيات التشغيلية",
+"en": "Annual OT risk assessment report; risk register with OT-specific entries; risk acceptance sign-offs by plant/asset owner"
+},
+{
+"id": 321,
+"code": "1-1-4",
+"name_en": "OT Cybersecurity Compliance & Audit",
+"name_ar": "الامتثال والتدقيق السيبراني للتقنيات التشغيلية",
+"en": "Internal OT audit schedule; OT audit findings report; evidence of corrective action closure; NCA self-assessment submission"
+},
+{
+"id": 322,
+"code": "1-2-1",
+"name_en": "OT Hardware Asset Register",
+"name_ar": "سجل أصول العتاد التشغيلي",
+"en": "OT asset inventory database/spreadsheet with make/model/firmware/location/criticality; evidence of quarterly reconciliation; scan reports from passive OT discovery tool (e.g., Claroty, Dragos, Nozomi)"
+},
+{
+"id": 323,
+"code": "1-2-2",
+"name_en": "OT Software & Firmware Inventory",
+"name_ar": "جرد البرمجيات والبرامج الثابتة التشغيلية",
+"en": "Software bill of materials (SBOM) for OT systems; SCADA/HMI version register; firmware version tracking spreadsheet; change records for updates"
+},
+{
+"id": 324,
+"code": "1-2-3",
+"name_en": "OT Asset Criticality Classification",
+"name_ar": "تصنيف مستوى أهمية أصول التقنيات التشغيلية",
+"en": "Asset criticality classification matrix (High/Medium/Low based on safety/operational impact); business impact analysis for top-tier OT assets"
+},
+{
+"id": 325,
+"code": "1-3-1",
+"name_en": "Purdue-Based Zone Architecture",
+"name_ar": "هندسة المناطق وفق نموذج بوردو",
+"en": "Network architecture diagram showing Purdue Levels 0–4; zone-and-conduit diagram; firewall rule-set for each conduit; approved data-flow matrix"
+},
+{
+"id": 326,
+"code": "1-3-2",
+"name_en": "OT-IT Demilitarised Zone (OT-DMZ)",
+"name_ar": "المنطقة المنزوعة السلاح بين شبكتَي التقنيات التشغيلية وتقنية المعلومات",
+"en": "OT-DMZ network diagram; firewall configuration screenshots; allowed services list (data diode, historian, jump server); penetration test evidence for DMZ boundaries"
+},
+{
+"id": 327,
+"code": "1-3-3",
+"name_en": "Wireless & Serial Communication Controls",
+"name_ar": "ضوابط الاتصالات اللاسلكية والتسلسلية",
+"en": "Wireless security policy for OT; Wi-Fi site survey showing segmentation; encryption config for permitted wireless (WPA3 or equivalent); serial-link inventory and justification"
+},
+{
+"id": 328,
+"code": "1-3-4",
+"name_en": "Remote Dial-Up & Legacy Protocol Isolation",
+"name_ar": "عزل الاتصالات القديمة والبروتوكولات الموروثة",
+"en": "Legacy modem/dial-up inventory; decommission plan or compensating-control evidence; Modbus/DNP3/Profibus risk assessment; protocol gateway configuration"
+},
+{
+"id": 329,
+"code": "1-4-1",
+"name_en": "Jump Host / Bastion Server for OT",
+"name_ar": "خادم الوصول الآمن (Jump Host) لبيئات التقنيات التشغيلية",
+"en": "Jump-host build baseline; CIS-hardened OS configuration; MFA enrolment records for all jump-host users; session recording configuration; access log samples"
+},
+{
+"id": 330,
+"code": "1-4-2",
+"name_en": "Vendor & Third-Party Remote Access Approval",
+"name_ar": "اعتماد وصول الموردين والأطراف الثالثة عن بُعد",
+"en": "Vendor remote-access request and approval forms; time-limited session tokens; VPN account provisioning/deprovisioning log; signed vendor AUP/NDA"
+},
+{
+"id": 331,
+"code": "1-4-3",
+"name_en": "OT Remote-Access Session Monitoring & Recording",
+"name_ar": "مراقبة وتسجيل جلسات الوصول عن بُعد لأنظمة التقنيات التشغيلية",
+"en": "PAM/session-recording tool configuration; sample recorded session exports; alert configuration for anomalous commands; retention policy (minimum 12 months)"
+},
+{
+"id": 332,
+"code": "1-5-1",
+"name_en": "OT Account Inventory & Least-Privilege",
+"name_ar": "جرد حسابات التقنيات التشغيلية وتطبيق مبدأ الحد الأدنى من الصلاحيات",
+"en": "OT account list export; role-based access matrix for SCADA/HMI operators vs engineers vs admins; access review sign-off records (semi-annual)"
+},
+{
+"id": 333,
+"code": "1-5-2",
+"name_en": "OT Default & Hardcoded Credential Elimination",
+"name_ar": "إزالة بيانات الاعتماد الافتراضية والمُضمَّنة في أنظمة التقنيات التشغيلية",
+"en": "Vendor default credential checklist (pre and post change); credential-scan tool output; compensating controls where firmware prevents change; change-management ticket"
+},
+{
+"id": 334,
+"code": "1-5-3",
+"name_en": "OT Privileged Account Management",
+"name_ar": "إدارة الحسابات المميزة في بيئات التقنيات التشغيلية",
+"en": "PAM solution coverage report for OT privileged accounts; password vault usage evidence; break-glass procedure documentation; emergency account audit log"
+},
+{
+"id": 335,
+"code": "1-6-1",
+"name_en": "OT Hardening Baselines & Configuration Standards",
+"name_ar": "معايير تصليب وضبط إعدادات أنظمة التقنيات التشغيلية",
+"en": "OT hardening checklist (ICS-CERT/CIS ICS benchmarks); baseline configuration files for HMI/EWS; configuration compliance scan output; deviation register"
+},
+{
+"id": 336,
+"code": "1-6-2",
+"name_en": "OT Patch Assessment & Risk-Based Prioritisation",
+"name_ar": "تقييم التصحيحات وترتيب أولوياتها بحسب المخاطر في بيئات التقنيات التشغيلية",
+"en": "Monthly OT vulnerability/patch advisory review records; vendor patch notification subscription evidence; risk-based patch prioritisation matrix; overdue patch register"
+},
+{
+"id": 337,
+"code": "1-6-3",
+"name_en": "OT Patch Testing on Isolated Test Bench",
+"name_ar": "اختبار التصحيحات على منصة الاختبار المعزولة قبل النشر في بيئة الإنتاج",
+"en": "OT test-bench asset register; patch-test lab network diagram; patch test procedure and sign-off records; test results reports before production push"
+},
+{
+"id": 338,
+"code": "1-6-4",
+"name_en": "OT Change Management Process",
+"name_ar": "إدارة التغييرات في بيئات التقنيات التشغيلية",
+"en": "OT change management procedure; change-request forms with cybersecurity impact field; CAB approval records for high-risk OT changes; rollback test records"
+},
+{
+"id": 339,
+"code": "1-7-1",
+"name_en": "USB & Removable Media Policy Enforcement",
+"name_ar": "تطبيق سياسة USB والوسائط القابلة للإزالة في البيئات التشغيلية",
+"en": "USB control policy document; DLP/port-lock configuration screenshots; approved USB device register; non-compliance incident log"
+},
+{
+"id": 340,
+"code": "1-7-2",
+"name_en": "Malware Scan Kiosk for OT Media",
+"name_ar": "كشك الفحص من البرمجيات الخبيثة للوسائط التشغيلية",
+"en": "Malware-scan kiosk asset record (e.g., Honeywell Secure Media Exchange or equivalent); AV definition update log; scan results log for each media use event; kiosk location map"
+},
+{
+"id": 341,
+"code": "1-7-3",
+"name_en": "Vendor Laptop & Engineering Tool Verification",
+"name_ar": "التحقق من أجهزة حاسوب الموردين وأدوات الهندسة قبل الوصول",
+"en": "Vendor equipment verification checklist; AV scan results performed at site entry; patch-level verification record; vendor equipment inventory log"
+},
+{
+"id": 342,
+"code": "1-8-1",
+"name_en": "OT Control Room & Cabinet Physical Access Control",
+"name_ar": "ضبط الوصول المادي لغرف التحكم وخزائن التقنيات التشغيلية",
+"en": "Access control system logs for control room entry; badge access list; physical security audit report; CCTV coverage plan for OT areas"
+},
+{
+"id": 343,
+"code": "1-8-2",
+"name_en": "OT Network Port & Unused Interface Lockdown",
+"name_ar": "تعطيل المنافذ وواجهات الشبكة غير المستخدمة في بيئات التقنيات التشغيلية",
+"en": "Network switch port-security configuration; unused port shutdown evidence; physical RJ45 port-lock documentation; network diagram showing active vs disabled ports"
+},
+{
+"id": 344,
+"code": "1-8-3",
+"name_en": "OT Asset Tamper Detection & Environmental Monitoring",
+"name_ar": "الكشف عن العبث بأصول التقنيات التشغيلية ومراقبة البيئة",
+"en": "Tamper-evident seal records for critical OT cabinets; environmental sensor alerts log (temperature, humidity, power); UPS test records; physical inspection checklist"
+},
+{
+"id": 345,
+"code": "1-9-1",
+"name_en": "OT Network Traffic Baseline & Anomaly Detection",
+"name_ar": "رسم خط الأساس لحركة مرور الشبكة التشغيلية والكشف عن الانحرافات",
+"en": "OT monitoring tool deployment diagram; traffic baseline report; anomaly detection rule catalogue; sample alert tickets from OT SOC"
+},
+{
+"id": 346,
+"code": "1-9-2",
+"name_en": "OT SIEM Integration & Log Management",
+"name_ar": "تكامل سجلات التقنيات التشغيلية مع نظام إدارة المعلومات والأحداث الأمنية",
+"en": "OT log source inventory and SIEM onboarding records; log retention configuration (minimum 12 months); OT-specific SIEM use-case documentation; alert SLA evidence"
+},
+{
+"id": 347,
+"code": "1-9-3",
+"name_en": "OT SOC Use Cases & Threat Intelligence",
+"name_ar": "حالات الاستخدام الأمني ومصادر استخبارات التهديدات في مركز العمليات التشغيلي",
+"en": "OT SOC use-case register (with ICS MITRE ATT&CK mapping); OT threat intelligence subscription evidence; monthly OT threat briefing records; use-case tuning log"
+},
+{
+"id": 348,
+"code": "1-9-4",
+"name_en": "OT Vulnerability Scanning (Passive / Risk-Based)",
+"name_ar": "الفحص السلبي للثغرات وإدارتها بحسب المخاطر في بيئات التقنيات التشغيلية",
+"en": "Passive vulnerability discovery report; OT CVE watch-list; risk-based remediation plan with owner and target date; vendor advisory subscription records"
+},
+{
+"id": 349,
+"code": "1-10-1",
+"name_en": "OT Incident Response Plan & Playbooks",
+"name_ar": "خطة الاستجابة للحوادث وكتيبات التشغيل في بيئات التقنيات التشغيلية",
+"en": "OT-specific IRP document; scenario playbooks (ransomware on HMI, rogue PLC command, historian compromise); annual tabletop exercise report; lessons-learned register"
+},
+{
+"id": 350,
+"code": "1-10-2",
+"name_en": "OT Incident Classification & Escalation",
+"name_ar": "تصنيف الحوادث وإجراءات التصعيد في بيئات التقنيات التشغيلية",
+"en": "OT incident severity classification matrix; escalation flowchart linking OT SOC to plant manager and CISO; NCA reporting obligation documentation; sample escalation records"
+},
+{
+"id": 351,
+"code": "1-10-3",
+"name_en": "OT Forensic & Evidence Preservation",
+"name_ar": "الأدلة الجنائية الرقمية وحفظها في بيئات التقنيات التشغيلية",
+"en": "OT forensic toolkit inventory; chain-of-custody form template; ICS forensic procedure document; sample evidence collection records from past drills"
+},
+{
+"id": 352,
+"code": "1-11-1",
+"name_en": "SIS Cyber Risk Assessment (aligned to IEC 61511 / IEC 62443)",
+"name_ar": "تقييم المخاطر السيبرانية لأنظمة الأجهزة الأمنية وفق معايير IEC 61511 و IEC 62443",
+"en": "SIS cyber risk assessment report; cyber PHA/HAZOP findings; SIL verification incorporating cyber threats; IEC 61511 phase review records"
+},
+{
+"id": 353,
+"code": "1-11-2",
+"name_en": "SIS Network Isolation & Air-Gapping",
+"name_ar": "عزل أنظمة الأجهزة الأمنية وقطعها عن الشبكات الأخرى",
+"en": "SIS network topology showing isolation from DCS/control network; data diode or one-way gateway configuration records; periodic validation test of isolation; approved exception register"
+},
+{
+"id": 354,
+"code": "1-11-3",
+"name_en": "SIS Maintenance & Access Security",
+"name_ar": "أمان الوصول وصيانة أنظمة الأجهزة الأمنية",
+"en": "SIS maintenance access procedure; key-switch/bypass log; authorised SIS engineer list; SIS vendor access approval records; post-maintenance validation checklist"
+},
+{
+"id": 355,
+"code": "1-12-1",
+"name_en": "OT Configuration & Logic Backup",
+"name_ar": "النسخ الاحتياطي لإعدادات ومنطق التحكم في التقنيات التشغيلية",
+"en": "Backup schedule and scope documentation; PLC/DCS logic backup files with version history; backup storage location (offline/air-gapped); last backup test date and result"
+},
+{
+"id": 356,
+"code": "1-12-2",
+"name_en": "OT Backup Integrity Testing & Recovery Drill",
+"name_ar": "اختبار سلامة النسخ الاحتياطية وتدريبات الاسترداد التشغيلي",
+"en": "Quarterly backup restoration test records; OT disaster-recovery drill report; RTO/RPO targets for each OT system class; recovery checklist signed by plant engineer"
+},
+{
+"id": 357,
+"code": "1-12-3",
+"name_en": "Ransomware-Resilient OT Backup Architecture",
+"name_ar": "بنية النسخ الاحتياطي المقاومة للفدية الخبيثة في بيئات التقنيات التشغيلية",
+"en": "Immutable backup solution configuration; offline/cold copy evidence; backup network isolation diagram; ransomware recovery runbook for OT"
+},
+{
+"id": 358,
+"code": "1-13-1",
+"name_en": "OT Vendor Cybersecurity Due Diligence",
+"name_ar": "العناية الواجبة للأمن السيبراني عند اختيار موردي التقنيات التشغيلية",
+"en": "OT vendor cybersecurity questionnaire responses; SDLC security review for purchased OT software; vendor security assessment report; contractual security clauses"
+},
+{
+"id": 359,
+"code": "1-13-2",
+"name_en": "OT Remote Maintenance Agreement & Oversight",
+"name_ar": "اتفاقية الصيانة عن بُعد والإشراف على موردي التقنيات التشغيلية",
+"en": "Vendor remote-access agreement (includes session recording consent); NDA with OT data-handling clauses; supervised-access log; post-session closure confirmation"
+},
+{
+"id": 360,
+"code": "1-13-3",
+"name_en": "OT Software & Firmware Supply Chain Integrity",
+"name_ar": "سلامة سلسلة توريد البرمجيات والبرامج الثابتة للتقنيات التشغيلية",
+"en": "Vendor software signing/hash verification records; patch authenticity verification procedure; SBOM for critical OT software; counterfeit hardware detection checklist"
+}
+]

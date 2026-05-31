@@ -8,4 +8,5 @@ import java.util.List;
 public interface EvidenceControlRepository extends JpaRepository<EvidenceControl, Long> {
     List<EvidenceControl> findByFrameworkIdAndIsActiveTrue(Long frameworkId);
     List<EvidenceControl> findByFrameworkIdIn(java.util.Collection<Long> frameworkIds);
+    List<EvidenceControl> findByFrameworkIdInAndIsActiveTrue(java.util.Collection<Long> frameworkIds);
 }

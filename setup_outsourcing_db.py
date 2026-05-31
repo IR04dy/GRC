@@ -62,6 +62,7 @@ BEGIN
         sama_non_objection_ref      NVARCHAR(64),
         live_at                     DATE,
         exited_at                   DATE,
+        suspended_at                DATETIME2,
         rejected_at                 DATETIME2,
         rejection_reason_en         NVARCHAR(MAX),
         rejection_reason_ar         NVARCHAR(MAX),

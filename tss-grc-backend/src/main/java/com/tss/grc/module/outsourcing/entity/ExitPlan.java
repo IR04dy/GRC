@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /** SAMA §7 exit-and-contingency plan. One per arrangement. */
-@Entity
+@Entity(name = "OutsourcingCloudExitPlan")
 @Table(schema = "outsourcing", name = "exit_plan")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor

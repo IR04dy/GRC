@@ -40,12 +40,14 @@ def ensure_model(org, code, *, title_en, title_ar, mtype, domain, tier,
     r = cur.fetchone()
     if r:
         return int(r[0])
+    # model_owner_user_id + business_sponsor_user_id are NOT NULL — default to admin
     cur.execute(
         "INSERT INTO ai_governance.ml_model "
         "(organisation_id, model_code, title_en, title_ar, model_type, "
-        " business_domain, risk_tier, lifecycle_stage, version_label) "
-        "OUTPUT INSERTED.id VALUES (?,?,?,?,?,?,?,?,?)",
-        org, code, title_en, title_ar, mtype, domain, tier, stage, version,
+        " business_domain, risk_tier, lifecycle_stage, version_label, "
+        " model_owner_user_id, business_sponsor_user_id) "
+        "OUTPUT INSERTED.id VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        org, code, title_en, title_ar, mtype, domain, tier, stage, version, 1, 1,
     )
     return int(cur.fetchone()[0])
 

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Database, FileText, Target, Wrench, AlertCircle, CheckCircle2,
   Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check, Paperclip,
@@ -134,10 +134,36 @@ type NdiTab =
   | 'import'         // slice 2 sub-page (import official framework)
   | 'audit';         // slice 14
 
+// Tabs the sidebar/other surfaces can deep-link to via /ndi?tab=NAME.
+// Validated against the NdiTab union below; falls back to 'cycles' otherwise
+// (matches the prior default).
+const VALID_NDI_TABS: NdiTab[] = ['dashboard','cycles','framework','maturity','compliance','opex','domains','evidence','gaps','improvement','submission','reports','settings','import','audit'];
+
 export function NdiPage() {
   const { t, lang } = useI18n();
   const isAr = lang === 'ar';
-  const [tab, setTab] = useState<NdiTab>('cycles');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Initial tab comes from ?tab= so a sidebar deep-link to e.g.
+  // /ndi?tab=evidence lands the DPO directly on the evidence locker.
+  const initialTab = (() => {
+    const t = searchParams.get('tab') as NdiTab | null;
+    return t && VALID_NDI_TABS.includes(t) ? t : 'cycles';
+  })();
+  const [tab, setTabState] = useState<NdiTab>(initialTab);
+  // Reflect tab changes back into the URL so links the user clicks here
+  // remain shareable/bookmarkable.
+  const setTab = (next: NdiTab) => {
+    setTabState(next);
+    const sp = new URLSearchParams(searchParams);
+    sp.set('tab', next);
+    setSearchParams(sp, { replace: true });
+  };
+  // If the URL changes (back/forward, sidebar re-click) sync the tab.
+  useEffect(() => {
+    const t = searchParams.get('tab') as NdiTab | null;
+    if (t && VALID_NDI_TABS.includes(t) && t !== tab) setTabState(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <Shell

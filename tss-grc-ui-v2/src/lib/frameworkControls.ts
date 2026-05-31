@@ -36,6 +36,26 @@ export function listAllControls(): Promise<CyberControl[]> {
   return api.get('/api/v1/cyber/controls/all');
 }
 
+export interface CyberSubControl {
+  id: number;
+  controlId?: number;
+  subControlNumber?: string;
+  titleEn?: string; titleAr?: string;
+  descriptionEn?: string;        // recommended evidence text
+  descriptionAr?: string;        // Arabic recommended evidence text
+  controlOwner?: string;
+  implementationStatus?: string;
+  maturityLevel?: string;
+  evidenceRequired?: boolean;
+}
+
+/** Sub-controls for a single control. Backend returns a Spring Page; we unwrap .content. */
+export async function listSubControlsByControl(controlId: number): Promise<CyberSubControl[]> {
+  const res = await api.get<{ content?: CyberSubControl[] } | CyberSubControl[]>(
+    `/api/v1/cyber/sub-controls?controlId=${controlId}&size=300`);
+  return Array.isArray(res) ? res : (res?.content ?? []);
+}
+
 export const CTRL_IMPL_TONE: Record<string, 'success'|'warning'|'danger'|'info'> = {
   IMPLEMENTED: 'success', PARTIAL: 'warning', PLANNED: 'info',
   NOT_APPLICABLE: 'info', NOT_IMPLEMENTED: 'danger',

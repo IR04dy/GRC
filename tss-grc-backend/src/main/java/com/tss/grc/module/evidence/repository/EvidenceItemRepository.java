@@ -33,4 +33,21 @@ public interface EvidenceItemRepository extends JpaRepository<EvidenceItem, Long
     long countByOrganisationIdAndStatus(Long orgId, String status);
 
     long countByOrganisationId(Long orgId);
+
+    /** Per-sub-control evidence counts grouped by status — drives the GRC Expert coverage rollup. */
+    @Query("SELECT e.subControlId, e.status, COUNT(e) FROM EvidenceItem e " +
+           "WHERE e.organisationId = :orgId AND e.subControlId IS NOT NULL " +
+           "GROUP BY e.subControlId, e.status")
+    List<Object[]> aggregateStatusBySubControl(@Param("orgId") Long orgId);
+
+    /** Per-sub-control expired vs expiring-soon counts (by valid_to) for the GRC Expert freshness badges. */
+    @Query("SELECT e.subControlId, " +
+           "SUM(CASE WHEN e.validTo < :today THEN 1 ELSE 0 END), " +
+           "SUM(CASE WHEN e.validTo >= :today AND e.validTo <= :horizon THEN 1 ELSE 0 END) " +
+           "FROM EvidenceItem e " +
+           "WHERE e.organisationId = :orgId AND e.subControlId IS NOT NULL AND e.validTo IS NOT NULL " +
+           "GROUP BY e.subControlId")
+    List<Object[]> aggregateExpiryBySubControl(@Param("orgId") Long orgId,
+                                               @Param("today") LocalDate today,
+                                               @Param("horizon") LocalDate horizon);
 }

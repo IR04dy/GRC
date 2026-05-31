@@ -197,7 +197,7 @@ def seed_org1():
         classification="PUBLIC", status="IN_USE",
         lawful_basis="LEGAL_OBLIGATION_CONSUMER_PROTECTION",
         host="Public website CMS", retention=5,
-        encryption_at_rest=False, masking=False,
+        enc_rest=False, masking=False,
         classified_at=NOW - timedelta(days=420),
         approved_at=NOW - timedelta(days=415),
         next_review=TODAY + timedelta(days=520), rows=180)

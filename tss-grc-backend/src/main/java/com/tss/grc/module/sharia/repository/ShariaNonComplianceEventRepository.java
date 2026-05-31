@@ -24,7 +24,7 @@ public interface ShariaNonComplianceEventRepository extends JpaRepository<Sharia
 
     @org.springframework.data.jpa.repository.Query(
             "SELECT COALESCE(SUM(e.snciAmountSar), 0) FROM ShariaNonComplianceEvent e " +
-                    "WHERE e.organisationId = :org AND e.status IN :statuses AND e.isDeleted = 0")
+                    "WHERE e.organisationId = :org AND e.status IN :statuses AND e.isDeleted = false")
     BigDecimal sumSnciByStatus(@org.springframework.data.repository.query.Param("org") Long org,
                                 @org.springframework.data.repository.query.Param("statuses") java.util.Collection<String> statuses);
 }

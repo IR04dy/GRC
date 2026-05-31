@@ -1,0 +1,205 @@
+[
+{
+"id": 361,
+"code": "1-1-1",
+"name_en": "Teleworking Cybersecurity Policy",
+"name_ar": "سياسة الأمن السيبراني للعمل عن بُعد",
+"en": "Board/executive-approved teleworking policy document; version history; distribution acknowledgement log from all teleworkers; annual review record"
+},
+{
+"id": 362,
+"code": "1-1-2",
+"name_en": "Acceptable Use Agreement for Teleworkers",
+"name_ar": "اتفاقية الاستخدام المقبول للعاملين عن بُعد",
+"en": "Signed AUP/teleworking agreement per employee; BYOD consent form; updated HR onboarding checklist confirming cybersecurity AUP signature; periodic re-acknowledgement records"
+},
+{
+"id": 363,
+"code": "1-1-3",
+"name_en": "Teleworking Risk Assessment",
+"name_ar": "تقييم مخاطر العمل عن بُعد",
+"en": "Teleworking risk assessment report; role-based risk classification (high/medium/low sensitivity roles); risk acceptance sign-off by CISO; re-assessment trigger log"
+},
+{
+"id": 364,
+"code": "1-2-1",
+"name_en": "Corporate VPN Deployment & Configuration",
+"name_ar": "نشر الشبكة الافتراضية الخاصة للمؤسسة وضبط إعداداتها",
+"en": "VPN solution architecture diagram; SSL/IPsec configuration baseline; split-tunnel policy (disabled for sensitive roles); VPN capacity and availability report"
+},
+{
+"id": 365,
+"code": "1-2-2",
+"name_en": "Multi-Factor Authentication (MFA) for Remote Access",
+"name_ar": "المصادقة متعددة العوامل للوصول عن بُعد",
+"en": "MFA enrolment report (% of teleworkers enrolled); MFA platform configuration; phishing-resistant MFA (FIDO2/OTP app) policy; MFA exemption register with risk-acceptance"
+},
+{
+"id": 366,
+"code": "1-2-3",
+"name_en": "Remote Access Session Controls & Timeout",
+"name_ar": "ضبط جلسات الوصول عن بُعد والمهلة الزمنية",
+"en": "VPN session timeout configuration; idle-lock policy on remote desktops; concurrent-session limit evidence; failed-authentication lockout configuration"
+},
+{
+"id": 367,
+"code": "1-3-1",
+"name_en": "Corporate Device Hardening & MDM Enrolment",
+"name_ar": "تصليب الأجهزة المؤسسية وتسجيلها في نظام إدارة الأجهزة المحمولة",
+"en": "MDM/UEM platform enrolment report; device compliance policy configuration; patch compliance dashboard; full-disk encryption enforcement evidence (BitLocker/FileVault)"
+},
+{
+"id": 368,
+"code": "1-3-2",
+"name_en": "BYOD Security Requirements & Containerisation",
+"name_ar": "متطلبات أمان الأجهزة الشخصية والفصل بين البيانات المؤسسية والشخصية",
+"en": "BYOD policy document; MAM/containerisation configuration; BYOD enrolment records; jailbreak/root-detection alert log; BYOD access-tier limitation documentation"
+},
+{
+"id": 369,
+"code": "1-3-3",
+"name_en": "Endpoint Antimalware & EDR for Telework Devices",
+"name_ar": "الحماية من البرمجيات الخبيثة واكتشاف التهديدات على أجهزة العمل عن بُعد",
+"en": "EDR/AV deployment coverage report; last-scan date and quarantine log; EDR alert escalation procedure; AV definition currency check"
+},
+{
+"id": 370,
+"code": "1-3-4",
+"name_en": "Application Allow-listing & Web Filtering for Remote Endpoints",
+"name_ar": "قوائم التطبيقات المعتمدة وتصفية الويب لأجهزة العمل عن بُعد",
+"en": "Application allow-list policy; web proxy/DNS filter configuration and block-list categories; DNS-over-VPN configuration; exception approval log"
+},
+{
+"id": 371,
+"code": "1-4-1",
+"name_en": "Home Router & Wi-Fi Security Requirements",
+"name_ar": "متطلبات أمان أجهزة التوجيه والشبكات اللاسلكية المنزلية",
+"en": "Teleworker home network security checklist (in AUP); self-attestation forms confirming WPA2/3, router firmware update, default credential change; spot-check audit sample"
+},
+{
+"id": 372,
+"code": "1-4-2",
+"name_en": "Data Handling & Printing Restrictions for Teleworkers",
+"name_ar": "قيود التعامل مع البيانات والطباعة للعاملين عن بُعد",
+"en": "DLP policy configuration covering cloud upload and local print; data classification policy references; teleworker acknowledgement of no-local-print rule for confidential data; DLP alert sample"
+},
+{
+"id": 373,
+"code": "1-4-3",
+"name_en": "Video Conferencing & Screen-Sharing Security",
+"name_ar": "أمان مؤتمرات الفيديو ومشاركة الشاشة عن بُعد",
+"en": "Approved video-conferencing platform list; meeting password and waiting-room enforcement configuration; screen-share data classification guidance; recording consent policy"
+},
+{
+"id": 374,
+"code": "1-5-1",
+"name_en": "Teleworker Security Awareness Programme",
+"name_ar": "برنامج التوعية الأمنية للعاملين عن بُعد",
+"en": "Annual teleworker security awareness training completion records; training content covering phishing, secure Wi-Fi, and device security; knowledge-check pass rate report"
+},
+{
+"id": 375,
+"code": "1-5-2",
+"name_en": "Phishing Simulation for Remote Workers",
+"name_ar": "محاكاة هجمات التصيد الاحتيالي للعاملين عن بُعد",
+"en": "Phishing simulation campaign schedule and results (click rate, report rate); targeted follow-up training records for repeat clickers; trend analysis report"
+},
+{
+"id": 376,
+"code": "1-5-3",
+"name_en": "Incident Reporting Channel for Remote Workers",
+"name_ar": "قنوات الإبلاغ عن الحوادث السيبرانية للعاملين عن بُعد",
+"en": "Incident reporting SOP communicated to all teleworkers; reporting channel accessibility test (available outside VPN); incident report sample from remote workers; awareness material referencing the channel"
+},
+{
+"id": 377,
+"code": "1-6-1",
+"name_en": "Official Social Media Account Inventory",
+"name_ar": "جرد حسابات وسائل التواصل الاجتماعي الرسمية للمؤسسة",
+"en": "Authorised social media account register (platform, handle, owner, creation date, purpose); quarterly reconciliation evidence; decommissioned account closure records"
+},
+{
+"id": 378,
+"code": "1-6-2",
+"name_en": "Social Media Policy & Content Approval Workflow",
+"name_ar": "سياسة وسائل التواصل الاجتماعي وإجراءات اعتماد المحتوى",
+"en": "Social media policy document; content approval workflow diagram; approved-publisher list per platform; sample approved post records; post-rejection log"
+},
+{
+"id": 379,
+"code": "1-6-3",
+"name_en": "Social Media Account Ownership & Succession",
+"name_ar": "ملكية حسابات التواصل الاجتماعي وإجراءات التعاقب",
+"en": "Account-owner role matrix; offboarding checklist confirming credential transfer; emergency access procedure for account owner absence; account access audit log"
+},
+{
+"id": 380,
+"code": "1-7-1",
+"name_en": "MFA Enforcement on All Official Social Media Accounts",
+"name_ar": "تطبيق المصادقة متعددة العوامل على جميع حسابات التواصل الاجتماعي الرسمية",
+"en": "MFA enrolment screenshots or platform admin panel exports for each official account; MFA method documentation (authenticator app preferred over SMS); periodic MFA validity check records"
+},
+{
+"id": 381,
+"code": "1-7-2",
+"name_en": "Social Media Admin Role Minimisation & Separation of Duties",
+"name_ar": "تقليص صلاحيات الإدارة وتطبيق مبدأ الفصل بين المهام في حسابات التواصل الاجتماعي",
+"en": "Admin role list per platform (screenshots); role minimisation evidence (number of admins ≤ 3 per account as a benchmark); SoD matrix for content creation vs approval vs publishing"
+},
+{
+"id": 382,
+"code": "1-7-3",
+"name_en": "Social Media Account Password & Credential Management",
+"name_ar": "إدارة كلمات المرور وبيانات الاعتماد لحسابات التواصل الاجتماعي",
+"en": "Password manager / vault usage evidence for social media credentials; password complexity policy extract; credential rotation log (minimum annual); no-shared-password attestation"
+},
+{
+"id": 383,
+"code": "1-7-4",
+"name_en": "Third-Party Social Media App & Integration Control",
+"name_ar": "ضبط تطبيقات وتكاملات الطرف الثالث المرتبطة بحسابات التواصل الاجتماعي",
+"en": "Authorised third-party app register for each social platform; revoked app audit log; periodic review of connected apps (quarterly); approval workflow for new integrations"
+},
+{
+"id": 384,
+"code": "1-8-1",
+"name_en": "Social Media Account Compromise Playbook",
+"name_ar": "كتيب التشغيل للتعامل مع الاختراق والسيطرة على الحسابات",
+"en": "Social media account compromise playbook; incident response drills (tabletop); contact list for platform security/trust-and-safety teams; credential invalidation runbook"
+},
+{
+"id": 385,
+"code": "1-8-2",
+"name_en": "Social Media Impersonation Detection & Takedown",
+"name_ar": "الكشف عن انتحال الشخصية واتخاذ إجراءات الإزالة",
+"en": "Impersonation monitoring tool or scheduled search procedure; takedown request log (platform and NCA/CITC channel); response time SLA for impersonation incidents; past takedown case records"
+},
+{
+"id": 386,
+"code": "1-8-3",
+"name_en": "Unauthorised Content Removal & Communication",
+"name_ar": "إزالة المحتوى غير المعتمد والتواصل مع المتابعين",
+"en": "Content removal procedure; unauthorised post log with removal time; crisis communication template for followers; post-incident review records"
+},
+{
+"id": 387,
+"code": "1-9-1",
+"name_en": "Social Media Account Login & Activity Monitoring",
+"name_ar": "مراقبة تسجيل الدخول والنشاطات على حسابات التواصل الاجتماعي",
+"en": "Login alert configuration on each platform (email/app notifications for unrecognised logins); platform activity log review frequency; SIEM integration for social media alerts where available"
+},
+{
+"id": 388,
+"code": "1-9-2",
+"name_en": "Brand & Keyword Monitoring for Threats",
+"name_ar": "مراقبة العلامة التجارية والمصطلحات المرتبطة بها للكشف عن التهديدات",
+"en": "Brand monitoring tool or saved-search procedure; keyword/hashtag alert configuration; weekly brand monitoring report samples; escalation path for identified threats"
+},
+{
+"id": 389,
+"code": "1-9-3",
+"name_en": "Social Media Security Awareness for Staff & Administrators",
+"name_ar": "التوعية بأمن وسائل التواصل الاجتماعي للموظفين ومديري الحسابات",
+"en": "Social-media security training completion records for account administrators; awareness content covering phishing via DM, credential theft, account takeover signs; annual refresher evidence"
+}
+]

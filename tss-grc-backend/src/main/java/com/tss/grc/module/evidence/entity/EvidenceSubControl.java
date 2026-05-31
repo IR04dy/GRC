@@ -38,6 +38,9 @@ public class EvidenceSubControl {
     @Column(name = "evidence_guidance", columnDefinition = "NVARCHAR(MAX)")
     private String evidenceGuidance;
 
+    @Column(name = "evidence_guidance_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String evidenceGuidanceAr;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

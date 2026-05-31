@@ -35,7 +35,35 @@
 .sb-title { color: #fff; font-weight: 800; font-size: 13.5px; letter-spacing: -.2px; }
 .sb-sub   { color: var(--sb-text-3); font: 500 10px var(--font-mono); letter-spacing: .08em; margin-top: 2px; }
 
-.sb-section { font-weight: 800; font-size: 9px; color: var(--sb-text-3); letter-spacing: .14em; text-transform: uppercase; padding: 18px 18px 6px; }
+.sb-section {
+  font-weight: 800; font-size: 9px;
+  color: var(--sb-text-3);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 18px 18px 6px;
+  display: flex; align-items: center; gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  text-align: inherit;
+  font-family: inherit;
+}
+/* Pinned group (Workspace) — no chevron, no hover, not clickable */
+.sb-section[disabled] { cursor: default; opacity: 1; }
+/* Collapsible group — show chevron + hover hint */
+.sb-section-toggle {
+  cursor: pointer;
+  transition: color var(--dur-fast);
+}
+.sb-section-toggle:hover { color: var(--sb-active-fg, #fff); }
+.sb-chevron {
+  transition: transform var(--dur-fast);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.sb-chevron-open { transform: rotate(90deg); }
+[dir="rtl"] .sb-chevron { transform: rotate(180deg); }
+[dir="rtl"] .sb-chevron-open { transform: rotate(90deg); }
 
 .sb-item {
   display: flex; align-items: center; gap: 12px;
@@ -55,6 +83,52 @@
   color: var(--sb-active-fg);
   font-weight: 600;
   border-inline-start-color: var(--accent-300);
+}
+
+/* Parent items with children: keep the toggle chevron inline. The
+ * wrapper holds the NavLink + the toggle button so they share a row. */
+.sb-item-wrap { position: relative; display: flex; align-items: stretch; }
+.sb-item-wrap .sb-item { flex: 1 1 auto; padding-inline-end: 36px; }
+.sb-item-toggle {
+  position: absolute;
+  inset-inline-end: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--sb-text-3);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all var(--dur-fast);
+}
+.sb-item-toggle:hover {
+  background: var(--sb-hover-bg);
+  color: var(--sb-active-fg, #fff);
+}
+.sb-item-toggle > svg { transition: transform var(--dur-fast); }
+.sb-item-toggle-open > svg { transform: rotate(90deg); }
+[dir="rtl"] .sb-item-toggle > svg { transform: rotate(180deg); }
+[dir="rtl"] .sb-item-toggle-open > svg { transform: rotate(90deg); }
+
+/* Children block — indented, smaller, with a vertical guide line on
+ * the leading edge to reinforce the parent/child relationship. */
+.sb-children {
+  position: relative;
+  margin-inline-start: 28px;
+  border-inline-start: 1px solid var(--sb-border);
+}
+.sb-item-child {
+  padding-inline-start: 16px;
+  font-size: 12px;
+  color: var(--sb-text-2, var(--sb-text));
+  border-inline-start: 2px solid transparent;
+}
+.sb-item-child:hover { color: #fff; }
+.sb-item-child.active {
+  border-inline-start-color: var(--accent-300);
+  font-weight: 600;
 }
 
 /* Pending-counter pill at the right edge of a sidebar entry.

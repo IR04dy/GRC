@@ -1,0 +1,415 @@
+[
+{
+"id": 467,
+"code": "1-1",
+"name_en": "Identify and document a lawful basis for each processing purpose",
+"name_ar": "تحديد الأساس القانوني لكل غرض من أغراض المعالجة وتوثيقه",
+"en": "ROPA register showing lawful-basis column per processing activity; legal-basis assessment memo signed by DPO or legal counsel; board/management approval record where consent is not the chosen basis"
+},
+{
+"id": 468,
+"code": "1-2",
+"name_en": "Obtain and record valid, granular consent",
+"name_ar": "الحصول على الموافقة الصريحة والمحددة وتسجيلها",
+"en": "Time-stamped consent capture logs (digital form, click-to-accept records, or signed paper forms); consent version linked to privacy notice version; separate consent tick-boxes per processing purpose; evidence that consent was not bundled with terms of service"
+},
+{
+"id": 469,
+"code": "1-3",
+"name_en": "Enable withdrawal of consent and cease processing upon request",
+"name_ar": "إتاحة سحب الموافقة ووقف المعالجة فور الطلب",
+"en": "Withdrawal-of-consent records with timestamps; self-service opt-out mechanism screenshot or audit trail; evidence of processing cessation within the prescribed period; updated consent log reflecting withdrawal"
+},
+{
+"id": 470,
+"code": "1-4",
+"name_en": "Legitimate-interest assessment (LIA) where that basis is relied upon",
+"name_ar": "تقييم المصلحة المشروعة عند الاستناد إليها أساساً للمعالجة",
+"en": "Completed LIA template covering purpose, necessity, and balancing test; sign-off record by DPO; documentation confirming data subject interests were weighed and not overridden"
+},
+{
+"id": 471,
+"code": "2-1",
+"name_en": "Publish a comprehensive privacy notice covering all PDPL-required elements",
+"name_ar": "نشر إشعار خصوصية شامل يغطي جميع العناصر المطلوبة نظاماً",
+"en": "Current published privacy notice (Arabic primary + English); version history and effective dates; checklist confirming coverage of: controller identity, DPO contact, purposes, legal bases, retention schedule, data subject rights, cross-border transfer details, complaint mechanism"
+},
+{
+"id": 472,
+"code": "2-2",
+"name_en": "Deliver layered, just-in-time privacy information at point of collection",
+"name_ar": "تقديم معلومات الخصوصية الطبقية في لحظة جمع البيانات",
+"en": "Screenshots or design specifications showing layered notice implementation (short notice + link to full notice); user-journey documentation confirming notice is presented before or at point of data collection; A/B or UX test records if available"
+},
+{
+"id": 473,
+"code": "2-3",
+"name_en": "Maintain a notice version log and notify subjects of material changes",
+"name_ar": "الاحتفاظ بسجل إصدارات الإشعار وإبلاغ أصحاب البيانات بالتغييرات الجوهرية",
+"en": "Privacy-notice version control log with change descriptions and publication dates; evidence of subject notification (email, in-app message, re-consent prompt) for material changes; sign-off record confirming legal/DPO review before each new version"
+},
+{
+"id": 474,
+"code": "2-4",
+"name_en": "Provide privacy information in Arabic as the primary language",
+"name_ar": "توفير معلومات الخصوصية باللغة العربية بوصفها اللغة الأساسية",
+"en": "Arabic-language version of all public-facing privacy notices and consent forms; linguistic review certification by a qualified Arabic legal-language reviewer; evidence that the Arabic version is at least as prominent as any English version"
+},
+{
+"id": 475,
+"code": "3-1",
+"name_en": "Right of access — respond to subject access requests (SARs) within statutory period",
+"name_ar": "حق الاطلاع — الاستجابة لطلبات الوصول خلال المدة النظامية",
+"en": "DSR intake register with date-received and date-closed columns; SLA compliance report showing response within 30 days (extendable to 60 days with notification); sample redacted SAR responses; identity-verification procedure documentation; log of requests refused and stated reasons"
+},
+{
+"id": 476,
+"code": "3-2",
+"name_en": "Right of rectification — correct inaccurate or incomplete personal data",
+"name_ar": "حق التصحيح — تصحيح البيانات غير الدقيقة أو الناقصة",
+"en": "DSR register entries marked as rectification requests; evidence of data correction in source systems with before/after comparison (where permissible to share); notification records sent to third parties where data was disclosed prior to correction; response-time SLA report"
+},
+{
+"id": 477,
+"code": "3-3",
+"name_en": "Right of erasure — delete personal data upon request where no retention obligation applies",
+"name_ar": "حق الحذف — مسح البيانات الشخصية عند انتفاء المسوّغ القانوني للاحتفاظ بها",
+"en": "DSR register entries marked as erasure requests; evidence of data deletion or anonymisation in source systems; retention-obligation assessment memo where erasure is refused; notification records to processors instructed to delete; erasure certificates where available"
+},
+{
+"id": 478,
+"code": "3-4",
+"name_en": "Right of portability — provide personal data in machine-readable format",
+"name_ar": "حق نقل البيانات — تسليم البيانات الشخصية بصيغة قابلة للقراءة الآلية",
+"en": "DSR register entries marked as portability requests; exported data package samples (JSON or CSV); evidence of response within 30 days; procedure documentation for portability workflow including identity verification and format options offered"
+},
+{
+"id": 479,
+"code": "3-5",
+"name_en": "Right to object to processing and to opt out of direct marketing",
+"name_ar": "حق الاعتراض على المعالجة والرفض للتسويق المباشر",
+"en": "Objection-request log with grounds stated and outcomes recorded; marketing opt-out mechanism screenshots and confirmation emails; evidence that processing ceased following upheld objection; procedure for evaluating compelling legitimate-interest grounds where raised"
+},
+{
+"id": 480,
+"code": "3-6",
+"name_en": "DSR process governance — intake, verification, tracking, and escalation",
+"name_ar": "حوكمة معالجة طلبات أصحاب البيانات — الاستقبال والتحقق والتتبع والتصعيد",
+"en": "Published DSR submission channel (web form, email, or portal) with Arabic-language option; identity-verification procedure documentation; DSR tracker showing open, in-progress, and closed status with responsible owner; escalation matrix for complex or disputed requests; annual DSR volume and SLA-compliance management report"
+},
+{
+"id": 481,
+"code": "4-1",
+"name_en": "Maintain a comprehensive ROPA covering all mandatory fields",
+"name_ar": "الاحتفاظ بسجل شامل لأنشطة المعالجة يغطي جميع الحقول الإلزامية",
+"en": "ROPA register export (spreadsheet or GRC system report) including: processing purpose, lawful basis, data categories, data subject categories, recipients, cross-border transfers, retention period, security measures reference, processor details; dated and version-controlled"
+},
+{
+"id": 482,
+"code": "4-2",
+"name_en": "Keep the ROPA current — review upon new processing activity or material change",
+"name_ar": "تحديث سجل أنشطة المعالجة باستمرار عند بدء نشاط جديد أو إجراء تغيير جوهري",
+"en": "ROPA change-management log showing date of update, nature of change, and approver; new-system intake checklist requiring ROPA update before go-live; periodic ROPA completeness review record signed by DPO or privacy lead; version history showing at least annual formal review"
+},
+{
+"id": 483,
+"code": "4-3",
+"name_en": "Make the ROPA available to SDAIA upon request",
+"name_ar": "إتاحة سجل أنشطة المعالجة لهيئة البيانات والذكاء الاصطناعي عند الطلب",
+"en": "Designated ROPA custodian and access procedure documentation; evidence that the ROPA is held in a format exportable within a reasonable timeframe; prior SDAIA inspection response record if applicable; access-control log confirming DPO has read/export rights to the ROPA"
+},
+{
+"id": 484,
+"code": "5-1",
+"name_en": "Conduct a DPIA for all high-risk processing activities before commencement",
+"name_ar": "إجراء تقييم أثر حماية البيانات قبل البدء في أي نشاط معالجة عالي الخطورة",
+"en": "DPIA screening register identifying all processing activities assessed for high-risk triggers; completed DPIA reports for triggered activities covering: systematic description, necessity/proportionality assessment, risk identification, mitigating measures; DPO sign-off records; board or senior management approval where residual risk is high"
+},
+{
+"id": 485,
+"code": "5-2",
+"name_en": "Document DPIA outcomes, residual risks, and agreed mitigating measures",
+"name_ar": "توثيق نتائج تقييم الأثر والمخاطر المتبقية وتدابير التخفيف المعتمدة",
+"en": "DPIA final report with residual-risk rating and treatment plan; risk register entries cross-referenced to DPIA findings; evidence of implemented controls (e.g., pseudonymisation, access restriction); post-implementation review record confirming control effectiveness"
+},
+{
+"id": 486,
+"code": "5-3",
+"name_en": "Consult SDAIA prior to processing where high residual risk cannot be mitigated",
+"name_ar": "التشاور مع الهيئة قبل المعالجة حين لا يمكن تخفيف المخاطر العالية المتبقية",
+"en": "Prior-consultation request to SDAIA with DPIA report attached; SDAIA response or acknowledgement record; evidence that processing was delayed pending regulatory consultation outcome; board decision record on whether to proceed following SDAIA guidance"
+},
+{
+"id": 487,
+"code": "5-4",
+"name_en": "Maintain a DPIA register and schedule periodic reviews for ongoing high-risk processing",
+"name_ar": "الاحتفاظ بسجل تقييمات الأثر وجدولة مراجعات دورية للأنشطة العالية الخطورة المستمرة",
+"en": "DPIA register index with processing activity, DPIA date, next-review date, and status; review records for DPIAs older than two years or where processing has materially changed; DPO attestation that the DPIA register is complete and current"
+},
+{
+"id": 488,
+"code": "6-1",
+"name_en": "Detect, log, and assess all actual and suspected personal data breaches",
+"name_ar": "اكتشاف جميع خروقات البيانات الشخصية الفعلية والمشتبه بها وتسجيلها وتقييمها",
+"en": "Breach register with: incident date, discovery date, data types affected, number of subjects, breach category, and initial risk assessment; detection-to-awareness timeline evidence; internal escalation records to DPO and legal counsel within 24 hours of discovery; investigation report documenting cause and scope"
+},
+{
+"id": 489,
+"code": "6-2",
+"name_en": "Notify SDAIA within 72 hours for breaches posing risk to data subjects",
+"name_ar": "إخطار الهيئة خلال 72 ساعة للخروقات التي تشكّل خطراً على أصحاب البيانات",
+"en": "SDAIA breach notification submission record (portal reference number or email acknowledgement); notification timestamp proving 72-hour compliance; notification content covering: nature of breach, categories and approximate number of affected records and subjects, DPO contact, likely consequences, measures taken or proposed; where notification was delayed beyond 72 hours, documented reasons"
+},
+{
+"id": 490,
+"code": "6-3",
+"name_en": "Notify affected data subjects without undue delay for high-risk breaches",
+"name_ar": "إخطار أصحاب البيانات المتضررين دون تأخير غير مبرر للخروقات عالية الخطورة",
+"en": "Data subject notification records (email send logs, SMS delivery receipts, or posted-letter proof); notification content evidence covering: plain-language description, DPO contact, likely consequences, protective steps subjects should take; SDAIA consultation record where notification was waived; subject-notification timeline evidence"
+},
+{
+"id": 491,
+"code": "6-4",
+"name_en": "Maintain a breach register and conduct post-incident review",
+"name_ar": "الاحتفاظ بسجل الخروقات وإجراء مراجعة ما بعد الحادثة",
+"en": "Cumulative breach register accessible to DPO and senior management; post-incident review report for each significant breach covering root cause, lessons learned, and preventive actions; evidence of preventive actions implemented; annual breach trend analysis report"
+},
+{
+"id": 492,
+"code": "7-1",
+"name_en": "Identify and document all cross-border personal data transfers",
+"name_ar": "تحديد جميع عمليات نقل البيانات الشخصية عبر الحدود وتوثيقها",
+"en": "Cross-border transfer inventory mapped from ROPA; destination country list with adequacy status classification; processor/sub-processor country-of-operation records; data-flow diagram showing international flows; annual transfer inventory review record"
+},
+{
+"id": 493,
+"code": "7-2",
+"name_en": "Conduct a transfer risk assessment (TRA) for each destination jurisdiction",
+"name_ar": "إجراء تقييم مخاطر النقل لكل ولاية قضائية مقصودة",
+"en": "Completed TRA per destination country or processor covering: local legal framework adequacy, government-access risk, technical safeguards in place, and overall risk rating; SDAIA adequacy determination check record (published list); DPO approval memo for each TRA; date of last review and trigger for next review"
+},
+{
+"id": 494,
+"code": "7-3",
+"name_en": "Implement and document an approved transfer mechanism for non-adequate destinations",
+"name_ar": "تطبيق آلية نقل معتمدة وتوثيقها للوجهات غير الكافية",
+"en": "Signed data transfer agreements (standard contractual clauses approved by SDAIA, or binding corporate rules); SDAIA approval or registration records where required; evidence that contractual clauses are reflected in operational practice; supplementary technical measures documentation (encryption, pseudonymisation)"
+},
+{
+"id": 495,
+"code": "7-4",
+"name_en": "Apply and document recognised transfer exceptions where relied upon",
+"name_ar": "تطبيق استثناءات النقل المعترف بها وتوثيقها عند الاستناد إليها",
+"en": "Exception-reliance register documenting which exception applies (explicit consent, contractual necessity, vital interests, public interest), the factual basis, and frequency of use; legal opinion or DPO assessment confirming exception conditions are met; evidence that exceptions are not used systematically as a substitute for a proper transfer mechanism"
+},
+{
+"id": 496,
+"code": "7-5",
+"name_en": "Monitor changes to SDAIA adequacy determinations and update transfer arrangements accordingly",
+"name_ar": "متابعة تحديثات قرارات الكفاءة الصادرة عن الهيئة وتحديث ترتيبات النقل وفقاً لذلك",
+"en": "Documented process for monitoring SDAIA adequacy-list updates; change log showing transfer-mechanism updates triggered by adequacy decisions; evidence of processor notification where transfer arrangements are affected; annual transfer compliance review signed by DPO"
+},
+{
+"id": 497,
+"code": "8-1",
+"name_en": "Apply data minimisation — collect only data necessary for the specified purpose",
+"name_ar": "تطبيق مبدأ تقليل البيانات — جمع ما هو ضروري فحسب للغرض المحدد",
+"en": "Data-collection field inventory mapped to processing purpose with necessity justification per field; privacy-by-design review record for new systems confirming minimisation applied; periodic data-catalogue audit showing redundant or excess fields identified and removed"
+},
+{
+"id": 498,
+"code": "8-2",
+"name_en": "Maintain data accuracy and provide correction mechanisms",
+"name_ar": "الحفاظ على دقة البيانات وتوفير آليات التصحيح",
+"en": "Data-quality policy and periodic data-quality audit reports; evidence of proactive accuracy checks (e.g., annual profile update prompts sent to customers); DSR rectification-request log demonstrating operational correction process; data-quality KPI dashboard extract"
+},
+{
+"id": 499,
+"code": "8-3",
+"name_en": "Maintain and implement a formal retention schedule for all personal data categories",
+"name_ar": "وضع جدول احتفاظ رسمي بجميع فئات البيانات الشخصية وتطبيقه",
+"en": "Approved retention schedule document covering all personal data categories with retention periods, legal/regulatory basis for each period, and deletion trigger; evidence of annual retention schedule review and DPO/legal sign-off; record of retention schedule being communicated to data custodians"
+},
+{
+"id": 500,
+"code": "8-4",
+"name_en": "Execute secure, verifiable disposal of personal data at end of retention period",
+"name_ar": "تنفيذ إتلاف آمن وقابل للتحقق للبيانات الشخصية عند انتهاء فترة الاحتفاظ",
+"en": "Automated or scheduled data-deletion job run logs; secure-disposal certificates from data custodians and processors; evidence of physical media destruction (certificates from vendor); annual disposal compliance report cross-referencing retention schedule; anonymisation audit trail where deletion is replaced by anonymisation"
+},
+{
+"id": 501,
+"code": "9-1",
+"name_en": "Identify and inventory all sensitive personal data categories processed",
+"name_ar": "تحديد جميع فئات البيانات الشخصية الحساسة المعالَجة وحصرها",
+"en": "Sensitive-data inventory derived from ROPA; classification matrix mapping data types to PDPL sensitive categories (health, genetic, biometric, financial, criminal, religious/political); data-classification labelling evidence in systems handling sensitive data; DPO attestation of inventory completeness"
+},
+{
+"id": 502,
+"code": "9-2",
+"name_en": "Establish a specific lawful basis or explicit consent for each sensitive data processing activity",
+"name_ar": "تحديد أساس قانوني خاص أو موافقة صريحة لكل نشاط معالجة للبيانات الحساسة",
+"en": "Sensitive-data processing register showing lawful basis or explicit-consent record per activity; explicit-consent capture logs distinct from general processing consent; legal opinion or SDAIA guidance relied upon for statutory-basis processing; DPO sign-off on all sensitive-data processing justifications"
+},
+{
+"id": 503,
+"code": "9-3",
+"name_en": "Apply enhanced security and access controls to sensitive personal data",
+"name_ar": "تطبيق ضمانات أمنية مشددة وضوابط وصول على البيانات الحساسة",
+"en": "Access-control matrix showing sensitive data accessible only to role-justified users; encryption-at-rest and in-transit evidence for sensitive data stores; segregation evidence (sensitive data in separate schemas or encrypted fields); access log review records; penetration test scope confirmation that sensitive data stores are covered"
+},
+{
+"id": 504,
+"code": "9-4",
+"name_en": "Conduct a DPIA before commencing large-scale or novel sensitive data processing",
+"name_ar": "إجراء تقييم أثر حماية البيانات قبل البدء في معالجة واسعة النطاق أو جديدة للبيانات الحساسة",
+"en": "DPIA screening record confirming sensitive-data trigger was assessed; completed DPIA report for large-scale or novel sensitive processing; evidence of mitigating measures implemented; DPO and senior management approval records"
+},
+{
+"id": 505,
+"code": "10-1",
+"name_en": "Obtain verified parental or guardian consent before processing children's personal data",
+"name_ar": "الحصول على موافقة وليّ الأمر الموثقة قبل معالجة بيانات القاصرين",
+"en": "Age-verification mechanism documentation and audit trail; parental/guardian consent capture logs with identity-verification step evidence; under-18 user flag in data systems; procedure for handling data collected before age verification where applicable; child-specific privacy notice in age-appropriate language"
+},
+{
+"id": 506,
+"code": "10-2",
+"name_en": "Restrict health data processing to authorised medical or insurance purposes with strict access controls",
+"name_ar": "تقييد معالجة البيانات الصحية على الأغراض الطبية أو التأمينية المعتمدة مع ضوابط وصول صارمة",
+"en": "Health data processing purpose register with statutory or explicit-consent basis per entry; role-based access control evidence limiting health data to clinical/insurance roles; audit logs for health data access and export; data-sharing agreement with any healthcare provider or insurer receiving health data; professional confidentiality policy"
+},
+{
+"id": 507,
+"code": "10-3",
+"name_en": "Process credit and financial data only under regulated-purpose basis with consumer protection safeguards",
+"name_ar": "معالجة البيانات الائتمانية والمالية في نطاق الأغراض النظامية مع ضمانات حماية المستهلك",
+"en": "Credit-data processing register linked to SAMA/SIMAH authorisation or contractual necessity basis; data-sharing agreements with SIMAH or other credit bureaus; consumer dispute and correction process documentation; evidence that credit data is not used for purposes beyond credit assessment; annual credit-data audit report"
+},
+{
+"id": 508,
+"code": "10-4",
+"name_en": "Process genetic data only for expressly permitted purposes under heightened security",
+"name_ar": "معالجة البيانات الجينية فقط للأغراض المصرح بها صراحةً وبأعلى مستوى من الضمانات الأمنية",
+"en": "Genetic data processing justification memo citing specific statutory permission or explicit consent; evidence of encryption and pseudonymisation applied to genetic datasets; access restricted to qualified researchers or clinicians with documented need-to-know; ethics committee or IRB approval record where processing is for research"
+},
+{
+"id": 509,
+"code": "11-1",
+"name_en": "Designate a qualified DPO and register with SDAIA where required",
+"name_ar": "تعيين مسؤول حماية بيانات مؤهل وتسجيله لدى الهيئة حيثما اشترط النظام",
+"en": "DPO appointment letter or board resolution; DPO qualifications and certification evidence (CIPP/ME or equivalent); SDAIA registration or notification record; DPO contact published in privacy notice; evidence that the DPO is not in a conflict of interest with other duties"
+},
+{
+"id": 510,
+"code": "11-2",
+"name_en": "Ensure DPO independence, authority, and access to senior management",
+"name_ar": "ضمان استقلالية مسؤول حماية البيانات وصلاحياته ووصوله إلى الإدارة العليا",
+"en": "Organisational chart showing DPO reporting line (directly to board or CEO level); DPO mandate/charter document confirming independence from business units; evidence of DPO attendance at senior management or board meetings; record of DPO advisory opinions sought and considered on high-risk decisions"
+},
+{
+"id": 511,
+"code": "11-3",
+"name_en": "Assign DPO tasks formally and provide sufficient resources",
+"name_ar": "تحديد مهام مسؤول حماية البيانات رسمياً وتزويده بالموارد الكافية",
+"en": "DPO job description covering all PDPL-mandated tasks (monitoring compliance, DPIA advisory, SDAIA liaison, data-subject rights, training); evidence of dedicated time allocation; DPO annual work plan and activity log; training budget allocation record; evidence of DPO participation in industry forums or continuing professional development"
+},
+{
+"id": 512,
+"code": "11-4",
+"name_en": "Establish a privacy governance framework — policies, procedures, and accountability structure",
+"name_ar": "إرساء إطار حوكمة الخصوصية — السياسات والإجراءات وهيكل المساءلة",
+"en": "Approved data protection policy suite (privacy policy, data retention policy, breach response procedure, DSR procedure, DPIA procedure, third-party management policy); board approval records; annual privacy governance review minutes; privacy risk inclusion in enterprise risk register; privacy training completion records for all staff handling personal data"
+},
+{
+"id": 513,
+"code": "12-1",
+"name_en": "Conduct due-diligence assessments of processors before engagement",
+"name_ar": "إجراء تقييم العناية الواجبة للمعالجين قبل التعاقد معهم",
+"en": "Processor due-diligence questionnaire and completed assessment records; security certification evidence (ISO 27001, SOC 2, or equivalent) for critical processors; DPO sign-off on processor assessments; annual processor risk-review schedule and records; registry of approved processors with risk ratings"
+},
+{
+"id": 514,
+"code": "12-2",
+"name_en": "Execute a PDPL-compliant data processing agreement (DPA) with every processor",
+"name_ar": "إبرام اتفاقية معالجة بيانات متوافقة مع نظام حماية البيانات مع كل معالج",
+"en": "Signed DPA inventory covering all processors; DPA template review record confirming coverage of: processing scope and purpose, data subject categories, security obligations, sub-processor approval requirement, breach notification to controller, data return/deletion at termination, audit rights; legal counsel review record of DPA template"
+},
+{
+"id": 515,
+"code": "12-3",
+"name_en": "Manage and authorise sub-processor arrangements",
+"name_ar": "إدارة ترتيبات معالجي الباطن والموافقة عليها",
+"en": "Sub-processor register derived from processor disclosures; evidence of controller authorisation (general or specific) for sub-processor use; flow-down DPA or equivalent contractual obligations with sub-processors; notification log when processors appoint new sub-processors; annual sub-processor inventory review"
+},
+{
+"id": 516,
+"code": "12-4",
+"name_en": "Monitor processor compliance and exercise audit rights periodically",
+"name_ar": "متابعة امتثال المعالجين وممارسة حقوق التدقيق بصفة دورية",
+"en": "Annual processor compliance review records (questionnaire, audit, or third-party assurance report); evidence of follow-up on non-conformances identified; processor audit-right clause in DPA; record of exercised audit visits or inspection letters for high-risk processors; processor incident/breach notification log"
+},
+{
+"id": 517,
+"code": "13-1",
+"name_en": "Obtain and document marketing consent; maintain suppression lists",
+"name_ar": "الحصول على موافقة التسويق وتوثيقها؛ الاحتفاظ بقوائم الإلغاء",
+"en": "Marketing opt-in consent records linked to campaign CRM; suppression/do-not-contact list evidence; unsubscribe mechanism audit trail confirming removal from lists within required period; evidence that suppression list is applied across all marketing channels; annual marketing-database hygiene audit"
+},
+{
+"id": 518,
+"code": "13-2",
+"name_en": "Comply with the Communications and Information Technology Commission (CITC) anti-spam obligations",
+"name_ar": "الامتثال لاشتراطات هيئة الاتصالات وتقنية المعلومات المتعلقة بمكافحة البريد الإلكتروني غير المرغوب فيه",
+"en": "CITC anti-spam policy compliance checklist; unsubscribe link presence in all commercial emails; sender identification in all SMS/email marketing; evidence of opt-in prior to first commercial communication; record of complaints received and handled"
+},
+{
+"id": 519,
+"code": "13-3",
+"name_en": "Implement safeguards and transparency for automated individual decision-making",
+"name_ar": "اعتماد ضمانات وشفافية لصنع القرار الآلي الفردي",
+"en": "Automated decision-making register identifying all processes producing significant effects; privacy notice disclosure covering automated decision-making logic in plain language; evidence of human-review mechanism for data subjects affected by automated decisions; DPIA record for automated decision-making activities; algorithmic bias monitoring report where applicable"
+},
+{
+"id": 520,
+"code": "13-4",
+"name_en": "Prohibit processing for profiling or targeted advertising without appropriate basis",
+"name_ar": "حظر استخدام البيانات للتحديد النوعي أو الإعلان المستهدف دون أساس قانوني مناسب",
+"en": "Data-use purpose register confirming advertising/profiling activities have an identified lawful basis; consent records where consent is the basis for profiling; LIA documentation where legitimate interest is claimed; evidence of opt-out mechanism for interest-based advertising; periodic review of third-party advertising-technology partners' data use"
+},
+{
+"id": 521,
+"code": "14-1",
+"name_en": "Implement risk-appropriate technical security measures for personal data",
+"name_ar": "اعتماد تدابير أمنية تقنية متناسبة مع المخاطر لحماية البيانات الشخصية",
+"en": "Information security policy approved by senior management; encryption standard documentation covering data at rest and in transit; access-control matrix with least-privilege principle applied; annual penetration test report with personal-data scope confirmed; vulnerability management programme evidence; network segmentation diagram isolating personal data stores"
+},
+{
+"id": 522,
+"code": "14-2",
+"name_en": "Implement organisational security measures — training, policies, and access management",
+"name_ar": "اعتماد تدابير أمنية تنظيمية — التدريب والسياسات وإدارة الوصول",
+"en": "Annual data protection training completion records for all staff; security-awareness programme evidence; background check records for staff with privileged access; access provisioning/de-provisioning log; leavers' process documentation confirming access removed promptly; clean-desk and clear-screen policy implementation evidence"
+},
+{
+"id": 523,
+"code": "14-3",
+"name_en": "Embed privacy by design and by default in new systems and projects",
+"name_ar": "دمج الخصوصية بالتصميم والافتراض في الأنظمة والمشاريع الجديدة",
+"en": "Privacy-by-design checklist integrated into SDLC or project management gate process; evidence of privacy review at design and build phases of at least two recent projects; default privacy settings documentation showing most privacy-protective settings as default; DPO sign-off at project go-live gate"
+},
+{
+"id": 524,
+"code": "14-4",
+"name_en": "Maintain accountability documentation and demonstrate compliance to SDAIA on request",
+"name_ar": "الاحتفاظ بوثائق المساءلة وإثبات الامتثال للهيئة عند الطلب",
+"en": "Compliance programme documentation index (policies, ROPA, DPIAs, DPO appointment, training records, breach register, processor DPAs, transfer assessments); evidence that documents are version-controlled and retrievable; record of any SDAIA inspection or enquiry and response; annual privacy compliance report presented to board or audit committee"
+},
+{
+"id": 525,
+"code": "14-5",
+"name_en": "Conduct an annual internal privacy audit and address findings",
+"name_ar": "إجراء تدقيق خصوصية داخلي سنوي ومعالجة النتائج",
+"en": "Annual internal or third-party privacy audit scope and methodology document; audit report with findings rated by severity; remediation plan with owners and target dates; evidence of findings closure; audit report presented to DPO, senior management, and audit committee; trend analysis comparing successive annual audit findings"
+}
+]

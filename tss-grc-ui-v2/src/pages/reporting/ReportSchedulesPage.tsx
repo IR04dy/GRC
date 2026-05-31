@@ -34,6 +34,7 @@ const REPORT_TYPE_OPTIONS = [
 const FORMAT_OPTIONS = [
   { value: 'PDF',  label: 'PDF' },
   { value: 'XLSX', label: 'Excel' },
+  { value: 'DOCX', label: 'Word' },
   { value: 'PPTX', label: 'PowerPoint (board-pack only)' },
 ];
 const LANGUAGE_OPTIONS = [{ value: 'en', label: 'English' }, { value: 'ar', label: 'العربية' }];

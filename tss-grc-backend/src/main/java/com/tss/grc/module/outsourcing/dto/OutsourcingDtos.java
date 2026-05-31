@@ -57,7 +57,7 @@ public final class OutsourcingDtos {
             String status, String riskRating,
             LocalDateTime riskAssessedAt, LocalDateTime boardApprovedAt,
             LocalDateTime samaNotifiedAt, String samaNonObjectionRef,
-            LocalDate liveAt, LocalDate exitedAt, LocalDateTime rejectedAt,
+            LocalDate liveAt, LocalDate exitedAt, LocalDateTime suspendedAt, LocalDateTime rejectedAt,
             String rejectionReasonEn, String rejectionReasonAr,
             LocalDate contractStart, LocalDate contractEnd,
             Integer renewalNoticeDays, BigDecimal annualSpendSar,

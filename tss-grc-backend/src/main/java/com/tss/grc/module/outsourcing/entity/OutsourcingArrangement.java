@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
  * <p>Material outsourcing must transition through {@code SAMA_NOTIFIED}
  * within 60 calendar days of {@code BOARD_APPROVED}.
  */
-@Entity
+@Entity(name = "OutsourcingCloudArrangement")
 @Table(schema = "outsourcing", name = "outsourcing_arrangement")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor
@@ -97,6 +97,10 @@ public class OutsourcingArrangement extends BaseEntity {
 
     @Column(name = "exited_at")
     private LocalDate exitedAt;
+
+    /** Reachable from LIVE/UNDER_REVIEW when SAMA opens inquiry or breach is being investigated. */
+    @Column(name = "suspended_at")
+    private LocalDateTime suspendedAt;
 
     @Column(name = "rejected_at")
     private LocalDateTime rejectedAt;

@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
  * <p>Approval gate: T3 + T4 require {@code dataResidency=IN_KINGDOM};
  * T2 may be IN_KINGDOM or GCC; T1 may be GLOBAL.
  */
-@Entity
+@Entity(name = "OutsourcingCloudService")
 @Table(schema = "outsourcing", name = "cloud_service")
 @Where(clause = "is_deleted = 0")
 @Getter @Setter @NoArgsConstructor

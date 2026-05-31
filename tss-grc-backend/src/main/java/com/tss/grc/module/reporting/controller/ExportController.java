@@ -2,6 +2,7 @@ package com.tss.grc.module.reporting.controller;
 
 import com.tss.grc.module.reporting.service.BoardPackPptxService;
 import com.tss.grc.module.reporting.service.BoardPackService;
+import com.tss.grc.module.reporting.service.DocxExportService;
 import com.tss.grc.module.reporting.service.ExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -31,11 +32,14 @@ public class ExportController {
     private final ExportService exportService;
     private final BoardPackService boardPackService;
     private final BoardPackPptxService boardPackPptxService;
+    private final DocxExportService docxExportService;
 
     private static final MediaType XLSX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private static final MediaType PPTX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.presentationml.presentation");
+    private static final MediaType DOCX_TYPE =
+        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
     // ── PDF (Q1) ──────────────────────────────────────────────────────────
 
@@ -84,6 +88,32 @@ public class ExportController {
         return xlsx(exportService.kriDashboardXlsx(), "kri-dashboard-" + LocalDate.now() + ".xlsx");
     }
 
+    // ── Word (.docx) ──────────────────────────────────────────────────────
+
+    @GetMapping("/risk-register.docx")
+    @PreAuthorize("hasPermission('RISK','READ')")
+    @Operation(summary = "Risk register DOCX — pass ?lang=ar for Arabic RTL")
+    public ResponseEntity<byte[]> riskRegisterDocx(@RequestParam(defaultValue = "en") String lang) {
+        return docx(docxExportService.riskRegisterDocx(lang),
+                "risk-register-" + LocalDate.now() + ".docx");
+    }
+
+    @GetMapping("/findings-aging.docx")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    @Operation(summary = "Findings aging DOCX — pass ?lang=ar for Arabic RTL")
+    public ResponseEntity<byte[]> findingsAgingDocx(@RequestParam(defaultValue = "en") String lang) {
+        return docx(docxExportService.findingsAgingDocx(lang),
+                "audit-findings-aging-" + LocalDate.now() + ".docx");
+    }
+
+    @GetMapping("/kri-dashboard.docx")
+    @PreAuthorize("hasPermission('RISK','READ')")
+    @Operation(summary = "KRI dashboard DOCX — pass ?lang=ar for Arabic RTL")
+    public ResponseEntity<byte[]> kriDashboardDocx(@RequestParam(defaultValue = "en") String lang) {
+        return docx(docxExportService.kriDashboardDocx(lang),
+                "kri-dashboard-" + LocalDate.now() + ".docx");
+    }
+
     // ── Board pack (S1) ───────────────────────────────────────────────────
 
     @GetMapping("/board-pack.pdf")
@@ -120,6 +150,12 @@ public class ExportController {
     private ResponseEntity<byte[]> pptx(byte[] body, String filename) {
         return ResponseEntity.ok()
             .contentType(PPTX_TYPE)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .body(body);
+    }
+    private ResponseEntity<byte[]> docx(byte[] body, String filename) {
+        return ResponseEntity.ok()
+            .contentType(DOCX_TYPE)
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
             .body(body);
     }

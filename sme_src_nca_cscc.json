@@ -1,0 +1,254 @@
+[
+{
+"id": 282,
+"code": "1-1-1",
+"name_en": "Cloud Usage Policy (CST)",
+"name_ar": "سياسة استخدام الحوسبة السحابية — المستأجر",
+"en": "Board-approved cloud usage policy; scope covering IaaS/PaaS/SaaS; shadow-IT prohibition clause; approved-cloud-service register; policy distribution and staff acknowledgement records."
+},
+{
+"id": 283,
+"code": "1-1-2",
+"name_en": "Approved Cloud Service Provider Register (CST)",
+"name_ar": "سجل مزودي الخدمات السحابية المعتمدين — المستأجر",
+"en": "Approved-CSP register with provider name, service description, classification of hosted data, NCA licensing status, and last risk-assessment date; onboarding checklist; decommission log."
+},
+{
+"id": 284,
+"code": "1-1-3",
+"name_en": "Shared-Responsibility Matrix (CSP & CST)",
+"name_ar": "مصفوفة المسؤولية المشتركة — المزود والمستأجر",
+"en": "Signed shared-responsibility matrix (SRM) for each cloud deployment model in use (IaaS/PaaS/SaaS); SRM reviewed on contract renewal; evidence of gap analysis where CST controls supplement CSP defaults; SRM embedded in cloud onboarding checklist."
+},
+{
+"id": 285,
+"code": "1-1-4",
+"name_en": "Cloud Security Strategy & Risk Appetite (CST)",
+"name_ar": "استراتيجية الأمن السيبراني للسحابة وشهية المخاطر — المستأجر",
+"en": "Cloud security strategy document endorsed by CISO; risk appetite statement covering cloud services; cloud risk register with residual risk sign-off; annual review evidence."
+},
+{
+"id": 286,
+"code": "1-1-5",
+"name_en": "Cloud Service Provider NCA Licensing Verification (CST)",
+"name_ar": "التحقق من ترخيص NCA لمزودي الخدمات السحابية — المستأجر",
+"en": "Evidence of NCA cloud licensing check for each CSP (NCA approved-CSP list cross-reference); annual re-verification records; escalation process for unlicensed CSP discovery."
+},
+{
+"id": 287,
+"code": "2-1-1",
+"name_en": "Cloud Data Classification Assessment",
+"name_ar": "تقييم تصنيف البيانات في بيئة السحابة",
+"en": "Data classification assessment for each cloud workload; mapping to national classification requirements; restricted/sovereign data prohibition for public cloud without NCA approval; assessment updated on each new cloud migration project."
+},
+{
+"id": 288,
+"code": "2-1-2",
+"name_en": "Data Residency Enforcement — KSA Sovereign Data",
+"name_ar": "تطبيق متطلبات الإقامة للبيانات السيادية السعودية",
+"en": "Cloud region configuration evidence (KSA region pinning); geo-restriction policy screenshots; storage account location audit; periodic cross-region replication review to confirm no out-of-kingdom copies of sovereign data."
+},
+{
+"id": 289,
+"code": "2-1-3",
+"name_en": "Cloud Data Inventory & Tagging",
+"name_ar": "جرد البيانات السحابية ووضع علاماتها",
+"en": "Cloud resource tagging policy (classification, owner, environment, data-residency tags); tag compliance scan report (% tagged); untagged-resource remediation log; integration with CSPM for continuous tag enforcement."
+},
+{
+"id": 290,
+"code": "3-1-1",
+"name_en": "MFA Enforcement for Cloud Console Access",
+"name_ar": "تطبيق المصادقة متعددة العوامل على وحدات التحكم السحابية",
+"en": "MFA policy configuration evidence for all cloud management accounts (AWS IAM policy, Azure Conditional Access, GCP Org Policy); MFA coverage report (% of accounts with MFA); break-glass account MFA exception log with compensating controls."
+},
+{
+"id": 291,
+"code": "3-1-2",
+"name_en": "Least-Privilege IAM Role Design",
+"name_ar": "تصميم أدوار الوصول وفق مبدأ الصلاحيات الدنيا",
+"en": "IAM policy review records showing no wildcard (*) permissions for production workloads; role definition documentation; unused permission removal log; quarterly access certification results."
+},
+{
+"id": 292,
+"code": "3-1-3",
+"name_en": "Privileged Cloud Account Management (PAM Integration)",
+"name_ar": "إدارة الحسابات المتميزة في السحابة — تكامل PAM",
+"en": "PAM tool integration with cloud management accounts evidence; just-in-time access provisioning configuration; privileged session recording for cloud console access; quarterly review of standing privileged cloud accounts."
+},
+{
+"id": 293,
+"code": "3-1-4",
+"name_en": "Service Account & API Key Governance",
+"name_ar": "حوكمة حسابات الخدمة ومفاتيح واجهة برمجة التطبيقات",
+"en": "Service account inventory with purpose, owner, and last-rotation date; API key rotation schedule and evidence; prohibition of long-lived credentials in code repositories (secret scanning tool evidence); service account access review (quarterly)."
+},
+{
+"id": 294,
+"code": "3-1-5",
+"name_en": "Federated Identity & SSO for Cloud Access (CST)",
+"name_ar": "الهوية الموحدة وتسجيل الدخول الموحد للوصول السحابي — المستأجر",
+"en": "IdP federation configuration evidence (SAML/OIDC with corporate directory); local cloud-native accounts audit (minimised/eliminated); SSO coverage report; IdP health monitoring alerts."
+},
+{
+"id": 295,
+"code": "4-1-1",
+"name_en": "Virtual Private Cloud (VPC) Architecture & Segmentation",
+"name_ar": "هندسة الشبكة الافتراضية الخاصة وتجزئتها",
+"en": "VPC/VNET architecture diagram showing subnet segmentation by environment (prod/non-prod) and workload tier; security group / network ACL baseline; peering and transit-gateway topology document; quarterly network architecture review."
+},
+{
+"id": 296,
+"code": "4-1-2",
+"name_en": "Cloud Firewall & Security Group Rule Management",
+"name_ar": "إدارة جدار الحماية السحابي وقواعد مجموعات الأمان",
+"en": "Security group/firewall rule inventory; evidence of 0.0.0.0/0 inbound rule prohibition for sensitive ports; rule review cadence records (quarterly); IaC-enforced baseline configuration (Terraform/CloudFormation policy-as-code scan results)."
+},
+{
+"id": 297,
+"code": "4-1-3",
+"name_en": "Cloud Web Application Firewall (WAF) Deployment",
+"name_ar": "نشر جدار حماية تطبيقات الويب السحابي",
+"en": "WAF deployment evidence for public-facing cloud workloads; managed-rule-set version; custom rule configuration for application-specific threats; WAF alert and block logs; false-positive tuning records."
+},
+{
+"id": 298,
+"code": "4-1-4",
+"name_en": "Private Connectivity for Sensitive Cloud Access (CST)",
+"name_ar": "الاتصال الخاص للوصول الحساس إلى السحابة — المستأجر",
+"en": "Private endpoint / PrivateLink configuration for storage and database services; ExpressRoute/Direct Connect circuit documentation; evidence that sensitive data services do not traverse the public internet; network flow logs confirming private routing."
+},
+{
+"id": 299,
+"code": "5-1-1",
+"name_en": "Cloud-Native KMS Configuration & Key Hierarchy",
+"name_ar": "إعداد KMS السحابي وتسلسل المفاتيح",
+"en": "Cloud KMS key inventory (AWS KMS / Azure Key Vault / GCP Cloud KMS); key hierarchy documentation (master key, data encryption keys); key rotation schedule and evidence (annual minimum); access control policy for key management operations."
+},
+{
+"id": 300,
+"code": "5-1-2",
+"name_en": "Bring-Your-Own-Key (BYOK) for High-Sensitivity Workloads (CST)",
+"name_ar": "إحضار مفاتيحك الخاصة (BYOK) للأحمال الحساسة — المستأجر",
+"en": "BYOK implementation documentation for Confidential/Restricted workloads; HSM-generated key material evidence; key import audit log; ability-to-revoke-key test evidence; key custody assignment."
+},
+{
+"id": 301,
+"code": "5-1-3",
+"name_en": "Encryption of Data at Rest in Cloud Storage",
+"name_ar": "تشفير البيانات الساكنة في التخزين السحابي",
+"en": "Encryption-at-rest configuration for all cloud storage services (S3, Blob, GCS, RDS); CSP encryption report or configuration compliance scan; evidence AES-256 or equivalent algorithm in use; unencrypted bucket/container remediation log."
+},
+{
+"id": 302,
+"code": "5-1-4",
+"name_en": "Secrets Management for Cloud Workloads",
+"name_ar": "إدارة الأسرار لأحمال العمل السحابية",
+"en": "Secrets management solution deployment (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault references); prohibition of hard-coded secrets in IaC/code (secret-scanning CI gate evidence); secret rotation policy and rotation audit log."
+},
+{
+"id": 303,
+"code": "6-1-1",
+"name_en": "Cloud Management Plane Audit Logging (CloudTrail/Activity Log)",
+"name_ar": "تسجيل مستوى إدارة السحابة — CloudTrail / سجل النشاط",
+"en": "CloudTrail / Azure Activity Log / GCP Audit Log enabled in all regions/subscriptions; log retention configuration (minimum 1 year); log integrity validation enabled; evidence forwarding to centralised SIEM."
+},
+{
+"id": 304,
+"code": "6-1-2",
+"name_en": "Cloud Security Posture Management (CSPM) Continuous Monitoring",
+"name_ar": "إدارة وضع الأمن السيبراني السحابي — المراقبة المستمرة",
+"en": "CSPM tool deployment evidence; coverage across all cloud accounts; daily/continuous scan schedule; critical/high findings SLA (e.g. P1 = 24 hours); monthly posture trend report."
+},
+{
+"id": 305,
+"code": "6-1-3",
+"name_en": "SIEM Use Cases for Cloud Threat Detection",
+"name_ar": "حالات استخدام SIEM للكشف عن التهديدات السحابية",
+"en": "Cloud-specific SIEM use-case catalogue (root-account usage, S3 public-access enablement, security group open-all rule, suspicious API call volume, geographic anomaly); alert test records; mean-time-to-detect metrics."
+},
+{
+"id": 306,
+"code": "6-1-4",
+"name_en": "Cloud VPC/Network Flow Log Monitoring",
+"name_ar": "مراقبة سجلات تدفق شبكة VPC السحابية",
+"en": "VPC Flow Logs / NSG Flow Logs enabled for all production VPCs; retention policy; SIEM ingestion evidence; anomaly detection alert configuration for large outbound transfers or lateral movement patterns."
+},
+{
+"id": 307,
+"code": "6-1-5",
+"name_en": "Cloud Workload & Container Security Monitoring (CSP & CST)",
+"name_ar": "مراقبة أمن أحمال العمل والحاويات السحابية",
+"en": "Cloud workload protection platform (CWPP) deployment coverage; container image scanning in CI/CD pipeline (policy-gate evidence); runtime threat detection alert logs; Kubernetes admission controller policy configuration."
+},
+{
+"id": 308,
+"code": "7-1-1",
+"name_en": "Cloud Backup Policy & Recovery Testing (CST)",
+"name_ar": "سياسة النسخ الاحتياطي للسحابة واختبار الاسترداد — المستأجر",
+"en": "Cloud backup policy specifying RPO/RTO per workload tier; automated backup configuration evidence; cross-region backup replication for Confidential/Restricted workloads; quarterly restore test records with pass/fail outcome."
+},
+{
+"id": 309,
+"code": "7-1-2",
+"name_en": "Disaster Recovery Plan for Cloud Workloads",
+"name_ar": "خطة التعافي من الكوارث لأحمال العمل السحابية",
+"en": "Cloud DR plan document with failover architecture diagram; DR runbook per critical workload; annual DR test report with RTO/RPO achievement evidence; lessons-learned log."
+},
+{
+"id": 310,
+"code": "7-1-3",
+"name_en": "High Availability Architecture Design (CSP)",
+"name_ar": "تصميم بنية التوافر العالي — مزود الخدمة",
+"en": "CSP SLA documentation; multi-AZ/multi-region deployment architecture for critical services; load balancer health-check configuration; auto-scaling policy; availability metrics report (monthly uptime vs. SLA)."
+},
+{
+"id": 311,
+"code": "7-1-4",
+"name_en": "Cloud Exit & Data Portability Plan (CST)",
+"name_ar": "خطة الخروج من السحابة وقابلية نقل البيانات — المستأجر",
+"en": "Cloud exit plan document for each material CSP dependency; data export/portability assessment (standard formats, API availability); exit timeline and resource estimates; annual review; contractual portability clause evidence in cloud agreement."
+},
+{
+"id": 312,
+"code": "7-1-5",
+"name_en": "Multi-Cloud & Vendor Lock-in Risk Management (CST)",
+"name_ar": "إدارة مخاطر الاعتماد على مورد واحد والسحابة المتعددة — المستأجر",
+"en": "Vendor lock-in risk register; architectural decision records for proprietary service use; mitigation strategies (abstraction layers, open standards, multi-cloud distribution); annual review of lock-in risk by cloud governance committee."
+},
+{
+"id": 313,
+"code": "8-1-1",
+"name_en": "CSP Security Assurance Report Review (SOC 2 / ISO 27017)",
+"name_ar": "مراجعة تقارير ضمان أمن مزودي الخدمة — SOC 2 / ISO 27017",
+"en": "Current-year SOC 2 Type II report (or ISO 27001/ISO 27017 certificate) for each material CSP; management review record noting exceptions and CSP remediation commitments; tracking of bridge letters between annual report cycles."
+},
+{
+"id": 314,
+"code": "8-1-2",
+"name_en": "Cloud Contract Security Clauses (CST)",
+"name_ar": "بنود الأمن السيبراني في عقود الخدمات السحابية — المستأجر",
+"en": "Cloud service agreement checklist covering: data residency, security incident notification SLA, audit right, data deletion on termination, sub-processor disclosure, law enforcement request notification; legal sign-off evidence."
+},
+{
+"id": 315,
+"code": "8-1-3",
+"name_en": "CSP Sub-Processor & Fourth-Party Risk Management (CST)",
+"name_ar": "إدارة المخاطر لمعالجي البيانات الفرعيين من الطرف الرابع — المستأجر",
+"en": "CSP sub-processor disclosure list (extracted from cloud DPA/agreement); risk assessment for material sub-processors; change-notification clause evidence; escalation process for sub-processor changes affecting KSA data."
+},
+{
+"id": 316,
+"code": "8-1-4",
+"name_en": "Cloud Penetration Testing & Vulnerability Management (CST)",
+"name_ar": "اختبار الاختراق وإدارة الثغرات في السحابة — المستأجر",
+"en": "CSP penetration-testing authorisation obtained (cloud provider pen-test policy compliance); annual cloud workload penetration test report; critical/high finding remediation within SLA; cloud vulnerability scan coverage report from CSPM or scanner."
+},
+{
+"id": 317,
+"code": "8-1-5",
+"name_en": "Cloud Security Configuration Baseline & IaC Policy-as-Code (CST)",
+"name_ar": "خط الأساس لإعدادات الأمن السحابي وسياسة الكود البنيوي — المستأجر",
+"en": "Cloud security baseline standard document (CIS benchmark alignment); IaC policy-as-code gate in CI/CD pipeline (OPA/Conftest/Checkov evidence); compliance scan results (% compliant vs. baseline); drift-detection alerts and remediation log."
+}
+]

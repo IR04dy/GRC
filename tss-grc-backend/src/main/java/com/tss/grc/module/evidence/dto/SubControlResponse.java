@@ -11,6 +11,7 @@ public record SubControlResponse(
     String nameAr,
     String descriptionEn,
     String evidenceGuidance,
+    String evidenceGuidanceAr,
     Boolean isActive,
     Long evidenceCount
 ) {}

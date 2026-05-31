@@ -26,7 +26,7 @@ export type RetrainingStatus =
 export type RetrainingTrigger = 'DRIFT' | 'SCHEDULED' | 'MANUAL' | 'POST_INCIDENT';
 
 export type RecertificationStatus =
-  | 'DUE' | 'IN_REVIEW' | 'RECERTIFIED' | 'RECERTIFIED_WITH_CONDITIONS' | 'REVOKED';
+  | 'DUE' | 'IN_REVIEW' | 'RECERTIFIED' | 'RECERTIFIED_WITH_CONDITIONS' | 'REVOKED' | 'EXPIRED';
 
 // ─── Saudi-native bilingual labels ───────────────────────────────
 
@@ -74,12 +74,13 @@ export const RECERT_STATUS_LABEL: Record<RecertificationStatus, { en: string; ar
   RECERTIFIED:                  { en: 'Recertified',                  ar: 'مُعاد اعتماده' },
   RECERTIFIED_WITH_CONDITIONS:  { en: 'Recertified with conditions',  ar: 'مُعاد اعتماده بشروط' },
   REVOKED:                      { en: 'Revoked',                      ar: 'مُلغى' },
+  EXPIRED:                      { en: 'Expired',                      ar: 'مُنتهي الصلاحية' },
 };
 
 export const RECERT_STATUS_TONE: Record<RecertificationStatus, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DUE: 'warning', IN_REVIEW: 'info',
   RECERTIFIED: 'success', RECERTIFIED_WITH_CONDITIONS: 'warning',
-  REVOKED: 'danger',
+  REVOKED: 'danger', EXPIRED: 'danger',
 };
 
 // ─── Responses ────────────────────────────────────────────────────
@@ -160,6 +161,95 @@ export interface DashboardResponse {
   overdueRecertifications: RecertificationResponse[];
 }
 
+// ─── Write requests ──────────────────────────────────────────────
+
+export interface CreateValidationRequest {
+  modelId: number;
+  reference: string;
+  validationType?: string;
+  validatorUserId?: number;
+  validatorOrgLabel?: string;
+  scheduledAt?: string;
+}
+
+export interface TransitionValidationRequest {
+  toStatus: ValidationStatus;
+  metricsJson?: string;
+  ethicsScoresJson?: string;
+  fairnessDisparityPct?: number;
+  findingsEn?: string;
+  findingsAr?: string;
+  conditionsEn?: string;
+  conditionsAr?: string;
+  linkedCapaId?: number;
+}
+
+export interface CreateRetrainingRequest {
+  modelId: number;
+  reference: string;
+  triggerReason?: RetrainingTrigger;
+  rationaleEn?: string;
+  rationaleAr?: string;
+  fromVersionLabel?: string;
+  toVersionLabel?: string;
+  ownerUserId?: number;
+}
+
+export interface TransitionRetrainingRequest {
+  toStatus: RetrainingStatus;
+  postDeployMetricsJson?: string;
+  rollbackReasonEn?: string;
+  rollbackReasonAr?: string;
+}
+
+export interface CreateRecertificationRequest {
+  modelId: number;
+  reference: string;
+  cycleLabel?: string;
+  dueDate?: string;
+}
+
+export interface TransitionRecertificationRequest {
+  toStatus: RecertificationStatus;
+  decisionRationaleEn?: string;
+  decisionRationaleAr?: string;
+  conditionsEn?: string;
+  conditionsAr?: string;
+  nextDueDate?: string;
+  linkedValidationId?: number;
+}
+
+// ─── State-machine helpers ───────────────────────────────────────
+
+export function nextValidationStatuses(s: ValidationStatus): ValidationStatus[] {
+  switch (s) {
+    case 'SCHEDULED':              return ['IN_PROGRESS'];
+    case 'IN_PROGRESS':            return ['PASSED', 'PASSED_WITH_CONDITIONS', 'FAILED'];
+    case 'PASSED_WITH_CONDITIONS': return ['REMEDIATION'];
+    case 'FAILED':                 return ['REMEDIATION'];
+    case 'REMEDIATION':            return ['IN_PROGRESS'];
+    default:                       return [];
+  }
+}
+
+export function nextRetrainingStatuses(s: RetrainingStatus): RetrainingStatus[] {
+  switch (s) {
+    case 'PROPOSED':    return ['APPROVED', 'REJECTED', 'ABANDONED'];
+    case 'APPROVED':    return ['IN_PROGRESS', 'ABANDONED'];
+    case 'IN_PROGRESS': return ['DEPLOYED', 'ABANDONED'];
+    case 'DEPLOYED':    return ['ROLLED_BACK'];
+    default:            return [];
+  }
+}
+
+export function nextRecertStatuses(s: RecertificationStatus): RecertificationStatus[] {
+  switch (s) {
+    case 'DUE':       return ['IN_REVIEW', 'EXPIRED'];
+    case 'IN_REVIEW': return ['RECERTIFIED', 'RECERTIFIED_WITH_CONDITIONS', 'REVOKED'];
+    default:          return [];
+  }
+}
+
 // ─── REST client ─────────────────────────────────────────────────
 
 const BASE = '/api/v1/ai-lifecycle';
@@ -170,12 +260,26 @@ export const aiLifecycleApi = {
     const q = modelId ? `?modelId=${modelId}` : '';
     return api.get<ValidationResponse[]>(`${BASE}/validations${q}`);
   },
+  createValidation: (req: CreateValidationRequest) =>
+    api.post<ValidationResponse>(`${BASE}/validations`, req),
+  transitionValidation: (id: number, req: TransitionValidationRequest) =>
+    api.post<ValidationResponse>(`${BASE}/validations/${id}/transition`, req),
+
   listRetrainings: (modelId?: number) => {
     const q = modelId ? `?modelId=${modelId}` : '';
     return api.get<RetrainingResponse[]>(`${BASE}/retrainings${q}`);
   },
+  createRetraining: (req: CreateRetrainingRequest) =>
+    api.post<RetrainingResponse>(`${BASE}/retrainings`, req),
+  transitionRetraining: (id: number, req: TransitionRetrainingRequest) =>
+    api.post<RetrainingResponse>(`${BASE}/retrainings/${id}/transition`, req),
+
   listRecerts: (modelId?: number) => {
     const q = modelId ? `?modelId=${modelId}` : '';
     return api.get<RecertificationResponse[]>(`${BASE}/recertifications${q}`);
   },
+  createRecert: (req: CreateRecertificationRequest) =>
+    api.post<RecertificationResponse>(`${BASE}/recertifications`, req),
+  transitionRecert: (id: number, req: TransitionRecertificationRequest) =>
+    api.post<RecertificationResponse>(`${BASE}/recertifications/${id}/transition`, req),
 };

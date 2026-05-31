@@ -30,10 +30,12 @@ public class FrameworkService {
         List<EvidenceFramework> frameworks = frameworkRepository.findByIsActiveTrue();
 
         List<Long> frameworkIds = frameworks.stream().map(EvidenceFramework::getId).toList();
-        List<EvidenceControl> allControls = controlRepository.findByFrameworkIdIn(frameworkIds);
+        List<EvidenceControl> allControls = frameworkIds.isEmpty() ? List.of()
+                : controlRepository.findByFrameworkIdInAndIsActiveTrue(frameworkIds);
 
         List<Long> controlIds = allControls.stream().map(EvidenceControl::getId).toList();
-        List<EvidenceSubControl> allSubControls = subControlRepository.findByControlIdIn(controlIds);
+        List<EvidenceSubControl> allSubControls = controlIds.isEmpty() ? List.of()
+                : subControlRepository.findByControlIdInAndIsActiveTrue(controlIds);
 
         Map<Long, List<EvidenceSubControl>> subsByControl = allSubControls.stream()
                 .collect(Collectors.groupingBy(EvidenceSubControl::getControlId));
@@ -79,7 +81,7 @@ public class FrameworkService {
     private SubControlResponse toSubControlResponse(EvidenceSubControl sc, Long evidenceCount) {
         return new SubControlResponse(sc.getId(), sc.getExternalId(), sc.getControlId(),
                 sc.getSubControlCode(), sc.getNameEn(), sc.getNameAr(), sc.getDescriptionEn(),
-                sc.getEvidenceGuidance(), sc.getIsActive(),
+                sc.getEvidenceGuidance(), sc.getEvidenceGuidanceAr(), sc.getIsActive(),
                 evidenceCount != null ? evidenceCount : 0L);
     }
 }

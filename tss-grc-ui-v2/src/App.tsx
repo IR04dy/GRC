@@ -225,11 +225,25 @@ const OutsourcingArrangementsPage   = lazy(() => import('./pages/outsourcing/Out
 const OutsourcingCloudServicesPage  = lazy(() => import('./pages/outsourcing/OutsourcingCloudServicesPage').then(m => ({ default: m.OutsourcingCloudServicesPage })));
 // Sprint 31 — AI/ML Model Lifecycle.
 const AiLifecycleDashboardPage         = lazy(() => import('./pages/aiLifecycle/AiLifecycleDashboardPage').then(m => ({ default: m.AiLifecycleDashboardPage })));
+const AiLifecycleValidationsPage       = lazy(() => import('./pages/aiLifecycle/AiLifecycleValidationsPage').then(m => ({ default: m.AiLifecycleValidationsPage })));
+const AiLifecycleRetrainingsPage       = lazy(() => import('./pages/aiLifecycle/AiLifecycleRetrainingsPage').then(m => ({ default: m.AiLifecycleRetrainingsPage })));
 const AiLifecycleRecertificationsPage  = lazy(() => import('./pages/aiLifecycle/AiLifecycleRecertificationsPage').then(m => ({ default: m.AiLifecycleRecertificationsPage })));
 // Sprint 32 — Data Classification + NDMO.
 const DataclassDashboardPage    = lazy(() => import('./pages/dataclass/DataclassDashboardPage').then(m => ({ default: m.DataclassDashboardPage })));
 const DataclassAssetsPage       = lazy(() => import('./pages/dataclass/DataclassAssetsPage').then(m => ({ default: m.DataclassAssetsPage })));
 const DataclassFlowsPage        = lazy(() => import('./pages/dataclass/DataclassFlowsPage').then(m => ({ default: m.DataclassFlowsPage })));
+// Sprint 33 — Saudi Data Officer Toolkit (PDPL + NDMO + SDAIA)
+const DataOfficerDashboardPage  = lazy(() => import('./pages/dataOfficer/DataOfficerDashboardPage').then(m => ({ default: m.DataOfficerDashboardPage })));
+const DsrPage                   = lazy(() => import('./pages/dataOfficer/DsrPage').then(m => ({ default: m.DsrPage })));
+const BreachPage                = lazy(() => import('./pages/dataOfficer/BreachPage').then(m => ({ default: m.BreachPage })));
+const ConsentPage               = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.ConsentPage })));
+const DpiaPage                  = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.DpiaPage })));
+const NoticePage                = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.NoticePage })));
+const RetentionPage             = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.RetentionPage })));
+const NdrPage                   = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.NdrPage })));
+const CatalogPage               = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.CatalogPage })));
+const QualityPage               = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.QualityPage })));
+const DoEthicsPage              = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.EthicsPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
@@ -318,6 +332,8 @@ const ResilienceTestsPage    = lazy(() => import('./pages/resilience-tests/Resil
 // Sprint 11 P1 GRC — ISO 31010 Bow-Tie analysis pages.
 const RiskBowTiePage         = lazy(() => import('./pages/risk/RiskBowTiePage').then(m => ({ default: m.RiskBowTiePage })));
 const RiskBowTieDetailPage   = lazy(() => import('./pages/risk/RiskBowTieDetailPage').then(m => ({ default: m.RiskBowTieDetailPage })));
+// GRC Expert — SME surface linking framework controls to evidence lifecycle.
+const GrcExpertPage          = lazy(() => import('./pages/expert/GrcExpertPage').then(m => ({ default: m.GrcExpertPage })));
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 export function App() {
@@ -421,6 +437,7 @@ export function App() {
               <Route path="/third-party-cyber"      element={<ThirdPartyCyberPage />} />
               <Route path="/resilience-tests"       element={<ResilienceTestsPage />} />
               <Route path="/evidence"   element={<EvidencePage />} />
+              <Route path="/expert"     element={<GrcExpertPage />} />
               <Route path="/buyer-gap"  element={<BuyerGapPage />} />
 
               {/* Workflow Hub + per-module wizards (Saudi-GRC §7) */}
@@ -631,12 +648,27 @@ export function App() {
 
               {/* Sprint 31 — AI/ML Model Lifecycle. */}
               <Route path="/ai-lifecycle/dashboard"               element={<AiLifecycleDashboardPage />} />
+              <Route path="/ai-lifecycle/validations"             element={<AiLifecycleValidationsPage />} />
+              <Route path="/ai-lifecycle/retrainings"             element={<AiLifecycleRetrainingsPage />} />
               <Route path="/ai-lifecycle/recertifications"        element={<AiLifecycleRecertificationsPage />} />
 
               {/* Sprint 32 — Data Classification + NDMO. */}
               <Route path="/dataclass/dashboard"                  element={<DataclassDashboardPage />} />
               <Route path="/dataclass/assets"                     element={<DataclassAssetsPage />} />
               <Route path="/dataclass/flows"                      element={<DataclassFlowsPage />} />
+
+              {/* Sprint 33 — Saudi Data Officer Toolkit. */}
+              <Route path="/data-officer/dashboard"               element={<DataOfficerDashboardPage />} />
+              <Route path="/data-officer/dsr"                     element={<DsrPage />} />
+              <Route path="/data-officer/consents"                element={<ConsentPage />} />
+              <Route path="/data-officer/dpia"                    element={<DpiaPage />} />
+              <Route path="/data-officer/breaches"                element={<BreachPage />} />
+              <Route path="/data-officer/notices"                 element={<NoticePage />} />
+              <Route path="/data-officer/retention"               element={<RetentionPage />} />
+              <Route path="/data-officer/ndr"                     element={<NdrPage />} />
+              <Route path="/data-officer/catalog"                 element={<CatalogPage />} />
+              <Route path="/data-officer/quality"                 element={<QualityPage />} />
+              <Route path="/data-officer/ethics"                  element={<DoEthicsPage />} />
 
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 

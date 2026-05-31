@@ -1,0 +1,541 @@
+[
+{
+"id": 390,
+"code": "1-1",
+"name_en": "Data Governance Framework & Charter",
+"name_ar": "إطار حوكمة البيانات والميثاق التأسيسي",
+"en": "Board/executive-approved data governance charter (signed, dated); data governance policy document; mandate letter for Chief Data Officer or equivalent; governance framework version history showing annual review."
+},
+{
+"id": 391,
+"code": "1-2",
+"name_en": "Data Governance Roles & RACI",
+"name_ar": "أدوار حوكمة البيانات ومصفوفة المسؤوليات",
+"en": "RACI matrix covering Data Owner, Data Steward, Data Custodian, and CDO roles; organisational chart showing data office placement; signed role-acceptance letters or HR job descriptions per role."
+},
+{
+"id": 392,
+"code": "1-3",
+"name_en": "Data Governance Committee & Operating Model",
+"name_ar": "لجنة حوكمة البيانات ونموذج التشغيل",
+"en": "Data Governance Committee ToR (terms of reference); meeting minutes (minimum quarterly); escalation path document; integration evidence with enterprise risk and IT governance committees."
+},
+{
+"id": 393,
+"code": "1-4",
+"name_en": "Data Governance Policies & Standards Register",
+"name_ar": "سجل سياسات ومعايير حوكمة البيانات",
+"en": "Policy register listing each data governance policy with owner, version, approval date, and next-review date; evidence that policies are published on the intranet and communicated to staff."
+},
+{
+"id": 394,
+"code": "1-5",
+"name_en": "NDI Self-Assessment Submission & Maturity Tracking",
+"name_ar": "تقديم التقييم الذاتي لمؤشر البيانات الوطني ومتابعة النضج",
+"en": "Completed NDMO NDI self-assessment submission for current year; gap analysis report against previous year's score; maturity improvement roadmap with milestones; NDI score trend dashboard screenshot."
+},
+{
+"id": 395,
+"code": "1-6",
+"name_en": "Data Governance Awareness & Training Programme",
+"name_ar": "برنامج التوعية والتدريب على حوكمة البيانات",
+"en": "Annual training plan for data governance roles; completion records / LMS certificates for Data Owners and Stewards; awareness campaign materials; post-training assessment scores."
+},
+{
+"id": 396,
+"code": "2-1",
+"name_en": "Enterprise Data Catalog Establishment",
+"name_ar": "إنشاء فهرس بيانات مؤسسي شامل",
+"en": "Screenshot/export of active data catalog tool listing all registered data assets with dataset name, owner, classification, and system of record; data asset inventory count vs. total known systems; gap closure plan for unregistered systems."
+},
+{
+"id": 397,
+"code": "2-2",
+"name_en": "Metadata Standards & Business Glossary",
+"name_ar": "معايير البيانات الوصفية والمسرد التجاري",
+"en": "Published business glossary with term definitions, owners, and approval dates; metadata schema document specifying mandatory attributes per asset type; glossary coverage % across catalog assets."
+},
+{
+"id": 398,
+"code": "2-3",
+"name_en": "Data Lineage Mapping & Documentation",
+"name_ar": "رسم وتوثيق سلسلة نسب البيانات",
+"en": "Data lineage diagrams for critical data elements (CDEs) showing source-to-consumption path; lineage coverage % report for Tier-1 systems; evidence that lineage is updated on system changes."
+},
+{
+"id": 399,
+"code": "2-4",
+"name_en": "NDI Data Asset Submission & Catalogue Registration",
+"name_ar": "تسجيل أصول البيانات في مؤشر البيانات الوطني وفهرسته",
+"en": "NDMO NDI portal submission receipts for all reportable datasets; mapping of internal catalog assets to NDI catalogue entries; NDI metadata completeness score per submitted dataset."
+},
+{
+"id": 400,
+"code": "2-5",
+"name_en": "Metadata Quality & Completeness Monitoring",
+"name_ar": "مراقبة جودة واكتمال البيانات الوصفية",
+"en": "Monthly metadata completeness dashboard showing % of assets with all mandatory fields populated; automated metadata quality rules definition; trend chart over last 12 months; corrective action log."
+},
+{
+"id": 401,
+"code": "3-1",
+"name_en": "Data Quality Framework & Dimensions Definition",
+"name_ar": "إطار جودة البيانات وتعريف الأبعاد",
+"en": "Approved data quality framework document covering completeness, accuracy, consistency, timeliness, uniqueness, and validity dimensions; DQ dimension definitions aligned to ISO 8000 or DAMA; DQ policy approval evidence."
+},
+{
+"id": 402,
+"code": "3-2",
+"name_en": "Critical Data Elements (CDE) Identification & Profiling",
+"name_ar": "تحديد العناصر البيانية الحرجة وتوصيفها",
+"en": "CDE register listing each element with business owner, source system, quality dimension targets, and current scores; data profiling reports from profiling tool (e.g. Informatica, Talend, SQL queries) showing null rates, duplicate rates, format violations."
+},
+{
+"id": 403,
+"code": "3-3",
+"name_en": "Data Quality Rules & Automated Validation",
+"name_ar": "قواعد جودة البيانات والتحقق الآلي",
+"en": "Data quality rules catalogue with rule ID, description, source system, and enforcement point; evidence of automated rule execution (scheduled job logs, pipeline validation reports); pass/fail rate trends per rule over 3 months."
+},
+{
+"id": 404,
+"code": "3-4",
+"name_en": "Data Quality Scorecards & Reporting",
+"name_ar": "بطاقات جودة البيانات والتقارير الدورية",
+"en": "Monthly DQ scorecard by domain showing dimension scores vs. targets; executive summary report presented to Data Governance Committee (meeting minutes evidence); historical trend chart (12 months); NDI data quality maturity rating documentation."
+},
+{
+"id": 405,
+"code": "3-5",
+"name_en": "Data Quality Issue Management & Root-Cause Remediation",
+"name_ar": "إدارة مشكلات جودة البيانات ومعالجة الأسباب الجذرية",
+"en": "Issue register / ticketing system export showing open DQ issues with owner, severity, and age; root-cause analysis reports for recurring issues; evidence of process or system fixes applied; mean-time-to-resolve (MTTR) trend."
+},
+{
+"id": 406,
+"code": "3-6",
+"name_en": "Data Quality Improvement Roadmap",
+"name_ar": "خارطة طريق تحسين جودة البيانات",
+"en": "Approved DQ improvement roadmap aligned to NDI maturity targets; project charters or initiative briefs for each improvement initiative; progress tracking dashboard with milestone completion %."
+},
+{
+"id": 407,
+"code": "4-1",
+"name_en": "Data Lifecycle Policy & Retention Schedule",
+"name_ar": "سياسة دورة حياة البيانات وجدول الاحتفاظ",
+"en": "Board-approved data lifecycle policy; retention schedule document listing each data asset class with retention period, legal basis, and disposal method; evidence of periodic review (version history)."
+},
+{
+"id": 408,
+"code": "4-2",
+"name_en": "Data Ingestion & Integration Standards",
+"name_ar": "معايير استيعاب البيانات وتكاملها",
+"en": "Integration architecture diagram showing data flows between source systems; data integration standards document specifying API/file/streaming protocols; evidence of standards enforcement in project design reviews (review checklists signed by Data Architect)."
+},
+{
+"id": 409,
+"code": "4-3",
+"name_en": "Data Storage, Backup & Recovery Controls",
+"name_ar": "ضوابط تخزين البيانات والنسخ الاحتياطي والاسترداد",
+"en": "Storage architecture document; automated backup job logs with success/failure rates; tested recovery runbooks with last test date and RTO/RPO results; storage capacity monitoring dashboard."
+},
+{
+"id": 410,
+"code": "4-4",
+"name_en": "Data Disposal & Secure Deletion Procedures",
+"name_ar": "إجراءات إتلاف البيانات والحذف الآمن",
+"en": "Secure deletion policy and procedure document; data disposal request forms with approvals; certificate of destruction for hard media; audit log from data erasure tool; annual disposal audit report."
+},
+{
+"id": 411,
+"code": "4-5",
+"name_en": "Data Operations Monitoring & SLA Reporting",
+"name_ar": "مراقبة عمليات البيانات وتقارير اتفاقيات مستوى الخدمة",
+"en": "Operations monitoring dashboard showing pipeline success rates, latency, and error counts; SLA definition document per data pipeline; monthly SLA compliance report; incident log for pipeline failures."
+},
+{
+"id": 412,
+"code": "5-1",
+"name_en": "Document Management Policy & Taxonomy",
+"name_ar": "سياسة إدارة الوثائق ونظام التصنيف التدرجي",
+"en": "Approved document management policy; document taxonomy / filing structure document; DMS tool configuration screenshot showing taxonomy in use; governance committee approval evidence."
+},
+{
+"id": 413,
+"code": "5-2",
+"name_en": "Document Version Control & Approval Workflows",
+"name_ar": "ضبط إصدارات الوثائق وسير عمل الاعتماد",
+"en": "DMS version history report for a sample of controlled documents; approval workflow configuration screenshots; evidence that superseded versions are archived not deleted; change log per document."
+},
+{
+"id": 414,
+"code": "5-3",
+"name_en": "Records Retention & Legal Hold Management",
+"name_ar": "الاحتفاظ بالسجلات وإدارة التجميد القانوني",
+"en": "Records retention schedule aligned to Saudi National Archives Authority requirements; legal hold register listing active holds with legal basis and scope; evidence of hold notifications to custodians."
+},
+{
+"id": 415,
+"code": "5-4",
+"name_en": "Content Accessibility & Search Enablement",
+"name_ar": "إمكانية الوصول للمحتوى وتفعيل البحث",
+"en": "DMS search configuration evidence (full-text indexing enabled); user satisfaction survey results on content findability; metadata completeness report for DMS assets; accessibility audit report."
+},
+{
+"id": 416,
+"code": "6-1",
+"name_en": "Enterprise Data Architecture Vision & Principles",
+"name_ar": "رؤية هندسة البيانات المؤسسية ومبادئها",
+"en": "Approved enterprise data architecture strategy document; data architecture principles register (min. 8 principles with rationale); evidence of architecture board endorsement."
+},
+{
+"id": 417,
+"code": "6-2",
+"name_en": "Conceptual & Logical Data Models",
+"name_ar": "النماذج المفاهيمية والمنطقية للبيانات",
+"en": "Published conceptual data model covering all core business domains; logical data models for Tier-1 systems in the data modeling tool repository; model review records signed by Data Architect and Business Owner."
+},
+{
+"id": 418,
+"code": "6-3",
+"name_en": "Data Architecture Review in Project Lifecycle",
+"name_ar": "مراجعة هندسة البيانات ضمن دورة حياة المشاريع",
+"en": "Architecture review checklist used in project SDLC gates; sample of architecture review decisions (approved/rejected) from last 12 months; evidence that non-compliant designs are tracked to resolution."
+},
+{
+"id": 419,
+"code": "6-4",
+"name_en": "Data Ecosystem & Integration Architecture Map",
+"name_ar": "خريطة بيئة البيانات وهندسة التكامل",
+"en": "Current-state data ecosystem diagram showing all systems, data flows, and integration patterns; integration pattern standards document; evidence of annual architecture map update."
+},
+{
+"id": 420,
+"code": "6-5",
+"name_en": "Data Technology Standards & Tooling Governance",
+"name_ar": "معايير تقنيات البيانات وحوكمة الأدوات",
+"en": "Approved data technology standards register (databases, ETL, BI, cataloging tools); evidence of standards enforcement in procurement and project approval; annual review of technology radar."
+},
+{
+"id": 421,
+"code": "7-1",
+"name_en": "Master Data Domain Identification & Ownership",
+"name_ar": "تحديد نطاقات البيانات الرئيسية وتحديد ملاكها",
+"en": "Master data domain register listing each domain (e.g. Customer, Supplier, Employee, Asset, Location) with assigned Data Owner and Steward; business justification for each domain's criticality classification."
+},
+{
+"id": 422,
+"code": "7-2",
+"name_en": "Golden Record Management & MDM Platform",
+"name_ar": "إدارة السجل الذهبي ومنصة البيانات الرئيسية",
+"en": "MDM platform architecture document; golden-record definition per domain (matching rules, survivorship rules); duplicate detection rate report; golden-record adoption % in consuming systems."
+},
+{
+"id": 423,
+"code": "7-3",
+"name_en": "Reference Data Governance & Codelist Management",
+"name_ar": "حوكمة البيانات المرجعية وإدارة قوائم الترميز",
+"en": "Reference data registry listing all code lists with owner, source authority (e.g. SAMA, GAZT, NDMO national classifications), and last-review date; change request log for reference data updates; evidence of synchronisation with national/sector reference standards."
+},
+{
+"id": 424,
+"code": "7-4",
+"name_en": "MDM Data Quality & Reconciliation Reporting",
+"name_ar": "جودة البيانات الرئيسية وتقارير المطابقة",
+"en": "Monthly MDM data quality scorecard per domain showing duplicate rate, completeness, and match confidence; reconciliation report between MDM hub and downstream systems; data steward sign-off evidence."
+},
+{
+"id": 425,
+"code": "7-5",
+"name_en": "MDM Integration & Synchronisation Standards",
+"name_ar": "معايير تكامل ومزامنة البيانات الرئيسية",
+"en": "MDM integration architecture diagram showing all publishing and subscribing systems; synchronisation SLA document per domain; latency monitoring dashboard; exception handling procedure."
+},
+{
+"id": 426,
+"code": "8-1",
+"name_en": "BI & Analytics Governance Framework",
+"name_ar": "إطار حوكمة ذكاء الأعمال والتحليلات",
+"en": "BI governance policy document; BI center-of-excellence or analytics team charter; report ownership register listing each certified report with owner and approval date."
+},
+{
+"id": 427,
+"code": "8-2",
+"name_en": "Data Warehouse & Analytical Data Store Management",
+"name_ar": "إدارة مستودع البيانات والمخازن التحليلية",
+"en": "Data warehouse architecture document; model documentation for fact and dimension tables; change management log for warehouse schema changes; data freshness SLA report."
+},
+{
+"id": 428,
+"code": "8-3",
+"name_en": "Self-Service Analytics Enablement & Guardrails",
+"name_ar": "تمكين التحليلات الذاتية وضوابطها",
+"en": "Self-service analytics platform access control policy; training completion records for self-service users; certified dataset register available to self-service users; data literacy programme materials."
+},
+{
+"id": 429,
+"code": "8-4",
+"name_en": "Analytics Output Validation & Reconciliation",
+"name_ar": "التحقق من مخرجات التحليلات ومطابقتها",
+"en": "Report reconciliation procedure document; sample reconciliation test results for top-5 management reports; UAT sign-off records for new reports before production deployment."
+},
+{
+"id": 430,
+"code": "8-5",
+"name_en": "AI & Advanced Analytics Ethics and Governance",
+"name_ar": "أخلاقيات وحوكمة الذكاء الاصطناعي والتحليلات المتقدمة",
+"en": "AI/ML model inventory register with model owner, purpose, and risk classification; ethical AI review checklist applied to each model before production; bias assessment report for high-risk models; alignment documentation with SDAIA AI Ethics Principles."
+},
+{
+"id": 431,
+"code": "9-1",
+"name_en": "Data Security Policy & Standards",
+"name_ar": "سياسة أمن البيانات ومعاييرها",
+"en": "Board-approved data security policy; technical data security standards document covering encryption, masking, access, and DLP; evidence of annual policy review; alignment mapping to NCA ECC controls."
+},
+{
+"id": 432,
+"code": "9-2",
+"name_en": "Data Access Control & Privileged User Management",
+"name_ar": "ضبط الوصول للبيانات وإدارة المستخدمين المميزين",
+"en": "Role-based access control (RBAC) matrix for critical data stores; quarterly access recertification report signed by Data Owners; privileged access review log; segregation of duties conflict report."
+},
+{
+"id": 433,
+"code": "9-3",
+"name_en": "Data Encryption & Masking Controls",
+"name_ar": "ضوابط تشفير البيانات وإخفاء هويتها",
+"en": "Encryption standards document specifying algorithms and key lengths per classification level; encryption coverage report for data at rest and in transit; data masking configuration for non-production environments; key management procedure document."
+},
+{
+"id": 434,
+"code": "9-4",
+"name_en": "Data Loss Prevention (DLP) Controls",
+"name_ar": "ضوابط منع تسرب البيانات",
+"en": "DLP tool deployment scope document; DLP policy rule set configuration export; monthly DLP incident report showing policy violation counts by severity; evidence of DLP rule tuning based on incidents."
+},
+{
+"id": 435,
+"code": "9-5",
+"name_en": "Data Security Incident Response & Breach Notification",
+"name_ar": "الاستجابة لحوادث أمن البيانات وإخطار الاختراق",
+"en": "Data security incident response procedure; data breach notification workflow showing NDMO/SDAIA notification path and timelines; sample incident report (anonymised) showing containment and notification steps; breach drill exercise report."
+},
+{
+"id": 436,
+"code": "10-1",
+"name_en": "Data Sharing Policy & Governance Framework",
+"name_ar": "سياسة مشاركة البيانات وإطار حوكمتها",
+"en": "Board-approved data sharing policy; data sharing request and approval procedure; data sharing register listing active sharing arrangements with counterparty, purpose, legal basis, and expiry date."
+},
+{
+"id": 437,
+"code": "10-2",
+"name_en": "Data Sharing Agreements (DSAs) & Legal Basis Documentation",
+"name_ar": "اتفاقيات مشاركة البيانات والأساس القانوني",
+"en": "Signed DSA or MOU for each active sharing arrangement; legal basis assessment document per arrangement (citing Personal Data Protection Law article where personal data is involved); DSA renewal calendar."
+},
+{
+"id": 438,
+"code": "10-3",
+"name_en": "Interoperability Standards & API Governance",
+"name_ar": "معايير قابلية التشغيل البيني وحوكمة واجهات برمجة التطبيقات",
+"en": "Interoperability standards document (e.g. NDMO data exchange standards, Saudi GOV-API guidelines); API catalogue listing all published APIs with version, owner, and consumer list; API design review gate evidence."
+},
+{
+"id": 439,
+"code": "10-4",
+"name_en": "National Data Exchange Platform (NDP) Integration",
+"name_ar": "التكامل مع منصة تبادل البيانات الوطنية",
+"en": "NDP integration architecture diagram; list of datasets onboarded to NDP with metadata completeness scores; NDP portal connection test evidence; data quality certification before NDP publication."
+},
+{
+"id": 440,
+"code": "10-5",
+"name_en": "Data Sharing Audit Trail & Usage Monitoring",
+"name_ar": "مسار التدقيق على مشاركة البيانات ومراقبة الاستخدام",
+"en": "Audit log export for data sharing API calls (last 90 days); anomaly detection report for unusual sharing volumes; annual review of sharing arrangements by Data Governance Committee (minutes)."
+},
+{
+"id": 441,
+"code": "11-1",
+"name_en": "Data Value Framework & Benefit Measurement",
+"name_ar": "إطار قيمة البيانات وقياس المنافع",
+"en": "Approved data value framework document defining value categories (operational, commercial, social); benefits realisation register for data initiatives with baseline, target, and actual KPIs; annual data value report presented to leadership."
+},
+{
+"id": 442,
+"code": "11-2",
+"name_en": "Data Monetisation & Innovation Opportunities Register",
+"name_ar": "سجل فرص تحقيق الدخل من البيانات والابتكار",
+"en": "Data monetisation opportunity register with each initiative's description, owner, stage, and estimated value; evidence of board/executive review; privacy and security impact assessment for monetisation initiatives involving personal data."
+},
+{
+"id": 443,
+"code": "11-3",
+"name_en": "Data Literacy & Data Culture Programme",
+"name_ar": "برنامج محو أمية البيانات وثقافة البيانات",
+"en": "Data literacy strategy document; training curriculum by role; completion rate report (% of staff completing each tier of training); data culture survey results (annual) with trend; champions network membership list."
+},
+{
+"id": 444,
+"code": "11-4",
+"name_en": "Data Innovation Lab & Pilot Programme Governance",
+"name_ar": "حوكمة مختبر ابتكار البيانات وبرنامج الحالات التجريبية",
+"en": "Data innovation lab (or sandbox) governance document; pilot project register with hypothesis, dataset used, privacy safeguards applied, and outcome; stage-gate review evidence for pilots progressing to production."
+},
+{
+"id": 445,
+"code": "12-1",
+"name_en": "Open Data Policy & Publication Strategy",
+"name_ar": "سياسة البيانات المفتوحة واستراتيجية النشر",
+"en": "Board-approved open data policy; open data publication strategy with dataset prioritisation criteria; evidence of alignment with data.gov.sa or sector-specific portal requirements."
+},
+{
+"id": 446,
+"code": "12-2",
+"name_en": "Open Data Dataset Register & Quality Certification",
+"name_ar": "سجل مجموعات البيانات المفتوحة وشهادة الجودة",
+"en": "Open data dataset register listing each published dataset with owner, format, licence, update frequency, and quality score; DQ certification checklist completed before publication; data portal publication confirmation."
+},
+{
+"id": 447,
+"code": "12-3",
+"name_en": "Open Data Licensing & Intellectual Property Management",
+"name_ar": "ترخيص البيانات المفتوحة وإدارة الملكية الفكرية",
+"en": "Licence assignment record per dataset (e.g. Saudi Open Data Licence terms); IP review evidence confirming no third-party IP conflicts; legal opinion for datasets with potential commercial sensitivity."
+},
+{
+"id": 448,
+"code": "12-4",
+"name_en": "Open Data Portal Maintenance & User Engagement",
+"name_ar": "صيانة بوابة البيانات المفتوحة والتفاعل مع المستخدمين",
+"en": "Portal availability and uptime report (monthly); dataset download and API usage statistics; user feedback / issue tracker for data quality reports from portal users; evidence of issue resolution."
+},
+{
+"id": 449,
+"code": "12-5",
+"name_en": "Open Data Impact Assessment & Value Reporting",
+"name_ar": "تقييم أثر البيانات المفتوحة وإعداد تقارير القيمة",
+"en": "Annual open data impact report covering dataset downloads, known reuse cases, and estimated economic/social value; survey results from data ecosystem stakeholders on open data usefulness."
+},
+{
+"id": 450,
+"code": "13-1",
+"name_en": "FOI Policy & Legal Framework Alignment",
+"name_ar": "سياسة حرية المعلومات والتوافق مع الإطار القانوني",
+"en": "Approved FOI/information access policy document citing applicable legislation; roles and responsibilities document for FOI handling; evidence of policy publication on entity website."
+},
+{
+"id": 451,
+"code": "13-2",
+"name_en": "FOI Request Register & Response Tracking",
+"name_ar": "سجل طلبات حرية المعلومات ومتابعة الردود",
+"en": "FOI request register export showing all requests received in the period with date received, request type, assigned handler, response date, and outcome (disclosed/partially disclosed/refused); on-time response rate KPI."
+},
+{
+"id": 452,
+"code": "13-3",
+"name_en": "FOI Exemption Assessment & Refusal Documentation",
+"name_ar": "تقييم استثناءات حرية المعلومات وتوثيق الرفض",
+"en": "Exemption assessment template with exemption categories and harm test; sample refusal letters with exemption grounds cited; appeals register; legal review sign-off for complex refusals."
+},
+{
+"id": 453,
+"code": "13-4",
+"name_en": "FOI Annual Reporting & Performance Review",
+"name_ar": "التقارير السنوية وتقييم أداء حرية المعلومات",
+"en": "Annual FOI performance report covering request volumes, response rates, exemption statistics, and appeal outcomes; evidence of report submission to relevant oversight body; improvement plan addressing identified gaps."
+},
+{
+"id": 454,
+"code": "14-1",
+"name_en": "Privacy Governance & Data Protection Officer",
+"name_ar": "حوكمة الخصوصية ومسؤول حماية البيانات",
+"en": "DPO appointment letter or equivalent role charter; DPO contact details published on entity website; privacy governance committee ToR; annual DPO report to board/leadership."
+},
+{
+"id": 455,
+"code": "14-2",
+"name_en": "Record of Processing Activities (ROPA)",
+"name_ar": "سجل أنشطة المعالجة",
+"en": "ROPA spreadsheet/system export listing each processing activity with controller details, purpose, categories of data subjects and data, legal basis, retention period, and third-party transfers; evidence of quarterly ROPA review and update."
+},
+{
+"id": 456,
+"code": "14-3",
+"name_en": "Consent Management & Lawful Basis Documentation",
+"name_ar": "إدارة الموافقة وتوثيق الأساس القانوني",
+"en": "Consent management platform configuration or consent register showing consent records with timestamp, version of consent text, and opt-out records; lawful basis assessment document per processing activity citing PDPL article; privacy notice review record."
+},
+{
+"id": 457,
+"code": "14-4",
+"name_en": "Data Subject Rights Management (DSAR Process)",
+"name_ar": "إدارة حقوق أصحاب البيانات (آلية طلبات الوصول)",
+"en": "DSAR procedure document covering all PDPL rights (access, correction, deletion, portability, objection); DSAR request register with receipt date, right exercised, response date, and outcome; on-time response rate vs. PDPL statutory deadline."
+},
+{
+"id": 458,
+"code": "14-5",
+"name_en": "Privacy Impact Assessment (DPIA) Process",
+"name_ar": "عملية تقييم أثر الخصوصية",
+"en": "DPIA procedure and threshold assessment criteria; completed DPIAs for high-risk processing activities (last 12 months); DPO sign-off records on each DPIA; evidence that DPIA findings are tracked to remediation."
+},
+{
+"id": 459,
+"code": "14-6",
+"name_en": "Third-Party & Cross-Border Data Transfer Controls",
+"name_ar": "ضوابط نقل البيانات عبر الحدود والأطراف الثالثة",
+"en": "Third-party processor agreements (DPA clauses) for all vendors processing personal data on behalf of the entity; cross-border transfer risk assessment for transfers outside KSA citing PDPL adequacy or safeguards; vendor due-diligence checklist."
+},
+{
+"id": 460,
+"code": "14-7",
+"name_en": "Personal Data Breach Management & NDMO Notification",
+"name_ar": "إدارة خروقات البيانات الشخصية والإخطار للمكتب الوطني",
+"en": "Personal data breach response procedure with NDMO notification workflow and timeline (72-hour target); breach register with severity classification, notification dates, and lessons learned; annual breach simulation exercise report."
+},
+{
+"id": 461,
+"code": "15-1",
+"name_en": "Data Classification Policy & Four-Level Scheme Adoption",
+"name_ar": "سياسة تصنيف البيانات واعتماد النظام الرباعي",
+"en": "Board-approved data classification policy citing the four classification levels: Top Secret (سري للغاية), Secret (سري), Restricted (محظور), and Public (عام); mapping of policy to NDMO Data Classification Standard and NCA ECC requirements; evidence of annual policy review."
+},
+{
+"id": 462,
+"code": "15-2",
+"name_en": "Data Classification Procedures & Labelling Standards",
+"name_ar": "إجراءات تصنيف البيانات ومعايير التوسيم",
+"en": "Data classification procedure document with decision tree and worked examples per data type; labelling standards document specifying label format for structured data, documents, and emails; evidence of labelling tool deployment (e.g. Microsoft Purview sensitivity labels or equivalent)."
+},
+{
+"id": 463,
+"code": "15-3",
+"name_en": "Data Asset Classification Inventory & Coverage",
+"name_ar": "مخزون تصنيف أصول البيانات ونسبة التغطية",
+"en": "Classification inventory report showing % of data assets classified by level across all systems; unclassified asset remediation plan with target date; classification coverage trend (monthly)."
+},
+{
+"id": 464,
+"code": "15-4",
+"name_en": "Classification-Aligned Security & Handling Controls",
+"name_ar": "ضوابط الأمن والتعامل المنسجمة مع التصنيف",
+"en": "Security control matrix mapping each classification level to required technical controls (encryption, access restrictions, DLP rules, watermarking); evidence of controls applied per level in Tier-1 systems; exception register with risk acceptance sign-off."
+},
+{
+"id": 465,
+"code": "15-5",
+"name_en": "Data Classification Awareness & Staff Training",
+"name_ar": "التوعية بتصنيف البيانات وتدريب الموظفين",
+"en": "Annual classification training completion records (% of staff by role); classification quick-reference card distributed to staff; phishing/classification scenario test results; awareness campaign evidence."
+},
+{
+"id": 466,
+"code": "15-6",
+"name_en": "Classification Review, Reclassification & Declassification Process",
+"name_ar": "عملية مراجعة التصنيف وإعادة التصنيف والرفع عنه",
+"en": "Reclassification/declassification request and approval procedure; reclassification request log with approver, rationale, and effective date; periodic review schedule (at least every 2 years) for Secret and Restricted assets."
+}
+]

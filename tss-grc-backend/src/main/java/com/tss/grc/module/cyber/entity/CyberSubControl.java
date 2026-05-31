@@ -36,6 +36,9 @@ public class CyberSubControl {
     @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)")
     private String descriptionEn;
 
+    @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String descriptionAr;
+
     @Column(name = "control_owner")
     private String controlOwner;
 

@@ -1,0 +1,429 @@
+[
+{
+"id": 526,
+"code": "4-1",
+"name_en": "Internal & External Issues Inventory",
+"name_ar": "جرد العوامل الداخلية والخارجية المؤثرة في الاستمرارية",
+"en": "PESTLE / SWOT analysis document listing internal capabilities and external threats relevant to BCM; annual review record signed by BCM owner"
+},
+{
+"id": 527,
+"code": "4-2",
+"name_en": "Interested-Party Needs & Expectations",
+"name_ar": "تحديد توقعات الأطراف المعنية واحتياجاتها",
+"en": "Stakeholder register with identified BCM obligations (regulatory, contractual, reputational); documented review cycle; evidence of regulatory requirements captured (SAMA, NCA, NCEMA)"
+},
+{
+"id": 528,
+"code": "4-3",
+"name_en": "BCM Scope Definition & Boundaries",
+"name_ar": "تحديد نطاق إدارة استمرارية الأعمال وحدوده",
+"en": "Approved BCM scope statement referencing organisational boundaries, locations, products/services, and exclusions; board or executive sign-off minute"
+},
+{
+"id": 529,
+"code": "4-4",
+"name_en": "BCMS & Its Processes",
+"name_ar": "نظام إدارة استمرارية الأعمال وعملياته",
+"en": "Process map or RACI chart for the BCMS lifecycle; documented interaction between BCM processes and the broader management system; version-controlled BCMS manual or programme charter"
+},
+{
+"id": 530,
+"code": "4-5",
+"name_en": "Determination of Critical Activities & Dependencies",
+"name_ar": "تحديد الأنشطة الحرجة والتبعيات التشغيلية",
+"en": "Critical-activity register with upstream/downstream dependencies (people, technology, third parties, facilities); linkage to BIA output; reviewed and approved by department heads"
+},
+{
+"id": 531,
+"code": "5-1",
+"name_en": "Top Management Commitment & Accountability",
+"name_ar": "التزام الإدارة العليا ومساءلتها في استمرارية الأعمال",
+"en": "Board resolution or executive committee minute mandating BCM programme; annual BCM performance report presented to board; evidence of budget allocation for BCM activities"
+},
+{
+"id": 532,
+"code": "5-2",
+"name_en": "BCM Policy — Content & Approval",
+"name_ar": "سياسة استمرارية الأعمال — المحتوى والاعتماد",
+"en": "Approved BCM policy document (with version history) covering objectives, scope, regulatory alignment, review cycle, and consequence of non-compliance; board/CEO sign-off minute; published policy accessible to all staff"
+},
+{
+"id": 533,
+"code": "3",
+"name_en": "BCM Roles, Responsibilities & Authorities",
+"name_ar": "أدوار استمرارية الأعمال ومسؤولياتها وصلاحياتها",
+"en": "BCMS RACI matrix covering BCM owner, crisis management team (CMT), business continuity coordinator per BU, IT DR lead, and communications officer; documented in policy or separate governance charter; updated upon org changes"
+},
+{
+"id": 534,
+"code": "5-4",
+"name_en": "BCM Objectives Alignment with Strategic Direction",
+"name_ar": "توافق أهداف استمرارية الأعمال مع التوجه الاستراتيجي",
+"en": "BCM objectives documented in the annual BCM plan and traceable to the organisation's strategic objectives; KPIs defined per objective; progress reviewed at management review"
+},
+{
+"id": 535,
+"code": "6-1",
+"name_en": "Actions to Address Risks & Opportunities",
+"name_ar": "إجراءات معالجة المخاطر والفرص في استمرارية الأعمال",
+"en": "BCM risk register identifying risks to achieving BCMS outcomes; documented risk treatment plan; linkage to enterprise risk register; reviewed at least annually and after significant incidents"
+},
+{
+"id": 536,
+"code": "6-2",
+"name_en": "BCM Objectives & Planning to Achieve Them",
+"name_ar": "أهداف استمرارية الأعمال وخطط تحقيقها",
+"en": "Documented BCM objectives with owner, target date, success measure, and resource requirements; embedded in annual BCM programme plan; progress tracked in management-review dashboard"
+},
+{
+"id": 537,
+"code": "6-3",
+"name_en": "Change Management within the BCMS",
+"name_ar": "إدارة التغيير داخل نظام إدارة استمرارية الأعمال",
+"en": "Change-management log for BCMS updates (policy, scope, plans); impact-assessment template applied before changes take effect; communication of changes to relevant stakeholders on record"
+},
+{
+"id": 538,
+"code": "7-1",
+"name_en": "BCM Resource Adequacy",
+"name_ar": "كفاية موارد استمرارية الأعمال",
+"en": "Approved BCM budget line in annual financial plan; resource inventory (staff, alternate sites, tooling, vendors); gap analysis reviewed by BCM owner and signed off by executive sponsor"
+},
+{
+"id": 539,
+"code": "7-2",
+"name_en": "BCM Competence & Training Records",
+"name_ar": "كفاءة العاملين في استمرارية الأعمال وسجلات التدريب",
+"en": "Competency framework for BCM roles (BCM coordinator, CMT members, IT DR staff); training completion records (classroom, tabletop, e-learning); skills gap assessment with closure plan; annual refresher schedule"
+},
+{
+"id": 540,
+"code": "7-3",
+"name_en": "BCM Awareness Programme",
+"name_ar": "برنامج التوعية باستمرارية الأعمال",
+"en": "Annual BCM awareness calendar (campaigns, intranet articles, tabletop teasers); completion tracking per department; post-awareness survey results; awareness content approved by BCM owner"
+},
+{
+"id": 541,
+"code": "7-4",
+"name_en": "BCM Communication Plan (Internal & External)",
+"name_ar": "خطة التواصل في استمرارية الأعمال (الداخلية والخارجية)",
+"en": "Documented communication plan covering: what to communicate, when, to whom (staff, customers, regulators, media), via which channel, and who is authorised spokesperson; tested in at least one exercise per year; escalation thresholds defined"
+},
+{
+"id": 542,
+"code": "7-5",
+"name_en": "Documented Information — Control & Retention",
+"name_ar": "ضبط المعلومات الموثقة والاحتفاظ بها",
+"en": "Document control procedure covering naming convention, version control, approval workflow, distribution list, retention periods, and secure off-site/cloud backup of BCM documents; document register reviewed quarterly"
+},
+{
+"id": 543,
+"code": "8-2-1",
+"name_en": "BIA Methodology & Governance",
+"name_ar": "منهجية تحليل تأثير الأعمال وحوكمته",
+"en": "Approved BIA methodology document defining impact criteria (financial, operational, reputational, regulatory), time horizons, scoring scale, and review frequency; signed off by BCM owner and executive sponsor"
+},
+{
+"id": 544,
+"code": "8-2-2",
+"name_en": "BIA Worksheets per Critical Activity / Service",
+"name_ar": "أوراق عمل تحليل التأثير لكل نشاط حرج وخدمة حرجة",
+"en": "Completed BIA worksheets for each critical service/process: owner, description, dependencies, impact ratings per time horizon, agreed RTO/RPO/MTPD/MBCO; signed off by process owner and BCM coordinator; version-dated"
+},
+{
+"id": 545,
+"code": "8-2-3",
+"name_en": "RTO / RPO / MTPD / MBCO Definition & Sign-off",
+"name_ar": "تحديد أهداف وقت الاسترداد ونقطة الاسترداد والمدة القصوى للانقطاع والحد الأدنى لمستوى الأعمال واعتمادها",
+"en": "Consolidated RTO/RPO/MTPD/MBCO register per critical service with executive sign-off; alignment evidence to SAMA impact-tolerance statement; annual review record with change log"
+},
+{
+"id": 546,
+"code": "8-2-4",
+"name_en": "Critical Resource Requirements Identification",
+"name_ar": "تحديد متطلبات الموارد الحرجة اللازمة للاسترداد",
+"en": "Resource dependency matrix per critical activity covering staff (minimum numbers and skills), IT systems, data, facilities, third-party services, and utilities; gaps between minimum requirements and alternate-site capacity documented"
+},
+{
+"id": 547,
+"code": "8-2-5",
+"name_en": "BIA Review Cycle & Trigger-based Update",
+"name_ar": "دورة مراجعة تحليل التأثير والتحديث المبني على المحفزات",
+"en": "Documented BIA review policy (annual minimum + triggered by material change — new product, M&A, technology refresh, incident); review completion records; change log entries linked to triggering events"
+},
+{
+"id": 548,
+"code": "8-3-1",
+"name_en": "BCM Threat Identification & Scenario Library",
+"name_ar": "تحديد تهديدات استمرارية الأعمال ومكتبة السيناريوهات",
+"en": "Documented threat/scenario library (natural disasters, cyber incidents, power outages, pandemics, civil unrest, supplier failure, key-person dependency) tailored to Saudi operating context; reviewed by risk management and BCM teams"
+},
+{
+"id": 549,
+"code": "8-3-2",
+"name_en": "BCM Risk Register — Likelihood, Impact & Rating",
+"name_ar": "سجل مخاطر استمرارية الأعمال — الاحتمالية والتأثير والتقييم",
+"en": "BCM risk register with threat scenarios rated on likelihood × impact matrix; risk owners assigned; residual-risk rating after existing controls; linked to BIA critical-activity priorities; maintained in GRC system or controlled spreadsheet"
+},
+{
+"id": 550,
+"code": "8-3-3",
+"name_en": "Risk Treatment Decisions & Control Mapping",
+"name_ar": "قرارات معالجة مخاطر الاستمرارية وربطها بالضوابط",
+"en": "Risk treatment register showing accept/mitigate/transfer/avoid decisions per risk; controls mapped to each risk; residual-risk acceptances signed by risk owner and BCM owner; escalation to risk committee for high-rated residuals"
+},
+{
+"id": 551,
+"code": "8-3-4",
+"name_en": "Third-Party & Supply-Chain BCM Risk",
+"name_ar": "مخاطر استمرارية الأعمال للأطراف الثالثة وسلسلة التوريد",
+"en": "Third-party BCM risk assessment (critical suppliers/vendors); contractual BCM requirements (RTO SLAs, DR testing obligations, notification requirements); evidence of supplier BCM attestations or audit results; contingency sourcing plan for critical single-source suppliers"
+},
+{
+"id": 552,
+"code": "8-4-1",
+"name_en": "Strategy Options Analysis & Selection",
+"name_ar": "تحليل خيارات الاستراتيجية واختيارها",
+"en": "Recovery strategy options paper per critical activity covering: do nothing, manual workaround, alternate site (warm/hot/cold), work-from-home, mutual-aid agreement, cloud failover; cost-benefit analysis; selected strategy approved by executive sponsor"
+},
+{
+"id": 553,
+"code": "8-4-2",
+"name_en": "Resource Provision for Recovery Strategies",
+"name_ar": "توفير الموارد اللازمة لتنفيذ استراتيجيات الاسترداد",
+"en": "Alternate-site configuration records (seats, connectivity, licences, equipment); DR infrastructure build/test records; WFH toolkit inventory; SLA agreements with alternate-site or cloud providers; budget allocation for strategy implementation"
+},
+{
+"id": 554,
+"code": "8-4-3",
+"name_en": "IT Disaster Recovery Strategy & Architecture",
+"name_ar": "استراتيجية التعافي من كوارث تقنية المعلومات وبنيتها",
+"en": "IT DR strategy document covering RPO/RTO per system tier; DR architecture diagram (primary–DR site replication topology); data backup and restore policy with test records; cloud-based failover design where applicable; aligned to SAMA technology risk requirements"
+},
+{
+"id": 555,
+"code": "8-4-4",
+"name_en": "People Continuity & Key-Person Risk Mitigation",
+"name_ar": "استمرارية الكفاءات البشرية وتخفيف مخاطر الاعتماد على الأفراد الرئيسيين",
+"en": "Key-person risk register; documented succession/cover plans for critical roles; cross-training records; contact tree (alternate contacts per role); HR emergency-response roster; evidence of succession plan tests in tabletop exercises"
+},
+{
+"id": 556,
+"code": "8-4-5",
+"name_en": "Telecommunications & Communication Redundancy",
+"name_ar": "التكرار في الاتصالات والتواصل",
+"en": "Network resilience design document (dual ISP, MPLS + internet failover, satellite backup); tested failover scenario records; out-of-band communication tools inventory (satellite phones, emergency messaging platform); SAMA notification channel readiness confirmation"
+},
+{
+"id": 557,
+"code": "8-5-1",
+"name_en": "Business Continuity Plan (BCP) — Structure & Content",
+"name_ar": "خطة استمرارية الأعمال — الهيكل والمحتوى",
+"en": "Approved master BCP document covering: purpose, scope, activation criteria, CMT structure, escalation chain, communication plan, recovery procedures per critical activity; version-controlled; off-site and offline copy maintained; last review date evidenced"
+},
+{
+"id": 558,
+"code": "8-5-2",
+"name_en": "Crisis Management Plan & Command Structure",
+"name_ar": "خطة إدارة الأزمات وهيكل القيادة",
+"en": "Crisis Management Plan defining CMT composition (Gold/Silver/Bronze or equivalent), decision-making authorities, crisis room setup, spokesperson designation, escalation matrix, and stand-down procedures; CMT contact list (current); rehearsed in CMT tabletop at least annually"
+},
+{
+"id": 559,
+"code": "8-5-3",
+"name_en": "IT Disaster Recovery Runbooks",
+"name_ar": "أدلة تشغيل التعافي من كوارث تقنية المعلومات",
+"en": "Step-by-step DR runbooks per critical system/application covering: failover trigger, pre-conditions, numbered recovery steps, validation tests, roll-back procedure, and responsible team; runbooks version-controlled and accessible in DR site or cloud vault; last tested date recorded"
+},
+{
+"id": 560,
+"code": "8-5-4",
+"name_en": "Incident Notification & Escalation Procedures",
+"name_ar": "إجراءات إخطار الحوادث والتصعيد",
+"en": "Documented incident notification matrix defining who to notify (internal tiers, regulators, customers, media) based on incident severity/type/duration; escalation timeline (e.g., SAMA notification within X hours); template notification messages approved; tested in exercises"
+},
+{
+"id": 561,
+"code": "8-5-5",
+"name_en": "Recovery Site & Remote-Working Activation Procedures",
+"name_ar": "إجراءات تفعيل موقع الاسترداد والعمل عن بُعد",
+"en": "Recovery site activation checklist (step-by-step with owners and timing); remote-working activation guide (VPN capacity, device policy, application access confirmation); travel/logistics plan for key staff relocation; site readiness assessment records"
+},
+{
+"id": 562,
+"code": "8-5-6",
+"name_en": "Post-Incident Recovery & Return-to-Normal Procedures",
+"name_ar": "إجراءات الاسترداد بعد الحادث والعودة إلى الوضع الطبيعي",
+"en": "Stand-down and return-to-normal procedures covering: recovery verification criteria, data-integrity checks, system sign-off, primary-site reinstatement, lessons-learned trigger; documented in BCP appendix; reviewed after each activation"
+},
+{
+"id": 563,
+"code": "8-6-1",
+"name_en": "Exercise Programme — Schedule & Scope",
+"name_ar": "برنامج التمارين — الجدول الزمني والنطاق",
+"en": "Annual BCM exercise programme document covering: exercise types (awareness walk-through, tabletop, simulation, full failover), schedule, objectives, scope per exercise, responsible owners; approved by BCM governance body; communicated to relevant departments"
+},
+{
+"id": 564,
+"code": "8-6-2",
+"name_en": "Tabletop & Simulation Exercise Records",
+"name_ar": "سجلات التمارين المكتبية ومحاكاة الحوادث",
+"en": "Tabletop/simulation exercise records including: scenario description, participants, observations/findings, actions raised; after-action report (AAR) signed by exercise lead; improvement items logged in BCM action tracker; evidence of closure"
+},
+{
+"id": 565,
+"code": "8-6-3",
+"name_en": "Technical DR Failover Test Records",
+"name_ar": "سجلات اختبارات الفشل التقني في التعافي من الكوارث",
+"en": "DR failover test plans and results per critical system: test objectives, RPO/RTO achieved vs. target, pass/fail per test step, defects found, remediation completed, sign-off by IT DR lead and business owner; tested at minimum annually (SAMA requirement: semi-annually for critical systems)"
+},
+{
+"id": 566,
+"code": "8-6-4",
+"name_en": "Exercise Findings & Improvement Tracking",
+"name_ar": "نتائج التمارين وتتبع التحسينات",
+"en": "BCM improvement log consolidating findings from all exercises and tests; each item with owner, priority, due date, and status; reviewed monthly by BCM coordinator; presented to management review; trend analysis for recurring themes"
+},
+{
+"id": 567,
+"code": "8-6-5",
+"name_en": "SAMA-Mandated Cyber-Resilience & Scenario Testing",
+"name_ar": "الاختبارات الإلزامية بموجب إطار البنك المركزي للمرونة الإلكترونية والسيناريوهات",
+"en": "Cyber-resilience test plan and results (threat-led penetration testing, ransomware recovery simulation, SWIFT environment DR); SAMA scenario test evidence (e.g., simultaneous site loss + cyber incident dual-scenario); results shared with CISO and BCM owner; regulatory submission where required"
+},
+{
+"id": 568,
+"code": "9-1",
+"name_en": "BCM Monitoring & Measurement",
+"name_ar": "مراقبة وقياس أداء استمرارية الأعمال",
+"en": "BCM KPI dashboard covering: % BCPs tested per schedule, RTO/RPO achievement in tests, open improvement-action closure rate, BIA currency (age), staff awareness completion rate, exercise frequency compliance; reviewed quarterly by BCM owner"
+},
+{
+"id": 569,
+"code": "9-2",
+"name_en": "Internal BCM Audit",
+"name_ar": "التدقيق الداخلي لنظام إدارة استمرارية الأعمال",
+"en": "Annual internal BCM audit plan; audit reports with findings, nonconformity ratings, and corrective-action requirements; evidence of auditor independence (not auditing own work); management response to findings; closure evidence for major NCs"
+},
+{
+"id": 570,
+"code": "9-3",
+"name_en": "Management Review — Inputs, Outputs & Minutes",
+"name_ar": "مراجعة الإدارة — المدخلات والمخرجات والمحاضر",
+"en": "Management review meeting minutes (at minimum annual) covering mandatory inputs: audit results, exercise findings, BCM performance KPIs, changes to context/risks, regulatory feedback, corrective actions status; documented decisions and action items with owners and dates"
+},
+{
+"id": 571,
+"code": "9-4",
+"name_en": "Regulatory & Certification Compliance Tracking",
+"name_ar": "تتبع الامتثال للمتطلبات التنظيمية وشهادات الاعتماد",
+"en": "Compliance register mapping BCMS controls to ISO 22301:2019, SAMA BCM Framework, and NCEMA requirements; compliance status (compliant/partial/non-compliant) per requirement; evidence links; annual refresh; gap closure plan for partials and non-conformities"
+},
+{
+"id": 572,
+"code": "10-1",
+"name_en": "Nonconformity & Corrective Action Process",
+"name_ar": "عملية معالجة عدم المطابقة والإجراءات التصحيحية",
+"en": "Nonconformity log with root-cause analysis, corrective action plan, owner, target date, and verification of effectiveness; linkage to audit, exercise, and incident findings; management review of overdue items; trend analysis for systemic issues"
+},
+{
+"id": 573,
+"code": "10-2",
+"name_en": "Continual Improvement — Opportunities & Innovations",
+"name_ar": "التحسين المستمر — الفرص والابتكارات",
+"en": "Annual BCMS improvement roadmap capturing lessons from exercises, incidents, regulatory changes, and benchmarking; innovation items (e.g., automation of DR failover, AI-based incident detection); approved by BCM owner; progress tracked quarterly"
+},
+{
+"id": 574,
+"code": "10-3",
+"name_en": "Lessons Learned from Actual Incidents",
+"name_ar": "الدروس المستفادة من الحوادث الفعلية",
+"en": "Post-incident review (PIR) report for each BCM activation (including near-misses): timeline reconstruction, root cause, plan effectiveness assessment, gaps identified, improvement actions raised; PIR completed within 30 days of stand-down; findings fed into BIA and risk assessment updates"
+},
+{
+"id": 575,
+"code": "S1-1",
+"name_en": "Board & Senior Management BCM Oversight",
+"name_ar": "إشراف مجلس الإدارة والإدارة العليا على استمرارية الأعمال",
+"en": "Board-approved BCM policy and annual BCM report; board or risk-committee agenda item on BCM at least annually; documented board-level escalation path for BCM activations exceeding defined thresholds; board attestation to SAMA where required"
+},
+{
+"id": 576,
+"code": "S1-2",
+"name_en": "Impact Tolerance Statement for Critical Operations",
+"name_ar": "بيان تحمل التأثير للعمليات الحرجة",
+"en": "Formal impact tolerance statement per critical operation specifying the maximum tolerable level of disruption (time and degradation); methodology used; board approval evidence; alignment with BIA-derived MTPD/MBCO; annual review and SAMA submission record"
+},
+{
+"id": 577,
+"code": "S1-3",
+"name_en": "Critical Operations Identification & Prioritisation",
+"name_ar": "تحديد العمليات الحرجة وترتيب أولوياتها",
+"en": "SAMA-aligned critical-operations register listing services that, if disrupted, would cause material harm to customers, financial stability, or regulatory compliance; prioritisation rationale; linkage to BIA; reviewed annually and after material business changes"
+},
+{
+"id": 578,
+"code": "S1-4",
+"name_en": "Scenario Testing — SAMA-Mandated Scenarios",
+"name_ar": "اختبارات السيناريوهات المطلوبة من البنك المركزي السعودي",
+"en": "Annual scenario test schedule including SAMA-specified severe-but-plausible scenarios (e.g., data-centre complete loss, cyber attack, simultaneous pandemic + cyber, payment-system failure); test reports with RTO/RPO achieved; SAMA submission of results where required; senior-management sign-off"
+},
+{
+"id": 579,
+"code": "S1-5",
+"name_en": "Regulator Notification — Incidents & Material Changes",
+"name_ar": "إخطار الجهات التنظيمية عند الحوادث والتغييرات الجوهرية",
+"en": "Documented SAMA notification procedure covering: trigger criteria (incident type, duration, customer impact threshold), notification timeline (e.g., initial notice within 2 hours, follow-up within 24 hours), responsible officer, template notification messages; notification log for all incidents; post-incident regulatory report records"
+},
+{
+"id": 580,
+"code": "S1-6",
+"name_en": "Cyber Resilience Integration with BCM",
+"name_ar": "دمج المرونة الإلكترونية مع استمرارية الأعمال",
+"en": "Documented integration between BCM and cyber-incident response (shared escalation criteria, joint CMT activation triggers, shared communication plan); ransomware recovery playbook tested at least annually; evidence of NCA and SAMA cybersecurity framework alignment within BCM plans"
+},
+{
+"id": 581,
+"code": "S1-7",
+"name_en": "SAMA Self-Assessment & Independent Review Submission",
+"name_ar": "التقييم الذاتي لمتطلبات البنك المركزي والمراجعة المستقلة",
+"en": "Completed SAMA BCM Framework self-assessment with evidence references per requirement; independent (internal audit or external assurance) review of BCM capability at SAMA-specified frequency; submission to SAMA on schedule; management response to review findings"
+},
+{
+"id": 582,
+"code": "N1-1",
+"name_en": "NCEMA Interface & Coordination Roles",
+"name_ar": "واجهة التنسيق مع المركز الوطني لإدارة الطوارئ وأدوار التنسيق",
+"en": "Documented NCEMA liaison role within CMT; contact directory for NCEMA and relevant national emergency-management authorities; organisation's place in sector/national response hierarchy documented; briefing notes/registration evidence with NCEMA if required by sector"
+},
+{
+"id": 583,
+"code": "N1-2",
+"name_en": "Alignment with National Emergency Response Plans",
+"name_ar": "التوافق مع خطط الاستجابة الوطنية للطوارئ",
+"en": "Gap assessment mapping organisational BCP to relevant national emergency plans (sector contingency plans, NCEMA national crisis plan); alignment actions documented and tracked; BCM activation procedures reference national coordination protocols"
+},
+{
+"id": 584,
+"code": "N1-3",
+"name_en": "Participation in National & Sector BCM Exercises",
+"name_ar": "المشاركة في التمارين الوطنية وتمارين الاستمرارية على مستوى القطاع",
+"en": "Participation records in NCEMA or sector-level BCM exercises (invitation, attendance confirmation, exercise report, lessons-learned input); internal debrief incorporating national-exercise findings; improvements actioned and evidenced"
+},
+{
+"id": 585,
+"code": "N1-4",
+"name_en": "Incident Reporting to NCEMA & National Authorities",
+"name_ar": "الإبلاغ عن الحوادث للمركز الوطني لإدارة الطوارئ والجهات الوطنية",
+"en": "Notification procedure for reporting to NCEMA and relevant national authorities (criteria, timeline, channel, authorised officer, template); record of all national-authority notifications; post-incident national reporting submissions; national-authority feedback log"
+},
+{
+"id": 586,
+"code": "N1-5",
+"name_en": "National Risk Register Alignment",
+"name_ar": "التوافق مع سجل المخاطر الوطني",
+"en": "Review record of NCEMA national risk register or Saudi national risk landscape; evidence that nationally identified risks (e.g., pandemic, earthquake, extreme weather, regional conflict) are reflected in organisational BCM scenario library and BIA assumptions; annual alignment review"
+}
+]
