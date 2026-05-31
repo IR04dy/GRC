@@ -343,7 +343,7 @@ export function App() {
       <I18nProvider>
         <ToastProvider>
           <DialogProvider>
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense fallback={<WizardChunkFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />

@@ -67,3 +67,21 @@ a:hover { color: var(--primary-hover); }
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-mono);
 }
+
+/* Reduced motion — honour the OS "reduce motion" setting app-wide (WCAG
+   2.3.3 Animation from Interactions). This global reset supersedes the
+   narrow per-component guards and, critically, also stills the infinite
+   loops that were previously unguarded: the skeleton + data-table
+   shimmers and the mobile offline-banner pulse. Animations collapse to a
+   near-zero duration (rather than `none`) so any animationend handlers
+   still fire and dependent state doesn't stall. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
