@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Files, Inbox, CalendarX, BadgeCheck, Filter, Download, Plus, BarChart3, FileText, Send, ClipboardCheck,
-  Layers, Plug, ChevronDown, ChevronRight, History, Power, Zap,
+  Layers, Plug, ChevronDown, ChevronRight, History, Power, Zap, Paperclip,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -76,6 +76,31 @@ export function EvidencePage() {
   const [editing, setEditing] = useState<EvidenceItemDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<EvidenceItemDto | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // ── Binary file upload (multipart) — wires POST /evidence/items/{id}/file ──
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTargetId, setUploadTargetId] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
+  function pickFileFor(item: EvidenceItemDto) {
+    setUploadTargetId(item.id);
+    fileInputRef.current?.click();
+  }
+  async function onFileChosen(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';                       // allow re-selecting the same file
+    if (!file || uploadTargetId == null) return;
+    setUploading(true);
+    try {
+      await evidenceApi.uploadFile(uploadTargetId, file);
+      toast.success(t('evidenceFileUploaded'));
+      items.reload();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : t('evidenceFileUploadFailed'));
+    } finally {
+      setUploading(false);
+      setUploadTargetId(null);
+    }
+  }
 
   const items    = useApiList<EvidenceItemDto>(()    => evidenceApi.items(0, 100),    EVIDENCE);
   const requests = useApiList<EvidenceRequestDto>(() => evidenceApi.requests(0, 100), EVIDENCE_REQUESTS);
@@ -194,7 +219,16 @@ export function EvidencePage() {
 
   const itemCols: Column<EvidenceItemDto>[] = [
     { header: t('colCode'),      cell: r => r.evidenceCode, mono: true },
-    { header: t('colTitle'),     cell: r => <span style={{ fontWeight: 600 }}>{r.titleEn}</span> },
+    { header: t('colTitle'),     cell: r => (
+        <span style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {r.titleEn}
+          {r.fileName && (
+            <span title={r.fileName} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 400, color: 'var(--ink-3)' }}>
+              <Paperclip size={12} /> {r.fileName.length > 24 ? r.fileName.slice(0, 24) + '…' : r.fileName}
+            </span>
+          )}
+        </span>
+      ) },
     { header: t('colType'),      cell: r => <Badge tone="neutral">{(r.evidenceType ?? '').replace(/_/g, ' ')}</Badge> },
     { header: 'Regulator anchors', cell: r => <AnchorChips anchors={EVIDENCE_ANCHORS_BY_ID[r.id] ?? []} max={3} /> },
     { header: t('colExpiry'),    cell: r => <span className="mono">{r.expiryDate ?? '—'}</span> },
@@ -202,7 +236,10 @@ export function EvidencePage() {
     { header: '', align: 'end', width: '120px',
       cell: r => (
         <RowActions
-          extras={[{ Icon: History, onClick: () => openVersions(r), title: t('evidenceVersionHistory'), tone: 'primary' }]}
+          extras={[
+            { Icon: Paperclip, onClick: () => pickFileFor(r), title: t('evidenceAttachFile'), tone: 'primary' },
+            { Icon: History, onClick: () => openVersions(r), title: t('evidenceVersionHistory'), tone: 'primary' },
+          ]}
           onEdit={() => { setEditing(r); setOpen(true); }}
           onDelete={() => setConfirmDel(r)} />
       ) },
@@ -541,6 +578,11 @@ export function EvidencePage() {
       <FilterModal open={filterOpen} fields={evidenceFilterFields} value={advFilters}
         onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
         onClose={() => setFilterOpen(false)} />
+
+      {/* Hidden picker for the binary file-upload row action (multipart). */}
+      <input ref={fileInputRef} type="file" hidden onChange={onFileChosen}
+        disabled={uploading}
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.txt,.csv,.json,.xml,.zip" />
     </Shell>
   );
 }

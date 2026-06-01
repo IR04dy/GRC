@@ -3402,6 +3402,9 @@ export const en = {
 
   // Evidence v2 — control-anchored matrix + connectors + version history
   evidenceVersionHistory: 'Version History',
+  evidenceAttachFile: 'Attach file',
+  evidenceFileUploaded: 'File attached to evidence item',
+  evidenceFileUploadFailed: 'File upload failed',
   evidenceVersionsTitle:  'Evidence version history',
   evidenceVersionsSub:    'Replacing an evidence file produces a new version row. Previous versions are retained read-only and form a per-evidence WORM hash chain.',
   evidenceSnapshotNew:    'Snapshot New Version',

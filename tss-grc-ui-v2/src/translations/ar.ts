@@ -3388,6 +3388,9 @@ export const ar = {
 
   // الأدلة v2 — مصفوفة الضوابط + التكاملات + تاريخ الإصدارات
   evidenceVersionHistory: 'تاريخ الإصدارات',
+  evidenceAttachFile: 'إرفاق ملف',
+  evidenceFileUploaded: 'تم إرفاق الملف بعنصر الإثبات',
+  evidenceFileUploadFailed: 'تعذّر رفع الملف',
   evidenceVersionsTitle:  'سجل إصدارات الدليل',
   evidenceVersionsSub:    'استبدال ملف الدليل يُنشئ إصداراً جديداً. تُحفظ الإصدارات السابقة للقراءة فقط وتُكوّن سلسلة تجزئة WORM لكل دليل.',
   evidenceSnapshotNew:    'إصدار نسخة جديدة',

@@ -193,6 +193,41 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
 }
 
+/**
+ * Upload a single binary file via multipart/form-data (e.g. attach a document
+ * to an evidence item). The browser sets the multipart Content-Type + boundary,
+ * so we must NOT set Content-Type ourselves. Mirrors downloadFile's 401-refresh.
+ */
+export async function uploadFile<T>(path: string, file: File, field = 'file'): Promise<T> {
+  const attempt = async (token: string | null): Promise<Response> => {
+    const fd = new FormData();
+    fd.append(field, file);
+    return fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+      credentials: 'include',
+      body: fd,
+    });
+  };
+
+  let res = await attempt(getAccessToken());
+  if (res.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) res = await attempt(newToken);
+    else redirectToLogin();
+  }
+
+  const text = await res.text();
+  let parsed: unknown = undefined;
+  if (text) { try { parsed = JSON.parse(text); } catch { parsed = text; } }
+  if (!res.ok) {
+    const p = (parsed as { detail?: string; title?: string; message?: string }) ?? {};
+    const msg = p.detail ?? p.title ?? p.message ?? res.statusText ?? 'Upload failed';
+    throw new ApiError(res.status, msg, parsed);
+  }
+  return parsed as T;
+}
+
 // ─── Ethics & Compliance — Cases (whistleblower + investigations) ──────────
 export interface EthicsCaseDto {
   id: number; organisationId?: number;
@@ -1769,6 +1804,7 @@ export interface EvidenceItemDto {
   descriptionEn?: string; descriptionAr?: string;
   evidenceType: string; status?: string;
   collectedDate?: string; expiryDate?: string;
+  fileName?: string; fileSize?: number; mimeType?: string;
 }
 export interface EvidenceItemRequest {
   titleEn: string; titleAr?: string; descriptionEn?: string;
@@ -1840,6 +1876,8 @@ export const evidenceApi = {
   deleteItem:   (id: number) => api.delete<void>(`/api/v1/evidence/items/${id}`),
   approve:      (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/approve`),
   reject:       (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/reject`),
+  submit:       (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/submit`),
+  uploadFile:   (id: number, file: File) => uploadFile<EvidenceItemDto>(`/api/v1/evidence/items/${id}/file`, file),
   stats:        () => api.get<unknown>('/api/v1/evidence/items/stats'),
   expired:      () => api.get<PageResponse<EvidenceItemDto>>('/api/v1/evidence/items/expired'),
   requests:     (page = 0, size = 50) => api.get<PageResponse<EvidenceRequestDto>>(`/api/v1/evidence/requests${pageQ(page, size)}`),
