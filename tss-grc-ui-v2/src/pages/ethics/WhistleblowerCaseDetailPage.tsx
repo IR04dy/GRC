@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, FileText, Lock, MessageSquare, ShieldAlert } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
@@ -343,6 +345,19 @@ export function WhistleblowerCaseDetailPage() {
           fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {/* Documents & control mapping — investigation file, evidence, controls */}
+      {data && (
+        <div style={{ marginTop: 16 }}>
+          <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <AttachmentsField entityType="WHISTLEBLOWER_CASE" entityId={data.id} />
+              <div style={{ borderTop: '1px solid var(--border)' }} />
+              <ControlMappingPicker entityType="WHISTLEBLOWER_CASE" entityId={data.id} />
+            </div>
+          </Card>
         </div>
       )}
     </Shell>

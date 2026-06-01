@@ -7,6 +7,8 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -414,6 +416,17 @@ export function FraudCaseDetailPage() {
             caseId={caseData.id}
             onClose={() => setActiveAction(null)}
             onDone={() => { setActiveAction(null); load(); }} />
+
+          {/* Documents & control mapping — investigation evidence, SAR, controls */}
+          <div style={{ marginTop: 16 }}>
+            <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <AttachmentsField entityType="FRAUD_CASE" entityId={caseData.id} />
+                <div style={{ borderTop: '1px solid var(--border)' }} />
+                <ControlMappingPicker entityType="FRAUD_CASE" entityId={caseData.id} />
+              </div>
+            </Card>
+          </div>
         </>
       )}
     </Shell>
