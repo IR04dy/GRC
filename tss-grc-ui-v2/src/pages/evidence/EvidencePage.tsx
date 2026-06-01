@@ -68,8 +68,29 @@ function itemToReq(i: EvidenceItemDto): EvidenceItemRequest {
   };
 }
 
+// Evidence-request SLA: render the due date with an overdue / due-soon badge.
+// Closed/satisfied requests just show the date (no SLA pressure).
+const REQ_DONE = new Set(['SATISFIED', 'COMPLETED', 'CLOSED', 'APPROVED', 'FULFILLED']);
+function dueCell(r: EvidenceRequestDto, lang: string) {
+  const ar = lang === 'ar';
+  if (!r.dueDate) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
+  const date = <span className="mono">{r.dueDate}</span>;
+  if (REQ_DONE.has((r.status ?? '').toUpperCase())) return date;
+  const today = new Date().toISOString().slice(0, 10);
+  const days = Math.round((new Date(r.dueDate).getTime() - new Date(today).getTime()) / 86_400_000);
+  if (Number.isNaN(days)) return date;
+  const badge = days < 0
+    ? <Badge tone="danger">{ar ? `متأخر ${-days} ي` : `${-days}d overdue`}</Badge>
+    : days <= 7
+      ? <Badge tone="warning">{ar ? `خلال ${days} ي` : `in ${days}d`}</Badge>
+      : null;
+  return badge
+    ? <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>{date}{badge}</span>
+    : date;
+}
+
 export function EvidencePage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const [tab, setTab] = useState<TabId>('overview');
   const [open, setOpen] = useState(false);
@@ -251,7 +272,7 @@ export function EvidencePage() {
     { header: t('colSubControl'), cell: r => r.subControlCode ?? '—', mono: true },
     { header: t('colFramework'),  cell: r => <Badge tone="primary">{r.frameworkCode ?? '—'}</Badge> },
     { header: t('colOwner'),      cell: r => r.ownerName ?? '—' },
-    { header: t('colDue'),        cell: r => r.dueDate ?? '—', mono: true },
+    { header: t('colDue'),        cell: r => dueCell(r, lang) },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
   ];
 
