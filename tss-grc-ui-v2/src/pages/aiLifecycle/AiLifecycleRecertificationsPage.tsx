@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, Award } from 'lucide-react';
+import { Plus, Award, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -37,6 +38,7 @@ export function AiLifecycleRecertificationsPage() {
 
   // transition
   const [moveTarget, setMoveTarget] = useState<RecertificationResponse | null>(null);
+  const [docsTarget, setDocsTarget] = useState<RecertificationResponse | null>(null);
   const [toStatus, setToStatus] = useState<RecertificationStatus | null>(null);
   const [nextDue, setNextDue] = useState('');
   const [decisionEn, setDecisionEn] = useState('');
@@ -119,18 +121,24 @@ export function AiLifecycleRecertificationsPage() {
         {RECERT_STATUS_LABEL[r.status][lang === 'ar' ? 'ar' : 'en']}</Badge> },
     { header: lang === 'ar' ? 'الاستحقاق القادم' : 'Next due', width: '120px',
       cell: r => <span style={{ fontSize: 12 }}>{r.nextDueDate ?? '—'}</span> },
-    { header: '', width: '95px',
+    { header: '', width: '140px',
       cell: r => {
         const next = nextRecertStatuses(r.status);
-        if (next.length === 0) return null;
         return (
-          <Button variant="ghost" size="sm"
-            onClick={(e) => { e.stopPropagation();
-              setMoveTarget(r); setToStatus(next[0]);
-              setNextDue(''); setDecisionEn(''); setDecisionAr('');
-              setCondEn(''); setCondAr(''); setLinkedVal(''); }}>
-            {lang === 'ar' ? 'تحريك' : 'Move'}
-          </Button>
+          <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(r); }} />
+            {next.length > 0 && (
+              <Button variant="ghost" size="sm"
+                onClick={(e) => { e.stopPropagation();
+                  setMoveTarget(r); setToStatus(next[0]);
+                  setNextDue(''); setDecisionEn(''); setDecisionAr('');
+                  setCondEn(''); setCondAr(''); setLinkedVal(''); }}>
+                {lang === 'ar' ? 'تحريك' : 'Move'}
+              </Button>
+            )}
+          </span>
         );
       } },
   ];
@@ -267,6 +275,12 @@ export function AiLifecycleRecertificationsPage() {
           />
         )}
       </Card>
+      <EntityDocsModal
+        entityType="AI_RECERTIFICATION"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        onClose={() => setDocsTarget(null)}
+      />
     </Shell>
   );
 }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -43,6 +44,7 @@ export function AiLifecycleRetrainingsPage() {
 
   // transition
   const [moveTarget, setMoveTarget] = useState<RetrainingResponse | null>(null);
+  const [docsTarget, setDocsTarget] = useState<RetrainingResponse | null>(null);
   const [toStatus, setToStatus] = useState<RetrainingStatus | null>(null);
   const [rollbackEn, setRollbackEn] = useState('');
   const [rollbackAr, setRollbackAr] = useState('');
@@ -117,17 +119,23 @@ export function AiLifecycleRetrainingsPage() {
     { header: lang === 'ar' ? 'الحالة' : 'Status', width: '150px',
       cell: r => <Badge tone={RETRAINING_STATUS_TONE[r.status]}>
         {RETRAINING_STATUS_LABEL[r.status][lang === 'ar' ? 'ar' : 'en']}</Badge> },
-    { header: '', width: '95px',
+    { header: '', width: '140px',
       cell: r => {
         const next = nextRetrainingStatuses(r.status);
-        if (next.length === 0) return null;
         return (
-          <Button variant="ghost" size="sm"
-            onClick={(e) => { e.stopPropagation();
-              setMoveTarget(r); setToStatus(next[0]);
-              setRollbackEn(''); setRollbackAr(''); }}>
-            {lang === 'ar' ? 'تحريك' : 'Move'}
-          </Button>
+          <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(r); }} />
+            {next.length > 0 && (
+              <Button variant="ghost" size="sm"
+                onClick={(e) => { e.stopPropagation();
+                  setMoveTarget(r); setToStatus(next[0]);
+                  setRollbackEn(''); setRollbackAr(''); }}>
+                {lang === 'ar' ? 'تحريك' : 'Move'}
+              </Button>
+            )}
+          </span>
         );
       } },
   ];
@@ -260,6 +268,12 @@ export function AiLifecycleRetrainingsPage() {
           />
         )}
       </Card>
+      <EntityDocsModal
+        entityType="AI_RETRAINING"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        onClose={() => setDocsTarget(null)}
+      />
     </Shell>
   );
 }
