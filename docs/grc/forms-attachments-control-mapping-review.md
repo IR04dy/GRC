@@ -131,5 +131,11 @@ Where an entityType appears on both a register and a detail page (`BREACH`, `DPI
 ### Intentionally not wired (low attachment value / not single-entity)
 Template-management pages (committee form/template, crisis-comms template), workflow/approval **process-instance** views (workflow submission, approval-chain instance), MTPD-inheritance (a cross-function matrix, not one record), and KRI detail (metric, string `externalId`). CAPA detail uses a **string** record id, incompatible with the numeric attachment `entityId` contract — its attachments live on the register/linked finding instead.
 
-### Follow-ups (leader-parity add-ons, not blocking)
-Extend attachment expiry/recollection (`valid_to`) to generic attachments; reminder/SLA escalation on evidence requests; the optional `FormModal` `kind: 'attachments'` for create/edit modals (deferred — detail-page surfacing covers the need).
+### Follow-ups (leader-parity add-ons) — ✅ delivered
+- ✅ **Attachment expiry** — optional "valid until" on upload → drives the `EXPIRED` badge (certs/DPAs/contracts).
+- ✅ **Re-collection** — expired attachments expose a "Re-collect" action that re-opens the picker pre-seeded with the same type/title so the fresh copy supersedes the stale one.
+- ✅ **Per-file title** — staging panel lets each upload be named (was always the filename).
+- ✅ **`FormModal kind: 'attachments'`** — live in edit mode; create mode stages `File[]` and uploads them after `onSubmit` returns `{ entityId }` (backward-compatible).
+- ✅ **Evidence-request SLA indicators** — overdue / due-soon badges on the requests register.
+
+**Still pending (backend — needs a build env):** the automated reminder/escalation *scheduler* for evidence-request SLAs (the operator-facing visibility is done); evidence-approval segregation-of-duties (coded, parked on `feat/evidence-sod-approve`).
