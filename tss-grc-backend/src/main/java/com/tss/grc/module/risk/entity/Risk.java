@@ -32,6 +32,9 @@ public class Risk extends BaseEntity {
     @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)")
     private String descriptionEn;
 
+    @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String descriptionAr;
+
     @Column(name = "source_module", length = 50)
     private String sourceModule = "ERM";
 

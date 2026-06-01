@@ -23,7 +23,7 @@ interface Props {
 }
 
 const EMPTY: RiskRequest = {
-  titleEn: '', titleAr: '', descriptionEn: '',
+  titleEn: '', titleAr: '', descriptionEn: '', descriptionAr: '',
   categoryId: undefined, ownerId: undefined,
   inherentLikelihood: 3, inherentImpact: 3,
   residualLikelihood: 2, residualImpact: 2,
@@ -63,6 +63,7 @@ export function NewRiskModal({ open, existing, onClose, onSaved, demoMode }: Pro
         titleEn: existing.titleEn,
         titleAr: existing.titleAr ?? '',
         descriptionEn: existing.descriptionEn ?? '',
+        descriptionAr: existing.descriptionAr ?? '',
         categoryId: existing.categoryId,
         ownerId: existing.ownerId,
         inherentLikelihood: existing.inherentLikelihood,
@@ -106,6 +107,7 @@ export function NewRiskModal({ open, existing, onClose, onSaved, demoMode }: Pro
           titleEn: form.titleEn,
           titleAr: form.titleAr,
           descriptionEn: form.descriptionEn,
+          descriptionAr: form.descriptionAr,
           categoryId: form.categoryId,
           categoryNameEn: categories.find(c => c.id === form.categoryId)?.nameEn,
           categoryNameAr: categories.find(c => c.id === form.categoryId)?.nameAr,
@@ -164,6 +166,10 @@ export function NewRiskModal({ open, existing, onClose, onSaved, demoMode }: Pro
         <Textarea id="descriptionEn" label={t('fldDescription')} rows={2}
           value={form.descriptionEn ?? ''}
           onChange={e => update('descriptionEn', e.currentTarget.value)} />
+
+        <Textarea id="descriptionAr" label={lang === 'ar' ? 'الوصف (عربي)' : 'Description (Arabic)'} rows={2}
+          value={form.descriptionAr ?? ''}
+          onChange={e => update('descriptionAr', e.currentTarget.value)} />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Select id="categoryId" label={t('fldCategory')}

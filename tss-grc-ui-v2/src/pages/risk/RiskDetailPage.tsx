@@ -236,7 +236,7 @@ export function RiskDetailPage() {
         ]}
         eyebrow={risk.riskCode}
         title={title}
-        sub={risk.descriptionEn}
+        sub={lang === 'ar' && risk.descriptionAr ? risk.descriptionAr : risk.descriptionEn}
         badges={<>
           <Badge tone={STATUS_TONE[risk.status] ?? 'neutral'} dot>{risk.status.replace(/_/g, ' ')}</Badge>
           {risk.riskLevel && <Badge tone={RISK_LEVEL_TONE[risk.riskLevel] ?? 'neutral'}>{risk.riskLevel}</Badge>}
@@ -310,7 +310,7 @@ export function RiskDetailPage() {
           {tab === 'overview' && (
             <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
               <Field label={t('riskColName')} value={title} bold />
-              <Field label={t('detailDescription')} value={risk.descriptionEn ?? '—'} multiline />
+              <Field label={t('detailDescription')} value={(lang === 'ar' && risk.descriptionAr ? risk.descriptionAr : risk.descriptionEn) ?? '—'} multiline />
             </Card>
           )}
 

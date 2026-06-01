@@ -7,6 +7,7 @@ public record RiskRequest(
     @NotBlank @Size(max = 300) String titleEn,
     @Size(max = 300) String titleAr,
     String descriptionEn,
+    String descriptionAr,
     Long categoryId,
     Long ownerId,
     @Min(1) @Max(5) Integer inherentLikelihood,

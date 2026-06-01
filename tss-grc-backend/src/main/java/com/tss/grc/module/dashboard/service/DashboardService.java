@@ -87,7 +87,7 @@ public class DashboardService {
         return risks.stream().map(r -> new RiskResponse(
             r.getId(), r.getExternalId(),
             "RISK-" + String.format("%04d", r.getId()),
-            r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(),
+            r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(), r.getDescriptionAr(),
             r.getCategoryId(), null, null, null,
             r.getOwnerId(), null, null, null,
             r.getStatus(),

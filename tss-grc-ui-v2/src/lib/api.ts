@@ -695,7 +695,7 @@ export async function logout(): Promise<void> {
 // ─── Risk ───────────────────────────────────────────────────────────────────
 export interface RiskResponse {
   id: number; externalId?: string; riskCode: string;
-  titleEn: string; titleAr?: string; descriptionEn?: string;
+  titleEn: string; titleAr?: string; descriptionEn?: string; descriptionAr?: string;
   categoryId?: number; categoryName?: string; categoryNameEn?: string; categoryNameAr?: string;
   ownerId?: number; ownerName?: string; ownerFullNameEn?: string; ownerUsername?: string;
   status: string;
@@ -705,7 +705,7 @@ export interface RiskResponse {
   createdAt?: string; updatedAt?: string;
 }
 export interface RiskRequest {
-  titleEn: string; titleAr?: string; descriptionEn?: string;
+  titleEn: string; titleAr?: string; descriptionEn?: string; descriptionAr?: string;
   categoryId?: number; ownerId?: number;
   inherentLikelihood: number; inherentImpact: number;
   residualLikelihood?: number; residualImpact?: number;

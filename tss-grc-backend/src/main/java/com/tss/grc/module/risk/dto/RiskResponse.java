@@ -11,6 +11,7 @@ public record RiskResponse(
     String titleEn,
     String titleAr,
     String descriptionEn,
+    String descriptionAr,
     Long categoryId,
     String categoryName,
     String categoryNameEn,

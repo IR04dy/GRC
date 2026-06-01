@@ -224,6 +224,7 @@ public class RiskService {
         risk.setTitleEn(req.titleEn());
         risk.setTitleAr(req.titleAr());
         risk.setDescriptionEn(req.descriptionEn());
+        risk.setDescriptionAr(req.descriptionAr());
         risk.setCategoryId(req.categoryId());
         risk.setOwnerId(req.ownerId());
         risk.setInherentLikelihood(req.inherentLikelihood());
@@ -260,7 +261,7 @@ public class RiskService {
         return new RiskResponse(
             r.getId(), r.getExternalId(),
             riskCode,
-            r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(),
+            r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(), r.getDescriptionAr(),
             r.getCategoryId(), categoryNameEn,
             categoryNameEn, categoryNameAr,
             r.getOwnerId(), ownerFullNameEn,

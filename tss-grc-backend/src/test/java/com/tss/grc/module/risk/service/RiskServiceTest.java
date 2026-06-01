@@ -77,7 +77,7 @@ class RiskServiceTest {
 
     private static RiskRequest req() {
         return new RiskRequest(
-            "Title EN", "العنوان", "desc", null, null,
+            "Title EN", "العنوان", "desc", "الوصف", null, null,
             3, 4, 2, 3, null, null
         );
     }
