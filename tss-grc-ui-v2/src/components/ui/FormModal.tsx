@@ -1,10 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Paperclip, Upload, X } from 'lucide-react';
 import { Modal } from './Modal';
 import { Input, Textarea } from './Input';
 import { Select } from './Select';
 import { SearchableSelect, type SelectOption } from './SearchableSelect';
 import { Button } from './Button';
+import { AttachmentsField } from './AttachmentsField';
+import { attachmentsApi } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 
 /**
  * Span out of 12 (Bootstrap-style). 12 = full row, 6 = half, 4 = third, 3 = quarter.
@@ -39,7 +43,19 @@ export type FieldDef =
       onCreate?: (typedLabel: string) => Promise<string | null> | string | null;
       createLabel?: (typedLabel: string) => string;
       emptyHint?: string;
-    });
+    })
+  /**
+   * Typed file attachments inside the form.
+   *   - EDIT mode (entityId set): a live AttachmentsField that uploads
+   *     immediately against the existing record.
+   *   - CREATE mode (entityId omitted): files are staged in form state and
+   *     uploaded after onSubmit resolves with the new record's id. Requires
+   *     onSubmit to return `{ entityId }`.
+   */
+  | (FieldCommon & { kind: 'attachments'; entityType: string; entityId?: number });
+
+/** onSubmit may return the created record's id so staged attachments can link to it. */
+export type FormSubmitResult = void | { entityId?: number };
 
 interface FormModalProps<T> {
   open: boolean;
@@ -47,7 +63,7 @@ interface FormModalProps<T> {
   fields: FieldDef[];
   initial: T;
   onClose: () => void;
-  onSubmit: (values: T) => Promise<void> | void;
+  onSubmit: (values: T) => Promise<FormSubmitResult> | FormSubmitResult;
   submitLabel?: string;
   /** Modal width preset. Defaults to "lg" (880px) so forms breathe. */
   size?: 'sm' | 'md' | 'lg';
@@ -63,6 +79,7 @@ export function FormModal<T>({
   open, title, fields, initial, onClose, onSubmit, submitLabel, size = 'lg',
 }: FormModalProps<T>) {
   const { t } = useI18n();
+  const toast = useToast();
   const [values, setValues] = useState<T>(initial);
   const [submitting, setSubmitting] = useState(false);
 
@@ -72,7 +89,27 @@ export function FormModal<T>({
   async function handle(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    try { await onSubmit(values); } finally { setSubmitting(false); }
+    try {
+      const result = await onSubmit(values);
+      // CREATE-mode attachments: upload staged files once we know the new id.
+      const newId = result && typeof result === 'object' ? result.entityId : undefined;
+      const bag = values as unknown as Record<string, unknown>;
+      const pending = fields.filter(
+        (f): f is Extract<FieldDef, { kind: 'attachments' }> =>
+          f.kind === 'attachments' && f.entityId == null,
+      );
+      if (pending.length && newId != null) {
+        let failed = 0;
+        for (const f of pending) {
+          const files = (bag[f.key] as File[] | undefined) ?? [];
+          for (const file of files) {
+            try { await attachmentsApi.upload(f.entityType, newId, file, { docType: 'OTHER' }); }
+            catch { failed++; }
+          }
+        }
+        if (failed > 0) toast.danger(`${failed} attachment(s) failed to upload — add them from the record's Documents tab.`);
+      }
+    } finally { setSubmitting(false); }
   }
 
   return (
@@ -147,9 +184,74 @@ export function FormModal<T>({
                   value={(v as string) ?? ''}
                   onChange={(next) => setV(next)} />
               );
+            case 'attachments':
+              return wrap(
+                f.entityId != null
+                  ? <AttachmentsField entityType={f.entityType} entityId={f.entityId} label={f.label} />
+                  : <PendingFilesField label={f.label}
+                      files={(v as File[] | undefined) ?? []}
+                      onChange={(next) => setV(next)} />
+              );
           }
         })}
       </form>
     </Modal>
+  );
+}
+
+/**
+ * CREATE-mode attachment staging: collect File[] before the record exists.
+ * FormModal uploads them after onSubmit returns the new entity id.
+ */
+function PendingFilesField({ label, files, onChange }: {
+  label: string;
+  files: File[];
+  onChange: (files: File[]) => void;
+}) {
+  const { lang } = useI18n();
+  const ar = lang === 'ar';
+  const ref = useRef<HTMLInputElement>(null);
+
+  function add(e: ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (picked.length) onChange([...files, ...picked]);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+          <Paperclip size={13} /> {label}
+        </span>
+        <Button size="sm" variant="secondary" Icon={Upload} onClick={() => ref.current?.click()}>
+          {ar ? 'إضافة ملفات' : 'Add files'}
+        </Button>
+      </div>
+      {files.length === 0 ? (
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+          {ar ? 'ستُرفع الملفات بعد حفظ السجل.' : 'Files upload after the record is saved.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {files.map((file, i) => (
+            <div key={`${file.name}-${i}`} style={{
+              display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
+              padding: '4px 8px', borderRadius: 6, background: 'var(--surface-2)',
+            }}>
+              <Paperclip size={12} style={{ color: 'var(--ink-3)' }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+              <button type="button" aria-label="remove"
+                onClick={() => onChange(files.filter((_, j) => j !== i))}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex' }}>
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input ref={ref} type="file" multiple hidden onChange={add}
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.txt,.csv,.json,.xml,.zip" />
+    </div>
   );
 }
