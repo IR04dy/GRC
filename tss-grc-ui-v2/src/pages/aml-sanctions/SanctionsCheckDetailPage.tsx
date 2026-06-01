@@ -4,6 +4,8 @@ import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock, RefreshCw, XCircle } 
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
@@ -264,6 +266,19 @@ export function SanctionsCheckDetailPage() {
             ))}
           </div>
         </>
+      )}
+
+      {/* Documents & control mapping — screening evidence, EDD pack, controls */}
+      {check && (
+        <div style={{ marginTop: 16 }}>
+          <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <AttachmentsField entityType="SANCTIONS_CHECK" entityId={check.id} />
+              <div style={{ borderTop: '1px solid var(--border)' }} />
+              <ControlMappingPicker entityType="SANCTIONS_CHECK" entityId={check.id} />
+            </div>
+          </Card>
+        </div>
       )}
     </Shell>
   );
