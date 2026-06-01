@@ -90,6 +90,7 @@ public class RiskTreatmentService {
         ensureRiskInTenant(t.getRiskId());
         // Type can't change once recorded — would invalidate the audit history.
         if (body.getDescriptionEn() != null) t.setDescriptionEn(body.getDescriptionEn());
+        if (body.getDescriptionAr() != null) t.setDescriptionAr(body.getDescriptionAr());
         if (body.getOwnerId() != null)       t.setOwnerId(body.getOwnerId());
         if (body.getDueDate() != null)       t.setDueDate(body.getDueDate());
         return treatments.save(t);

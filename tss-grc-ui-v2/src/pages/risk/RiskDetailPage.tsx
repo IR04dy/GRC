@@ -114,10 +114,15 @@ export function RiskDetailPage() {
       title: 'Record re-assessment',
       label: 'Notes (optional)', type: 'textarea',
     });
+    const notesAr = await dialog.prompt({
+      title: 'Record re-assessment',
+      label: 'Notes — Arabic / ملاحظات بالعربية (optional)', type: 'textarea',
+    });
     try {
       await recordAssessment(risk.id, {
         likelihood: Number(lAns), impact: Number(iAns),
         assessmentNotesEn: notes ?? undefined,
+        assessmentNotesAr: notesAr ?? undefined,
       });
       toast.success('Assessment recorded — residual score updated');
       setLiveAssessments(await listAssessments(risk.id));
@@ -145,6 +150,10 @@ export function RiskDetailPage() {
       label: 'Description', type: 'textarea', required: true,
     });
     if (!description) return;
+    const descriptionAr = await dialog.prompt({
+      title: 'New treatment',
+      label: 'Description — Arabic / الوصف بالعربية (optional)', type: 'textarea',
+    });
     const due = await dialog.prompt({
       title: 'New treatment',
       label: 'Due date (YYYY-MM-DD, optional)', type: 'text',
@@ -153,6 +162,7 @@ export function RiskDetailPage() {
       await createTreatment(risk.id, {
         treatmentType: upper as RiskTreatmentType,
         descriptionEn: description,
+        descriptionAr: descriptionAr || undefined,
         dueDate: due || undefined,
       });
       toast.success('Treatment created');
@@ -331,7 +341,7 @@ export function RiskDetailPage() {
                             L={a.likelihood} · I={a.impact}
                           </div>
                           <div className="risk-detail-cell-sub">
-                            {a.assessmentNotesEn ?? '—'}
+                            {(lang === 'ar' && a.assessmentNotesAr ? a.assessmentNotesAr : a.assessmentNotesEn) ?? '—'}
                           </div>
                         </div>
                         <span className="mono risk-detail-cell-id">
@@ -385,7 +395,7 @@ export function RiskDetailPage() {
                         <div className="risk-detail-row-head">
                           <div className="risk-detail-row-head__group">
                             <Badge tone={treatmentTypeTone(tr.treatmentType)}>{tr.treatmentType}</Badge>
-                            <span className="risk-detail-cell-title--bold">{tr.descriptionEn}</span>
+                            <span className="risk-detail-cell-title--bold">{lang === 'ar' && tr.descriptionAr ? tr.descriptionAr : tr.descriptionEn}</span>
                           </div>
                           <Badge tone={treatmentStatusTone(tr.status)}>{tr.status.replace(/_/g, ' ')}</Badge>
                         </div>

@@ -77,12 +77,13 @@ public class RiskAssessmentService {
 
     /** Risk owner / risk manager can correct the last assessment within the same day. */
     @Transactional
-    public RiskAssessment correct(Long id, Integer likelihood, Integer impact, String notesEn) {
+    public RiskAssessment correct(Long id, Integer likelihood, Integer impact, String notesEn, String notesAr) {
         RiskAssessment a = get(id);
         Risk risk = ensureRiskInTenant(a.getRiskId());
         if (likelihood != null) { validateScale(likelihood, "likelihood"); a.setLikelihood(likelihood); }
         if (impact != null)     { validateScale(impact, "impact");         a.setImpact(impact); }
         if (notesEn != null)    a.setAssessmentNotesEn(notesEn);
+        if (notesAr != null)    a.setAssessmentNotesAr(notesAr);
         RiskAssessment saved = assessments.save(a);
         // Mirror to parent Risk only if this is still the most-recent assessment.
         List<RiskAssessment> latest = assessments.findByRiskIdOrderByAssessmentDateDesc(a.getRiskId());

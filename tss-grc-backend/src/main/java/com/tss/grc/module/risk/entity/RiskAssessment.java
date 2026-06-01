@@ -37,6 +37,9 @@ public class RiskAssessment {
     @Column(name = "assessment_notes_en", columnDefinition = "NVARCHAR(MAX)")
     private String assessmentNotesEn;
 
+    @Column(name = "assessment_notes_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String assessmentNotesAr;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

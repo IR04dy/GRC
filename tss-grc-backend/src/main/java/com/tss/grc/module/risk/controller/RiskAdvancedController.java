@@ -60,7 +60,8 @@ public class RiskAdvancedController {
         Integer likelihood = body.get("likelihood") == null ? null : ((Number) body.get("likelihood")).intValue();
         Integer impact     = body.get("impact")     == null ? null : ((Number) body.get("impact")).intValue();
         String  notes      = (String) body.get("assessmentNotesEn");
-        return assessmentService.correct(id, likelihood, impact, notes);
+        String  notesAr    = (String) body.get("assessmentNotesAr");
+        return assessmentService.correct(id, likelihood, impact, notes, notesAr);
     }
 
     // ─── Treatments ────────────────────────────────────────────────

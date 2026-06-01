@@ -123,7 +123,7 @@ class RiskAssessmentServiceTest {
         when(assessments.findByRiskIdOrderByAssessmentDateDesc(RISK_ID))
             .thenReturn(List.of(a));
 
-        service.correct(500L, 5, 4, "rolled up after cyber incident");
+        service.correct(500L, 5, 4, "rolled up after cyber incident", null);
 
         assertThat(a.getLikelihood()).isEqualTo(5);
         assertThat(a.getImpact()).isEqualTo(4);
@@ -146,7 +146,7 @@ class RiskAssessmentServiceTest {
         when(assessments.findByRiskIdOrderByAssessmentDateDesc(RISK_ID))
             .thenReturn(List.of(newer, older));
 
-        service.correct(500L, 3, 3, null);
+        service.correct(500L, 3, 3, null, null);
 
         // older assessment values updated…
         assertThat(older.getLikelihood()).isEqualTo(3);
@@ -161,7 +161,7 @@ class RiskAssessmentServiceTest {
         when(assessments.findById(500L)).thenReturn(Optional.of(a));
         when(risks.findById(RISK_ID)).thenReturn(Optional.of(risk(ORG_ID)));
 
-        assertThatThrownBy(() -> service.correct(500L, 99, null, null))
+        assertThatThrownBy(() -> service.correct(500L, 99, null, null, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("likelihood must be 1..5");
     }

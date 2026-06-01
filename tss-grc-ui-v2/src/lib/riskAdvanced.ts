@@ -16,6 +16,7 @@ export interface RiskAssessment {
   impact: number;
   score?: number;
   assessmentNotesEn?: string;
+  assessmentNotesAr?: string;
   createdAt?: string;
 }
 
@@ -28,6 +29,7 @@ export interface RiskTreatment {
   riskId: number;
   treatmentType: RiskTreatmentType;
   descriptionEn: string;
+  descriptionAr?: string;
   ownerId?: number;
   dueDate?: string;
   status: RiskTreatmentStatus;
@@ -42,11 +44,11 @@ export function listAssessments(riskId: number) {
   return api.get<RiskAssessment[]>(`${BASE}/risks/${riskId}/assessments`);
 }
 
-export function recordAssessment(riskId: number, body: { likelihood: number; impact: number; assessmentNotesEn?: string; assessmentDate?: string }) {
+export function recordAssessment(riskId: number, body: { likelihood: number; impact: number; assessmentNotesEn?: string; assessmentNotesAr?: string; assessmentDate?: string }) {
   return api.post<RiskAssessment>(`${BASE}/risks/${riskId}/assessments`, body);
 }
 
-export function correctAssessment(id: number, body: { likelihood?: number; impact?: number; assessmentNotesEn?: string }) {
+export function correctAssessment(id: number, body: { likelihood?: number; impact?: number; assessmentNotesEn?: string; assessmentNotesAr?: string }) {
   return api.put<RiskAssessment>(`${BASE}/assessments/${id}`, body);
 }
 

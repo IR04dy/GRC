@@ -25,6 +25,9 @@ public class RiskTreatment extends BaseEntity {
     @Column(name = "description_en", columnDefinition = "NVARCHAR(MAX)", nullable = false)
     private String descriptionEn;
 
+    @Column(name = "description_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String descriptionAr;
+
     @Column(name = "owner_id")
     private Long ownerId;
 
