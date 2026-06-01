@@ -87,6 +87,29 @@ public class NotificationService {
         return delivered;
     }
 
+    /**
+     * Deliver a single notification to a specific user. No-op (returns false) if
+     * recipientId is null. Used by schedulers/services that target a known user
+     * (e.g. an evidence-request assignee), as opposed to {@link #broadcastToRole}.
+     */
+    @Transactional
+    public boolean notifyUser(Long organisationId, Long recipientId,
+                              String titleEn, String titleAr, String messageEn,
+                              String notificationType, String entityType, Long entityId) {
+        if (recipientId == null) return false;
+        Notification n = new Notification();
+        n.setOrganisationId(organisationId);
+        n.setRecipientId(recipientId);
+        n.setTitleEn(titleEn);
+        n.setTitleAr(titleAr);
+        n.setMessageEn(messageEn);
+        n.setNotificationType(notificationType);
+        n.setEntityType(entityType);
+        n.setEntityId(entityId);
+        notificationRepository.save(n);
+        return true;
+    }
+
     @Transactional
     public void markAsRead(Long id, Long userId) {
         Notification n = notificationRepository.findById(id)
