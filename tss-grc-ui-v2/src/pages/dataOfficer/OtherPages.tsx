@@ -43,6 +43,7 @@ export function ConsentPage() {
   const { rows, error, reload } = useList<ConsentResponse>(() => dataOfficerApi.listConsents());
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<ConsentResponse | null>(null);
   const [ref, setRef] = useState(''); const [subject, setSubject] = useState('');
   const [purpose, setPurpose] = useState('MARKETING'); const [channel, setChannel] = useState('WEB');
   const [legalBasis, setLegalBasis] = useState('CONSENT');
@@ -74,8 +75,14 @@ export function ConsentPage() {
     { header: ar ? 'الأساس' : 'Basis', cell: c => <span style={{ fontSize: 12 }}>{c.legalBasis ?? '—'}</span> },
     { header: ar ? 'الحالة' : 'Status', width: '120px',
       cell: c => <Badge tone={CONSENT_STATUS_TONE[c.status]}>{CONSENT_STATUS_LABEL[c.status][ar ? 'ar' : 'en']}</Badge> },
-    { header: '', width: '110px',
-      cell: c => c.status === 'GRANTED' ? <Button size="sm" variant="ghost" onClick={() => withdraw(c.id)}>{ar ? 'سحب' : 'Withdraw'}</Button> : null },
+    { header: '', width: '150px', align: 'end',
+      cell: c => (
+        <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+          <Button size="sm" variant="ghost" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+            onClick={() => setDocsTarget(c)} />
+          {c.status === 'GRANTED' && <Button size="sm" variant="ghost" onClick={() => withdraw(c.id)}>{ar ? 'سحب' : 'Withdraw'}</Button>}
+        </span>
+      ) },
   ];
   return (
     <Shell>
@@ -112,6 +119,8 @@ export function ConsentPage() {
       <Card>{rows.length === 0
         ? <EmptyState Icon={ShieldCheck} title={ar ? 'لا توجد موافقات' : 'No consents'} sub={ar ? 'سجّل أول موافقة' : 'Record the first consent'} />
         : <DataTable columns={cols} rows={rows} />}</Card>
+      <EntityDocsModal entityType="CONSENT" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        recordLabel={docsTarget?.reference} onClose={() => setDocsTarget(null)} />
     </Shell>
   );
 }
@@ -213,6 +222,7 @@ export function NoticePage() {
     } finally { setBusy(false); }
   }
 
+  const [docsTarget, setDocsTarget] = useState<NoticeResponse | null>(null);
   const cols: Column<NoticeResponse>[] = [
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '120px', cell: n => <span style={{ fontSize: 12 }}>{n.reference}</span> },
     { header: ar ? 'النسخة' : 'Version', width: '110px', cell: n => <span style={{ fontSize: 12 }}>{n.versionLabel}</span> },
@@ -222,6 +232,10 @@ export function NoticePage() {
       cell: n => <Badge tone={NOTICE_STATUS_TONE[n.status]}>{NOTICE_STATUS_LABEL[n.status][ar ? 'ar' : 'en']}</Badge> },
     { header: ar ? 'يتطلّب موافقة جديدة' : 'Re-consent', width: '110px',
       cell: n => n.requiresReConsent ? <Badge tone="warning">{ar ? 'نعم' : 'Yes'}</Badge> : null },
+    { header: '', width: '60px', align: 'end',
+      cell: n => <Button variant="ghost" size="sm" Icon={FolderOpen}
+        title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+        onClick={(e) => { e.stopPropagation(); setDocsTarget(n); }} /> },
   ];
   return (
     <Shell>
@@ -252,6 +266,8 @@ export function NoticePage() {
       <Card>{rows.length === 0
         ? <EmptyState Icon={BookOpen} title={ar ? 'لا توجد إشعارات' : 'No notices'} sub={ar ? 'سجّل أول إشعار' : 'Draft the first notice'} />
         : <DataTable columns={cols} rows={rows} />}</Card>
+      <EntityDocsModal entityType="PRIVACY_NOTICE" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        recordLabel={docsTarget?.reference} onClose={() => setDocsTarget(null)} />
     </Shell>
   );
 }
