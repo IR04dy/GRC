@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
@@ -514,6 +516,17 @@ export function ComplaintDetailPage() {
               ))}
             </div>
           )}
+        </Card>
+      </div>
+
+      {/* Documents & control mapping — complaint letter, resolution evidence, controls */}
+      <div style={{ marginTop: 16 }}>
+        <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="COMPLAINT" entityId={complaint.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="COMPLAINT" entityId={complaint.id} />
+          </div>
         </Card>
       </div>
 

@@ -7,6 +7,8 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
@@ -397,6 +399,17 @@ export function ExerciseScenarioDetailPage() {
           </div>
         )}
       </Card>
+
+      {/* Documents & control mapping — scenario script, exercise evidence, controls */}
+      <div style={{ marginTop: 16 }}>
+        <Card padded title={isAr ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="EXERCISE_SCENARIO" entityId={s.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="EXERCISE_SCENARIO" entityId={s.id} />
+          </div>
+        </Card>
+      </div>
     </Shell>
   );
 }

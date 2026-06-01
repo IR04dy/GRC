@@ -7,6 +7,8 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -249,6 +251,17 @@ export function CcmTestDetailPage() {
             />
         }
       </Card>
+
+      {/* Documents & control mapping — test procedure, sample evidence, monitored controls */}
+      <div style={{ marginTop: 16 }}>
+        <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="CCM_TEST" entityId={test.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="CCM_TEST" entityId={test.id} />
+          </div>
+        </Card>
+      </div>
     </Shell>
   );
 }

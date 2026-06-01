@@ -6,6 +6,8 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LoadableSection } from '../../components/ui/LoadableSection';
@@ -222,6 +224,17 @@ export function AarDetailPage() {
               <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
                 <EntityActivityTimeline entityType="CrisisAar" entityId={a.id} />
                 <EntityAutomationRuns   entityType="CrisisAar" entityId={a.id} />
+              </div>
+
+              {/* Documents & control mapping — AAR report, exercise evidence, controls */}
+              <div style={{ marginTop: 16 }}>
+                <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    <AttachmentsField entityType="CRISIS_AAR" entityId={a.id} />
+                    <div style={{ borderTop: '1px solid var(--border)' }} />
+                    <ControlMappingPicker entityType="CRISIS_AAR" entityId={a.id} />
+                  </div>
+                </Card>
               </div>
             </>
           );
