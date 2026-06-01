@@ -85,14 +85,14 @@ How the platform's forms/workflows compare to ServiceNow IRM, RSA Archer, Metric
 
 ## Per-form rollout plan (execution)
 
-Foundation status: **Attachments backend + `<AttachmentsField>` shipped & verified** (Phase 0a). Control-mapping backend + `<ControlMappingPicker>` = Phase 0b (next). Each form is improved **independently** by dropping `<AttachmentsField entityType=… entityId=…>` into its detail page (or the FormModal `attachments` field kind in edit mode), and later the control-mapping picker.
+Foundation status: **Attachments (Phase 0a) AND Control-mapping (Phase 0b) shipped & verified.** `<AttachmentsField>` + generic `platform.attachments`; `<ControlMappingPicker>` + generic `evidence.control_links` (optional/manual, cross-framework, replace-set). Both piloted on the Risk detail page. Each form is improved **independently** by dropping `<AttachmentsField entityType=… entityId=…>` into its detail page (or the FormModal `attachments` field kind in edit mode), and later the control-mapping picker.
 
 Each row: the `entityType` string to use + which improvement(s) apply. Attachments roll out first (foundation ready); control-mapping after Phase 0b.
 
 **Batch 1 — HIGH, has a detail page (attachments now):**
 | Form / detail page | entityType | Attach | Map |
 |---|---|---|---|
-| Risk detail (`risk/RiskDetailPage`) | `RISK` | ✅ done | ✅ later |
+| Risk detail (`risk/RiskDetailPage`) | `RISK` | ✅ done | ✅ done |
 | Policy (`policy/PolicyManagementPage` / `compliance` policy) | `POLICY` | ☐ | ✅ |
 | Incident (`incidents/IncidentsPage`) | `INCIDENT` | ☐ | ✅ |
 | Privacy breach (`dataOfficer/BreachPage`, `privacy`) | `BREACH` | ☐ | ✅ |

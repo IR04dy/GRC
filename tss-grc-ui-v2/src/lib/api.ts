@@ -1921,6 +1921,19 @@ export interface AttachmentDto {
   downloadUrl: string;
 }
 
+// ─── Generic control mapping — any entity ↔ many sub-controls (cross-framework) ──
+export interface ControlLinkDto {
+  subControlId: number;
+  subControlCode?: string; subControlNameEn?: string; subControlNameAr?: string;
+  controlCode?: string; frameworkCode?: string;
+}
+export const controlLinksApi = {
+  get: (entityType: string, entityId: number) =>
+    api.get<ControlLinkDto[]>(`/api/v1/control-links/${entityType}/${entityId}`),
+  set: (entityType: string, entityId: number, subControlIds: number[]) =>
+    api.put<ControlLinkDto[]>(`/api/v1/control-links/${entityType}/${entityId}`, { subControlIds }),
+};
+
 export const attachmentsApi = {
   list: (entityType: string, entityId: number) =>
     api.get<AttachmentDto[]>(`/api/v1/attachments/${entityType}/${entityId}`),
