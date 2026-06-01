@@ -8,6 +8,7 @@ import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
@@ -202,6 +203,11 @@ export function VendorBcpCampaignDetailPage() {
       <div style={{ marginBottom: 16 }}>
         <Card>
           <AttachmentsField entityType="VENDOR_BCP_CAMPAIGN" entityId={Number(id)} />
+        </Card>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <Card>
+          <ControlMappingPicker entityType="VENDOR_BCP_CAMPAIGN" entityId={Number(id)} />
         </Card>
       </div>
 

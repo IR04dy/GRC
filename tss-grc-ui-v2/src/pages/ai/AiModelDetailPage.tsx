@@ -8,6 +8,7 @@ import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -152,6 +153,11 @@ export function AiModelDetailPage() {
       <div style={{ marginTop: 12 }}>
         <Card>
           <AttachmentsField entityType="AI_MODEL" entityId={model.id} />
+        </Card>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <Card>
+          <ControlMappingPicker entityType="AI_MODEL" entityId={model.id} />
         </Card>
       </div>
 
