@@ -47,6 +47,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const fileRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<AttachmentDto[]>([]);
   const [docType, setDocType] = useState<AttachmentDocType>('PLAN');
+  const [validTo, setValidTo] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [confirmDel, setConfirmDel] = useState<AttachmentDto | null>(null);
@@ -66,8 +67,9 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     if (!file) return;
     setBusy(true);
     try {
-      await attachmentsApi.upload(entityType, entityId, file, { docType });
+      await attachmentsApi.upload(entityType, entityId, file, { docType, validTo: validTo || undefined });
       toast.success(ar ? 'تم إرفاق الملف' : 'File attached');
+      setValidTo('');
       load();
     } catch (err) {
       toast.danger(err instanceof ApiError ? err.message : (ar ? 'تعذّر رفع الملف' : 'Upload failed'));
@@ -101,6 +103,15 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
               <option key={t} value={t}>{ar ? DOC_TYPE_LABELS[t].ar : DOC_TYPE_LABELS[t].en}</option>
             ))}
           </select>
+          <input
+            type="date"
+            value={validTo}
+            min={today}
+            onChange={e => setValidTo(e.currentTarget.value)}
+            title={ar ? 'صالح حتى (اختياري — للشهادات والعقود)' : 'Valid until (optional — for certs/contracts)'}
+            aria-label={ar ? 'صالح حتى' : 'Valid until'}
+            style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: validTo ? 'var(--ink-1)' : 'var(--ink-3)' }}
+          />
           <Button size="sm" variant="primary" Icon={Upload} disabled={busy}
             onClick={() => fileRef.current?.click()}>
             {busy ? (ar ? 'جارٍ الرفع…' : 'Uploading…') : (ar ? 'إرفاق ملف' : 'Attach file')}
