@@ -138,12 +138,18 @@ public class GrcExpertService {
         return out;
     }
 
-    /** Map a framework to one of the four SME families (else OTHER) from its code / issuer. */
+    /** Map a framework to one of the SME families (else OTHER) from its code / issuer.
+     *  ESG and ERM are checked before the NCA issuer-fallback so ERM/RISK catalogs
+     *  (whose issuer may mention NCA) classify as ERM, not NCA. */
     static String classifyFamily(String code, String issuer) {
         String c = code == null ? "" : code.toUpperCase();
         if (c.startsWith("PDPL")) return "PDPL";
         if (c.startsWith("NDMO") || c.startsWith("NDI")) return "NDI";
         if (c.startsWith("BCM")) return "BCM";
+        if (c.startsWith("ESG") || c.startsWith("GRI") || c.startsWith("TCFD")
+                || c.startsWith("ISSB") || c.startsWith("SUST")) return "ESG";
+        if (c.startsWith("ERM") || c.startsWith("RISK") || c.startsWith("COSO")
+                || c.startsWith("ISO31000")) return "ERM";
         if (c.startsWith("ECC") || c.startsWith("CCC") || c.startsWith("DCC")
                 || c.startsWith("CSCC") || c.startsWith("OTCC") || c.startsWith("TCC")
                 || (issuer != null && issuer.toUpperCase().contains("NCA"))) return "NCA";

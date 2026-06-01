@@ -5,7 +5,7 @@ import { api } from './api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ExpertFamily = 'NCA' | 'NDI' | 'PDPL' | 'BCM' | 'OTHER';
+export type ExpertFamily = 'NCA' | 'NDI' | 'PDPL' | 'BCM' | 'ERM' | 'ESG' | 'OTHER';
 /** EXPIRED = approved evidence exists but all of it is past valid_to (stale) — distinct from COVERED. */
 export type CoverageStatus = 'COVERED' | 'PARTIAL' | 'GAP' | 'EXPIRED';
 
@@ -87,6 +87,8 @@ export const FAMILY_LABELS: Record<ExpertFamily, { en: string; ar: string }> = {
   NDI:   { en: 'NDI',      ar: 'إدارة البيانات الوطنية' },
   PDPL:  { en: 'PDPL',     ar: 'نظام حماية البيانات' },
   BCM:   { en: 'BCM',      ar: 'استمرارية الأعمال' },
+  ERM:   { en: 'ERM',      ar: 'إدارة المخاطر المؤسسية' },
+  ESG:   { en: 'ESG',      ar: 'الاستدامة والحوكمة البيئية' },
   OTHER: { en: 'Other',    ar: 'أطر أخرى' },
 };
 
