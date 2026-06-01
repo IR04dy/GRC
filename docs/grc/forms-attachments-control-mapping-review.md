@@ -137,5 +137,9 @@ Template-management pages (committee form/template, crisis-comms template), work
 - ✅ **Per-file title** — staging panel lets each upload be named (was always the filename).
 - ✅ **`FormModal kind: 'attachments'`** — live in edit mode; create mode stages `File[]` and uploads them after `onSubmit` returns `{ entityId }` (backward-compatible).
 - ✅ **Evidence-request SLA indicators** — overdue / due-soon badges on the requests register.
+- ✅ **Drag-and-drop upload** — drop files onto AttachmentsField / FormModal create-mode field; dashed drop-zone + hint.
+- ✅ **Client-side file validation** — extension allow-list + 50 MB cap checked before upload (drag-drop bypasses the picker's `accept`).
+- ✅ **Multi-file queue** — pick/drop several files; each surfaces in the staging panel in turn ("+N queued" · "Upload & next").
+- ✅ **Chain-of-custody** — upload date shown on each attachment row.
 
 **Still pending (backend — needs a build env):** the automated reminder/escalation *scheduler* for evidence-request SLAs (the operator-facing visibility is done); evidence-approval segregation-of-duties (coded, parked on `feat/evidence-sod-approve`).
