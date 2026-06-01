@@ -318,6 +318,18 @@ export type MlHosting =
 export type MlComplianceStatus =
   | 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT' | 'NOT_ASSESSED';
 
+// Human oversight mode — SDAIA "Humanity" principle · EU AI Act Art.14.
+export type MlHumanOversight =
+  | 'HUMAN_IN_THE_LOOP' | 'HUMAN_ON_THE_LOOP' | 'HUMAN_IN_COMMAND' | 'NONE';
+
+// Data residency — PDPL Art.29 · SDAIA data classification.
+export type MlDataResidency = 'KSA' | 'GCC' | 'GLOBAL';
+
+// Cross-border transfer legal basis — PDPL Art.29.
+export type MlTransferBasis =
+  | 'NONE_KSA_RESIDENT' | 'SDAIA_ADEQUACY' | 'EXPLICIT_CONSENT'
+  | 'BCR_SCC' | 'VITAL_INTEREST' | 'NOT_ASSESSED';
+
 export type MlAuditType =
   | 'FAIRNESS' | 'BIAS' | 'EXPLAINABILITY' | 'ROBUSTNESS'
   | 'PRIVACY' | 'SECURITY' | 'PERFORMANCE';
@@ -365,6 +377,11 @@ export interface MlModelResponse {
   hosting?: MlHosting;
   inferenceLatencyMs?: number;
   trainingComputeHours?: number;
+  humanOversight?: MlHumanOversight;
+  humanOversightNotesEn?: string;
+  humanOversightNotesAr?: string;
+  dataResidency?: MlDataResidency;
+  crossBorderTransferBasis?: MlTransferBasis;
   hasPdplDpia: boolean;
   pdplDpiaId?: number;
   hasFairnessAudit: boolean;
@@ -405,6 +422,11 @@ export interface MlModelRequest {
   hosting?: MlHosting;
   inferenceLatencyMs?: number;
   trainingComputeHours?: number;
+  humanOversight?: MlHumanOversight;
+  humanOversightNotesEn?: string;
+  humanOversightNotesAr?: string;
+  dataResidency?: MlDataResidency;
+  crossBorderTransferBasis?: MlTransferBasis;
   hasPdplDpia?: boolean;
   pdplDpiaId?: number;
   hasFairnessAudit?: boolean;
@@ -638,6 +660,41 @@ export const ML_COMPLIANCE_TONE: Record<MlComplianceStatus, 'success' | 'accent'
   NOT_ASSESSED:  'neutral',
 };
 
+export const ML_OVERSIGHT_LABEL: Record<MlHumanOversight, { en: string; ar: string }> = {
+  HUMAN_IN_THE_LOOP: { en: 'Human in the loop', ar: 'الإنسان في الحلقة' },
+  HUMAN_ON_THE_LOOP: { en: 'Human on the loop', ar: 'الإنسان على الحلقة' },
+  HUMAN_IN_COMMAND:  { en: 'Human in command',  ar: 'الإنسان في القيادة' },
+  NONE:              { en: 'No human oversight', ar: 'بدون إشراف بشري' },
+};
+
+export const ML_OVERSIGHT_TONE: Record<MlHumanOversight, 'success' | 'accent' | 'warning' | 'danger'> = {
+  HUMAN_IN_THE_LOOP: 'success',
+  HUMAN_ON_THE_LOOP: 'accent',
+  HUMAN_IN_COMMAND:  'accent',
+  NONE:              'danger',
+};
+
+export const ML_RESIDENCY_LABEL: Record<MlDataResidency, { en: string; ar: string }> = {
+  KSA:    { en: 'KSA (in-Kingdom)', ar: 'داخل المملكة' },
+  GCC:    { en: 'GCC',              ar: 'دول الخليج' },
+  GLOBAL: { en: 'Global (cross-border)', ar: 'خارج المملكة' },
+};
+
+export const ML_RESIDENCY_TONE: Record<MlDataResidency, 'success' | 'warning' | 'danger'> = {
+  KSA:    'success',
+  GCC:    'warning',
+  GLOBAL: 'danger',
+};
+
+export const ML_TRANSFER_BASIS_LABEL: Record<MlTransferBasis, { en: string; ar: string }> = {
+  NONE_KSA_RESIDENT: { en: 'Not required (in-Kingdom)', ar: 'غير مطلوب (داخل المملكة)' },
+  SDAIA_ADEQUACY:    { en: 'Adequate-country (SDAIA)',  ar: 'دولة ذات حماية كافية (سدايا)' },
+  EXPLICIT_CONSENT:  { en: 'Explicit consent',          ar: 'موافقة صريحة' },
+  BCR_SCC:           { en: 'BCR / standard clauses',    ar: 'قواعد ملزمة/بنود تعاقدية معيارية' },
+  VITAL_INTEREST:    { en: 'Vital interest',            ar: 'مصلحة حيوية' },
+  NOT_ASSESSED:      { en: 'Not assessed',              ar: 'لم يُقيَّم' },
+};
+
 // ─── Aggregate KPIs across the live registry ───────────────────────────────
 
 export interface MlRegistryStats {
@@ -704,6 +761,13 @@ export function approvalGateMissing(m: MlModelResponse): string[] {
   if (!m.hasFairnessAudit) missing.push('has_fairness_audit');
   if (!m.hasPdplDpia) missing.push('has_pdpl_dpia');
   if (!m.hasExplainabilityDoc) missing.push('has_explainability_doc');
+  // SDAIA "Humanity" + EU AI Act Art.14 — a defined, non-NONE oversight mode.
+  if (!m.humanOversight || m.humanOversight === 'NONE') missing.push('human_oversight');
+  // PDPL Art.29 — cross-border residency needs a documented transfer basis.
+  if ((m.dataResidency === 'GCC' || m.dataResidency === 'GLOBAL')
+      && (!m.crossBorderTransferBasis || m.crossBorderTransferBasis === 'NOT_ASSESSED')) {
+    missing.push('cross_border_transfer_basis');
+  }
   return missing;
 }
 

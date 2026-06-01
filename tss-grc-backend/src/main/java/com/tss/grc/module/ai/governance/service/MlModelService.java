@@ -235,6 +235,9 @@ public class MlModelService {
                 .orElseThrow(() -> new EntityNotFoundException("MlModel not found: " + externalId));
     }
 
+    /** Residency values that require a PDPL Art.29 cross-border transfer basis. */
+    private static final Set<String> CROSS_BORDER_RESIDENCY = Set.of("GCC", "GLOBAL");
+
     private void assertApprovalGate(MlModel m) {
         List<String> missing = new java.util.ArrayList<>();
         if (m.getValidatorUserId() == null) missing.add("validator_user_id");
@@ -242,6 +245,20 @@ public class MlModelService {
         if (!Boolean.TRUE.equals(m.getHasFairnessAudit())) missing.add("has_fairness_audit");
         if (!Boolean.TRUE.equals(m.getHasPdplDpia())) missing.add("has_pdpl_dpia");
         if (!Boolean.TRUE.equals(m.getHasExplainabilityDoc())) missing.add("has_explainability_doc");
+        // SDAIA "Humanity" + EU AI Act Art.14 — a high-risk model must have a
+        // defined human-oversight mode (and not NONE) before production.
+        if (m.getHumanOversight() == null || m.getHumanOversight().isBlank()
+                || "NONE".equals(m.getHumanOversight())) {
+            missing.add("human_oversight");
+        }
+        // PDPL Art.29 — if training/inference data leaves the Kingdom, the
+        // transfer must rest on a documented legal basis.
+        if (CROSS_BORDER_RESIDENCY.contains(m.getDataResidency())
+                && (m.getCrossBorderTransferBasis() == null
+                    || m.getCrossBorderTransferBasis().isBlank()
+                    || "NOT_ASSESSED".equals(m.getCrossBorderTransferBasis()))) {
+            missing.add("cross_border_transfer_basis");
+        }
         if (!missing.isEmpty()) {
             throw new IllegalStateException(
                     "Cannot promote " + m.getModelCode() + " (risk tier " + m.getRiskTier()
@@ -276,6 +293,11 @@ public class MlModelService {
         if (r.hosting() != null) m.setHosting(r.hosting());
         if (r.inferenceLatencyMs() != null) m.setInferenceLatencyMs(r.inferenceLatencyMs());
         if (r.trainingComputeHours() != null) m.setTrainingComputeHours(r.trainingComputeHours());
+        if (r.humanOversight() != null) m.setHumanOversight(r.humanOversight());
+        if (r.humanOversightNotesEn() != null) m.setHumanOversightNotesEn(r.humanOversightNotesEn());
+        if (r.humanOversightNotesAr() != null) m.setHumanOversightNotesAr(r.humanOversightNotesAr());
+        if (r.dataResidency() != null) m.setDataResidency(r.dataResidency());
+        if (r.crossBorderTransferBasis() != null) m.setCrossBorderTransferBasis(r.crossBorderTransferBasis());
         if (r.hasPdplDpia() != null) m.setHasPdplDpia(r.hasPdplDpia());
         if (r.pdplDpiaId() != null) m.setPdplDpiaId(r.pdplDpiaId());
         if (r.hasFairnessAudit() != null) m.setHasFairnessAudit(r.hasFairnessAudit());
@@ -310,6 +332,8 @@ public class MlModelService {
         p.put("lifecycleStage",  safe(m.getLifecycleStage()));
         p.put("sdaiaCompliance", safe(m.getSdaiaAiEthicsCompliance()));
         p.put("samaCompliance",  safe(m.getSamaAiPrinciplesCompliance()));
+        p.put("humanOversight",  safe(m.getHumanOversight()));
+        p.put("dataResidency",   safe(m.getDataResidency()));
         p.put("isHighRiskEuAi",  m.getIsHighRiskEuAiAct() != null && m.getIsHighRiskEuAiAct());
         if (previousStage != null) p.put("previousStage", previousStage);
         return p;

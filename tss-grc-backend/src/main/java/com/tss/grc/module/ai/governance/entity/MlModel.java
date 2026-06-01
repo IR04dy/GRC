@@ -145,6 +145,36 @@ public class MlModel extends BaseEntity {
     @Column(name = "training_compute_hours", precision = 10, scale = 2)
     private BigDecimal trainingComputeHours;
 
+    // ─── Human oversight (SDAIA "Humanity" principle · EU AI Act Art.14) ─
+    //
+    // Structured, queryable oversight mode — not buried in free text. A
+    // HIGH+ tier model cannot be promoted to APPROVED_FOR_PROD with a
+    // null or NONE oversight mode (enforced in MlModelService).
+
+    /** HUMAN_IN_THE_LOOP / HUMAN_ON_THE_LOOP / HUMAN_IN_COMMAND / NONE. */
+    @Column(name = "human_oversight", length = 30)
+    private String humanOversight;
+
+    @Column(name = "human_oversight_notes_en", columnDefinition = "NVARCHAR(MAX)")
+    private String humanOversightNotesEn;
+
+    @Column(name = "human_oversight_notes_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String humanOversightNotesAr;
+
+    // ─── Data residency & cross-border transfer (PDPL Art.29 · SDAIA) ────
+    //
+    // Explicit residency + transfer legal basis, rather than inferring
+    // from `hosting`. For HIGH+ models with GCC/GLOBAL residency the
+    // transfer basis must be set (and not NOT_ASSESSED) before production.
+
+    /** KSA / GCC / GLOBAL. */
+    @Column(name = "data_residency", length = 20)
+    private String dataResidency;
+
+    /** NONE_KSA_RESIDENT / SDAIA_ADEQUACY / EXPLICIT_CONSENT / BCR_SCC / VITAL_INTEREST / NOT_ASSESSED. */
+    @Column(name = "cross_border_transfer_basis", length = 40)
+    private String crossBorderTransferBasis;
+
     // ─── Compliance flags (tri-track regulator surface) ─────────
 
     @Column(name = "has_pdpl_dpia", nullable = false)

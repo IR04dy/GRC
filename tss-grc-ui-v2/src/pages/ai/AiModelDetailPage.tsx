@@ -27,6 +27,7 @@ import {
   ML_AUDIT_TYPE_LABEL, ML_AUDIT_STATUS_LABEL, ML_AUDIT_STATUS_TONE,
   ML_DRIFT_TYPE_LABEL, ML_DRIFT_SEVERITY_LABEL, ML_DRIFT_SEVERITY_TONE,
   ML_COMPLIANCE_LABEL, ML_COMPLIANCE_TONE,
+  ML_OVERSIGHT_LABEL, ML_RESIDENCY_LABEL, ML_TRANSFER_BASIS_LABEL,
   type MlModelResponse, type MlLifecycleStage,
   type MlModelAuditResponse, type MlAuditType, type MlAuditStatus,
   type DriftObservationResponse,
@@ -296,6 +297,14 @@ function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) 
         <Field label={lang === 'ar' ? 'إطار العمل' : 'Framework'} value={model.framework ?? '—'} />
         <Field label={lang === 'ar' ? 'الاستضافة' : 'Hosting'} value={model.hosting ?? '—'} />
         <Field label={lang === 'ar' ? 'زمن الاستدلال (مللي ثانية)' : 'Inference latency (ms)'} value={model.inferenceLatencyMs?.toString() ?? '—'} />
+        <Field
+          label={lang === 'ar' ? 'الإشراف البشري' : 'Human oversight'}
+          value={model.humanOversight ? ML_OVERSIGHT_LABEL[model.humanOversight][lang === 'ar' ? 'ar' : 'en'] : '—'} />
+        {(lang === 'ar' ? model.humanOversightNotesAr : model.humanOversightNotesEn) && (
+          <p className="aimd-muted" style={{ marginTop: 4, fontSize: 12 }}>
+            {lang === 'ar' ? model.humanOversightNotesAr : model.humanOversightNotesEn}
+          </p>
+        )}
       </div>
       <div>
         <h3 className="aimd-h3">
@@ -406,6 +415,12 @@ function ComplianceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | '
                value={model.hasExplainabilityDoc ? '✓' : '—'} />
         <Field label={lang === 'ar' ? 'عالي الخطورة EU AI Act' : 'EU AI Act high-risk'}
                value={model.isHighRiskEuAiAct ? '✓ (Annex III)' : '—'} />
+        <Field label={lang === 'ar' ? 'الإشراف البشري' : 'Human oversight'}
+               value={model.humanOversight ? ML_OVERSIGHT_LABEL[model.humanOversight][lang === 'ar' ? 'ar' : 'en'] : '—'} />
+        <Field label={lang === 'ar' ? 'موطن البيانات' : 'Data residency'}
+               value={model.dataResidency ? ML_RESIDENCY_LABEL[model.dataResidency][lang === 'ar' ? 'ar' : 'en'] : '—'} />
+        <Field label={lang === 'ar' ? 'أساس النقل عبر الحدود (PDPL م.29)' : 'Cross-border basis (PDPL Art.29)'}
+               value={model.crossBorderTransferBasis ? ML_TRANSFER_BASIS_LABEL[model.crossBorderTransferBasis][lang === 'ar' ? 'ar' : 'en'] : '—'} />
       </div>
     </div>
   );
