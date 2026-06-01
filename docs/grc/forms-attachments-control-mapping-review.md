@@ -58,3 +58,25 @@
 - **Phase 2/3 (MED/LOW):** remaining ~25 forms.
 
 The full rollout (Phases 1–3) spans ~30+ forms and is multi-session / workflow-scale.
+
+---
+
+## Benchmark vs GRC market leaders
+
+How the platform's forms/workflows compare to ServiceNow IRM, RSA Archer, MetricStream, OneTrust, AuditBoard, LogicGate, Hyperproof, Vanta/Drata, IBM OpenPages, Diligent.
+
+| Capability (table-stakes for leaders) | Leaders | This platform today | Action |
+|---|---|---|---|
+| **Inline file attachments + preview/versioning** on records | All (AuditBoard, OneTrust, ServiceNow, Hyperproof) | Only evidence items (real); rest mock/none | **Build generic Attachments** (Phase 0) — the #1 alignment gap |
+| **Many-to-many control ↔ framework crosswalk** (one control/evidence → SOC2 + ISO + GDPR…) | Vanta, Drata, Hyperproof, AuditBoard, OneTrust | Single `subControlId`; read-only crosswalk page | **Build generic Control-Mapping** (Phase 0) — the #2 alignment gap |
+| **Evidence requests with owner + due date + reminders/SLA** | AuditBoard, Hyperproof, ServiceNow | ✅ just added (assignee/department/due, requester recorded) | Add reminder/SLA escalation (small follow-up) |
+| **Evidence freshness / expiry / re-collection** | Vanta, Drata, Hyperproof | ✅ EXPIRED state + nightly expiry + freshness-aware coverage | Extend expiry to generic attachments (`valid_to` + recollect) |
+| **Automated evidence collection (integrations)** | Vanta, Drata (Hypersyncs), ServiceNow | Connector library = MVP/stub | Wire 1–2 real connectors later |
+| **Assessment templates / questionnaires (DPIA, vendor)** | OneTrust, AuditBoard | Partial (DPIA, processor assessments exist) | Add reusable questionnaire builder (later) |
+| **Bulk actions · saved views · filters** | All | ✅ saved views + filter modals | OK |
+| **Approval workflow / e-signature** | ServiceNow, Diligent | Workflow engine + signatures (mock) | Make signatures real (later) |
+| **Audit trail / chain of custody** | All | ✅ audit log + evidence chain + SHA-256 | OK |
+| **Risk quantification (inherent/residual, heatmap)** | LogicGate, ServiceNow | ✅ residual-banded + heatmap | OK |
+| **Reporting / dashboards / board packs** | Diligent, ServiceNow | ✅ reporting + board pack + exports | OK |
+
+**Conclusion:** the platform already matches the leaders on workflow, freshness, audit trail, risk quant, and reporting. The **two specific places it lags are exactly the two you identified** — inline typed attachments and many-to-many cross-framework control mapping. The Phase-0 foundation closes both and brings the forms to leader parity. Leader-inspired add-ons (attachment expiry/recollection, reminder SLAs on requests, real connectors, questionnaire builder, real e-signature) are smaller follow-ups layered on top.
