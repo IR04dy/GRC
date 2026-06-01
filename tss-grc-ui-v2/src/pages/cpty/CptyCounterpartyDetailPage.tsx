@@ -4,6 +4,7 @@ import { Users, Banknote, AlertTriangle, Plus, Activity } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/ui/DataTable';
@@ -315,6 +316,12 @@ export function CptyCounterpartyDetailPage() {
           {error}
         </div>
       )}
+
+      <div style={{ marginBottom: 16 }}>
+        <Card>
+          <AttachmentsField entityType="COUNTERPARTY" entityId={cpty.id} />
+        </Card>
+      </div>
 
       <div style={{
         display: 'grid',

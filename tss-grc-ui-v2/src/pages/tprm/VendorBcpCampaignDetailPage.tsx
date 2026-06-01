@@ -7,6 +7,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
@@ -196,6 +197,12 @@ export function VendorBcpCampaignDetailPage() {
           value={String(stats?.overdue ?? 0)}
           tone={(stats?.overdue ?? 0) > 0 ? 'danger' : 'neutral'}
         />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <Card>
+          <AttachmentsField entityType="VENDOR_BCP_CAMPAIGN" entityId={Number(id)} />
+        </Card>
       </div>
 
       <Card title={isAr ? 'سجلات الموردين' : 'Vendor responses'} Icon={ClipboardCheck}>
