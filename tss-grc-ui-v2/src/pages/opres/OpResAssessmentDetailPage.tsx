@@ -7,6 +7,8 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
@@ -465,6 +467,17 @@ export function OpResAssessmentDetailPage() {
           </Card>
         </div>
       )}
+
+      {/* Documents & control mapping — assessment report, evidence, cross-framework controls */}
+      <div style={{ marginTop: 16 }}>
+        <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="OPRES_ASSESSMENT" entityId={assessment.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="OPRES_ASSESSMENT" entityId={assessment.id} />
+          </div>
+        </Card>
+      </div>
     </Shell>
   );
 }

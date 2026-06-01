@@ -10,6 +10,8 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -220,6 +222,11 @@ export function EngagementDetailPage() {
                       </div>
                     ))}
                   </div>}
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <AttachmentsField entityType="AUDIT_ENGAGEMENT" entityId={e.id} />
+                <div style={{ borderTop: '1px solid var(--border)' }} />
+                <ControlMappingPicker entityType="AUDIT_ENGAGEMENT" entityId={e.id} />
+              </div>
             </Card>
           )}
 
