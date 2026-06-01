@@ -13,9 +13,12 @@
 **/.vite/
 *.tsbuildinfo
 
-# Evidence-item binary uploads — runtime storage backend (STORAGE_BASE_PATH,
-# default ./uploads). Created on startup; never committed.
+# Evidence-item & attachment binary uploads — runtime storage backend
+# (STORAGE_BASE_PATH, default ./uploads). Created on startup; never committed.
+# Match both the repo-root default and the backend module's working dir.
 /uploads/
+uploads/
+tss-grc-backend/uploads/
 
 # ─── Local dev tooling ─────────────────────────────────────────────────
 # .tools/ is committed (it holds intentional dev scripts), but the runtime
