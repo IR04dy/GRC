@@ -8,6 +8,8 @@ import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { useI18n } from '../../lib/i18n';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
@@ -25,7 +27,7 @@ import {
   type LifecycleStage,
 } from '../../lib/subprocessors';
 
-type Tab = 'overview' | 'safeguard' | 'dpa' | 'events' | 'activity';
+type Tab = 'overview' | 'safeguard' | 'dpa' | 'events' | 'activity' | 'docs';
 
 /**
  * Sub-processor detail — Sprint 11.
@@ -243,6 +245,9 @@ export function SubprocessorDetailPage() {
           <TabButton active={tab === 'activity'}  onClick={() => setTab('activity')}>
             {lang === 'ar' ? 'النشاط' : 'Activity'}
           </TabButton>
+          <TabButton active={tab === 'docs'}      onClick={() => setTab('docs')}>
+            {lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'}
+          </TabButton>
         </div>
 
         {tab === 'overview' && (
@@ -309,6 +314,14 @@ export function SubprocessorDetailPage() {
             <Field icon={Activity} label={lang === 'ar' ? 'معرّف المسؤول' : 'DPO user id'} value={row.dpoApprovedByUserId?.toString()} />
             <Field icon={Activity} label={lang === 'ar' ? 'تاريخ الإنشاء' : 'Created'}    value={row.createdAt?.substring(0, 10)} />
           </Grid>
+        )}
+
+        {tab === 'docs' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="SUBPROCESSOR" entityId={row.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="SUBPROCESSOR" entityId={row.id} />
+          </div>
         )}
       </Card>
     </Shell>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Bug, ChevronRight, ChevronDown, AlertTriangle, CheckCircle2, Lock, Plus,
+  Bug, ChevronRight, ChevronDown, AlertTriangle, CheckCircle2, Lock, Plus, FolderOpen,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -12,6 +12,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -32,6 +33,7 @@ export function ThirdPartyCyberPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<ThirdPartyCyberAssessment | null>(null);
 
   useEffect(() => { void reload(); }, []);
   async function reload() {
@@ -164,6 +166,7 @@ export function ThirdPartyCyberPage() {
                           </td>
                           <td><Badge tone={TPC_STATUS_TONE[r.status]}>{r.status.replace('_',' ')}</Badge></td>
                           <td style={{textAlign:'right'}}>
+                            <Button size="sm" variant="ghost" Icon={FolderOpen} title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'} onClick={() => setDocsTarget(r)} />{' '}
                             {r.status === 'DRAFT' && <Button size="sm" variant="primary" disabled={busyId === r.id} onClick={() => onSubmit(r.id)}>{t('tpcSubmit')}</Button>}
                             {r.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCircle2} disabled={busyId === r.id} onClick={() => onApprove(r.id)}>{t('tpcApprove')}</Button>}
                             {r.status === 'APPROVED' && <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => onRetire(r.id)}>{t('tpcRetire')}</Button>}
@@ -225,6 +228,14 @@ export function ThirdPartyCyberPage() {
         initial={{ inherentCyberRisk: 'MEDIUM' }}
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
+      />
+
+      <EntityDocsModal
+        entityType="THIRD_PARTY_CYBER_ASSESSMENT"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.assessmentCode ?? undefined}
+        onClose={() => setDocsTarget(null)}
       />
     </Shell>
   );
