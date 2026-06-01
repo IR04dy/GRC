@@ -260,7 +260,9 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                   <span style={{ fontWeight: 600 }}>{a.titleEn || a.fileName}</span>
                   {a.titleEn && <span style={{ color: 'var(--ink-3)' }}> · {a.fileName}</span>}
                 </div>
-                <span style={{ color: 'var(--ink-3)' }} className="mono">{fmtBytes(a.fileSize)}</span>
+                <span style={{ color: 'var(--ink-3)' }} className="mono">
+                  {fmtBytes(a.fileSize)}{a.createdAt ? ` · ${a.createdAt.slice(0, 10)}` : ''}
+                </span>
                 {a.validTo
                   ? <Badge tone={expired ? 'danger' : 'neutral'}>{ar ? 'حتى ' : 'until '}{a.validTo}</Badge>
                   : <span />}
