@@ -2,6 +2,7 @@ package com.tss.grc.module.controlmap.controller;
 
 import com.tss.grc.module.controlmap.dto.ControlLinkResponse;
 import com.tss.grc.module.controlmap.dto.ControlLinkSetRequest;
+import com.tss.grc.module.controlmap.dto.EntityControlEvidenceResponse;
 import com.tss.grc.module.controlmap.service.ControlMapService;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +32,13 @@ public class ControlMapController {
     @Operation(summary = "List the sub-controls an entity maps to")
     public List<ControlLinkResponse> get(@PathVariable String entityType, @PathVariable Long entityId) {
         return service.getMappings(entityType, entityId);
+    }
+
+    @GetMapping("/{entityType}/{entityId}/evidence")
+    @Operation(summary = "The entity's mapped sub-controls with recommended evidence + live coverage")
+    public List<EntityControlEvidenceResponse> evidence(@PathVariable String entityType,
+                                                        @PathVariable Long entityId) {
+        return service.getEvidenceReadiness(entityType, entityId);
     }
 
     @PutMapping("/{entityType}/{entityId}")

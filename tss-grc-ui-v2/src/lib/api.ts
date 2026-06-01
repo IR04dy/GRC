@@ -1946,11 +1946,24 @@ export interface ControlLinkDto {
   controlCode?: string; frameworkCode?: string;
   satisfaction?: ControlSatisfaction;
 }
+export type EvidenceCoverage = 'COVERED' | 'PARTIAL' | 'GAP' | 'EXPIRED';
+export interface ControlEvidenceDto {
+  subControlId: number;
+  subControlCode?: string; subControlNameEn?: string; subControlNameAr?: string;
+  controlCode?: string; frameworkCode?: string;
+  satisfaction?: ControlSatisfaction;
+  evidenceGuidanceEn?: string; evidenceGuidanceAr?: string;
+  total: number; approved: number; pendingReview: number; draft: number; rejected: number;
+  expiringSoon: number; expired: number;
+  coverage: EvidenceCoverage;
+}
 export const controlLinksApi = {
   get: (entityType: string, entityId: number) =>
     api.get<ControlLinkDto[]>(`/api/v1/control-links/${entityType}/${entityId}`),
   set: (entityType: string, entityId: number, subControlIds: number[], satisfaction?: Record<number, ControlSatisfaction>) =>
     api.put<ControlLinkDto[]>(`/api/v1/control-links/${entityType}/${entityId}`, { subControlIds, satisfaction }),
+  evidence: (entityType: string, entityId: number) =>
+    api.get<ControlEvidenceDto[]>(`/api/v1/control-links/${entityType}/${entityId}/evidence`),
 };
 
 export const attachmentsApi = {

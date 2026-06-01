@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, ShieldAlert, Activity, FileSearch, ClipboardCheck,
-  BadgeAlert, Database, PowerOff, AlertTriangle, ListChecks,
+  BadgeAlert, Database, PowerOff, AlertTriangle, ListChecks, FileCheck2, Send,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,7 +17,8 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
-import { ApiError } from '../../lib/api';
+import { ApiError, controlLinksApi, type ControlEvidenceDto, type EvidenceCoverage } from '../../lib/api';
+import { raiseEvidenceRequest } from '../../lib/grcExpert';
 import {
   mlModelApi,
   approvalGateMissing, ML_NEXT_STAGES,
@@ -44,7 +45,7 @@ import '../../styles/pages/ai-model-detail.css';
  * disabled button + reason show the user *why* before they try and fail.
  */
 
-type Tab = 'overview' | 'provenance' | 'compliance' | 'audits' | 'drift' | 'activity';
+type Tab = 'overview' | 'provenance' | 'compliance' | 'evidence' | 'audits' | 'drift' | 'activity';
 
 export function AiModelDetailPage() {
   const { lang } = useI18n();
@@ -56,6 +57,7 @@ export function AiModelDetailPage() {
   const [model, setModel] = useState<MlModelResponse | null>(null);
   const [audits, setAudits] = useState<MlModelAuditResponse[]>([]);
   const [drift, setDrift] = useState<DriftObservationResponse[]>([]);
+  const [controlEv, setControlEv] = useState<ControlEvidenceDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
   const [showAuditModal, setShowAuditModal] = useState(false);
@@ -73,6 +75,7 @@ export function AiModelDetailPage() {
       setModel(m);
       setAudits(a);
       setDrift(d);
+      controlLinksApi.evidence('AI_MODEL', m.id).then(setControlEv).catch(() => setControlEv([]));
     } catch (err) {
       toast.danger(err instanceof ApiError ? err.message : 'Failed to load model');
     } finally {
@@ -201,6 +204,7 @@ export function AiModelDetailPage() {
           <TabButton id="overview"   label={lang === 'ar' ? 'نظرة عامة' : 'Overview'}        active={tab} setActive={setTab} Icon={ListChecks} />
           <TabButton id="provenance" label={lang === 'ar' ? 'المصدر' : 'Provenance'}         active={tab} setActive={setTab} Icon={Database} />
           <TabButton id="compliance" label={lang === 'ar' ? 'الامتثال' : 'Compliance'}        active={tab} setActive={setTab} Icon={ShieldAlert} />
+          <TabButton id="evidence"   label={lang === 'ar' ? 'جاهزية الأدلة' : 'Evidence'}     active={tab} setActive={setTab} Icon={FileCheck2} count={controlEv.length} />
           <TabButton id="audits"     label={lang === 'ar' ? 'التدقيقات' : 'Audits'}           active={tab} setActive={setTab} Icon={ClipboardCheck} count={audits.length} />
           <TabButton id="drift"      label={lang === 'ar' ? 'الانحراف' : 'Drift'}             active={tab} setActive={setTab} Icon={Activity} count={drift.length} />
           <TabButton id="activity"   label={lang === 'ar' ? 'سجل النشاط' : 'Activity'}        active={tab} setActive={setTab} Icon={FileSearch} />
@@ -209,6 +213,7 @@ export function AiModelDetailPage() {
         {tab === 'overview' && <OverviewTab model={model} lang={lang} gateMissing={gateMissing} onTransition={doTransition} />}
         {tab === 'provenance' && <ProvenanceTab model={model} lang={lang} />}
         {tab === 'compliance' && <ComplianceTab model={model} lang={lang} />}
+        {tab === 'evidence' && <EvidenceReadinessTab rows={controlEv} lang={lang} />}
         {tab === 'audits' && (
           <AuditsTab
             audits={audits} lang={lang}
@@ -438,6 +443,115 @@ function ComplianceCard({ title, status, lang }: { title: string; status: MlMode
         </Badge>
       </div>
     </Card>
+  );
+}
+
+// ─── Evidence readiness tab (GRC-Expert-style, scoped to this model) ─
+
+const COVERAGE_TONE: Record<EvidenceCoverage, 'success' | 'warning' | 'danger' | 'accent'> = {
+  COVERED: 'success', PARTIAL: 'warning', EXPIRED: 'accent', GAP: 'danger',
+};
+const COVERAGE_LABEL: Record<EvidenceCoverage, { en: string; ar: string }> = {
+  COVERED: { en: 'Covered', ar: 'مغطّى' },
+  PARTIAL: { en: 'Partial', ar: 'جزئي' },
+  EXPIRED: { en: 'Expired', ar: 'منتهٍ' },
+  GAP:     { en: 'Gap',     ar: 'فجوة' },
+};
+
+function EvidenceReadinessTab({ rows, lang }: { rows: ControlEvidenceDto[]; lang: 'en' | 'ar' }) {
+  const ar = lang === 'ar';
+  const [target, setTarget] = useState<ControlEvidenceDto | null>(null);
+  if (rows.length === 0) {
+    return <EmptyState Icon={FileCheck2}
+      title={ar ? 'لا توجد ضوابط مرتبطة' : 'No linked controls'}
+      sub={ar ? 'اربط الضوابط من رأس الصفحة لعرض الأدلة الموصى بها وحالة جمعها.'
+              : 'Map controls from the header to see recommended evidence and its collection status.'} />;
+  }
+  const counts = rows.reduce<Record<string, number>>((a, r) => { a[r.coverage] = (a[r.coverage] || 0) + 1; return a; }, {});
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        {(['GAP', 'PARTIAL', 'EXPIRED', 'COVERED'] as EvidenceCoverage[]).map(c => (
+          <Badge key={c} tone={COVERAGE_TONE[c]}>
+            {(ar ? COVERAGE_LABEL[c].ar : COVERAGE_LABEL[c].en)}: {counts[c] || 0}
+          </Badge>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rows.map(r => (
+          <div key={r.subControlId} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <Badge tone={COVERAGE_TONE[r.coverage]} dot>{ar ? COVERAGE_LABEL[r.coverage].ar : COVERAGE_LABEL[r.coverage].en}</Badge>
+                <strong className="mono" style={{ fontSize: 12 }}>{r.frameworkCode} · {r.subControlCode}</strong>
+                <span style={{ fontWeight: 600 }}>{ar ? (r.subControlNameAr || r.subControlNameEn) : (r.subControlNameEn || r.subControlNameAr)}</span>
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  {ar ? `${r.approved}/${r.total} معتمد` : `${r.approved}/${r.total} approved`}
+                  {r.expiringSoon > 0 && (ar ? ` · ${r.expiringSoon} ينتهي قريباً` : ` · ${r.expiringSoon} expiring`)}
+                </span>
+                <Button size="sm" variant="ghost" Icon={Send} onClick={() => setTarget(r)}>{ar ? 'طلب دليل' : 'Request'}</Button>
+              </span>
+            </div>
+            {(ar ? r.evidenceGuidanceAr : r.evidenceGuidanceEn) && (
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>
+                <FileCheck2 size={12} style={{ verticalAlign: '-2px', marginInlineEnd: 4 }} />
+                {ar ? (r.evidenceGuidanceAr || r.evidenceGuidanceEn) : (r.evidenceGuidanceEn || r.evidenceGuidanceAr)}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+      {target && <RaiseEvidenceModal row={target} lang={lang} onClose={() => setTarget(null)} />}
+    </div>
+  );
+}
+
+function RaiseEvidenceModal({ row, lang, onClose }: { row: ControlEvidenceDto; lang: 'en' | 'ar'; onClose: () => void }) {
+  const ar = lang === 'ar';
+  const toast = useToast();
+  const [title, setTitle] = useState(
+    (ar ? (row.subControlNameAr || row.subControlNameEn) : (row.subControlNameEn || row.subControlNameAr)) || row.subControlCode || '');
+  const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
+  const [due, setDue] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function submit() {
+    if (!title.trim()) { toast.danger(ar ? 'العنوان مطلوب' : 'Title is required'); return; }
+    setBusy(true);
+    try {
+      await raiseEvidenceRequest({ titleEn: title.trim(), subControlId: row.subControlId, priority, dueDate: due || undefined });
+      toast.success(ar ? 'تم إنشاء طلب الدليل' : 'Evidence request raised');
+      onClose();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (ar ? 'تعذّر إنشاء الطلب' : 'Failed to raise request'));
+    } finally { setBusy(false); }
+  }
+  return (
+    <Modal open onClose={onClose} title={ar ? 'طلب دليل' : 'Request evidence'}
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>{ar ? 'إلغاء' : 'Cancel'}</Button>
+        <Button variant="primary" Icon={Send} disabled={busy} onClick={() => { void submit(); }}>
+          {busy ? (ar ? 'جارٍ…' : 'Raising…') : (ar ? 'إرسال الطلب' : 'Raise request')}
+        </Button>
+      </>}>
+      <div className="aimd-form">
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }} className="mono">
+          {row.frameworkCode} · {row.subControlCode}
+        </div>
+        <Row><Label>{ar ? 'العنوان' : 'Title'}</Label>
+          <input className="aimd-input" value={title} onChange={e => setTitle(e.target.value)} /></Row>
+        <Row><Label>{ar ? 'الأولوية' : 'Priority'}</Label>
+          <Select value={priority} onChange={v => setPriority(v as 'LOW' | 'MEDIUM' | 'HIGH')}
+            options={[
+              { value: 'LOW', label: ar ? 'منخفضة' : 'Low' },
+              { value: 'MEDIUM', label: ar ? 'متوسطة' : 'Medium' },
+              { value: 'HIGH', label: ar ? 'عالية' : 'High' },
+            ]} /></Row>
+        <Row><Label>{ar ? 'تاريخ الاستحقاق' : 'Due date'}</Label>
+          <input type="date" className="aimd-input" value={due} onChange={e => setDue(e.target.value)} /></Row>
+      </div>
+    </Modal>
   );
 }
 
