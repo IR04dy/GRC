@@ -83,30 +83,53 @@ How the platform's forms/workflows compare to ServiceNow IRM, RSA Archer, Metric
 
 ---
 
-## Per-form rollout plan (execution)
+## Per-form rollout plan (execution) — ✅ COMPLETE
 
-Foundation status: **Attachments (Phase 0a) AND Control-mapping (Phase 0b) shipped & verified.** `<AttachmentsField>` + generic `platform.attachments`; `<ControlMappingPicker>` + generic `evidence.control_links` (optional/manual, cross-framework, replace-set). Both piloted on the Risk detail page. Each form is improved **independently** by dropping `<AttachmentsField entityType=… entityId=…>` into its detail page (or the FormModal `attachments` field kind in edit mode), and later the control-mapping picker.
+Foundation: **Attachments (Phase 0a) AND Control-mapping (Phase 0b) shipped & verified.** `<AttachmentsField>` + generic `platform.attachments`; `<ControlMappingPicker>` + generic `evidence.control_links` (optional/manual, cross-framework, replace-set). Surfaced three ways: (a) a docs tab on detail pages that use the shared `Tabs`; (b) a page-level "Documents & control mapping" card appended to bespoke detail pages; (c) a `FolderOpen` row-action opening the shared `<EntityDocsModal>` on register pages without a detail page.
 
-Each row: the `entityType` string to use + which improvement(s) apply. Attachments roll out first (foundation ready); control-mapping after Phase 0b.
+**Status: 51 surfaces wired — 30 detail pages + 21 registers — covering every meaningful GRC artifact across the platform.** `tsc --noEmit` clean throughout; each increment committed and pushed to `origin/master`.
 
-**Batch 1 — HIGH, has a detail page (attachments now):**
-| Form / detail page | entityType | Attach | Map |
+Where an entityType appears on both a register and a detail page (`BREACH`, `DPIA`, `CONSENT`, `DSR`), the **same** `entityType`+numeric `entityId` is reused so attachments stay in sync across both surfaces.
+
+### Detail pages (30)
+| Detail page | entityType | Attach | Map |
 |---|---|---|---|
-| Risk detail (`risk/RiskDetailPage`) | `RISK` | ✅ done | ✅ done |
-| Policy (`policy/PolicyManagementPage` / `compliance` policy) | `POLICY` | ☐ | ✅ |
-| Incident (`incidents/IncidentsPage`) | `INCIDENT` | ☐ | ✅ |
-| Privacy breach (`dataOfficer/BreachPage`, `privacy`) | `BREACH` | ☐ | ✅ |
-| Outsourcing arrangement (`outsourcing/OutsourcingDetailPage`) | `OUTSOURCING` | ✅ done | ✅ later |
-| Vendor / TPRM (`tprm`) | `VENDOR` | ☐ | ✅ |
-| BCP / DR plan (`bcm/BcpBuilder`, `dr-plans`) | `BCP` | ☐ | ✅ |
-| Processor assessment (`processor-assessments`) | `PROCESSOR_ASSESSMENT` | ☐ | ✅ |
-| Audit engagement (`compliance`, `audit-lifecycle`) | `AUDIT_ENGAGEMENT` | ☐ | ✅ |
-| AI model (`ai/AiModelDetailPage`) | `AI_MODEL` | ✅ done | ✅ later |
+| `risk/RiskDetailPage` | `RISK` | ✅ | ✅ |
+| `outsourcing/OutsourcingDetailPage` | `OUTSOURCING` | ✅ | ✅ |
+| `ai/AiModelDetailPage` | `AI_MODEL` | ✅ | ✅ |
+| `cpty/CptyCounterpartyDetailPage` | `COUNTERPARTY` | ✅ | ✅ |
+| `tprm/VendorBcpCampaignDetailPage` | `VENDOR_BCP_CAMPAIGN` | ✅ | ✅ |
+| `privacy/SubprocessorDetailPage` | `SUBPROCESSOR` | ✅ | ✅ |
+| `detail/PolicyDetailPage` | `POLICY` | ✅ | (rich Mappings tab) |
+| `detail/VendorDetailPage` | `TPRM_VENDOR` | ✅ | ✅ |
+| `detail/FindingDetailPage` | `AUDIT_FINDING` | ✅ | ✅ |
+| `detail/RopaDetailPage` | `ROPA` | ✅ | ✅ |
+| `detail/DpiaDetailPage` | `DPIA` | ✅ | ✅ |
+| `detail/PrivacyBreachDetailPage` | `BREACH` | ✅ | ✅ |
+| `detail/ConsentDetailPage` | `CONSENT` | ✅ | ✅ |
+| `detail/DsrDetailPage` | `DSR` | ✅ | ✅ |
+| `detail/ControlDetailPage` | `CONTROL` | ✅ | (sub-controls/links tabs) |
+| `audit/EngagementDetailPage` | `AUDIT_ENGAGEMENT` | ✅ | ✅ |
+| `opres/OpResAssessmentDetailPage` | `OPRES_ASSESSMENT` | ✅ | ✅ |
+| `regreporting/RegReportingFilingDetailPage` | `REG_FILING` | ✅ | ✅ |
+| `openbanking/ObTppDetailPage` | `OB_TPP` | ✅ | ✅ |
+| `rrp/RrpCycleDetailPage` | `RRP_CYCLE` | ✅ | ✅ |
+| `audit-ia/IaEngagementDetailPage` | `IA_ENGAGEMENT` | ✅ | ✅ |
+| `aml-sanctions/SanctionsCheckDetailPage` | `SANCTIONS_CHECK` | ✅ | ✅ |
+| `consumer/ComplaintDetailPage` | `COMPLAINT` | ✅ | ✅ |
+| `bcm/AarDetailPage` | `CRISIS_AAR` | ✅ | ✅ |
+| `bcm/ExerciseScenarioDetailPage` | `EXERCISE_SCENARIO` | ✅ | ✅ |
+| `ccm/CcmTestDetailPage` | `CCM_TEST` | ✅ | ✅ |
+| `cyber/AttackSurfaceAssetDetailPage` | `ASM_ASSET` | ✅ | ✅ |
+| `ethics/coi/CoiCampaignDetailPage` | `COI_CAMPAIGN` | ✅ | ✅ |
+| `fraud/FraudCaseDetailPage` | `FRAUD_CASE` | ✅ | ✅ |
+| `ethics/WhistleblowerCaseDetailPage` | `WHISTLEBLOWER_CASE` | ✅ | ✅ |
 
-**Batch 2 — HIGH/MED:** Cyber vuln/exception/evidence (`CYBER_*`), DPIA (`DPIA`), Cross-border transfer (`CBT`), RCA (`RCA`), CAPA (`CAPA`), Reg inspection (`REG_INSPECTION`), Crisis runbook (`CRISIS`), Resilience test (`RESILIENCE_TEST`), ESG disclosure (`ESG_DISCLOSURE`), Data sharing agreement (`DSA`).
+### Registers — `<EntityDocsModal>` row-action (21)
+`INCIDENT`, `BREACH`, `DSR`, `DATACLASS_ASSET`, `DATACLASS_FLOW`, `AI_VALIDATION`, `AI_RETRAINING`, `AI_RECERTIFICATION`, `DPIA`, `CONSENT`, `PRIVACY_NOTICE`, `RETENTION_RULE`, `NDR`, `DATA_CATALOG`, `DATA_QUALITY_RULE`, `AI_ETHICS_REVIEW`, `CHANGE_REQUEST`, `DATA_SHARING_AGREEMENT`, `PROCESSOR_ASSESSMENT`, `FOURTH_PARTY_EXPOSURE`, `THIRD_PARTY_CYBER_ASSESSMENT`.
 
-**Batch 3 — MED/LOW:** remaining registers (emerging risk, scenarios, contract clauses, committees, third-party-cyber, fourth-party, counterparties, etc.).
+### Intentionally not wired (low attachment value / not single-entity)
+Template-management pages (committee form/template, crisis-comms template), workflow/approval **process-instance** views (workflow submission, approval-chain instance), MTPD-inheritance (a cross-function matrix, not one record), and KRI detail (metric, string `externalId`). CAPA detail uses a **string** record id, incompatible with the numeric attachment `entityId` contract — its attachments live on the register/linked finding instead.
 
-**Control-mapping (Phase 0b) rollout order:** Risk, Policy, Incident, Evidence, Audit, CAPA, Vendor, BCP — the entities that most need cross-framework mapping — then the rest, all via the optional/manual `<ControlMappingPicker>`.
-
-Progress is tracked by the ✅/☐ marks above as each form is wired.
+### Follow-ups (leader-parity add-ons, not blocking)
+Extend attachment expiry/recollection (`valid_to`) to generic attachments; reminder/SLA escalation on evidence requests; the optional `FormModal` `kind: 'attachments'` for create/edit modals (deferred — detail-page surfacing covers the need).
