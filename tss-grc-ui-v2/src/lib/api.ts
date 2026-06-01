@@ -984,7 +984,7 @@ export interface DashboardStats {
   totalRisks: number; criticalRisks: number; highRisks: number; mediumRisks: number; lowRisks: number;
   openRisks: number; closedRisks: number; totalUsers: number; activeUsers: number;
   openCriticalRisks: number; openHighRisks: number; openIncidents: number;
-  complianceScore: number; pendingTasks: number;
+  complianceScore: number; pendingTasks: number; overdueItems?: number;
 }
 export interface TrendPoint { label: string; value: number }
 export const dashboardApi = {

@@ -16,5 +16,8 @@ public record DashboardStats(
     // Sprint-2 placeholders (0 until those modules are implemented)
     long openIncidents,
     long complianceScore,
-    long pendingTasks
+    long pendingTasks,
+    // Overdue audit findings (due_date past, not closed) — real, replaces the
+    // mock-data count the dashboard's "Overdue items" tile previously used.
+    long overdueItems
 ) {}

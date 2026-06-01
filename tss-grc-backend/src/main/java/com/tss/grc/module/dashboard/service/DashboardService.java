@@ -61,8 +61,18 @@ public class DashboardService {
         Double avgScore = assessmentRepository.avgScoreByOrg(organisationId);
         long complianceScore = avgScore != null ? Math.round(avgScore) : 0L;
 
+        // Overdue audit findings — past due_date and not in a closed state.
+        long overdueItems = ((Number) em.createNativeQuery(
+                "SELECT COUNT(*) FROM compliance.findings "
+                        + "WHERE organisation_id = :org AND is_deleted = 0 "
+                        + "AND due_date IS NOT NULL AND due_date < :today "
+                        + "AND status NOT IN ('CLOSED','RESOLVED','REMEDIATED','DONE','VERIFIED')")
+                .setParameter("org", organisationId)
+                .setParameter("today", LocalDate.now())
+                .getSingleResult()).longValue();
+
         return new DashboardStats(total, critical, high, medium, low, open, closed, totalUsers, activeUsers,
-                critical, high, openIncidents, complianceScore, 0L);
+                critical, high, openIncidents, complianceScore, 0L, overdueItems);
     }
 
     @Cacheable(value = "heatmapData", key = "#organisationId")

@@ -14,7 +14,6 @@ import { Progress } from '../../components/ui/Progress';
 import { dashboardApi, type DashboardStats, type TrendPoint } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { mlModelApi, aggregateMlRegistry, type MlModelResponse } from '../../lib/aiGovernance';
-import { COMPLIANCE_FINDINGS } from '../compliance/mockCompliance';
 
 /**
  * Executive Dashboard hero + KPI ribbon — the first impression of the
@@ -382,10 +381,8 @@ function ExecutiveKpiRow({ stats, riskTrend, incidentTrend }: {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
 
-  // Compute overdue items count — sum across the data sources we have.
-  const overdueFindings = COMPLIANCE_FINDINGS.filter(f =>
-    f.status !== 'CLOSED' && f.dueDate && new Date(f.dueDate) < new Date()
-  ).length;
+  // Overdue items — real overdue audit findings (backend) + pending tasks.
+  const overdueFindings = stats.overdueItems ?? 0;
   const totalOverdue = overdueFindings + (stats.pendingTasks ?? 0);
 
   const tiles: KpiTileProps[] = [
