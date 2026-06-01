@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, AlertOctagon, FileWarning, Activity,
   TrendingUp, TrendingDown, ArrowUpRight, Calendar, Clock,
-  Sparkles, Flame, Award,
+  Sparkles, Flame, Award, Bot,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -12,6 +12,8 @@ import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { TimeSeries, type TimeSeriesPoint } from '../../components/viz/TimeSeries';
 import { Progress } from '../../components/ui/Progress';
 import type { DashboardStats } from '../../lib/api';
+import { isAuthenticated } from '../../lib/auth';
+import { mlModelApi, aggregateMlRegistry, type MlModelResponse } from '../../lib/aiGovernance';
 import { COMPLIANCE_FINDINGS } from '../compliance/mockCompliance';
 
 /**
@@ -40,8 +42,76 @@ export function ExecutiveDashboard({ stats, heat }: {
       <ExecutiveKpiRow stats={stats} />
       <RiskHeatTrendRow heat={heat} stats={stats} />
       <FrameworkReadiness stats={stats} />
+      <AiGovernanceStrip />
       <AttentionStrip />
     </div>
+  );
+}
+
+// ─── 4b. AI Governance posture ──────────────────────────────────────────
+//
+// Live strip fed by the AI/ML registry: headline counts + the four
+// governance-gap chips (fairness / human oversight / cross-border PDPL
+// basis / signed-off AIA). Renders only when authenticated and the org
+// actually runs models — otherwise it stays out of the way.
+
+function AiGovernanceStrip() {
+  const { lang } = useI18n();
+  const isAr = lang === 'ar';
+  const [rows, setRows] = useState<MlModelResponse[]>([]);
+  const [missingAia, setMissingAia] = useState(0);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    let alive = true;
+    Promise.all([mlModelApi.list(), mlModelApi.highRiskWithoutAia().catch(() => [])])
+      .then(([list, noAia]) => {
+        if (!alive) return;
+        setRows(list);
+        setMissingAia(noAia.length);
+        setReady(true);
+      })
+      .catch(() => { if (alive) setReady(true); });
+    return () => { alive = false; };
+  }, []);
+
+  if (!ready || rows.length === 0) return null;
+  const s = aggregateMlRegistry(rows, 0, missingAia);
+
+  const stat = (label: string, value: number) => (
+    <Link to="/ai/models" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span style={{ font: '800 22px/1 var(--font-sans)', color: 'var(--ink-1)' }}>{value}</span>
+      <span className="text-2xs text-muted" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+    </Link>
+  );
+  const gap = (label: string, value: number) => (
+    <Badge tone={value > 0 ? 'danger' : 'success'} dot>{label}: {value}</Badge>
+  );
+
+  return (
+    <Card title={isAr ? 'حوكمة الذكاء الاصطناعي' : 'AI Governance'} Icon={Bot}
+      action={<Link to="/ai/models" style={{
+        font: '600 11px var(--font-sans)', color: 'var(--primary-700)',
+        textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 3,
+      }}>{isAr ? 'عرض السجل' : 'View registry'} <ArrowUpRight size={12} /></Link>}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+        gap: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)',
+      }}>
+        {stat(isAr ? 'إجمالي النماذج' : 'Total models', s.total)}
+        {stat(isAr ? 'في الإنتاج' : 'In production', s.inProduction)}
+        {stat(isAr ? 'حرج/مرتفع' : 'Critical / High', s.highOrCritical)}
+        {stat(isAr ? 'EU عالي الخطورة' : 'EU high-risk', s.euAiActHighRisk)}
+        {stat(isAr ? 'مُمتثل لسدايا' : 'SDAIA compliant', s.sdaiaCompliant)}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+        {gap(isAr ? 'بدون تدقيق عدالة' : 'No fairness audit', s.missingFairnessAudit)}
+        {gap(isAr ? 'بدون إشراف بشري' : 'No human oversight', s.missingHumanOversight)}
+        {gap(isAr ? 'نقل عابر بلا أساس' : 'Cross-border, no basis', s.crossBorderNoBasis)}
+        {gap(isAr ? 'بدون تقييم أثر معتمد' : 'No signed-off AIA', s.missingSignedOffAia)}
+      </div>
+    </Card>
   );
 }
 
