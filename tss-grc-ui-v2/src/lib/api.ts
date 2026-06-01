@@ -1901,6 +1901,41 @@ export const departmentsApi = {
   list: () => api.get<DepartmentDto[]>('/api/v1/departments'),
 };
 
+// ─── Generic typed attachments — any entity can own files of a doc_type ──────
+export type AttachmentDocType =
+  'PLAN' | 'REPORT' | 'POLICY' | 'CERTIFICATE' | 'EVIDENCE'
+  | 'CONTRACT' | 'MINUTES' | 'QUESTIONNAIRE' | 'SCREENSHOT' | 'OTHER';
+
+export const ATTACHMENT_DOC_TYPES: AttachmentDocType[] = [
+  'PLAN', 'REPORT', 'POLICY', 'CERTIFICATE', 'EVIDENCE',
+  'CONTRACT', 'MINUTES', 'QUESTIONNAIRE', 'SCREENSHOT', 'OTHER',
+];
+
+export interface AttachmentDto {
+  id: number;
+  entityType: string; entityId: number;
+  docType: AttachmentDocType;
+  titleEn?: string;
+  fileName: string; fileSize?: number; mimeType?: string; sha256?: string;
+  validTo?: string; uploadedById?: number; createdAt?: string;
+  downloadUrl: string;
+}
+
+export const attachmentsApi = {
+  list: (entityType: string, entityId: number) =>
+    api.get<AttachmentDto[]>(`/api/v1/attachments/${entityType}/${entityId}`),
+  upload: (entityType: string, entityId: number, file: File,
+           opts?: { docType?: AttachmentDocType; title?: string; validTo?: string }) => {
+    const q = new URLSearchParams();
+    q.set('docType', opts?.docType ?? 'OTHER');
+    if (opts?.title) q.set('title', opts.title);
+    if (opts?.validTo) q.set('validTo', opts.validTo);
+    return uploadFile<AttachmentDto>(`/api/v1/attachments/${entityType}/${entityId}?${q.toString()}`, file);
+  },
+  download: (a: AttachmentDto) => downloadFile(`/api/v1/attachments/${a.id}/download`, a.fileName),
+  remove: (id: number) => api.delete<void>(`/api/v1/attachments/${id}`),
+};
+
 // ─── PDPL DPIA (assessment §5.4 critical #3) ────────────────────────────────
 export interface DpiaDto {
   id: number; titleEn: string; titleAr?: string;

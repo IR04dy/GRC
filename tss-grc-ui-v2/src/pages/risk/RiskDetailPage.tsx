@@ -8,6 +8,7 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
@@ -282,6 +283,9 @@ export function RiskDetailPage() {
             anchors={RISK_ANCHORS_BY_ID[risk.id] ?? []}
             subtitle="Authorities this risk threatens." />
           <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
+          <Card>
+            <AttachmentsField entityType="RISK" entityId={risk.id} />
+          </Card>
           <Card title={t('detailQuickActions')} Icon={Edit}>
             <Link to={`/risk?focus=${risk.id}`} className="risk-detail-quick-link">{t('detailEditInRegister')}</Link>
           </Card>
