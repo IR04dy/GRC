@@ -468,7 +468,7 @@ export function RiskRegisterPage() {
       )}
 
       {tab === 'heatmap' && (
-        <Card title={t('riskTabHeatMap')} action={<Badge tone="primary">5 × 5</Badge>}>
+        <Card title={t('riskTabHeatMap')} action={<><Badge tone="info">{t('riskHeatMapResidual')}</Badge> <Badge tone="primary">5 × 5</Badge></>}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>{t('riskHeatMapHint')}</div>
           <HeatMap
             data={heatData}
