@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import {
-  ClipboardCheck, ChevronRight, ChevronDown, CheckCircle2, XCircle, AlertTriangle, Shield, Plus,
+  ClipboardCheck, ChevronRight, ChevronDown, CheckCircle2, XCircle, AlertTriangle, Shield, Plus, FolderOpen,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -31,6 +32,7 @@ export function ProcessorAssessmentsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<ProcessorAssessment | null>(null);
 
   useEffect(() => { void reload(); }, []);
   async function reload() {
@@ -158,6 +160,7 @@ export function ProcessorAssessmentsPage() {
                           <td style={{textAlign:'right'}} className="mono">{r.riskScore ?? '—'}</td>
                           <td><Badge tone={PROC_STATUS_TONE[r.status]}>{r.status.replace('_',' ')}</Badge></td>
                           <td style={{textAlign:'right'}}>
+                            <Button size="sm" variant="ghost" Icon={FolderOpen} title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'} onClick={() => setDocsTarget(r)} />{' '}
                             {r.status === 'COMPLETED' && (
                               <>
                                 <Button size="sm" variant="primary" Icon={CheckCircle2} disabled={busyId === r.id} onClick={() => onApprove(r.id)}>{t('procApprove')}</Button>{' '}
@@ -216,6 +219,14 @@ export function ProcessorAssessmentsPage() {
         initial={{ assessmentType: 'ONBOARDING' }}
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
+      />
+
+      <EntityDocsModal
+        entityType="PROCESSOR_ASSESSMENT"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.assessmentCode ?? undefined}
+        onClose={() => setDocsTarget(null)}
       />
     </Shell>
   );

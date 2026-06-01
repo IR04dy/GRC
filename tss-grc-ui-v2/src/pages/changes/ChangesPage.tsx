@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   GitBranch, Filter, Plus, BarChart3, ListChecks, KanbanSquare, Activity,
   CheckCheck, X as XIcon, ArrowRight, AlertTriangle, ShieldCheck, Clock, Send,
-  Wrench, Stamp, ChevronRight, MessageSquare, Link2, RefreshCw, Trash2,
+  Wrench, Stamp, ChevronRight, MessageSquare, Link2, RefreshCw, Trash2, FolderOpen,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,6 +17,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Progress } from '../../components/ui/Progress';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import {
@@ -107,6 +108,7 @@ export function ChangesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ChangeRequestDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<ChangeRequestDto | null>(null);
+  const [docsTarget, setDocsTarget] = useState<ChangeRequestDto | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -202,6 +204,7 @@ export function ChangesPage() {
       cell: c => <RowActions onEdit={() => { setEditing(c); setModalOpen(true); }}
                               onDelete={() => setConfirmDel(c)}
                               extras={[
+                                { Icon: FolderOpen, onClick: () => setDocsTarget(c), title: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },
                                 { Icon: ChevronRight, onClick: () => { setDetailId(c.id); setTab('workflow'); }, title: t('changeActOpen'), tone: 'primary' },
                               ]} /> },
   ];
@@ -302,6 +305,14 @@ export function ChangesPage() {
         confirmLabel={t('deleteBtn')}
         onCancel={() => setConfirmDel(null)}
         onConfirm={executeDelete}
+      />
+
+      <EntityDocsModal
+        entityType="CHANGE_REQUEST"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.changeCode ?? undefined}
+        onClose={() => setDocsTarget(null)}
       />
     </Shell>
   );

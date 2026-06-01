@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import {
-  Network, ChevronRight, ChevronDown, AlertTriangle, CheckCircle2, Shield, Globe, Plus,
+  Network, ChevronRight, ChevronDown, AlertTriangle, CheckCircle2, Shield, Globe, Plus, FolderOpen,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
@@ -39,6 +40,7 @@ export function FourthPartyPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<FourthPartyExposure | null>(null);
 
   useEffect(() => { void reload(); }, []);
 
@@ -194,6 +196,7 @@ export function FourthPartyPage() {
                           <td><Badge tone={FP_CONC_TONE[r.concentrationRisk]}>{r.concentrationRisk}</Badge></td>
                           <td><Badge tone={FP_STATUS_TONE[r.status]}>{statusLabel(r.status, lang)}</Badge></td>
                           <td style={{ textAlign: 'right' }}>
+                            <Button size="sm" variant="ghost" Icon={FolderOpen} title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'} onClick={() => setDocsTarget(r)} />{' '}
                             {r.status === 'DISCOVERED' && (
                               <Button size="sm" variant="primary" disabled={busyId === r.id} onClick={() => onValidate(r.id)}>
                                 {t('f4pValidate')}
@@ -254,6 +257,14 @@ export function FourthPartyPage() {
         initial={{ dependencyType: 'INFRASTRUCTURE', downstreamCriticality: 'MEDIUM' }}
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
+      />
+
+      <EntityDocsModal
+        entityType="FOURTH_PARTY_EXPOSURE"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.fourthPartyName ?? undefined}
+        onClose={() => setDocsTarget(null)}
       />
     </Shell>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Share2, ChevronRight, ChevronDown, CheckCircle2, FileText, Globe, AlertOctagon, Plus,
+  Share2, ChevronRight, ChevronDown, CheckCircle2, FileText, Globe, AlertOctagon, Plus, FolderOpen,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -12,6 +12,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -31,6 +32,7 @@ export function DataSharingPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<DataSharingAgreement | null>(null);
 
   useEffect(() => { void reload(); }, []);
   async function reload() {
@@ -175,6 +177,7 @@ export function DataSharingPage() {
                           <td>{r.crossBorderMechanism !== 'NONE' ? <Badge tone="warning">{r.crossBorderMechanism}</Badge> : <span style={{color:'var(--muted-foreground)'}}>—</span>}</td>
                           <td><Badge tone={DSA_STATUS_TONE[r.status]}>{r.status.replace('_',' ')}</Badge></td>
                           <td style={{textAlign:'right'}}>
+                            <Button size="sm" variant="ghost" Icon={FolderOpen} title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'} onClick={() => setDocsTarget(r)} />{' '}
                             {r.status === 'DRAFT' && <Button size="sm" variant="primary" disabled={busyId === r.id} onClick={() => onSubmit(r.id)}>{t('dsaSubmit')}</Button>}
                             {r.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCircle2} disabled={busyId === r.id} onClick={() => onActivate(r.id)}>{t('dsaActivate')}</Button>}
                             {r.status === 'ACTIVE' && <>
@@ -232,6 +235,14 @@ export function DataSharingPage() {
         initial={{ recipientLegalRole: 'CONTROLLER', lawfulBasis: 'LEGAL_OBLIGATION', crossBorderMechanism: 'NONE' }}
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
+      />
+
+      <EntityDocsModal
+        entityType="DATA_SHARING_AGREEMENT"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.agreementCode ?? undefined}
+        onClose={() => setDocsTarget(null)}
       />
     </Shell>
   );
