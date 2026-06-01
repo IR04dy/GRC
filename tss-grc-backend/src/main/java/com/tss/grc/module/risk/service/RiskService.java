@@ -12,7 +12,9 @@ import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import com.tss.grc.platform.realtime.BroadcastHelper;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,6 +36,10 @@ public class RiskService {
     private final UserRepository userRepository;
     private final AuditLogService audit;
     private final ApplicationEventPublisher eventPublisher;
+
+    /** Re-reads DB-computed columns after save — null in unit tests, set at runtime. */
+    @PersistenceContext
+    private EntityManager entityManager;
 
     /** Optional — null in unit tests, autowired by Spring at runtime. */
     @Autowired(required = false)
@@ -68,6 +74,10 @@ public class RiskService {
         applyRequest(risk, req);
         risk.setIdentifiedDate(LocalDate.now());
         risk = riskRepository.save(risk);
+        // The DB computes inherent_score / residual_score / risk_level — refresh
+        // so the F8 RISK_CREATED payload and the response carry real values (not
+        // null), otherwise riskLevel=CRITICAL escalation rules never match on create.
+        refreshComputed(risk);
         audit.log("CREATE", "Risk", risk.getId(),
             "Risk " + riskCodeFor(risk.getId())
             + " raised · " + safe(risk.getTitleEn())
@@ -95,6 +105,7 @@ public class RiskService {
         Integer prevResidual = risk.getResidualScore();
         applyRequest(risk, req);
         risk = riskRepository.save(risk);
+        refreshComputed(risk);   // recompute inherent/residual score + risk_level after L×I change
         audit.log("UPDATE", "Risk", id,
             "Risk " + riskCodeFor(id)
             + " updated · residual " + safeNum(prevResidual) + " → " + safeNum(risk.getResidualScore()));
@@ -197,6 +208,16 @@ public class RiskService {
         for (String s : allowed) if (s.equals(r.getStatus())) return;
         throw new IllegalArgumentException(
             "Risk must be in " + java.util.Arrays.toString(allowed) + " (was " + r.getStatus() + ")");
+    }
+
+    /** Re-read the DB-computed columns (inherent_score / residual_score /
+     *  risk_level) into the entity after an insert or L×I update so the response
+     *  DTO and the F8 payload carry real values instead of null. No-op in unit
+     *  tests where no persistence context is wired. */
+    private void refreshComputed(Risk r) {
+        if (entityManager == null || r.getId() == null) return;
+        entityManager.flush();
+        entityManager.refresh(r);
     }
 
     private void applyRequest(Risk risk, RiskRequest req) {

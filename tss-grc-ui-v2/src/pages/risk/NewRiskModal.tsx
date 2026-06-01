@@ -10,6 +10,7 @@ import { riskApi, adminApi, ApiError, type RiskRequest, type RiskResponse, type 
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 import { cn } from '../../lib/cn';
+import { statusLabel } from '../../lib/statusLabels';
 
 interface Props {
   open: boolean;
@@ -29,13 +30,10 @@ const EMPTY: RiskRequest = {
   status: 'OPEN', reviewDate: '',
 };
 
-const STATUS_OPTIONS = [
-  { value: 'OPEN',         label: 'Open' },
-  { value: 'IN_PROGRESS',  label: 'In Progress' },
-  { value: 'MITIGATE',     label: 'Mitigate' },
-  { value: 'TREATED',      label: 'Treated' },
-  { value: 'CLOSED',       label: 'Closed' },
-];
+// Canonical backend risk lifecycle (matches risk.risks CK_risks_status and the
+// RiskService state machine OPEN→UNDER_REVIEW→MITIGATING→ACCEPTED/CLOSED). The
+// previous IN_PROGRESS/MITIGATE/TREATED values violated the DB CHECK constraint.
+const STATUS_VALUES = ['OPEN', 'UNDER_REVIEW', 'MITIGATING', 'ACCEPTED', 'CLOSED'] as const;
 
 function levelFromScore(s: number): { label: string; tone: 'success' | 'info' | 'warning' | 'danger' | 'neutral'; color: string } {
   if (s >= 16) return { label: 'CRITICAL', tone: 'danger', color: 'var(--risk-crit)' };
@@ -47,7 +45,8 @@ function levelFromScore(s: number): { label: string; tone: 'success' | 'info' | 
 }
 
 export function NewRiskModal({ open, existing, onClose, onSaved, demoMode }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const statusOptions = STATUS_VALUES.map(v => ({ value: v, label: statusLabel(v, lang) }));
   const toast = useToast();
 
   const [form, setForm] = useState<RiskRequest>(EMPTY);
@@ -178,7 +177,7 @@ export function NewRiskModal({ open, existing, onClose, onSaved, demoMode }: Pro
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Select id="status" label={t('fldStatus')} options={STATUS_OPTIONS}
+          <Select id="status" label={t('fldStatus')} options={statusOptions}
             value={form.status}
             onChange={e => update('status', e.currentTarget.value)} />
           <Input id="reviewDate" label={t('fldReviewDate')} type="date"

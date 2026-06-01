@@ -33,6 +33,10 @@ const STATUS_LABELS: Record<string, { en: string; ar: string }> = {
   RESOLVED:                 { en: 'Resolved',         ar: 'مُعالجة' },
   CLOSED:                   { en: 'Closed',           ar: 'مُغلقة' },
   CANCELLED:                { en: 'Cancelled',        ar: 'مُلغاة' },
+  // ── Risk lifecycle (backend OPEN→UNDER_REVIEW→MITIGATING→ACCEPTED/CLOSED) ──
+  MITIGATING:               { en: 'Mitigating',       ar: 'قيد التخفيف' },
+  ACCEPTED:                 { en: 'Accepted',         ar: 'مقبولة' },
+  TRANSFERRED:              { en: 'Transferred',      ar: 'مُحوَّلة' },
   // ── Approval / treatment / workflow review ──────────────────────
   DRAFT:                    { en: 'Draft',            ar: 'مسودة' },
   SUBMITTED:                { en: 'Submitted',        ar: 'مُرسلة' },
