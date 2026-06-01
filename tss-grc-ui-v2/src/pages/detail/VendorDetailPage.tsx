@@ -10,6 +10,7 @@ import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
+import { EvidenceReadinessPanel } from '../../components/ui/EvidenceReadinessPanel';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
@@ -163,6 +164,13 @@ export function VendorDetailPage() {
             <AttachmentsField entityType="TPRM_VENDOR" entityId={item.id} />
             <div style={{ borderTop: '1px solid var(--border)' }} />
             <ControlMappingPicker entityType="TPRM_VENDOR" entityId={item.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <FileCheck2 size={15} /> {lang === 'ar' ? 'جاهزية الأدلة' : 'Evidence readiness'}
+              </div>
+              <EvidenceReadinessPanel entityType="TPRM_VENDOR" entityId={item.id} />
+            </div>
           </div>
         </Card>
       )}
