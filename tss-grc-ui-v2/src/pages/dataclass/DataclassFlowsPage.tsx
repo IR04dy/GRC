@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, Share2 } from 'lucide-react';
+import { Plus, Share2, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -48,6 +49,7 @@ export function DataclassFlowsPage() {
 
   // transition
   const [moveTarget, setMoveTarget] = useState<FlowResponse | null>(null);
+  const [docsTarget, setDocsTarget] = useState<FlowResponse | null>(null);
   const [toStatus, setToStatus] = useState<FlowStatus | null>(null);
   const [reasonEn, setReasonEn] = useState('');
   const [reasonAr, setReasonAr] = useState('');
@@ -147,17 +149,23 @@ export function DataclassFlowsPage() {
     { header: lang === 'ar' ? 'الحالة' : 'Status', width: '140px',
       cell: f => <Badge tone={FLOW_STATUS_TONE[f.status]}>
         {FLOW_STATUS_LABEL[f.status][lang === 'ar' ? 'ar' : 'en']}</Badge> },
-    { header: '', width: '95px',
+    { header: '', width: '140px',
       cell: f => {
         const next = nextFlowStatuses(f.status);
-        if (next.length === 0) return null;
         return (
-          <Button variant="ghost" size="sm"
-            onClick={(e) => { e.stopPropagation();
-              setMoveTarget(f); setToStatus(next[0]);
-              setReasonEn(''); setReasonAr(''); setArt7TransitionRef(''); }}>
-            {lang === 'ar' ? 'تحريك' : 'Move'}
-          </Button>
+          <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(f); }} />
+            {next.length > 0 && (
+              <Button variant="ghost" size="sm"
+                onClick={(e) => { e.stopPropagation();
+                  setMoveTarget(f); setToStatus(next[0]);
+                  setReasonEn(''); setReasonAr(''); setArt7TransitionRef(''); }}>
+                {lang === 'ar' ? 'تحريك' : 'Move'}
+              </Button>
+            )}
+          </span>
         );
       } },
   ];
@@ -323,6 +331,13 @@ export function DataclassFlowsPage() {
           />
         )}
       </Card>
+      <EntityDocsModal
+        entityType="DATACLASS_FLOW"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.reference}
+        onClose={() => setDocsTarget(null)}
+      />
     </Shell>
   );
 }
