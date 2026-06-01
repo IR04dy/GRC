@@ -43,6 +43,7 @@ public class ReportSchedulerService {
     private final ExportService exportService;
     private final BoardPackService boardPackService;
     private final BoardPackPptxService boardPackPptxService;
+    private final com.tss.grc.module.ai.governance.service.AiRegistryExportService aiRegistryExportService;
     /** Optional — JavaMailSender bean exists only when spring.mail.* is configured. */
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
 
@@ -123,6 +124,7 @@ public class ReportSchedulerService {
             case "BOARD_PACK"     -> "PPTX".equalsIgnoreCase(fmt)
                 ? boardPackPptxService.generatePptx(lang)
                 : boardPackService.generatePdf(lang);
+            case "AI_MODEL_REGISTRY" -> aiRegistryExportService.export(fmt);
             default -> throw new IllegalArgumentException("Unknown report type: " + type);
         };
     }

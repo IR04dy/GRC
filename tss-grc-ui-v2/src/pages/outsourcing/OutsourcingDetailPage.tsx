@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
+import { EvidenceReadinessPanel } from '../../components/ui/EvidenceReadinessPanel';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -188,6 +189,11 @@ export function OutsourcingDetailPage() {
           <div className="lg:col-span-2">
             <Card>
               <ControlMappingPicker entityType="OUTSOURCING" entityId={arrangement.id} />
+            </Card>
+          </div>
+          <div className="lg:col-span-2">
+            <Card title={isAr ? 'جاهزية الأدلة' : 'Evidence readiness'}>
+              <EvidenceReadinessPanel entityType="OUTSOURCING" entityId={arrangement.id} />
             </Card>
           </div>
           <div className="lg:col-span-2">

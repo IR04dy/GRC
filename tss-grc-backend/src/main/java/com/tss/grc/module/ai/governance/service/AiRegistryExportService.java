@@ -70,17 +70,63 @@ public class AiRegistryExportService {
                           int crossBorderNoBasis, int missingSignedOffAia,
                           int euAiActHighRisk, int sdaiaCompliant, int samaCompliant) {}
 
+    /** Optional export filter — mirrors the registry filters + gap drill-downs. */
+    public record ExportFilter(String stage, String tier, String domain, String gap, Boolean euHighRisk) {
+        public static final ExportFilter NONE = new ExportFilter(null, null, null, null, null);
+        boolean isEmpty() {
+            return blank(stage) && blank(tier) && blank(domain) && blank(gap) && euHighRisk == null;
+        }
+        private static boolean blank(String s) { return s == null || s.isBlank(); }
+    }
+
     @Transactional(readOnly = true)
     public byte[] export(String format) {
+        return export(format, ExportFilter.NONE);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] export(String format, ExportFilter filter) {
         Long orgId = TenantContext.getCurrentTenant();
-        List<MlModel> models = repo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId);
+        List<MlModel> all = repo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId);
         Set<Long> aiaSignedOff = new HashSet<>(auditRepo.findModelIdsWithSignedOffAia(orgId));
+        List<MlModel> models = applyFilter(all, filter, aiaSignedOff);
         Posture p = posture(models, aiaSignedOff);
         Organisation org = orgId == null ? null : orgs.findById(orgId).orElse(null);
         return "PDF".equalsIgnoreCase(format)
                 ? toPdf(models, aiaSignedOff, p, org)
                 : toXlsx(models, aiaSignedOff, p, org);
     }
+
+    private List<MlModel> applyFilter(List<MlModel> all, ExportFilter f, Set<Long> aia) {
+        if (f == null || f.isEmpty()) return all;
+        List<MlModel> out = new ArrayList<>();
+        for (MlModel m : all) {
+            if (notBlank(f.stage()) && !f.stage().equalsIgnoreCase(m.getLifecycleStage())) continue;
+            if (notBlank(f.tier()) && !f.tier().equalsIgnoreCase(m.getRiskTier())) continue;
+            if (notBlank(f.domain()) && !f.domain().equalsIgnoreCase(m.getBusinessDomain())) continue;
+            if (Boolean.TRUE.equals(f.euHighRisk()) && !Boolean.TRUE.equals(m.getIsHighRiskEuAiAct())) continue;
+            if (notBlank(f.gap()) && !matchesGap(m, f.gap(), aia)) continue;
+            out.add(m);
+        }
+        return out;
+    }
+
+    private boolean matchesGap(MlModel m, String gap, Set<Long> aia) {
+        boolean elevated = ELEVATED.contains(m.getRiskTier());
+        boolean prodish = PROD_OR_APPROVED.contains(m.getLifecycleStage());
+        return switch (gap.toUpperCase()) {
+            case "OVERSIGHT" -> elevated && prodish && (m.getHumanOversight() == null
+                    || m.getHumanOversight().isBlank() || "NONE".equals(m.getHumanOversight()));
+            case "CROSS_BORDER" -> CROSS_BORDER.contains(m.getDataResidency())
+                    && (m.getCrossBorderTransferBasis() == null || m.getCrossBorderTransferBasis().isBlank()
+                        || "NOT_ASSESSED".equals(m.getCrossBorderTransferBasis()));
+            case "AIA" -> elevated && prodish && !aia.contains(m.getId());
+            case "FAIRNESS" -> elevated && prodish && !Boolean.TRUE.equals(m.getHasFairnessAudit());
+            default -> true;
+        };
+    }
+
+    private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
 
     private Posture posture(List<MlModel> models, Set<Long> aiaSignedOff) {
         int total = models.size(), inProd = 0, hiCrit = 0, noFair = 0, noOvr = 0, xb = 0, noAia = 0, eu = 0, sdaia = 0, sama = 0;

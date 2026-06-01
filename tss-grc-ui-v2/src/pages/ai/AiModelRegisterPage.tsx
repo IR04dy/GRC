@@ -185,6 +185,21 @@ export function AiModelRegisterPage() {
     },
   ];
 
+  // Build the export URL carrying the currently-active filters, so "Export"
+  // produces exactly what the user is looking at (e.g. a gap remediation list).
+  const exportUrl = (fmt: 'XLSX' | 'PDF') => {
+    const q = new URLSearchParams({ format: fmt });
+    if (filterStage !== 'ALL') q.set('stage', filterStage);
+    if (filterTier !== 'ALL') q.set('tier', filterTier);
+    if (filterDomain !== 'ALL') q.set('domain', filterDomain);
+    if (filterEuAi === 'YES') q.set('euHighRisk', 'true');
+    if (filterGap !== 'ALL') q.set('gap', filterGap === 'OVERSIGHT' ? 'OVERSIGHT'
+      : filterGap === 'CROSS_BORDER' ? 'CROSS_BORDER' : 'AIA');
+    return `/api/v1/ai/models/export?${q.toString()}`;
+  };
+  const exportName = (ext: string) =>
+    `ai-model-registry${filterGap !== 'ALL' ? '-gaps' : ''}.${ext}`;
+
   return (
     <Shell
       title={lang === 'ar' ? 'سجل نماذج الذكاء الاصطناعي' : 'AI/ML Model Registry'}
@@ -203,11 +218,11 @@ export function AiModelRegisterPage() {
               : (
                 <>
                   <Button size="sm" variant="ghost" Icon={FileSpreadsheet}
-                    onClick={() => { void downloadFile('/api/v1/ai/models/export?format=XLSX', 'ai-model-registry.xlsx'); }}>
+                    onClick={() => { void downloadFile(exportUrl('XLSX'), exportName('xlsx')); }}>
                     {lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}
                   </Button>
                   <Button size="sm" variant="ghost" Icon={FileText}
-                    onClick={() => { void downloadFile('/api/v1/ai/models/export?format=PDF', 'ai-model-registry.pdf'); }}>
+                    onClick={() => { void downloadFile(exportUrl('PDF'), exportName('pdf')); }}>
                     {lang === 'ar' ? 'تصدير PDF' : 'Export PDF'}
                   </Button>
                 </>

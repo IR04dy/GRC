@@ -57,10 +57,17 @@ public class MlModelController {
 
     @GetMapping("/export")
     @PreAuthorize(READ_GUARD)
-    @Operation(summary = "Regulator-ready AI registry pack (XLSX or PDF): posture summary + per-model attributes.")
-    public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "XLSX") String format) {
+    @Operation(summary = "Regulator-ready AI registry pack (XLSX or PDF): posture summary + per-model attributes. "
+            + "Optional filters (stage/tier/domain/euHighRisk/gap) export only the matching subset — e.g. gap=AIA for a remediation list.")
+    public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "XLSX") String format,
+                                         @RequestParam(required = false) String stage,
+                                         @RequestParam(required = false) String tier,
+                                         @RequestParam(required = false) String domain,
+                                         @RequestParam(required = false) String gap,
+                                         @RequestParam(required = false) Boolean euHighRisk) {
         boolean pdf = "PDF".equalsIgnoreCase(format);
-        byte[] body = exportService.export(format);
+        byte[] body = exportService.export(format,
+                new AiRegistryExportService.ExportFilter(stage, tier, domain, gap, euHighRisk));
         MediaType ct = pdf ? MediaType.APPLICATION_PDF
                 : MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         String filename = "ai-model-registry." + (pdf ? "pdf" : "xlsx");

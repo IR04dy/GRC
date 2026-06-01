@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
+import { EvidenceReadinessPanel } from '../../components/ui/EvidenceReadinessPanel';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -318,6 +319,11 @@ export function AttackSurfaceAssetDetailPage() {
               <AttachmentsField entityType="ASM_ASSET" entityId={asset.id} />
               <div style={{ borderTop: '1px solid var(--border)' }} />
               <ControlMappingPicker entityType="ASM_ASSET" entityId={asset.id} />
+              <div style={{ borderTop: '1px solid var(--border)' }} />
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>{lang === 'ar' ? 'جاهزية الأدلة' : 'Evidence readiness'}</div>
+                <EvidenceReadinessPanel entityType="ASM_ASSET" entityId={asset.id} />
+              </div>
             </div>
           </Card>
         </div>

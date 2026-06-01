@@ -30,6 +30,7 @@ const REPORT_TYPE_OPTIONS = [
   { value: 'FINDINGS_AGING', label: 'Findings Aging' },
   { value: 'KRI_DASHBOARD',  label: 'KRI Dashboard' },
   { value: 'BOARD_PACK',     label: 'Board Pack (multi-section)' },
+  { value: 'AI_MODEL_REGISTRY', label: 'AI/ML Model Registry (posture pack)' },
 ];
 const FORMAT_OPTIONS = [
   { value: 'PDF',  label: 'PDF' },
