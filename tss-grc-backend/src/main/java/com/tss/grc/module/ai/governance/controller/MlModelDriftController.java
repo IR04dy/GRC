@@ -44,25 +44,25 @@ public class MlModelDriftController {
     @GetMapping
     @PreAuthorize(READ_GUARD)
     @Operation(summary = "List drift observations for this model (newest first).")
-    public List<DriftObservationResponse> list(@PathVariable UUID externalId) {
-        return service.list(externalId);
+    public List<DriftObservationResponse> list(@PathVariable String externalId) {
+        return service.list(AiModelIds.parse(externalId));
     }
 
     @PostMapping
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Record a drift observation. CRITICAL severity auto-opens an Issue + flips the model to REVISION.")
-    public ResponseEntity<DriftObservationResponse> record(@PathVariable UUID externalId,
+    public ResponseEntity<DriftObservationResponse> record(@PathVariable String externalId,
                                                            @Valid @RequestBody DriftObservationRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.record(externalId, req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.record(AiModelIds.parse(externalId), req));
     }
 
     @PostMapping("/{obsId}/acknowledge")
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Acknowledge a drift observation — stamps acknowledged_at / by.")
-    public DriftObservationResponse acknowledge(@PathVariable UUID externalId,
+    public DriftObservationResponse acknowledge(@PathVariable String externalId,
                                                 @PathVariable UUID obsId,
                                                 @AuthenticationPrincipal GrcUserDetails me) {
         Long userId = me == null ? null : me.getUserId();
-        return service.acknowledge(externalId, obsId, userId);
+        return service.acknowledge(AiModelIds.parse(externalId), obsId, userId);
     }
 }

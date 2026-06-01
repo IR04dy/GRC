@@ -14,7 +14,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * REST surface for fairness / bias / explainability / robustness /
@@ -41,16 +40,16 @@ public class MlModelAuditController {
     @GetMapping
     @PreAuthorize(READ_GUARD)
     @Operation(summary = "List every audit result against the model (newest first).")
-    public List<MlModelAuditResponse> list(@PathVariable UUID externalId) {
-        return service.listAudits(externalId);
+    public List<MlModelAuditResponse> list(@PathVariable String externalId) {
+        return service.listAudits(AiModelIds.parse(externalId));
     }
 
     @GetMapping("/latest/{auditType}")
     @PreAuthorize(READ_GUARD)
     @Operation(summary = "Most-recent audit of the given type — convenience for the detail page.")
-    public ResponseEntity<MlModelAuditResponse> latest(@PathVariable UUID externalId,
+    public ResponseEntity<MlModelAuditResponse> latest(@PathVariable String externalId,
                                                        @PathVariable String auditType) {
-        return service.getLatestByType(externalId, auditType)
+        return service.getLatestByType(AiModelIds.parse(externalId), auditType)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -58,8 +57,8 @@ public class MlModelAuditController {
     @PostMapping
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Record a new audit result. FAIRNESS/EXPLAINABILITY positive results flip the parent compliance flag.")
-    public ResponseEntity<MlModelAuditResponse> record(@PathVariable UUID externalId,
+    public ResponseEntity<MlModelAuditResponse> record(@PathVariable String externalId,
                                                        @Valid @RequestBody MlModelAuditRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.recordAudit(externalId, req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.recordAudit(AiModelIds.parse(externalId), req));
     }
 }

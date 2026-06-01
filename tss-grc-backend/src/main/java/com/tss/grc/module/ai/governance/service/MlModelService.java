@@ -73,7 +73,11 @@ public class MlModelService {
     /** Risk tiers that trigger the APPROVED_FOR_PROD gate. */
     private static final Set<String> ELEVATED_RISK_TIERS = Set.of("CRITICAL", "HIGH");
 
+    /** Audit statuses that count as a signed-off (passed) AIA. */
+    private static final Set<String> AIA_SIGNED_OFF = Set.of("PASSED", "PASSED_WITH_CONDITIONS", "REMEDIATED");
+
     private final MlModelRepository repo;
+    private final com.tss.grc.module.ai.governance.repository.MlModelAuditRepository auditRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -259,6 +263,15 @@ public class MlModelService {
                     || "NOT_ASSESSED".equals(m.getCrossBorderTransferBasis()))) {
             missing.add("cross_border_transfer_basis");
         }
+        // SDAIA expects a dedicated AI Impact Assessment (distinct from the
+        // PDPL DPIA) for high-risk AI. Require a signed-off (passed) AIA audit
+        // record — a first-class artefact, not just a header flag.
+        boolean aiaSignedOff = auditRepo
+                .findTopByOrganisationIdAndModelIdAndAuditTypeAndIsDeletedFalseOrderByAuditDateDesc(
+                        m.getOrganisationId(), m.getId(), "AIA")
+                .map(a -> AIA_SIGNED_OFF.contains(a.getStatus()))
+                .orElse(false);
+        if (!aiaSignedOff) missing.add("signed_off_aia");
         if (!missing.isEmpty()) {
             throw new IllegalStateException(
                     "Cannot promote " + m.getModelCode() + " (risk tier " + m.getRiskTier()

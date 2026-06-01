@@ -103,7 +103,7 @@ export function AiModelDetailPage() {
     }
   }
 
-  const gateMissing = useMemo(() => model ? approvalGateMissing(model) : [], [model]);
+  const gateMissing = useMemo(() => model ? approvalGateMissing(model, audits) : [], [model, audits]);
   const unackDrift = drift.filter(d => !d.isAcknowledged);
 
   if (demoMode) {
@@ -402,7 +402,7 @@ function ComplianceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | '
         status={model.sdaiaAiEthicsCompliance}
         lang={lang} />
       <ComplianceCard
-        title="SAMA AI Governance (Dec 2024)"
+        title="SAMA AI Governance (draft)"
         status={model.samaAiPrinciplesCompliance}
         lang={lang} />
       <div>
@@ -569,6 +569,7 @@ function DriftTab({ drift, lang, onAck }: {
 // ─── Record-audit modal ────────────────────────────────────────────
 
 const AUDIT_METRIC_HELPERS: Record<MlAuditType, string[]> = {
+  AIA:            ['fundamental_rights_score', 'affected_population', 'residual_risk_rating'],
   FAIRNESS:       ['demographic_parity_diff', 'equal_opportunity_diff', 'disparate_impact_ratio'],
   BIAS:           ['statistical_parity_diff', 'group_fairness_score'],
   EXPLAINABILITY: ['reason_code_coverage', 'avg_shap_features_surfaced'],

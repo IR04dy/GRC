@@ -16,7 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * REST surface for the AI/ML Model Registry inventory.
@@ -55,8 +54,8 @@ public class MlModelController {
     @GetMapping("/{externalId}")
     @PreAuthorize(READ_GUARD)
     @Operation(summary = "Get one model by external id.")
-    public MlModelResponse get(@PathVariable UUID externalId) {
-        return service.get(externalId);
+    public MlModelResponse get(@PathVariable String externalId) {
+        return service.get(AiModelIds.parse(externalId));
     }
 
     @GetMapping("/high-risk-without-fairness")
@@ -76,23 +75,23 @@ public class MlModelController {
     @PutMapping("/{externalId}")
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Update metadata on a model that is not DECOMMISSIONED.")
-    public MlModelResponse update(@PathVariable UUID externalId, @Valid @RequestBody MlModelRequest req) {
-        return service.update(externalId, req);
+    public MlModelResponse update(@PathVariable String externalId, @Valid @RequestBody MlModelRequest req) {
+        return service.update(AiModelIds.parse(externalId), req);
     }
 
     @PostMapping("/{externalId}/transition")
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Transition lifecycle stage — HIGH+ risk → APPROVED_FOR_PROD requires fairness/DPIA/explainability/validator.")
-    public MlModelResponse transition(@PathVariable UUID externalId,
+    public MlModelResponse transition(@PathVariable String externalId,
                                       @Valid @RequestBody LifecycleTransitionRequest req) {
-        return service.transition(externalId, req);
+        return service.transition(AiModelIds.parse(externalId), req);
     }
 
     @PostMapping("/{externalId}/decommission")
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Decommission the model with a documented reason.")
-    public MlModelResponse decommission(@PathVariable UUID externalId,
+    public MlModelResponse decommission(@PathVariable String externalId,
                                         @Valid @RequestBody DecommissionRequest req) {
-        return service.decommission(externalId, req);
+        return service.decommission(AiModelIds.parse(externalId), req);
     }
 }

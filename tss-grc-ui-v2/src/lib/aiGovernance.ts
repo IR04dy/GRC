@@ -1,6 +1,6 @@
 // AI governance — Sprint 6 follow-on (C1).
 //
-// SDAIA published binding AI Ethics Principles in 2026; SAMA has a draft
+// SDAIA published its AI Ethics Principles in 2023; SAMA has a draft
 // AI in Financial Services framework out for consultation. Every regulated
 // Saudi entity now needs:
 //   • An AI inventory (what models we run, which use case, what data)
@@ -331,7 +331,7 @@ export type MlTransferBasis =
   | 'BCR_SCC' | 'VITAL_INTEREST' | 'NOT_ASSESSED';
 
 export type MlAuditType =
-  | 'FAIRNESS' | 'BIAS' | 'EXPLAINABILITY' | 'ROBUSTNESS'
+  | 'AIA' | 'FAIRNESS' | 'BIAS' | 'EXPLAINABILITY' | 'ROBUSTNESS'
   | 'PRIVACY' | 'SECURITY' | 'PERFORMANCE';
 
 export type MlAuditStatus =
@@ -600,6 +600,7 @@ export const ML_DOMAIN_LABEL: Record<MlBusinessDomain, { en: string; ar: string 
 };
 
 export const ML_AUDIT_TYPE_LABEL: Record<MlAuditType, { en: string; ar: string }> = {
+  AIA:            { en: 'AI Impact Assessment', ar: 'تقييم أثر الذكاء الاصطناعي' },
   FAIRNESS:       { en: 'Fairness',       ar: 'عدالة' },
   BIAS:           { en: 'Bias',           ar: 'تحيز' },
   EXPLAINABILITY: { en: 'Explainability', ar: 'قابلية التفسير' },
@@ -753,7 +754,13 @@ export function aggregateMlRegistry(
 // readable reason. The server enforces this in MlModelService — this is a
 // pure UI helper that returns a list of missing prerequisite keys.
 
-export function approvalGateMissing(m: MlModelResponse): string[] {
+/** Audit statuses that count as a signed-off (passed) AIA — mirrors the server. */
+const AIA_SIGNED_OFF: ReadonlySet<string> = new Set(['PASSED', 'PASSED_WITH_CONDITIONS', 'REMEDIATED']);
+
+export function approvalGateMissing(
+  m: MlModelResponse,
+  audits?: ReadonlyArray<{ auditType: string; status: string }>,
+): string[] {
   if (m.riskTier !== 'CRITICAL' && m.riskTier !== 'HIGH') return [];
   const missing: string[] = [];
   if (!m.validatorUserId) missing.push('validator_user_id');
@@ -767,6 +774,12 @@ export function approvalGateMissing(m: MlModelResponse): string[] {
   if ((m.dataResidency === 'GCC' || m.dataResidency === 'GLOBAL')
       && (!m.crossBorderTransferBasis || m.crossBorderTransferBasis === 'NOT_ASSESSED')) {
     missing.push('cross_border_transfer_basis');
+  }
+  // SDAIA — a signed-off AI Impact Assessment (distinct from the PDPL DPIA).
+  // Only evaluable when the caller supplies the audit list; otherwise the
+  // server remains the source of truth and enforces it on transition.
+  if (audits && !audits.some(a => a.auditType === 'AIA' && AIA_SIGNED_OFF.has(a.status))) {
+    missing.push('signed_off_aia');
   }
   return missing;
 }

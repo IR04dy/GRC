@@ -175,8 +175,8 @@ export function AiModelRegisterPage() {
         eyebrow={lang === 'ar' ? 'حوكمة الذكاء الاصطناعي' : 'AI Governance'}
         title={lang === 'ar' ? 'سجل نماذج الذكاء الاصطناعي' : 'AI/ML Model Registry'}
         sub={lang === 'ar'
-          ? 'جرد مركزي لكل نموذج ذكاء اصطناعي أو تعلم آلي في الإنتاج، مع المصدر وتدقيق العدالة ومراقبة الانحراف، وفق مبادئ سدايا لأخلاقيات الذكاء الاصطناعي ومبادئ البنك المركزي السعودي لحوكمة الذكاء الاصطناعي والمادة 16 من نظام الذكاء الاصطناعي الأوروبي.'
-          : 'Central inventory of every AI/ML model in production, with provenance, fairness audits, and drift monitoring, per SDAIA AI Ethics Principles, SAMA AI Governance Principles, and EU AI Act Article 16.'}
+          ? 'جرد مركزي لكل نموذج ذكاء اصطناعي أو تعلم آلي في الإنتاج، مع المصدر وتدقيق العدالة ومراقبة الانحراف، وفق مبادئ سدايا لأخلاقيات الذكاء الاصطناعي (2023) ومسوّدة مبادئ البنك المركزي السعودي لحوكمة الذكاء الاصطناعي والمادة 16 من نظام الذكاء الاصطناعي الأوروبي.'
+          : 'Central inventory of every AI/ML model in production, with provenance, fairness audits, and drift monitoring, per SDAIA AI Ethics Principles (2023), SAMA’s draft AI governance principles, and EU AI Act Article 16.'}
         actions={demoMode ? <Badge tone="warning">{lang === 'ar' ? 'وضع العرض' : 'Demo mode'}</Badge> : null}
       />
 
