@@ -54,7 +54,8 @@ public class GrcExpertService {
 
         // ── Per-sub-control evidence rollups (org-scoped) ─────────────────────
         Map<Long, Map<String, Integer>> statusBySc = new HashMap<>();
-        Map<Long, int[]> expiryBySc = new HashMap<>();   // [expired, expiringSoon]
+        Map<Long, int[]> expiryBySc = new HashMap<>();        // [expired, expiringSoon]
+        Map<Long, Integer> freshApprovedBySc = new HashMap<>(); // APPROVED & not past valid_to
         if (orgId != null) {
             for (Object[] r : itemRepository.aggregateStatusBySubControl(orgId)) {
                 Long scId = ((Number) r[0]).longValue();
@@ -69,6 +70,9 @@ public class GrcExpertService {
                 int expired = ((Number) r[1]).intValue();
                 int soon = ((Number) r[2]).intValue();
                 expiryBySc.put(scId, new int[]{expired, soon});
+            }
+            for (Object[] r : itemRepository.aggregateFreshApprovedBySubControl(orgId, today)) {
+                freshApprovedBySc.put(((Number) r[0]).longValue(), ((Number) r[1]).intValue());
             }
         }
 
@@ -96,12 +100,19 @@ public class GrcExpertService {
                     int rejected = sm.getOrDefault("REJECTED", 0);
                     int total    = sm.values().stream().mapToInt(Integer::intValue).sum();
                     int[] exp = expiryBySc.getOrDefault(sc.getId(), new int[]{0, 0});
+                    int freshApproved = freshApprovedBySc.getOrDefault(sc.getId(), 0);
 
-                    String coverage = approved > 0 ? "COVERED" : (total > 0 ? "PARTIAL" : "GAP");
+                    // Freshness-aware coverage: COVERED only when at least one approved item is
+                    // still valid. If approved evidence exists but ALL of it has expired, the
+                    // sub-control is EXPIRED (not COVERED) so an officer is not shown green over
+                    // stale evidence. EXPIRED rolls up with PARTIAL at the framework level so
+                    // covered + partial + gap == subControlCount holds.
+                    String coverage = freshApproved > 0 ? "COVERED"
+                            : (approved > 0 ? "EXPIRED" : (total > 0 ? "PARTIAL" : "GAP"));
                     switch (coverage) {
-                        case "COVERED" -> cCovered++;
-                        case "PARTIAL" -> cPartial++;
-                        default        -> cGap++;
+                        case "COVERED"          -> cCovered++;
+                        case "EXPIRED", "PARTIAL" -> cPartial++;
+                        default                 -> cGap++;
                     }
 
                     scResponses.add(new ExpertSubControlResponse(

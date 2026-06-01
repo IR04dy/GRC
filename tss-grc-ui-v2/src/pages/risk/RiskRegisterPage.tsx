@@ -78,12 +78,22 @@ function writeFiltersToQs(qs: URLSearchParams, f: RiskFilters, tab: TabId): URLS
   return next;
 }
 
+// Bands match the server-side risk.risks.risk_level computed column
+// (CRITICAL>=20 / HIGH>=12 / MEDIUM>=6 / LOW>=1) so the UI-computed level
+// always agrees with the backend riskLevel.
 function scoreToLevel(score: number): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' {
-  if (score >= 16) return 'CRITICAL';
+  if (score >= 20) return 'CRITICAL';
   if (score >= 12) return 'HIGH';
-  if (score >= 8)  return 'MEDIUM';
+  if (score >= 6)  return 'MEDIUM';
   return 'LOW';
 }
+
+// Operating ERM view = residual (post-control) exposure, falling back to
+// inherent when a risk has not yet been re-assessed (residual null), matching
+// the server's COALESCE(residual, inherent) banding.
+function effLikelihood(r: RiskResponse): number { return r.residualLikelihood ?? r.inherentLikelihood; }
+function effImpact(r: RiskResponse): number { return r.residualImpact ?? r.inherentImpact; }
+function effScore(r: RiskResponse): number { return r.residualScore ?? r.inherentScore; }
 
 const STATUS_TONES: Record<string, BadgeTone> = {
   OPEN: 'danger',
@@ -276,20 +286,21 @@ export function RiskRegisterPage() {
   const heatData: HeatCell[] = useMemo(() => {
     const buckets = new Map<string, HeatCell>();
     for (const r of risks) {
-      const key = `${r.inherentLikelihood}|${r.inherentImpact}`;
+      const l = effLikelihood(r), i = effImpact(r);
+      const key = `${l}|${i}`;
       const cur = buckets.get(key);
       if (cur) cur.count += 1;
-      else buckets.set(key, { l: r.inherentLikelihood, i: r.inherentImpact, count: 1 });
+      else buckets.set(key, { l, i, count: 1 });
     }
     return Array.from(buckets.values());
   }, [risks]);
 
   const filteredRisks = useMemo(() => {
     return risks.filter(r => {
-      if (filters.l != null && r.inherentLikelihood !== filters.l) return false;
-      if (filters.i != null && r.inherentImpact     !== filters.i) return false;
+      if (filters.l != null && effLikelihood(r) !== filters.l) return false;
+      if (filters.i != null && effImpact(r)     !== filters.i) return false;
       if (filters.status   && r.status !== filters.status) return false;
-      if (filters.level    && scoreToLevel(r.inherentScore) !== filters.level) return false;
+      if (filters.level    && scoreToLevel(effScore(r)) !== filters.level) return false;
       if (filters.category) {
         const cat = r.categoryNameEn ?? r.categoryName ?? '';
         if (!cat.toLowerCase().includes(filters.category.toLowerCase())) return false;
@@ -298,7 +309,7 @@ export function RiskRegisterPage() {
     });
   }, [risks, filters]);
 
-  const criticalCount = risks.filter(r => r.inherentScore >= 16).length;
+  const criticalCount = risks.filter(r => effScore(r) >= 20).length;
   const treatedCount  = risks.filter(r => r.status === 'TREATED' || r.status === 'CLOSED').length;
   const openCount     = risks.filter(r => r.status === 'OPEN').length;
 

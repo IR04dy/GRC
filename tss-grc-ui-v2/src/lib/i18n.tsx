@@ -25,8 +25,10 @@ const dictionaries: Record<Lang, Dictionary> = { en: en as Dictionary, ar: ar as
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
+    // Arabic-primary platform: default first load to 'ar' (RTL) unless the
+    // user has explicitly chosen English in a previous session.
     const stored = localStorage.getItem(LANG_KEY) as Lang | null;
-    return stored === 'ar' ? 'ar' : 'en';
+    return stored === 'en' ? 'en' : 'ar';
   });
   const dir: Dir = lang === 'ar' ? 'rtl' : 'ltr';
 

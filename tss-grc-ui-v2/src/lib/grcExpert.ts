@@ -6,7 +6,8 @@ import { api } from './api';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ExpertFamily = 'NCA' | 'NDI' | 'PDPL' | 'BCM' | 'OTHER';
-export type CoverageStatus = 'COVERED' | 'PARTIAL' | 'GAP';
+/** EXPIRED = approved evidence exists but all of it is past valid_to (stale) — distinct from COVERED. */
+export type CoverageStatus = 'COVERED' | 'PARTIAL' | 'GAP' | 'EXPIRED';
 
 export interface ExpertSubControl {
   id: number;
@@ -92,11 +93,13 @@ export const FAMILY_LABELS: Record<ExpertFamily, { en: string; ar: string }> = {
 export const COVERAGE_TONE: Record<CoverageStatus, 'success' | 'warning' | 'danger'> = {
   COVERED: 'success',
   PARTIAL: 'warning',
+  EXPIRED: 'warning',
   GAP:     'danger',
 };
 
 export const COVERAGE_LABEL: Record<CoverageStatus, { en: string; ar: string }> = {
   COVERED: { en: 'Covered',  ar: 'مغطّى' },
   PARTIAL: { en: 'Partial',  ar: 'جزئي' },
+  EXPIRED: { en: 'Expired',  ar: 'منتهي الصلاحية' },
   GAP:     { en: 'Gap',      ar: 'فجوة' },
 };

@@ -56,4 +56,14 @@ public interface EvidenceItemRepository extends JpaRepository<EvidenceItem, Long
     List<Object[]> aggregateExpiryBySubControl(@Param("orgId") Long orgId,
                                                @Param("today") LocalDate today,
                                                @Param("horizon") LocalDate horizon);
+
+    /** Per-sub-control count of APPROVED items that are still valid (not past valid_to) — drives
+     *  freshness-aware coverage so a sub-control whose only approved evidence has expired does NOT
+     *  read COVERED. A null validTo means "no expiry" and counts as fresh. */
+    @Query("SELECT e.subControlId, COUNT(e) FROM EvidenceItem e " +
+           "WHERE e.organisationId = :orgId AND e.subControlId IS NOT NULL " +
+           "AND e.status = 'APPROVED' AND (e.validTo IS NULL OR e.validTo >= :today) " +
+           "GROUP BY e.subControlId")
+    List<Object[]> aggregateFreshApprovedBySubControl(@Param("orgId") Long orgId,
+                                                      @Param("today") LocalDate today);
 }
