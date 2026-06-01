@@ -62,4 +62,8 @@ public class EvidenceRequest extends BaseEntity {
 
     @Column(name = "notes", columnDefinition = "NVARCHAR(MAX)")
     private String notes;
+
+    /** Last time the SLA scheduler sent an overdue reminder — used to throttle. */
+    @Column(name = "last_reminded_at")
+    private LocalDateTime lastRemindedAt;
 }

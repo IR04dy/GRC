@@ -8,8 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -31,6 +33,9 @@ public class EvidenceRequestSlaScheduler {
     /** Days overdue after which the requester is escalated, not just the assignee. */
     private static final long ESCALATION_DAYS = 7;
 
+    /** Minimum gap between reminders for the same request (anti-spam). */
+    private static final long REMINDER_THROTTLE_DAYS = 3;
+
     private final EvidenceRequestRepository requestRepository;
     private final NotificationService notifications;
 
@@ -48,11 +53,18 @@ public class EvidenceRequestSlaScheduler {
     }
 
     /** Finds overdue open requests and notifies assignees (+ requesters when escalated). */
+    @Transactional
     public int remindOverdue() {
         LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime throttleBefore = now.minusDays(REMINDER_THROTTLE_DAYS);
         List<EvidenceRequest> overdue = requestRepository.findOverdue(today);
         int sent = 0;
         for (EvidenceRequest r : overdue) {
+            // Throttle: skip if we already reminded within the last few days.
+            if (r.getLastRemindedAt() != null && r.getLastRemindedAt().isAfter(throttleBefore)) {
+                continue;
+            }
             long days = ChronoUnit.DAYS.between(r.getDueDate(), today);
             String msgEn = "\"" + r.getTitleEn() + "\" is " + days + " day(s) overdue (due " + r.getDueDate() + ").";
 
@@ -72,6 +84,9 @@ public class EvidenceRequestSlaScheduler {
                     sent++;
                 }
             }
+
+            r.setLastRemindedAt(now);
+            requestRepository.save(r);
         }
         return sent;
     }
