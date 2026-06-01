@@ -10,6 +10,8 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
@@ -18,7 +20,7 @@ import { consentApi, ApiError, type ConsentRecordDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 
-type TabId = 'overview' | 'history' | 'activity';
+type TabId = 'overview' | 'history' | 'docs' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   ACTIVE:     'success',
@@ -151,6 +153,7 @@ export function ConsentDetailPage() {
   const tabs: TabItem<TabId>[] = [
     { id: 'overview', label: isAr ? 'نظرة عامة' : 'Overview' },
     { id: 'history',  label: isAr ? `السجل التاريخي · ${history.length}` : `History · ${history.length}` },
+    { id: 'docs',     label: isAr ? 'المستندات والضوابط' : 'Docs & controls' },
     { id: 'activity', label: isAr ? 'سجل النشاط' : 'Activity' },
   ];
 
@@ -238,6 +241,16 @@ export function ConsentDetailPage() {
                     ))}
                   </div>
                 )}
+            </Card>
+          )}
+
+          {tab === 'docs' && (
+            <Card title={isAr ? 'المستندات وربط الضوابط' : 'Documents & control mapping'} Icon={FileSignature}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <AttachmentsField entityType="CONSENT" entityId={item.id} />
+                <div style={{ borderTop: '1px solid var(--border)' }} />
+                <ControlMappingPicker entityType="CONSENT" entityId={item.id} />
+              </div>
             </Card>
           )}
 

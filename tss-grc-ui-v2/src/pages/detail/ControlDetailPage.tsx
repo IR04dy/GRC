@@ -8,6 +8,7 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
@@ -21,7 +22,7 @@ import {
   COMPLIANCE_CONTROLS, CONTROL_SUBCONTROLS_BY_ID, CONTROL_EVIDENCE_BY_ID, CONTROL_TESTS_BY_ID,
 } from '../compliance/mockCompliance';
 
-type TabId = 'overview' | 'subcontrols' | 'evidence' | 'tests' | 'links' | 'activity';
+type TabId = 'overview' | 'subcontrols' | 'evidence' | 'tests' | 'docs' | 'links' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   IMPLEMENTED: 'success', PARTIAL: 'warning', PLANNED: 'info', NOT_APPLICABLE: 'neutral',
@@ -60,6 +61,7 @@ export function ControlDetailPage() {
     { id: 'subcontrols', label: t('detailTabSubControls') },
     { id: 'evidence',    label: t('detailTabEvidence') },
     { id: 'tests',       label: t('detailTabTests') },
+    { id: 'docs',        label: lang === 'ar' ? 'المستندات' : 'Documents' },
     { id: 'links',       label: t('detailTabLinks') },
     { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
@@ -183,6 +185,11 @@ export function ControlDetailPage() {
                   </div>
                 ))}
               </div>}
+        </Card>
+      )}
+      {tab === 'docs' && (
+        <Card title={lang === 'ar' ? 'مستندات الضابط' : 'Control documents'} Icon={FileCheck2}>
+          <AttachmentsField entityType="CONTROL" entityId={item.id} />
         </Card>
       )}
       {tab === 'links' && (
