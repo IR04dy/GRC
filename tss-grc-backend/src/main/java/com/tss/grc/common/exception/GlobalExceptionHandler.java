@@ -59,6 +59,17 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    /** Business-rule violation (e.g. segregation of duties) — 403 with the
+     *  rule's own message, since explaining the rule is the point. */
+    @ExceptionHandler(BusinessRuleException.class)
+    public ProblemDetail handleBusinessRule(BusinessRuleException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Operation Not Allowed");
+        pd.setType(URI.create("https://grc.tss.com/errors/business-rule"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ProblemDetail handleBadCredentials(BadCredentialsException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid username or password.");

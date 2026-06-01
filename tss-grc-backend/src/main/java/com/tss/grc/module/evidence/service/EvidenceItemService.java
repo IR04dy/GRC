@@ -1,5 +1,6 @@
 package com.tss.grc.module.evidence.service;
 
+import com.tss.grc.common.exception.BusinessRuleException;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.evidence.dto.*;
@@ -13,7 +14,6 @@ import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -194,7 +194,7 @@ public class EvidenceItemService {
         // has to sign off. (ECC 2-3 / ISO 27001 A.5.3 / SAMA — four-eyes.)
         Long currentUser = currentUserId();
         if (currentUser != null && currentUser.equals(item.getCreatedBy())) {
-            throw new AccessDeniedException(
+            throw new BusinessRuleException(
                 "Segregation of duties: you cannot approve evidence you submitted; a different reviewer must approve it.");
         }
         return transitionStatus(id, "APPROVED");
