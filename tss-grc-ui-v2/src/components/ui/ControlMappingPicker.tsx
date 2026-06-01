@@ -6,10 +6,17 @@ import { Link2, X, Search } from 'lucide-react';
 import { Badge } from './Badge';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
-import { controlLinksApi, ApiError, type ControlLinkDto } from '../../lib/api';
+import { controlLinksApi, ApiError, type ControlLinkDto, type ControlSatisfaction } from '../../lib/api';
 import { listExpertCatalog } from '../../lib/grcExpert';
 
 interface FlatSub { id: number; fw: string; ctrl: string; code: string; nameEn: string; nameAr: string; }
+
+const SAT_LEVELS: ControlSatisfaction[] = ['FULL', 'PARTIAL', 'PLANNED'];
+const SAT_LABEL: Record<ControlSatisfaction, { en: string; ar: string; tone: 'success' | 'warning' | 'neutral' }> = {
+  FULL:    { en: 'Full',    ar: 'كامل',  tone: 'success' },
+  PARTIAL: { en: 'Partial', ar: 'جزئي',  tone: 'warning' },
+  PLANNED: { en: 'Planned', ar: 'مخطط',  tone: 'neutral' },
+};
 
 export interface ControlMappingPickerProps {
   entityType: string;
@@ -43,14 +50,25 @@ export function ControlMappingPicker({ entityType, entityId, label }: ControlMap
 
   const mappedIds = useMemo(() => new Set(mapped.map(m => m.subControlId)), [mapped]);
 
-  async function save(ids: number[]) {
+  /** Current satisfaction map from the loaded mappings (default FULL). */
+  function currentSat(): Record<number, ControlSatisfaction> {
+    return Object.fromEntries(mapped.map(m => [m.subControlId, m.satisfaction ?? 'FULL']));
+  }
+
+  async function save(ids: number[], sat: Record<number, ControlSatisfaction>) {
     setBusy(true);
-    try { setMapped(await controlLinksApi.set(entityType, entityId, ids)); }
+    try { setMapped(await controlLinksApi.set(entityType, entityId, ids, sat)); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : (ar ? 'تعذّر الحفظ' : 'Save failed')); }
     finally { setBusy(false); }
   }
-  function add(id: number) { if (!mappedIds.has(id)) void save([...mappedIds, id]); setQ(''); }
-  function remove(id: number) { void save([...mappedIds].filter(x => x !== id)); }
+  function add(id: number) {
+    if (!mappedIds.has(id)) void save([...mappedIds, id], { ...currentSat(), [id]: 'FULL' });
+    setQ('');
+  }
+  function remove(id: number) { void save([...mappedIds].filter(x => x !== id), currentSat()); }
+  function setSat(id: number, level: ControlSatisfaction) {
+    void save([...mappedIds], { ...currentSat(), [id]: level });
+  }
 
   const results = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -85,6 +103,21 @@ export function ControlMappingPicker({ entityType, entityId, label }: ControlMap
               <span style={{ color: 'var(--ink-3)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ar ? m.subControlNameAr : m.subControlNameEn}
               </span>
+              <select
+                value={m.satisfaction ?? 'FULL'}
+                disabled={busy}
+                onChange={e => setSat(m.subControlId, e.currentTarget.value as ControlSatisfaction)}
+                aria-label={ar ? 'مستوى التغطية' : 'Satisfaction'}
+                title={ar ? 'مستوى تغطية الضابط' : 'How fully this satisfies the control'}
+                style={{
+                  fontSize: 11, padding: '1px 4px', borderRadius: 6, cursor: 'pointer',
+                  border: '1px solid var(--border)', background: 'var(--surface)',
+                  color: `var(--${SAT_LABEL[m.satisfaction ?? 'FULL'].tone}-fg, var(--ink-2))`,
+                }}>
+                {SAT_LEVELS.map(l => (
+                  <option key={l} value={l}>{ar ? SAT_LABEL[l].ar : SAT_LABEL[l].en}</option>
+                ))}
+              </select>
               <button onClick={() => remove(m.subControlId)} disabled={busy}
                 aria-label="remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex' }}>
                 <X size={13} />

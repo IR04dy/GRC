@@ -6,5 +6,6 @@ public record ControlLinkResponse(
     String subControlNameEn,
     String subControlNameAr,
     String controlCode,
-    String frameworkCode
+    String frameworkCode,
+    String satisfaction
 ) {}

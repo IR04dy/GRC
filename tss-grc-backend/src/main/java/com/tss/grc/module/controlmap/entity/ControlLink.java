@@ -32,6 +32,10 @@ public class ControlLink {
     @Column(name = "sub_control_id", nullable = false)
     private Long subControlId;
 
+    /** How fully this entity satisfies the mapped control: FULL / PARTIAL / PLANNED. */
+    @Column(name = "satisfaction", length = 20)
+    private String satisfaction = "FULL";
+
     @Column(name = "created_by")
     private Long createdBy;
 

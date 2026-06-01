@@ -39,7 +39,7 @@ public class ControlMapController {
                                          @PathVariable Long entityId,
                                          @RequestBody ControlLinkSetRequest request,
                                          @AuthenticationPrincipal GrcUserDetails me) {
-        return service.setMappings(entityType, entityId, request.subControlIds(),
+        return service.setMappings(entityType, entityId, request.subControlIds(), request.satisfaction(),
             me != null ? me.getUserId() : null);
     }
 }
