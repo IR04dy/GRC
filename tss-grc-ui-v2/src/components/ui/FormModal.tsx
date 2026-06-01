@@ -6,7 +6,10 @@ import { Select } from './Select';
 import { SearchableSelect, type SelectOption } from './SearchableSelect';
 import { Button } from './Button';
 import { AttachmentsField, isAllowedFile } from './AttachmentsField';
-import { attachmentsApi } from '../../lib/api';
+import { attachmentsApi, ATTACHMENT_DOC_TYPES, type AttachmentDocType } from '../../lib/api';
+
+/** A create-mode staged file with its chosen document type. */
+interface StagedFile { file: File; docType: AttachmentDocType; }
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 
@@ -101,9 +104,9 @@ export function FormModal<T>({
       if (pending.length && newId != null) {
         let failed = 0;
         for (const f of pending) {
-          const files = (bag[f.key] as File[] | undefined) ?? [];
-          for (const file of files) {
-            try { await attachmentsApi.upload(f.entityType, newId, file, { docType: 'OTHER' }); }
+          const staged = (bag[f.key] as StagedFile[] | undefined) ?? [];
+          for (const s of staged) {
+            try { await attachmentsApi.upload(f.entityType, newId, s.file, { docType: s.docType }); }
             catch { failed++; }
           }
         }
@@ -189,7 +192,7 @@ export function FormModal<T>({
                 f.entityId != null
                   ? <AttachmentsField entityType={f.entityType} entityId={f.entityId} label={f.label} />
                   : <PendingFilesField label={f.label}
-                      files={(v as File[] | undefined) ?? []}
+                      files={(v as StagedFile[] | undefined) ?? []}
                       onChange={(next) => setV(next)} />
               );
           }
@@ -200,13 +203,13 @@ export function FormModal<T>({
 }
 
 /**
- * CREATE-mode attachment staging: collect File[] before the record exists.
- * FormModal uploads them after onSubmit returns the new entity id.
+ * CREATE-mode attachment staging: collect files (each with a chosen doc-type)
+ * before the record exists. FormModal uploads them after onSubmit returns the id.
  */
 function PendingFilesField({ label, files, onChange }: {
   label: string;
-  files: File[];
-  onChange: (files: File[]) => void;
+  files: StagedFile[];
+  onChange: (files: StagedFile[]) => void;
 }) {
   const { lang } = useI18n();
   const ar = lang === 'ar';
@@ -219,7 +222,7 @@ function PendingFilesField({ label, files, onChange }: {
     if (ok.length < incoming.length) {
       toast.danger(ar ? 'تم تجاهل ملفات غير مسموحة (النوع/الحجم 50 ميجابايت).' : 'Some files were skipped (type or 50 MB limit).');
     }
-    if (ok.length) onChange([...files, ...ok]);
+    if (ok.length) onChange([...files, ...ok.map(file => ({ file, docType: 'OTHER' as AttachmentDocType }))]);
   }
 
   function add(e: ChangeEvent<HTMLInputElement>) {
@@ -255,13 +258,20 @@ function PendingFilesField({ label, files, onChange }: {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {files.map((file, i) => (
-            <div key={`${file.name}-${i}`} style={{
+          {files.map((s, i) => (
+            <div key={`${s.file.name}-${i}`} style={{
               display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
               padding: '4px 8px', borderRadius: 6, background: 'var(--surface-2)',
             }}>
               <Paperclip size={12} style={{ color: 'var(--ink-3)' }} />
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.file.name}</span>
+              <select
+                value={s.docType}
+                aria-label={ar ? 'نوع المستند' : 'Document type'}
+                onChange={e => onChange(files.map((x, j) => j === i ? { ...x, docType: e.currentTarget.value as AttachmentDocType } : x))}
+                style={{ fontSize: 11, padding: '1px 4px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                {ATTACHMENT_DOC_TYPES.map(dt => <option key={dt} value={dt}>{dt}</option>)}
+              </select>
               <button type="button" aria-label="remove"
                 onClick={() => onChange(files.filter((_, j) => j !== i))}
                 style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex' }}>
