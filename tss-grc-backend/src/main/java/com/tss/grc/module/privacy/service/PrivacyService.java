@@ -4,8 +4,10 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.privacy.entity.DataBreach;
 import com.tss.grc.module.privacy.entity.DataSubjectRequest;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
+import com.tss.grc.module.privacy.repository.ConsentRecordRepository;
 import com.tss.grc.module.privacy.repository.DataBreachRepository;
 import com.tss.grc.module.privacy.repository.DataSubjectRequestRepository;
+import com.tss.grc.module.privacy.repository.DpiaRepository;
 import com.tss.grc.module.privacy.repository.ProcessingActivityRepository;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
@@ -25,6 +28,8 @@ public class PrivacyService {
     private final DataBreachRepository breachRepo;
     private final DataSubjectRequestRepository dsrRepo;
     private final ProcessingActivityRepository ropaRepo;
+    private final DpiaRepository dpiaRepo;
+    private final ConsentRecordRepository consentRepo;
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
@@ -384,15 +389,63 @@ public class PrivacyService {
 
     // ── Stats ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Privacy / PDPL dashboard stats. Returns the full shape the dashboard
+     * reads (ropaCount, highRiskRopa, pia*, dsr*, consents*, cross-border,
+     * breach*) — earlier this returned only three keys with different names,
+     * so every dashboard tile read {@code undefined} and rendered 0. The
+     * legacy keys (totalBreaches/openDsrs/totalRopa) are kept for back-compat.
+     */
     @Transactional(readOnly = true)
     public Map<String, Long> getStats() {
         Long orgId = TenantContext.getCurrentTenant();
-        return Map.of(
-            "totalBreaches",    breachRepo.countByOrganisationIdAndStatus(orgId, "OPEN") + breachRepo.countByOrganisationIdAndStatus(orgId, "INVESTIGATING"),
-            "openDsrs",         dsrRepo.countByOrganisationIdAndStatus(orgId, "PENDING")
-                                  + dsrRepo.countByOrganisationIdAndStatus(orgId, "IN_PROGRESS")
-                                  + dsrRepo.countByOrganisationIdAndStatus(orgId, "OPEN"),
-            "totalRopa",        ropaRepo.findByOrganisationId(orgId, Pageable.unpaged()).getTotalElements()
-        );
+
+        long totalRopa     = ropaRepo.findByOrganisationId(orgId, Pageable.unpaged()).getTotalElements();
+        long crossBorder   = ropaRepo.findByOrganisationIdAndCrossBorderTransferTrue(orgId).size();
+        long highRiskRopa  = ropaRepo.findByOrganisationIdAndSpecialCategoryFlagTrue(orgId).size();
+
+        long dsrOpen = dsrRepo.countByOrganisationIdAndStatus(orgId, "PENDING")
+                     + dsrRepo.countByOrganisationIdAndStatus(orgId, "IN_PROGRESS")
+                     + dsrRepo.countByOrganisationIdAndStatus(orgId, "OPEN")
+                     + dsrRepo.countByOrganisationIdAndStatus(orgId, "NEW");
+        long dsrSla  = dsrRepo.countByOrganisationIdAndStatus(orgId, "ESCALATED");
+
+        long openBreaches = breachRepo.countByOrganisationIdAndStatus(orgId, "OPEN")
+                          + breachRepo.countByOrganisationIdAndStatus(orgId, "INVESTIGATING");
+        long notified     = breachRepo.countByOrganisationIdAndStatus(orgId, "NOTIFIED");
+        long incidents12m = openBreaches + notified
+                          + breachRepo.countByOrganisationIdAndStatus(orgId, "INVESTIGATED")
+                          + breachRepo.countByOrganisationIdAndStatus(orgId, "ESCALATED")
+                          + breachRepo.countByOrganisationIdAndStatus(orgId, "REMEDIATED")
+                          + breachRepo.countByOrganisationIdAndStatus(orgId, "CLOSED");
+
+        long piaCompleted = dpiaRepo.countByOrganisationIdAndStatus(orgId, "APPROVED");
+        long piaOverdue   = dpiaRepo.countByOrganisationIdAndStatus(orgId, "EXPIRED");
+
+        long activeConsents = consentRepo.countByOrganisationIdAndStatus(orgId, "ACTIVE")
+                            + consentRepo.countByOrganisationIdAndStatus(orgId, "GRANTED");
+        long withdrawn      = consentRepo.countByOrganisationIdAndStatus(orgId, "WITHDRAWN");
+
+        Map<String, Long> m = new LinkedHashMap<>();
+        // Legacy keys (back-compat).
+        m.put("totalRopa", totalRopa);
+        m.put("openDsrs", dsrOpen);
+        m.put("totalBreaches", openBreaches);
+        // Dashboard shape.
+        m.put("ropaCount", totalRopa);
+        m.put("highRiskRopa", highRiskRopa);
+        m.put("crossBorderTransfers", crossBorder);
+        m.put("piaCompleted", piaCompleted);
+        m.put("piaOverdue", piaOverdue);
+        m.put("dsrOpen", dsrOpen);
+        m.put("dsrSlaBreaches", dsrSla);
+        m.put("activeConsents", activeConsents);
+        m.put("withdrawnConsents30d", withdrawn);
+        m.put("privacyIncidents12m", incidents12m);
+        m.put("breachNotifications", notified);
+        // Not tracked in this module yet — surfaced as 0 rather than absent.
+        m.put("processorsWithoutDpa", 0L);
+        m.put("retentionViolations", 0L);
+        return m;
     }
 }
