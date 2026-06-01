@@ -4,6 +4,8 @@ import { Server, ShieldCheck, Archive, ArrowUpRight } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -307,6 +309,19 @@ export function AttackSurfaceAssetDetailPage() {
               : 'No findings have been recorded against this asset yet.'} />}
         />
       </Card>
+
+      {/* Documents & control mapping — scan reports, remediation evidence, controls */}
+      {asset && (
+        <div style={{ marginTop: 16 }}>
+          <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <AttachmentsField entityType="ASM_ASSET" entityId={asset.id} />
+              <div style={{ borderTop: '1px solid var(--border)' }} />
+              <ControlMappingPicker entityType="ASM_ASSET" entityId={asset.id} />
+            </div>
+          </Card>
+        </div>
+      )}
     </Shell>
   );
 }
