@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, Database } from 'lucide-react';
+import { Plus, Database, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -53,6 +54,7 @@ export function DataclassAssetsPage() {
 
   // classify dialog
   const [classifyTarget, setClassifyTarget] = useState<AssetResponse | null>(null);
+  const [docsTarget, setDocsTarget] = useState<AssetResponse | null>(null);
   const [klass, setKlass] = useState<Classification>('INTERNAL');
   const [klassSpecial, setKlassSpecial] = useState<SpecialCategory>('NONE');
   const [nextReview, setNextReview] = useState('');
@@ -168,6 +170,9 @@ export function DataclassAssetsPage() {
         const next = nextAssetStatuses(a.status);
         return (
           <div style={{ display: 'flex', gap: 4 }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(a); }} />
             {a.status === 'DRAFT' && (
               <Button variant="ghost" size="sm"
                 onClick={(e) => { e.stopPropagation();
@@ -364,6 +369,13 @@ export function DataclassAssetsPage() {
           />
         )}
       </Card>
+      <EntityDocsModal
+        entityType="DATACLASS_ASSET"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.reference}
+        onClose={() => setDocsTarget(null)}
+      />
     </Shell>
   );
 }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, Inbox } from 'lucide-react';
+import { Plus, Inbox, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -43,6 +44,7 @@ export function DsrPage() {
 
   // Move form
   const [moveTarget, setMoveTarget] = useState<DsrResponse | null>(null);
+  const [docsTarget, setDocsTarget] = useState<DsrResponse | null>(null);
   const [toStatus, setToStatus] = useState<DsrStatus | null>(null);
   const [verifMethod, setVerifMethod] = useState('NAFATH');
   const [responseEn, setResponseEn] = useState('');
@@ -124,14 +126,22 @@ export function DsrPage() {
                    : (ar ? `${d.hoursLeft}س متبقية` : `${d.hoursLeft}h left`)}
         </span>;
       } },
-    { header: '', width: '95px',
+    { header: '', width: '140px',
       cell: d => {
         const next = nextDsrStatuses(d.status);
-        if (next.length === 0) return null;
-        return <Button variant="ghost" size="sm"
-          onClick={(e) => { e.stopPropagation(); setMoveTarget(d); setToStatus(next[0]); }}>
-          {ar ? 'تحريك' : 'Move'}
-        </Button>;
+        return (
+          <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(d); }} />
+            {next.length > 0 && (
+              <Button variant="ghost" size="sm"
+                onClick={(e) => { e.stopPropagation(); setMoveTarget(d); setToStatus(next[0]); }}>
+                {ar ? 'تحريك' : 'Move'}
+              </Button>
+            )}
+          </span>
+        );
       } },
   ];
 
@@ -224,6 +234,13 @@ export function DsrPage() {
           <DataTable columns={cols} rows={rows} />
         )}
       </Card>
+      <EntityDocsModal
+        entityType="DSR"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.reference}
+        onClose={() => setDocsTarget(null)}
+      />
     </Shell>
   );
 }
