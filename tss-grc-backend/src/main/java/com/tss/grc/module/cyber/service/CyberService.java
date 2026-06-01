@@ -57,11 +57,11 @@ public class CyberService {
         List<CyberControl> controls = controlRepo.findAllByOrganisationId(orgId);
         dto.setTotalControls(controls.size());
         dto.setCompliantControls((int) controls.stream()
-                .filter(c -> "COMPLIANT".equalsIgnoreCase(c.getImplementationStatus())).count());
+                .filter(c -> "IMPLEMENTED".equalsIgnoreCase(c.getImplementationStatus())).count());
         dto.setNonCompliantControls((int) controls.stream()
-                .filter(c -> "NON_COMPLIANT".equalsIgnoreCase(c.getImplementationStatus())).count());
+                .filter(c -> "NOT_IMPLEMENTED".equalsIgnoreCase(c.getImplementationStatus())).count());
         dto.setPartialControls((int) controls.stream()
-                .filter(c -> "PARTIAL".equalsIgnoreCase(c.getImplementationStatus())).count());
+                .filter(c -> "PARTIALLY_IMPLEMENTED".equalsIgnoreCase(c.getImplementationStatus())).count());
 
         List<Vulnerability> vulns = vulnerabilityRepo.findAllByOrganisationId(orgId);
         dto.setOpenVulnerabilities((int) vulns.stream()
@@ -103,7 +103,7 @@ public class CyberService {
                           && e.getExpiryDate().isBefore(horizon)
                           && !"EXPIRED".equalsIgnoreCase(e.getStatus())).count());
 
-        // Per-framework compliance: % of controls whose status is COMPLIANT
+        // Per-framework compliance: % of controls whose status is IMPLEMENTED
         // inside that framework. 0 means no controls assessed yet for the
         // framework (NOT 0% compliant) — frontend tints it differently.
         dto.setEccScore(scoreForFramework(controls, "ECC"));
@@ -125,7 +125,7 @@ public class CyberService {
         return dto;
     }
 
-    /** Returns the percentage of controls in this framework marked COMPLIANT.
+    /** Returns the percentage of controls in this framework marked IMPLEMENTED.
      *  Returns 0 when there are no controls for the framework — caller should
      *  treat 0 as "not started" rather than "0% compliant" since the cycle
      *  may simply not have opened yet. */
@@ -134,14 +134,14 @@ public class CyberService {
         long total = controls.stream()
                 .filter(c -> fwCode.equalsIgnoreCase(c.getFrameworkName())
                           || (c.getFrameworkName() != null
-                              && c.getFrameworkName().toUpperCase().startsWith(fwCode.toUpperCase())))
+                              && c.getFrameworkName().toUpperCase().contains(fwCode.toUpperCase())))
                 .count();
         if (total == 0) return 0;
         long compliant = controls.stream()
                 .filter(c -> fwCode.equalsIgnoreCase(c.getFrameworkName())
                           || (c.getFrameworkName() != null
-                              && c.getFrameworkName().toUpperCase().startsWith(fwCode.toUpperCase())))
-                .filter(c -> "COMPLIANT".equalsIgnoreCase(c.getImplementationStatus()))
+                              && c.getFrameworkName().toUpperCase().contains(fwCode.toUpperCase())))
+                .filter(c -> "IMPLEMENTED".equalsIgnoreCase(c.getImplementationStatus()))
                 .count();
         return Math.round(100f * compliant / total);
     }
