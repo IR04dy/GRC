@@ -59,6 +59,26 @@ public class AttachmentService {
         return toResponse(repository.save(a));
     }
 
+    /**
+     * Metadata-only edit — re-type / rename / re-date an attachment without
+     * deleting + re-uploading. Null fields are left unchanged; a blank title
+     * clears it.
+     */
+    @Transactional
+    public AttachmentResponse update(Long id, String docType, String titleEn, LocalDate validTo) {
+        Attachment a = mustGet(id);
+        if (docType != null && !docType.isBlank()) {
+            String type = docType.toUpperCase();
+            if (!DOC_TYPES.contains(type)) {
+                throw new IllegalArgumentException("Unknown docType '" + docType + "'. Valid: " + DOC_TYPES);
+            }
+            a.setDocType(type);
+        }
+        if (titleEn != null) a.setTitleEn(titleEn.isBlank() ? null : titleEn);
+        if (validTo != null) a.setValidTo(validTo);
+        return toResponse(repository.save(a));
+    }
+
     /** Bytes + metadata for streaming a download. */
     public record DownloadPayload(String fileName, String mimeType, byte[] bytes) {}
 

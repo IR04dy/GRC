@@ -1946,6 +1946,8 @@ export const attachmentsApi = {
     return uploadFile<AttachmentDto>(`/api/v1/attachments/${entityType}/${entityId}?${q.toString()}`, file);
   },
   download: (a: AttachmentDto) => downloadFile(`/api/v1/attachments/${a.id}/download`, a.fileName),
+  update: (id: number, body: { docType?: AttachmentDocType; titleEn?: string; validTo?: string }) =>
+    api.patch<AttachmentDto>(`/api/v1/attachments/${id}`, body),
   remove: (id: number) => api.delete<void>(`/api/v1/attachments/${id}`),
 };
 

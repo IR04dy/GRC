@@ -7,7 +7,7 @@
 // attachments expose a "Re-collect" action that re-opens the picker pre-seeded
 // with the same type/title so the fresh copy supersedes the stale one.
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent } from 'react';
-import { Paperclip, Download, Trash2, Upload, RefreshCw, X } from 'lucide-react';
+import { Paperclip, Download, Trash2, Upload, RefreshCw, X, Pencil } from 'lucide-react';
 import { Button } from './Button';
 import { Badge } from './Badge';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -76,6 +76,11 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const [queue, setQueue] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // metadata edit
+  const [editing, setEditing] = useState<AttachmentDto | null>(null);
+  const [eDocType, setEDocType] = useState<AttachmentDocType>('OTHER');
+  const [eTitle, setETitle] = useState('');
+  const [eValidTo, setEValidTo] = useState('');
   // delete confirmation
   const [confirmDel, setConfirmDel] = useState<AttachmentDto | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -167,6 +172,26 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     finally { setDeleting(false); }
   }
 
+  function startEdit(a: AttachmentDto) {
+    setEditing(a);
+    setEDocType(a.docType);
+    setETitle(a.titleEn ?? '');
+    setEValidTo(a.validTo ?? '');
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await attachmentsApi.update(editing.id, { docType: eDocType, titleEn: eTitle.trim(), validTo: eValidTo || undefined });
+      toast.success(ar ? 'تم تحديث المرفق' : 'Attachment updated');
+      setEditing(null);
+      load();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : (ar ? 'تعذّر التحديث' : 'Update failed'));
+    } finally { setBusy(false); }
+  }
+
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -237,6 +262,43 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
         </div>
       )}
 
+      {/* Metadata editor — re-type / rename / re-date without re-uploading. */}
+      {editing && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10, padding: 10,
+          border: '1px solid var(--warning-300, var(--border))', borderRadius: 8, background: 'var(--surface-2)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+            <Pencil size={13} style={{ color: 'var(--ink-3)' }} />
+            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {ar ? 'تعديل: ' : 'Editing: '}{editing.fileName}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <select value={eDocType} onChange={e => setEDocType(e.currentTarget.value as AttachmentDocType)}
+              aria-label={ar ? 'نوع المستند' : 'Document type'} style={inputStyle}>
+              {ATTACHMENT_DOC_TYPES.map(t => (
+                <option key={t} value={t}>{ar ? DOC_TYPE_LABELS[t].ar : DOC_TYPE_LABELS[t].en}</option>
+              ))}
+            </select>
+            <input value={eTitle} onChange={e => setETitle(e.currentTarget.value)}
+              placeholder={ar ? 'عنوان (اختياري)' : 'Title (optional)'}
+              aria-label={ar ? 'العنوان' : 'Title'} style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
+            <input type="date" value={eValidTo} onChange={e => setEValidTo(e.currentTarget.value)}
+              aria-label={ar ? 'صالح حتى' : 'Valid until'}
+              style={{ ...inputStyle, color: eValidTo ? 'var(--ink-1)' : 'var(--ink-3)' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button size="sm" variant="ghost" Icon={X} disabled={busy} onClick={() => setEditing(null)}>
+              {ar ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button size="sm" variant="primary" disabled={busy} onClick={() => { void saveEdit(); }}>
+              {busy ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : (ar ? 'حفظ' : 'Save')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '10px 0' }}>
           {ar ? 'جارٍ التحميل…' : 'Loading…'}
@@ -272,6 +334,8 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                       title={ar ? 'إعادة التجميع (رفع نسخة محدّثة)' : 'Re-collect (upload a fresh copy)'}
                       onClick={() => pick({ docType: a.docType, title: a.titleEn || '' })} />
                   )}
+                  <Button size="sm" variant="ghost" Icon={Pencil} title={ar ? 'تعديل البيانات' : 'Edit details'}
+                    onClick={() => startEdit(a)} />
                   <Button size="sm" variant="ghost" Icon={Download} title={ar ? 'تنزيل' : 'Download'}
                     onClick={() => { void attachmentsApi.download(a); }} />
                   <Button size="sm" variant="ghost" Icon={Trash2} title={ar ? 'حذف' : 'Delete'}

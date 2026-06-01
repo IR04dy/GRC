@@ -1,6 +1,7 @@
 package com.tss.grc.module.attachment.controller;
 
 import com.tss.grc.module.attachment.dto.AttachmentResponse;
+import com.tss.grc.module.attachment.dto.AttachmentUpdateRequest;
 import com.tss.grc.module.attachment.service.AttachmentService;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,6 +63,12 @@ public class AttachmentController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + p.fileName() + "\"")
             .contentType(MediaType.parseMediaType(p.mimeType()))
             .body(p.bytes());
+    }
+
+    @PatchMapping("/{id}")
+    @Operation(summary = "Edit attachment metadata (docType / title / expiry) — binary unchanged")
+    public AttachmentResponse update(@PathVariable Long id, @RequestBody AttachmentUpdateRequest req) {
+        return service.update(id, req.docType(), req.titleEn(), req.validTo());
     }
 
     @DeleteMapping("/{id}")
