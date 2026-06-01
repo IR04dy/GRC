@@ -5,19 +5,27 @@ import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.dashboard.dto.ChartData;
 import com.tss.grc.module.dashboard.dto.DashboardStats;
 import com.tss.grc.module.dashboard.dto.HeatmapData;
+import com.tss.grc.module.dashboard.dto.TrendPoint;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.incident.repository.IncidentRepository;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +36,9 @@ public class DashboardService {
     private final IncidentRepository incidentRepository;
     private final ControlRepository controlRepository;
     private final ComplianceAssessmentRepository assessmentRepository;
+
+    @PersistenceContext
+    private EntityManager em;
 
     @Cacheable(value = "dashboardStats", key = "#organisationId")
     @Transactional(readOnly = true)
@@ -96,5 +107,67 @@ public class DashboardService {
             r.getRiskLevel(), r.getIdentifiedDate(), r.getReviewDate(),
             r.getCreatedAt(), r.getUpdatedAt()
         )).toList();
+    }
+
+    // ── KPI trend (real weekly series from entity timestamps) ───────────────
+    //
+    // Replaces the synthetic Math.random/Math.sin sparklines on the dashboards
+    // with a genuine series: for each of the last `weeks` ISO weeks, the
+    // cumulative count of still-open items created on or before that week.
+    // No snapshot table needed — derived from created_at + current status.
+
+    private record MetricSource(String table, String openFilter, String extra) {}
+
+    private static final Map<String, MetricSource> METRICS = Map.of(
+        "risks",          new MetricSource("risk.risks",     " AND status <> 'CLOSED'", ""),
+        "open_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", ""),
+        "critical_risks", new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'CRITICAL'"),
+        "high_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'HIGH'"),
+        "incidents",      new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", ""),
+        "open_incidents", new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "")
+    );
+
+    @Transactional(readOnly = true)
+    public List<TrendPoint> getKpiTrend(Long orgId, String metric, int weeks) {
+        int n = Math.max(2, Math.min(52, weeks));
+        MetricSource src = METRICS.getOrDefault(metric == null ? "risks" : metric.toLowerCase(),
+                METRICS.get("risks"));
+        LocalDate windowStart = LocalDate.now()
+                .minusWeeks(n - 1L)
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+        String base = " FROM " + src.table()
+                + " WHERE organisation_id = :org AND is_deleted = 0" + src.openFilter() + src.extra();
+
+        long baseline = ((Number) em.createNativeQuery(
+                "SELECT COUNT(*)" + base + " AND created_at < :start")
+                .setParameter("org", orgId)
+                .setParameter("start", windowStart.atStartOfDay())
+                .getSingleResult()).longValue();
+
+        // Fetch creation timestamps inside the window and bucket by week in Java.
+        // (SQL Server won't GROUP BY a parameterised DATEDIFF, so we bucket here.)
+        @SuppressWarnings("unchecked")
+        List<Object> stamps = em.createNativeQuery(
+                "SELECT created_at" + base + " AND created_at >= :start")
+                .setParameter("org", orgId)
+                .setParameter("start", windowStart.atStartOfDay())
+                .getResultList();
+        Map<Integer, Long> byWeek = new HashMap<>();
+        for (Object o : stamps) {
+            LocalDate created = o instanceof java.sql.Timestamp ts ? ts.toLocalDateTime().toLocalDate()
+                    : o instanceof java.time.LocalDateTime ldt ? ldt.toLocalDate()
+                    : LocalDate.parse(o.toString().substring(0, 10));
+            int w = (int) java.time.temporal.ChronoUnit.WEEKS.between(windowStart, created);
+            if (w >= 0 && w < n) byWeek.merge(w, 1L, Long::sum);
+        }
+
+        List<TrendPoint> out = new ArrayList<>(n);
+        long cumulative = baseline;
+        for (int w = 0; w < n; w++) {
+            cumulative += byWeek.getOrDefault(w, 0L);
+            out.add(new TrendPoint("W" + (w + 1), cumulative));
+        }
+        return out;
     }
 }

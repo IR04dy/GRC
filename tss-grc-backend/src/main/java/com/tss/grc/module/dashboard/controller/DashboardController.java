@@ -52,6 +52,15 @@ public class DashboardController {
         return dashboardService.getRiskByCategory(TenantContext.requireOrganisationId());
     }
 
+    /** Real weekly KPI trend (metric = risks | critical_risks | high_risks | incidents). */
+    @GetMapping("/kpi-trend")
+    @PreAuthorize("hasAnyAuthority('RISK_READ','INCIDENT_READ','COMPLIANCE_READ','CYBER_READ')")
+    public List<com.tss.grc.module.dashboard.dto.TrendPoint> kpiTrend(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "risks") String metric,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "12") int weeks) {
+        return dashboardService.getKpiTrend(TenantContext.requireOrganisationId(), metric, weeks);
+    }
+
     @GetMapping("/recent-risks")
     @PreAuthorize("hasPermission('RISK','READ')")
     public List<RiskResponse> recentRisks() {

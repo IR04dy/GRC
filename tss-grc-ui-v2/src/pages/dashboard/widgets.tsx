@@ -43,39 +43,21 @@ export interface WidgetContext {
   stats: DashboardStats;
   heat: HeatCell[];
   t: (k: string) => string;
-}
-
-/**
- * Generates a mock 12-point trend that lands on the current value.
- * Replace with real `/api/v1/dashboard/kpi-trend?metric=...` calls when the
- * backend endpoint ships.
- */
-function mockTrend(current: number, volatility = 0.18): number[] {
-  const n = 12;
-  const series: number[] = [];
-  let v = current * (1 - volatility);
-  for (let i = 0; i < n - 1; i++) {
-    // Random walk biased toward `current` so the line drifts to today's value
-    const noise = (Math.random() - 0.5) * volatility * Math.max(1, current * 0.3);
-    const pull  = (current - v) * 0.18;
-    v = Math.max(0, v + pull + noise);
-    series.push(Math.round(v * 100) / 100);
-  }
-  series.push(current);
-  return series;
+  /** Real weekly open-risk trend from /api/v1/dashboard/kpi-trend (for sparklines). */
+  riskTrend?: number[];
 }
 
 // ─── Built-in widgets ──────────────────────────────────────────────────────
 export const WIDGETS: DashboardWidget[] = [
   // KPIs — every tile drills into a filtered list (Tier 1)
   { id: 'kpi-total-risks',    titleKey: 'kpiTotalRisks',    defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={AlertTriangle} label={t('kpiTotalRisks')} value={stats.totalRisks} tone="primary" spark={mockTrend(stats.totalRisks)} to="/risk" /> },
+    render: ({ stats, t, riskTrend }) => <Kpi Icon={AlertTriangle} label={t('kpiTotalRisks')} value={stats.totalRisks} tone="primary" spark={riskTrend} to="/risk" /> },
   { id: 'kpi-critical-risks', titleKey: 'kpiCriticalRisks', defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={Flame} label={t('kpiCriticalRisks')} value={stats.criticalRisks ?? stats.openCriticalRisks} tone="danger" spark={mockTrend(stats.criticalRisks ?? stats.openCriticalRisks ?? 0, 0.3)} to="/risk?level=CRITICAL" /> },
+    render: ({ stats, t, riskTrend }) => <Kpi Icon={Flame} label={t('kpiCriticalRisks')} value={stats.criticalRisks ?? stats.openCriticalRisks} tone="danger" spark={riskTrend} to="/risk?level=CRITICAL" /> },
   { id: 'kpi-compliance',     titleKey: 'kpiCompliance',    defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={ClipboardCheck} label={t('kpiCompliance')} value={`${stats.complianceScore}%`} tone="success" spark={mockTrend(stats.complianceScore, 0.06)} to="/compliance?tab=scorecard" /> },
+    render: ({ stats, t }) => <Kpi Icon={ClipboardCheck} label={t('kpiCompliance')} value={`${stats.complianceScore}%`} tone="success" to="/compliance?tab=scorecard" /> },
   { id: 'kpi-active-controls',titleKey: 'kpiActiveControls',defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ stats, t }) => <Kpi Icon={ShieldCheck} label={t('kpiActiveControls')} value={stats.activeUsers} tone="info" spark={mockTrend(stats.activeUsers, 0.08)} to="/compliance?tab=controls" /> },
+    render: ({ stats, t }) => <Kpi Icon={ShieldCheck} label={t('kpiActiveControls')} value={stats.activeUsers} tone="info" to="/compliance?tab=controls" /> },
 
   // Charts
   { id: 'heatmap',           titleKey: 'cardHeatTitle',    defaultSize: 'md', category: 'chart',
@@ -467,7 +449,6 @@ function OpenIntakesKpi({ t }: { t: (k: string) => string }) {
     label={t('dashKpiOpenIntakes')}
     value={open}
     tone={overdue > 0 ? 'danger' : 'primary'}
-    spark={mockTrend(open, 0.25)}
     to="/intake-inbox"
   />;
 }
@@ -484,7 +465,6 @@ function OverdueReassessmentsKpi({ t }: { t: (k: string) => string }) {
     label={t('dashKpiOverdueReassessments')}
     value={overdueCount}
     tone={overdueCount > 0 ? 'warning' : 'success'}
-    spark={mockTrend(overdueCount, 0.3)}
     to="/tprm"
   />;
 }
@@ -499,7 +479,6 @@ function CabQueueKpi({ t }: { t: (k: string) => string }) {
     label={t('dashKpiCabQueue')}
     value={inFlight}
     tone="info"
-    spark={mockTrend(inFlight, 0.2)}
     to="/changes"
   />;
 }

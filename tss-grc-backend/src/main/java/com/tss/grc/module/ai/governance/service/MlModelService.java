@@ -266,7 +266,7 @@ public class MlModelService {
         }
         // PDPL Art.29 — if training/inference data leaves the Kingdom, the
         // transfer must rest on a documented legal basis.
-        if (CROSS_BORDER_RESIDENCY.contains(m.getDataResidency())
+        if (m.getDataResidency() != null && CROSS_BORDER_RESIDENCY.contains(m.getDataResidency())
                 && (m.getCrossBorderTransferBasis() == null
                     || m.getCrossBorderTransferBasis().isBlank()
                     || "NOT_ASSESSED".equals(m.getCrossBorderTransferBasis()))) {

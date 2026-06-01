@@ -11,7 +11,7 @@ import { useI18n } from '../../lib/i18n';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { TimeSeries, type TimeSeriesPoint } from '../../components/viz/TimeSeries';
 import { Progress } from '../../components/ui/Progress';
-import type { DashboardStats } from '../../lib/api';
+import { dashboardApi, type DashboardStats, type TrendPoint } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { mlModelApi, aggregateMlRegistry, type MlModelResponse } from '../../lib/aiGovernance';
 import { COMPLIANCE_FINDINGS } from '../compliance/mockCompliance';
@@ -36,11 +36,25 @@ export function ExecutiveDashboard({ stats, heat }: {
   stats: DashboardStats;
   heat: HeatCell[];
 }) {
+  // Real KPI trends (weekly, from entity timestamps) — replaces the previous
+  // synthetic Math.sin/Math.random sparklines. Falls back to undefined (flat /
+  // no sparkline) if unauthenticated or the endpoint is unavailable.
+  const [riskTrend, setRiskTrend] = useState<number[] | undefined>();
+  const [incidentTrend, setIncidentTrend] = useState<number[] | undefined>();
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    let alive = true;
+    const toSeries = (pts: TrendPoint[]) => pts.map(p => p.value);
+    dashboardApi.kpiTrend('risks', 12).then(p => { if (alive) setRiskTrend(toSeries(p)); }).catch(() => {});
+    dashboardApi.kpiTrend('incidents', 12).then(p => { if (alive) setIncidentTrend(toSeries(p)); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
       <PostureHero stats={stats} />
-      <ExecutiveKpiRow stats={stats} />
-      <RiskHeatTrendRow heat={heat} stats={stats} />
+      <ExecutiveKpiRow stats={stats} riskTrend={riskTrend} incidentTrend={incidentTrend} />
+      <RiskHeatTrendRow heat={heat} stats={stats} riskTrend={riskTrend} />
       <FrameworkReadiness stats={stats} />
       <AiGovernanceStrip />
       <AttentionStrip />
@@ -360,16 +374,13 @@ function KpiTile({ Icon, label, value, to, tone, spark, delta, segments }: KpiTi
   );
 }
 
-function ExecutiveKpiRow({ stats }: { stats: DashboardStats }) {
+function ExecutiveKpiRow({ stats, riskTrend, incidentTrend }: {
+  stats: DashboardStats;
+  riskTrend?: number[];
+  incidentTrend?: number[];
+}) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-
-  // Synthetic 12-week sparklines that converge on the current value —
-  // replace with real /api/v1/dashboard/kpi-trend when shipped.
-  const trendTo = (target: number, vol = 0.2) =>
-    Array.from({ length: 12 }, (_, i) =>
-      Math.max(0, Math.round(target * (1 + (Math.sin(i * 0.7) * vol + (i / 12 - 0.5) * 0.1))))
-    );
 
   // Compute overdue items count — sum across the data sources we have.
   const overdueFindings = COMPLIANCE_FINDINGS.filter(f =>
@@ -384,7 +395,7 @@ function ExecutiveKpiRow({ stats }: { stats: DashboardStats }) {
       value: stats.openRisks ?? 0,
       to: '/risk?status=open',
       tone: stats.openCriticalRisks > 0 ? 'danger' : 'warning',
-      spark: trendTo(stats.openRisks ?? 0),
+      spark: riskTrend,
       delta: { value: -2, tone: 'success' },
       segments: [
         { value: stats.openCriticalRisks ?? 0, color: 'var(--danger)',  label: isAr ? 'حرجة' : 'Critical' },
@@ -399,7 +410,6 @@ function ExecutiveKpiRow({ stats }: { stats: DashboardStats }) {
       value: `${stats.complianceScore ?? 0}%`,
       to: '/compliance',
       tone: 'primary',
-      spark: trendTo(stats.complianceScore ?? 0, 0.05),
       delta: { value: +3, tone: 'success' },
     },
     {
@@ -408,7 +418,7 @@ function ExecutiveKpiRow({ stats }: { stats: DashboardStats }) {
       value: stats.openIncidents ?? 0,
       to: '/incidents?status=open',
       tone: (stats.openIncidents ?? 0) > 0 ? 'danger' : 'success',
-      spark: trendTo(stats.openIncidents ?? 0, 0.4),
+      spark: incidentTrend,
       delta: stats.openIncidents > 0 ? { value: +1, tone: 'danger' } : undefined,
     },
     {
@@ -417,7 +427,6 @@ function ExecutiveKpiRow({ stats }: { stats: DashboardStats }) {
       value: totalOverdue,
       to: '/capa?status=overdue',
       tone: totalOverdue > 5 ? 'danger' : totalOverdue > 0 ? 'warning' : 'success',
-      spark: trendTo(totalOverdue, 0.3),
       segments: totalOverdue > 0 ? [
         { value: overdueFindings,             color: 'var(--danger)',  label: isAr ? 'ملاحظات' : 'Findings' },
         { value: stats.pendingTasks ?? 0,     color: 'var(--warning)', label: isAr ? 'مهام' : 'Tasks' },
@@ -438,18 +447,20 @@ function ExecutiveKpiRow({ stats }: { stats: DashboardStats }) {
 
 // ─── 3. Risk Heatmap + 90-day Trend (side-by-side) ──────────────────────
 
-function RiskHeatTrendRow({ heat, stats }: { heat: HeatCell[]; stats: DashboardStats }) {
+function RiskHeatTrendRow({ heat, stats, riskTrend }: { heat: HeatCell[]; stats: DashboardStats; riskTrend?: number[] }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
 
-  // 12-week mocked trend — same convergence shape, stable enough to render
-  // a clean area chart. Replace when the trend endpoint ships.
-  const series: TimeSeriesPoint[] = Array.from({ length: 12 }, (_, i) => {
-    const base = (stats.openRisks ?? 28) - 4;
-    const v = Math.max(0, Math.round(base + Math.sin(i * 0.6) * 5 + (i / 12) * 4));
-    const wkLabel = isAr ? `أ${i + 1}` : `W${i + 1}`;
-    return { label: wkLabel, value: v };
-  });
+  // Real weekly open-risk trend from /api/v1/dashboard/kpi-trend. Until it
+  // loads (or if unavailable), show a flat line at the current open-risk
+  // count — honest "no trend data yet" rather than a fabricated curve.
+  const values = (riskTrend && riskTrend.length >= 2)
+    ? riskTrend
+    : Array.from({ length: 12 }, () => stats.openRisks ?? 0);
+  const series: TimeSeriesPoint[] = values.map((v, i) => ({
+    label: isAr ? `أ${i + 1}` : `W${i + 1}`,
+    value: v,
+  }));
 
   return (
     <div style={{

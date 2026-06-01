@@ -48,6 +48,7 @@ export function DashboardPage() {
   const toast = useToast();
   const [stats, setStats] = useState<DashboardStats>(FALLBACK_STATS);
   const [heat, setHeat] = useState<HeatCell[]>(FALLBACK_HEAT);
+  const [riskTrend, setRiskTrend] = useState<number[] | undefined>();
   const [isDemo, setIsDemo] = useState<boolean>(!isAuthenticated());
   const [loading, setLoading] = useState<boolean>(isAuthenticated());
   const [customising, setCustomising] = useState(false);
@@ -73,12 +74,14 @@ export function DashboardPage() {
     if (!isAuthenticated()) { setIsDemo(true); setLoading(false); return; }
     setLoading(true);
     try {
-      const [s, h] = await Promise.all([
+      const [s, h, trend] = await Promise.all([
         dashboardApi.stats().catch(() => null),
         dashboardApi.heatmap().catch(() => null),
+        dashboardApi.kpiTrend('risks', 12).catch(() => null),
       ]);
       if (s) { setStats(s); setIsDemo(false); }
       if (Array.isArray(h)) setHeat(h as HeatCell[]);
+      if (Array.isArray(trend)) setRiskTrend(trend.map(p => p.value));
     } finally { setLoading(false); }
   };
   async function load() { return loadRef.current(); }
@@ -203,7 +206,7 @@ export function DashboardPage() {
 
             <DashboardGrid
               items={layout.items}
-              ctx={{ stats, heat, t }}
+              ctx={{ stats, heat, t, riskTrend }}
               customising={customising}
               onMove={layout.move}
               onRemove={layout.remove}
@@ -225,7 +228,7 @@ function DashboardGrid({
   items, ctx, customising, onMove, onRemove, onResize,
 }: {
   items: Array<{ id: string; size: WidgetSize }>;
-  ctx: { stats: DashboardStats; heat: HeatCell[]; t: (k: string) => string };
+  ctx: { stats: DashboardStats; heat: HeatCell[]; t: (k: string) => string; riskTrend?: number[] };
   customising: boolean;
   onMove: (from: number, to: number) => void;
   onRemove: (id: string) => void;

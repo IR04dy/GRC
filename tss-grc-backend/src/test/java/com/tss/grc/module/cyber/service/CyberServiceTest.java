@@ -256,9 +256,9 @@ class CyberServiceTest {
     @Test
     void getDashboard_counts_open_overdue_critical_correctly() {
         // Controls: 3 total, 1 compliant, 1 partial, 1 non-compliant
-        CyberControl c1 = new CyberControl(); c1.setImplementationStatus("COMPLIANT");
-        CyberControl c2 = new CyberControl(); c2.setImplementationStatus("PARTIAL");
-        CyberControl c3 = new CyberControl(); c3.setImplementationStatus("NON_COMPLIANT");
+        CyberControl c1 = new CyberControl(); c1.setImplementationStatus("IMPLEMENTED");
+        CyberControl c2 = new CyberControl(); c2.setImplementationStatus("PARTIALLY_IMPLEMENTED");
+        CyberControl c3 = new CyberControl(); c3.setImplementationStatus("NOT_IMPLEMENTED");
         when(controlRepo.findAllByOrganisationId(ORG_ID)).thenReturn(List.of(c1, c2, c3));
 
         // Vulns: 4 total, 3 open (1 closed), 2 critical, 1 overdue

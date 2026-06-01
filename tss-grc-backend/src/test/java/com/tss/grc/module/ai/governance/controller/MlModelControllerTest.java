@@ -64,6 +64,7 @@ class MlModelControllerTest {
                 null, null, null,
                 null, false, null,
                 "XGBOOST", "AZURE_KSA", 45, null,
+                null, null, null, null, null,
                 true, null, true, null,
                 true, false,
                 "COMPLIANT", "COMPLIANT",
@@ -85,7 +86,7 @@ class MlModelControllerTest {
     void get_dispatchesToService() {
         when(service.get(MODEL_EX)).thenReturn(stub());
 
-        MlModelResponse out = controller.get(MODEL_EX);
+        MlModelResponse out = controller.get(MODEL_EX.toString());
 
         assertThat(out.modelCode()).isEqualTo("MODEL-2026-001");
         verify(service).get(MODEL_EX);
@@ -102,6 +103,7 @@ class MlModelControllerTest {
                 null, null, null,
                 null, null, null, null, null, null, false, null,
                 null, null, null, null,
+                null, null, null, null, null,
                 null, null, null, null, null, null, null, null
         );
         ResponseEntity<MlModelResponse> resp = controller.create(req);
@@ -116,7 +118,7 @@ class MlModelControllerTest {
         when(service.transition(any(UUID.class), any(LifecycleTransitionRequest.class)))
                 .thenReturn(stub());
 
-        MlModelResponse out = controller.transition(MODEL_EX,
+        MlModelResponse out = controller.transition(MODEL_EX.toString(),
                 new LifecycleTransitionRequest("IN_PRODUCTION"));
 
         assertThat(out).isNotNull();
@@ -128,7 +130,7 @@ class MlModelControllerTest {
         when(service.decommission(any(UUID.class), any(DecommissionRequest.class)))
                 .thenReturn(stub());
 
-        MlModelResponse out = controller.decommission(MODEL_EX,
+        MlModelResponse out = controller.decommission(MODEL_EX.toString(),
                 new DecommissionRequest("Superseded", null, null));
 
         assertThat(out).isNotNull();

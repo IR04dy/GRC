@@ -7,6 +7,8 @@ import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.LifecycleTransition
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelResponse;
 import com.tss.grc.module.ai.governance.entity.MlModel;
+import com.tss.grc.module.ai.governance.entity.MlModelAudit;
+import com.tss.grc.module.ai.governance.repository.MlModelAuditRepository;
 import com.tss.grc.module.ai.governance.repository.MlModelRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -54,6 +56,7 @@ class MlModelServiceTest {
     private static final Long MODEL_ID  = 42L;
 
     @Mock private MlModelRepository repo;
+    @Mock private MlModelAuditRepository auditRepo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -99,6 +102,7 @@ class MlModelServiceTest {
                 null, null, null,
                 null, null, null, null, null, null, false, null,
                 "XGBOOST", "AZURE_KSA", 45, null,
+                null, null, null, null, null,
                 false, null, false, null, false, false,
                 "NOT_ASSESSED", "NOT_ASSESSED"
         );
@@ -170,6 +174,7 @@ class MlModelServiceTest {
                 null, null, null,
                 null, null, null, null, null, null, false, null,
                 null, null, null, null,
+                null, null, null, null, null,
                 null, null, null, null, null, null, null, null
         );
         MlModelResponse out = service.create(r);
@@ -275,9 +280,14 @@ class MlModelServiceTest {
         m.setHasFairnessAudit(true);
         m.setHasPdplDpia(true);
         m.setHasExplainabilityDoc(true);
+        m.setHumanOversight("HUMAN_IN_THE_LOOP");
         when(repo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, MODEL_EX))
                 .thenReturn(Optional.of(m));
         when(repo.save(any(MlModel.class))).thenAnswer(inv -> inv.getArgument(0));
+        MlModelAudit passedAia = new MlModelAudit();
+        passedAia.setStatus("PASSED");
+        when(auditRepo.findTopByOrganisationIdAndModelIdAndAuditTypeAndIsDeletedFalseOrderByAuditDateDesc(
+                any(), any(), eq("AIA"))).thenReturn(Optional.of(passedAia));
 
         MlModelResponse out = service.transition(MODEL_EX, new LifecycleTransitionRequest("APPROVED_FOR_PROD"));
 

@@ -117,7 +117,7 @@ public class AiRegistryExportService {
         return switch (gap.toUpperCase()) {
             case "OVERSIGHT" -> elevated && prodish && (m.getHumanOversight() == null
                     || m.getHumanOversight().isBlank() || "NONE".equals(m.getHumanOversight()));
-            case "CROSS_BORDER" -> CROSS_BORDER.contains(m.getDataResidency())
+            case "CROSS_BORDER" -> m.getDataResidency() != null && CROSS_BORDER.contains(m.getDataResidency())
                     && (m.getCrossBorderTransferBasis() == null || m.getCrossBorderTransferBasis().isBlank()
                         || "NOT_ASSESSED".equals(m.getCrossBorderTransferBasis()));
             case "AIA" -> elevated && prodish && !aia.contains(m.getId());
@@ -138,7 +138,7 @@ public class AiRegistryExportService {
             if (elevated && prodish && !Boolean.TRUE.equals(m.getHasFairnessAudit())) noFair++;
             if (elevated && prodish && (m.getHumanOversight() == null || m.getHumanOversight().isBlank()
                     || "NONE".equals(m.getHumanOversight()))) noOvr++;
-            if (CROSS_BORDER.contains(m.getDataResidency())
+            if (m.getDataResidency() != null && CROSS_BORDER.contains(m.getDataResidency())
                     && (m.getCrossBorderTransferBasis() == null || m.getCrossBorderTransferBasis().isBlank()
                         || "NOT_ASSESSED".equals(m.getCrossBorderTransferBasis()))) xb++;
             if (elevated && prodish && !aiaSignedOff.contains(m.getId())) noAia++;

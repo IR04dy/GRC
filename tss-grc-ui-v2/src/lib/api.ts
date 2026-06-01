@@ -986,8 +986,11 @@ export interface DashboardStats {
   openCriticalRisks: number; openHighRisks: number; openIncidents: number;
   complianceScore: number; pendingTasks: number;
 }
+export interface TrendPoint { label: string; value: number }
 export const dashboardApi = {
   stats: () => api.get<DashboardStats>('/api/v1/dashboard/stats'),
+  kpiTrend: (metric = 'risks', weeks = 12) =>
+    api.get<TrendPoint[]>(`/api/v1/dashboard/kpi-trend?metric=${encodeURIComponent(metric)}&weeks=${weeks}`),
   heatmap: () => api.get<unknown>('/api/v1/dashboard/heatmap'),
   riskByCategory: () => api.get<unknown>('/api/v1/dashboard/risk-by-category'),
   recentRisks: () => api.get<unknown>('/api/v1/dashboard/recent-risks'),
