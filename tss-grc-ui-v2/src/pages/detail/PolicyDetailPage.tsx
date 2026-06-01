@@ -9,6 +9,7 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { SignaturePanel } from '../../components/ui/SignaturePanel';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
@@ -23,7 +24,7 @@ import { PolicyLifecycleStrip } from '../../components/compliance/PolicyLifecycl
 import { PolicyVersionHistory } from '../../components/compliance/PolicyVersionHistory';
 import type { PolicyStage } from '../../lib/policyLifecycle';
 
-type TabId = 'overview' | 'mappings' | 'lifecycle' | 'versions' | 'docs' | 'links' | 'activity';
+type TabId = 'overview' | 'mappings' | 'lifecycle' | 'versions' | 'docs' | 'signoff' | 'links' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', LEGAL_REVIEW: 'info', EXEC_APPROVAL: 'accent',
@@ -70,6 +71,7 @@ export function PolicyDetailPage() {
     { id: 'versions',  label: t('policyTabVersions') },
     { id: 'lifecycle', label: t('detailTabLifecycle') },
     { id: 'docs',      label: lang === 'ar' ? 'المستندات' : 'Documents' },
+    { id: 'signoff',   label: lang === 'ar' ? 'التوقيعات' : 'Sign-off' },
     { id: 'links',     label: t('detailTabLinks') },
     { id: 'activity',  label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
@@ -184,6 +186,11 @@ export function PolicyDetailPage() {
       {tab === 'docs' && (
         <Card title={lang === 'ar' ? 'مستندات السياسة' : 'Policy documents'} Icon={BookCopy}>
           <AttachmentsField entityType="POLICY" entityId={item.id} />
+        </Card>
+      )}
+      {tab === 'signoff' && (
+        <Card title={lang === 'ar' ? 'اعتماد السياسة' : 'Policy sign-off'} Icon={CheckCheck}>
+          <SignaturePanel entityType="POLICY" entityId={item.id} />
         </Card>
       )}
       {tab === 'links' && (

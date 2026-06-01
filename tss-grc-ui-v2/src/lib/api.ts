@@ -1901,6 +1901,22 @@ export const departmentsApi = {
   list: () => api.get<DepartmentDto[]>('/api/v1/departments'),
 };
 
+// ─── In-house e-signature (sign-off / attestation) ───────────────────────────
+export type SignIntent = 'APPROVE' | 'REVIEW' | 'ACKNOWLEDGE' | 'ATTEST' | 'REJECT';
+export const SIGN_INTENTS: SignIntent[] = ['APPROVE', 'REVIEW', 'ACKNOWLEDGE', 'ATTEST', 'REJECT'];
+export interface SignatureDto {
+  id: number; entityType: string; entityId: number;
+  intent: SignIntent; statementEn?: string;
+  signerId?: number; signerName?: string; signerRole?: string;
+  payloadHash: string; signedAt?: string;
+}
+export const signaturesApi = {
+  list: (entityType: string, entityId: number) =>
+    api.get<SignatureDto[]>(`/api/v1/signatures/${entityType}/${entityId}`),
+  sign: (entityType: string, entityId: number, body: { intent: SignIntent; statementEn?: string }) =>
+    api.post<SignatureDto>(`/api/v1/signatures/${entityType}/${entityId}`, body),
+};
+
 // ─── Generic typed attachments — any entity can own files of a doc_type ──────
 export type AttachmentDocType =
   'PLAN' | 'REPORT' | 'POLICY' | 'CERTIFICATE' | 'EVIDENCE'
