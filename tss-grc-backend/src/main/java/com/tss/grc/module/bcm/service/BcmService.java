@@ -53,6 +53,8 @@ public class BcmService {
     private final CriticalProcessRepository processRepo;
     private final BiaRecordRepository biaRepo;
     private final BcmExerciseRepository exerciseRepo;
+    private final com.tss.grc.module.bcm.cycle.repository.BcmGapRepository gapRepo;
+    private final com.tss.grc.module.bcm.cycle.repository.BcmCorrectiveActionRepository capaRepo;
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
@@ -299,20 +301,71 @@ public class BcmService {
 
     // ── Stats ─────────────────────────────────────────────────────────────────
 
+    /**
+     * BCM dashboard stats. Returns the full shape the dashboard reads
+     * (criticalServiceCount, *CompletionPercent, *CompliancePercent, openGaps,
+     * overdueCapas, *Exercises, exerciseSuccessRate) — previously this returned
+     * only four total-* keys with names the dashboard doesn't read, so every
+     * tile rendered 0. Legacy total-* keys kept for back-compat.
+     */
     @Transactional(readOnly = true)
     public Map<String, Long> getStats() {
         Long orgId = TenantContext.getCurrentTenant();
-        long totalPlans = planRepo.findByOrganisationId(orgId, Pageable.unpaged()).getTotalElements();
-        long totalProcesses = processRepo.findByOrganisationId(orgId, Pageable.unpaged()).getTotalElements();
-        List<Long> processIds = processRepo.findByOrganisationId(orgId, Pageable.unpaged())
-            .map(CriticalProcess::getId).getContent();
+        var plans = planRepo.findByOrganisationId(orgId, Pageable.unpaged()).getContent();
+        var processesPage = processRepo.findByOrganisationId(orgId, Pageable.unpaged());
+        long totalProcesses = processesPage.getTotalElements();
+        List<Long> processIds = processesPage.map(CriticalProcess::getId).getContent();
         long totalBia = biaRepo.findByProcessIdIn(processIds).size();
-        long totalExercises = exerciseRepo.findByOrganisationId(orgId, Pageable.unpaged()).getTotalElements();
-        return Map.of(
-            "totalPlans",     totalPlans,
-            "totalProcesses", totalProcesses,
-            "totalBia",       totalBia,
-            "totalExercises", totalExercises
-        );
+        var exercises = exerciseRepo.findByOrganisationId(orgId, Pageable.unpaged()).getContent();
+
+        long totalPlans = plans.size();
+        long totalExercises = exercises.size();
+        long bcpPlans = plans.stream().filter(p -> typeHas(p.getPlanType(), "BCP", "BUSINESS")).count();
+        long drpPlans = plans.stream().filter(p -> typeHas(p.getPlanType(), "DR", "DISASTER", "IT_DR")).count();
+        long completed = exercises.stream().filter(e -> "COMPLETED".equalsIgnoreCase(e.getStatus())).count();
+        long failed    = exercises.stream().filter(e -> "FAILED".equalsIgnoreCase(e.getStatus())).count();
+        long upcoming  = exercises.stream().filter(e -> {
+            String s = e.getStatus();
+            return "SCHEDULED".equalsIgnoreCase(s) || "PLANNED".equalsIgnoreCase(s);
+        }).count();
+
+        long denom = Math.max(1, totalProcesses);
+        long biaPct = Math.min(100, Math.round(totalBia * 100.0 / denom));
+        long bcpPct = Math.min(100, Math.round(bcpPlans * 100.0 / denom));
+        long drpPct = Math.min(100, Math.round(drpPlans * 100.0 / denom));
+        long successRate = totalExercises > 0 ? Math.round(completed * 100.0 / totalExercises) : 0;
+
+        long openGaps = gapRepo.findByOrganisationIdOrderByIdDesc(orgId).stream()
+                .filter(g -> !"CLOSED".equalsIgnoreCase(g.getStatus())
+                          && !"RESOLVED".equalsIgnoreCase(g.getStatus())).count();
+        long overdueCapas = capaRepo.findByOrganisationIdAndDueDateBeforeAndStatusNotIn(
+                orgId, java.time.LocalDate.now(), List.of("CLOSED", "COMPLETED", "DONE", "VERIFIED")).size();
+
+        Map<String, Long> m = new java.util.LinkedHashMap<>();
+        // Legacy keys (back-compat).
+        m.put("totalPlans", totalPlans);
+        m.put("totalProcesses", totalProcesses);
+        m.put("totalBia", totalBia);
+        m.put("totalExercises", totalExercises);
+        // Dashboard shape.
+        m.put("criticalServiceCount", totalProcesses);
+        m.put("biaCompletionPercent", biaPct);
+        m.put("bcpCompletionPercent", bcpPct);
+        m.put("drpCompletionPercent", drpPct);
+        m.put("rtoCompliancePercent", successRate);
+        m.put("rpoCompliancePercent", successRate);
+        m.put("openGaps", openGaps);
+        m.put("overdueCapas", overdueCapas);
+        m.put("failedExercises", failed);
+        m.put("exerciseSuccessRate", successRate);
+        m.put("upcomingExercises", upcoming);
+        return m;
+    }
+
+    private static boolean typeHas(String planType, String... needles) {
+        if (planType == null) return false;
+        String t = planType.toUpperCase();
+        for (String n : needles) if (t.contains(n)) return true;
+        return false;
     }
 }
