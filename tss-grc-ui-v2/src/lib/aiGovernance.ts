@@ -516,6 +516,8 @@ export const mlModelApi = {
   get:     (externalId: string) => api.get<MlModelResponse>(`/api/v1/ai/models/${externalId}`),
   highRiskWithoutFairness:
            () => api.get<MlModelResponse[]>('/api/v1/ai/models/high-risk-without-fairness'),
+  highRiskWithoutAia:
+           () => api.get<MlModelResponse[]>('/api/v1/ai/models/high-risk-without-aia'),
   create:  (body: MlModelRequest) => api.post<MlModelResponse>('/api/v1/ai/models', body),
   update:  (externalId: string, body: MlModelRequest) =>
               api.put<MlModelResponse>(`/api/v1/ai/models/${externalId}`, body),
@@ -707,11 +709,29 @@ export interface MlRegistryStats {
   euAiActHighRisk: number;
   sdaiaCompliant: number;
   samaCompliant: number;
+  missingHumanOversight: number;    // HIGH+ in prod-ish without a defined (non-NONE) oversight mode
+  crossBorderNoBasis: number;       // GCC/GLOBAL residency without a PDPL Art.29 transfer basis
+  missingSignedOffAia: number;      // HIGH+ in prod-ish without a signed-off AIA (from endpoint)
+}
+
+/** HIGH+ prod-ish model with no defined (or NONE) human-oversight mode. */
+export function isMissingHumanOversight(m: MlModelResponse): boolean {
+  const PROD_OR_APPROVED: ReadonlySet<MlLifecycleStage> = new Set(['APPROVED_FOR_PROD', 'IN_PRODUCTION', 'MONITORING']);
+  return (m.riskTier === 'CRITICAL' || m.riskTier === 'HIGH')
+    && PROD_OR_APPROVED.has(m.lifecycleStage)
+    && (!m.humanOversight || m.humanOversight === 'NONE');
+}
+
+/** Cross-border residency (GCC/GLOBAL) lacking a PDPL Art.29 transfer basis. */
+export function isCrossBorderNoBasis(m: MlModelResponse): boolean {
+  return (m.dataResidency === 'GCC' || m.dataResidency === 'GLOBAL')
+    && (!m.crossBorderTransferBasis || m.crossBorderTransferBasis === 'NOT_ASSESSED');
 }
 
 export function aggregateMlRegistry(
   models: ReadonlyArray<MlModelResponse>,
   unacknowledgedDriftCount = 0,
+  missingSignedOffAiaCount = 0,
 ): MlRegistryStats {
   const PROD_STAGES: ReadonlySet<MlLifecycleStage> = new Set(['IN_PRODUCTION', 'MONITORING']);
   const PROD_OR_APPROVED: ReadonlySet<MlLifecycleStage> = new Set([
@@ -723,6 +743,8 @@ export function aggregateMlRegistry(
   let euAiActHighRisk = 0;
   let sdaiaCompliant = 0;
   let samaCompliant = 0;
+  let missingHumanOversight = 0;
+  let crossBorderNoBasis = 0;
   for (const m of models) {
     if (PROD_STAGES.has(m.lifecycleStage)) inProduction++;
     if (m.riskTier === 'CRITICAL' || m.riskTier === 'HIGH') {
@@ -731,6 +753,8 @@ export function aggregateMlRegistry(
         missingFairnessAudit++;
       }
     }
+    if (isMissingHumanOversight(m)) missingHumanOversight++;
+    if (isCrossBorderNoBasis(m)) crossBorderNoBasis++;
     if (m.isHighRiskEuAiAct) euAiActHighRisk++;
     if (m.sdaiaAiEthicsCompliance === 'COMPLIANT') sdaiaCompliant++;
     if (m.samaAiPrinciplesCompliance === 'COMPLIANT') samaCompliant++;
@@ -744,6 +768,9 @@ export function aggregateMlRegistry(
     euAiActHighRisk,
     sdaiaCompliant,
     samaCompliant,
+    missingHumanOversight,
+    crossBorderNoBasis,
+    missingSignedOffAia: missingSignedOffAiaCount,
   };
 }
 

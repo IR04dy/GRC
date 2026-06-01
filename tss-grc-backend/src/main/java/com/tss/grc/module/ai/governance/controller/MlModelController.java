@@ -65,6 +65,13 @@ public class MlModelController {
         return service.findHighRiskModelsWithoutFairnessAudit();
     }
 
+    @GetMapping("/high-risk-without-aia")
+    @PreAuthorize(READ_GUARD)
+    @Operation(summary = "Production-running CRITICAL/HIGH-risk models that lack a signed-off AI Impact Assessment.")
+    public List<MlModelResponse> highRiskWithoutAia() {
+        return service.findHighRiskModelsWithoutSignedOffAia();
+    }
+
     @PostMapping
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Register a new AI/ML model (starts in PROPOSED).")

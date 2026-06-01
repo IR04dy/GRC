@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Bot, Cpu, Shield, AlertTriangle, ShieldAlert,
-  Activity, CheckCircle2, BadgeAlert,
+  Activity, CheckCircle2, BadgeAlert, UserCheck, Globe, FileWarning, X,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,6 +17,7 @@ import { ApiError } from '../../lib/api';
 import {
   mlModelApi,
   aggregateMlRegistry,
+  isMissingHumanOversight, isCrossBorderNoBasis,
   ML_STAGE_LABEL, ML_STAGE_TONE,
   ML_TIER_LABEL, ML_TIER_TONE,
   ML_DOMAIN_LABEL,
@@ -47,6 +48,7 @@ export function AiModelRegisterPage() {
 
   const [rows, setRows] = useState<MlModelResponse[]>([]);
   const [unackDrift, setUnackDrift] = useState(0);
+  const [missingAiaIds, setMissingAiaIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,11 +58,14 @@ export function AiModelRegisterPage() {
   const [filterDomain, setFilterDomain] = useState<'ALL' | MlBusinessDomain>('ALL');
   const [filterSdaia, setFilterSdaia]   = useState<'ALL' | MlComplianceStatus>('ALL');
   const [filterEuAi, setFilterEuAi]     = useState<'ALL' | 'YES' | 'NO'>('ALL');
+  // Governance-gap quick filter, toggled by the posture KPI tiles.
+  const [filterGap, setFilterGap] = useState<'ALL' | 'OVERSIGHT' | 'CROSS_BORDER' | 'AIA'>('ALL');
 
   async function load() {
     if (demoMode) {
       setRows([]);
       setUnackDrift(0);
+      setMissingAiaIds(new Set());
       return;
     }
     setLoading(true);
@@ -68,6 +73,11 @@ export function AiModelRegisterPage() {
     try {
       const list = await mlModelApi.list();
       setRows(list);
+      // HIGH+ models without a signed-off AIA — server-computed (joins the
+      // audit table), so we just collect the externalIds for the gap filter.
+      mlModelApi.highRiskWithoutAia()
+        .then(ms => setMissingAiaIds(new Set(ms.map(m => m.externalId))))
+        .catch(() => setMissingAiaIds(new Set()));
       // Approximate the unacknowledged-drift count by summing the per-model
       // drift list — there's no tenant-wide aggregator endpoint yet, but
       // the in-production list is short enough that this is fine.
@@ -101,10 +111,17 @@ export function AiModelRegisterPage() {
     if (filterSdaia !== 'ALL' && m.sdaiaAiEthicsCompliance !== filterSdaia) return false;
     if (filterEuAi === 'YES' && !m.isHighRiskEuAiAct) return false;
     if (filterEuAi === 'NO' && m.isHighRiskEuAiAct) return false;
+    if (filterGap === 'OVERSIGHT' && !isMissingHumanOversight(m)) return false;
+    if (filterGap === 'CROSS_BORDER' && !isCrossBorderNoBasis(m)) return false;
+    if (filterGap === 'AIA' && !missingAiaIds.has(m.externalId)) return false;
     return true;
-  }), [rows, filterStage, filterTier, filterDomain, filterSdaia, filterEuAi]);
+  }), [rows, filterStage, filterTier, filterDomain, filterSdaia, filterEuAi, filterGap, missingAiaIds]);
 
-  const stats = useMemo(() => aggregateMlRegistry(rows, unackDrift), [rows, unackDrift]);
+  const stats = useMemo(() => aggregateMlRegistry(rows, unackDrift, missingAiaIds.size),
+    [rows, unackDrift, missingAiaIds]);
+  // Toggle a governance-gap tile: clicking the active one clears it.
+  const toggleGap = (g: 'OVERSIGHT' | 'CROSS_BORDER' | 'AIA') =>
+    setFilterGap(prev => (prev === g ? 'ALL' : g));
 
   const cols: Column<MlModelResponse>[] = [
     {
@@ -199,7 +216,36 @@ export function AiModelRegisterPage() {
              value={stats.sdaiaCompliant} tone="success" />
         <Kpi Icon={Shield}       label={lang === 'ar' ? 'مُمتثل للبنك المركزي' : 'SAMA compliant'}
              value={stats.samaCompliant} tone="success" />
+        {/* ─── Governance-posture gaps (clickable filters) ─── */}
+        <Kpi Icon={UserCheck}    label={lang === 'ar' ? 'بدون إشراف بشري' : 'No human oversight'}
+             value={stats.missingHumanOversight}
+             tone={stats.missingHumanOversight > 0 ? 'danger' : 'success'}
+             onClick={() => toggleGap('OVERSIGHT')} />
+        <Kpi Icon={Globe}        label={lang === 'ar' ? 'نقل عابر بلا أساس' : 'Cross-border, no basis'}
+             value={stats.crossBorderNoBasis}
+             tone={stats.crossBorderNoBasis > 0 ? 'danger' : 'success'}
+             onClick={() => toggleGap('CROSS_BORDER')} />
+        <Kpi Icon={FileWarning}  label={lang === 'ar' ? 'بدون تقييم أثر معتمد' : 'No signed-off AIA'}
+             value={stats.missingSignedOffAia}
+             tone={stats.missingSignedOffAia > 0 ? 'danger' : 'success'}
+             onClick={() => toggleGap('AIA')} />
       </div>
+
+      {filterGap !== 'ALL' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 0' }}>
+          <Badge tone="danger" dot>
+            {lang === 'ar' ? 'تصفية: ' : 'Filtered: '}
+            {filterGap === 'OVERSIGHT' ? (lang === 'ar' ? 'بدون إشراف بشري' : 'No human oversight')
+              : filterGap === 'CROSS_BORDER' ? (lang === 'ar' ? 'نقل عابر بلا أساس' : 'Cross-border, no basis')
+              : (lang === 'ar' ? 'بدون تقييم أثر معتمد' : 'No signed-off AIA')}
+            {' · '}{filtered.length}
+          </Badge>
+          <button onClick={() => setFilterGap('ALL')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--ink-3)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <X size={13} /> {lang === 'ar' ? 'إلغاء التصفية' : 'Clear'}
+          </button>
+        </div>
+      )}
 
       <Card padded>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>

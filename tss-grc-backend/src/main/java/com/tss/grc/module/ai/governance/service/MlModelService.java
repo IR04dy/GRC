@@ -106,6 +106,15 @@ public class MlModelService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<MlModelResponse> findHighRiskModelsWithoutSignedOffAia() {
+        Long orgId = TenantContext.getCurrentTenant();
+        return repo.findHighRiskModelsWithoutSignedOffAia(orgId)
+                .stream()
+                .map(MlModelResponse::from)
+                .toList();
+    }
+
     // ─── Writes ───────────────────────────────────────────────────
 
     @Transactional
