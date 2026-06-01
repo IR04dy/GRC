@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import { Paperclip, Download, Trash2, Upload } from 'lucide-react';
 import { Button } from './Button';
 import { Badge } from './Badge';
+import { ConfirmDialog } from './ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -47,9 +48,15 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const [items, setItems] = useState<AttachmentDto[]>([]);
   const [docType, setDocType] = useState<AttachmentDocType>('PLAN');
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [confirmDel, setConfirmDel] = useState<AttachmentDto | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(() => {
-    attachmentsApi.list(entityType, entityId).then(setItems).catch(() => setItems([]));
+    setLoading(true);
+    attachmentsApi.list(entityType, entityId)
+      .then(setItems).catch(() => setItems([]))
+      .finally(() => setLoading(false));
   }, [entityType, entityId]);
   useEffect(() => { load(); }, [load]);
 
@@ -68,8 +75,10 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   }
 
   async function remove(a: AttachmentDto) {
-    try { await attachmentsApi.remove(a.id); toast.success(ar ? 'تم الحذف' : 'Removed'); load(); }
+    setDeleting(true);
+    try { await attachmentsApi.remove(a.id); toast.success(ar ? 'تم الحذف' : 'Removed'); setConfirmDel(null); load(); }
     catch (err) { toast.danger(err instanceof ApiError ? err.message : (ar ? 'تعذّر الحذف' : 'Delete failed')); }
+    finally { setDeleting(false); }
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -99,7 +108,11 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {loading ? (
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '10px 0' }}>
+          {ar ? 'جارٍ التحميل…' : 'Loading…'}
+        </div>
+      ) : items.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '10px 0' }}>
           {ar ? 'لا توجد مرفقات بعد.' : 'No attachments yet.'}
         </div>
@@ -126,7 +139,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                   <Button size="sm" variant="ghost" Icon={Download} title={ar ? 'تنزيل' : 'Download'}
                     onClick={() => { void attachmentsApi.download(a); }} />
                   <Button size="sm" variant="ghost" Icon={Trash2} title={ar ? 'حذف' : 'Delete'}
-                    onClick={() => { void remove(a); }} />
+                    onClick={() => setConfirmDel(a)} />
                 </span>
               </div>
             );
@@ -136,6 +149,20 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
 
       <input ref={fileRef} type="file" hidden onChange={onFile}
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.txt,.csv,.json,.xml,.zip" />
+
+      <ConfirmDialog
+        open={!!confirmDel}
+        destructive
+        busy={deleting}
+        title={ar ? 'حذف المرفق' : 'Delete attachment'}
+        message={confirmDel
+          ? (ar ? `سيتم حذف «${confirmDel.titleEn || confirmDel.fileName}». لا يمكن التراجع.`
+                : `“${confirmDel.titleEn || confirmDel.fileName}” will be deleted. This cannot be undone.`)
+          : ''}
+        confirmLabel={ar ? 'حذف' : 'Delete'}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={() => { if (confirmDel) void remove(confirmDel); }}
+      />
     </div>
   );
 }
