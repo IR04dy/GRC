@@ -6,6 +6,8 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/ui/DataTable';
@@ -336,6 +338,15 @@ export function ObTppDetailPage() {
             )}
           </Card>
         )}
+
+        {/* Documents & control mapping — registration cert, API agreements, controls */}
+        <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="OB_TPP" entityId={tpp.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="OB_TPP" entityId={tpp.id} />
+          </div>
+        </Card>
       </div>
     </Shell>
   );

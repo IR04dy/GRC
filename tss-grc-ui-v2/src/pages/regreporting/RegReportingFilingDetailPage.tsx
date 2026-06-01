@@ -6,6 +6,8 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -472,6 +474,17 @@ export function RegReportingFilingDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Documents & control mapping — filing document, regulator acknowledgement, controls */}
+      <div style={{ marginTop: 16 }}>
+        <Card padded title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="REG_FILING" entityId={filing.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="REG_FILING" entityId={filing.id} />
+          </div>
+        </Card>
+      </div>
     </Shell>
   );
 }
