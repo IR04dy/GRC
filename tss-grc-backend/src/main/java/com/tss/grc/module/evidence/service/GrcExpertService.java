@@ -148,6 +148,7 @@ public class GrcExpertService {
         if (c.startsWith("BCM")) return "BCM";
         if (c.startsWith("ESG") || c.startsWith("GRI") || c.startsWith("TCFD")
                 || c.startsWith("ISSB") || c.startsWith("SUST")) return "ESG";
+        if (c.startsWith("AI") || c.startsWith("ISO42001") || c.startsWith("NIST")) return "AI";
         if (c.startsWith("ERM") || c.startsWith("RISK") || c.startsWith("COSO")
                 || c.startsWith("ISO31000")) return "ERM";
         if (c.startsWith("ECC") || c.startsWith("CCC") || c.startsWith("DCC")

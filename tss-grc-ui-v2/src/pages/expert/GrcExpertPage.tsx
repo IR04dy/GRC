@@ -27,7 +27,7 @@ import {
 } from '../../lib/grcExpert';
 
 // Families shown as tabs (in order); OTHER appears only when data has it.
-const PRIMARY_FAMILIES: ExpertFamily[] = ['NCA', 'NDI', 'PDPL', 'BCM', 'ERM', 'ESG'];
+const PRIMARY_FAMILIES: ExpertFamily[] = ['NCA', 'NDI', 'PDPL', 'BCM', 'ERM', 'ESG', 'AI'];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
