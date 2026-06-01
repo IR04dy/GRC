@@ -25,6 +25,12 @@ public class EvidenceItem extends BaseEntity {
     @Column(name = "sub_control_id")
     private Long subControlId;
 
+    /** The EvidenceRequest this item fulfils, if it was collected against one.
+     *  Closes the collect→fulfil loop: on APPROVED, the request's
+     *  fulfilled_by_id / fulfilled_at get stamped. */
+    @Column(name = "request_id")
+    private Long requestId;
+
     @Column(name = "title_en", nullable = false, length = 300)
     private String titleEn;
 

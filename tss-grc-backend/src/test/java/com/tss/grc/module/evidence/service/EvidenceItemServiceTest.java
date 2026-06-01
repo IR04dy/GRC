@@ -51,9 +51,11 @@ class EvidenceItemServiceTest {
     @Mock private EvidenceControlRepository controlRepository;
     @Mock private EvidenceFrameworkRepository frameworkRepository;
     @Mock private EvidenceLinkRepository linkRepository;
+    @Mock private EvidenceRequestRepository requestRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private EvidenceStorageService storage;
     @InjectMocks private EvidenceItemService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -75,7 +77,7 @@ class EvidenceItemServiceTest {
     private static EvidenceItemCreateRequest createReq() {
         return new EvidenceItemCreateRequest(
             "Q1 Pen Test", "اختبار الاختراق Q1", "Network test results",
-            null, "DOCUMENT", null, null, null, "1.0",
+            null, null, "DOCUMENT", null, null, null, "1.0",
             LocalDate.now().minusDays(30), LocalDate.now().plusDays(335),
             null, "pentest-q1.pdf"
         );

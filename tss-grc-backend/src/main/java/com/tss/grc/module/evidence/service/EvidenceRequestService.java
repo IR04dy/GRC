@@ -1,5 +1,6 @@
 package com.tss.grc.module.evidence.service;
 
+import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
 import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
@@ -21,7 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,19 @@ public class EvidenceRequestService {
     private final EvidenceControlRepository controlRepository;
     private final EvidenceFrameworkRepository frameworkRepository;
     private final UserRepository userRepository;
+
+    // ── Request lifecycle state machine ───────────────────────────────────────
+    private static final Set<String> REQUEST_STATUSES =
+        Set.of("OPEN", "IN_PROGRESS", "SUBMITTED", "APPROVED", "REJECTED", "CLOSED");
+
+    private static final Map<String, Set<String>> REQUEST_TRANSITIONS = Map.of(
+        "OPEN",        Set.of("IN_PROGRESS", "SUBMITTED", "REJECTED", "CLOSED"),
+        "IN_PROGRESS", Set.of("SUBMITTED", "OPEN", "REJECTED", "CLOSED"),
+        "SUBMITTED",   Set.of("APPROVED", "REJECTED", "IN_PROGRESS", "CLOSED"),
+        "APPROVED",    Set.of("CLOSED", "OPEN"),
+        "REJECTED",    Set.of("OPEN", "IN_PROGRESS", "CLOSED"),
+        "CLOSED",      Set.of("OPEN")
+    );
 
     @Transactional(readOnly = true)
     public Page<EvidenceRequestResponse> list(String status, Pageable pageable) {
@@ -78,12 +94,26 @@ public class EvidenceRequestService {
         EvidenceRequest req = requestRepository.findById(id)
                 .filter(r -> r.getOrganisationId().equals(orgId))
                 .orElseThrow(() -> new EntityNotFoundException("Evidence request not found: " + id));
+        validateTransition(req.getStatus(), newStatus);
         req.setStatus(newStatus);
         if ("SUBMITTED".equals(newStatus) || "APPROVED".equals(newStatus)) {
             req.setFulfilledAt(LocalDateTime.now());
         }
         req = requestRepository.save(req);
         return toResponse(req);
+    }
+
+    /** Unknown statuses → 400; known-but-illegal moves → 409; same-status is a no-op. */
+    private void validateTransition(String from, String to) {
+        if (!REQUEST_STATUSES.contains(to)) {
+            throw new IllegalArgumentException(
+                "Unknown request status: '" + to + "'. Valid statuses: " + REQUEST_STATUSES);
+        }
+        if (to.equals(from)) return;
+        Set<String> allowed = REQUEST_TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(to)) {
+            throw new IllegalTransitionException(from, to, allowed);
+        }
     }
 
     @Transactional

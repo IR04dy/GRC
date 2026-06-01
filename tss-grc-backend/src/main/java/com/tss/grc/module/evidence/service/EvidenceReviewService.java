@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -24,7 +25,10 @@ public class EvidenceReviewService {
 
     private final EvidenceReviewRepository reviewRepository;
     private final EvidenceItemRepository itemRepository;
+    private final EvidenceItemService evidenceItemService;
     private final UserRepository userRepository;
+
+    private static final Set<String> REVIEW_RESULTS = Set.of("APPROVED", "REJECTED", "NEEDS_REVISION");
 
     @Transactional(readOnly = true)
     public Page<EvidenceReviewResponse> list(String status, Pageable pageable) {
@@ -52,6 +56,10 @@ public class EvidenceReviewService {
     @Transactional
     public EvidenceReviewResponse complete(Long id, String result, String notes) {
         Long orgId = TenantContext.getCurrentTenant();
+        if (result == null || !REVIEW_RESULTS.contains(result)) {
+            throw new IllegalArgumentException(
+                "Unknown review result: '" + result + "'. Valid results: " + REVIEW_RESULTS);
+        }
         EvidenceReview review = reviewRepository.findById(id)
                 .filter(r -> r.getOrganisationId().equals(orgId))
                 .orElseThrow(() -> new EntityNotFoundException("Review not found: " + id));
@@ -61,13 +69,19 @@ public class EvidenceReviewService {
         review.setReviewDate(LocalDate.now());
         review = reviewRepository.save(review);
 
-        // Sync evidence item status
+        // Drive the evidence item's status through the single item-path
+        // pipeline (audit log + DomainEvent + transition guard) rather than
+        // mutating item.status directly here. This stops the review and the
+        // item-level approve/reject paths from diverging, and preserves
+        // NEEDS_REVISION as a distinct state (no longer collapsed to DRAFT).
         EvidenceItem item = itemRepository.findById(review.getEvidenceId()).orElse(null);
         if (item != null && item.getOrganisationId().equals(orgId)) {
-            if ("APPROVED".equals(result)) item.setStatus("APPROVED");
-            else if ("REJECTED".equals(result)) item.setStatus("REJECTED");
-            else item.setStatus("DRAFT");
-            itemRepository.save(item);
+            switch (result) {
+                case "APPROVED"       -> evidenceItemService.approve(item.getId());
+                case "REJECTED"       -> evidenceItemService.reject(item.getId());
+                case "NEEDS_REVISION" -> evidenceItemService.requestRevision(item.getId());
+                default               -> { /* validated above — unreachable */ }
+            }
         }
         return toResponse(review);
     }

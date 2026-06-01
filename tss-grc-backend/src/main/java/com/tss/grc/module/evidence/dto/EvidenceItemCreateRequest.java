@@ -10,6 +10,7 @@ public record EvidenceItemCreateRequest(
     @Size(max = 300) String titleAr,
     String descriptionEn,
     Long subControlId,
+    Long requestId,
     @NotBlank String evidenceType,
     String sourceModule,
     Long sourceEntityId,

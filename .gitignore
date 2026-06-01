@@ -13,6 +13,10 @@
 **/.vite/
 *.tsbuildinfo
 
+# Evidence-item binary uploads — runtime storage backend (STORAGE_BASE_PATH,
+# default ./uploads). Created on startup; never committed.
+/uploads/
+
 # ─── Local dev tooling ─────────────────────────────────────────────────
 # .tools/ is committed (it holds intentional dev scripts), but the runtime
 # artefacts that land alongside them aren't. Stay specific to avoid
