@@ -73,6 +73,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const [sDocType, setSDocType] = useState<AttachmentDocType>('PLAN');
   const [sTitle, setSTitle] = useState('');
   const [sValidTo, setSValidTo] = useState('');
+  const [queue, setQueue] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   // delete confirmation
@@ -106,8 +107,8 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     return true;
   }
 
-  function stageFile(file: File) {
-    if (!validate(file)) return;
+  /** Move one file into the staging panel (applies any re-collect seed). */
+  function stageOne(file: File) {
     const seed = seedRef.current;
     seedRef.current = null;
     const base = file.name.replace(/\.[^./\\]+$/, '');
@@ -117,19 +118,28 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     setSValidTo('');
   }
 
+  /** Validate a batch; stage the first valid file and queue the rest. */
+  function stageFiles(files: File[]) {
+    const ok = files.filter(validate);
+    if (!ok.length) return;
+    stageOne(ok[0]);
+    setQueue(ok.slice(1));
+  }
+
   function onFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (file) stageFile(file);
+    if (picked.length) stageFiles(picked);
   }
 
   function onDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragging(false);
     if (busy || staged) return;
-    const file = e.dataTransfer.files?.[0];
-    if (file) stageFile(file);
+    stageFiles(Array.from(e.dataTransfer.files ?? []));
   }
+
+  function cancelStaged() { setStaged(null); setQueue([]); }
 
   async function confirmUpload() {
     if (!staged) return;
@@ -141,8 +151,10 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
         validTo: sValidTo || undefined,
       });
       toast.success(ar ? 'تم إرفاق الملف' : 'File attached');
-      setStaged(null);
       load();
+      // Advance to the next queued file, if any.
+      if (queue.length) { const [next, ...rest] = queue; setQueue(rest); stageOne(next); }
+      else setStaged(null);
     } catch (err) {
       toast.danger(err instanceof ApiError ? err.message : (ar ? 'تعذّر رفع الملف' : 'Upload failed'));
     } finally { setBusy(false); }
@@ -191,8 +203,11 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
             <Paperclip size={13} style={{ color: 'var(--ink-3)' }} />
-            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{staged.name}</span>
+            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{staged.name}</span>
             <span className="mono" style={{ color: 'var(--ink-3)' }}>{fmtBytes(staged.size)}</span>
+            {queue.length > 0 && (
+              <Badge tone="info">{ar ? `+${queue.length} في الانتظار` : `+${queue.length} queued`}</Badge>
+            )}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             <select value={sDocType} onChange={e => setSDocType(e.currentTarget.value as AttachmentDocType)}
@@ -210,11 +225,13 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
               style={{ ...inputStyle, color: sValidTo ? 'var(--ink-1)' : 'var(--ink-3)' }} />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button size="sm" variant="ghost" Icon={X} disabled={busy} onClick={() => setStaged(null)}>
-              {ar ? 'إلغاء' : 'Cancel'}
+            <Button size="sm" variant="ghost" Icon={X} disabled={busy} onClick={cancelStaged}>
+              {queue.length > 0 ? (ar ? 'إلغاء الكل' : 'Cancel all') : (ar ? 'إلغاء' : 'Cancel')}
             </Button>
             <Button size="sm" variant="primary" Icon={Upload} disabled={busy} onClick={() => { void confirmUpload(); }}>
-              {busy ? (ar ? 'جارٍ الرفع…' : 'Uploading…') : (ar ? 'رفع' : 'Upload')}
+              {busy ? (ar ? 'جارٍ الرفع…' : 'Uploading…')
+                : queue.length > 0 ? (ar ? 'رفع والتالي' : 'Upload & next')
+                : (ar ? 'رفع' : 'Upload')}
             </Button>
           </div>
         </div>
@@ -264,7 +281,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
         </div>
       )}
 
-      <input ref={fileRef} type="file" hidden onChange={onFile}
+      <input ref={fileRef} type="file" multiple hidden onChange={onFile}
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.txt,.csv,.json,.xml,.zip" />
 
       <ConfirmDialog
