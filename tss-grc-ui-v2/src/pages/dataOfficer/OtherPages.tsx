@@ -299,7 +299,11 @@ export function RetentionPage() {
     } finally { setBusy(false); }
   }
 
+  const [docsTarget, setDocsTarget] = useState<RetentionRuleResponse | null>(null);
   const cols: Column<RetentionRuleResponse>[] = [
+    { header: '', width: '50px',
+      cell: row => <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+        onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} /> },
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '120px', cell: r => <span style={{ fontSize: 12 }}>{r.reference}</span> },
     { header: ar ? 'الفئة' : 'Category', cell: r => <span style={{ fontSize: 13 }}>{r.dataCategory}</span> },
     { header: ar ? 'المدة' : 'Retention', width: '100px',
@@ -339,6 +343,8 @@ export function RetentionPage() {
       <Card>{rules.length === 0
         ? <EmptyState Icon={Archive} title={ar ? 'لا توجد قواعد احتفاظ' : 'No retention rules'} sub={ar ? 'أنشئ أول قاعدة' : 'Create the first rule'} />
         : <DataTable columns={cols} rows={rules} />}</Card>
+      <EntityDocsModal entityType="RETENTION_RULE" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        onClose={() => setDocsTarget(null)} />
       {jobs.length > 0 && (
         <Card>
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>
@@ -374,7 +380,11 @@ export function NdrPage() {
       await reload();
     } finally { setBusy(false); }
   }
+  const [docsTarget, setDocsTarget] = useState<NdrResponse | null>(null);
   const cols: Column<NdrResponse>[] = [
+    { header: '', width: '50px',
+      cell: row => <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+        onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} /> },
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '140px', cell: n => <span style={{ fontSize: 12 }}>{n.reference}</span> },
     { header: ar ? 'السنة' : 'Year', width: '80px', cell: n => <span style={{ fontSize: 13, fontWeight: 600 }}>{n.cycleYear}</span> },
     { header: ar ? 'العنوان' : 'Title', cell: n => <span style={{ fontSize: 13 }}>{ar ? (n.titleAr ?? n.titleEn) : (n.titleEn ?? n.titleAr) ?? '—'}</span> },
@@ -405,6 +415,8 @@ export function NdrPage() {
       <Card>{rows.length === 0
         ? <EmptyState Icon={ScrollText} title={ar ? 'لا توجد دورات تقديم' : 'No submission cycles'} sub={ar ? 'ابدأ دورة هذا العام' : 'Start this year\'s cycle'} />
         : <DataTable columns={cols} rows={rows} />}</Card>
+      <EntityDocsModal entityType="NDR" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        onClose={() => setDocsTarget(null)} />
     </Shell>
   );
 }
@@ -434,7 +446,11 @@ export function CatalogPage() {
       await reload();
     } finally { setBusy(false); }
   }
+  const [docsTarget, setDocsTarget] = useState<CatalogEntryResponse | null>(null);
   const cols: Column<CatalogEntryResponse>[] = [
+    { header: '', width: '50px',
+      cell: row => <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+        onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} /> },
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '120px', cell: e => <span style={{ fontSize: 12 }}>{e.reference}</span> },
     { header: ar ? 'اسم البيانات' : 'Dataset',
       cell: e => <div><div style={{ fontWeight: 600, fontSize: 13 }}>{ar ? (e.datasetNameAr ?? e.datasetNameEn) : e.datasetNameEn}</div>
@@ -484,6 +500,8 @@ export function CatalogPage() {
       <Card>{rows.length === 0
         ? <EmptyState Icon={Database} title={ar ? 'الدليل فارغ' : 'Catalog is empty'} sub={ar ? 'سجّل أول مجموعة بيانات' : 'Register the first dataset'} />
         : <DataTable columns={cols} rows={rows} />}</Card>
+      <EntityDocsModal entityType="DATA_CATALOG" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        onClose={() => setDocsTarget(null)} />
     </Shell>
   );
 }
@@ -515,7 +533,11 @@ export function QualityPage() {
     } finally { setBusy(false); }
   }
 
+  const [docsTarget, setDocsTarget] = useState<QualityRuleResponse | null>(null);
   const cols: Column<QualityRuleResponse>[] = [
+    { header: '', width: '50px',
+      cell: row => <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+        onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} /> },
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '120px', cell: r => <span style={{ fontSize: 12 }}>{r.reference}</span> },
     { header: ar ? 'القاعدة' : 'Rule',
       cell: r => <div><div style={{ fontWeight: 600, fontSize: 13 }}>{ar ? (r.ruleNameAr ?? r.ruleNameEn) : r.ruleNameEn}</div>
@@ -553,6 +575,8 @@ export function QualityPage() {
       <Card>{rules.length === 0
         ? <EmptyState Icon={Sigma} title={ar ? 'لا توجد قواعد' : 'No rules'} sub={ar ? 'سجّل أول قاعدة جودة' : 'Register the first quality rule'} />
         : <DataTable columns={cols} rows={rules} />}</Card>
+      <EntityDocsModal entityType="DATA_QUALITY_RULE" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        onClose={() => setDocsTarget(null)} />
       {runs.length > 0 && (
         <Card>
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>
@@ -593,7 +617,11 @@ export function EthicsPage() {
     } finally { setBusy(false); }
   }
 
+  const [docsTarget, setDocsTarget] = useState<EthicsResponse | null>(null);
   const cols: Column<EthicsResponse>[] = [
+    { header: '', width: '50px',
+      cell: row => <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+        onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} /> },
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '120px', cell: e => <span style={{ fontSize: 12 }}>{e.reference}</span> },
     { header: ar ? 'العنوان' : 'Title',
       cell: e => <div><div style={{ fontWeight: 600, fontSize: 13 }}>{ar ? e.titleAr : e.titleEn}</div>
@@ -630,6 +658,8 @@ export function EthicsPage() {
       <Card>{rows.length === 0
         ? <EmptyState Icon={Scale} title={ar ? 'لا توجد مراجعات' : 'No reviews'} sub={ar ? 'قدّم أول مراجعة' : 'Submit the first review'} />
         : <DataTable columns={cols} rows={rows} />}</Card>
+      <EntityDocsModal entityType="AI_ETHICS_REVIEW" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        onClose={() => setDocsTarget(null)} />
     </Shell>
   );
 }
