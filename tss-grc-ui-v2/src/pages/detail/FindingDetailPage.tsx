@@ -8,6 +8,8 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
@@ -22,7 +24,7 @@ import { CommsPanel } from '../../components/comms/CommsPanel';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { EntityAutomationRuns } from '../../components/audit/EntityAutomationRuns';
 
-type TabId = 'overview' | 'capa' | 'evidence' | 'links' | 'history' | 'comms';
+type TabId = 'overview' | 'capa' | 'evidence' | 'docs' | 'links' | 'history' | 'comms';
 
 const CAPA_STAGE_TONE: Record<string, BadgeTone> = {
   IDENTIFIED: 'neutral', IMPLEMENTING: 'info', OWNER_TESTED: 'primary',
@@ -31,7 +33,7 @@ const CAPA_STAGE_TONE: Record<string, BadgeTone> = {
 
 export function FindingDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const [item, setItem] = useState<ComplianceFindingDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,7 @@ export function FindingDetailPage() {
     { id: 'overview', label: t('detailTabOverview') },
     { id: 'capa',     label: t('detailTabCapa') },
     { id: 'evidence', label: t('detailTabEvidence') },
+    { id: 'docs',     label: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },
     { id: 'links',    label: t('detailTabLinks') },
     { id: 'history',  label: t('detailTabHistory') },
     { id: 'comms',    label: t('detailTabComms') },
@@ -167,6 +170,15 @@ export function FindingDetailPage() {
                   </div>
                 ))}
               </div>}
+        </Card>
+      )}
+      {tab === 'docs' && (
+        <Card title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'} Icon={ShieldCheck}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="AUDIT_FINDING" entityId={item.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="AUDIT_FINDING" entityId={item.id} />
+          </div>
         </Card>
       )}
       {tab === 'links' && (

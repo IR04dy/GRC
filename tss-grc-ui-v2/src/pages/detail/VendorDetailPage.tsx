@@ -8,6 +8,8 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
@@ -17,7 +19,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { VENDORS, VENDOR_ASSESSMENTS_BY_ID, VENDOR_CONTRACTS_BY_ID } from '../tprm/mockTprm';
 
-type TabId = 'overview' | 'assessments' | 'contracts' | 'links' | 'activity';
+type TabId = 'overview' | 'assessments' | 'contracts' | 'docs' | 'links' | 'activity';
 
 const RISK_TONE: Record<string, BadgeTone> = {
   LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
@@ -54,6 +56,7 @@ export function VendorDetailPage() {
     { id: 'overview',    label: t('detailTabOverview') },
     { id: 'assessments', label: t('detailTabAssessments') },
     { id: 'contracts',   label: t('detailTabContracts') },
+    { id: 'docs',        label: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },
     { id: 'links',       label: t('detailTabLinks') },
     { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
@@ -152,6 +155,15 @@ export function VendorDetailPage() {
                   </div>
                 ))}
               </div>}
+        </Card>
+      )}
+      {tab === 'docs' && (
+        <Card title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'} Icon={FileCheck2}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="TPRM_VENDOR" entityId={item.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="TPRM_VENDOR" entityId={item.id} />
+          </div>
         </Card>
       )}
       {tab === 'links' && (
