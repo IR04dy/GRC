@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertOctagon, Flame, Timer, CheckCircle2, Filter, Download, Plus, BarChart3, Lightbulb,
-  Activity, FileText, AlertTriangle, ShieldCheck, RefreshCw, ArrowRight, Send, Archive, Scroll,
+  Activity, FileText, AlertTriangle, ShieldCheck, RefreshCw, ArrowRight, Send, Archive, Scroll, FolderOpen,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -20,6 +20,7 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { Timeline, type TimelineEvent } from '../../components/ui/Timeline';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { useI18n } from '../../lib/i18n';
 import { STATUS_TONE, SEVERITY_TONE, statusLabel, severityLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
@@ -123,6 +124,7 @@ export function IncidentsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<IncidentDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<IncidentDto | null>(null);
+  const [docsTarget, setDocsTarget] = useState<IncidentDto | null>(null);
   const [busy, setBusy] = useState(false);
   // Saudi regulatory-report templates state
   const [templatesOpen, setTemplatesOpen] = useState<{ incident: IncidentDto; templates: RegulatoryTemplate[] } | null>(null);
@@ -326,6 +328,7 @@ export function IncidentsPage() {
       cell: r => {
         const phase = (r as IncidentDto & { nistPhase?: string }).nistPhase ?? 'IDENTIFICATION';
         const extras: Array<{ Icon: typeof ArrowRight; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        extras.push({ Icon: FolderOpen, onClick: () => setDocsTarget(r), title: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' });
         if (r.status !== 'CLOSED' && phase !== 'POST_INCIDENT') extras.push({ Icon: ArrowRight, onClick: () => advancePhase(r), title: t('incidentsActAdvancePhase'), tone: 'primary' });
         if (r.status !== 'CLOSED')                              extras.push({ Icon: Scroll,     onClick: () => openTemplates(r),  title: t('incidentsActSaudiTemplates'), tone: 'accent' });
         if (r.status !== 'CLOSED')                              extras.push({ Icon: Archive,    onClick: () => closeIncidentAction(r), title: t('incidentsActClose'),    tone: 'success' });
@@ -559,6 +562,14 @@ export function IncidentsPage() {
         message={confirmDel ? `Incident "${confirmDel.title}" will be removed. This cannot be undone.` : ''}
         confirmLabel="Delete"
         onCancel={() => setConfirmDel(null)} onConfirm={executeDelete}
+      />
+
+      <EntityDocsModal
+        entityType="INCIDENT"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget ? `INC-${String(docsTarget.id).padStart(4, '0')}` : undefined}
+        onClose={() => setDocsTarget(null)}
       />
 
       {/* ── Saudi regulatory-report templates modal ── */}
