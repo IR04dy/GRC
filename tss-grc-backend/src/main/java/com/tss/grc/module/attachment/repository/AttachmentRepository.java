@@ -7,6 +7,11 @@ import java.util.List;
 
 public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
 
-    List<Attachment> findByOrganisationIdAndEntityTypeAndEntityIdOrderByUploadedAtDesc(
+    /** Current (non-superseded) attachments for an entity. */
+    List<Attachment> findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
         Long organisationId, String entityType, Long entityId);
+
+    /** Every version in a document's version chain, newest first. */
+    List<Attachment> findByOrganisationIdAndVersionGroupIdOrderByVersionDesc(
+        Long organisationId, Long versionGroupId);
 }

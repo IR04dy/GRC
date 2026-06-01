@@ -65,6 +65,26 @@ public class AttachmentController {
             .body(p.bytes());
     }
 
+    @PostMapping(value = "/{id}/version", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload a new version that supersedes this attachment (multipart)")
+    public AttachmentResponse newVersion(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "docType", required = false) String docType,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "validTo", required = false)
+                @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate validTo,
+            @AuthenticationPrincipal GrcUserDetails me) {
+        return service.replaceVersion(id, docType, title, validTo, file,
+            me != null ? me.getUserId() : null);
+    }
+
+    @GetMapping("/{id}/history")
+    @Operation(summary = "Version history of this attachment's document (newest first)")
+    public List<AttachmentResponse> history(@PathVariable Long id) {
+        return service.history(id);
+    }
+
     @PatchMapping("/{id}")
     @Operation(summary = "Edit attachment metadata (docType / title / expiry) — binary unchanged")
     public AttachmentResponse update(@PathVariable Long id, @RequestBody AttachmentUpdateRequest req) {

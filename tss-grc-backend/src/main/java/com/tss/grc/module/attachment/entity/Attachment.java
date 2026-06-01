@@ -70,6 +70,21 @@ public class Attachment {
     @Column(name = "uploaded_at", nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
+    // ── Versioning ────────────────────────────────────────────────────────────
+    /** 1 for the first upload; incremented each time the document is replaced. */
+    @Column(name = "version", nullable = false)
+    private Integer version = 1;
+
+    /** Id of the first (v1) attachment in this document's version chain. All
+     *  versions of one logical document share this. Null until set post-insert. */
+    @Column(name = "version_group_id")
+    private Long versionGroupId;
+
+    /** True once a newer version exists — superseded rows are hidden from the
+     *  current list but remain available via the version history. */
+    @Column(name = "superseded", nullable = false)
+    private Boolean superseded = false;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 }

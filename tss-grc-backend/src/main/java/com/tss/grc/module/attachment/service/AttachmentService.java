@@ -30,7 +30,7 @@ public class AttachmentService {
     public List<AttachmentResponse> list(String entityType, Long entityId) {
         Long orgId = TenantContext.getCurrentTenant();
         return repository
-            .findByOrganisationIdAndEntityTypeAndEntityIdOrderByUploadedAtDesc(orgId, entityType, entityId)
+            .findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(orgId, entityType, entityId)
             .stream().map(this::toResponse).toList();
     }
 
@@ -56,7 +56,59 @@ public class AttachmentService {
         a.setSha256Hash(stored.sha256());
         a.setValidTo(validTo);
         a.setUploadedBy(userId);
-        return toResponse(repository.save(a));
+        a.setVersion(1);
+        a.setSuperseded(false);
+        Attachment saved = repository.save(a);
+        // The first version anchors its own version chain.
+        saved.setVersionGroupId(saved.getId());
+        return toResponse(repository.save(saved));
+    }
+
+    /**
+     * Upload a new version that supersedes an existing attachment. The new row
+     * inherits the entity/doc-type/title (overridable) and bumps the version;
+     * the prior row is flagged superseded (kept for history). Returns the new
+     * current version.
+     */
+    @Transactional
+    public AttachmentResponse replaceVersion(Long oldId, String docType, String titleEn,
+                                             LocalDate validTo, MultipartFile file, Long userId) {
+        Attachment old = mustGet(oldId);
+        Long orgId = old.getOrganisationId();
+        String type = (docType == null || docType.isBlank()) ? old.getDocType() : docType.toUpperCase();
+        if (!DOC_TYPES.contains(type)) {
+            throw new IllegalArgumentException("Unknown docType '" + docType + "'. Valid: " + DOC_TYPES);
+        }
+        AttachmentStorageService.StoredFile stored = storage.store(orgId, old.getEntityType(), file);
+        Attachment a = new Attachment();
+        a.setOrganisationId(orgId);
+        a.setEntityType(old.getEntityType());
+        a.setEntityId(old.getEntityId());
+        a.setDocType(type);
+        a.setTitleEn(titleEn != null ? (titleEn.isBlank() ? null : titleEn) : old.getTitleEn());
+        a.setFileName(stored.originalName());
+        a.setFilePath(stored.relativePath());
+        a.setFileSizeBytes(stored.size());
+        a.setMimeType(stored.mimeType() == null ? "application/octet-stream" : stored.mimeType());
+        a.setSha256Hash(stored.sha256());
+        a.setValidTo(validTo != null ? validTo : old.getValidTo());
+        a.setUploadedBy(userId);
+        a.setVersion(old.getVersion() + 1);
+        a.setVersionGroupId(old.getVersionGroupId() != null ? old.getVersionGroupId() : old.getId());
+        a.setSuperseded(false);
+        Attachment saved = repository.save(a);
+        old.setSuperseded(true);
+        repository.save(old);
+        return toResponse(saved);
+    }
+
+    /** Full version history of the document this attachment belongs to (newest first). */
+    @Transactional(readOnly = true)
+    public List<AttachmentResponse> history(Long id) {
+        Attachment a = mustGet(id);
+        Long group = a.getVersionGroupId() != null ? a.getVersionGroupId() : a.getId();
+        return repository.findByOrganisationIdAndVersionGroupIdOrderByVersionDesc(a.getOrganisationId(), group)
+            .stream().map(this::toResponse).toList();
     }
 
     /**
@@ -109,6 +161,7 @@ public class AttachmentService {
             a.getId(), a.getEntityType(), a.getEntityId(), a.getDocType(), a.getTitleEn(),
             a.getFileName(), a.getFileSizeBytes(), a.getMimeType(), a.getSha256Hash(),
             a.getValidTo(), a.getUploadedBy(), a.getUploadedAt(),
+            a.getVersion(), a.getVersionGroupId(),
             "/api/v1/attachments/" + a.getId() + "/download");
     }
 }

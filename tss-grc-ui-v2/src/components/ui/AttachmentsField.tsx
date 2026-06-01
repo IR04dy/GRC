@@ -7,10 +7,11 @@
 // attachments expose a "Re-collect" action that re-opens the picker pre-seeded
 // with the same type/title so the fresh copy supersedes the stale one.
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent } from 'react';
-import { Paperclip, Download, Trash2, Upload, RefreshCw, X, Pencil } from 'lucide-react';
+import { Paperclip, Download, Trash2, Upload, RefreshCw, X, Pencil, History, Layers } from 'lucide-react';
 import { Button } from './Button';
 import { Badge } from './Badge';
 import { ConfirmDialog } from './ConfirmDialog';
+import { Modal } from './Modal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -84,6 +85,10 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   // delete confirmation
   const [confirmDel, setConfirmDel] = useState<AttachmentDto | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // versioning
+  const [replaceTarget, setReplaceTarget] = useState<AttachmentDto | null>(null);
+  const [historyOf, setHistoryOf] = useState<AttachmentDto | null>(null);
+  const [historyRows, setHistoryRows] = useState<AttachmentDto[]>([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -97,6 +102,18 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   function pick(seed?: { docType: AttachmentDocType; title: string }) {
     seedRef.current = seed ?? null;
     fileRef.current?.click();
+  }
+
+  /** Replace an attachment with a new version (supersedes the current one). */
+  function pickReplace(a: AttachmentDto) {
+    setReplaceTarget(a);
+    seedRef.current = { docType: a.docType, title: a.titleEn ?? '' };
+    fileRef.current?.click();
+  }
+
+  function openHistory(a: AttachmentDto) {
+    setHistoryOf(a);
+    attachmentsApi.history(a.id).then(setHistoryRows).catch(() => setHistoryRows([]));
   }
 
   function validate(file: File): boolean {
@@ -144,24 +161,28 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     stageFiles(Array.from(e.dataTransfer.files ?? []));
   }
 
-  function cancelStaged() { setStaged(null); setQueue([]); }
+  function cancelStaged() { setStaged(null); setQueue([]); setReplaceTarget(null); }
 
   async function confirmUpload() {
     if (!staged) return;
+    const opts = { docType: sDocType, title: sTitle.trim() || undefined, validTo: sValidTo || undefined };
     setBusy(true);
     try {
-      await attachmentsApi.upload(entityType, entityId, staged, {
-        docType: sDocType,
-        title: sTitle.trim() || undefined,
-        validTo: sValidTo || undefined,
-      });
-      toast.success(ar ? 'تم إرفاق الملف' : 'File attached');
-      load();
-      // Advance to the next queued file, if any.
-      if (queue.length) { const [next, ...rest] = queue; setQueue(rest); stageOne(next); }
-      else setStaged(null);
+      if (replaceTarget) {
+        await attachmentsApi.newVersion(replaceTarget.id, staged, opts);
+        toast.success(ar ? 'تم رفع نسخة جديدة' : 'New version uploaded');
+        setReplaceTarget(null); setStaged(null); setQueue([]);
+        load();
+      } else {
+        await attachmentsApi.upload(entityType, entityId, staged, opts);
+        toast.success(ar ? 'تم إرفاق الملف' : 'File attached');
+        load();
+        // Advance to the next queued file, if any.
+        if (queue.length) { const [next, ...rest] = queue; setQueue(rest); stageOne(next); }
+        else setStaged(null);
+      }
     } catch (err) {
-      toast.danger(err instanceof ApiError ? err.message : (ar ? 'تعذّر رفع الملف' : 'Upload failed'));
+      toast.danger(err instanceof ApiError ? err.message : (ar ? 'تعذّر الرفع' : 'Upload failed'));
     } finally { setBusy(false); }
   }
 
@@ -321,6 +342,9 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                 <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ fontWeight: 600 }}>{a.titleEn || a.fileName}</span>
                   {a.titleEn && <span style={{ color: 'var(--ink-3)' }}> · {a.fileName}</span>}
+                  {a.version != null && a.version > 1 && (
+                    <span className="mono" style={{ marginInlineStart: 6, fontSize: 10, color: 'var(--primary, #2563eb)', fontWeight: 700 }}>v{a.version}</span>
+                  )}
                 </div>
                 <span style={{ color: 'var(--ink-3)' }} className="mono">
                   {fmtBytes(a.fileSize)}{a.createdAt ? ` · ${a.createdAt.slice(0, 10)}` : ''}
@@ -333,6 +357,12 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                     <Button size="sm" variant="ghost" Icon={RefreshCw}
                       title={ar ? 'إعادة التجميع (رفع نسخة محدّثة)' : 'Re-collect (upload a fresh copy)'}
                       onClick={() => pick({ docType: a.docType, title: a.titleEn || '' })} />
+                  )}
+                  <Button size="sm" variant="ghost" Icon={Layers} title={ar ? 'رفع نسخة جديدة' : 'Upload new version'}
+                    onClick={() => pickReplace(a)} />
+                  {a.version != null && a.version > 1 && (
+                    <Button size="sm" variant="ghost" Icon={History} title={ar ? 'سجل النسخ' : 'Version history'}
+                      onClick={() => openHistory(a)} />
                   )}
                   <Button size="sm" variant="ghost" Icon={Pencil} title={ar ? 'تعديل البيانات' : 'Edit details'}
                     onClick={() => startEdit(a)} />
@@ -363,6 +393,28 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
         onCancel={() => setConfirmDel(null)}
         onConfirm={() => { if (confirmDel) void remove(confirmDel); }}
       />
+
+      {historyOf && (
+        <Modal open title={(ar ? 'سجل النسخ · ' : 'Version history · ') + (historyOf.titleEn || historyOf.fileName)}
+          size="md" onClose={() => setHistoryOf(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {historyRows.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: 8 }}>{ar ? 'لا توجد نسخ.' : 'No versions.'}</div>
+            ) : historyRows.map((v, idx) => (
+              <div key={v.id} style={{
+                display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: 10, alignItems: 'center',
+                padding: '8px 10px', borderBottom: '1px solid var(--border)', fontSize: 12,
+              }}>
+                <Badge tone={idx === 0 ? 'success' : 'neutral'}>v{v.version}{idx === 0 ? (ar ? ' · حالي' : ' · current') : ''}</Badge>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.fileName}</span>
+                <span className="mono" style={{ color: 'var(--ink-3)' }}>{v.createdAt?.slice(0, 10)}</span>
+                <Button size="sm" variant="ghost" Icon={Download} title={ar ? 'تنزيل' : 'Download'}
+                  onClick={() => { void attachmentsApi.download(v); }} />
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

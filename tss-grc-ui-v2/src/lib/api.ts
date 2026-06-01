@@ -1918,6 +1918,7 @@ export interface AttachmentDto {
   titleEn?: string;
   fileName: string; fileSize?: number; mimeType?: string; sha256?: string;
   validTo?: string; uploadedById?: number; createdAt?: string;
+  version?: number; versionGroupId?: number;
   downloadUrl: string;
 }
 
@@ -1950,6 +1951,15 @@ export const attachmentsApi = {
   download: (a: AttachmentDto) => downloadFile(`/api/v1/attachments/${a.id}/download`, a.fileName),
   update: (id: number, body: { docType?: AttachmentDocType; titleEn?: string; validTo?: string }) =>
     api.patch<AttachmentDto>(`/api/v1/attachments/${id}`, body),
+  newVersion: (id: number, file: File, opts?: { docType?: AttachmentDocType; title?: string; validTo?: string }) => {
+    const q = new URLSearchParams();
+    if (opts?.docType) q.set('docType', opts.docType);
+    if (opts?.title) q.set('title', opts.title);
+    if (opts?.validTo) q.set('validTo', opts.validTo);
+    const qs = q.toString();
+    return uploadFile<AttachmentDto>(`/api/v1/attachments/${id}/version${qs ? '?' + qs : ''}`, file);
+  },
+  history: (id: number) => api.get<AttachmentDto[]>(`/api/v1/attachments/${id}/history`),
   remove: (id: number) => api.delete<void>(`/api/v1/attachments/${id}`),
 };
 

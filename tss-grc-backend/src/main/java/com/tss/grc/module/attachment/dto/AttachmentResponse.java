@@ -16,5 +16,7 @@ public record AttachmentResponse(
     LocalDate validTo,
     Long uploadedById,
     LocalDateTime createdAt,
+    Integer version,
+    Long versionGroupId,
     String downloadUrl
 ) {}
