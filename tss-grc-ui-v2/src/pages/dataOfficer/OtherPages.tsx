@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, ShieldCheck, ScrollText, BookOpen, Archive, Database, Sigma, Scale } from 'lucide-react';
+import { Plus, ShieldCheck, ScrollText, BookOpen, Archive, Database, Sigma, Scale, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
@@ -123,6 +124,7 @@ export function DpiaPage() {
   const { rows, error, reload } = useList<DpiaResponse>(() => dataOfficerApi.listDpia());
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<DpiaResponse | null>(null);
   const [ref, setRef] = useState(''); const [titleEn, setTitleEn] = useState(''); const [titleAr, setTitleAr] = useState('');
   const [trigger, setTrigger] = useState('NEW_PROCESSING');
   const [highRisk, setHighRisk] = useState(false);
@@ -147,6 +149,10 @@ export function DpiaPage() {
       cell: d => <Badge tone={DPIA_STATUS_TONE[d.status]}>{DPIA_STATUS_LABEL[d.status][ar ? 'ar' : 'en']}</Badge> },
     { header: ar ? 'مراجعة قادمة' : 'Next review', width: '120px',
       cell: d => <span style={{ fontSize: 12 }}>{d.nextReviewDue ?? '—'}</span> },
+    { header: '', width: '60px', align: 'end',
+      cell: d => <Button variant="ghost" size="sm" Icon={FolderOpen}
+        title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+        onClick={(e) => { e.stopPropagation(); setDocsTarget(d); }} /> },
   ];
   return (
     <Shell>
@@ -177,6 +183,8 @@ export function DpiaPage() {
       <Card>{rows.length === 0
         ? <EmptyState Icon={ScrollText} title={ar ? 'لا توجد تقييمات' : 'No DPIAs'} sub={ar ? 'سجّل أول تقييم أثر' : 'Draft the first DPIA'} />
         : <DataTable columns={cols} rows={rows} />}</Card>
+      <EntityDocsModal entityType="DPIA" entityId={docsTarget?.id ?? null} open={!!docsTarget}
+        recordLabel={docsTarget?.reference} onClose={() => setDocsTarget(null)} />
     </Shell>
   );
 }
