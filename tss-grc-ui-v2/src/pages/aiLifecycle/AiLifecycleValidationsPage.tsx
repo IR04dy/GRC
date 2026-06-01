@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, ClipboardCheck } from 'lucide-react';
+import { Plus, ClipboardCheck, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -38,6 +39,7 @@ export function AiLifecycleValidationsPage() {
 
   // transition
   const [moveTarget, setMoveTarget] = useState<ValidationResponse | null>(null);
+  const [docsTarget, setDocsTarget] = useState<ValidationResponse | null>(null);
   const [toStatus, setToStatus] = useState<ValidationStatus | null>(null);
   const [disparity, setDisparity] = useState<number | ''>('');
   const [findingsEn, setFindingsEn] = useState('');
@@ -120,18 +122,24 @@ export function AiLifecycleValidationsPage() {
     { header: lang === 'ar' ? 'الحالة' : 'Status', width: '180px',
       cell: v => <Badge tone={VALIDATION_STATUS_TONE[v.status]}>
         {VALIDATION_STATUS_LABEL[v.status][lang === 'ar' ? 'ar' : 'en']}</Badge> },
-    { header: '', width: '95px',
+    { header: '', width: '140px',
       cell: v => {
         const next = nextValidationStatuses(v.status);
-        if (next.length === 0) return null;
         return (
-          <Button variant="ghost" size="sm"
-            onClick={(e) => { e.stopPropagation();
-              setMoveTarget(v); setToStatus(next[0]);
-              setDisparity(''); setFindingsEn(''); setFindingsAr('');
-              setConditionsEn(''); setConditionsAr(''); }}>
-            {lang === 'ar' ? 'تحريك' : 'Move'}
-          </Button>
+          <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(v); }} />
+            {next.length > 0 && (
+              <Button variant="ghost" size="sm"
+                onClick={(e) => { e.stopPropagation();
+                  setMoveTarget(v); setToStatus(next[0]);
+                  setDisparity(''); setFindingsEn(''); setFindingsAr('');
+                  setConditionsEn(''); setConditionsAr(''); }}>
+                {lang === 'ar' ? 'تحريك' : 'Move'}
+              </Button>
+            )}
+          </span>
         );
       } },
   ];
@@ -270,6 +278,12 @@ export function AiLifecycleValidationsPage() {
           />
         )}
       </Card>
+      <EntityDocsModal
+        entityType="AI_VALIDATION"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        onClose={() => setDocsTarget(null)}
+      />
     </Shell>
   );
 }
