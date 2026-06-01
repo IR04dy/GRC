@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
 import { Paperclip, Upload, X } from 'lucide-react';
 import { Modal } from './Modal';
 import { Input, Textarea } from './Input';
 import { Select } from './Select';
 import { SearchableSelect, type SelectOption } from './SearchableSelect';
 import { Button } from './Button';
-import { AttachmentsField } from './AttachmentsField';
+import { AttachmentsField, isAllowedFile } from './AttachmentsField';
 import { attachmentsApi } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -210,16 +210,37 @@ function PendingFilesField({ label, files, onChange }: {
 }) {
   const { lang } = useI18n();
   const ar = lang === 'ar';
+  const toast = useToast();
   const ref = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  function accept(incoming: File[]) {
+    const ok = incoming.filter(isAllowedFile);
+    if (ok.length < incoming.length) {
+      toast.danger(ar ? 'تم تجاهل ملفات غير مسموحة (النوع/الحجم 50 ميجابايت).' : 'Some files were skipped (type or 50 MB limit).');
+    }
+    if (ok.length) onChange([...files, ...ok]);
+  }
 
   function add(e: ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (picked.length) onChange([...files, ...picked]);
+    accept(picked);
+  }
+
+  function onDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    accept(Array.from(e.dataTransfer.files ?? []));
   }
 
   return (
-    <div>
+    <div
+      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={e => { if (e.currentTarget === e.target) setDragging(false); }}
+      onDrop={onDrop}
+      style={{ outline: dragging ? '2px dashed var(--primary, #2563eb)' : 'none', outlineOffset: 4, borderRadius: 8 }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
           <Paperclip size={13} /> {label}

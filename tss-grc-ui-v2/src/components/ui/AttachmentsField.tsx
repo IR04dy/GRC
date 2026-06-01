@@ -6,7 +6,7 @@
 // optionally set an expiry ("valid until") before confirming. Expired
 // attachments expose a "Re-collect" action that re-opens the picker pre-seeded
 // with the same type/title so the fresh copy supersedes the stale one.
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent } from 'react';
 import { Paperclip, Download, Trash2, Upload, RefreshCw, X } from 'lucide-react';
 import { Button } from './Button';
 import { Badge } from './Badge';
@@ -30,6 +30,16 @@ const DOC_TYPE_LABELS: Record<AttachmentDocType, { en: string; ar: string }> = {
   SCREENSHOT:    { en: 'Screenshot',    ar: 'لقطة شاشة' },
   OTHER:         { en: 'Other',         ar: 'أخرى' },
 };
+
+// Mirror the backend allow-list + 50 MB cap so drag-drop (which bypasses the
+// file picker's `accept` filter) fails fast with a clear message.
+export const MAX_BYTES = 50 * 1024 * 1024;
+export const ALLOWED_EXT = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'txt', 'csv', 'json', 'xml', 'zip'];
+/** True if a file passes the extension allow-list + size cap. */
+export function isAllowedFile(file: File): boolean {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return ALLOWED_EXT.includes(ext) && file.size <= MAX_BYTES;
+}
 
 function fmtBytes(n?: number): string {
   if (!n && n !== 0) return '';
@@ -64,6 +74,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const [sTitle, setSTitle] = useState('');
   const [sValidTo, setSValidTo] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
   // delete confirmation
   const [confirmDel, setConfirmDel] = useState<AttachmentDto | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -82,10 +93,21 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     fileRef.current?.click();
   }
 
-  function onFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  function validate(file: File): boolean {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!ALLOWED_EXT.includes(ext)) {
+      toast.danger(ar ? `نوع الملف غير مسموح: .${ext}` : `File type not allowed: .${ext}`);
+      return false;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.danger(ar ? 'حجم الملف يتجاوز 50 ميجابايت' : 'File exceeds the 50 MB limit');
+      return false;
+    }
+    return true;
+  }
+
+  function stageFile(file: File) {
+    if (!validate(file)) return;
     const seed = seedRef.current;
     seedRef.current = null;
     const base = file.name.replace(/\.[^./\\]+$/, '');
@@ -93,6 +115,20 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     setSDocType(seed?.docType ?? 'PLAN');
     setSTitle(seed?.title || base);
     setSValidTo('');
+  }
+
+  function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) stageFile(file);
+  }
+
+  function onDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    if (busy || staged) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) stageFile(file);
   }
 
   async function confirmUpload() {
@@ -122,7 +158,20 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div>
+    <div
+      onDragOver={e => { if (!busy && !staged) { e.preventDefault(); setDragging(true); } }}
+      onDragLeave={e => { if (e.currentTarget === e.target) setDragging(false); }}
+      onDrop={onDrop}
+      style={{
+        outline: dragging ? '2px dashed var(--primary, #2563eb)' : 'none',
+        outlineOffset: 4, borderRadius: 8, transition: 'outline-color .1s',
+      }}
+    >
+      {dragging && (
+        <div style={{ fontSize: 12, color: 'var(--primary, #2563eb)', fontWeight: 600, padding: '2px 0 6px' }}>
+          {ar ? 'أفلِت الملف للإرفاق…' : 'Drop the file to attach…'}
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
           <Paperclip size={15} /> {label ?? (ar ? 'المرفقات' : 'Attachments')}
