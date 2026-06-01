@@ -128,13 +128,24 @@ public class DashboardService {
 
     private record MetricSource(String table, String openFilter, String extra) {}
 
-    private static final Map<String, MetricSource> METRICS = Map.of(
-        "risks",          new MetricSource("risk.risks",     " AND status <> 'CLOSED'", ""),
-        "open_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", ""),
-        "critical_risks", new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'CRITICAL'"),
-        "high_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'HIGH'"),
-        "incidents",      new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", ""),
-        "open_incidents", new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "")
+    private static final Map<String, MetricSource> METRICS = Map.ofEntries(
+        Map.entry("risks",          new MetricSource("risk.risks",     " AND status <> 'CLOSED'", "")),
+        Map.entry("open_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", "")),
+        Map.entry("critical_risks", new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'CRITICAL'")),
+        Map.entry("high_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'HIGH'")),
+        Map.entry("incidents",      new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "")),
+        Map.entry("open_incidents", new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "")),
+        // Compliance / audit findings still open (not closed or remediated).
+        Map.entry("findings",       new MetricSource("compliance.findings",
+                " AND status NOT IN ('CLOSED','RESOLVED','REMEDIATED','VERIFIED','DONE')", "")),
+        // PDPL data-subject requests still in flight.
+        Map.entry("dsr",            new MetricSource("privacy.data_subject_requests",
+                " AND status NOT IN ('COMPLETED','RESOLVED','REJECTED','CLOSED')", "")),
+        // Privacy breaches not yet closed out.
+        Map.entry("breaches",       new MetricSource("privacy.data_breaches",
+                " AND status NOT IN ('CLOSED','RESOLVED','REMEDIATED')", "")),
+        // Third-party / supplier vendors on the books (excludes terminated).
+        Map.entry("vendors",        new MetricSource("scm.vendors", " AND status <> 'TERMINATED'", ""))
     );
 
     @Transactional(readOnly = true)

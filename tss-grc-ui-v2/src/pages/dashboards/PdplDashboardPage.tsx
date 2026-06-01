@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Fingerprint, AlertOctagon, ShieldAlert, Users, FileWarning, Send } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
 import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
+import { LineChart } from '../../components/charts/LineChart';
 import { useI18n } from '../../lib/i18n';
-import { privacyApi } from '../../lib/api';
+import { privacyApi, dashboardApi } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
 
 /**
@@ -39,6 +41,16 @@ export function PdplDashboardPage() {
   const { data, state, errMsg, retry } = useDashboardLoader<PrivacyStatsShape>(
     () => privacyApi.stats() as Promise<PrivacyStatsShape>);
 
+  const [trend, setTrend] = useState<Array<{ week: string; dsr: number; breaches: number }>>([]);
+  useEffect(() => {
+    Promise.all([
+      dashboardApi.kpiTrend('dsr', 12).catch(() => []),
+      dashboardApi.kpiTrend('breaches', 12).catch(() => []),
+    ]).then(([d, b]) =>
+      setTrend(d.map((p, i) => ({ week: p.label, dsr: p.value, breaches: b[i]?.value ?? 0 }))),
+    );
+  }, []);
+
   if (state === 'loading') return <DashboardLoading title={title} eyebrow={eyebrow} />;
   if (state === 'error' || !data) {
     return <DashboardError title={title} eyebrow={eyebrow} errMsg={errMsg} onRetry={retry} />;
@@ -61,6 +73,22 @@ export function PdplDashboardPage() {
   ];
 
   const widgets: DomainDashboardWidget[] = [
+    {
+      id: 'privacy-trend',
+      title: isAr ? 'اتجاه الطلبات والخروقات — 12 أسبوع' : 'DSR + breach trend · 12 weeks',
+      body: (
+        <LineChart
+          data={trend}
+          xKey="week"
+          height={200}
+          series={[
+            { key: 'dsr', name: isAr ? 'طلبات مفتوحة' : 'Open DSRs', color: 'var(--primary)' },
+            { key: 'breaches', name: isAr ? 'خروقات مفتوحة' : 'Open breaches', color: '#dc2626' },
+          ]}
+          emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'} />
+      ),
+      href: '/privacy?tab=dsr',
+    },
     {
       id: 'pia',
       title: isAr ? 'تقييمات أثر الخصوصية (PIA)' : 'Privacy Impact Assessments',

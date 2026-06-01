@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Truck, AlertOctagon, FileText, Activity, Layers, Network } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
 import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
+import { LineChart } from '../../components/charts/LineChart';
 import { useI18n } from '../../lib/i18n';
-import { scmApi, type ScmStats } from '../../lib/api';
+import { scmApi, dashboardApi, type ScmStats } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
 
 /**
@@ -21,6 +23,13 @@ export function ScmDashboardPage() {
   const eyebrow = isAr ? 'إدارة الموردين' : 'Supply chain';
 
   const { data, state, errMsg, retry } = useDashboardLoader<ScmStats>(() => scmApi.stats());
+
+  const [trend, setTrend] = useState<Array<{ week: string; vendors: number }>>([]);
+  useEffect(() => {
+    dashboardApi.kpiTrend('vendors', 12)
+      .then(pts => setTrend(pts.map(p => ({ week: p.label, vendors: p.value }))))
+      .catch(() => setTrend([]));
+  }, []);
 
   if (state === 'loading') return <DashboardLoading title={title} eyebrow={eyebrow} />;
   if (state === 'error' || !data) {
@@ -45,6 +54,19 @@ export function ScmDashboardPage() {
     : stats.criticalVendors >= 8 ? 'MEDIUM' : 'LOW';
 
   const widgets: DomainDashboardWidget[] = [
+    {
+      id: 'vendor-trend',
+      title: isAr ? 'اتجاه قاعدة الموردين — 12 أسبوع' : 'Vendor base trend · 12 weeks',
+      body: (
+        <LineChart
+          data={trend}
+          xKey="week"
+          height={200}
+          series={[{ key: 'vendors', name: isAr ? 'موردون نشطون' : 'Active vendors', color: 'var(--primary)' }]}
+          emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'} />
+      ),
+      href: '/scm',
+    },
     {
       id: 'concentration',
       title: isAr ? 'مخاطر التركّز' : 'Concentration risk',

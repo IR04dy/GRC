@@ -40,19 +40,21 @@ export function ExecutiveDashboard({ stats, heat }: {
   // no sparkline) if unauthenticated or the endpoint is unavailable.
   const [riskTrend, setRiskTrend] = useState<number[] | undefined>();
   const [incidentTrend, setIncidentTrend] = useState<number[] | undefined>();
+  const [findingsTrend, setFindingsTrend] = useState<number[] | undefined>();
   useEffect(() => {
     if (!isAuthenticated()) return;
     let alive = true;
     const toSeries = (pts: TrendPoint[]) => pts.map(p => p.value);
     dashboardApi.kpiTrend('risks', 12).then(p => { if (alive) setRiskTrend(toSeries(p)); }).catch(() => {});
     dashboardApi.kpiTrend('incidents', 12).then(p => { if (alive) setIncidentTrend(toSeries(p)); }).catch(() => {});
+    dashboardApi.kpiTrend('findings', 12).then(p => { if (alive) setFindingsTrend(toSeries(p)); }).catch(() => {});
     return () => { alive = false; };
   }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
       <PostureHero stats={stats} />
-      <ExecutiveKpiRow stats={stats} riskTrend={riskTrend} incidentTrend={incidentTrend} />
+      <ExecutiveKpiRow stats={stats} riskTrend={riskTrend} incidentTrend={incidentTrend} findingsTrend={findingsTrend} />
       <RiskHeatTrendRow heat={heat} stats={stats} riskTrend={riskTrend} />
       <FrameworkReadiness stats={stats} />
       <AiGovernanceStrip />
@@ -373,10 +375,11 @@ function KpiTile({ Icon, label, value, to, tone, spark, delta, segments }: KpiTi
   );
 }
 
-function ExecutiveKpiRow({ stats, riskTrend, incidentTrend }: {
+function ExecutiveKpiRow({ stats, riskTrend, incidentTrend, findingsTrend }: {
   stats: DashboardStats;
   riskTrend?: number[];
   incidentTrend?: number[];
+  findingsTrend?: number[];
 }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
@@ -424,6 +427,7 @@ function ExecutiveKpiRow({ stats, riskTrend, incidentTrend }: {
       value: totalOverdue,
       to: '/capa?status=overdue',
       tone: totalOverdue > 5 ? 'danger' : totalOverdue > 0 ? 'warning' : 'success',
+      spark: findingsTrend,
       segments: totalOverdue > 0 ? [
         { value: overdueFindings,             color: 'var(--danger)',  label: isAr ? 'ملاحظات' : 'Findings' },
         { value: stats.pendingTasks ?? 0,     color: 'var(--warning)', label: isAr ? 'مهام' : 'Tasks' },

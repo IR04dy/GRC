@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { BarChart } from '../../components/charts/BarChart';
 import { PieChart, type PieDatum } from '../../components/charts/PieChart';
+import { LineChart } from '../../components/charts/LineChart';
 import { useI18n } from '../../lib/i18n';
 import { dashboardApi, ermAdvancedApi, type DashboardStats, ApiError } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
@@ -41,6 +42,7 @@ export function ErmDashboardPage() {
   const [byCat, setByCat] = useState<CategoryBucket | null>(null);
   const [kri, setKri] = useState<KriBands | null>(null);
   const [appetite, setAppetite] = useState<AppetiteSummary | null>(null);
+  const [trend, setTrend] = useState<Array<{ week: string; open: number; critical: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,18 +50,21 @@ export function ErmDashboardPage() {
     if (!isAuthenticated()) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [s, h, c, k, a] = await Promise.all([
+      const [s, h, c, k, a, tRisks, tCrit] = await Promise.all([
         dashboardApi.stats(),
         dashboardApi.heatmap() as Promise<{ cells: HeatmapCell[] }>,
         dashboardApi.riskByCategory() as Promise<CategoryBucket>,
         ermAdvancedApi.kriDashboard(),
         ermAdvancedApi.appetiteDashboard().catch(() => null),
+        dashboardApi.kpiTrend('risks', 12).catch(() => []),
+        dashboardApi.kpiTrend('critical_risks', 12).catch(() => []),
       ]);
       setStats(s);
       setHeatmap(h?.cells ?? []);
       setByCat(c ?? null);
       setKri(k ?? null);
       setAppetite(a as AppetiteSummary | null);
+      setTrend(tRisks.map((p, i) => ({ week: p.label, open: p.value, critical: tCrit[i]?.value ?? 0 })));
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load dashboard');
@@ -159,6 +164,28 @@ export function ErmDashboardPage() {
             <PieChart data={kriPie} innerRadius={55} legend height={240}
               onPointClick={() => navigate('/risk?tab=kri')}
               emptyState={isAr ? 'لا توجد قراءات' : 'No KRI readings'} />
+          </div>
+        </Card>
+      </div>
+
+      {/* ── Risk trend over time (real, 12 weeks from /kpi-trend) ── */}
+      <div style={{ marginBottom: 16 }}>
+        <Card>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 700 }}>{isAr ? 'اتجاه المخاطر المفتوحة — 12 أسبوع' : 'Open-risk trend · 12 weeks'}</div>
+            <Badge tone="neutral">{trend.length ? trend[trend.length - 1].open : 0}</Badge>
+          </div>
+          <div style={{ padding: 12 }}>
+            <LineChart
+              data={trend}
+              xKey="week"
+              height={220}
+              series={[
+                { key: 'open', name: isAr ? 'مخاطر مفتوحة' : 'Open risks', color: 'var(--primary)' },
+                { key: 'critical', name: isAr ? 'حرجة' : 'Critical', color: '#dc2626' },
+              ]}
+              emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'}
+              onPointClick={() => navigate('/risk')} />
           </div>
         </Card>
       </div>

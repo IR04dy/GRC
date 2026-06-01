@@ -3,8 +3,9 @@ import { Shield, AlertTriangle, Bug, Activity, ServerCog, FileWarning, RefreshCw
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { LineChart } from '../../components/charts/LineChart';
 import { useI18n } from '../../lib/i18n';
-import { cyberApi, type CyberDashboardDto } from '../../lib/api';
+import { cyberApi, dashboardApi, type CyberDashboardDto } from '../../lib/api';
 
 /**
  * NCA Cybersecurity Dashboard — task #36 (prompt §30.5).
@@ -24,6 +25,7 @@ export function CyberDashboardPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const [stats, setStats] = useState<CyberDashboardDto | null>(null);
+  const [trend, setTrend] = useState<Array<{ week: string; incidents: number }>>([]);
   const [state, setState] = useState<LoadState>('idle');
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
@@ -33,6 +35,9 @@ export function CyberDashboardPage() {
     try {
       const data = await cyberApi.dashboard();
       setStats(data);
+      dashboardApi.kpiTrend('incidents', 12)
+        .then(pts => setTrend(pts.map(p => ({ week: p.label, incidents: p.value }))))
+        .catch(() => setTrend([]));
       setState('ready');
     } catch (e) {
       setErrMsg((e as Error)?.message ?? String(e));
@@ -111,6 +116,19 @@ export function CyberDashboardPage() {
   ];
 
   const widgets: DomainDashboardWidget[] = [
+    {
+      id: 'incident-trend',
+      title: isAr ? 'اتجاه الحوادث — 12 أسبوع' : 'Incident trend · 12 weeks',
+      body: (
+        <LineChart
+          data={trend}
+          xKey="week"
+          height={200}
+          series={[{ key: 'incidents', name: isAr ? 'حوادث مفتوحة' : 'Open incidents', color: 'var(--danger)' }]}
+          emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'} />
+      ),
+      href: '/cyber',
+    },
     {
       id: 'frameworks',
       title: isAr ? 'النتائج حسب الإطار' : 'Score by framework',
