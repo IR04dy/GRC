@@ -25,9 +25,17 @@ Companion docs at the repo root carry context that is *not* in this file:
 
 ### Backend (Spring Boot, port 8084 in dev)
 
+**Required env vars** — even in dev the app refuses to start without these (the
+`application-dev.yml` defaults are deliberate placeholders):
+- `JWT_SECRET` — ≥32 chars, must not contain `change-this`/`placeholder` (see `JwtTokenProvider.validateSecret`). Boot fails with *"JWT_SECRET appears to be a placeholder value"* otherwise.
+- `DB_PASSWORD` — the dev SQL Server `sa` password (`tss.123`). Default is `CHANGE_ME_IN_ENV`; without it Hibernate fails with *"Unable to determine Dialect without JDBC metadata"* (it can't authenticate).
+
+Export both (e.g. in your shell profile / IDE run config) before any of the run commands below. A bare `java -jar …` won't inherit them unless they're in the environment.
+
 ```bash
 cd tss-grc-backend
-mvn spring-boot:run -Dspring.profiles.active=dev
+JWT_SECRET=<32+ char secret> DB_PASSWORD=tss.123 \
+  mvn spring-boot:run -Dspring.profiles.active=dev
 # API:        http://localhost:8084
 # Swagger UI: http://localhost:8084/swagger-ui.html  (dev only)
 # Health:     http://localhost:8084/actuator/health
