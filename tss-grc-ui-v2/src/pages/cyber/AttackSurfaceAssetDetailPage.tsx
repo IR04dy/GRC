@@ -318,7 +318,7 @@ export function AttackSurfaceAssetDetailPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <AttachmentsField entityType="ASM_ASSET" entityId={asset.id} />
               <div style={{ borderTop: '1px solid var(--border)' }} />
-              <ControlMappingPicker entityType="ASM_ASSET" entityId={asset.id} />
+              <ControlMappingPicker entityType="ASM_ASSET" entityId={asset.id} evidence={false} />
               <div style={{ borderTop: '1px solid var(--border)' }} />
               <div>
                 <div style={{ fontWeight: 700, marginBottom: 8 }}>{lang === 'ar' ? 'جاهزية الأدلة' : 'Evidence readiness'}</div>

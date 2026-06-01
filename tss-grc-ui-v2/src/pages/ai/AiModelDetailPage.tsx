@@ -161,7 +161,7 @@ export function AiModelDetailPage() {
       </div>
       <div style={{ marginTop: 12 }}>
         <Card>
-          <ControlMappingPicker entityType="AI_MODEL" entityId={model.id} />
+          <ControlMappingPicker entityType="AI_MODEL" entityId={model.id} evidence={false} />
         </Card>
       </div>
 

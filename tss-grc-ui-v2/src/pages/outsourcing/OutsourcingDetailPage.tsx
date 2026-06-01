@@ -188,7 +188,7 @@ export function OutsourcingDetailPage() {
           </div>
           <div className="lg:col-span-2">
             <Card>
-              <ControlMappingPicker entityType="OUTSOURCING" entityId={arrangement.id} />
+              <ControlMappingPicker entityType="OUTSOURCING" entityId={arrangement.id} evidence={false} />
             </Card>
           </div>
           <div className="lg:col-span-2">

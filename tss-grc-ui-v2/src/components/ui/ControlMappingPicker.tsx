@@ -2,8 +2,9 @@
 // sub-controls across frameworks (ECC ↔ ISO ↔ PDPL …). Nothing is auto-derived;
 // the user adds/removes mappings, which are saved (replace-set) immediately.
 import { useEffect, useMemo, useState } from 'react';
-import { Link2, X, Search } from 'lucide-react';
+import { Link2, X, Search, FileCheck2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from './Badge';
+import { EvidenceReadinessPanel } from './EvidenceReadinessPanel';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { controlLinksApi, ApiError, type ControlLinkDto, type ControlSatisfaction } from '../../lib/api';
@@ -22,9 +23,16 @@ export interface ControlMappingPickerProps {
   entityType: string;
   entityId: number;
   label?: string;
+  /**
+   * Show the collapsible "Evidence readiness" section (recommended evidence +
+   * live coverage + raise request) under the mapping, when controls are mapped.
+   * Defaults to true so every register that maps controls gets it for free.
+   * Pages with a dedicated evidence surface pass `evidence={false}`.
+   */
+  evidence?: boolean;
 }
 
-export function ControlMappingPicker({ entityType, entityId, label }: ControlMappingPickerProps) {
+export function ControlMappingPicker({ entityType, entityId, label, evidence = true }: ControlMappingPickerProps) {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const toast = useToast();
@@ -33,6 +41,7 @@ export function ControlMappingPicker({ entityType, entityId, label }: ControlMap
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+  const [evOpen, setEvOpen] = useState(false);
 
   useEffect(() => {
     controlLinksApi.get(entityType, entityId).then(setMapped).catch(() => setMapped([]));
@@ -172,6 +181,22 @@ export function ControlMappingPicker({ entityType, entityId, label }: ControlMap
           </div>
         )}
       </div>
+
+      {evidence && mapped.length > 0 && (
+        <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+          <button type="button" onClick={() => setEvOpen(o => !o)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--ink-1)', padding: 0 }}>
+            {evOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <FileCheck2 size={14} /> {ar ? 'جاهزية الأدلة' : 'Evidence readiness'}
+            <Badge tone="neutral">{mapped.length}</Badge>
+          </button>
+          {evOpen && (
+            <div style={{ marginTop: 10 }}>
+              <EvidenceReadinessPanel entityType={entityType} entityId={entityId} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

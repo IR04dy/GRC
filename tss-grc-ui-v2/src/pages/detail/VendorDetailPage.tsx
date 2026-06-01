@@ -163,7 +163,7 @@ export function VendorDetailPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <AttachmentsField entityType="TPRM_VENDOR" entityId={item.id} />
             <div style={{ borderTop: '1px solid var(--border)' }} />
-            <ControlMappingPicker entityType="TPRM_VENDOR" entityId={item.id} />
+            <ControlMappingPicker entityType="TPRM_VENDOR" entityId={item.id} evidence={false} />
             <div style={{ borderTop: '1px solid var(--border)' }} />
             <div>
               <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
