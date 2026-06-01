@@ -2,18 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Bot, Cpu, Shield, AlertTriangle, ShieldAlert,
   Activity, CheckCircle2, BadgeAlert, UserCheck, Globe, FileWarning, X,
+  FileSpreadsheet, FileText,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
 import { isAuthenticated } from '../../lib/auth';
-import { ApiError } from '../../lib/api';
+import { ApiError, downloadFile } from '../../lib/api';
 import {
   mlModelApi,
   aggregateMlRegistry,
@@ -194,7 +196,24 @@ export function AiModelRegisterPage() {
         sub={lang === 'ar'
           ? 'جرد مركزي لكل نموذج ذكاء اصطناعي أو تعلم آلي في الإنتاج، مع المصدر وتدقيق العدالة ومراقبة الانحراف، وفق مبادئ سدايا لأخلاقيات الذكاء الاصطناعي (2023) ومسوّدة مبادئ البنك المركزي السعودي لحوكمة الذكاء الاصطناعي والمادة 16 من نظام الذكاء الاصطناعي الأوروبي.'
           : 'Central inventory of every AI/ML model in production, with provenance, fairness audits, and drift monitoring, per SDAIA AI Ethics Principles (2023), SAMA’s draft AI governance principles, and EU AI Act Article 16.'}
-        actions={demoMode ? <Badge tone="warning">{lang === 'ar' ? 'وضع العرض' : 'Demo mode'}</Badge> : null}
+        actions={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {demoMode
+              ? <Badge tone="warning">{lang === 'ar' ? 'وضع العرض' : 'Demo mode'}</Badge>
+              : (
+                <>
+                  <Button size="sm" variant="ghost" Icon={FileSpreadsheet}
+                    onClick={() => { void downloadFile('/api/v1/ai/models/export?format=XLSX', 'ai-model-registry.xlsx'); }}>
+                    {lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                  </Button>
+                  <Button size="sm" variant="ghost" Icon={FileText}
+                    onClick={() => { void downloadFile('/api/v1/ai/models/export?format=PDF', 'ai-model-registry.pdf'); }}>
+                    {lang === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                  </Button>
+                </>
+              )}
+          </div>
+        }
       />
 
       <div className="kpi-grid-sm">

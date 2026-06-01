@@ -4,13 +4,16 @@ import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.DecommissionRequest
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.LifecycleTransitionRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelResponse;
+import com.tss.grc.module.ai.governance.service.AiRegistryExportService;
 import com.tss.grc.module.ai.governance.service.MlModelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -43,12 +46,28 @@ public class MlModelController {
             "hasAnyRole('RISK_MANAGER','MODEL_OWNER','CISO','PLATFORM_ADMIN')";
 
     private final MlModelService service;
+    private final AiRegistryExportService exportService;
 
     @GetMapping
     @PreAuthorize(READ_GUARD)
     @Operation(summary = "List AI/ML models for the current tenant.")
     public List<MlModelResponse> list() {
         return service.list();
+    }
+
+    @GetMapping("/export")
+    @PreAuthorize(READ_GUARD)
+    @Operation(summary = "Regulator-ready AI registry pack (XLSX or PDF): posture summary + per-model attributes.")
+    public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "XLSX") String format) {
+        boolean pdf = "PDF".equalsIgnoreCase(format);
+        byte[] body = exportService.export(format);
+        MediaType ct = pdf ? MediaType.APPLICATION_PDF
+                : MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        String filename = "ai-model-registry." + (pdf ? "pdf" : "xlsx");
+        return ResponseEntity.ok()
+                .contentType(ct)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(body);
     }
 
     @GetMapping("/{externalId}")
