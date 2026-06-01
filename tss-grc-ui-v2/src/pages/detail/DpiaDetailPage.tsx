@@ -8,6 +8,8 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
@@ -19,7 +21,7 @@ import {
   DPIAS, DPIA_QUESTIONS_BY_ID, DPIA_MITIGATIONS_BY_ID, DPIA_REVIEWS_BY_ID,
 } from '../privacy/mockPrivacy';
 
-type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'links' | 'activity';
+type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'docs' | 'links' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', IN_REVIEW: 'warning', APPROVED: 'success', REJECTED: 'danger', EXPIRED: 'neutral',
@@ -60,6 +62,7 @@ export function DpiaDetailPage() {
     { id: 'questions',   label: t('detailTabQuestions') },
     { id: 'mitigations', label: t('detailTabMitigations') },
     { id: 'reviews',     label: t('detailTabReviews') },
+    { id: 'docs',        label: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },
     { id: 'links',       label: t('detailTabLinks') },
     { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
@@ -185,6 +188,15 @@ export function DpiaDetailPage() {
           </Card>
         );
       })()}
+      {tab === 'docs' && (
+        <Card title={lang === 'ar' ? 'المستندات وربط الضوابط' : 'Documents & control mapping'} Icon={ShieldCheck}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AttachmentsField entityType="DPIA" entityId={item.id} />
+            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <ControlMappingPicker entityType="DPIA" entityId={item.id} />
+          </div>
+        </Card>
+      )}
       {tab === 'links' && (
         <Card title={t('detailTabLinks')} Icon={Link2}>
           <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>

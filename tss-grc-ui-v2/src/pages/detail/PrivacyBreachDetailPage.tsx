@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   ShieldAlert, ShieldCheck, Send, Archive, Calendar, AlertTriangle,
-  ScrollText, ChevronRight,
+  ScrollText, ChevronRight, FileText,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -10,6 +10,8 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
@@ -18,7 +20,7 @@ import { privacyApi, ApiError, type PrivacyBreachDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 
-type TabId = 'overview' | 'activity';
+type TabId = 'overview' | 'docs' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   OPEN: 'danger', NEW: 'danger',
@@ -120,6 +122,7 @@ export function PrivacyBreachDetailPage() {
 
   const tabs: TabItem<TabId>[] = [
     { id: 'overview', label: isAr ? 'نظرة عامة' : 'Overview' },
+    { id: 'docs',     label: isAr ? 'المستندات والضوابط' : 'Docs & controls' },
     { id: 'activity', label: isAr ? 'سجل النشاط' : 'Activity' },
   ];
 
@@ -226,6 +229,16 @@ export function PrivacyBreachDetailPage() {
                     <li>{isAr ? 'وثيقة الدروس المستفادة والإجراءات التصحيحية' : 'Document lessons learned + corrective actions'}</li>
                   </ul>
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {tab === 'docs' && (
+            <Card title={isAr ? 'المستندات وربط الضوابط' : 'Documents & control mapping'} Icon={FileText}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <AttachmentsField entityType="BREACH" entityId={item.id} />
+                <div style={{ borderTop: '1px solid var(--border)' }} />
+                <ControlMappingPicker entityType="BREACH" entityId={item.id} />
               </div>
             </Card>
           )}
