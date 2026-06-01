@@ -23,6 +23,7 @@ export function ControlMappingPicker({ entityType, entityId, label }: ControlMap
   const toast = useToast();
   const [mapped, setMapped] = useState<ControlLinkDto[]>([]);
   const [catalog, setCatalog] = useState<FlatSub[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -31,12 +32,13 @@ export function ControlMappingPicker({ entityType, entityId, label }: ControlMap
   }, [entityType, entityId]);
 
   useEffect(() => {
+    setCatalogLoading(true);
     listExpertCatalog().then(fws => {
       const flat: FlatSub[] = [];
       for (const f of fws) for (const c of f.controls) for (const s of c.subControls)
         flat.push({ id: s.id, fw: f.code, ctrl: c.code, code: s.code, nameEn: s.nameEn, nameAr: s.nameAr });
       setCatalog(flat);
-    }).catch(() => setCatalog([]));
+    }).catch(() => setCatalog([])).finally(() => setCatalogLoading(false));
   }, []);
 
   const mappedIds = useMemo(() => new Set(mapped.map(m => m.subControlId)), [mapped]);
@@ -122,6 +124,18 @@ export function ControlMappingPicker({ entityType, entityId, label }: ControlMap
                 </span>
               </button>
             ))}
+          </div>
+        )}
+        {q.trim() && results.length === 0 && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, marginTop: 2,
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+            boxShadow: 'var(--shadow-md, 0 4px 16px rgba(0,0,0,.12))',
+            padding: '9px 10px', fontSize: 12, color: 'var(--ink-3)',
+          }}>
+            {catalogLoading
+              ? (ar ? 'جارٍ تحميل دليل الضوابط…' : 'Loading control catalog…')
+              : (ar ? 'لا توجد ضوابط مطابقة.' : 'No matching controls.')}
           </div>
         )}
       </div>
