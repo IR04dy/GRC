@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Plus, Siren } from 'lucide-react';
+import { Plus, Siren, FolderOpen } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -43,6 +44,7 @@ export function BreachPage() {
   const [descEn, setDescEn] = useState(''); const [descAr, setDescAr] = useState('');
 
   const [moveTarget, setMoveTarget] = useState<BreachResponse | null>(null);
+  const [docsTarget, setDocsTarget] = useState<BreachResponse | null>(null);
   const [toStatus, setToStatus] = useState<BreachStatus | null>(null);
   const [sdaiaRef, setSdaiaRef] = useState('');
   const [containEn, setContainEn] = useState(''); const [containAr, setContainAr] = useState('');
@@ -123,14 +125,22 @@ export function BreachPage() {
                    : (ar ? `${b.hoursToSdaiaDeadline}س متبقية` : `${b.hoursToSdaiaDeadline}h left`)}
         </span>;
       } },
-    { header: '', width: '95px',
+    { header: '', width: '140px',
       cell: b => {
         const next = nextBreachStatuses(b.status);
-        if (next.length === 0) return null;
-        return <Button variant="ghost" size="sm"
-          onClick={(e) => { e.stopPropagation(); setMoveTarget(b); setToStatus(next[0]); }}>
-          {ar ? 'تحريك' : 'Move'}
-        </Button>;
+        return (
+          <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(b); }} />
+            {next.length > 0 && (
+              <Button variant="ghost" size="sm"
+                onClick={(e) => { e.stopPropagation(); setMoveTarget(b); setToStatus(next[0]); }}>
+                {ar ? 'تحريك' : 'Move'}
+              </Button>
+            )}
+          </span>
+        );
       } },
   ];
 
@@ -225,6 +235,13 @@ export function BreachPage() {
           <DataTable columns={cols} rows={rows} />
         )}
       </Card>
+      <EntityDocsModal
+        entityType="BREACH"
+        entityId={docsTarget?.id ?? null}
+        open={!!docsTarget}
+        recordLabel={docsTarget?.reference}
+        onClose={() => setDocsTarget(null)}
+      />
     </Shell>
   );
 }
