@@ -80,3 +80,33 @@ How the platform's forms/workflows compare to ServiceNow IRM, RSA Archer, Metric
 | **Reporting / dashboards / board packs** | Diligent, ServiceNow | ✅ reporting + board pack + exports | OK |
 
 **Conclusion:** the platform already matches the leaders on workflow, freshness, audit trail, risk quant, and reporting. The **two specific places it lags are exactly the two you identified** — inline typed attachments and many-to-many cross-framework control mapping. The Phase-0 foundation closes both and brings the forms to leader parity. Leader-inspired add-ons (attachment expiry/recollection, reminder SLAs on requests, real connectors, questionnaire builder, real e-signature) are smaller follow-ups layered on top.
+
+---
+
+## Per-form rollout plan (execution)
+
+Foundation status: **Attachments backend + `<AttachmentsField>` shipped & verified** (Phase 0a). Control-mapping backend + `<ControlMappingPicker>` = Phase 0b (next). Each form is improved **independently** by dropping `<AttachmentsField entityType=… entityId=…>` into its detail page (or the FormModal `attachments` field kind in edit mode), and later the control-mapping picker.
+
+Each row: the `entityType` string to use + which improvement(s) apply. Attachments roll out first (foundation ready); control-mapping after Phase 0b.
+
+**Batch 1 — HIGH, has a detail page (attachments now):**
+| Form / detail page | entityType | Attach | Map |
+|---|---|---|---|
+| Risk detail (`risk/RiskDetailPage`) | `RISK` | ✅ done | ✅ later |
+| Policy (`policy/PolicyManagementPage` / `compliance` policy) | `POLICY` | ☐ | ✅ |
+| Incident (`incidents/IncidentsPage`) | `INCIDENT` | ☐ | ✅ |
+| Privacy breach (`dataOfficer/BreachPage`, `privacy`) | `BREACH` | ☐ | ✅ |
+| Outsourcing arrangement (`outsourcing/OutsourcingDetailPage`) | `OUTSOURCING` | ✅ done | ✅ later |
+| Vendor / TPRM (`tprm`) | `VENDOR` | ☐ | ✅ |
+| BCP / DR plan (`bcm/BcpBuilder`, `dr-plans`) | `BCP` | ☐ | ✅ |
+| Processor assessment (`processor-assessments`) | `PROCESSOR_ASSESSMENT` | ☐ | ✅ |
+| Audit engagement (`compliance`, `audit-lifecycle`) | `AUDIT_ENGAGEMENT` | ☐ | ✅ |
+| AI model (`ai/AiModelDetailPage`) | `AI_MODEL` | ✅ done | ✅ later |
+
+**Batch 2 — HIGH/MED:** Cyber vuln/exception/evidence (`CYBER_*`), DPIA (`DPIA`), Cross-border transfer (`CBT`), RCA (`RCA`), CAPA (`CAPA`), Reg inspection (`REG_INSPECTION`), Crisis runbook (`CRISIS`), Resilience test (`RESILIENCE_TEST`), ESG disclosure (`ESG_DISCLOSURE`), Data sharing agreement (`DSA`).
+
+**Batch 3 — MED/LOW:** remaining registers (emerging risk, scenarios, contract clauses, committees, third-party-cyber, fourth-party, counterparties, etc.).
+
+**Control-mapping (Phase 0b) rollout order:** Risk, Policy, Incident, Evidence, Audit, CAPA, Vendor, BCP — the entities that most need cross-framework mapping — then the rest, all via the optional/manual `<ControlMappingPicker>`.
+
+Progress is tracked by the ✅/☐ marks above as each form is wired.

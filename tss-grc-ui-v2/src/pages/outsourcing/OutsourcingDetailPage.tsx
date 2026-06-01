@@ -4,6 +4,7 @@ import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, Refre
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -178,6 +179,11 @@ export function OutsourcingDetailPage() {
               <DataPair label={isAr ? 'ضمانة عبر الحدود' : 'Cross-border safeguard'} value={arrangement.crossBorderSafeguardType} />
             )}
           </Card>
+          <div className="lg:col-span-2">
+            <Card>
+              <AttachmentsField entityType="OUTSOURCING" entityId={arrangement.id} />
+            </Card>
+          </div>
           <div className="lg:col-span-2">
             <Card title={isAr ? 'الجوهرية' : 'Materiality'} Icon={AlertTriangle}>
               <DataPair label={isAr ? 'مُصنَّفة' : 'Classified'} value={arrangement.isMaterial ? (isAr ? 'جوهرية' : 'Material') : (isAr ? 'غير جوهرية' : 'Non-material')} />
