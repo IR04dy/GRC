@@ -14,6 +14,8 @@ import com.tss.grc.module.evidence.repository.EvidenceRequestRepository;
 import com.tss.grc.module.evidence.repository.EvidenceSubControlRepository;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
+import com.tss.grc.module.platform.entity.Department;
+import com.tss.grc.module.platform.repository.DepartmentRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,7 @@ public class EvidenceRequestService {
     private final EvidenceControlRepository controlRepository;
     private final EvidenceFrameworkRepository frameworkRepository;
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
 
     // ── Request lifecycle state machine ───────────────────────────────────────
     private static final Set<String> REQUEST_STATUSES =
@@ -68,10 +71,11 @@ public class EvidenceRequestService {
     }
 
     @Transactional
-    public EvidenceRequestResponse create(EvidenceRequestCreateDto dto) {
+    public EvidenceRequestResponse create(EvidenceRequestCreateDto dto, Long requesterId) {
         Long orgId = TenantContext.getCurrentTenant();
         EvidenceRequest req = new EvidenceRequest();
         req.setOrganisationId(orgId);
+        req.setRequestedById(requesterId);   // record who raised the request
         applyDto(req, dto);
         req = requestRepository.save(req);
         return toResponse(req);
@@ -132,6 +136,7 @@ public class EvidenceRequestService {
         req.setDescriptionEn(dto.descriptionEn());
         req.setSubControlId(dto.subControlId());
         req.setAssignedToId(dto.assignedToId());
+        req.setDepartmentId(dto.departmentId());
         req.setDueDate(dto.dueDate());
         req.setNotes(dto.notes());
         if (dto.priority() != null) req.setPriority(dto.priority());
@@ -157,6 +162,9 @@ public class EvidenceRequestService {
         String assignedToName = r.getAssignedToId() != null
                 ? userRepository.findById(r.getAssignedToId()).map(User::getFullNameEn).orElse(null)
                 : null;
+        String departmentName = r.getDepartmentId() != null
+                ? departmentRepository.findById(r.getDepartmentId()).map(Department::getNameEn).orElse(null)
+                : null;
 
         return new EvidenceRequestResponse(
                 r.getId(), r.getExternalId(),
@@ -165,6 +173,7 @@ public class EvidenceRequestService {
                 r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(),
                 r.getRequestedById(), requestedByName,
                 r.getAssignedToId(), assignedToName,
+                r.getDepartmentId(), departmentName,
                 r.getDueDate(), r.getPriority(), r.getStatus(), r.getNotes(),
                 r.getCreatedAt(), r.getUpdatedAt()
         );

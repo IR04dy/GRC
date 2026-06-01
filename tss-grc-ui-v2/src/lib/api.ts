@@ -1893,6 +1893,14 @@ export const evidenceApi = {
   runConnector: (id: number) => api.post<ConnectorDefinitionDto>(`/api/v1/evidence/connectors/${id}/run`),
 };
 
+// ─── Departments (platform) — used to route an evidence request to an owner ──
+export interface DepartmentDto {
+  id: number; code?: string; nameEn: string; nameAr?: string;
+}
+export const departmentsApi = {
+  list: () => api.get<DepartmentDto[]>('/api/v1/departments'),
+};
+
 // ─── PDPL DPIA (assessment §5.4 critical #3) ────────────────────────────────
 export interface DpiaDto {
   id: number; titleEn: string; titleAr?: string;

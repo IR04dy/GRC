@@ -11,6 +11,7 @@ public record EvidenceRequestCreateDto(
     String descriptionEn,
     Long subControlId,
     Long assignedToId,
+    Long departmentId,
     LocalDate dueDate,
     String priority,
     String notes

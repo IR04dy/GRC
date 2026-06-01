@@ -19,6 +19,8 @@ public record EvidenceRequestResponse(
     String requestedByName,
     Long assignedToId,
     String assignedToName,
+    Long departmentId,
+    String departmentName,
     LocalDate dueDate,
     String priority,
     String status,

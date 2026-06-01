@@ -3,6 +3,7 @@ package com.tss.grc.module.evidence.controller;
 import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
 import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
 import com.tss.grc.module.evidence.service.EvidenceRequestService;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -44,8 +46,9 @@ public class EvidenceRequestController {
     @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new evidence request")
-    public EvidenceRequestResponse create(@Valid @RequestBody EvidenceRequestCreateDto dto) {
-        return requestService.create(dto);
+    public EvidenceRequestResponse create(@Valid @RequestBody EvidenceRequestCreateDto dto,
+                                          @AuthenticationPrincipal GrcUserDetails me) {
+        return requestService.create(dto, me != null ? me.getUserId() : null);
     }
 
     @PutMapping("/{id}")

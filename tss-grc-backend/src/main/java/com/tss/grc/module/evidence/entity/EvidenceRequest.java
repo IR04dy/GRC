@@ -41,6 +41,10 @@ public class EvidenceRequest extends BaseEntity {
     @Column(name = "assigned_to_id")
     private Long assignedToId;
 
+    /** Owning department the evidence is requested from (alternative/additional to a named assignee). */
+    @Column(name = "department_id")
+    private Long departmentId;
+
     @Column(name = "due_date")
     private LocalDate dueDate;
 

@@ -12,7 +12,7 @@ import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
-import { ApiError } from '../../lib/api';
+import { ApiError, adminApi, departmentsApi, type AdminUserDto, type DepartmentDto } from '../../lib/api';
 import {
   listExpertCatalog,
   raiseEvidenceRequest,
@@ -49,7 +49,15 @@ export function GrcExpertPage() {
   const [collectTitle, setCollectTitle] = useState('');
   const [collectDesc, setCollectDesc] = useState('');
   const [collectPriority, setCollectPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
+  const [collectAssignee, setCollectAssignee] = useState<number | ''>('');
+  const [collectDept, setCollectDept] = useState<number | ''>('');
+  const [collectDue, setCollectDue] = useState('');
   const [collecting, setCollecting] = useState(false);
+
+  // Directory for the "request from" pickers — a request must name an accountable
+  // owner (person and/or department), not be a fire-and-forget button.
+  const [users, setUsers] = useState<AdminUserDto[]>([]);
+  const [departments, setDepartments] = useState<DepartmentDto[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,6 +77,16 @@ export function GrcExpertPage() {
   }, [lang]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Load the assignee + department directories once for the request pickers.
+  useEffect(() => {
+    adminApi.users(0, 200).then(p => setUsers(p.content.filter(u => u.isActive))).catch(() => setUsers([]));
+    departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
+  }, []);
+
+  const userLabel = (u: AdminUserDto) =>
+    (lang === 'ar' ? (u.fullNameAr || u.fullNameEn) : (u.fullNameEn || u.fullNameAr)) || u.username;
+  const deptLabel = (d: DepartmentDto) => (lang === 'ar' ? (d.nameAr || d.nameEn) : d.nameEn);
 
   // When family changes, auto-select the first framework in that family
   useEffect(() => {
@@ -108,6 +126,10 @@ export function GrcExpertPage() {
     setCollectTitle(`Evidence: ${sc.code} ${sc.nameEn}`);
     setCollectDesc(sc.evidenceGuidance ?? '');
     setCollectPriority('MEDIUM');
+    setCollectAssignee('');
+    setCollectDept('');
+    const due = new Date(); due.setDate(due.getDate() + 14);   // default 2-week turnaround
+    setCollectDue(due.toISOString().slice(0, 10));
   }
 
   function closeCollect() {
@@ -115,10 +137,16 @@ export function GrcExpertPage() {
     setCollectTitle('');
     setCollectDesc('');
     setCollectPriority('MEDIUM');
+    setCollectAssignee('');
+    setCollectDept('');
+    setCollectDue('');
   }
 
+  // A request must be routed to a person and/or a department — never anonymous.
+  const canSubmitCollect = !!collectTitle.trim() && (collectAssignee !== '' || collectDept !== '');
+
   async function submitCollect() {
-    if (!collectTarget) return;
+    if (!collectTarget || !canSubmitCollect) return;
     setCollecting(true);
     try {
       const input: RaiseEvidenceRequestInput = {
@@ -126,6 +154,9 @@ export function GrcExpertPage() {
         descriptionEn: collectDesc.trim() || undefined,
         subControlId: collectTarget.id,
         priority: collectPriority,
+        assignedToId: collectAssignee === '' ? undefined : collectAssignee,
+        departmentId: collectDept === '' ? undefined : collectDept,
+        dueDate: collectDue || undefined,
       };
       await raiseEvidenceRequest(input);
       toast.success(
@@ -359,7 +390,7 @@ export function GrcExpertPage() {
               <Button
                 variant="primary"
                 onClick={() => { void submitCollect(); }}
-                disabled={collecting || !collectTitle.trim()}
+                disabled={collecting || !canSubmitCollect}
                 Icon={FileCheck2}
               >
                 {collecting
@@ -397,22 +428,72 @@ export function GrcExpertPage() {
               <textarea
                 value={collectDesc}
                 onChange={e => setCollectDesc(e.target.value)}
-                rows={4}
+                rows={3}
                 style={{ ...inputStyle, resize: 'vertical' }}
               />
             </FieldRow>
 
-            <FieldRow label={lang === 'ar' ? 'الأولوية' : t('expert.collect.priority')}>
+            {/* Who is this requested from — a person and/or a department (required). */}
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', marginTop: 4 }}>
+              {lang === 'ar' ? 'الطلب موجَّه إلى' : 'Request from'}
+              <span style={{ color: 'var(--danger-fg, #c0392b)' }}> *</span>
+            </div>
+
+            <FieldRow label={lang === 'ar' ? 'المسؤول (شخص)' : 'Assignee (person)'}>
               <select
-                value={collectPriority}
-                onChange={e => setCollectPriority(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH')}
+                value={collectAssignee}
+                onChange={e => setCollectAssignee(e.target.value === '' ? '' : Number(e.target.value))}
                 style={inputStyle}
               >
-                <option value="LOW">{lang === 'ar' ? 'منخفضة' : 'Low'}</option>
-                <option value="MEDIUM">{lang === 'ar' ? 'متوسطة' : 'Medium'}</option>
-                <option value="HIGH">{lang === 'ar' ? 'عالية' : 'High'}</option>
+                <option value="">{lang === 'ar' ? '— اختر شخصًا —' : '— Select a person —'}</option>
+                {users.map(u => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
               </select>
             </FieldRow>
+
+            <FieldRow label={lang === 'ar' ? 'الإدارة / القسم' : 'Department'}>
+              <select
+                value={collectDept}
+                onChange={e => setCollectDept(e.target.value === '' ? '' : Number(e.target.value))}
+                style={inputStyle}
+              >
+                <option value="">{lang === 'ar' ? '— اختر إدارة —' : '— Select a department —'}</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{deptLabel(d)}</option>)}
+              </select>
+            </FieldRow>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <FieldRow label={lang === 'ar' ? 'تاريخ الاستحقاق' : 'Due date'}>
+                  <input
+                    type="date"
+                    value={collectDue}
+                    onChange={e => setCollectDue(e.target.value)}
+                    style={inputStyle}
+                  />
+                </FieldRow>
+              </div>
+              <div style={{ flex: 1 }}>
+                <FieldRow label={lang === 'ar' ? 'الأولوية' : t('expert.collect.priority')}>
+                  <select
+                    value={collectPriority}
+                    onChange={e => setCollectPriority(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH')}
+                    style={inputStyle}
+                  >
+                    <option value="LOW">{lang === 'ar' ? 'منخفضة' : 'Low'}</option>
+                    <option value="MEDIUM">{lang === 'ar' ? 'متوسطة' : 'Medium'}</option>
+                    <option value="HIGH">{lang === 'ar' ? 'عالية' : 'High'}</option>
+                  </select>
+                </FieldRow>
+              </div>
+            </div>
+
+            {!canSubmitCollect && (
+              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                {lang === 'ar'
+                  ? 'يجب إسناد الطلب إلى شخص أو إدارة قبل الرفع.'
+                  : 'Assign the request to a person or a department before submitting.'}
+              </div>
+            )}
           </div>
         </Modal>
       )}

@@ -64,6 +64,12 @@ export interface RaiseEvidenceRequestInput {
   descriptionEn?: string;
   subControlId: number;
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  /** Person the evidence is requested from (accountable owner). */
+  assignedToId?: number;
+  /** Owning department the evidence is requested from (alternative/additional to a person). */
+  departmentId?: number;
+  /** Due date (ISO yyyy-MM-dd) by which the evidence must be provided. */
+  dueDate?: string;
 }
 
 // ─── API functions ────────────────────────────────────────────────────────────
