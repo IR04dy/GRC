@@ -80,7 +80,7 @@ export function RiskMatrix5x5({
         <defs>
           <marker id={`arw-good-${uid}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3"
             orient="auto" markerUnits="userSpaceOnUse">
-            <path d="M0,0 L6,3 L0,6 Z" fill="var(--primary)" />
+            <path d="M0,0 L6,3 L0,6 Z" fill="var(--success)" />
           </marker>
           <marker id={`arw-bad-${uid}`} markerWidth="7" markerHeight="7" refX="5.5" refY="3"
             orient="auto" markerUnits="userSpaceOnUse">
@@ -105,7 +105,7 @@ export function RiskMatrix5x5({
                   stroke="var(--surface)" strokeWidth={2} />
                 <text x={cxFor(L)} y={cyFor(I)} textAnchor="middle" dominantBaseline="central"
                   className="tnum"
-                  style={{ font: '700 15px var(--font-sans)', fill: count > 0 ? (light ? '#fff' : 'var(--ink-1)') : 'var(--ink-4)', pointerEvents: 'none' }}>
+                  style={{ font: '700 15px var(--font-sans)', fill: count > 0 ? (light ? 'var(--ink-0)' : 'var(--ink-1)') : 'var(--ink-4)', pointerEvents: 'none' }}>
                   {count || '·'}
                 </text>
               </g>
@@ -120,7 +120,7 @@ export function RiskMatrix5x5({
               const fromScore = m.fromL * m.fromI;
               const toScore = m.toL * m.toI;
               const good = toScore <= fromScore;
-              const col = good ? 'var(--primary)' : 'var(--danger)';
+              const col = good ? 'var(--success)' : 'var(--danger)';
               const x1 = cxFor(m.fromL), y1 = cyFor(m.fromI);
               const x2 = cxFor(m.toL), y2 = cyFor(m.toI);
               return (
@@ -158,7 +158,7 @@ export function RiskMatrix5x5({
         {vectors.length > 0 && (
           <>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <svg width="22" height="8"><line x1="1" y1="4" x2="16" y2="4" stroke="var(--primary)" strokeWidth="2" /><path d="M16,1 L21,4 L16,7 Z" fill="var(--primary)" /></svg>
+              <svg width="22" height="8"><line x1="1" y1="4" x2="16" y2="4" stroke="var(--success)" strokeWidth="2" /><path d="M16,1 L21,4 L16,7 Z" fill="var(--success)" /></svg>
               {ar ? 'تحسّن (كامن→متبقي)' : 'Improved (inherent→residual)'}
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>

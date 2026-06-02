@@ -52,7 +52,7 @@ export function Donut({
               strokeDashoffset={dashoffset}
               transform={`rotate(-90 ${c} ${c})`}
               style={{
-                transition: 'stroke-dasharray var(--dur-base) var(--ease-standard), stroke-width var(--dur-fast) var(--ease-standard)',
+                transition: 'stroke-dasharray var(--dur-normal) var(--ease-standard), stroke-width var(--dur-fast) var(--ease-standard)',
                 cursor: onSegmentClick ? 'pointer' : 'default',
               }}
               onClick={onSegmentClick ? () => onSegmentClick(s) : undefined}

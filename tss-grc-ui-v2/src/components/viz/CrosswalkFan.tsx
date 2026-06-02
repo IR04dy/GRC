@@ -95,9 +95,9 @@ export function CrosswalkFan({ controlCode, citations, ar = false, onCitationCli
           <rect x={controlX} y={controlCy - CONTROL_H / 2} width={CONTROL_W} height={CONTROL_H} rx={10}
             fill="var(--primary)" />
           <text x={controlX + CONTROL_W / 2} y={controlCy - 6} textAnchor="middle"
-            style={{ font: '700 13px var(--font-mono)', fill: '#fff' }}>{controlCode}</text>
+            style={{ font: '700 13px var(--font-mono)', fill: 'var(--ink-0)' }}>{controlCode}</text>
           <text x={controlX + CONTROL_W / 2} y={controlCy + 13} textAnchor="middle" className="tnum"
-            style={{ font: '800 14px var(--font-sans)', fill: '#fff', opacity: 0.95 }}>×{n}</text>
+            style={{ font: '800 14px var(--font-sans)', fill: 'var(--ink-0)', opacity: 0.95 }}>×{n}</text>
         </g>
 
         {/* Citation nodes */}

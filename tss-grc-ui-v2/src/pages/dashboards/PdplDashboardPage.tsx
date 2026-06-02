@@ -84,7 +84,7 @@ export function PdplDashboardPage() {
           height={200}
           series={[
             { key: 'dsr', name: isAr ? 'طلبات مفتوحة' : 'Open DSRs', color: 'var(--primary)' },
-            { key: 'breaches', name: isAr ? 'خروقات مفتوحة' : 'Open breaches', color: '#dc2626' },
+            { key: 'breaches', name: isAr ? 'خروقات مفتوحة' : 'Open breaches', color: 'var(--danger)' },
           ]}
           emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'} />
       ),

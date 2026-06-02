@@ -30,10 +30,10 @@ export interface DriftChartProps {
 
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: 'var(--danger)',
-  MAJOR: 'var(--danger)',
+  MAJOR: 'var(--risk-vhigh)', // distinct from CRITICAL's --danger
   MODERATE: 'var(--warning)',
-  MINOR: 'var(--accent)',
-  INFO: 'var(--info)',
+  MINOR: 'var(--info)',       // was --accent == --warning (same hex) → collision
+  INFO: 'var(--ink-4)',
 };
 
 const PAD_L = 38;

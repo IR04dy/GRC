@@ -105,17 +105,17 @@ export function ErmDashboardPage() {
 
   // ─── Pie data ─────────────────────────────────────────────────────
   const severityPie: PieDatum[] = stats ? [
-    { name: isAr ? 'حرجة'   : 'Critical', value: stats.criticalRisks, color: '#dc2626' },
-    { name: isAr ? 'عالية'  : 'High',     value: stats.highRisks,     color: '#ea580c' },
-    { name: isAr ? 'متوسطة' : 'Medium',   value: stats.mediumRisks,   color: '#ca8a04' },
-    { name: isAr ? 'منخفضة' : 'Low',      value: stats.lowRisks,      color: '#16a34a' },
+    { name: isAr ? 'حرجة'   : 'Critical', value: stats.criticalRisks, color: 'var(--danger)' },
+    { name: isAr ? 'عالية'  : 'High',     value: stats.highRisks,     color: 'var(--risk-vhigh)' },
+    { name: isAr ? 'متوسطة' : 'Medium',   value: stats.mediumRisks,   color: 'var(--warning)' },
+    { name: isAr ? 'منخفضة' : 'Low',      value: stats.lowRisks,      color: 'var(--success)' },
   ].filter(d => d.value > 0) : [];
 
   const kriPie: PieDatum[] = kri ? [
-    { name: isAr ? 'أخضر'        : 'Green',   value: kri.green,  color: '#16a34a' },
-    { name: isAr ? 'أصفر'        : 'Amber',   value: kri.amber,  color: '#ca8a04' },
-    { name: isAr ? 'أحمر'        : 'Red',     value: kri.red,    color: '#dc2626' },
-    { name: isAr ? 'بدون بيانات' : 'No data', value: kri.noData, color: '#94a3b8' },
+    { name: isAr ? 'أخضر'        : 'Green',   value: kri.green,  color: 'var(--success)' },
+    { name: isAr ? 'أصفر'        : 'Amber',   value: kri.amber,  color: 'var(--warning)' },
+    { name: isAr ? 'أحمر'        : 'Red',     value: kri.red,    color: 'var(--danger)' },
+    { name: isAr ? 'بدون بيانات' : 'No data', value: kri.noData, color: 'var(--ink-4)' },
   ].filter(d => d.value > 0) : [];
 
   // ─── Risk-by-category bar data — top 8 categories ─────────────────
@@ -196,7 +196,7 @@ export function ErmDashboardPage() {
               height={220}
               series={[
                 { key: 'open', name: isAr ? 'مخاطر مفتوحة' : 'Open risks', color: 'var(--primary)' },
-                { key: 'critical', name: isAr ? 'حرجة' : 'Critical', color: '#dc2626' },
+                { key: 'critical', name: isAr ? 'حرجة' : 'Critical', color: 'var(--danger)' },
               ]}
               emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'}
               onPointClick={() => navigate('/risk')} />
@@ -237,7 +237,7 @@ export function ErmDashboardPage() {
           <div style={{ padding: 12 }}>
             <BarChart data={categoryBars}
               xKey="label"
-              series={[{ key: 'value', name: isAr ? 'العدد' : 'Risks', color: '#0d9488' }]}
+              series={[{ key: 'value', name: isAr ? 'العدد' : 'Risks', color: 'var(--cat-1)' }]}
               height={260}
               onPointClick={(d) => navigate(`/risk?category=${encodeURIComponent(d.label)}`)}
               emptyState={isAr ? 'لا توجد فئات' : 'No categories'} />
@@ -273,7 +273,7 @@ interface KriBands { totalKris: number; green: number; amber: number; red: numbe
 interface AppetiteSummary { total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number; }
 
 function AppetiteTile({ label, value, tone }: { label: string; value: number; tone?: 'success' | 'warning' | 'danger' }) {
-  const color = tone === 'success' ? '#16a34a' : tone === 'warning' ? '#ca8a04' : tone === 'danger' ? '#dc2626' : 'inherit';
+  const color = tone === 'success' ? 'var(--success)' : tone === 'warning' ? 'var(--warning)' : tone === 'danger' ? 'var(--danger)' : 'inherit';
   return (
     <div>
       <div style={{ fontSize: 24, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>

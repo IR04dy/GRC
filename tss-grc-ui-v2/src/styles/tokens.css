@@ -93,7 +93,7 @@
   --risk-med:   #F0D58A;
   --risk-high:  #E8A878;
   --risk-vhigh: #D87560;
-  --risk-crit:  #B33C36;
+  --risk-crit:  var(--danger);  /* one "critical" red across heatmap/badges/rings */
 
   /* ─── Color · Categorical (charts) ────────────────── */
   --cat-1: #0E5E5E;
@@ -270,13 +270,27 @@
   --neutral-bg: #1F2A27;
   --neutral-fg: #93A19B;
 
-  /* Risk severity (heat-map) — slightly desaturated for dark */
+  /* Risk severity (heat-map) — slightly desaturated for dark.
+     --risk-crit is anchored to --danger so "critical" reads as one red
+     across the heat-map, badges, and the countdown ring. */
   --risk-vlow:  #2D4A37;
   --risk-low:   #3F6E51;
   --risk-med:   #8C7035;
   --risk-high:  #A86E45;
   --risk-vhigh: #B8554A;
-  --risk-crit:  #D04942;
+  --risk-crit:  var(--danger);
+
+  /* Categorical chart palette — lifted ~2 steps for legibility on dark
+     surfaces (the light-mode --cat-* are too dark to read on a dark canvas).
+     Mirrors how --primary/--success/--warning/--info are lifted above. */
+  --cat-1: #3FA5A5;  /* teal */
+  --cat-2: #E5B547;  /* amber */
+  --cat-3: #7FB0B0;  /* desaturated teal */
+  --cat-4: #B589A6;  /* mauve */
+  --cat-5: #6FBF8E;  /* green */
+  --cat-6: #D98C63;  /* terracotta */
+  --cat-7: #9B82C0;  /* purple */
+  --cat-8: #DCC85F;  /* gold */
 
   /* Sidebar — already dark, keep it the same family */
   --sb-bg:        #060F11;
