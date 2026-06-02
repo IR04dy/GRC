@@ -110,6 +110,13 @@ export function AiModelDetailPage() {
 
   const gateMissing = useMemo(() => model ? approvalGateMissing(model, audits) : [], [model, audits]);
   const unackDrift = drift.filter(d => !d.isAcknowledged);
+  // The forward lifecycle step (first non-decommission transition) is the
+  // record's primary action — promote it to the header as `primary` instead
+  // of leaving it as a ghost buried in the Overview tab (review DT4).
+  const forwardStage = model
+    ? (ML_NEXT_STAGES[model.lifecycleStage] ?? []).find(s => s !== 'DECOMMISSIONED') ?? null
+    : null;
+  const forwardBlocked = forwardStage === 'APPROVED_FOR_PROD' && gateMissing.length > 0;
 
   if (demoMode) {
     return (
@@ -151,9 +158,23 @@ export function AiModelDetailPage() {
         }
         actions={
           model.lifecycleStage !== 'DECOMMISSIONED' ? (
-            <Button variant="ghost" Icon={PowerOff} onClick={() => setShowDecomModal(true)}>
-              {lang === 'ar' ? 'خارج الخدمة' : 'Decommission'}
-            </Button>
+            <>
+              {forwardStage && (
+                <Button
+                  variant="primary"
+                  disabled={forwardBlocked}
+                  onClick={() => doTransition(forwardStage)}
+                  title={forwardBlocked
+                    ? (lang === 'ar' ? `محظور — ينقص: ${gateMissing.join(', ')}` : `Blocked — missing: ${gateMissing.join(', ')}`)
+                    : undefined}
+                >
+                  → {ML_STAGE_LABEL[forwardStage][lang === 'ar' ? 'ar' : 'en']}
+                </Button>
+              )}
+              <Button variant="danger" Icon={PowerOff} onClick={() => setShowDecomModal(true)}>
+                {lang === 'ar' ? 'خارج الخدمة' : 'Decommission'}
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -291,7 +312,9 @@ interface OverviewProps {
 }
 
 function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) {
-  const nextStages = ML_NEXT_STAGES[model.lifecycleStage];
+  // Decommission is the header's danger action (confirmation modal) — keep it
+  // out of this list so there's one decommission path, not an unconfirmed one.
+  const nextStages = (ML_NEXT_STAGES[model.lifecycleStage] ?? []).filter(s => s !== 'DECOMMISSIONED');
   return (
     <div className="aimd-overview-grid">
       <div>
@@ -330,7 +353,7 @@ function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) 
               return (
                 <Button
                   key={s}
-                  variant="ghost"
+                  variant="secondary"
                   disabled={blocked}
                   onClick={() => onTransition(s)}
                   title={blocked
