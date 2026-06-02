@@ -153,6 +153,14 @@
   --tracking-wide:   0.04em;
   --tracking-mono:   0.01em;
 
+  /* Headline-number sizes (T2) + one shared clamp (T3) so a Kpi and a
+   * stat-tile in the same row resolve to the same size; --tracking-num is the
+   * tighter tracking for large numerals (T7). */
+  --num-tile:     24px;
+  --num-hero:     36px;
+  --num-clamp:    clamp(var(--num-tile), 3.5vw, var(--num-hero));
+  --tracking-num: -0.025em;
+
   /* ─── Spacing (4px base) ──────────────────────────── */
   --sp-0:  0;
   --sp-1:  2px;

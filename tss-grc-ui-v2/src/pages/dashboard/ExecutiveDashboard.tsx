@@ -203,7 +203,7 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
           // headline to the focal posture gauge on the right (review D4).
           font: '800 24px var(--font-sans)',
           color: 'var(--ink-1)',
-          letterSpacing: '-0.02em',
+          letterSpacing: 'var(--tracking-tight)',
           lineHeight: 1.15,
         }}>
           {greeting}{isAr ? '، ' : ', '}
@@ -320,7 +320,7 @@ function KpiTile({ Icon, label, value, to, tone, spark, delta, segments }: KpiTi
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
         <span style={{
           font: '800 30px/1 var(--font-sans)',
-          color: 'var(--ink-1)', letterSpacing: '-0.02em',
+          color: 'var(--ink-1)', letterSpacing: 'var(--tracking-num)',
         }}>
           {value}
         </span>

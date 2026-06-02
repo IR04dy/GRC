@@ -134,7 +134,7 @@ export function AuthorityWorkspacePage() {
             {authority.authorityType.replace(/_/g, ' ')}
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-1)', letterSpacing: '-0.01em', margin: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-1)', letterSpacing: 'var(--tracking-tight)', margin: 0 }}>
               {lang === 'ar' ? authority.nameAr : authority.nameEn}
             </h1>
             <Badge tone="primary">{authority.code}</Badge>

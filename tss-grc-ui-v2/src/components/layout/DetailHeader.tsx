@@ -38,7 +38,7 @@ export function DetailHeader({
         <div style={{ flex: 1, minWidth: 0 }}>
           {eyebrow && <div className="eyebrow">{eyebrow}</div>}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-1)', letterSpacing: '-0.01em', margin: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-1)', letterSpacing: 'var(--tracking-tight)', margin: 0 }}>
               {title}
             </h1>
             {badges}

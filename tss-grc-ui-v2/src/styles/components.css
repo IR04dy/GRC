@@ -320,9 +320,9 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
  *     value reacts to viewport width — caps prevent it from going
  *     comically small on mobile or huge on a 4K monitor. */
 .kpi-value {
-  font: 800 clamp(24px, 4vw, 36px)/1 var(--font-sans);
+  font: 800 var(--num-clamp)/1 var(--font-sans);
   color: var(--ink-1);
-  letter-spacing: -.025em;
+  letter-spacing: var(--tracking-num);
   font-feature-settings: 'tnum' 1, 'lnum' 1;
   margin-top: auto;
   min-width: 0;
@@ -374,9 +374,9 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   font-size: 12px;
 }
 .stat-tile-value {
-  font: 800 clamp(24px, 3vw, 32px)/1 var(--font-sans);
+  font: 800 var(--num-clamp)/1 var(--font-sans);
   color: var(--ink-1);
-  letter-spacing: -.025em;
+  letter-spacing: var(--tracking-num);
   font-feature-settings: 'tnum' 1, 'lnum' 1;
   min-width: 0;
   white-space: nowrap;
@@ -847,7 +847,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.modal-header h3 { margin: 0; font: 800 18px var(--font-sans); color: var(--ink-1); letter-spacing: -.01em; }
+.modal-header h3 { margin: 0; font: 800 18px var(--font-sans); color: var(--ink-1); letter-spacing: var(--tracking-tight); }
 /* flex:1 + min-height:0 lets a tall form scroll WITHIN the card while the
  * header/footer (flex-shrink:0) stay pinned — otherwise a long modal pushes
  * the action buttons off-screen / compresses the header. */
@@ -908,7 +908,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .login-hero::before { content: ''; position: absolute; inset: 0; background: var(--grad-aurora); pointer-events: none; }
 .login-hero-content { position: relative; z-index: 1; }
-.login-hero h1 { font: 800 36px/1.15 var(--font-sans); letter-spacing: -.02em; margin: 0 0 10px; }
+.login-hero h1 { font: 800 36px/1.15 var(--font-sans); letter-spacing: var(--tracking-tight); margin: 0 0 10px; }
 .login-hero p  { font-size: 14px; opacity: .9; max-width: 420px; line-height: 1.55; }
 .login-hero-mark {
   position: relative; z-index: 1;
@@ -930,7 +930,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .login-form-side { display: flex; align-items: center; justify-content: center; padding: 48px 32px; }
 .login-form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; }
 .login-form .login-eyebrow { font: 800 10px var(--font-mono); color: var(--primary); letter-spacing: .14em; text-transform: uppercase; }
-.login-form h2 { font: 800 24px var(--font-sans); margin: 0; color: var(--ink-1); letter-spacing: -.01em; }
+.login-form h2 { font: 800 24px var(--font-sans); margin: 0; color: var(--ink-1); letter-spacing: var(--tracking-tight); }
 .login-form .login-sub { font-size: 13px; color: var(--ink-3); margin-bottom: 8px; }
 .login-form .login-error {
   background: var(--danger-bg);

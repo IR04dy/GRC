@@ -134,7 +134,7 @@ export function RadialGauge({
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <span className="tnum" style={{
             font: `800 ${Math.round(size * 0.26)}px/1 var(--font-sans)`,
-            color: derived, letterSpacing: '-0.03em',
+            color: derived, letterSpacing: 'var(--tracking-num)',
           }}>{display}</span>
           {unit && <span className="tnum" style={{ font: '700 13px var(--font-sans)', color: 'var(--ink-3)' }}>{unit}</span>}
         </div>

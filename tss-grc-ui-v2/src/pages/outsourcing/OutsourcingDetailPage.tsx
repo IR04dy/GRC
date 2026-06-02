@@ -234,7 +234,7 @@ export function OutsourcingDetailPage() {
                 </div>
                 <div style={row}>
                   <Badge tone={recommendationTone(d.recommendation)}>{d.recommendation}</Badge>
-                  <span className="tnum" style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em' }}>{d.compositeScore.toFixed(2)}</span>
+                  <span className="tnum" style={{ fontSize: 24, fontWeight: 800, letterSpacing: 'var(--tracking-num)' }}>{d.compositeScore.toFixed(2)}</span>
                 </div>
               </div>
               <div style={{ marginTop: 12, display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))' }}>
