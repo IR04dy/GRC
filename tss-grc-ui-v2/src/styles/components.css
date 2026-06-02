@@ -918,7 +918,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .login-form .login-error {
   background: var(--danger-bg);
   color: var(--danger-fg);
-  border: 1px solid #ECCFCC;
+  border: 1px solid var(--danger-border);
   padding: 9px 12px;
   border-radius: var(--r-md);
   font: 600 12px var(--font-sans);
@@ -1909,10 +1909,10 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   border-radius: 50%;
   background: currentColor;
 }
-.maturity-1 { background: var(--danger-bg);  color: var(--danger-fg);  border-color: #ECCFCC; }
+.maturity-1 { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--danger-border); }
 .maturity-2 { background: var(--warning-bg); color: var(--warning-fg); border-color: var(--accent-100); }
-.maturity-3 { background: var(--info-bg);    color: var(--info-fg);    border-color: #CFD9DD; }
-.maturity-4 { background: var(--success-bg); color: var(--success-fg); border-color: #C9DEC9; }
+.maturity-3 { background: var(--info-bg);    color: var(--info-fg);    border-color: var(--info-border); }
+.maturity-4 { background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border); }
 .maturity-5 { background: var(--primary-50); color: var(--primary-700); border-color: var(--primary-100); }
 
 /* ─── Chip picker (1-5 score selector) ──────────── */
@@ -1962,12 +1962,12 @@ tr:hover .row-actions { opacity: 1; }
 .row-action-btn.danger:hover {
   background: var(--danger-bg);
   color: var(--danger-fg);
-  border-color: #ECCFCC;
+  border-color: var(--danger-border);
 }
 .row-action-btn.success:hover {
   background: var(--success-bg);
   color: var(--success-fg);
-  border-color: #C9DEC9;
+  border-color: var(--success-border);
 }
 .row-action-btn.accent:hover {
   background: var(--accent-50);
