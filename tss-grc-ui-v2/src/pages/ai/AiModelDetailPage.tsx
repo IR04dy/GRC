@@ -9,6 +9,7 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
+import { DriftChart } from '../../components/viz/DriftChart';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -519,8 +520,30 @@ function DriftTab({ drift, lang, onAck }: {
       title={lang === 'ar' ? 'لا توجد ملاحظات انحراف' : 'No drift observations'}
       sub={lang === 'ar' ? 'تظهر ملاحظات الانحراف هنا تلقائياً عند رصدها.' : 'Drift observations appear here automatically when detected.'} />;
   }
+  // Dominant metric → the drift-over-time chart (the watsonx-class hero).
+  const byMetric = new Map<string, DriftObservationResponse[]>();
+  for (const d of drift) {
+    const k = d.metricName ?? '—';
+    const arr = byMetric.get(k) ?? [];
+    arr.push(d); byMetric.set(k, arr);
+  }
+  const dominant = [...byMetric.entries()].sort((a, b) => b[1].length - a[1].length)[0];
   return (
-    <table className="aimd-table">
+    <>
+      {dominant && dominant[1].length >= 2 && (
+        <div style={{ marginBottom: 14, padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface)' }}>
+          <div style={{ font: '700 12px var(--font-sans)', color: 'var(--ink-2)', marginBottom: 6 }}>
+            {lang === 'ar' ? `انحراف المقياس: ${dominant[0]}` : `Metric drift: ${dominant[0]}`}
+          </div>
+          <DriftChart ar={lang === 'ar'} metricName={dominant[0]}
+            points={dominant[1].map(d => ({
+              observedAt: d.observedAt, value: d.metricValue,
+              baseline: d.baselineValue, threshold: d.driftThreshold,
+              severity: d.severity, acknowledged: d.isAcknowledged,
+            }))} />
+        </div>
+      )}
+      <table className="aimd-table">
       <thead>
         <tr>
           <th>{lang === 'ar' ? 'وقت الرصد' : 'Observed'}</th>
@@ -568,6 +591,7 @@ function DriftTab({ drift, lang, onAck }: {
         ))}
       </tbody>
     </table>
+    </>
   );
 }
 
