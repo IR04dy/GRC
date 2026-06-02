@@ -4,6 +4,7 @@ import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidg
 import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
 import { LineChart } from '../../components/charts/LineChart';
+import { RadialGauge } from '../../components/viz/RadialGauge';
 import { useI18n } from '../../lib/i18n';
 import { scmApi, dashboardApi, type ScmStats } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
@@ -73,13 +74,21 @@ export function ScmDashboardPage() {
       badge: concentrationLevel,
       badgeTone: concentrationLevel === 'HIGH' ? 'danger' : concentrationLevel === 'MEDIUM' ? 'warning' : 'success',
       body: (
-        <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'موردون حرجون' : 'Critical suppliers'}: <strong>{stats.criticalVendors}</strong> / {stats.totalVendors}</div>
-          <div>{isAr ? 'ترابطات عالية' : 'High dependencies'}: <strong>{stats.highDependencies}</strong></div>
-          <div className="text-muted" style={{ marginTop: 4 }}>
-            {isAr
-              ? 'مؤشّر تركّز مبدئي مبني على نسبة الموردين الحرجين. تحوّل إلى مؤشّر هيرفندال عند توفّر بيانات إنفاق المورّد.'
-              : 'Rough concentration heuristic based on critical-supplier share. Switch to Herfindahl once spend data is wired.'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <RadialGauge
+            value={stats.totalVendors > 0 ? Math.round((stats.criticalVendors / stats.totalVendors) * 100) : 0}
+            max={100} size={112}
+            valueColor={concentrationLevel === 'HIGH' ? 'var(--danger)' : concentrationLevel === 'MEDIUM' ? 'var(--warning)' : 'var(--success)'}
+            format={(v) => `${Math.round(v)}%`}
+            caption={isAr ? 'حصة الموردين الحرجين' : 'Critical-supplier share'} />
+          <div className="text-xs" style={{ lineHeight: 1.8, flex: 1, minWidth: 170 }}>
+            <div>{isAr ? 'موردون حرجون' : 'Critical suppliers'}: <strong>{stats.criticalVendors}</strong> / {stats.totalVendors}</div>
+            <div>{isAr ? 'ترابطات عالية' : 'High dependencies'}: <strong>{stats.highDependencies}</strong></div>
+            <div className="text-muted" style={{ marginTop: 4 }}>
+              {isAr
+                ? 'مؤشّر تركّز مبدئي مبني على نسبة الموردين الحرجين. تحوّل إلى مؤشّر هيرفندال عند توفّر بيانات إنفاق المورّد.'
+                : 'Rough concentration heuristic based on critical-supplier share. Switch to Herfindahl once spend data is wired.'}
+            </div>
           </div>
         </div>
       ),

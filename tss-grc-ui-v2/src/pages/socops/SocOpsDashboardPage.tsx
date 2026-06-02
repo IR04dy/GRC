@@ -4,6 +4,7 @@ import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidg
   from '../../components/dashboard/DomainDashboardShell';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { Donut } from '../../components/viz/Donut';
 import { useI18n } from '../../lib/i18n';
 import { socopsApi, type SocOpsDashboard } from '../../lib/socops';
 
@@ -125,6 +126,24 @@ export function SocOpsDashboardPage() {
 
   // ── Widgets ──
   const widgets: DomainDashboardWidget[] = [
+    {
+      id: 'severity-mix',
+      title: isAr ? 'الأحداث المفتوحة حسب الشدّة' : 'Open events by severity',
+      body: (
+        (stats.openEventsCritical + stats.openEventsHigh) === 0 ? (
+          <div className="text-xs text-muted">{isAr ? 'لا توجد أحداث مفتوحة' : 'No open events'}</div>
+        ) : (
+          <Donut size={150} thickness={22}
+            segments={[
+              { label: isAr ? 'حرجة' : 'Critical', value: stats.openEventsCritical, color: 'var(--risk-crit)' },
+              { label: isAr ? 'عالية' : 'High', value: stats.openEventsHigh, color: 'var(--risk-high)' },
+            ]}
+            centerLabel={String(stats.openEventsCritical + stats.openEventsHigh)}
+            centerSub={isAr ? 'مفتوحة' : 'open'} />
+        )
+      ),
+      href: '/socops/events',
+    },
     {
       id: 'overlays',
       title: isAr ? 'النوافذ الموسمية النشطة' : 'Active seasonal overlays',
