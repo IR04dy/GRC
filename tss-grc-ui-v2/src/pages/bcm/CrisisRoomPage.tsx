@@ -8,6 +8,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -513,7 +514,7 @@ export function CrisisRoomPage() {
                 <select value={newEvt.severity ?? 1} onChange={e => setNewEvt({ ...newEvt, severity: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 })}
                         style={inputStyle}>
                   {[1, 2, 3, 4, 5].map(n => (
-                    <option key={n} value={n}>{n} — {isAr ? SEVERITY_LABELS[n].ar : SEVERITY_LABELS[n].en}</option>
+                    <option key={n} value={n}>{n} — {tlabel(SEVERITY_LABELS, n, isAr)}</option>
                   ))}
                 </select>
               </Field>

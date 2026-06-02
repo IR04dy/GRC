@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import { getUser } from '../../lib/auth';
@@ -161,9 +162,7 @@ export function ParticipantViewPage() {
       <PageHeader
         title={isAr ? 'عرض المُشارِك' : 'Participant view'}
         eyebrow={`BCM · ${summary.runCode}`}
-        actions={<Badge tone={statusTone}>{isAr
-          ? RUN_STATUS_LABELS[summary.status].ar
-          : RUN_STATUS_LABELS[summary.status].en}</Badge>} />
+        actions={<Badge tone={statusTone}>{tlabel(RUN_STATUS_LABELS, summary.status, isAr)}</Badge>} />
 
       <div className="max-w-2xl mx-auto space-y-4 mt-4">
         {/* Run paused / completed states */}
@@ -300,9 +299,7 @@ function ActiveInjectBanner({ inj, isAr }: { inj: InjectView; isAr: boolean }) {
     <Card>
       <div className="flex items-center gap-2 mb-3">
         <TypeIcon size={20} className="text-primary-600" />
-        <Badge tone={tone}>{isAr
-          ? INJECT_TYPE_LABELS[inj.injectType].ar
-          : INJECT_TYPE_LABELS[inj.injectType].en}</Badge>
+        <Badge tone={tone}>{tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr)}</Badge>
         <span className="text-xs text-tx-muted ml-auto">
           {fmtOffset(inj.plannedTimeOffsetMinutes, isAr)}
         </span>
@@ -332,16 +329,14 @@ function PastInjectCard({ inj, isAr, responded }: {
   const txt = isAr && inj.injectTextAr ? inj.injectTextAr : inj.injectTextEn;
   const statusLabel = responded
     ? (isAr ? 'تمّ ردّك' : 'You responded')
-    : (isAr ? INJECT_STATUS_LABELS[inj.status].ar : INJECT_STATUS_LABELS[inj.status].en);
+    : (tlabel(INJECT_STATUS_LABELS, inj.status, isAr));
   const tone: BadgeTone = responded ? 'success'
     : inj.status === 'COMPLETED'    ? 'success'
     : inj.status === 'ACKNOWLEDGED' ? 'info'    : 'neutral';
   return (
     <Card>
       <div className="flex items-center gap-2 mb-1">
-        <Badge tone="neutral">{isAr
-          ? INJECT_TYPE_LABELS[inj.injectType].ar
-          : INJECT_TYPE_LABELS[inj.injectType].en}</Badge>
+        <Badge tone="neutral">{tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr)}</Badge>
         <Badge tone={tone}>{statusLabel}</Badge>
         <span className="text-xs text-tx-muted ml-auto">
           {fmtOffset(inj.plannedTimeOffsetMinutes, isAr)}

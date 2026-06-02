@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -97,7 +98,7 @@ export function FinancedEmissionsPage() {
   async function changeStage(r: FinancedEmissionsRecord, to: EmissionsLifecycleStage) {
     try {
       await transitionEmission(r.externalId, to);
-      toast.success(isAr ? `الحالة: ${EMISSIONS_STAGE_LABELS[to].ar}` : `Stage: ${EMISSIONS_STAGE_LABELS[to].en}`);
+      toast.success(isAr ? `الحالة: ${tlabel(EMISSIONS_STAGE_LABELS, to, true)}` : `Stage: ${tlabel(EMISSIONS_STAGE_LABELS, to, false)}`);
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed');
@@ -178,7 +179,7 @@ export function FinancedEmissionsPage() {
                     <tr key={r.externalId}>
                       <td style={td}>{r.reportingYear} · {r.reportingPeriod}</td>
                       <td style={td}>
-                        {isAr ? ASSET_CLASS_LABELS[r.assetClass].ar : ASSET_CLASS_LABELS[r.assetClass].en}
+                        {tlabel(ASSET_CLASS_LABELS, r.assetClass, isAr)}
                       </td>
                       <td style={td}>{fmtSarMillions(r.outstandingAmountSarMillions, isAr)}</td>
                       <td style={td}>{Number(r.attributionFactor).toFixed(6)}</td>
@@ -190,7 +191,7 @@ export function FinancedEmissionsPage() {
                       <td style={td}>{fmtTco2e(r.totalFinancedEmissionsTco2e)}</td>
                       <td style={td}>
                         <Badge tone={emissionsStageTone(r.lifecycleStage)}>
-                          {isAr ? EMISSIONS_STAGE_LABELS[r.lifecycleStage].ar : EMISSIONS_STAGE_LABELS[r.lifecycleStage].en}
+                          {tlabel(EMISSIONS_STAGE_LABELS, r.lifecycleStage, isAr)}
                         </Badge>
                       </td>
                       <td style={td}>
@@ -252,7 +253,7 @@ export function FinancedEmissionsPage() {
                       <td style={td}>{isAr ? (p.titleAr || p.titleEn) : p.titleEn}</td>
                       <td style={td}>
                         <Badge tone={p.sbtiAligned ? 'success' : 'info'}>
-                          {isAr ? ALIGNMENT_LABELS[p.alignmentFramework].ar : ALIGNMENT_LABELS[p.alignmentFramework].en}
+                          {tlabel(ALIGNMENT_LABELS, p.alignmentFramework, isAr)}
                         </Badge>
                       </td>
                       <td style={td}>{p.baselineYear} · {fmtTco2e(p.baselineEmissionsTco2e)}</td>

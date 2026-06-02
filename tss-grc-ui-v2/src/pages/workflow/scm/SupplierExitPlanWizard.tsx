@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { WizardShell, type WizardStep } from '../../../components/workflow/WizardShell';
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
+import { tlabel } from '../../../lib/labels';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
 
@@ -147,7 +148,7 @@ export function SupplierExitPlanWizard() {
                 <Toggle key={t}
                         checked={draft.triggers.includes(t)}
                         onChange={() => toggleTrigger(t)}
-                        label={isAr ? TRIGGER_LABELS[t].ar : TRIGGER_LABELS[t].en}/>
+                        label={tlabel(TRIGGER_LABELS, t, isAr)}/>
               ))}
             </div>
           </Field>
@@ -281,7 +282,7 @@ export function SupplierExitPlanWizard() {
           <div className="wf-review" style={{ gridColumn: '1 / -1' }}>
             <Row k={isAr ? 'المورد' : 'Vendor'} v={draft.vendorName} />
             <Row k={isAr ? 'المحفزات' : 'Triggers'}
-                 v={draft.triggers.map(t => isAr ? TRIGGER_LABELS[t].ar : TRIGGER_LABELS[t].en).join(', ') || '—'} />
+                 v={draft.triggers.map(t => tlabel(TRIGGER_LABELS, t, isAr)).join(', ') || '—'} />
             <Row k={isAr ? 'البديل' : 'Alternate'}
                  v={draft.alternateOption === 'PREQUALIFIED'
                     ? (draft.alternateName ?? '—')

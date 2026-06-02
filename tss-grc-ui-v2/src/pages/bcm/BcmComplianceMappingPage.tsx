@@ -8,6 +8,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -148,7 +149,7 @@ export function BcmComplianceMappingPage() {
               return (
                 <div key={fw} style={{ fontSize: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <strong>{isAr ? FRAMEWORK_LABELS[fw as Framework].ar : FRAMEWORK_LABELS[fw as Framework].en}</strong>
+                    <strong>{tlabel(FRAMEWORK_LABELS, fw as Framework, isAr)}</strong>
                     <span className="mono">{pct}% compliant ({compl}/{total})</span>
                   </div>
                   <div style={{ display: 'flex', gap: 2, marginTop: 4, height: 10, background: 'var(--surface-2)', borderRadius: 3 }}>
@@ -170,7 +171,7 @@ export function BcmComplianceMappingPage() {
             action={<select value={filter} onChange={e => setFilter(e.target.value as Framework | '')}
                             style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border)' }}>
               <option value="">{isAr ? 'كل الأطر' : 'All frameworks'}</option>
-              {FRAMEWORKS.map(f => <option key={f} value={f}>{isAr ? FRAMEWORK_LABELS[f].ar : FRAMEWORK_LABELS[f].en}</option>)}
+              {FRAMEWORKS.map(f => <option key={f} value={f}>{tlabel(FRAMEWORK_LABELS, f, isAr)}</option>)}
             </select>}>
         {loading && <div className="text-muted" style={{ fontSize: 11 }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>}
         {items.length === 0 ? (

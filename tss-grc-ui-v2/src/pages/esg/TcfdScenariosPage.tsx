@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
@@ -92,7 +93,7 @@ export function TcfdScenariosPage() {
   async function transition(item: TcfdScenario, to: ScenarioLifecycleStage) {
     try {
       await transitionScenario(item.externalId, to);
-      toast.success(isAr ? `الحالة الآن: ${SCENARIO_STAGE_LABELS[to].ar}` : `Now: ${SCENARIO_STAGE_LABELS[to].en}`);
+      toast.success(isAr ? `الحالة الآن: ${tlabel(SCENARIO_STAGE_LABELS, to, true)}` : `Now: ${tlabel(SCENARIO_STAGE_LABELS, to, false)}`);
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed');
@@ -242,16 +243,16 @@ export function TcfdScenariosPage() {
                     <td style={td}>{isAr ? (s.titleAr || s.titleEn) : s.titleEn}</td>
                     <td style={td}>
                       <Badge tone={scenarioTypeTone(s.scenarioType)}>
-                        {isAr ? SCENARIO_TYPE_LABELS[s.scenarioType].ar : SCENARIO_TYPE_LABELS[s.scenarioType].en}
+                        {tlabel(SCENARIO_TYPE_LABELS, s.scenarioType, isAr)}
                       </Badge>
                     </td>
-                    <td style={td}>{isAr ? FRAMEWORK_LABELS[s.referenceFramework].ar : FRAMEWORK_LABELS[s.referenceFramework].en}</td>
+                    <td style={td}>{tlabel(FRAMEWORK_LABELS, s.referenceFramework, isAr)}</td>
                     <td style={td}>{fmtCelsius(s.globalWarmingCelsius)}</td>
                     <td style={td}>{s.probabilityWeight}</td>
                     <td style={td}>{fmtSarMillions(s.expectedLossSarMillions, isAr)}</td>
                     <td style={td}>
                       <Badge tone={scenarioStageTone(s.lifecycleStage)}>
-                        {isAr ? SCENARIO_STAGE_LABELS[s.lifecycleStage].ar : SCENARIO_STAGE_LABELS[s.lifecycleStage].en}
+                        {tlabel(SCENARIO_STAGE_LABELS, s.lifecycleStage, isAr)}
                       </Badge>
                     </td>
                     <td style={td}>
@@ -303,7 +304,7 @@ export function TcfdScenariosPage() {
                         onChange={e => setDraft({...draft, scenarioType: e.target.value as ScenarioType})}>
                   {(Object.keys(SCENARIO_TYPE_LABELS) as ScenarioType[]).map(t => (
                     <option key={t} value={t}>
-                      {isAr ? SCENARIO_TYPE_LABELS[t].ar : SCENARIO_TYPE_LABELS[t].en}
+                      {tlabel(SCENARIO_TYPE_LABELS, t, isAr)}
                     </option>
                   ))}
                 </select>
@@ -313,7 +314,7 @@ export function TcfdScenariosPage() {
                         onChange={e => setDraft({...draft, referenceFramework: e.target.value as ReferenceFramework})}>
                   {(Object.keys(FRAMEWORK_LABELS) as ReferenceFramework[]).map(t => (
                     <option key={t} value={t}>
-                      {isAr ? FRAMEWORK_LABELS[t].ar : FRAMEWORK_LABELS[t].en}
+                      {tlabel(FRAMEWORK_LABELS, t, isAr)}
                     </option>
                   ))}
                 </select>
@@ -361,7 +362,7 @@ export function TcfdScenariosPage() {
               <p><strong>{isAr ? 'مراجعة:' : 'Review:'}</strong></p>
               <ul>
                 <li>{isAr ? 'العنوان:' : 'Title:'} {draft.titleEn}{draft.titleAr ? ` / ${draft.titleAr}` : ''}</li>
-                <li>{isAr ? 'النوع:' : 'Type:'} {SCENARIO_TYPE_LABELS[draft.scenarioType].en} — {FRAMEWORK_LABELS[draft.referenceFramework].en}</li>
+                <li>{isAr ? 'النوع:' : 'Type:'} {tlabel(SCENARIO_TYPE_LABELS, draft.scenarioType, false)} — {tlabel(FRAMEWORK_LABELS, draft.referenceFramework, false)}</li>
                 <li>{isAr ? 'الاحترار:' : 'Warming:'} {fmtCelsius(draft.globalWarmingCelsius)} / {draft.timeHorizonYears}y</li>
                 <li>{isAr ? 'وزن الاحتمال:' : 'Probability weight:'} {String(draft.probabilityWeight ?? 0)}</li>
               </ul>

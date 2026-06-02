@@ -9,6 +9,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -152,8 +153,8 @@ export function BiaWizardPage() {
       const saved = await calculateBiaCriticality(editing.id);
       setEditing(saved);
       toast.success(isAr
-        ? `الأهمية: ${CRITICALITY_LABELS[saved.overallCriticality ?? 'LOW'].ar}`
-        : `Criticality: ${CRITICALITY_LABELS[saved.overallCriticality ?? 'LOW'].en}`);
+        ? `الأهمية: ${tlabel(CRITICALITY_LABELS, saved.overallCriticality ?? 'LOW', true)}`
+        : `Criticality: ${tlabel(CRITICALITY_LABELS, saved.overallCriticality ?? 'LOW', false)}`);
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed');
     }
@@ -276,7 +277,7 @@ export function BiaWizardPage() {
                       <td>
                         {b.overallCriticality
                           ? <Badge tone={criticalityTone(b.overallCriticality)}>
-                              {isAr ? CRITICALITY_LABELS[b.overallCriticality].ar : CRITICALITY_LABELS[b.overallCriticality].en}
+                              {tlabel(CRITICALITY_LABELS, b.overallCriticality, isAr)}
                             </Badge>
                           : <span className="text-muted">—</span>}
                       </td>
@@ -326,7 +327,7 @@ export function BiaWizardPage() {
         <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 6 }}>
           {editing.overallCriticality && (
             <Badge tone={criticalityTone(editing.overallCriticality)}>
-              {isAr ? 'الأهمية' : 'Criticality'}: {isAr ? CRITICALITY_LABELS[editing.overallCriticality].ar : CRITICALITY_LABELS[editing.overallCriticality].en}
+              {isAr ? 'الأهمية' : 'Criticality'}: {tlabel(CRITICALITY_LABELS, editing.overallCriticality, isAr)}
             </Badge>
           )}
           <Badge tone={biaStatusTone(editing.approvalStatus)}>{editing.approvalStatus}</Badge>

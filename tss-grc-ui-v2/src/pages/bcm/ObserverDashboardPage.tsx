@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import { getUser, hasAnyRole } from '../../lib/auth';
@@ -270,9 +271,7 @@ export function ObserverDashboardPage() {
               {' '}
               {isAr ? 'وضع القراءة فقط' : 'Read-only'}
             </Badge>
-            <Badge tone={statusTone}>{isAr
-              ? RUN_STATUS_LABELS[summary.status].ar
-              : RUN_STATUS_LABELS[summary.status].en}</Badge>
+            <Badge tone={statusTone}>{tlabel(RUN_STATUS_LABELS, summary.status, isAr)}</Badge>
             <Button variant="ghost" onClick={() => navigate(-1)}>
               {isAr ? 'رجوع' : 'Back'}
             </Button>
@@ -379,7 +378,7 @@ export function ObserverDashboardPage() {
                   <Badge key={o.id} tone="accent">
                     #{isAr ? toArabicDigits(o.observerUserId) : o.observerUserId}
                     {' · '}
-                    {isAr ? OBSERVER_ROLE_LABELS[o.observerRole].ar : OBSERVER_ROLE_LABELS[o.observerRole].en}
+                    {tlabel(OBSERVER_ROLE_LABELS, o.observerRole, isAr)}
                   </Badge>
                 ))}
               </div>
@@ -403,7 +402,7 @@ export function ObserverDashboardPage() {
                     onChange={e => setObsType(e.target.value as ObservationType)}>
                     {OBSERVATION_TYPE_ORDER.map(t => (
                       <option key={t} value={t}>
-                        {isAr ? OBSERVATION_TYPE_LABELS[t].ar : OBSERVATION_TYPE_LABELS[t].en}
+                        {tlabel(OBSERVATION_TYPE_LABELS, t, isAr)}
                       </option>
                     ))}
                   </select>
@@ -412,7 +411,7 @@ export function ObserverDashboardPage() {
                     onChange={e => setObsSev(e.target.value as ObservationSeverity)}>
                     {SEVERITY_ORDER.map(s => (
                       <option key={s} value={s}>
-                        {isAr ? SEVERITY_LABELS[s].ar : SEVERITY_LABELS[s].en}
+                        {tlabel(SEVERITY_LABELS, s, isAr)}
                       </option>
                     ))}
                   </select>
@@ -437,7 +436,7 @@ export function ObserverDashboardPage() {
                     <option key={i.id} value={i.id}>
                       {fmtOffset(i.plannedTimeOffsetMinutes, isAr)}
                       {' · '}
-                      {isAr ? INJECT_TYPE_LABELS[i.injectType].ar : INJECT_TYPE_LABELS[i.injectType].en}
+                      {tlabel(INJECT_TYPE_LABELS, i.injectType, isAr)}
                       {' · '}
                       {(isAr && i.injectTextAr ? i.injectTextAr : i.injectTextEn).slice(0, 60)}
                     </option>
@@ -490,7 +489,7 @@ export function ObserverDashboardPage() {
                     typeFilter === t
                       ? 'bg-primary-50 border-primary-300 text-primary-700'
                       : 'border-bd-soft text-tx-muted hover:bg-bg-soft'}`}>
-                  {isAr ? OBSERVATION_TYPE_LABELS[t].ar : OBSERVATION_TYPE_LABELS[t].en}
+                  {tlabel(OBSERVATION_TYPE_LABELS, t, isAr)}
                 </button>
               ))}
             </div>
@@ -529,8 +528,8 @@ function ReadOnlyInjectCard({
   isAr: boolean;
   onSelect: () => void;
 }) {
-  const typeLabel = isAr ? INJECT_TYPE_LABELS[inj.injectType].ar : INJECT_TYPE_LABELS[inj.injectType].en;
-  const statusLabel = isAr ? INJECT_STATUS_LABELS[inj.status].ar : INJECT_STATUS_LABELS[inj.status].en;
+  const typeLabel = tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr);
+  const statusLabel = tlabel(INJECT_STATUS_LABELS, inj.status, isAr);
   const tone: BadgeTone =
     inj.status === 'PENDING'      ? 'neutral' :
     inj.status === 'DISPATCHED'   ? 'warning' :
@@ -581,7 +580,7 @@ function ReadOnlyActiveInjectCard({ inj, isAr }: { inj: InjectView; isAr: boolea
       <div className="flex items-center gap-2 mb-2">
         <TypeIcon size={18} className="text-primary-600" />
         <span className="text-sm font-semibold text-tx-strong">
-          {isAr ? INJECT_TYPE_LABELS[inj.injectType].ar : INJECT_TYPE_LABELS[inj.injectType].en}
+          {tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr)}
         </span>
         <span className="ml-auto text-xs text-tx-muted">
           {fmtOffset(inj.plannedTimeOffsetMinutes, isAr)}
@@ -665,10 +664,8 @@ function ObservationCard({
       } : undefined}>
       <Card>
         <div className="flex items-center gap-2 flex-wrap mb-1.5">
-          <Badge tone={tone}>{isAr ? OBSERVATION_TYPE_LABELS[o.observationType].ar
-                                  : OBSERVATION_TYPE_LABELS[o.observationType].en}</Badge>
-          <Badge tone={sevTone}>{isAr ? SEVERITY_LABELS[o.severity].ar
-                                       : SEVERITY_LABELS[o.severity].en}</Badge>
+          <Badge tone={tone}>{tlabel(OBSERVATION_TYPE_LABELS, o.observationType, isAr)}</Badge>
+          <Badge tone={sevTone}>{tlabel(SEVERITY_LABELS, o.severity, isAr)}</Badge>
           {o.isFlaggedForAar && (
             <Badge tone="info" dot>
               <Flag size={10} className="inline" />

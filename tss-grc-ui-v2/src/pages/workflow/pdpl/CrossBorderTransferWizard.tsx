@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { WizardShell, type WizardStep } from '../../../components/workflow/WizardShell';
 import { Badge, type BadgeTone } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
+import { tlabel } from '../../../lib/labels';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
 
@@ -192,7 +193,7 @@ export function CrossBorderTransferWizard() {
                     onChange={e => set('mechanism', e.target.value as Mechanism)}>
               {(Object.keys(MECHANISM_LABELS) as Mechanism[]).map(m => (
                 <option key={m} value={m}>
-                  {isAr ? MECHANISM_LABELS[m].ar : MECHANISM_LABELS[m].en}
+                  {tlabel(MECHANISM_LABELS, m, isAr)}
                 </option>
               ))}
             </select>
@@ -271,7 +272,7 @@ export function CrossBorderTransferWizard() {
           <div className="wf-review" style={{ gridColumn: '1 / -1' }}>
             <Row k={isAr ? 'المستلم' : 'Recipient'} v={`${draft.recipientName} (${draft.recipientCountry})`} />
             <Row k={isAr ? 'الآلية' : 'Mechanism'}
-                 v={isAr ? MECHANISM_LABELS[draft.mechanism].ar : MECHANISM_LABELS[draft.mechanism].en} />
+                 v={tlabel(MECHANISM_LABELS, draft.mechanism, isAr)} />
             <Row k="SDO" v={draft.sdoReference ?? (needsSdo ? '—' : (isAr ? 'غير لازم' : 'Not required'))} />
             <Row k={isAr ? 'الحساسية' : 'Sensitivity'} v={draft.sensitivity} />
             <Row k={isAr ? 'المراجعة' : 'Review'}

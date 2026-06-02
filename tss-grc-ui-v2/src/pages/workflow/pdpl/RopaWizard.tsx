@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { WizardShell, type WizardStep } from '../../../components/workflow/WizardShell';
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
+import { tlabel } from '../../../lib/labels';
 import { useToast } from '../../../lib/toast';
 import { privacyApi } from '../../../lib/api';
 
@@ -157,7 +158,7 @@ export function RopaWizard() {
                     onChange={e => set('lawfulBasis', e.target.value as LawfulBasis)}>
               {(Object.keys(BASIS_LABELS) as LawfulBasis[]).map(b => (
                 <option key={b} value={b}>
-                  {isAr ? BASIS_LABELS[b].ar : BASIS_LABELS[b].en}
+                  {tlabel(BASIS_LABELS, b, isAr)}
                 </option>
               ))}
             </select>
@@ -288,7 +289,7 @@ export function RopaWizard() {
             <Row k={isAr ? 'النشاط' : 'Activity'} v={draft.activityName} />
             <Row k={isAr ? 'المالك' : 'Owner'} v={draft.ownerRole} />
             <Row k={isAr ? 'الأساس' : 'Basis'}
-                 v={isAr ? BASIS_LABELS[draft.lawfulBasis].ar : BASIS_LABELS[draft.lawfulBasis].en} />
+                 v={tlabel(BASIS_LABELS, draft.lawfulBasis, isAr)} />
             <Row k={isAr ? 'الاحتفاظ' : 'Retention'}
                  v={`${draft.retentionMonths} ${isAr ? 'شهراً' : 'months'}`} />
             <Row k={isAr ? 'نقل دولي' : 'International transfer'}

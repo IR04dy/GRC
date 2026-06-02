@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { WizardShell, type WizardStep } from '../../../components/workflow/WizardShell';
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
+import { tlabel } from '../../../lib/labels';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
 
@@ -148,7 +149,7 @@ export function ConsentManagementWizard() {
                 <Toggle key={p}
                         checked={draft.purposes.includes(p)}
                         onChange={() => togglePurpose(p)}
-                        label={isAr ? PURPOSE_LABELS[p].ar : PURPOSE_LABELS[p].en}/>
+                        label={tlabel(PURPOSE_LABELS, p, isAr)}/>
               ))}
             </div>
           </Field>
@@ -232,7 +233,7 @@ export function ConsentManagementWizard() {
             <Row k={isAr ? 'النشاط' : 'Activity'} v={draft.activityName} />
             <Row k={isAr ? 'القناة' : 'Channel'} v={draft.channel} />
             <Row k={isAr ? 'الأغراض' : 'Purposes'}
-                 v={draft.purposes.map(p => isAr ? PURPOSE_LABELS[p].ar : PURPOSE_LABELS[p].en).join(', ') || '—'} />
+                 v={draft.purposes.map(p => tlabel(PURPOSE_LABELS, p, isAr)).join(', ') || '—'} />
             <Row k={isAr ? 'النسخة' : 'Version'} v={draft.policyVersion} />
             <Row k={isAr ? 'الاحتفاظ' : 'Retention'}
                  v={`${draft.evidenceStoreMonths} ${isAr ? 'شهراً' : 'months'}`} />

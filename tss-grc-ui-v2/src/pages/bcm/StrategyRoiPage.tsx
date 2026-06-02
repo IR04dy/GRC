@@ -11,6 +11,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
@@ -247,8 +248,7 @@ export function StrategyRoiPage() {
                       <strong>{it.analysisCode}</strong>
                       {' — '}
                       <span style={{ color: 'var(--text-muted)' }}>
-                        {isAr ? STRATEGY_TYPE_LABELS[it.strategyType].ar
-                              : STRATEGY_TYPE_LABELS[it.strategyType].en}
+                        {tlabel(STRATEGY_TYPE_LABELS, it.strategyType, isAr)}
                       </span>
                     </span>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>
@@ -293,8 +293,7 @@ export function StrategyRoiPage() {
                   <td>{isAr ? 'النوع' : 'Strategy type'}</td>
                   {selectedItems.map(it => (
                     <td key={it.id}>
-                      {isAr ? STRATEGY_TYPE_LABELS[it.strategyType].ar
-                            : STRATEGY_TYPE_LABELS[it.strategyType].en}
+                      {tlabel(STRATEGY_TYPE_LABELS, it.strategyType, isAr)}
                     </td>
                   ))}
                 </tr>
@@ -351,8 +350,7 @@ export function StrategyRoiPage() {
                   {selectedItems.map(it => (
                     <td key={it.id}>
                       <Badge tone={recommendationTone(it.recommendation)}>
-                        {isAr ? RECOMMENDATION_LABELS[it.recommendation].ar
-                              : RECOMMENDATION_LABELS[it.recommendation].en}
+                        {tlabel(RECOMMENDATION_LABELS, it.recommendation, isAr)}
                       </Badge>
                     </td>
                   ))}
@@ -408,8 +406,7 @@ export function StrategyRoiPage() {
                     <td><strong>{it.analysisCode}</strong></td>
                     <td>{isAr ? it.strategyNameAr : it.strategyNameEn}</td>
                     <td>
-                      {isAr ? STRATEGY_TYPE_LABELS[it.strategyType].ar
-                            : STRATEGY_TYPE_LABELS[it.strategyType].en}
+                      {tlabel(STRATEGY_TYPE_LABELS, it.strategyType, isAr)}
                     </td>
                     <td style={{ textAlign: 'end' }}>{it.expectedRtoHours}</td>
                     <td style={{ textAlign: 'end' }}>{fmtSar(it.totalCostSar, isAr)}</td>
@@ -419,8 +416,7 @@ export function StrategyRoiPage() {
                     <td style={{ textAlign: 'end' }}>{fmtSar(it.npvSar, isAr)}</td>
                     <td>
                       <Badge tone={recommendationTone(it.recommendation)}>
-                        {isAr ? RECOMMENDATION_LABELS[it.recommendation].ar
-                              : RECOMMENDATION_LABELS[it.recommendation].en}
+                        {tlabel(RECOMMENDATION_LABELS, it.recommendation, isAr)}
                       </Badge>
                     </td>
                     <td>

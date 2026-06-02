@@ -21,7 +21,7 @@ export type BiLabel = { en: string; ar: string };
 
 export function tlabel(
   map: Record<string, BiLabel> | undefined | null,
-  key: string | null | undefined,
+  key: string | number | null | undefined,
   isAr: boolean,
 ): string {
   if (key == null) return '';

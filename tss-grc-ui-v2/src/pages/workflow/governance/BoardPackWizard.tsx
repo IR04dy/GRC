@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { WizardShell, type WizardStep } from '../../../components/workflow/WizardShell';
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
+import { tlabel } from '../../../lib/labels';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
 
@@ -178,7 +179,7 @@ export function BoardPackWizard() {
                 <Toggle key={s}
                         checked={draft.sections.includes(s)}
                         onChange={() => toggleSection(s)}
-                        label={isAr ? SECTION_LABELS[s].ar : SECTION_LABELS[s].en}/>
+                        label={tlabel(SECTION_LABELS, s, isAr)}/>
               ))}
             </div>
           </Field>

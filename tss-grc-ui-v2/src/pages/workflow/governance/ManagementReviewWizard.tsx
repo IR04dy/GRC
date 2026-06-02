@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { WizardShell, type WizardStep } from '../../../components/workflow/WizardShell';
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
+import { tlabel } from '../../../lib/labels';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
 
@@ -119,7 +120,7 @@ export function ManagementReviewWizard() {
             <select className="input" value={draft.scope}
                     onChange={e => set('scope', e.target.value as ReviewScope)}>
               {(Object.keys(SCOPE_LABELS) as ReviewScope[]).map(s => (
-                <option key={s} value={s}>{isAr ? SCOPE_LABELS[s].ar : SCOPE_LABELS[s].en}</option>
+                <option key={s} value={s}>{tlabel(SCOPE_LABELS, s, isAr)}</option>
               ))}
             </select>
           </Field>
@@ -238,7 +239,7 @@ export function ManagementReviewWizard() {
                   label={isAr ? 'اعتماد سكرتير اللجنة' : 'Secretary signed'}/>
           <div className="wf-review" style={{ gridColumn: '1 / -1' }}>
             <Row k={isAr ? 'النطاق' : 'Scope'}
-                 v={isAr ? SCOPE_LABELS[draft.scope].ar : SCOPE_LABELS[draft.scope].en} />
+                 v={tlabel(SCOPE_LABELS, draft.scope, isAr)} />
             <Row k={isAr ? 'الفترة' : 'Period'} v={draft.period} />
             <Row k={isAr ? 'التاريخ' : 'Date'} v={draft.reviewDate} />
             <Row k={isAr ? 'الرئاسة' : 'Chair'} v={draft.chairRole} />

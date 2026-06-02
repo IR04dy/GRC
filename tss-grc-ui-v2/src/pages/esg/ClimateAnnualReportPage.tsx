@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -155,10 +156,10 @@ export function ClimateAnnualReportPage() {
                         <td style={td}><code>{s.scenarioCode}</code></td>
                         <td style={td}>
                           <Badge tone={scenarioTypeTone(s.scenarioType)}>
-                            {isAr ? SCENARIO_TYPE_LABELS[s.scenarioType].ar : SCENARIO_TYPE_LABELS[s.scenarioType].en}
+                            {tlabel(SCENARIO_TYPE_LABELS, s.scenarioType, isAr)}
                           </Badge>
                         </td>
-                        <td style={td}>{isAr ? FRAMEWORK_LABELS[s.referenceFramework].ar : FRAMEWORK_LABELS[s.referenceFramework].en}</td>
+                        <td style={td}>{tlabel(FRAMEWORK_LABELS, s.referenceFramework, isAr)}</td>
                         <td style={td}>{fmtCelsius(s.globalWarmingCelsius)}</td>
                         <td style={td}>{s.timeHorizonYears}{isAr ? ' سنة' : 'y'}</td>
                         <td style={td}>{s.probabilityWeight}</td>
@@ -233,7 +234,7 @@ export function ClimateAnnualReportPage() {
                   <tbody>
                     {report.emissionsRecords.map(r => (
                       <tr key={r.externalId}>
-                        <td style={td}>{isAr ? ASSET_CLASS_LABELS[r.assetClass].ar : ASSET_CLASS_LABELS[r.assetClass].en}</td>
+                        <td style={td}>{tlabel(ASSET_CLASS_LABELS, r.assetClass, isAr)}</td>
                         <td style={td}>{fmtSarMillions(r.outstandingAmountSarMillions, isAr)}</td>
                         <td style={td}><Badge>PCAF {r.dataQualityScore}</Badge></td>
                         <td style={td}>{fmtTco2e(r.totalFinancedEmissionsTco2e)}</td>
@@ -271,7 +272,7 @@ export function ClimateAnnualReportPage() {
                         <td style={td}>{isAr ? (p.titleAr || p.titleEn) : p.titleEn}</td>
                         <td style={td}>
                           <Badge tone={p.sbtiAligned ? 'success' : 'info'}>
-                            {isAr ? ALIGNMENT_LABELS[p.alignmentFramework].ar : ALIGNMENT_LABELS[p.alignmentFramework].en}
+                            {tlabel(ALIGNMENT_LABELS, p.alignmentFramework, isAr)}
                           </Badge>
                         </td>
                         <td style={td}>{fmtPercent(p.reductionPercent)}</td>

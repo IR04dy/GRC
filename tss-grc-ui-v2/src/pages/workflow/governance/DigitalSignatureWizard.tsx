@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { WizardShell, type WizardStep } from '../../../components/workflow/WizardShell';
 import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
+import { tlabel } from '../../../lib/labels';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
 
@@ -126,7 +127,7 @@ export function DigitalSignatureWizard() {
             <select className="input" value={draft.recordKind}
                     onChange={e => set('recordKind', e.target.value as RecordKind)}>
               {(Object.keys(KIND_LABELS) as RecordKind[]).map(k => (
-                <option key={k} value={k}>{isAr ? KIND_LABELS[k].ar : KIND_LABELS[k].en}</option>
+                <option key={k} value={k}>{tlabel(KIND_LABELS, k, isAr)}</option>
               ))}
             </select>
           </Field>
@@ -185,7 +186,7 @@ export function DigitalSignatureWizard() {
       content: () => (
         <div className="wf-form-grid">
           <div className="wf-summary" style={{ gridColumn: '1 / -1' }}>
-            <Badge tone="info">{isAr ? KIND_LABELS[draft.recordKind].ar : KIND_LABELS[draft.recordKind].en}</Badge>{' '}
+            <Badge tone="info">{tlabel(KIND_LABELS, draft.recordKind, isAr)}</Badge>{' '}
             <strong>{draft.recordRef}</strong> · {draft.recordTitle}
           </div>
           {needsOtp && (

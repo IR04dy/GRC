@@ -13,6 +13,7 @@ import { Badge } from './Badge';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Modal } from './Modal';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import {
   attachmentsApi, ATTACHMENT_DOC_TYPES, ApiError,
@@ -259,7 +260,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
             <select value={sDocType} onChange={e => setSDocType(e.currentTarget.value as AttachmentDocType)}
               aria-label={ar ? 'نوع المستند' : 'Document type'} style={inputStyle}>
               {ATTACHMENT_DOC_TYPES.map(t => (
-                <option key={t} value={t}>{ar ? DOC_TYPE_LABELS[t].ar : DOC_TYPE_LABELS[t].en}</option>
+                <option key={t} value={t}>{tlabel(DOC_TYPE_LABELS, t, ar)}</option>
               ))}
             </select>
             <input value={sTitle} onChange={e => setSTitle(e.currentTarget.value)}
@@ -299,7 +300,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
             <select value={eDocType} onChange={e => setEDocType(e.currentTarget.value as AttachmentDocType)}
               aria-label={ar ? 'نوع المستند' : 'Document type'} style={inputStyle}>
               {ATTACHMENT_DOC_TYPES.map(t => (
-                <option key={t} value={t}>{ar ? DOC_TYPE_LABELS[t].ar : DOC_TYPE_LABELS[t].en}</option>
+                <option key={t} value={t}>{tlabel(DOC_TYPE_LABELS, t, ar)}</option>
               ))}
             </select>
             <input value={eTitle} onChange={e => setETitle(e.currentTarget.value)}
@@ -338,7 +339,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                 gap: 10, alignItems: 'center', padding: '8px 10px',
                 borderBottom: '1px solid var(--border)', background: 'var(--surface)', fontSize: 12,
               }}>
-                <Badge tone="info">{ar ? DOC_TYPE_LABELS[a.docType].ar : DOC_TYPE_LABELS[a.docType].en}</Badge>
+                <Badge tone="info">{tlabel(DOC_TYPE_LABELS, a.docType, ar)}</Badge>
                 <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ fontWeight: 600 }}>{a.titleEn || a.fileName}</span>
                   {a.titleEn && <span style={{ color: 'var(--ink-3)' }}> · {a.fileName}</span>}

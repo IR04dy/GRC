@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import { hasAnyRole } from '../../lib/auth';
@@ -320,9 +321,7 @@ export function FacilitatorConsolePage() {
         eyebrow={`BCM · ${summary.runCode}`}
         actions={
           <div className="flex items-center gap-2">
-            <Badge tone={statusTone}>{isAr
-              ? RUN_STATUS_LABELS[summary.status].ar
-              : RUN_STATUS_LABELS[summary.status].en}</Badge>
+            <Badge tone={statusTone}>{tlabel(RUN_STATUS_LABELS, summary.status, isAr)}</Badge>
             <Button variant="ghost" onClick={() => navigate(-1)}>
               {isAr ? 'رجوع' : 'Back'}
             </Button>
@@ -469,7 +468,7 @@ export function FacilitatorConsolePage() {
                   {(['CUSTOM','INFORMATION','ESCALATION','DECISION','MEDIA','REGULATOR'] as const)
                     .map(t => (
                       <option key={t} value={t}>
-                        {isAr ? INJECT_TYPE_LABELS[t].ar : INJECT_TYPE_LABELS[t].en}
+                        {tlabel(INJECT_TYPE_LABELS, t, isAr)}
                       </option>
                     ))}
                 </select>
@@ -526,8 +525,7 @@ export function FacilitatorConsolePage() {
                         #{isAr ? toArabicDigits(o.observerUserId) : o.observerUserId}
                       </span>
                       <span className="text-tx-muted ml-1.5">
-                        {isAr ? OBSERVER_ROLE_LABELS[o.observerRole].ar
-                              : OBSERVER_ROLE_LABELS[o.observerRole].en}
+                        {tlabel(OBSERVER_ROLE_LABELS, o.observerRole, isAr)}
                       </span>
                     </div>
                     <button type="button"
@@ -557,7 +555,7 @@ export function FacilitatorConsolePage() {
                      'SAMA_LIAISON','NCA_LIAISON','BOARD_OBSERVER'] as const)
                     .map(r => (
                       <option key={r} value={r}>
-                        {isAr ? OBSERVER_ROLE_LABELS[r].ar : OBSERVER_ROLE_LABELS[r].en}
+                        {tlabel(OBSERVER_ROLE_LABELS, r, isAr)}
                       </option>
                     ))}
                 </select>
@@ -615,8 +613,8 @@ function InjectQueueCard({ inj, isActive, isAr, runStartedAt, busy, onSelect, on
   onSelect: () => void;
   onDispatch: () => void;
 }) {
-  const typeLabel = isAr ? INJECT_TYPE_LABELS[inj.injectType].ar : INJECT_TYPE_LABELS[inj.injectType].en;
-  const statusLabel = isAr ? INJECT_STATUS_LABELS[inj.status].ar : INJECT_STATUS_LABELS[inj.status].en;
+  const typeLabel = tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr);
+  const statusLabel = tlabel(INJECT_STATUS_LABELS, inj.status, isAr);
   const tone: BadgeTone =
     inj.status === 'PENDING'      ? 'neutral' :
     inj.status === 'DISPATCHED'   ? 'warning' :
@@ -697,7 +695,7 @@ function ActiveInjectCard({ inj, isAr }: { inj: InjectView; isAr: boolean }) {
       <div className="flex items-center gap-2 mb-2">
         <TypeIcon size={18} className="text-primary-600" />
         <span className="text-sm font-semibold text-tx-strong">
-          {isAr ? INJECT_TYPE_LABELS[inj.injectType].ar : INJECT_TYPE_LABELS[inj.injectType].en}
+          {tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr)}
         </span>
         <span className="ml-auto text-xs text-tx-muted">
           {fmtOffset(inj.plannedTimeOffsetMinutes, isAr)}

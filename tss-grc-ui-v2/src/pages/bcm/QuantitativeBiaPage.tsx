@@ -13,6 +13,7 @@ import { Input, Textarea } from '../../components/ui/Input';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
@@ -506,8 +507,8 @@ export function QuantitativeBiaPage() {
             <div>
               <div className="text-bold" style={{ fontSize: 15, color: 'var(--danger-fg)' }}>
                 {isAr
-                  ? `تجاوز سقف الخسارة المعتمد عند ${TIME_BAND_LABELS[computed.breach][isAr ? 'ar' : 'en']}`
-                  : `MTPD ceiling breached at ${TIME_BAND_LABELS[computed.breach].en}`}
+                  ? `تجاوز سقف الخسارة المعتمد عند ${tlabel(TIME_BAND_LABELS, computed.breach, true)}`
+                  : `MTPD ceiling breached at ${tlabel(TIME_BAND_LABELS, computed.breach, false)}`}
               </div>
               <div className="text-muted mt-sm" style={{ fontSize: 12 }}>
                 {isAr
