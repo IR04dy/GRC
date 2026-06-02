@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play, PlayCircle, RefreshCw, ServerCog, Cable, HeartPulse,
+  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play, PlayCircle, RefreshCw, ServerCog, Cable, HeartPulse, Send,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -22,8 +22,11 @@ import {
 } from '../../lib/ccmApi';
 import {
   getIntegrationStatus, pollIntegration, integrationModeTone,
+  splunkTestPush, serviceNowTestPush,
   INTEGRATION_ADAPTERS, type IntegrationKey, type IntegrationStatus,
+  type SplunkTestPushRequest, type ServiceNowTestPushRequest,
 } from '../../lib/integrationsApi';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { ApiError } from '../../lib/api';
 import { CcmDashboard } from '../../components/compliance/CcmDashboard';
 
@@ -131,11 +134,18 @@ export function ConnectorsPage() {
   );
 }
 
+interface SplunkPushForm { sourceModule: string; sourceId: string; host: string; message: string; }
+interface ServiceNowPushForm {
+  grcSourceModule: string; grcSourceId: string; shortDescription: string;
+  description: string; severity: string; category: string;
+}
+
 /**
  * Live external integration adapters (L3). Surfaces the real
- * /api/v1/integrations/* adapters — status straight from the backend and an
- * on-demand poll for the inbound scanners (Tenable / CrowdStrike). STUB mode
- * in dev, so every status + poll is real.
+ * /api/v1/integrations/* adapters — status straight from the backend, an
+ * on-demand poll for the inbound scanners (Tenable / CrowdStrike), and a
+ * smoke-test push for the outbound ones (Splunk / ServiceNow). STUB mode in
+ * dev, so every status / poll / push is real.
  */
 function LiveIntegrationAdapters() {
   const { lang } = useI18n();
@@ -168,10 +178,65 @@ function LiveIntegrationAdapters() {
     } finally { setBusyKey(null); }
   }
 
+  // Outbound smoke-test pushes (Splunk / ServiceNow)
+  const [pushOpen, setPushOpen] = useState<'splunk' | 'servicenow' | null>(null);
+
+  async function submitSplunkPush(v: SplunkPushForm): Promise<void> {
+    try {
+      await splunkTestPush({
+        sourceModule: v.sourceModule, sourceId: v.sourceId.trim(),
+        host: v.host.trim() || undefined,
+        event: { message: v.message.trim() || 'GRC connectors-console smoke test', via: 'connectors-console' },
+      } satisfies SplunkTestPushRequest);
+      toast.success(isAr ? 'تم إرسال حدث الاختبار إلى Splunk' : 'Test event pushed to Splunk');
+      setPushOpen(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل الإرسال' : 'Push failed'));
+    }
+  }
+
+  async function submitServiceNowPush(v: ServiceNowPushForm): Promise<void> {
+    try {
+      await serviceNowTestPush({
+        grcSourceModule: v.grcSourceModule, grcSourceId: v.grcSourceId.trim(),
+        shortDescription: v.shortDescription.trim(), description: v.description.trim() || undefined,
+        severity: v.severity, category: v.category.trim() || undefined,
+      } satisfies ServiceNowTestPushRequest);
+      toast.success(isAr ? 'تم إنشاء حادثة اختبار في ServiceNow' : 'Test incident pushed to ServiceNow');
+      setPushOpen(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل الإرسال' : 'Push failed'));
+    }
+  }
+
+  const splunkFields: FieldDef[] = [
+    { kind: 'select', key: 'sourceModule', label: isAr ? 'وحدة المصدر *' : 'Source module *', required: true, span: 6,
+      options: ['SECURITY_EVENT', 'FINDING', 'RISK', 'CAPA_TASK', 'COMPLIANCE_GAP'].map(v => ({ value: v, label: v })) },
+    { kind: 'text', key: 'sourceId', label: isAr ? 'معرّف المصدر *' : 'Source id *', required: true, span: 6 },
+    { kind: 'text', key: 'host', label: isAr ? 'المضيف' : 'Host', span: 6 },
+    { kind: 'text', key: 'message', label: isAr ? 'رسالة الحدث' : 'Event message', span: 12 },
+  ];
+  const splunkInitial: SplunkPushForm = { sourceModule: 'SECURITY_EVENT', sourceId: 'SOC-SMOKE-001', host: 'soc-test-host', message: 'GRC connectors-console smoke test' };
+
+  const serviceNowFields: FieldDef[] = [
+    { kind: 'select', key: 'grcSourceModule', label: isAr ? 'وحدة المصدر *' : 'Source module *', required: true, span: 6,
+      options: ['CYBER_INCIDENT', 'AUDIT_FINDING', 'CAPA_TASK', 'COMPLIANCE_GAP'].map(v => ({ value: v, label: v })) },
+    { kind: 'text', key: 'grcSourceId', label: isAr ? 'معرّف المصدر *' : 'Source id *', required: true, span: 6 },
+    { kind: 'text', key: 'shortDescription', label: isAr ? 'وصف مختصر *' : 'Short description *', required: true, span: 12 },
+    { kind: 'select', key: 'severity', label: isAr ? 'الخطورة *' : 'Severity *', required: true, span: 6,
+      options: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(v => ({ value: v, label: v })) },
+    { kind: 'text', key: 'category', label: isAr ? 'الفئة' : 'Category', span: 6 },
+    { kind: 'textarea', key: 'description', label: isAr ? 'الوصف' : 'Description', rows: 2, span: 12 },
+  ];
+  const serviceNowInitial: ServiceNowPushForm = { grcSourceModule: 'CYBER_INCIDENT', grcSourceId: 'INC-SMOKE-001', shortDescription: 'GRC connectors-console smoke test', description: '', severity: 'MEDIUM', category: 'Security' };
+
   const reachableCount = INTEGRATION_ADAPTERS.filter(a => statuses[a.key] != null).length;
   const healthyCount = INTEGRATION_ADAPTERS.filter(a => statuses[a.key]?.healthy).length;
 
   return (
+    <>
     <Card title={isAr ? 'موصِّلات الأنظمة الخارجية (مباشر)' : 'External integration adapters (live)'}
       Icon={Cable}
       action={
@@ -225,7 +290,10 @@ function LiveIntegrationAdapters() {
                     ? <Button size="sm" variant="primary" Icon={Play} disabled={busy || !reachable} onClick={() => void poll(a.key)}>
                         {isAr ? 'استقصاء' : 'Poll now'}
                       </Button>
-                    : <span className="text-2xs text-muted">{isAr ? 'صادر فقط' : 'Outbound only'}</span>}
+                    : <Button size="sm" variant="ghost" Icon={Send} disabled={!reachable}
+                        onClick={() => setPushOpen(a.key === 'servicenow' ? 'servicenow' : 'splunk')}>
+                        {isAr ? 'إرسال اختبار' : 'Test push'}
+                      </Button>}
                 </td>
               </tr>
             );
@@ -233,6 +301,26 @@ function LiveIntegrationAdapters() {
         </tbody>
       </table>
     </Card>
+
+    <FormModal<SplunkPushForm>
+      open={pushOpen === 'splunk'}
+      title={isAr ? 'اختبار دفع إلى Splunk' : 'Splunk test push'}
+      fields={splunkFields}
+      initial={splunkInitial}
+      onClose={() => setPushOpen(null)}
+      onSubmit={submitSplunkPush}
+      submitLabel={isAr ? 'إرسال' : 'Push'}
+    />
+    <FormModal<ServiceNowPushForm>
+      open={pushOpen === 'servicenow'}
+      title={isAr ? 'اختبار دفع إلى ServiceNow' : 'ServiceNow test push'}
+      fields={serviceNowFields}
+      initial={serviceNowInitial}
+      onClose={() => setPushOpen(null)}
+      onSubmit={submitServiceNowPush}
+      submitLabel={isAr ? 'إرسال' : 'Push'}
+    />
+    </>
   );
 }
 

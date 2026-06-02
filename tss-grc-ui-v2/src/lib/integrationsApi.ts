@@ -45,6 +45,30 @@ export function pollIntegration(key: 'tenable' | 'crowdstrike') {
   return api.post<IntegrationPollResult>(`${BASE}/${key}/poll`);
 }
 
+// ─── Outbound smoke-test pushes (Splunk / ServiceNow) ────────────────
+
+export interface SplunkTestPushRequest {
+  sourceModule: string;     // SECURITY_EVENT / FINDING / RISK / CAPA_TASK / COMPLIANCE_GAP
+  sourceId: string;
+  host?: string;
+  event?: Record<string, unknown>;
+}
+export interface ServiceNowTestPushRequest {
+  grcSourceModule: string;  // CYBER_INCIDENT / AUDIT_FINDING / CAPA_TASK / COMPLIANCE_GAP
+  grcSourceId: string;
+  shortDescription: string;
+  description?: string;
+  severity: string;         // CRITICAL / HIGH / MEDIUM / LOW
+  category?: string;
+}
+
+export function splunkTestPush(body: SplunkTestPushRequest) {
+  return api.post<Record<string, unknown>>(`${BASE}/splunk/test-push`, body);
+}
+export function serviceNowTestPush(body: ServiceNowTestPushRequest) {
+  return api.post<Record<string, unknown>>(`${BASE}/servicenow/test-push`, body);
+}
+
 // ─── Display catalog ─────────────────────────────────────────────────
 
 export interface IntegrationAdapterMeta {
