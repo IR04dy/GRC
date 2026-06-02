@@ -147,7 +147,7 @@ export function RegReportingObligationsPage() {
           {FILING_STATUS_LABEL[o.latestFilingStatus][lang === 'ar' ? 'ar' : 'en']}
           {o.latestFilingDueDate ? ` · ${o.latestFilingDueDate}` : ''}
         </Badge>
-      ) : <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>—</span>,
+      ) : <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>—</span>,
     },
     {
       header: lang === 'ar' ? 'الاستحقاق' : 'Due offset', width: '120px',

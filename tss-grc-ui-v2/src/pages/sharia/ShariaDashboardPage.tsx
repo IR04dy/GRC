@@ -230,7 +230,7 @@ export function ShariaDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.resolutionsByStatus ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا قرارات بعد.' : 'No resolutions yet.'}
                 </span>
               )}
@@ -248,7 +248,7 @@ export function ShariaDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.findingsBySeverity ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا نتائج مفتوحة.' : 'No open findings.'}
                 </span>
               )}
@@ -266,7 +266,7 @@ export function ShariaDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.productsByStatus ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا منتجات بعد.' : 'No products yet.'}
                 </span>
               )}

@@ -134,7 +134,7 @@ export function ExerciseScenarioLibraryPage() {
               <div>
                 <label style={{
                   display: 'block', fontSize: 12, fontWeight: 600,
-                  marginBottom: 4, color: 'var(--text-muted)',
+                  marginBottom: 4, color: 'var(--ink-3)',
                 }}>
                   {isAr ? 'بحث' : 'Search'}
                 </label>
@@ -154,7 +154,7 @@ export function ExerciseScenarioLibraryPage() {
                       [isAr ? 'right' : 'left']: 9,
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      color: 'var(--text-muted)',
+                      color: 'var(--ink-3)',
                     } as React.CSSProperties}
                   />
                 </div>
@@ -164,7 +164,7 @@ export function ExerciseScenarioLibraryPage() {
               <div>
                 <label style={{
                   display: 'block', fontSize: 12, fontWeight: 600,
-                  marginBottom: 4, color: 'var(--text-muted)',
+                  marginBottom: 4, color: 'var(--ink-3)',
                 }}>
                   {isAr ? 'نوع التمرين' : 'Exercise type'}
                 </label>
@@ -187,7 +187,7 @@ export function ExerciseScenarioLibraryPage() {
               <div>
                 <label style={{
                   display: 'block', fontSize: 12, fontWeight: 600,
-                  marginBottom: 4, color: 'var(--text-muted)',
+                  marginBottom: 4, color: 'var(--ink-3)',
                 }}>
                   {isAr ? 'مستوى التعقيد' : 'Complexity'}
                 </label>
@@ -210,7 +210,7 @@ export function ExerciseScenarioLibraryPage() {
               <div>
                 <label style={{
                   display: 'block', fontSize: 12, fontWeight: 600,
-                  marginBottom: 4, color: 'var(--text-muted)',
+                  marginBottom: 4, color: 'var(--ink-3)',
                 }}>
                   {isAr ? 'الإطار التنظيمي' : 'Framework'}
                 </label>
@@ -244,7 +244,7 @@ export function ExerciseScenarioLibraryPage() {
 
           {/* Help / regulatory context */}
           <Card title={isAr ? 'متطلبات SAMA BCF' : 'SAMA BCF requirement'} Icon={ShieldAlert}>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+            <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: 0 }}>
               {isAr
                 ? 'يفرض الملحق ج من إطار استمرارية الأعمال لساما إجراء تمرينين كاملي النطاق وأربعة تمارين حوارية على الأقل سنوياً. تساعد المكتبة على تحقيق هذا الالتزام بسرعة.'
                 : 'SAMA BCF Annex C requires 2 full-scale + 4 tabletop exercises per year. The library accelerates that obligation.'}
@@ -355,7 +355,7 @@ function ScenarioCard({
           }}>
             {isAr ? (s.titleAr || s.titleEn) : s.titleEn}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
             {s.scenarioCode}
           </div>
         </div>
@@ -390,7 +390,7 @@ function ScenarioCard({
                 fontSize: 10, padding: '2px 6px',
                 background: 'var(--surface-2, #f3f4f6)',
                 borderRadius: 3,
-                color: 'var(--text-muted)',
+                color: 'var(--ink-3)',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -398,7 +398,7 @@ function ScenarioCard({
             </span>
           ))}
           {frameworks.length > 4 && (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>
               {isAr ? `+${frameworks.length - 4}` : `+${frameworks.length - 4} more`}
             </span>
           )}
@@ -407,7 +407,7 @@ function ScenarioCard({
 
       {/* Footer stats */}
       <div className="cluster" style={{
-        gap: 12, fontSize: 11, color: 'var(--text-muted)',
+        gap: 12, fontSize: 11, color: 'var(--ink-3)',
         marginTop: 'auto',
       }}>
         <span title={isAr ? 'المدة المُوصى بها' : 'Recommended duration'}>

@@ -354,7 +354,7 @@ export function SupplierResiliencePage() {
                                 ? <Badge tone={ALT_OUTCOME_TONE[a.lastAssessedOutcome]}>
                                     {t(`srpOutcome_${a.lastAssessedOutcome}`)}
                                   </Badge>
-                                : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}
+                                : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                             </td>
                             <td>{t(`srpContract_${a.contractualStatus}`)}</td>
                             <td style={{ textAlign: 'right' }} className="mono">
@@ -396,7 +396,7 @@ export function SupplierResiliencePage() {
                                     </p>
                                   )}
                                   {a.archiveReason && (
-                                    <p style={{ color: 'var(--muted-foreground)' }}>
+                                    <p style={{ color: 'var(--ink-3)' }}>
                                       <strong>{t('scnArchiveReason')}:</strong> {a.archiveReason}
                                     </p>
                                   )}
@@ -520,7 +520,7 @@ export function SupplierResiliencePage() {
                                         {steps.map(s => (
                                           <li key={s.seq} style={{ marginBottom: 3 }}>
                                             {lang === 'ar' && s.actionAr ? s.actionAr : s.actionEn}
-                                            <span style={{ color: 'var(--muted-foreground)' }}>
+                                            <span style={{ color: 'var(--ink-3)' }}>
                                               {' · '}{s.owner}{' · '}{s.days}d
                                               {s.doneAt ? ` · ✓ ${new Date(s.doneAt).toLocaleDateString()}` : ''}
                                             </span>
@@ -536,7 +536,7 @@ export function SupplierResiliencePage() {
                                     </p>
                                   )}
                                   {p.nextTestDue && (
-                                    <p style={{ color: 'var(--muted-foreground)' }}>
+                                    <p style={{ color: 'var(--ink-3)' }}>
                                       <strong>{t('srpPlanNextTest')}:</strong>{' '}
                                       <span className="mono">{p.nextTestDue}</span>
                                     </p>

@@ -254,14 +254,14 @@ export function AuditCommitteeSnapshotPage() {
                           <Badge tone="info" dot>
                             {ROLE_LABEL[a.attestedRole][lang === 'ar' ? 'ar' : 'en']}
                           </Badge>
-                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                             user#{a.attestedByUserId}
                           </span>
-                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                             {new Date(a.attestedAt).toLocaleString(
                                 lang === 'ar' ? 'ar-SA' : 'en-GB')}
                           </span>
-                          <code style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          <code style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                             <Fingerprint size={11}
                                          style={{ verticalAlign: '-1px',
                                                   marginInlineEnd: 4 }} />
@@ -344,7 +344,7 @@ export function AuditCommitteeSnapshotPage() {
                         <p style={{ margin: 0, fontSize: 13 }}>
                           {lang === 'ar' && r.textAr ? r.textAr : r.textEn}
                         </p>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                           user#{r.recordedByUserId} ·{' '}
                           {new Date(r.recordedAt).toLocaleString(
                               lang === 'ar' ? 'ar-SA' : 'en-GB')}
@@ -417,7 +417,7 @@ export function AuditCommitteeSnapshotPage() {
               {finalizeError && (
                 <div style={{ color: 'var(--danger)', fontSize: 13 }}>{finalizeError}</div>
               )}
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                 {t('Once finalized the snapshot is locked from further changes.',
                    'بعد الاعتماد تُقفَل اللقطة عن أي تعديل لاحق.')}
               </div>
@@ -455,7 +455,7 @@ function TabBtn({ active, onClick, Icon, label, count }: {
                      border: '1px solid ' + (active ? 'var(--primary)' : 'var(--border)'),
                      borderRadius: 6,
                      background: active ? 'var(--primary)' : 'var(--surface)',
-                     color: active ? 'white' : 'var(--text)',
+                     color: active ? 'white' : 'var(--ink-1)',
                      fontSize: 13, cursor: 'pointer',
                      display: 'flex', alignItems: 'center', gap: 6 }}>
       <Icon size={14} />
@@ -516,7 +516,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 4,
   fontSize: 14,
   background: 'var(--surface)',
-  color: 'var(--text)',
+  color: 'var(--ink-1)',
   fontFamily: 'inherit',
 };
 
@@ -535,7 +535,7 @@ const btnSecondaryStyle: React.CSSProperties = {
   border: '1px solid var(--border)',
   borderRadius: 4,
   background: 'var(--surface)',
-  color: 'var(--text)',
+  color: 'var(--ink-1)',
   fontSize: 13,
   cursor: 'pointer',
 };

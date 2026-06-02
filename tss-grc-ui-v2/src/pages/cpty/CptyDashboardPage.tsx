@@ -215,7 +215,7 @@ export function CptyDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.bySector ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا أطراف بعد.' : 'No counterparties yet.'}
                 </span>
               )}
@@ -234,7 +234,7 @@ export function CptyDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.byInternalGrade ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لم تُسند تصنيفات بعد.' : 'No ratings assigned yet.'}
                 </span>
               )}
@@ -262,7 +262,7 @@ export function CptyDashboardPage() {
                 </Badge>
               )}
               {(data?.limitsBreach ?? 0) + (data?.limitsRed ?? 0) + (data?.limitsAmber ?? 0) === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'كل الحدود ضمن النطاق الأخضر.' : 'All limits within the green band.'}
                 </span>
               )}

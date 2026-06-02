@@ -222,7 +222,7 @@ export function ObDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.tppsByStatus ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لم يُسجَّل مزوّدون بعد.' : 'No TPPs registered yet.'}
                 </span>
               )}
@@ -240,7 +240,7 @@ export function ObDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.consentsByType ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا موافقات بعد.' : 'No consents yet.'}
                 </span>
               )}

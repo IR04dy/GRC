@@ -91,7 +91,7 @@ export function CcmDashboardPage() {
     {
       header: lang === 'ar' ? 'بصمة الدليل' : 'Evidence hash', width: '180px',
       cell: r => (
-        <code title={r.evidenceHash ?? ''} style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+        <code title={r.evidenceHash ?? ''} style={{ fontSize: 11, color: 'var(--ink-3)' }}>
           <Fingerprint size={11} style={{ verticalAlign: '-1px', marginInlineEnd: 4 }} />
           {shortHash(r.evidenceHash)}
         </code>
@@ -114,7 +114,7 @@ export function CcmDashboardPage() {
           <div style={{ display: 'flex', gap: 8 }}>
             <Link to="/ccm/tests"
                   style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6,
-                           textDecoration: 'none', color: 'var(--text)', fontSize: 13 }}>
+                           textDecoration: 'none', color: 'var(--ink-1)', fontSize: 13 }}>
               <ClipboardCheck size={14} style={{ verticalAlign: '-2px', marginInlineEnd: 6 }} />
               {lang === 'ar' ? 'تعريفات الاختبارات' : 'Test definitions'}
             </Link>
@@ -203,7 +203,7 @@ function FailingPanel({ items, lang }: FailingPanelProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {groups.map(g => (
         <div key={g.sev}>
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--ink-3)' }}>
             <Badge tone={CCM_SEVERITY_TONE[g.sev]}>
               {CCM_SEVERITY_LABEL[g.sev][lang === 'ar' ? 'ar' : 'en']}
             </Badge>
@@ -216,14 +216,14 @@ function FailingPanel({ items, lang }: FailingPanelProps) {
                 <Link to={`/ccm/tests/${i.externalId}`}
                       style={{ display: 'flex', justifyContent: 'space-between',
                                padding: '6px 8px', border: '1px solid var(--border)',
-                               borderRadius: 4, textDecoration: 'none', color: 'var(--text)' }}>
+                               borderRadius: 4, textDecoration: 'none', color: 'var(--ink-1)' }}>
                   <span>
-                    <code style={{ fontSize: 12, color: 'var(--text-muted)' }}>{i.testCode}</code>
+                    <code style={{ fontSize: 12, color: 'var(--ink-3)' }}>{i.testCode}</code>
                     <span style={{ marginInlineStart: 8 }}>
                       {lang === 'ar' && i.titleAr ? i.titleAr : i.titleEn}
                     </span>
                   </span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                     {lang === 'ar' ? `${i.consecutiveFailures} مرّات متتالية` : `${i.consecutiveFailures} consecutive`}
                   </span>
                 </Link>

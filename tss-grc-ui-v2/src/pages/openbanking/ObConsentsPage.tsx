@@ -124,7 +124,7 @@ export function ObConsentsPage() {
           ? <Badge tone={c.revokedBy === 'CUSTOMER' ? 'warning' : 'neutral'}>
               {revokedByLabel(c.revokedBy, lang)}
             </Badge>
-          : <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>—</span>
+          : <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>—</span>
       ),
     },
     {

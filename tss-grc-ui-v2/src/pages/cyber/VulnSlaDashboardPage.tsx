@@ -220,10 +220,10 @@ export function VulnSlaDashboardPage() {
                 <span style={{ fontWeight: 600 }}>
                   {lang === 'ar' && snap.defaultPolicy.titleAr ? snap.defaultPolicy.titleAr : snap.defaultPolicy.titleEn}
                 </span>
-                <code style={{ fontSize: 12, color: 'var(--text-muted)' }}>{snap.defaultPolicy.policyCode}</code>
+                <code style={{ fontSize: 12, color: 'var(--ink-3)' }}>{snap.defaultPolicy.policyCode}</code>
                 <Badge tone="success" dot>{lang === 'ar' ? 'افتراضي' : 'Default'}</Badge>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
                 {lang === 'ar'
                   ? `الساعات الأساسية: حرج ${formatHours(snap.defaultPolicy.criticalSlaHours)} · مرتفع ${formatHours(snap.defaultPolicy.highSlaHours)} · متوسط ${formatHours(snap.defaultPolicy.mediumSlaHours)} · منخفض ${formatHours(snap.defaultPolicy.lowSlaHours)}`
                   : `Base hours — Critical ${formatHours(snap.defaultPolicy.criticalSlaHours)} · High ${formatHours(snap.defaultPolicy.highSlaHours)} · Medium ${formatHours(snap.defaultPolicy.mediumSlaHours)} · Low ${formatHours(snap.defaultPolicy.lowSlaHours)}`}
@@ -296,7 +296,7 @@ function btnStyle(tone: 'primary' | 'secondary', busy: boolean): React.CSSProper
     border: tone === 'primary' ? 'none' : '1px solid var(--border)',
     borderRadius: 6,
     background: tone === 'primary' ? 'var(--primary)' : 'var(--surface)',
-    color: tone === 'primary' ? 'var(--on-primary, #fff)' : 'var(--text)',
+    color: tone === 'primary' ? 'var(--on-primary, #fff)' : 'var(--ink-1)',
     fontSize: 13,
     fontWeight: 500,
     cursor: busy ? 'wait' : 'pointer',

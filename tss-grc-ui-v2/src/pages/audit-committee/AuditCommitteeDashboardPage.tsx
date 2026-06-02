@@ -128,7 +128,7 @@ export function AuditCommitteeDashboardPage() {
             <button onClick={() => window.print()}
                     style={{ padding: '6px 12px', border: '1px solid var(--border)',
                              borderRadius: 6, background: 'var(--surface)',
-                             color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+                             color: 'var(--ink-1)', fontSize: 13, cursor: 'pointer' }}>
               <Printer size={14} style={{ verticalAlign: '-2px', marginInlineEnd: 6 }} />
               {t('Print A4', 'طباعة A4')}
             </button>
@@ -196,7 +196,7 @@ export function AuditCommitteeDashboardPage() {
                    tone={live.risk.criticalCount > 0 ? 'danger' : 'success'} />
             </div>
             {live.risk.topAboveAppetite.length > 0 && (
-              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--ink-3)' }}>
                 {t('Top 5 above-appetite risks:', 'أعلى 5 مخاطر تتجاوز الشهية:')}
                 <ol style={{ margin: '6px 0 0 0', paddingInlineStart: 18 }}>
                   {live.risk.topAboveAppetite.map(r => (
@@ -204,7 +204,7 @@ export function AuditCommitteeDashboardPage() {
                       <span style={{ fontWeight: 500 }}>
                         {lang === 'ar' ? (r.titleAr ?? r.titleEn) : r.titleEn}
                       </span>
-                      <span style={{ marginInlineStart: 8, color: 'var(--text-muted)' }}>
+                      <span style={{ marginInlineStart: 8, color: 'var(--ink-3)' }}>
                         ({r.riskLevel ?? '—'} · {fmtNumber(r.residualScore ?? 0, lang)})
                       </span>
                     </li>
@@ -233,7 +233,7 @@ export function AuditCommitteeDashboardPage() {
                    value={`${ccmPassPct}%`}
                    tone={ccmPassPct >= 95 ? 'success' : ccmPassPct >= 80 ? 'warning' : 'danger'} />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('CCM enabled tests:', 'الاختبارات المُفعَّلة:')}{' '}
               {fmtNumber(live.controls.ccmEnabledTests, lang)}{' '}/{' '}
               {fmtNumber(live.controls.ccmTotalTests, lang)}
@@ -257,12 +257,12 @@ export function AuditCommitteeDashboardPage() {
                    value={`${Math.round(live.findings.closureRateLastQuarterPct)}%`}
                    tone={live.findings.closureRateLastQuarterPct >= 70 ? 'success' : 'warning'} />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('Age buckets:', 'الفئات العمرية:')}{' '}
               0–30: {fmtNumber(live.findings.ageBucket0to30, lang)} ·
               30–90: {fmtNumber(live.findings.ageBucket30to90, lang)} · &gt;90:{' '}
               <span style={{ color: live.findings.ageBucketOver90 > 0
-                                ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                ? 'var(--danger)' : 'var(--ink-3)' }}>
                 {fmtNumber(live.findings.ageBucketOver90, lang)}
               </span>
             </div>
@@ -285,7 +285,7 @@ export function AuditCommitteeDashboardPage() {
                    value={`${Math.round(live.capa.onTrackRatioPct)}%`}
                    tone={live.capa.onTrackRatioPct >= 80 ? 'success' : 'warning'} />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('Closed this quarter:', 'مُغلقة هذا الربع:')}{' '}
               {fmtNumber(live.capa.closedThisQuarter, lang)}
             </div>
@@ -308,11 +308,11 @@ export function AuditCommitteeDashboardPage() {
                    value={fmtNumber(live.ai.missingFairnessAuditCount, lang)}
                    tone={live.ai.missingFairnessAuditCount > 0 ? 'danger' : 'success'} />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('Unacknowledged drift observations:',
                  'انحرافات غير مُؤكَّدة:')}{' '}
               <span style={{ color: live.ai.unacknowledgedDriftCount > 0
-                                ? 'var(--warning)' : 'var(--text-muted)' }}>
+                                ? 'var(--warning)' : 'var(--ink-3)' }}>
                 {fmtNumber(live.ai.unacknowledgedDriftCount, lang)}
               </span>
             </div>
@@ -337,7 +337,7 @@ export function AuditCommitteeDashboardPage() {
                    tone={(live.climate.financedEmissionsYoyChangePct ?? 0) <= 0
                          ? 'success' : 'warning'} />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('Current tCO2e:', 'tCO2e الحالي:')}{' '}
               {fmtNumber(Math.round(live.climate.financedEmissionsCurrentTco2e), lang)}
               {' '}({t('previous:', 'السابق:')}{' '}
@@ -363,7 +363,7 @@ export function AuditCommitteeDashboardPage() {
                    tone={live.obligations.attestedThisCyclePct >= 80 ? 'success' : 'warning'} />
             </div>
             {Object.keys(live.obligations.regulatorBreakdown).length > 0 && (
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
                 {t('By regulator:', 'حسب الجهة:')}{' '}
                 {Object.entries(live.obligations.regulatorBreakdown)
                   .sort((a, b) => b[1] - a[1])
@@ -395,10 +395,10 @@ export function AuditCommitteeDashboardPage() {
                           : `${Math.round(live.incidents.mttrAverageHours)}`}
                    tone="info" />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('Regulator-notifiable:', 'تُبلَّغ بها الجهة الرقابية:')}{' '}
               <span style={{ color: live.incidents.regulatorNotifiableCount > 0
-                                ? 'var(--warning)' : 'var(--text-muted)' }}>
+                                ? 'var(--warning)' : 'var(--ink-3)' }}>
                 {fmtNumber(live.incidents.regulatorNotifiableCount, lang)}
               </span>
             </div>
@@ -422,7 +422,7 @@ export function AuditCommitteeDashboardPage() {
                    tone={live.vendorBcp.belowRtoThresholdCount > 0 ? 'danger' : 'success'} />
             </div>
             {live.vendorBcp.latestCampaignCode && (
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
                 {t('Latest campaign:', 'آخر حملة:')}{' '}
                 <code>{live.vendorBcp.latestCampaignCode}</code>
               </div>
@@ -444,10 +444,10 @@ export function AuditCommitteeDashboardPage() {
                    label={t('Line 3', 'الخط الثالث')}
                    value={fmtNumber(live.threeLines.line3Count, lang)} tone="accent" />
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('Board escalations:', 'إحالات للمجلس:')}{' '}
               <span style={{ color: live.threeLines.boardEscalations > 0
-                                ? 'var(--warning)' : 'var(--text-muted)' }}>
+                                ? 'var(--warning)' : 'var(--ink-3)' }}>
                 {fmtNumber(live.threeLines.boardEscalations, lang)}
               </span>
             </div>
@@ -457,7 +457,7 @@ export function AuditCommitteeDashboardPage() {
 
       {live && (
         <Card padded>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
             {t('Computed at:', 'حُسبت في:')}{' '}
             {new Date(live.computedAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB')}
             {' · '}
@@ -565,7 +565,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 4,
   fontSize: 14,
   background: 'var(--surface)',
-  color: 'var(--text)',
+  color: 'var(--ink-1)',
 };
 
 const btnPrimaryStyle: React.CSSProperties = {
@@ -583,7 +583,7 @@ const btnSecondaryStyle: React.CSSProperties = {
   border: '1px solid var(--border)',
   borderRadius: 4,
   background: 'var(--surface)',
-  color: 'var(--text)',
+  color: 'var(--ink-1)',
   fontSize: 13,
   cursor: 'pointer',
 };

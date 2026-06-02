@@ -245,7 +245,7 @@ export function DrPlansPage() {
                                       <span className="mono">{new Date(r.lastTestedAt).toLocaleDateString()}</span><br /></>
                                     )}
                                     {r.lastTestNotesEn && (
-                                      <span style={{ color: 'var(--muted-foreground)' }}>{r.lastTestNotesEn}</span>
+                                      <span style={{ color: 'var(--ink-3)' }}>{r.lastTestNotesEn}</span>
                                     )}
                                   </div>
                                 </div>
@@ -264,7 +264,7 @@ export function DrPlansPage() {
                                       {deps.map((d, i) => (
                                         <li key={i}>
                                           <Network size={12} style={{ display:'inline', marginInlineEnd:4 }}/>
-                                          {d.system} {d.type && <span style={{ color:'var(--muted-foreground)' }}>— {d.type}</span>}
+                                          {d.system} {d.type && <span style={{ color:'var(--ink-3)' }}>— {d.type}</span>}
                                           {d.criticality && <Badge tone={d.criticality === 'CRITICAL' ? 'danger' : d.criticality === 'HIGH' ? 'warning' : 'info'}> {d.criticality}</Badge>}
                                         </li>
                                       ))}
@@ -279,7 +279,7 @@ export function DrPlansPage() {
                                       {failover.map(s => (
                                         <li key={s.seq}>
                                           {lang === 'ar' && s.actionAr ? s.actionAr : s.actionEn}
-                                          {s.owner && <span style={{ color:'var(--muted-foreground)' }}> — {s.owner}</span>}
+                                          {s.owner && <span style={{ color:'var(--ink-3)' }}> — {s.owner}</span>}
                                           {s.minutesAllocated != null && <span className="mono"> ({s.minutesAllocated}m)</span>}
                                           {s.automated && <Badge tone="info"> AUTO</Badge>}
                                           {s.doneAt && <span style={{ color: 'var(--success)' }}> ✓ {new Date(s.doneAt).toLocaleString()}</span>}
@@ -296,7 +296,7 @@ export function DrPlansPage() {
                                       {failback.map(s => (
                                         <li key={s.seq}>
                                           {lang === 'ar' && s.actionAr ? s.actionAr : s.actionEn}
-                                          {s.owner && <span style={{ color:'var(--muted-foreground)' }}> — {s.owner}</span>}
+                                          {s.owner && <span style={{ color:'var(--ink-3)' }}> — {s.owner}</span>}
                                           {s.minutesAllocated != null && <span className="mono"> ({s.minutesAllocated}m)</span>}
                                         </li>
                                       ))}
@@ -322,7 +322,7 @@ export function DrPlansPage() {
                                   </p>
                                 )}
                                 {r.archiveReason && (
-                                  <p style={{ marginTop: 6, color: 'var(--muted-foreground)' }}>
+                                  <p style={{ marginTop: 6, color: 'var(--ink-3)' }}>
                                     <strong>{t('scnArchiveReason')}:</strong> {r.archiveReason}
                                   </p>
                                 )}

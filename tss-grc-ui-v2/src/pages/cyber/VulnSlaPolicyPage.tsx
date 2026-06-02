@@ -285,7 +285,7 @@ export function VulnSlaPolicyPage() {
               <NumberInput value={draft.escalationCriticalPct} onChange={v => setDraft({ ...draft, escalationCriticalPct: v })} step={0.05} />
             </Field>
 
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>
               {lang === 'ar'
                 ? 'ملاحظة: تطبَّق دائماً حدود دنيا قدرها 25٪ من الساعات الأساسية، لمنع مهل غير قابلة للتنفيذ.'
                 : 'Note: a 0.25× base-hours floor always applies — prevents the multipliers from producing sub-minute SLAs.'}
@@ -297,7 +297,7 @@ export function VulnSlaPolicyPage() {
             <h3 style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 600 }}>
               {lang === 'ar' ? 'خريطة المعاينة — المهلة الفعلية لكل تركيبة' : 'Preview heatmap — effective SLA for every combination'}
             </h3>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
               {lang === 'ar'
                 ? 'تظهر هنا 64 خانة (4 خطورة × 4 تعرّض × 4 أهمية). الألوان تشير إلى مدى تشدّد المهلة مقارنةً بالأساس.'
                 : '64 cells (4 severity × 4 exposure × 4 criticality). Colours show how tight the effective SLA is compared to base.'}
@@ -329,7 +329,7 @@ function HeatmapMatrix({ draft }: HeatmapProps) {
               <span style={{ fontWeight: 600, fontSize: 13 }}>
                 {VULN_SLA_SEVERITY_LABEL[sev][lang === 'ar' ? 'ar' : 'en']}
               </span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                 {lang === 'ar' ? `الأساس ${formatHours(base)}` : `Base ${formatHours(base)}`}
               </span>
             </div>
@@ -408,7 +408,7 @@ const headCellStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
   textAlign: 'center',
-  color: 'var(--text-muted)',
+  color: 'var(--ink-3)',
 };
 const rowHeadStyle: React.CSSProperties = {
   padding: '8px 10px',
@@ -431,7 +431,7 @@ interface FieldProps { label: string; children: React.ReactNode; }
 function Field({ label, children }: FieldProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-      <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      <label style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
         {label}
       </label>
       {children}
@@ -444,7 +444,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div style={{
       fontSize: 11,
       fontWeight: 600,
-      color: 'var(--text-muted)',
+      color: 'var(--ink-3)',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
       borderTop: '1px solid var(--border)',
@@ -462,7 +462,7 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid var(--border)',
   borderRadius: 4,
   background: 'var(--surface)',
-  color: 'var(--text)',
+  color: 'var(--ink-1)',
   fontSize: 13,
   width: '100%',
 };
@@ -490,7 +490,7 @@ function btnStyle(tone: 'primary' | 'secondary', busy: boolean): React.CSSProper
     border: tone === 'primary' ? 'none' : '1px solid var(--border)',
     borderRadius: 6,
     background: tone === 'primary' ? 'var(--primary)' : 'var(--surface)',
-    color: tone === 'primary' ? 'var(--on-primary, #fff)' : 'var(--text)',
+    color: tone === 'primary' ? 'var(--on-primary, #fff)' : 'var(--ink-1)',
     fontSize: 13,
     fontWeight: 500,
     cursor: busy ? 'wait' : 'pointer',

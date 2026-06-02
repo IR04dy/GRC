@@ -80,7 +80,7 @@ export function PublicSubprocessorListPage() {
         <Badge tone={SAFEGUARD_TONE[r.crossBorderSafeguardType]}>
           {SAFEGUARD_LABEL[r.crossBorderSafeguardType][lang === 'ar' ? 'ar' : 'en']}
         </Badge>
-      ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>,
+      ) : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>,
     },
   ];
 
@@ -91,7 +91,7 @@ export function PublicSubprocessorListPage() {
           <ShieldCheck size={28} />
           {lang === 'ar' ? 'قائمة معالجي البيانات الفرعيين' : 'Sub-processor list'}
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>
+        <p style={{ color: 'var(--ink-3)', fontSize: 14, margin: 0 }}>
           {lang === 'ar'
             ? 'إفصاح عام وفق المادة 12 من نظام حماية البيانات الشخصية — يبيّن كل معالج بيانات فرعي يستعين به البنك مع الضمانات المطبّقة للنقل عبر الحدود.'
             : 'Public disclosure under PDPL Article 12 — every sub-processor the bank engages, with the cross-border safeguards applied.'}
@@ -117,7 +117,7 @@ export function PublicSubprocessorListPage() {
         )}
       </Card>
 
-      <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+      <div style={{ marginTop: 16, fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>
         {lang === 'ar'
           ? 'لمزيد من التفاصيل عن مسؤول حماية البيانات والاعتراضات، يُرجى مراجعة سياسة الخصوصية.'
           : 'For details on the Data Protection Officer and objection mechanisms, see the privacy notice.'}

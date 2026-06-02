@@ -195,7 +195,7 @@ export function FraudCaseNewPage() {
                       </Badge>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+                  <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                     {lang === 'ar' ? selectedTypology.descriptionAr : selectedTypology.descriptionEn}
                   </div>
                 </div>
@@ -311,7 +311,7 @@ export function FraudCaseNewPage() {
                 background: 'var(--color-bg-muted)',
                 borderRadius: 6,
                 fontSize: 13,
-                color: 'var(--color-text-muted)',
+                color: 'var(--ink-3)',
               }}>
                 {lang === 'ar'
                   ? 'يجب تسجيل الدخول لفتح قضية احتيال.'

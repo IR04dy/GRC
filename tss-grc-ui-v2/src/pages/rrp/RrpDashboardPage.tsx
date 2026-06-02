@@ -185,7 +185,7 @@ export function RrpDashboardPage() {
               </Badge>
             ))}
             {Object.keys(data?.byStatus ?? {}).length === 0 && (
-              <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+              <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                 {lang === 'ar' ? 'لا توجد دورات بعد.' : 'No cycles yet.'}
               </span>
             )}

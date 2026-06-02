@@ -347,11 +347,11 @@ function Field({ icon: Icon, label, value, valueAr, lang, wide }: FieldProps) {
   const display = valueAr && lang === 'ar' ? valueAr : value;
   return (
     <div style={{ gridColumn: wide ? '1 / -1' : 'auto', padding: 10, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
         {Icon && <Icon size={12} />}
         {label}
       </div>
-      <div style={{ fontSize: 13, color: 'var(--text)', wordBreak: 'break-word' }}>{display || '—'}</div>
+      <div style={{ fontSize: 13, color: 'var(--ink-1)', wordBreak: 'break-word' }}>{display || '—'}</div>
     </div>
   );
 }
@@ -367,7 +367,7 @@ function TabButton({ active, onClick, children }: TabButtonProps) {
         border: 'none',
         borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent',
         background: 'transparent',
-        color: active ? 'var(--primary)' : 'var(--text-muted)',
+        color: active ? 'var(--primary)' : 'var(--ink-3)',
         fontWeight: active ? 600 : 400,
         cursor: 'pointer',
         fontSize: 14,
@@ -391,7 +391,7 @@ const btnPrimaryStyle: React.CSSProperties = {
 const btnSecondaryStyle: React.CSSProperties = {
   padding: '8px 14px',
   background: 'var(--surface)',
-  color: 'var(--text)',
+  color: 'var(--ink-1)',
   border: '1px solid var(--border)',
   borderRadius: 4,
   cursor: 'pointer',

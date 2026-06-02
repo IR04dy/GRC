@@ -206,7 +206,7 @@ export function RegReportingDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.inFlightByRegulator ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا توجد تقارير قيد التنفيذ.'
                                   : 'No in-flight filings.'}
                 </span>
@@ -231,7 +231,7 @@ export function RegReportingDashboardPage() {
                 </Badge>
               ))}
               {Object.keys(data?.inFlightByStatus ?? {}).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا توجد تقارير قيد التنفيذ.'
                                   : 'No in-flight filings.'}
                 </span>

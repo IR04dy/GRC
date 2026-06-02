@@ -247,7 +247,7 @@ export function StrategyRoiPage() {
                     <span style={{ fontSize: 13 }}>
                       <strong>{it.analysisCode}</strong>
                       {' — '}
-                      <span style={{ color: 'var(--text-muted)' }}>
+                      <span style={{ color: 'var(--ink-3)' }}>
                         {tlabel(STRATEGY_TYPE_LABELS, it.strategyType, isAr)}
                       </span>
                     </span>
@@ -364,7 +364,7 @@ export function StrategyRoiPage() {
       {/* Main register table */}
       <Card title={isAr ? 'سجل تحليلات العائد' : 'ROI register'} Icon={Banknote}>
         {loading ? (
-          <p style={{ color: 'var(--text-muted)' }}>
+          <p style={{ color: 'var(--ink-3)' }}>
             {isAr ? 'جارٍ التحميل…' : 'Loading…'}
           </p>
         ) : items.length === 0 ? (

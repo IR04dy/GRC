@@ -121,7 +121,7 @@ export function CcmTestDetailPage() {
     {
       header: lang === 'ar' ? 'بصمة الدليل' : 'Evidence hash', width: '180px',
       cell: r => <code title={r.evidenceHash ?? ''}
-                      style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      style={{ fontSize: 11, color: 'var(--ink-3)' }}>
         <Fingerprint size={11} style={{ verticalAlign: '-1px', marginInlineEnd: 4 }} />
         {shortHash(r.evidenceHash)}
       </code>,
@@ -130,7 +130,7 @@ export function CcmTestDetailPage() {
       header: lang === 'ar' ? 'السبب' : 'Reason',
       cell: r => r.failureReason
         ? <span style={{ fontSize: 12 }}>{r.failureReason}</span>
-        : <span style={{ color: 'var(--text-muted)' }}>—</span>,
+        : <span style={{ color: 'var(--ink-3)' }}>—</span>,
     },
   ];
 
@@ -215,7 +215,7 @@ export function CcmTestDetailPage() {
         <h3 style={{ marginTop: 0 }}>{lang === 'ar' ? 'الإعداد' : 'Configuration'}</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>
               {lang === 'ar' ? 'إعدادات النظام المستهدف' : 'target_config_json'}
             </div>
             <pre style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 6,
@@ -224,7 +224,7 @@ export function CcmTestDetailPage() {
             </pre>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>
               {lang === 'ar' ? 'الشرط المتوقّع' : 'expected_condition_json'}
             </div>
             <pre style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 6,
@@ -271,7 +271,7 @@ function Kpi({ label, value }: KpiProps) {
   return (
     <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 6,
                   background: 'var(--surface)' }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
         {label}
       </div>
       <div style={{ fontSize: 16, fontWeight: 600, marginTop: 4 }}>{value}</div>

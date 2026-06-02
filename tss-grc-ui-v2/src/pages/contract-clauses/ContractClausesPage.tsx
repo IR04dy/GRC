@@ -199,7 +199,7 @@ export function ContractClausesPage() {
                                   </p>
                                 )}
                                 {r.owner && (
-                                  <p style={{ marginTop: 6, color: 'var(--muted-foreground)' }}>
+                                  <p style={{ marginTop: 6, color: 'var(--ink-3)' }}>
                                     <strong>{t('cclOwner')}:</strong> {r.owner}
                                     {r.tags && <>{' · '}<span className="mono">{r.tags}</span></>}
                                   </p>

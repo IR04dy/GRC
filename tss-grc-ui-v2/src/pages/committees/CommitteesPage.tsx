@@ -427,7 +427,7 @@ export function CommitteesPage() {
                                         {agenda.map(a => (
                                           <li key={a.seq}>
                                             {lang === 'ar' && a.topicAr ? a.topicAr : a.topicEn}
-                                            {a.presenter && <span style={{ color:'var(--muted-foreground)' }}> — {a.presenter}</span>}
+                                            {a.presenter && <span style={{ color:'var(--ink-3)' }}> — {a.presenter}</span>}
                                             {a.minutesAllocated && <span className="mono"> ({a.minutesAllocated}m)</span>}
                                           </li>
                                         ))}
@@ -464,7 +464,7 @@ export function CommitteesPage() {
                                             {lang === 'ar' && d.decisionAr ? d.decisionAr : d.decisionEn}
                                             {d.outcome && <Badge tone={d.outcome === 'APPROVED' ? 'success' : 'danger'}> {d.outcome}</Badge>}
                                             {d.voteFor != null && (
-                                              <span style={{ color:'var(--muted-foreground)' }}>
+                                              <span style={{ color:'var(--ink-3)' }}>
                                                 {' · '}{d.voteFor}/{(d.voteFor ?? 0) + (d.voteAgainst ?? 0) + (d.voteAbstain ?? 0)}
                                               </span>
                                             )}
@@ -480,7 +480,7 @@ export function CommitteesPage() {
                                         {acts.map(a => (
                                           <li key={a.seq}>
                                             {a.actionEn}
-                                            {a.owner && <span style={{ color:'var(--muted-foreground)' }}> — {a.owner}</span>}
+                                            {a.owner && <span style={{ color:'var(--ink-3)' }}> — {a.owner}</span>}
                                             {a.dueDate && <span className="mono"> · due {a.dueDate}</span>}
                                             {a.status && <Badge tone={a.status === 'COMPLETED' ? 'success' : a.status === 'IN_PROGRESS' ? 'primary' : 'info'}> {a.status}</Badge>}
                                           </li>
@@ -566,7 +566,7 @@ export function CommitteesPage() {
                             <td>{committeeNameFor(r.committeeId)}</td>
                             <td><Badge tone={OUTCOME_TONE[r.outcome]}>{r.outcome}</Badge></td>
                             <td className="mono">{r.voteFor} / {r.voteAgainst} / {r.voteAbstain}
-                              {totalVotes > 0 && <span style={{ color:'var(--muted-foreground)' }}> ({totalVotes})</span>}
+                              {totalVotes > 0 && <span style={{ color:'var(--ink-3)' }}> ({totalVotes})</span>}
                             </td>
                             <td className="mono">{r.effectiveFrom ?? '—'}</td>
                             <td className="mono">{r.reviewRequiredBy ?? '—'}</td>
@@ -646,7 +646,7 @@ export function CommitteesPage() {
                             </td>
                             <td className="mono">{a.actionCode}</td>
                             <td>{lang === 'ar' && a.titleAr ? a.titleAr : a.titleEn}</td>
-                            <td>{a.ownerName}{a.ownerRole && <span style={{ color:'var(--muted-foreground)' }}> — {a.ownerRole}</span>}</td>
+                            <td>{a.ownerName}{a.ownerRole && <span style={{ color:'var(--ink-3)' }}> — {a.ownerRole}</span>}</td>
                             <td className="mono">{a.dueDate}</td>
                             <td><Badge tone={ACTION_PRIORITY_TONE[a.priority]}>{a.priority}</Badge></td>
                             <td><Badge tone={ACTION_STATUS_TONE[a.status]}>{a.status.replace('_',' ')}</Badge></td>
@@ -658,10 +658,10 @@ export function CommitteesPage() {
                                   <ExternalLink size={11} />
                                 </Link>
                               ) : a.linkedModule ? (
-                                <span className="mono" style={{ color:'var(--muted-foreground)' }}>
+                                <span className="mono" style={{ color:'var(--ink-3)' }}>
                                   {a.linkedModule}{a.linkedEntityCode ? `:${a.linkedEntityCode}` : ''}
                                 </span>
-                              ) : <span style={{ color:'var(--muted-foreground)' }}>—</span>}
+                              ) : <span style={{ color:'var(--ink-3)' }}>—</span>}
                             </td>
                             <td style={{ textAlign: 'right' }}>
                               {a.status === 'OPEN' && (
@@ -700,7 +700,7 @@ export function CommitteesPage() {
                                       {lang === 'ar' && a.descriptionAr ? a.descriptionAr : a.descriptionEn}
                                     </p>
                                   )}
-                                  <p style={{ color:'var(--muted-foreground)' }}>
+                                  <p style={{ color:'var(--ink-3)' }}>
                                     {committeeNameFor(a.committeeId)}
                                     {' · '} meeting #{a.meetingId}
                                     {a.carriedFromMeetingId && <> {' · '} carried from meeting #{a.carriedFromMeetingId}</>}
@@ -708,7 +708,7 @@ export function CommitteesPage() {
                                   {a.completionNotesEn && (
                                     <p style={{ marginTop: 8, color: 'var(--success)' }}>
                                       <strong>Completion notes:</strong> {a.completionNotesEn}
-                                      {a.completedAt && <span style={{ color:'var(--muted-foreground)' }}> · {new Date(a.completedAt).toLocaleString()}</span>}
+                                      {a.completedAt && <span style={{ color:'var(--ink-3)' }}> · {new Date(a.completedAt).toLocaleString()}</span>}
                                     </p>
                                   )}
                                 </div>

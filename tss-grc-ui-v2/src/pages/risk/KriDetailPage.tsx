@@ -120,7 +120,7 @@ export function KriDetailPage() {
     {
       header: lang === 'ar' ? 'الإقرار' : 'Acknowledged', width: '180px',
       cell: b => b.acknowledgedAt
-        ? <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        ? <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
             {new Date(b.acknowledgedAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB')}
           </span>
         : (b.closedAt
@@ -148,7 +148,7 @@ export function KriDetailPage() {
       sub={def ? def.kriCode : ''}
     >
       <Link to="/risk/kri/dashboard"
-            style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-block', marginBottom: 4 }}>
+            style={{ fontSize: 12, color: 'var(--ink-3)', display: 'inline-block', marginBottom: 4 }}>
         <ChevronLeft size={12} style={{ verticalAlign: '-1px' }} />
         {lang === 'ar' ? 'العودة إلى لوحة المؤشّرات' : 'Back to KRI dashboard'}
       </Link>
@@ -203,7 +203,7 @@ export function KriDetailPage() {
               tone="neutral" />
           </div>
           {(def.descriptionEn || def.descriptionAr) && (
-            <p style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+            <p style={{ marginTop: 12, fontSize: 13, color: 'var(--ink-3)' }}>
               {lang === 'ar' ? def.descriptionAr : def.descriptionEn}
             </p>
           )}
@@ -233,14 +233,14 @@ export function KriDetailPage() {
             {lang === 'ar' ? 'تسجيل قياس يدوي' : 'Record a manual measurement'}
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>
               {lang === 'ar' ? 'القيمة' : 'Value'}
               <input type="number" value={recordValue}
                      onChange={e => setRecordValue(e.target.value)}
                      style={{ display: 'block', width: '100%', padding: '6px 8px',
                               border: '1px solid var(--border)', borderRadius: 4, marginTop: 4 }} />
             </label>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            <label style={{ fontSize: 12, color: 'var(--ink-3)' }}>
               {lang === 'ar' ? 'ملاحظات (اختياري)' : 'Notes (optional)'}
               <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
                      style={{ display: 'block', width: '100%', padding: '6px 8px',
@@ -324,7 +324,7 @@ function Sparkline({ points, def, lang }: SparklineProps) {
               stroke="#ef4444" strokeOpacity={0.5} strokeDasharray="4 4" />
       )}
       {/* trend line */}
-      <path d={path} fill="none" stroke="var(--text)" strokeOpacity={0.6} strokeWidth={1.5} />
+      <path d={path} fill="none" stroke="var(--ink-1)" strokeOpacity={0.6} strokeWidth={1.5} />
       {/* points coloured by status */}
       {points.map((p, i) => (
         <circle key={i} cx={xFor(i)} cy={yFor(Number(p.value))} r={3}
@@ -344,11 +344,11 @@ interface ThresholdTileProps {
 function ThresholdTile({ label, value, tone }: ThresholdTileProps) {
   const colour = {
     success: '#22c55e', warning: '#f59e0b', danger: '#ef4444',
-    info: 'var(--primary)', neutral: 'var(--text-muted)',
+    info: 'var(--primary)', neutral: 'var(--ink-3)',
   }[tone];
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 600, color: colour, fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </div>

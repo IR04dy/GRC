@@ -175,7 +175,7 @@ export function ResilienceTestsPage() {
                           <td><span style={{fontSize:11}}>{r.testType.replace(/_/g, ' ')}</span></td>
                           <td><span style={{fontSize:11}}>{r.scenarioScope.replace(/_/g, ' ')}</span></td>
                           <td className="mono" style={{fontSize:11}}>{r.scheduledFor ? r.scheduledFor.slice(0,10) : '—'}</td>
-                          <td>{r.outcome ? <Badge tone={SRT_OUTCOME_TONE[r.outcome]}>{r.outcome.replace(/_/g, ' ')}</Badge> : <span style={{color:'var(--muted-foreground)'}}>—</span>}</td>
+                          <td>{r.outcome ? <Badge tone={SRT_OUTCOME_TONE[r.outcome]}>{r.outcome.replace(/_/g, ' ')}</Badge> : <span style={{color:'var(--ink-3)'}}>—</span>}</td>
                           <td><Badge tone={SRT_STATUS_TONE[r.status]}>{r.status.replace('_',' ')}</Badge></td>
                           <td style={{textAlign:'right'}}>
                             {r.status === 'SCHEDULED' && (

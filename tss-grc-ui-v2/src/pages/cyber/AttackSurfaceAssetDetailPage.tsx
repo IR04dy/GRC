@@ -245,7 +245,7 @@ export function AttackSurfaceAssetDetailPage() {
           <KvRow k={lang === 'ar' ? 'الوسوم' : 'Tags'} v={asset.tags} />
         </div>
         {asset.descriptionEn && (
-          <p style={{ marginTop: 16, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          <p style={{ marginTop: 16, color: 'var(--ink-3)', lineHeight: 1.6 }}>
             {lang === 'ar' && asset.descriptionAr ? asset.descriptionAr : asset.descriptionEn}
           </p>
         )}
@@ -265,12 +265,12 @@ export function AttackSurfaceAssetDetailPage() {
 
       {/* Risk-score breakdown */}
       <Card padded title={lang === 'ar' ? 'تفسير درجة الخطورة' : 'Risk score breakdown'}>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6 }}>
+        <p style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>
           {lang === 'ar'
             ? 'الصيغة: درجة الخطورة = وزن أعلى نتيجة مفتوحة × معامل التعرّض × معامل الأهمية. عند عدم وجود نتائج مفتوحة تُحسب على أساس خطورة "منخفضة" افتراضياً (15).'
             : 'Formula: risk_score = highest-open-finding-severity × exposure × criticality. Defaults to LOW (15) when no open findings.'}
         </p>
-        <ul style={{ marginTop: 12, color: 'var(--text)', fontSize: 13, lineHeight: 1.8 }}>
+        <ul style={{ marginTop: 12, color: 'var(--ink-1)', fontSize: 13, lineHeight: 1.8 }}>
           <li>
             <strong>{lang === 'ar' ? 'التعرّض' : 'Exposure'}: </strong>
             {ASM_EXPOSURE_LABEL[asset.exposure][lang === 'ar' ? 'ar' : 'en']}
@@ -343,7 +343,7 @@ function KpiBox({ label, value }: KpiBoxProps) {
       borderRadius: 6,
       background: 'var(--surface-2, var(--surface))',
     }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
         {label}
       </div>
       <div style={{ fontSize: 16 }}>{value}</div>
@@ -355,10 +355,10 @@ interface KvRowProps { k: string; v?: string | null; }
 function KvRow({ k, v }: KvRowProps) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
         {k}
       </div>
-      <div style={{ fontSize: 14, color: 'var(--text)' }}>{v && v.length > 0 ? v : '—'}</div>
+      <div style={{ fontSize: 14, color: 'var(--ink-1)' }}>{v && v.length > 0 ? v : '—'}</div>
     </div>
   );
 }
@@ -369,7 +369,7 @@ function btnStyle(accent?: string): React.CSSProperties {
     border: `1px solid ${accent ?? 'var(--border)'}`,
     borderRadius: 4,
     background: 'var(--surface)',
-    color: accent ?? 'var(--text)',
+    color: accent ?? 'var(--ink-1)',
     cursor: 'pointer',
     fontSize: 13,
     display: 'inline-flex',

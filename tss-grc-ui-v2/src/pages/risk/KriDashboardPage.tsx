@@ -84,7 +84,7 @@ export function KriDashboardPage() {
           <div style={{ display: 'flex', gap: 8 }}>
             <Link to="/risk/kri/admin"
                   style={{ padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6,
-                           textDecoration: 'none', color: 'var(--text)', fontSize: 13 }}>
+                           textDecoration: 'none', color: 'var(--ink-1)', fontSize: 13 }}>
               <ClipboardList size={14} style={{ verticalAlign: '-2px', marginInlineEnd: 6 }} />
               {lang === 'ar' ? 'إدارة المؤشّرات' : 'Manage KRIs'}
             </Link>
@@ -139,7 +139,7 @@ export function KriDashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {groups.map(g => (
             <div key={g.cat}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--ink-3)' }}>
                 {KRI_CATEGORY_LABEL[g.cat][lang === 'ar' ? 'ar' : 'en']}
                 <span style={{ marginInlineStart: 8 }}>· {g.items.length}</span>
               </div>
@@ -148,7 +148,7 @@ export function KriDashboardPage() {
                             gap: 8 }}>
                 {g.items.map(cell => (
                   <Link key={cell.externalId} to={`/risk/kri/${cell.externalId}`}
-                        style={{ textDecoration: 'none', color: 'var(--text)',
+                        style={{ textDecoration: 'none', color: 'var(--ink-1)',
                                  border: '1px solid var(--border)', borderRadius: 6,
                                  padding: 10, display: 'flex', flexDirection: 'column', gap: 4,
                                  background: cell.status === 'RED' ? 'rgba(239,68,68,0.06)'
@@ -156,7 +156,7 @@ export function KriDashboardPage() {
                                           : cell.status === 'GREEN' ? 'rgba(34,197,94,0.04)'
                                           : 'transparent' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <code style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cell.kriCode}</code>
+                      <code style={{ fontSize: 11, color: 'var(--ink-3)' }}>{cell.kriCode}</code>
                       <Badge tone={KRI_STATUS_TONE[cell.status]} dot>
                         {KRI_STATUS_LABEL[cell.status][lang === 'ar' ? 'ar' : 'en']}
                       </Badge>
@@ -165,7 +165,7 @@ export function KriDashboardPage() {
                       {lang === 'ar' ? cell.titleAr : cell.titleEn}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between',
-                                  fontSize: 12, color: 'var(--text-muted)' }}>
+                                  fontSize: 12, color: 'var(--ink-3)' }}>
                       <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {formatKriValue(cell.latestValue, cell.measurementUnit)}
                       </span>
@@ -205,19 +205,19 @@ export function KriDashboardPage() {
                         onClick={(e) => e.preventDefault()}
                         style={{ display: 'flex', justifyContent: 'space-between',
                                  padding: '6px 8px', border: '1px solid var(--border)',
-                                 borderRadius: 4, textDecoration: 'none', color: 'var(--text)' }}>
+                                 borderRadius: 4, textDecoration: 'none', color: 'var(--ink-1)' }}>
                     <span>
                       <Badge tone={b.breachLevel === 'RED' ? 'danger' : 'warning'} dot>
                         {b.breachLevel}
                       </Badge>
-                      <code style={{ fontSize: 12, color: 'var(--text-muted)', marginInlineStart: 8 }}>
+                      <code style={{ fontSize: 12, color: 'var(--ink-3)', marginInlineStart: 8 }}>
                         {b.kriCode}
                       </code>
                       <span style={{ marginInlineStart: 8 }}>
                         {lang === 'ar' ? b.titleAr : b.titleEn}
                       </span>
                     </span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                       {lang === 'ar' ? 'منذ' : 'opened'} {new Date(b.openedAt).toLocaleDateString(
                         lang === 'ar' ? 'ar-SA' : 'en-GB')}
                     </span>

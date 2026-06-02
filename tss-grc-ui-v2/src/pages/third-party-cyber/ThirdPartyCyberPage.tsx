@@ -156,7 +156,7 @@ export function ThirdPartyCyberPage() {
                         <tr>
                           <td><button onClick={() => toggle(r.id)} style={{background:'none',border:0,cursor:'pointer'}}>{open ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}</button></td>
                           <td className="mono">{r.assessmentCode ?? '—'}</td>
-                          <td>{r.vendorName}<br/><span className="mono" style={{fontSize:10, color:'var(--muted-foreground)'}}>{r.vendorCountry ?? '—'}</span></td>
+                          <td>{r.vendorName}<br/><span className="mono" style={{fontSize:10, color:'var(--ink-3)'}}>{r.vendorCountry ?? '—'}</span></td>
                           <td><Badge tone={TPC_INHERENT_TONE[r.inherentCyberRisk]}>{r.inherentCyberRisk}</Badge></td>
                           <td><Badge tone={TPC_RESIDUAL_TONE[r.residualRiskTier]}>{r.residualRiskTier}</Badge></td>
                           <td style={{textAlign:'right'}} className="mono">{r.riskScore ?? '—'}</td>
@@ -191,7 +191,7 @@ export function ThirdPartyCyberPage() {
                                     <>
                                       <strong style={{color:'var(--danger)'}}>{t('tpcBreachHistory')}:</strong>{' '}
                                       {r.lastKnownBreachDate ?? '—'}<br/>
-                                      <span style={{fontSize:11, color:'var(--muted-foreground)'}}>{r.lastKnownBreachSummary}</span>
+                                      <span style={{fontSize:11, color:'var(--ink-3)'}}>{r.lastKnownBreachSummary}</span>
                                     </>
                                   )}
                                   {r.nextReviewDue && <><strong>{t('tpcNextReview')}:</strong> {r.nextReviewDue}<br/></>}

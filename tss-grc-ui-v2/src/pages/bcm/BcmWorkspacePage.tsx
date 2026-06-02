@@ -204,7 +204,7 @@ function ReadinessTile({ readiness, isAr }: { readiness: TenantScore; isAr: bool
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{ fontSize: 48, fontWeight: 700, color: colour, lineHeight: 1 }}>
             {readiness.averageScore.toFixed(1)}
-            <span style={{ fontSize: 18, color: 'var(--text-muted)', fontWeight: 400 }}> / 100</span>
+            <span style={{ fontSize: 18, color: 'var(--ink-3)', fontWeight: 400 }}> / 100</span>
           </div>
           <div className="text-muted" style={{ fontSize: 11 }}>
             {isAr

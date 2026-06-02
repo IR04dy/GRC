@@ -171,10 +171,10 @@ export function DataSharingPage() {
                           <td><button onClick={() => toggle(r.id)} style={{background:'none',border:0,cursor:'pointer'}}>{open ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}</button></td>
                           <td className="mono">{r.agreementCode ?? '—'}</td>
                           <td>{lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}</td>
-                          <td>{r.recipientName}<br/><span className="mono" style={{fontSize:10, color:'var(--muted-foreground)'}}>{r.recipientCountry ?? '—'}</span></td>
+                          <td>{r.recipientName}<br/><span className="mono" style={{fontSize:10, color:'var(--ink-3)'}}>{r.recipientCountry ?? '—'}</span></td>
                           <td><span style={{fontSize:11}}>{r.recipientType.replace(/_/g, ' ')}</span></td>
                           <td><span style={{fontSize:11}}>{r.lawfulBasis.replace(/_/g, ' ')}</span></td>
-                          <td>{r.crossBorderMechanism !== 'NONE' ? <Badge tone="warning">{r.crossBorderMechanism}</Badge> : <span style={{color:'var(--muted-foreground)'}}>—</span>}</td>
+                          <td>{r.crossBorderMechanism !== 'NONE' ? <Badge tone="warning">{r.crossBorderMechanism}</Badge> : <span style={{color:'var(--ink-3)'}}>—</span>}</td>
                           <td><Badge tone={DSA_STATUS_TONE[r.status]}>{r.status.replace('_',' ')}</Badge></td>
                           <td style={{textAlign:'right'}}>
                             <Button size="sm" variant="ghost" Icon={FolderOpen} title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'} onClick={() => setDocsTarget(r)} />{' '}

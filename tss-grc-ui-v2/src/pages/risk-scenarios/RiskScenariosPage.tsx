@@ -207,7 +207,7 @@ export function RiskScenariosPage() {
             <Kpi Icon={BarChart3} label={t('scnTypeStress')}     value={stats.stress} tone="warning" />
             <Kpi Icon={BarChart3} label={t('scnTypeWhatIf')}     value={stats.whatIf} tone="info" />
           </div>
-          <div style={{ marginTop: 12, fontSize: 13, color: 'var(--muted-foreground)' }}>
+          <div style={{ marginTop: 12, fontSize: 13, color: 'var(--ink-3)' }}>
             {t('scnStatsExpectedHint')}{' '}
             <span className="mono" style={{ fontWeight: 700 }}>{fmtSar(stats.avgExpected || undefined)}</span>
             {' · '}
@@ -257,7 +257,7 @@ export function RiskScenariosPage() {
                             <td>
                               {r.riskCode
                                 ? <span className="mono">{r.riskCode}</span>
-                                : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}
+                                : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                             </td>
                             <td>{t(SCENARIO_TYPE_LABEL_KEY[r.scenarioType])}</td>
                             <td>
@@ -330,7 +330,7 @@ export function RiskScenariosPage() {
                                     </div>
                                   )}
                                   {r.status === 'ARCHIVED' && r.archiveReason && (
-                                    <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted-foreground)' }}>
+                                    <div style={{ marginTop: 8, fontSize: 13, color: 'var(--ink-3)' }}>
                                       <strong>{t('scnArchiveReason')}:</strong> {r.archiveReason}
                                     </div>
                                   )}

@@ -375,7 +375,7 @@ interface FilterSelectProps {
 function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-      <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      <label style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
         {label}
       </label>
       <select
@@ -386,7 +386,7 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
           border: '1px solid var(--border)',
           borderRadius: 4,
           background: 'var(--surface)',
-          color: 'var(--text)',
+          color: 'var(--ink-1)',
           fontSize: 13,
         }}
       >

@@ -327,7 +327,7 @@ export function RrpCycleDetailPage() {
     <Shell title={cycle.reference}>
       <div style={{ marginBottom: 8 }}>
         <Link to="/rrp/cycles"
-          style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+          style={{ fontSize: 13, color: 'var(--ink-3)' }}>
           ← {lang === 'ar' ? 'العودة للدورات' : 'Back to cycles'}
         </Link>
       </div>
@@ -413,7 +413,7 @@ export function RrpCycleDetailPage() {
               padding: '8px 16px', border: 'none', background: 'none',
               fontSize: 13, fontWeight: 500, cursor: 'pointer',
               borderBottom: tab === t ? '2px solid var(--primary)' : '2px solid transparent',
-              color: tab === t ? 'var(--primary)' : 'var(--ink)',
+              color: tab === t ? 'var(--primary)' : 'var(--ink-1)',
             }}>
             {t === 'options' && (lang === 'ar' ? 'الخيارات' : 'Options')}
             {t === 'critical' && (lang === 'ar' ? 'الوظائف الحيوية' : 'Critical Fns')}
@@ -495,7 +495,7 @@ export function RrpCycleDetailPage() {
                   borderBottom: '1px solid var(--border)',
                   fontSize: 13,
                 }}>
-                  <div style={{ color: 'var(--ink-muted)' }}>
+                  <div style={{ color: 'var(--ink-3)' }}>
                     {new Date(e.occurredAt).toLocaleString(
                       lang === 'ar' ? 'ar-SA' : 'en-GB')}
                   </div>

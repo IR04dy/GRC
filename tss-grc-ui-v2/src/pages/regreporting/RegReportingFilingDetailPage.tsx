@@ -174,7 +174,7 @@ export function RegReportingFilingDetailPage() {
     <Shell title={filing.reference}>
       <div style={{ marginBottom: 8 }}>
         <Link to="/regreporting/filings"
-          style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+          style={{ fontSize: 13, color: 'var(--ink-3)' }}>
           ← {lang === 'ar' ? 'العودة لسجل التقديمات' : 'Back to filings'}
         </Link>
       </div>
@@ -351,7 +351,7 @@ export function RegReportingFilingDetailPage() {
                   borderBottom: '1px solid var(--border)',
                   fontSize: 13,
                 }}>
-                  <div style={{ color: 'var(--ink-muted)' }}>
+                  <div style={{ color: 'var(--ink-3)' }}>
                     {new Date(e.occurredAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB')}
                   </div>
                   <div>

@@ -264,7 +264,7 @@ export function ObTppsPage() {
                 {lang === 'ar' ? 'إلغاء' : 'Cancel'}
               </Button>
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {lang === 'ar'
                 ? 'سيُسجّل المزوّد بالحالة "قيد التحقّق". الاعتماد إلى ACTIVE يتمّ من صفحة التفاصيل بعد إنهاء KYB.'
                 : 'TPP enters in PENDING_KYB. Move to ACTIVE from the detail page once KYB is signed off.'}

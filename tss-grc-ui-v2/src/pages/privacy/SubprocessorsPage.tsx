@@ -111,7 +111,7 @@ export function SubprocessorsPage() {
         <Badge tone={SAFEGUARD_TONE[r.crossBorderSafeguardType]}>
           {SAFEGUARD_LABEL[r.crossBorderSafeguardType][lang === 'ar' ? 'ar' : 'en']}
         </Badge>
-      ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>,
+      ) : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>,
     },
     {
       header: lang === 'ar' ? 'الإذن' : 'Authorisation', width: '130px', align: 'center',
@@ -141,7 +141,7 @@ export function SubprocessorsPage() {
       header: lang === 'ar' ? 'المراجعة القادمة' : 'Next review', width: '150px', align: 'center',
       cell: r => {
         const d = daysUntilReview(r.nextReviewDueAt);
-        if (d === null) return <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>;
+        if (d === null) return <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>;
         if (d < 0) return <Badge tone="danger">{lang === 'ar' ? `متأخر ${-d} يوماً` : `${-d}d overdue`}</Badge>;
         if (d < 30) return <Badge tone="warning">{lang === 'ar' ? `بعد ${d} يوماً` : `in ${d}d`}</Badge>;
         return <span style={{ fontSize: 12 }}>{lang === 'ar' ? `بعد ${d} يوماً` : `in ${d}d`}</span>;
@@ -251,7 +251,7 @@ interface FilterSelectProps {
 function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160 }}>
-      <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      <label style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
         {label}
       </label>
       <select
@@ -261,7 +261,7 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
           border: '1px solid var(--border)',
           borderRadius: 4,
           background: 'var(--surface)',
-          color: 'var(--text)',
+          color: 'var(--ink-1)',
           fontSize: 13,
         }}
       >

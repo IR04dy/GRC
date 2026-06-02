@@ -144,7 +144,7 @@ export function EvidenceChainPage() {
                           <td style={{ textAlign: 'right' }} className="mono">
                             {r.chainFirstBreakVersion != null
                               ? `v${r.chainFirstBreakVersion}`
-                              : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}
+                              : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                           </td>
                           <td className="mono" style={{ fontSize: 12 }}>
                             {r.chainLastVerifiedAt ? new Date(r.chainLastVerifiedAt).toLocaleString() : '—'}
@@ -163,7 +163,7 @@ export function EvidenceChainPage() {
                             <td colSpan={8} style={{ background: 'var(--muted)' }}>
                               <div style={{ padding: 12, fontSize: 13 }}>
                                 {!rep ? (
-                                  <span style={{ color: 'var(--muted-foreground)' }}>{t('loading')}</span>
+                                  <span style={{ color: 'var(--ink-3)' }}>{t('loading')}</span>
                                 ) : (
                                   <>
                                     <div style={{ marginBottom: 8 }}>

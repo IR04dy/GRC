@@ -306,7 +306,7 @@ export function MtpdInheritancePage() {
             }
           >
             {loadingAssess && assessments.length === 0 && (
-              <p style={{ color: 'var(--text-muted)' }}>
+              <p style={{ color: 'var(--ink-3)' }}>
                 {isAr ? 'جارٍ التحميل…' : 'Loading…'}
               </p>
             )}
@@ -383,7 +383,7 @@ export function MtpdInheritancePage() {
           }
         >
           {loadingDeps && dependencies.length === 0 && (
-            <p style={{ color: 'var(--text-muted)' }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>
+            <p style={{ color: 'var(--ink-3)' }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>
           )}
           {!loadingDeps && dependencies.length === 0 && (
             <InlineEmpty

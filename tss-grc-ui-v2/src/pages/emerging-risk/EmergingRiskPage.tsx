@@ -283,7 +283,7 @@ export function EmergingRiskPage() {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                   <div>
                                     <strong>{t('emrSource')}:</strong> {r.source}
-                                    {r.sourceCitation && <span style={{ color:'var(--muted-foreground)' }}> — {r.sourceCitation}</span>}
+                                    {r.sourceCitation && <span style={{ color:'var(--ink-3)' }}> — {r.sourceCitation}</span>}
                                     <br />
                                     <strong>{t('emrVelocity')}:</strong> {r.velocity}
                                     {' · '}
@@ -312,7 +312,7 @@ export function EmergingRiskPage() {
                                   </p>
                                 )}
                                 {r.lastReviewNotes && (
-                                  <p style={{ marginTop: 6, color: 'var(--muted-foreground)' }}>
+                                  <p style={{ marginTop: 6, color: 'var(--ink-3)' }}>
                                     <strong>{t('emrLastReviewNotes')}:</strong> {r.lastReviewNotes}
                                   </p>
                                 )}

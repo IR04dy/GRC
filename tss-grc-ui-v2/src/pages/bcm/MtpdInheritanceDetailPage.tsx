@@ -284,7 +284,7 @@ export function MtpdInheritanceDetailPage() {
         Icon={AlertOctagon}
       >
         {loading && findings.length === 0 && (
-          <p style={{ color: 'var(--text-muted)' }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>
+          <p style={{ color: 'var(--ink-3)' }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>
         )}
         {!loading && findings.length === 0 && (
           <InlineEmpty
@@ -343,7 +343,7 @@ export function MtpdInheritanceDetailPage() {
                     <td>
                       {f.capaExternalId
                         ? <Badge tone="info">{f.capaExternalId}</Badge>
-                        : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        : <span style={{ color: 'var(--ink-3)' }}>—</span>}
                     </td>
                   </tr>
                 ))}

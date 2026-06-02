@@ -182,7 +182,7 @@ export function ControlLibraryPage() {
                     padding: '4px 8px', fontSize: 12,
                     border: '1px solid var(--border)', borderRadius: 6,
                     background: 'var(--surface)', cursor: 'pointer',
-                    color: 'var(--text)', display: 'inline-flex',
+                    color: 'var(--ink-1)', display: 'inline-flex',
                     alignItems: 'center', gap: 4,
                   }}>
                   <GitBranch size={12} />

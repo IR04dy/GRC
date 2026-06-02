@@ -230,7 +230,7 @@ export function ObTppDetailPage() {
                 </Button>
               ))}
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {lang === 'ar'
                 ? 'انتقال إلى موقوف أو مُلغى يُلغي تلقائياً كل الموافقات النشطة المرتبطة.'
                 : 'Moving to SUSPENDED or REVOKED auto-revokes every active consent tied to this TPP.'}
@@ -321,7 +321,7 @@ export function ObTppDetailPage() {
                     background: 'var(--card-bg)',
                     borderRadius: 4,
                   }}>
-                    <span style={{ fontSize: 11, color: 'var(--ink-muted)', minWidth: 130 }}>
+                    <span style={{ fontSize: 11, color: 'var(--ink-3)', minWidth: 130 }}>
                       {e.occurredAt}
                     </span>
                     <span style={{ fontSize: 12 }}>
@@ -373,7 +373,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{label}</span>
+      <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 500 }}>{value}</span>
     </div>
   );

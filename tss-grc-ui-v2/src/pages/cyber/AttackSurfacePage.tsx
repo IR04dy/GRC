@@ -444,7 +444,7 @@ function TabButton({ active, onClick, children }: TabButtonProps) {
         border: 'none',
         borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent',
         background: 'transparent',
-        color: active ? 'var(--primary)' : 'var(--text-muted)',
+        color: active ? 'var(--primary)' : 'var(--ink-3)',
         fontWeight: active ? 600 : 400,
         cursor: 'pointer',
         fontSize: 14,
@@ -462,7 +462,7 @@ interface FilterSelectProps {
 function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-      <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      <label style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
         {label}
       </label>
       <select
@@ -472,7 +472,7 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
           border: '1px solid var(--border)',
           borderRadius: 4,
           background: 'var(--surface)',
-          color: 'var(--text)',
+          color: 'var(--ink-1)',
           fontSize: 13,
         }}
       >

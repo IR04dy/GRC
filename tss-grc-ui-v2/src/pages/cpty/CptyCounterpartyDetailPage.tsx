@@ -297,7 +297,7 @@ export function CptyCounterpartyDetailPage() {
     <Shell title={cpty.reference}>
       <div style={{ marginBottom: 8 }}>
         <Link to="/cpty/counterparties"
-          style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+          style={{ fontSize: 13, color: 'var(--ink-3)' }}>
           ← {lang === 'ar' ? 'العودة للأطراف' : 'Back to counterparties'}
         </Link>
       </div>
@@ -365,7 +365,7 @@ export function CptyCounterpartyDetailPage() {
               padding: '8px 16px', border: 'none', background: 'none',
               fontSize: 13, fontWeight: 500, cursor: 'pointer',
               borderBottom: tab === t ? '2px solid var(--primary)' : '2px solid transparent',
-              color: tab === t ? 'var(--primary)' : 'var(--ink)',
+              color: tab === t ? 'var(--primary)' : 'var(--ink-1)',
             }}>
             {t === 'ratings' && (lang === 'ar' ? 'التصنيفات' : 'Ratings')}
             {t === 'actions' && (lang === 'ar' ? 'الإجراءات' : 'Actions')}
@@ -444,7 +444,7 @@ export function CptyCounterpartyDetailPage() {
                   padding: '8px 0', borderBottom: '1px solid var(--border)',
                   fontSize: 13,
                 }}>
-                  <div style={{ color: 'var(--ink-muted)' }}>
+                  <div style={{ color: 'var(--ink-3)' }}>
                     {new Date(e.occurredAt).toLocaleString(
                       lang === 'ar' ? 'ar-SA' : 'en-GB')}
                   </div>

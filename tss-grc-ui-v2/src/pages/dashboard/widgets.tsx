@@ -561,7 +561,7 @@ function TprmSnapshotWidget({ t }: { t: (k: string) => string }) {
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: 'var(--muted-foreground)', marginBottom: 10 }}>{t('dashTprmSnapshotSub')}</p>
+      <p style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>{t('dashTprmSnapshotSub')}</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
         <Tile to="/fourth-party"          Icon={Network}        label={t('tpoLinkFp')}    value={c.fp}   sub={c.fpHigh    ? `${c.fpHigh} HIGH conc.`     : undefined} subTone="danger" />
         <Tile to="/third-party-cyber"     Icon={Bug}            label={t('tpoLinkTpc')}   value={c.tpc}  sub={c.tpcHigh   ? `${c.tpcHigh} HIGH residual` : undefined} subTone="danger" />

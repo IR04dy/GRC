@@ -152,7 +152,7 @@ export function KriAdminPage() {
       sub={lang === 'ar' ? 'سجل التعريفات' : 'Definitions register'}
     >
       <Link to="/risk/kri/dashboard"
-            style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-block', marginBottom: 4 }}>
+            style={{ fontSize: 12, color: 'var(--ink-3)', display: 'inline-block', marginBottom: 4 }}>
         <ChevronLeft size={12} style={{ verticalAlign: '-1px' }} />
         {lang === 'ar' ? 'العودة إلى لوحة المؤشّرات' : 'Back to KRI dashboard'}
       </Link>
@@ -269,7 +269,7 @@ export function KriAdminPage() {
       <Card padded>
         <h3 style={{ marginTop: 0 }}>
           {lang === 'ar' ? 'كل المؤشّرات' : 'All KRIs'}
-          <span style={{ marginInlineStart: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+          <span style={{ marginInlineStart: 8, fontSize: 12, color: 'var(--ink-3)' }}>
             · {defs.length}
           </span>
         </h3>
@@ -298,7 +298,7 @@ interface FormFieldProps {
 }
 function FormField({ label, required, children }: FormFieldProps) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-3)' }}>
       <span>{label}{required ? ' *' : ''}</span>
       <div style={{ ['--input-padding' as string]: '6px 8px' }} className="kri-form-field">
         {children}
@@ -310,7 +310,7 @@ function FormField({ label, required, children }: FormFieldProps) {
           border: 1px solid var(--border);
           border-radius: 4px;
           background: var(--bg);
-          color: var(--text);
+          color: var(--ink-1);
           font-size: 13px;
         }
       `}</style>

@@ -242,7 +242,7 @@ export function RiskControlFindingPivotPage() {
                           <button onClick={() => switchLens('CONTROL', c.id)}
                                   style={linkBtnStyle}>
                             <strong>{c.code}</strong>
-                            <span style={{ color: 'var(--text-muted)', marginInlineStart: 8 }}>
+                            <span style={{ color: 'var(--ink-3)', marginInlineStart: 8 }}>
                               {(lang === 'ar' && c.titleAr) || c.titleEn}
                             </span>
                           </button>
@@ -286,7 +286,7 @@ export function RiskControlFindingPivotPage() {
                         <button onClick={() => switchLens('FINDING', f.id)}
                                 style={linkBtnStyle}>
                           <strong>{f.refNumber}</strong>
-                          <span style={{ color: 'var(--text-muted)', marginInlineStart: 8 }}>
+                          <span style={{ color: 'var(--ink-3)', marginInlineStart: 8 }}>
                             {(lang === 'ar' && f.titleAr) || f.titleEn}
                           </span>
                         </button>
@@ -329,7 +329,7 @@ export function RiskControlFindingPivotPage() {
                         <li key={`${c.sourceModule}-${c.id}`} style={rowStyle}>
                           <div>
                             <strong>{c.externalId}</strong>
-                            <span style={{ color: 'var(--text-muted)', marginInlineStart: 8 }}>
+                            <span style={{ color: 'var(--ink-3)', marginInlineStart: 8 }}>
                               {(lang === 'ar' && c.titleAr) || c.titleEn}
                             </span>
                           </div>
@@ -396,7 +396,7 @@ export function RiskControlFindingPivotPage() {
                   <ChecklistRow ok={!checklist.hasOverdueCapa}
                     label={t('No overdue CAPA', 'لا توجد إجراءات متأخرة')}
                     inverted={checklist.hasOverdueCapa} />
-                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--ink-3)' }}>
                     {t(
                       'These four checks gate the engagement scoping conversation. Any failure becomes a discussion point with the risk owner.',
                       'هذه الفحوصات الأربعة تُؤطّر نقاش تحديد نطاق الارتباط. أيّ فشل يُصبح نقطة نقاش مع مالك المخاطرة.'
@@ -468,7 +468,7 @@ function PillBtn({
         border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
         borderRadius: 999,
         background: active ? 'var(--primary)' : 'var(--surface)',
-        color: active ? 'white' : disabled ? 'var(--text-muted)' : 'var(--text)',
+        color: active ? 'white' : disabled ? 'var(--ink-3)' : 'var(--ink-1)',
         cursor: disabled || active ? 'default' : 'pointer',
         fontSize: 12,
         opacity: disabled ? 0.5 : 1,
@@ -485,7 +485,7 @@ function FocalCard({
     const r = pivot.risk;
     return (
       <Card padded>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
           {t('Focal risk', 'المخاطرة المحورية')} · {r.code}
         </div>
         <div style={{ fontSize: 20, fontWeight: 600, margin: '6px 0' }}>
@@ -516,7 +516,7 @@ function FocalCard({
     const c = pivot.control;
     return (
       <Card padded>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
           {t('Focal control', 'الضابط المحوري')} · {c.code}
         </div>
         <div style={{ fontSize: 20, fontWeight: 600, margin: '6px 0' }}>
@@ -535,7 +535,7 @@ function FocalCard({
     const f = pivot.finding;
     return (
       <Card padded>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
           {t('Focal finding', 'النتيجة المحورية')} · {f.refNumber}
         </div>
         <div style={{ fontSize: 20, fontWeight: 600, margin: '6px 0' }}>
@@ -591,7 +591,7 @@ function PivotMiniGraph({
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>
         {t('Risk → Control → Finding → CAPA flow',
            'تدفّق المخاطرة ← الضابط ← النتيجة ← الإجراء')}
       </div>
@@ -604,7 +604,7 @@ function PivotMiniGraph({
             <g key={node}>
               {idx < 3 && (
                 <line x1={x + 55} y1={45} x2={x + 80} y2={45}
-                      stroke="var(--text-muted)" strokeWidth={1.5}
+                      stroke="var(--ink-3)" strokeWidth={1.5}
                       markerEnd="url(#arrow)" />
               )}
               <circle cx={x + 25} cy={45} r={isFocal ? 24 : 18}
@@ -615,7 +615,7 @@ function PivotMiniGraph({
                     fill="white">
                 {counts[node]}
               </text>
-              <text x={x + 25} y={80} textAnchor="middle" fontSize={11} fill="var(--text)">
+              <text x={x + 25} y={80} textAnchor="middle" fontSize={11} fill="var(--ink-1)">
                 {lang === 'ar' ? labelAr[node] : labelEn[node]}
               </text>
             </g>
@@ -624,7 +624,7 @@ function PivotMiniGraph({
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
                   markerHeight="6" orient="auto">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--text-muted)" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-3)" />
           </marker>
         </defs>
       </svg>
@@ -644,7 +644,7 @@ function SectionTitle({
       <Icon size={16} />
       <span>{title}</span>
       {count != null && (
-        <span style={{ marginInlineStart: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+        <span style={{ marginInlineStart: 6, fontSize: 12, color: 'var(--ink-3)' }}>
           ({count})
         </span>
       )}
@@ -690,7 +690,7 @@ const linkBtnStyle: React.CSSProperties = {
   border: 'none',
   padding: 0,
   textAlign: 'inherit',
-  color: 'var(--text)',
+  color: 'var(--ink-1)',
   cursor: 'pointer',
   fontSize: 13,
   flex: 1,
@@ -702,11 +702,11 @@ const linkBtnStyle: React.CSSProperties = {
 
 const metaStyle: React.CSSProperties = {
   fontSize: 12,
-  color: 'var(--text-muted)',
+  color: 'var(--ink-3)',
 };
 
 const extStyle: React.CSSProperties = {
-  color: 'var(--text-muted)',
+  color: 'var(--ink-3)',
   display: 'inline-flex',
   alignItems: 'center',
 };
@@ -717,7 +717,7 @@ function btnStyle(variant: 'outline' | 'primary'): React.CSSProperties {
     border: `1px solid ${variant === 'primary' ? 'var(--primary)' : 'var(--border)'}`,
     borderRadius: 6,
     background: variant === 'primary' ? 'var(--primary)' : 'var(--surface)',
-    color: variant === 'primary' ? 'white' : 'var(--text)',
+    color: variant === 'primary' ? 'white' : 'var(--ink-1)',
     fontSize: 13,
     cursor: 'pointer',
   };

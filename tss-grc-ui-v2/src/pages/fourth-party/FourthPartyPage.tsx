@@ -227,7 +227,7 @@ export function FourthPartyPage() {
                                 <strong>{t('f4pFlowDown')}:</strong>{' '}{r.flowDownClausesPresent ? '✓' : '✗'}
                               </p>
                               {r.lastValidatedAt && (
-                                <p style={{ marginTop: 6, fontSize: 12, color: 'var(--muted-foreground)' }}>
+                                <p style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-3)' }}>
                                   {t('f4pLastValidated')}: {r.lastValidatedAt.slice(0, 10)} ({r.validatorName ?? '—'})
                                   {r.nextValidationDue ? ` · ${t('f4pNextDue')}: ${r.nextValidationDue}` : ''}
                                 </p>

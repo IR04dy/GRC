@@ -154,9 +154,9 @@ export function ProcessorAssessmentsPage() {
                         <tr>
                           <td><button onClick={() => toggle(r.id)} style={{background:'none',border:0,cursor:'pointer'}}>{open ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}</button></td>
                           <td className="mono">{r.assessmentCode ?? '—'}</td>
-                          <td>{r.processorName}<br/><span className="mono" style={{fontSize:10, color:'var(--muted-foreground)'}}>{r.processorCountry ?? '—'}</span></td>
+                          <td>{r.processorName}<br/><span className="mono" style={{fontSize:10, color:'var(--ink-3)'}}>{r.processorCountry ?? '—'}</span></td>
                           <td><span style={{fontSize:11}}>{r.assessmentType.replace(/_/g, ' ')}</span></td>
-                          <td>{r.overallOutcome ? <Badge tone={PROC_OUTCOME_TONE[r.overallOutcome]}>{r.overallOutcome.replace(/_/g, ' ')}</Badge> : <span style={{color:'var(--muted-foreground)'}}>—</span>}</td>
+                          <td>{r.overallOutcome ? <Badge tone={PROC_OUTCOME_TONE[r.overallOutcome]}>{r.overallOutcome.replace(/_/g, ' ')}</Badge> : <span style={{color:'var(--ink-3)'}}>—</span>}</td>
                           <td style={{textAlign:'right'}} className="mono">{r.riskScore ?? '—'}</td>
                           <td><Badge tone={PROC_STATUS_TONE[r.status]}>{r.status.replace('_',' ')}</Badge></td>
                           <td style={{textAlign:'right'}}>
@@ -183,7 +183,7 @@ export function ProcessorAssessmentsPage() {
                                         <span>{t(c.labelKey)}</span>
                                         {v
                                           ? <Badge tone={PROC_OUTCOME_TONE[v as keyof typeof PROC_OUTCOME_TONE]}>{v.replace(/_/g, ' ')}</Badge>
-                                          : <span style={{color:'var(--muted-foreground)'}}>—</span>}
+                                          : <span style={{color:'var(--ink-3)'}}>—</span>}
                                       </div>
                                     );
                                   })}
@@ -195,7 +195,7 @@ export function ProcessorAssessmentsPage() {
                               {r.recommendationsEn && (
                                 <p style={{marginTop:6}}><strong>{t('procRecommendations')}:</strong> {lang === 'ar' && r.recommendationsAr ? r.recommendationsAr : r.recommendationsEn}</p>
                               )}
-                              <p style={{marginTop:6, fontSize:12, color:'var(--muted-foreground)'}}>
+                              <p style={{marginTop:6, fontSize:12, color:'var(--ink-3)'}}>
                                 {r.assessedAt && <>{t('procAssessed')}: {r.assessedAt.slice(0,10)} ({r.assessorName ?? '—'})</>}
                                 {r.approvedAt && <> · {t('procApprovedOn')}: {r.approvedAt.slice(0,10)} ({r.approverName ?? '—'})</>}
                                 {r.nextAssessmentDue && <> · {t('procNextDue')}: {r.nextAssessmentDue}</>}

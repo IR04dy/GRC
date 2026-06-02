@@ -302,7 +302,7 @@ export function ShariaNcEventsPage() {
                 {lang === 'ar' ? 'إلغاء' : 'Cancel'}
               </Button>
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-muted)' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {lang === 'ar'
                 ? 'يجب تطهير الدخل غير الشرعي خلال 90 يوماً من الرصد وفق نظام الحوكمة الشرعية لساما §6.4 ومعيار أيوفي FAS 1.'
                 : 'SNCI must be purified within 90 days of detection per SAMA §6.4 + AAOIFI FAS 1.'}

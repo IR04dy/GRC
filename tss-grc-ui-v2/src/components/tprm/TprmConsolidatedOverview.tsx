@@ -95,7 +95,7 @@ export function TprmConsolidatedOverview() {
     <>
       <Card title={t('tpoTitle')} Icon={Truck}
         action={<Badge tone="primary">{rows.length}</Badge>}>
-        <p style={{ fontSize: 13, color: 'var(--muted-foreground)', marginBottom: 12 }}>{t('tpoSub')}</p>
+        <p style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 12 }}>{t('tpoSub')}</p>
 
         <div className="kpi-grid" style={{ marginBottom: 16 }}>
           <Kpi Icon={Network}       label={t('tpoKpiFp')}        value={loading ? '…' : fp.length}   tone="primary" />
@@ -130,17 +130,17 @@ export function TprmConsolidatedOverview() {
             </thead>
             <tbody>
               {loading
-                ? <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted-foreground)', padding: 24 }}>{t('loading')}</td></tr>
+                ? <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 24 }}>{t('loading')}</td></tr>
                 : rows.length === 0
-                  ? <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted-foreground)', padding: 24 }}>{t('tpoEmpty')}</td></tr>
+                  ? <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 24 }}>{t('tpoEmpty')}</td></tr>
                   : rows.map(r => (
                     <tr key={r.vendor}>
                       <td><strong>{r.vendor}</strong></td>
-                      <td style={{ textAlign: 'center' }}>{r.fpEdges > 0 ? <Badge tone={r.fpHighConc ? 'danger' : 'info'}>{r.fpEdges}{r.fpHighConc ? ' · HC' : ''}</Badge> : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}</td>
-                      <td style={{ textAlign: 'center' }}>{r.tpcResidual ? <Badge tone={tierTone(r.tpcResidual)}>{r.tpcResidual}</Badge> : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}</td>
-                      <td style={{ textAlign: 'center' }}>{r.procFails ? <Badge tone="danger">FAIL × {r.procFails}</Badge> : r.procPwc ? <Badge tone="warning">PwC × {r.procPwc}</Badge> : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}</td>
-                      <td style={{ textAlign: 'center' }}>{r.srtFail ? <Badge tone="danger">FAIL</Badge> : r.srtNextDue ? <Badge tone="info">{r.srtNextDue.slice(0, 10)}</Badge> : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}</td>
-                      <td style={{ textAlign: 'center' }}>{r.dsaActive ? <Badge tone="success">{r.dsaActive}</Badge> : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}</td>
+                      <td style={{ textAlign: 'center' }}>{r.fpEdges > 0 ? <Badge tone={r.fpHighConc ? 'danger' : 'info'}>{r.fpEdges}{r.fpHighConc ? ' · HC' : ''}</Badge> : <span style={{ color: 'var(--ink-3)' }}>—</span>}</td>
+                      <td style={{ textAlign: 'center' }}>{r.tpcResidual ? <Badge tone={tierTone(r.tpcResidual)}>{r.tpcResidual}</Badge> : <span style={{ color: 'var(--ink-3)' }}>—</span>}</td>
+                      <td style={{ textAlign: 'center' }}>{r.procFails ? <Badge tone="danger">FAIL × {r.procFails}</Badge> : r.procPwc ? <Badge tone="warning">PwC × {r.procPwc}</Badge> : <span style={{ color: 'var(--ink-3)' }}>—</span>}</td>
+                      <td style={{ textAlign: 'center' }}>{r.srtFail ? <Badge tone="danger">FAIL</Badge> : r.srtNextDue ? <Badge tone="info">{r.srtNextDue.slice(0, 10)}</Badge> : <span style={{ color: 'var(--ink-3)' }}>—</span>}</td>
+                      <td style={{ textAlign: 'center' }}>{r.dsaActive ? <Badge tone="success">{r.dsaActive}</Badge> : <span style={{ color: 'var(--ink-3)' }}>—</span>}</td>
                       <td style={{ textAlign: 'right' }} className="mono">{vendorScore(r)}</td>
                     </tr>
                   ))}

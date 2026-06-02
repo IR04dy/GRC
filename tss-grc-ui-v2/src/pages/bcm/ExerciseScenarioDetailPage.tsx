@@ -185,13 +185,13 @@ export function ExerciseScenarioDetailPage() {
               {tlabel(COMPLEXITY_LABELS, s.complexity, isAr)}
             </Badge>
           )}
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
             <Clock size={13} style={{ verticalAlign: 'text-top' }} />
             {' '}
             {fmtDuration(s.recommendedDurationMinutes ?? s.durationMinutes, isAr)}
           </span>
           {s.targetAudience && (
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>
               <Users size={13} style={{ verticalAlign: 'text-top' }} />
               {' '}
               {s.targetAudience}
@@ -204,7 +204,7 @@ export function ExerciseScenarioDetailPage() {
                   fontSize: 11, padding: '2px 8px',
                   background: 'var(--surface-2, #f3f4f6)',
                   borderRadius: 3,
-                  color: 'var(--text-muted)',
+                  color: 'var(--ink-3)',
                 }}>
                   {frameworkLabel(code, isAr)}
                 </span>
@@ -222,7 +222,7 @@ export function ExerciseScenarioDetailPage() {
           Icon={PlayCircle}
         >
           <div className="stack" style={{ gap: 'var(--space-sm)' }}>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+            <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: 0 }}>
               {isAr
                 ? 'سننسخ الأهداف ومعايير النجاح وتسلسل الحقن إلى تمرين جديد قابل للتنفيذ في وحدتك التنظيمية.'
                 : 'We will copy the objectives, success criteria, and inject sequence onto a runnable exercise in your tenant.'}
@@ -439,7 +439,7 @@ function InjectRow({
           width: 28, height: 28,
           borderRadius: '50%',
           background: 'var(--surface-2, #f3f4f6)',
-          color: 'var(--text)',
+          color: 'var(--ink-1)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: '2px solid var(--border)',
           zIndex: 1,
@@ -467,7 +467,7 @@ function InjectRow({
           <Badge tone={injectTypeTone(inj.injectType)}>
             {tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr)}
           </Badge>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
             #{inj.injectOrder}
           </span>
         </div>
@@ -506,7 +506,7 @@ function injectTypeIcon(t: InjectType) {
 
 const lblStyle: React.CSSProperties = {
   display: 'block', fontSize: 12, fontWeight: 600,
-  marginBottom: 4, color: 'var(--text-muted)',
+  marginBottom: 4, color: 'var(--ink-3)',
 };
 
 const prose: React.CSSProperties = {
