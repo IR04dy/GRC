@@ -542,6 +542,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   border-radius: 50%;
   font-weight: 800;
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   box-shadow: var(--shadow-1);
 }
 
@@ -702,6 +703,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   color: var(--ink-2);
   unicode-bidi: isolate;
   direction: ltr;
+  font-variant-numeric: tabular-nums;
 }
 .score-pill {
   font-family: var(--font-mono);
@@ -709,6 +711,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--chip-pad);
   border-radius: var(--chip-radius);
   font-size: var(--chip-font);
+  font-variant-numeric: tabular-nums;
   display: inline-block;
   min-width: 30px;
   text-align: center;
@@ -740,7 +743,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   pointer-events: none;
 }
 .bar3d:hover { transform: translateY(-3px); }
-.bar-val { font: 700 11px var(--font-mono); color: var(--ink-1); }
+.bar-val { font: 700 11px var(--font-mono); color: var(--ink-1); font-variant-numeric: tabular-nums; }
 .bar-lbl { font: 600 11px var(--font-sans); color: var(--ink-3); }
 
 /* ─── Modal ──────────────────────────────────────── */
@@ -1833,6 +1836,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--chip-pad);
   border-radius: var(--chip-radius);
   font: 700 var(--chip-font) var(--font-mono);
+  font-variant-numeric: tabular-nums;
   border: 1px solid;
 }
 .maturity-pip {
