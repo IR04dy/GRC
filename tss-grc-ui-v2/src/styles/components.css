@@ -591,6 +591,36 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
  * view loaded, WebSocket pushed a row). Runs only on React remount,
  * so it's cheap — no per-render cost. */
 .risk-table tbody { animation: fade-in var(--dur-normal) ease-out; }
+
+/* ── Unstyled-table aliases ──────────────────────────────────────────
+ * `.grc-table` (Compliance, NDI, TPRM, Control library, Committees, …)
+ * and `.tbl` (SOC Ops) previously had NO CSS at all and rendered as raw
+ * browser tables (serif, ~16px, no padding/zebra/hover/sticky). They now
+ * inherit the .risk-table craft. `text-align: start` flips for RTL for
+ * free (no [dir=rtl] override needed). */
+.grc-table, .tbl {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-family: var(--font-sans);
+}
+.grc-table th, .tbl th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-2);
+  padding: 11px 14px; text-align: start;
+  font: 700 10px var(--font-sans); color: var(--ink-3);
+  letter-spacing: .06em; text-transform: uppercase;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.grc-table td, .tbl td {
+  padding: 13px 14px; border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--ink-1); vertical-align: middle;
+  text-align: start;
+}
+.grc-table tbody tr:hover td, .tbl tbody tr:hover td { background: var(--surface-3); }
+.grc-table tbody tr:nth-child(even):not(:hover) td,
+.tbl tbody tr:nth-child(even):not(:hover) td {
+  background: color-mix(in srgb, var(--surface-3) 35%, transparent);
+}
+.grc-table tr:last-child td, .tbl tr:last-child td { border-bottom: none; }
 /* .mono — monospace for codes, IDs, timestamps, hex values, file paths.
  * `unicode-bidi: isolate` + `direction: ltr` lock the strong-LTR
  * direction so an Arabic UI doesn't reorder "INC-0042" / "AC-2.1.2" /
