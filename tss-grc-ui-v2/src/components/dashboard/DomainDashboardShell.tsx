@@ -43,6 +43,8 @@ export interface DomainDashboardWidget {
   body: ReactNode;
   /** Optional "see all" link target shown in the card header. */
   href?: string;
+  /** Span the full row (for wide charts / time-series). */
+  wide?: boolean;
 }
 
 export interface DomainDashboardShellProps {
@@ -75,9 +77,9 @@ export function DomainDashboardShell({
         </div>
       )}
 
-      <div className="dash-grid">
+      <div className="widget-grid">
         {widgets.map(w => (
-          <Card key={w.id} title={w.title}
+          <Card key={w.id} title={w.title} className={w.wide ? 'widget-wide' : undefined}
             action={w.badge ? <Badge tone={w.badgeTone ?? 'primary'}>{w.badge}</Badge> : undefined}>
             {w.body}
             {w.href && (

@@ -269,6 +269,12 @@
  * rendered value (12 / 16) is now the one canonical, token-based source. */
 .dash-grid    { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 20px; }
 .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+/* D1 — widget grid for the domain dashboards, which dump 5–11 equal-weight
+ * cards. auto-fit + minmax (instead of the rigid 1.4fr:1fr) flows them into as
+ * many even columns as fit and stretches each row to equal height, killing the
+ * ragged bottoms. A widget can opt into a full-width row with `.widget-wide`. */
+.widget-grid  { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px; align-items: stretch; }
+.widget-grid > .widget-wide { grid-column: 1 / -1; }
 
 @media (max-width: 1100px) {
   .dash-grid { grid-template-columns: 1fr; }
