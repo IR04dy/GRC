@@ -182,6 +182,9 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
       gridTemplateColumns: 'minmax(0, 1fr) auto',
       gap: 24,
       alignItems: 'center',
+      // Stable floor so the hero never collapses to a banner on a short
+      // greeting/caption — the focal posture gauge sets the visual weight.
+      minHeight: 200,
     }}>
       {/* Left: greeting + date */}
       <div style={{ minWidth: 0 }}>
@@ -196,7 +199,9 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
         </div>
         <h1 style={{
           margin: '12px 0 4px',
-          font: '800 28px var(--font-sans)',
+          // 24px (was 28) so the greeting reads as context, not as a rival
+          // headline to the focal posture gauge on the right (review D4).
+          font: '800 24px var(--font-sans)',
           color: 'var(--ink-1)',
           letterSpacing: '-0.02em',
           lineHeight: 1.15,
