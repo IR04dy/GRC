@@ -1990,11 +1990,13 @@ tr:hover .row-actions { opacity: 1; }
 /* Auto-fit KPI tile grids. The "minmax" lets cards reflow on narrow
    screens without media queries. -sm = denser tile (170px); the default
    matches the existing .kpi card width (220px). */
+/* The one .kpi-grid (S3 — shell.css used to duplicate this with a different
+   gap that the cascade overrode). Token-based, on-scale. */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-6);
 }
 .kpi-grid-sm {
   display: grid;
