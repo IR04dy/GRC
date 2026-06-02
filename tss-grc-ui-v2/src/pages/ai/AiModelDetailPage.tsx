@@ -7,6 +7,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { Field } from '../../components/ui/Field';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { DriftChart } from '../../components/viz/DriftChart';
@@ -298,12 +299,12 @@ function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) 
         <p className="aimd-desc">
           {lang === 'ar' && model.descriptionAr ? model.descriptionAr : (model.descriptionEn ?? '—')}
         </p>
-        <Field label={lang === 'ar' ? 'نوع النموذج' : 'Model type'} value={model.modelType} />
-        <Field label={lang === 'ar' ? 'الإصدار' : 'Version'} value={model.versionLabel ?? '—'} />
-        <Field label={lang === 'ar' ? 'إطار العمل' : 'Framework'} value={model.framework ?? '—'} />
-        <Field label={lang === 'ar' ? 'الاستضافة' : 'Hosting'} value={model.hosting ?? '—'} />
-        <Field label={lang === 'ar' ? 'زمن الاستدلال (مللي ثانية)' : 'Inference latency (ms)'} value={model.inferenceLatencyMs?.toString() ?? '—'} />
-        <Field
+        <Field variant="inline" label={lang === 'ar' ? 'نوع النموذج' : 'Model type'} value={model.modelType} />
+        <Field variant="inline" label={lang === 'ar' ? 'الإصدار' : 'Version'} value={model.versionLabel ?? '—'} />
+        <Field variant="inline" label={lang === 'ar' ? 'إطار العمل' : 'Framework'} value={model.framework ?? '—'} />
+        <Field variant="inline" label={lang === 'ar' ? 'الاستضافة' : 'Hosting'} value={model.hosting ?? '—'} />
+        <Field variant="inline" label={lang === 'ar' ? 'زمن الاستدلال (مللي ثانية)' : 'Inference latency (ms)'} value={model.inferenceLatencyMs?.toString() ?? '—'} />
+        <Field variant="inline"
           label={lang === 'ar' ? 'الإشراف البشري' : 'Human oversight'}
           value={model.humanOversight ? ML_OVERSIGHT_LABEL[model.humanOversight][lang === 'ar' ? 'ar' : 'en'] : '—'} />
         {(lang === 'ar' ? model.humanOversightNotesAr : model.humanOversightNotesEn) && (
@@ -358,15 +359,6 @@ function OverviewTab({ model, lang, gateMissing, onTransition }: OverviewProps) 
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="aimd-field-row">
-      <div className="aimd-field-label">{label}</div>
-      <div className="aimd-field-value">{value}</div>
-    </div>
-  );
-}
-
 // ─── Provenance tab ────────────────────────────────────────────────
 
 function ProvenanceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | 'ar' }) {
@@ -380,18 +372,18 @@ function ProvenanceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | '
           ? model.trainingDataProvenanceAr
           : (model.trainingDataProvenanceEn ?? '—')}
       </p>
-      <Field label={lang === 'ar' ? 'حجم البيانات (سجلات)' : 'Data size (records)'}
+      <Field variant="inline" label={lang === 'ar' ? 'حجم البيانات (سجلات)' : 'Data size (records)'}
              value={model.trainingDataSizeRecords?.toLocaleString() ?? '—'} />
-      <Field label={lang === 'ar' ? 'بداية الفترة' : 'Period start'}
+      <Field variant="inline" label={lang === 'ar' ? 'بداية الفترة' : 'Period start'}
              value={model.trainingDataPeriodStart ?? '—'} />
-      <Field label={lang === 'ar' ? 'نهاية الفترة' : 'Period end'}
+      <Field variant="inline" label={lang === 'ar' ? 'نهاية الفترة' : 'Period end'}
              value={model.trainingDataPeriodEnd ?? '—'} />
-      <Field label={lang === 'ar' ? 'عدد السمات' : 'Feature count'}
+      <Field variant="inline" label={lang === 'ar' ? 'عدد السمات' : 'Feature count'}
              value={model.featureCount?.toString() ?? '—'} />
-      <Field label={lang === 'ar' ? 'بيانات خارجية' : 'External dataset used'}
+      <Field variant="inline" label={lang === 'ar' ? 'بيانات خارجية' : 'External dataset used'}
              value={model.externalDatasetUsed ? (lang === 'ar' ? 'نعم' : 'Yes') : (lang === 'ar' ? 'لا' : 'No')} />
       {model.externalDatasetUsed && model.externalDatasetProvenance && (
-        <Field label={lang === 'ar' ? 'مصدر البيانات الخارجية' : 'External dataset provenance'}
+        <Field variant="inline" label={lang === 'ar' ? 'مصدر البيانات الخارجية' : 'External dataset provenance'}
                value={model.externalDatasetProvenance} />
       )}
     </div>
@@ -413,19 +405,19 @@ function ComplianceTab({ model, lang }: { model: MlModelResponse; lang: 'en' | '
         lang={lang} />
       <div>
         <h3 className="aimd-h3">{lang === 'ar' ? 'الأعلام التنظيمية' : 'Regulatory flags'}</h3>
-        <Field label={lang === 'ar' ? 'تقييم الأثر PDPL' : 'PDPL DPIA'}
+        <Field variant="inline" label={lang === 'ar' ? 'تقييم الأثر PDPL' : 'PDPL DPIA'}
                value={model.hasPdplDpia ? '✓' : '—'} />
-        <Field label={lang === 'ar' ? 'تدقيق العدالة' : 'Fairness audit'}
+        <Field variant="inline" label={lang === 'ar' ? 'تدقيق العدالة' : 'Fairness audit'}
                value={model.hasFairnessAudit ? `✓ (${model.lastFairnessAuditDate ?? ''})` : '—'} />
-        <Field label={lang === 'ar' ? 'وثيقة قابلية التفسير' : 'Explainability doc'}
+        <Field variant="inline" label={lang === 'ar' ? 'وثيقة قابلية التفسير' : 'Explainability doc'}
                value={model.hasExplainabilityDoc ? '✓' : '—'} />
-        <Field label={lang === 'ar' ? 'عالي الخطورة EU AI Act' : 'EU AI Act high-risk'}
+        <Field variant="inline" label={lang === 'ar' ? 'عالي الخطورة EU AI Act' : 'EU AI Act high-risk'}
                value={model.isHighRiskEuAiAct ? '✓ (Annex III)' : '—'} />
-        <Field label={lang === 'ar' ? 'الإشراف البشري' : 'Human oversight'}
+        <Field variant="inline" label={lang === 'ar' ? 'الإشراف البشري' : 'Human oversight'}
                value={model.humanOversight ? ML_OVERSIGHT_LABEL[model.humanOversight][lang === 'ar' ? 'ar' : 'en'] : '—'} />
-        <Field label={lang === 'ar' ? 'موطن البيانات' : 'Data residency'}
+        <Field variant="inline" label={lang === 'ar' ? 'موطن البيانات' : 'Data residency'}
                value={model.dataResidency ? ML_RESIDENCY_LABEL[model.dataResidency][lang === 'ar' ? 'ar' : 'en'] : '—'} />
-        <Field label={lang === 'ar' ? 'أساس النقل عبر الحدود (PDPL م.29)' : 'Cross-border basis (PDPL Art.29)'}
+        <Field variant="inline" label={lang === 'ar' ? 'أساس النقل عبر الحدود (PDPL م.29)' : 'Cross-border basis (PDPL Art.29)'}
                value={model.crossBorderTransferBasis ? ML_TRANSFER_BASIS_LABEL[model.crossBorderTransferBasis][lang === 'ar' ? 'ar' : 'en'] : '—'} />
       </div>
     </div>

@@ -8,6 +8,7 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { Field } from '../../components/ui/Field';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -534,17 +535,6 @@ export function RiskDetailPage() {
 
     </Shell>
   );
-}
-
-function Field({ label, value, bold, mono, multiline }: { label: string; value: string; bold?: boolean; mono?: boolean; multiline?: boolean }) {
-  const cls = ['risk-detail-field__value'];
-  cls.push(bold ? 'risk-detail-field__value--bold' : 'risk-detail-field__value--medium');
-  if (mono) cls.push('risk-detail-field__value--mono');
-  if (multiline) cls.push('risk-detail-field__value--multiline');
-  return <div className="risk-detail-field">
-    <div className="risk-detail-field__label">{label}</div>
-    <div className={cls.join(' ')}>{value}</div>
-  </div>;
 }
 
 function ScoreTile({ label, score }: { label: string; score: number }) {

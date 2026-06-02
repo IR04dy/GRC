@@ -206,24 +206,7 @@
 }
 
 /* ─── Generic Field component ─────────────────────────────── */
-.risk-detail-field {
-  margin-bottom: var(--sp-4);
-}
-.risk-detail-field__label {
-  font-size: var(--text-2xs);
-  color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.risk-detail-field__value {
-  font-size: var(--text-sm);
-  color: var(--ink-1);
-  margin-top: 2px;
-}
-.risk-detail-field__value--bold   { font-weight: 600; }
-.risk-detail-field__value--medium { font-weight: 500; }
-.risk-detail-field__value--mono   { font-family: var(--font-mono); }
-.risk-detail-field__value--multiline { white-space: pre-wrap; }
+/* Key/value rows now use the shared `.field` control (components.css). */
 
 /* ─── Score / Field tiles ─────────────────────────────────── */
 .risk-detail-tile {

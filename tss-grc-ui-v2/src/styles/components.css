@@ -649,6 +649,37 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .pill-tab[aria-pressed="true"] .pill-tab__count {
   background: color-mix(in srgb, var(--on-primary) 22%, transparent); color: var(--on-primary);
 }
+/* ─── Field — unified detail key/value renderer ───────────────────────
+ * One control replacing 4 drifted local copies (Policy/Control/Risk/AI).
+ * `stacked` = label above value; `inline` = label beside value (160px gutter).
+ * Block/flex flow honours `direction`, so both variants are RTL-safe. */
+.field { margin-bottom: var(--sp-4); min-width: 0; }
+.field__label {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.field__value {
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.field__value--bold      { font-weight: 600; }
+.field__value--medium    { font-weight: 500; }
+.field__value--mono      { font-family: var(--font-mono); }
+.field__value--multiline { white-space: pre-wrap; }
+.field--inline {
+  display: flex;
+  gap: var(--sp-5);
+  padding: var(--sp-3) 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+  align-items: baseline;
+}
+.field--inline .field__label { min-width: 160px; flex-shrink: 0; }
+.field--inline .field__value { margin-top: 0; }
 /* .mono — monospace for codes, IDs, timestamps, hex values, file paths.
  * `unicode-bidi: isolate` + `direction: ltr` lock the strong-LTR
  * direction so an Arabic UI doesn't reorder "INC-0042" / "AC-2.1.2" /

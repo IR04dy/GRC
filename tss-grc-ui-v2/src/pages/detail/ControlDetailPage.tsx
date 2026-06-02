@@ -8,6 +8,7 @@ import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { Field } from '../../components/ui/Field';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -231,9 +232,3 @@ export function ControlDetailPage() {
   );
 }
 
-function Field({ label, value, bold, mono, multiline }: { label: string; value: string; bold?: boolean; mono?: boolean; multiline?: boolean }) {
-  return <div style={{ marginBottom: 8 }}>
-    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-    <div style={{ fontSize: 13, color: 'var(--ink-1)', fontWeight: bold ? 600 : 500, fontFamily: mono ? 'var(--font-mono)' : undefined, whiteSpace: multiline ? 'pre-wrap' : 'normal', marginTop: 2 }}>{value}</div>
-  </div>;
-}

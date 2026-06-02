@@ -124,20 +124,7 @@
 }
 
 /* ─── Provenance + field rows ──────────────────────────── */
-.aimd-field-row {
-  display: flex;
-  gap: var(--sp-5);
-  padding: var(--sp-3) 0;
-  border-bottom: 1px solid var(--border);
-}
-.aimd-field-label {
-  min-width: 160px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-.aimd-field-value {
-  font-size: var(--text-sm);
-}
+/* Key/value rows now use the shared `.field` inline control (components.css). */
 
 /* ─── Compliance tab ───────────────────────────────────── */
 .aimd-comp-grid {
