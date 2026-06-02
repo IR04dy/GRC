@@ -302,8 +302,8 @@ function PacketPreview({ packet, lang, t }: { packet: SdaiaNotificationPacket; l
 const CLOCK_TONE: Record<BreachClock['tier'], 'success' | 'info' | 'warning' | 'danger'> = {
   GREEN: 'success', AMBER: 'warning', RED: 'danger', BREACHED: 'danger',
 };
-const SEVERITY_TONE: Record<PdplSeverity, 'info' | 'warning' | 'danger' | 'success'> = {
-  LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
+const SEVERITY_TONE: Record<PdplSeverity, 'risk-low' | 'risk-med' | 'risk-high' | 'risk-crit'> = {
+  LOW: 'risk-low', MEDIUM: 'risk-med', HIGH: 'risk-high', CRITICAL: 'risk-crit',
 };
 
 function tierLabel(t: (k: string) => string, tier: BreachClock['tier']): string {

@@ -162,11 +162,11 @@ export const VULN_SLA_SEVERITY_LABEL: Record<VulnSlaSeverity, { en: string; ar: 
   LOW:      { en: 'Low',      ar: 'منخفض' },
 };
 
-export const VULN_SLA_SEVERITY_TONE: Record<VulnSlaSeverity, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger',
-  HIGH:     'warning',
-  MEDIUM:   'info',
-  LOW:      'neutral',
+export const VULN_SLA_SEVERITY_TONE: Record<VulnSlaSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  CRITICAL: 'risk-crit',
+  HIGH:     'risk-high',
+  MEDIUM:   'risk-med',
+  LOW:      'risk-low',
 };
 
 export const VULN_SLA_EXPOSURE_LABEL: Record<VulnSlaExposure, { en: string; ar: string }> = {

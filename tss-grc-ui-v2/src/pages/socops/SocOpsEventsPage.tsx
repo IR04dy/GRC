@@ -21,11 +21,11 @@ import { socopsApi, type SecurityEvent, type PageResp } from '../../lib/socops';
 type Filter = 'all' | 'open' | 'critical' | 'sla' | 'closed';
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
-const SEVERITY_TONE: Record<string, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger',
-  HIGH: 'warning',
-  MEDIUM: 'info',
-  LOW: 'neutral',
+const SEVERITY_TONE: Record<string, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low' | 'neutral'> = {
+  CRITICAL: 'risk-crit',
+  HIGH: 'risk-high',
+  MEDIUM: 'risk-med',
+  LOW: 'risk-low',
   INFO: 'neutral',
 };
 

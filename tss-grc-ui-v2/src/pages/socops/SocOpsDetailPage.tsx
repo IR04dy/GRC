@@ -75,7 +75,7 @@ function fmtBadge(tones: Record<string, BadgeTone>): FieldFormatter {
 }
 
 const SEVERITY_TONE: Record<string, BadgeTone> = {
-  CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'info', LOW: 'neutral', INFO: 'neutral',
+  CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low', INFO: 'neutral',
 };
 
 const STATUS_TONE: Record<string, BadgeTone> = {

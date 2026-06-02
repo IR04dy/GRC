@@ -67,6 +67,23 @@
 .badge-danger  { background: var(--danger-bg);  color: var(--danger-fg);  border-color: var(--danger-border);  }
 .badge-info    { background: var(--info-bg);    color: var(--info-fg);    border-color: var(--info-border);    }
 
+/* L3 — severity badges on the 6-tone --risk-* ramp (not the coarse 4-tone
+ * semantic set), so HIGH vs VERY-HIGH vs CRITICAL stay distinct — matching the
+ * heatmap / score-pills. Tints are color-mixed with --surface so they adapt to
+ * dark mode; --ink-1 keeps the label legible on every step. */
+.badge-risk-vlow,
+.badge-risk-low,
+.badge-risk-med,
+.badge-risk-high,
+.badge-risk-vhigh,
+.badge-risk-crit { color: var(--ink-1); }
+.badge-risk-vlow  { background: color-mix(in srgb, var(--risk-vlow)  38%, var(--surface)); border-color: color-mix(in srgb, var(--risk-vlow)  60%, var(--surface)); }
+.badge-risk-low   { background: color-mix(in srgb, var(--risk-low)   38%, var(--surface)); border-color: color-mix(in srgb, var(--risk-low)   60%, var(--surface)); }
+.badge-risk-med   { background: color-mix(in srgb, var(--risk-med)   42%, var(--surface)); border-color: color-mix(in srgb, var(--risk-med)   64%, var(--surface)); }
+.badge-risk-high  { background: color-mix(in srgb, var(--risk-high)  44%, var(--surface)); border-color: color-mix(in srgb, var(--risk-high)  66%, var(--surface)); }
+.badge-risk-vhigh { background: color-mix(in srgb, var(--risk-vhigh) 44%, var(--surface)); border-color: color-mix(in srgb, var(--risk-vhigh) 66%, var(--surface)); }
+.badge-risk-crit  { background: color-mix(in srgb, var(--risk-crit)  42%, var(--surface)); border-color: color-mix(in srgb, var(--risk-crit)  64%, var(--surface)); }
+
 /* ─── Input / Select ───────────────────────────────
  * Contrast pass — user feedback: "the fonts in forms need to be more clear
  * since the colors of fonts is very close to the color of the form

@@ -218,8 +218,8 @@ export const CAPA_STATUS_TONE: Record<CapaStatus, 'neutral' | 'info' | 'primary'
   CANCELLED:           'neutral',
 };
 
-export const CAPA_SEVERITY_TONE: Record<CapaSeverity, 'success' | 'info' | 'warning' | 'danger'> = {
-  LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
+export const CAPA_SEVERITY_TONE: Record<CapaSeverity, 'risk-low' | 'risk-med' | 'risk-high' | 'risk-crit'> = {
+  LOW: 'risk-low', MEDIUM: 'risk-med', HIGH: 'risk-high', CRITICAL: 'risk-crit',
 };
 
 /** Days until / since `dueDate` (negative = overdue). */

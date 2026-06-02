@@ -291,11 +291,11 @@ export const SEVERITY_LABEL: Record<Severity, { en: string; ar: string }> = {
   LOW:      { en: 'Low',      ar: 'منخفضة' },
 };
 
-export const SEVERITY_TONE: Record<Severity, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger',
-  HIGH:     'danger',
-  MEDIUM:   'warning',
-  LOW:      'neutral',
+export const SEVERITY_TONE: Record<Severity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  CRITICAL: 'risk-crit',
+  HIGH:     'risk-high',
+  MEDIUM:   'risk-med',
+  LOW:      'risk-low',
 };
 
 export const STATUS_LABEL: Record<ComplaintStatus, { en: string; ar: string }> = {

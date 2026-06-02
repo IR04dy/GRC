@@ -159,8 +159,8 @@ export const HEALTH_LABEL: Record<ServiceHealth, { en: string; ar: string }> = {
   UNKNOWN:   { en: 'Unknown',   ar: 'غير معروف' },
 };
 
-export const SEVERITY_TONE: Record<AlertSeverity, 'info' | 'warning' | 'danger'> = {
-  LOW: 'info', MEDIUM: 'warning', HIGH: 'danger', CRITICAL: 'danger',
+export const SEVERITY_TONE: Record<AlertSeverity, 'risk-low' | 'risk-med' | 'risk-high' | 'risk-crit'> = {
+  LOW: 'risk-low', MEDIUM: 'risk-med', HIGH: 'risk-high', CRITICAL: 'risk-crit',
 };
 
 export interface MonitoringStats {

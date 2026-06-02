@@ -50,7 +50,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   REMEDIATION: 'primary', ESCALATED: 'danger', DISMISSED: 'neutral', CLOSED: 'success',
 };
 const SEVERITY_TONE: Record<string, BadgeTone> = {
-  LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
+  LOW: 'risk-low', MEDIUM: 'risk-med', HIGH: 'risk-high', CRITICAL: 'risk-crit',
 };
 const CATEGORY_OPTIONS = [
   'BRIBERY', 'KICKBACK', 'CONFLICT_OF_INTEREST', 'FRAUD', 'THEFT',
@@ -629,7 +629,7 @@ const AML_STATUS_TONE: Record<string, BadgeTone> = {
   ESCALATED: 'accent', STR_FILED: 'danger', CLOSED: 'neutral',
 };
 const AML_SEVERITY_TONE: Record<string, BadgeTone> = {
-  LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
+  LOW: 'risk-low', MEDIUM: 'risk-med', HIGH: 'risk-high', CRITICAL: 'risk-crit',
 };
 const AML_EMPTY: Partial<AmlAlertDto> = {
   alertType: 'STRUCTURING', severity: 'MEDIUM', status: 'OPEN',

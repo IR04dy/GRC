@@ -69,11 +69,15 @@ export const STATUS_TONE: Record<string, BadgeTone> = {
   NOT_IMPLEMENTED: 'danger',
 };
 
-/** Map a severity value to a Badge tone. */
+/** Map a severity value to a Badge tone on the 6-step --risk-* ramp, so HIGH,
+ *  VERY_HIGH and CRITICAL stay distinct (the old danger/danger/warning set
+ *  collapsed them). Mirrors severityBadgeTone() in ragColors. */
 export const SEVERITY_TONE: Record<string, BadgeTone> = {
-  CRITICAL: 'danger',
-  HIGH: 'danger',
-  MEDIUM: 'warning',
-  LOW: 'info',
+  CRITICAL: 'risk-crit',
+  VERY_HIGH: 'risk-vhigh',
+  HIGH: 'risk-high',
+  MEDIUM: 'risk-med',
+  LOW: 'risk-low',
+  VERY_LOW: 'risk-vlow',
   INFO: 'neutral',
 };

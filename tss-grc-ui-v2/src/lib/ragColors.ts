@@ -45,6 +45,26 @@ export function severityColor(level: string | null | undefined): string {
   }
 }
 
+/**
+ * Map a severity / risk-level label to a Badge tone on the 6-step `--risk-*`
+ * ramp. This is the badge counterpart of `severityColor()` — it keeps HIGH vs
+ * VERY_HIGH vs CRITICAL visually distinct, which the coarse semantic set
+ * (danger/warning/info) collapses. Handles the common label vocabularies
+ * (CRITICAL/HIGH/MEDIUM/LOW, P1–P4, MINOR/MODERATE/MAJOR). INFO/observation
+ * fall through to a neutral chip.
+ */
+export function severityBadgeTone(level: string | null | undefined): BadgeTone {
+  switch ((level ?? '').toUpperCase()) {
+    case 'CRITICAL': case 'CRIT': case 'P1':                 return 'risk-crit';
+    case 'VERY_HIGH': case 'VHIGH': case 'SEVERE':           return 'risk-vhigh';
+    case 'HIGH': case 'MAJOR': case 'P2':                    return 'risk-high';
+    case 'MEDIUM': case 'MED': case 'MODERATE': case 'P3':   return 'risk-med';
+    case 'LOW': case 'MINOR': case 'P4':                     return 'risk-low';
+    case 'VERY_LOW': case 'VLOW':                            return 'risk-vlow';
+    default:                                                 return 'neutral';
+  }
+}
+
 export type Rag = 'success' | 'info' | 'warning' | 'danger';
 
 /**

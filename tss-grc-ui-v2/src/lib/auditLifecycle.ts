@@ -893,8 +893,8 @@ export const WP_STATUS_TONE: Record<WorkingPaperStatus, 'neutral' | 'warning' | 
   DRAFT: 'neutral', PEER_REVIEW: 'warning', APPROVED: 'success', REJECTED: 'danger',
 };
 
-export const SEVERITY_TONE: Record<FindingSeverity, 'danger' | 'warning' | 'info' | 'success' | 'neutral'> = {
-  CRITICAL: 'danger', HIGH: 'danger', MEDIUM: 'warning', LOW: 'info', OBSERVATION: 'neutral',
+export const SEVERITY_TONE: Record<FindingSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low' | 'neutral'> = {
+  CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low', OBSERVATION: 'neutral',
 };
 
 export const FINDING_STATUS_LABEL: Record<FindingStatus, { en: string; ar: string }> = {

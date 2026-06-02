@@ -285,11 +285,11 @@ export const SEVERITY_LABEL: Record<IncidentSeverity, { en: string; ar: string }
 };
 
 export const SEVERITY_TONE: Record<IncidentSeverity,
-  'neutral' | 'info' | 'warning' | 'danger'> = {
-  LOW:      'neutral',
-  MEDIUM:   'info',
-  HIGH:     'warning',
-  CRITICAL: 'danger',
+  'risk-low' | 'risk-med' | 'risk-high' | 'risk-crit'> = {
+  LOW:      'risk-low',
+  MEDIUM:   'risk-med',
+  HIGH:     'risk-high',
+  CRITICAL: 'risk-crit',
 };
 
 export const INCIDENT_STATUS_LABEL: Record<IncidentStatus, { en: string; ar: string }> = {

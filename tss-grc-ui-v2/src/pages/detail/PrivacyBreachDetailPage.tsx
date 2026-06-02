@@ -29,7 +29,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   CLOSED: 'success',
 };
 const SEVERITY_TONE: Record<string, BadgeTone> = {
-  CRITICAL: 'danger', HIGH: 'danger', MEDIUM: 'warning', LOW: 'info',
+  CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low',
 };
 
 const BREACH_TYPE_LABEL: Record<string, { en: string; ar: string }> = {

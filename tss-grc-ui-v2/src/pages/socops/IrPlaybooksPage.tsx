@@ -25,11 +25,11 @@ import { socopsApi, type IrPlaybook } from '../../lib/socops';
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 type Tab = 'active' | 'templates';
 
-const SEVERITY_TONE: Record<string, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger',
-  HIGH: 'warning',
-  MEDIUM: 'info',
-  LOW: 'neutral',
+const SEVERITY_TONE: Record<string, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  CRITICAL: 'risk-crit',
+  HIGH: 'risk-high',
+  MEDIUM: 'risk-med',
+  LOW: 'risk-low',
 };
 
 const STATUS_TONE: Record<string, 'success' | 'info' | 'neutral'> = {

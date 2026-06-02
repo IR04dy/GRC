@@ -212,11 +212,11 @@ export const SEVERITY_LABEL: Record<Severity, { en: string; ar: string }> = {
 };
 
 export const SEVERITY_TONE: Record<Severity,
-  'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger',
-  HIGH:     'danger',
-  MEDIUM:   'warning',
-  LOW:      'info',
+  'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  CRITICAL: 'risk-crit',
+  HIGH:     'risk-high',
+  MEDIUM:   'risk-med',
+  LOW:      'risk-low',
 };
 
 export const SAMA_CATEGORY_LABEL: Record<SamaCategory, { en: string; ar: string }> = {

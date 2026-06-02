@@ -633,12 +633,12 @@ export const ML_DRIFT_TYPE_LABEL: Record<MlDriftType, { en: string; ar: string }
   FAIRNESS_REGRESSION:     { en: 'Fairness regression',     ar: 'تراجع العدالة' },
 };
 
-export const ML_DRIFT_SEVERITY_TONE: Record<MlDriftSeverity, 'success' | 'accent' | 'warning' | 'danger' | 'neutral'> = {
+export const ML_DRIFT_SEVERITY_TONE: Record<MlDriftSeverity, 'neutral' | 'risk-low' | 'risk-med' | 'risk-high' | 'risk-crit'> = {
   INFO:     'neutral',
-  MINOR:    'success',
-  MODERATE: 'accent',
-  MAJOR:    'warning',
-  CRITICAL: 'danger',
+  MINOR:    'risk-low',
+  MODERATE: 'risk-med',
+  MAJOR:    'risk-high',
+  CRITICAL: 'risk-crit',
 };
 
 export const ML_DRIFT_SEVERITY_LABEL: Record<MlDriftSeverity, { en: string; ar: string }> = {

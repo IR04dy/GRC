@@ -178,11 +178,11 @@ export const CCM_SEVERITY_LABEL: Record<CcmSeverity, { en: string; ar: string }>
   LOW:      { en: 'Low',      ar: 'منخفض' },
 };
 
-export const CCM_SEVERITY_TONE: Record<CcmSeverity, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger',
-  HIGH:     'warning',
-  MEDIUM:   'info',
-  LOW:      'neutral',
+export const CCM_SEVERITY_TONE: Record<CcmSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  CRITICAL: 'risk-crit',
+  HIGH:     'risk-high',
+  MEDIUM:   'risk-med',
+  LOW:      'risk-low',
 };
 
 export const CCM_TEST_TYPE_LABEL: Record<CcmTestType, { en: string; ar: string }> = {

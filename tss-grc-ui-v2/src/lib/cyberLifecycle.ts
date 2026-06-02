@@ -736,8 +736,8 @@ export const TIER_TONE: Record<AssetTier, 'danger' | 'warning' | 'info' | 'neutr
   'TIER-1-CRITICAL': 'danger', 'TIER-2-HIGH': 'warning', 'TIER-3-MEDIUM': 'info', 'TIER-4-LOW': 'neutral',
 };
 
-export const VULN_SEVERITY_TONE: Record<VulnSeverity, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'info', LOW: 'neutral',
+export const VULN_SEVERITY_TONE: Record<VulnSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low',
 };
 
 export const VULN_STATUS_LABEL: Record<VulnStatus, { en: string; ar: string }> = {
@@ -755,8 +755,8 @@ export const VULN_STATUS_TONE: Record<VulnStatus, 'neutral' | 'info' | 'warning'
   AWAITING_VERIFICATION: 'info', CLOSED: 'success', ACCEPTED: 'neutral',
 };
 
-export const SOC_SEVERITY_TONE: Record<SocSeverity, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  P1: 'danger', P2: 'warning', P3: 'info', P4: 'neutral',
+export const SOC_SEVERITY_TONE: Record<SocSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  P1: 'risk-crit', P2: 'risk-high', P3: 'risk-med', P4: 'risk-low',
 };
 
 export const SOC_STATUS_LABEL: Record<SocStatus, { en: string; ar: string }> = {

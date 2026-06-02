@@ -325,11 +325,11 @@ export const ASM_FINDING_SEVERITY_LABEL: Record<AsmFindingSeverity, { en: string
   INFO:     { en: 'Info',     ar: 'إعلامي' },
 };
 
-export const ASM_FINDING_SEVERITY_TONE: Record<AsmFindingSeverity, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger',
-  HIGH:     'warning',
-  MEDIUM:   'info',
-  LOW:      'neutral',
+export const ASM_FINDING_SEVERITY_TONE: Record<AsmFindingSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low' | 'neutral'> = {
+  CRITICAL: 'risk-crit',
+  HIGH:     'risk-high',
+  MEDIUM:   'risk-med',
+  LOW:      'risk-low',
   INFO:     'neutral',
 };
 

@@ -14,8 +14,8 @@ import { socopsApi, type ThreatIntel, type PageResp } from '../../lib/socops';
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 type Filter = 'all' | 'unactioned' | 'critical' | 'actioned';
 
-const SEVERITY_TONE: Record<string, 'danger' | 'warning' | 'info' | 'neutral'> = {
-  CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'info', LOW: 'neutral',
+const SEVERITY_TONE: Record<string, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
+  CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low',
 };
 
 const TLP_TONE: Record<string, 'danger' | 'warning' | 'success' | 'info'> = {
