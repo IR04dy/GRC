@@ -90,8 +90,8 @@ export function WorkflowsPage() {
     switch (color) {
       case 'success': return { bg: 'var(--success-bg)', fg: 'var(--success-fg)', border: 'var(--success-fg)' };
       case 'danger':  return { bg: 'var(--danger-bg)',  fg: 'var(--danger-fg)',  border: 'var(--danger-fg)' };
-      case 'warning': return { bg: 'var(--accent-bg)',  fg: 'var(--accent-700)', border: 'var(--accent-700)' };
-      case 'accent':  return { bg: 'var(--accent-bg)',  fg: 'var(--accent-700)', border: 'var(--accent-700)' };
+      case 'warning': return { bg: 'var(--accent-50)',  fg: 'var(--accent-700)', border: 'var(--accent-700)' };
+      case 'accent':  return { bg: 'var(--accent-50)',  fg: 'var(--accent-700)', border: 'var(--accent-700)' };
       case 'primary': return { bg: 'var(--primary-50)', fg: 'var(--primary-700)', border: 'var(--primary-700)' };
       case 'info':    return { bg: 'var(--surface-2)',  fg: 'var(--ink-1)',      border: 'var(--ink-3)' };
       default:        return { bg: 'var(--surface-2)',  fg: 'var(--ink-1)',      border: 'var(--ink-3)' };

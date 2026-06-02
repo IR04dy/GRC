@@ -216,7 +216,7 @@ export function ObligationDetailPage() {
       />
 
       <Card title={isAr ? 'تفاصيل الالتزام' : 'Obligation details'} Icon={FileCheck2}>
-        <div className="grid-2col" style={{ gap: 'var(--space-md)' }}>
+        <div className="grid-2col" style={{ gap: 'var(--sp-6)' }}>
           <Field label={isAr ? 'الجهة الرقابية' : 'Regulator'}
             value={tlabel(REGULATOR_LABELS, obligation.regulator, isAr)} />
           <Field label={isAr ? 'المرجع' : 'Reference'} value={obligation.regulationReference ?? '—'} />
@@ -248,13 +248,13 @@ export function ObligationDetailPage() {
         </div>
 
         {(obligation.descriptionEn || obligation.descriptionAr) && (
-          <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-md)',
+          <div style={{ marginTop: 'var(--sp-6)', padding: 'var(--sp-6)',
             background: 'var(--surface-2)', borderRadius: 6, fontSize: 13, lineHeight: 1.6 }}>
             {isAr ? obligation.descriptionAr : obligation.descriptionEn}
           </div>
         )}
 
-        <div className="cluster" style={{ gap: 8, marginTop: 'var(--space-md)' }}>
+        <div className="cluster" style={{ gap: 8, marginTop: 'var(--sp-6)' }}>
           {obligation.lifecycleStage === 'DRAFT' && (
             <Button size="sm" Icon={ShieldCheck} onClick={() => onTransition('ACTIVE')}>
               {isAr ? 'تفعيل' : 'Activate'}

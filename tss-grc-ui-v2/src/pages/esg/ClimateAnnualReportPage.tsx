@@ -79,7 +79,7 @@ export function ClimateAnnualReportPage() {
           ? 'حزمة الإفصاح السنوي وفق IFRS S2 وتوصيات TCFD — السيناريوهات، الانبعاثات المُموَّلة، الأهداف.'
           : 'Annual IFRS S2 + TCFD disclosure pack — scenarios, financed emissions, targets.'}
         actions={
-          <div className="cluster" style={{ gap: 'var(--space-sm)' }}>
+          <div className="cluster" style={{ gap: 'var(--sp-4)' }}>
             <label className="cluster" style={{ alignItems: 'center', gap: 4 }}>
               <Calendar size={16} />
               <select value={year} onChange={e => setYear(Number(e.target.value))}>
@@ -101,7 +101,7 @@ export function ClimateAnnualReportPage() {
       )}
       {!loading && report && (
         <>
-          <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+          <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
             <Kpi
               Icon={CloudLightning}
               label={isAr ? 'السيناريوهات المُعتمَدة' : 'Approved scenarios'}
@@ -171,7 +171,7 @@ export function ClimateAnnualReportPage() {
               </div>
             )}
             {report.weightedExpectedLoss.warning && (
-              <p style={{ color: 'var(--color-warning, #d97706)', marginTop: 'var(--space-sm)' }}>
+              <p style={{ color: 'var(--color-warning, #d97706)', marginTop: 'var(--sp-4)' }}>
                 <AlertTriangle size={16} style={{ verticalAlign: 'middle' }} />
                 {' '}{report.weightedExpectedLoss.warning}
               </p>
@@ -307,11 +307,11 @@ export function ClimateAnnualReportPage() {
 const th: React.CSSProperties = {
   textAlign: 'start',
   padding: '8px 12px',
-  borderBottom: '1px solid var(--color-border)',
+  borderBottom: '1px solid var(--border)',
   fontWeight: 600,
 };
 const td: React.CSSProperties = {
   padding: '8px 12px',
-  borderBottom: '1px solid var(--color-border)',
+  borderBottom: '1px solid var(--border)',
   verticalAlign: 'top',
 };

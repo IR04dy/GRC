@@ -336,7 +336,7 @@ export function OpResAssessmentDetailPage() {
                                  borderRadius: 6, padding: 8,
                                  fontSize: 11, lineHeight: 1.4,
                                  background: curN === r.level
-                                   ? 'var(--surface-hover)' : 'transparent',
+                                   ? 'var(--surface-2)' : 'transparent',
                                }}>
                             <div style={{ display: 'flex', alignItems: 'center',
                                           gap: 6, marginBottom: 4 }}>

@@ -215,7 +215,7 @@ export function FourthPartyPage() {
                           </td>
                         </tr>
                         {open && (
-                          <tr><td colSpan={9} style={{ background: 'var(--muted)' }}>
+                          <tr><td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                             <div style={{ padding: 12, fontSize: 13 }}>
                               <p>{lang === 'ar' && r.serviceDescriptionAr ? r.serviceDescriptionAr : r.serviceDescriptionEn}</p>
                               {r.dataCategoriesShared && (

@@ -203,7 +203,7 @@ export function StrategyRoiPage() {
         </Card>
       )}
 
-      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
         <Kpi
           Icon={Sigma}
           label={isAr ? 'إجمالي التحليلات' : 'Total analyses'}
@@ -235,7 +235,7 @@ export function StrategyRoiPage() {
           title={isAr ? 'مقارنة العائد على الاستثمار' : 'ROI comparison chart'}
           Icon={TrendingUp}
         >
-          <div className="stack" style={{ gap: 'var(--space-sm)' }}>
+          <div className="stack" style={{ gap: 'var(--sp-4)' }}>
             {items.map(it => {
               const roi = Number(it.roiPercent);
               const widthPct = maxRoi > 0

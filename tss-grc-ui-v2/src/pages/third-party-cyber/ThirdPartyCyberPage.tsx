@@ -173,7 +173,7 @@ export function ThirdPartyCyberPage() {
                           </td>
                         </tr>
                         {open && (
-                          <tr><td colSpan={9} style={{background:'var(--muted)'}}>
+                          <tr><td colSpan={9} style={{background:'var(--surface-2)'}}>
                             <div style={{padding:12, fontSize:13}}>
                               <p>{lang === 'ar' && r.scopeDescriptionAr ? r.scopeDescriptionAr : r.scopeDescriptionEn}</p>
                               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8, fontSize:12}}>

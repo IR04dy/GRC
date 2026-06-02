@@ -383,7 +383,7 @@ export function SupplierResiliencePage() {
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={10} style={{ background: 'var(--muted)' }}>
+                              <td colSpan={10} style={{ background: 'var(--surface-2)' }}>
                                 <div style={{ padding: 12, fontSize: 13 }}>
                                   <p style={{ marginBottom: 6 }}>
                                     <strong>{t('srpAltScopeEn')}:</strong>{' '}
@@ -505,7 +505,7 @@ export function SupplierResiliencePage() {
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={9} style={{ background: 'var(--muted)' }}>
+                              <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                                 <div style={{ padding: 12, fontSize: 13 }}>
                                   {p.triggerConditions && (
                                     <p style={{ marginBottom: 6 }}>

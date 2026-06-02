@@ -209,7 +209,7 @@ export function ObligationCampaignsPage() {
         }
       />
 
-      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
         <Kpi Icon={Briefcase}
           label={isAr ? 'إجمالي الحملات' : 'Total campaigns'}
           value={String(items.length)} />

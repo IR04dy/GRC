@@ -193,7 +193,7 @@ export function ResilienceTestsPage() {
                           </td>
                         </tr>
                         {open && (
-                          <tr><td colSpan={10} style={{background:'var(--muted)'}}>
+                          <tr><td colSpan={10} style={{background:'var(--surface-2)'}}>
                             <div style={{padding:12, fontSize:13}}>
                               <p>{lang === 'ar' && r.scenarioDescriptionAr ? r.scenarioDescriptionAr : r.scenarioDescriptionEn}</p>
                               {r.successCriteriaEn && <p style={{marginTop:6}}><strong>{t('srtSuccessCriteria')}:</strong> {r.successCriteriaEn}</p>}

@@ -99,7 +99,7 @@ export function ObligationsPage() {
         }
       />
 
-      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
         <Kpi
           Icon={ClipboardList}
           label={isAr ? 'الالتزامات النشطة' : 'Active obligations'}
@@ -128,7 +128,7 @@ export function ObligationsPage() {
 
       <Card title={isAr ? 'سجل الالتزامات' : 'Obligation register'} Icon={FileCheck2}>
         {/* Filter row */}
-        <div className="cluster" style={{ gap: 8, marginBottom: 'var(--space-md)' }}>
+        <div className="cluster" style={{ gap: 8, marginBottom: 'var(--sp-6)' }}>
           <Filter size={14} style={{ color: 'var(--ink-3)' }} />
           <select
             value={regulatorFilter}

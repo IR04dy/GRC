@@ -234,7 +234,7 @@ export function RegInspectWorkspaceDetailPage() {
         {showNewDr && (
           <div style={{ marginBottom: 12, padding: 12,
                         border: '1px solid var(--border)',
-                        borderRadius: 6, background: 'var(--surface-hover)' }}>
+                        borderRadius: 6, background: 'var(--surface-2)' }}>
             <div style={{ display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                           gap: 8 }}>
@@ -285,7 +285,7 @@ export function RegInspectWorkspaceDetailPage() {
               <div key={dr.id} style={{
                 border: '1px solid var(--border)',
                 borderRadius: 6, padding: 12,
-                background: dr.overdue ? 'rgba(220,38,38,0.05)' : 'var(--card-bg)',
+                background: dr.overdue ? 'rgba(220,38,38,0.05)' : 'var(--surface)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8,
                               marginBottom: 6, flexWrap: 'wrap' }}>
@@ -343,7 +343,7 @@ export function RegInspectWorkspaceDetailPage() {
           zIndex: 1000,
         }} onClick={() => setSubmitDrId(null)}>
           <div onClick={e => e.stopPropagation()}
-               style={{ background: 'var(--card-bg)', borderRadius: 8,
+               style={{ background: 'var(--surface)', borderRadius: 8,
                         padding: 20, width: 480, maxWidth: '90vw' }}>
             <h3 style={{ marginTop: 0, fontSize: 16 }}>
               {lang === 'ar' ? 'تقديم طلب الوثائق' : 'Submit Document Request'}
@@ -414,7 +414,7 @@ export function RegInspectWorkspaceDetailPage() {
                   gap: 12,
                   padding: 8,
                   borderInlineStart: '3px solid var(--primary)',
-                  background: 'var(--surface-hover)',
+                  background: 'var(--surface-2)',
                   borderRadius: 4,
                 }}>
                   <span style={{ fontSize: 12, opacity: 0.7 }}>

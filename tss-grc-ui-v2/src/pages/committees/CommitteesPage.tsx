@@ -292,7 +292,7 @@ export function CommitteesPage() {
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={9} style={{ background: 'var(--muted)' }}>
+                              <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                                 <div style={{ padding: 12, fontSize: 13 }}>
                                   {c.descriptionEn && (
                                     <p style={{ marginBottom: 8 }}>
@@ -411,7 +411,7 @@ export function CommitteesPage() {
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={7} style={{ background: 'var(--muted)' }}>
+                              <td colSpan={7} style={{ background: 'var(--surface-2)' }}>
                                 <div style={{ padding: 12, fontSize: 13 }}>
                                   {m.locationOrLink && (
                                     <p><strong>{t('comLocation')}:</strong> {m.locationOrLink}</p>
@@ -578,7 +578,7 @@ export function CommitteesPage() {
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={9} style={{ background: 'var(--muted)' }}>
+                              <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                                 <div style={{ padding: 12, fontSize: 13 }}>
                                   <p style={{ marginBottom: 8 }}>
                                     {lang === 'ar' && r.bodyAr ? r.bodyAr : r.bodyEn}
@@ -693,7 +693,7 @@ export function CommitteesPage() {
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={9} style={{ background: 'var(--muted)' }}>
+                              <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                                 <div style={{ padding: 12, fontSize: 13 }}>
                                   {(a.descriptionEn || a.descriptionAr) && (
                                     <p style={{ marginBottom: 8 }}>

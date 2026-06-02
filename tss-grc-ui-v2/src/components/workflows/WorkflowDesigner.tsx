@@ -188,7 +188,7 @@ export function WorkflowDesigner({ graph, onClose }: { graph: WorkflowDefinition
                     fontSize: 10, padding: '2px 6px',
                     background: 'var(--surface-1)', border: '1px solid var(--border)',
                     borderRadius: 'var(--r-sm)', display: 'inline-flex', alignItems: 'center', gap: 4,
-                    boxShadow: 'var(--shadow-sm)',
+                    boxShadow: 'var(--shadow-1)',
                     fontFamily: 'var(--font-mono)',
                   }}>
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -226,7 +226,7 @@ export function WorkflowDesigner({ graph, onClose }: { graph: WorkflowDefinition
                   : 'var(--primary)'}`,
                 borderRadius: 'var(--r-md)',
                 padding: 10, cursor: dragId === s.id ? 'grabbing' : 'grab',
-                userSelect: 'none', boxShadow: dragId === s.id ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+                userSelect: 'none', boxShadow: dragId === s.id ? 'var(--shadow-2)' : 'var(--shadow-1)',
                 transition: dragId === s.id ? 'none' : 'box-shadow var(--dur-fast)',
               }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>

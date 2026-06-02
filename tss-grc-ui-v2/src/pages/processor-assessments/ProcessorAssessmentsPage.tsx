@@ -170,7 +170,7 @@ export function ProcessorAssessmentsPage() {
                           </td>
                         </tr>
                         {open && (
-                          <tr><td colSpan={8} style={{background:'var(--muted)'}}>
+                          <tr><td colSpan={8} style={{background:'var(--surface-2)'}}>
                             <div style={{padding:12, fontSize:13}}>
                               <p>{lang === 'ar' && r.processingScopeAr ? r.processingScopeAr : r.processingScopeEn}</p>
                               <div style={{marginTop:10}}>
@@ -179,7 +179,7 @@ export function ProcessorAssessmentsPage() {
                                   {ART28_CONTROLS.map(c => {
                                     const v = (r as any)[c.key] as string | undefined;
                                     return (
-                                      <div key={c.key} style={{display:'flex', justifyContent:'space-between', padding:'4px 8px', background:'var(--card)', borderRadius:4, fontSize:12}}>
+                                      <div key={c.key} style={{display:'flex', justifyContent:'space-between', padding:'4px 8px', background:'var(--surface)', borderRadius:4, fontSize:12}}>
                                         <span>{t(c.labelKey)}</span>
                                         {v
                                           ? <Badge tone={PROC_OUTCOME_TONE[v as keyof typeof PROC_OUTCOME_TONE]}>{v.replace(/_/g, ' ')}</Badge>

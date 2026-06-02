@@ -291,7 +291,7 @@ export function RiskScenariosPage() {
                           </tr>
                           {open && (
                             <tr>
-                              <td colSpan={9} style={{ background: 'var(--muted)' }}>
+                              <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                                 <div style={{ padding: 12 }}>
                                   {r.descriptionEn && (
                                     <p style={{ marginBottom: 8 }}>
@@ -302,7 +302,7 @@ export function RiskScenariosPage() {
                                     <div>
                                       <strong>{t('scnInputJson')}</strong>
                                       <pre className="mono" style={{ whiteSpace: 'pre-wrap', fontSize: 12,
-                                        background: 'var(--card)', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                                        background: 'var(--surface)', padding: 8, borderRadius: 4, marginTop: 4 }}>
                                         {r.inputJson}
                                       </pre>
                                     </div>

@@ -169,7 +169,7 @@ export function ContractClausesPage() {
                         </tr>
                         {open && (
                           <tr>
-                            <td colSpan={9} style={{ background: 'var(--muted)' }}>
+                            <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                               <div style={{ padding: 12, fontSize: 13 }}>
                                 {r.applicableTo && (
                                   <p>
@@ -181,7 +181,7 @@ export function ContractClausesPage() {
                                   <strong>{t('cclBody')}:</strong>
                                 </p>
                                 <p style={{
-                                  whiteSpace: 'pre-wrap', background: 'var(--card)',
+                                  whiteSpace: 'pre-wrap', background: 'var(--surface)',
                                   padding: 8, borderRadius: 4, fontSize: 12,
                                 }}>
                                   {lang === 'ar' && r.bodyAr ? r.bodyAr : r.bodyEn}

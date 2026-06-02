@@ -318,7 +318,7 @@ export function ObTppDetailPage() {
                   <div key={e.id} style={{
                     display: 'flex', gap: 8, padding: '8px 12px',
                     borderInlineStart: '3px solid var(--accent)',
-                    background: 'var(--card-bg)',
+                    background: 'var(--surface)',
                     borderRadius: 4,
                   }}>
                     <span style={{ fontSize: 11, color: 'var(--ink-3)', minWidth: 130 }}>
@@ -385,7 +385,7 @@ function TabBtn({ active, onClick, Icon, label }:
   return (
     <button onClick={onClick} style={{
       padding: '6px 12px',
-      background: active ? 'var(--card-bg)' : 'transparent',
+      background: active ? 'var(--surface)' : 'transparent',
       border: '1px solid var(--border)',
       borderBottom: active ? '2px solid var(--accent)' : '1px solid var(--border)',
       borderRadius: '4px 4px 0 0',

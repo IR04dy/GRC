@@ -340,7 +340,7 @@ export function CrisisCommsTemplateDetailPage() {
                       padding: '6px 10px',
                       border: '1px solid var(--border)',
                       borderRadius: 6,
-                      background: 'var(--surface-alt)',
+                      background: 'var(--surface-2)',
                       fontFamily: 'var(--font-mono)',
                       fontSize: 12,
                     }}>

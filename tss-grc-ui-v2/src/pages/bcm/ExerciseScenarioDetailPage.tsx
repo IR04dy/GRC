@@ -221,7 +221,7 @@ export function ExerciseScenarioDetailPage() {
                      : 'Instantiate as runnable exercise'}
           Icon={PlayCircle}
         >
-          <div className="stack" style={{ gap: 'var(--space-sm)' }}>
+          <div className="stack" style={{ gap: 'var(--sp-4)' }}>
             <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: 0 }}>
               {isAr
                 ? 'سننسخ الأهداف ومعايير النجاح وتسلسل الحقن إلى تمرين جديد قابل للتنفيذ في وحدتك التنظيمية.'
@@ -231,7 +231,7 @@ export function ExerciseScenarioDetailPage() {
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: 'var(--space-sm)',
+              gap: 'var(--sp-4)',
             }}>
               <div>
                 <label style={lblStyle}>
@@ -342,7 +342,7 @@ export function ExerciseScenarioDetailPage() {
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: 'var(--space-md)',
+        gap: 'var(--sp-6)',
       }}>
         <Card
           title={isAr ? 'أهداف التعلم' : 'Learning objectives'}
@@ -429,9 +429,9 @@ function InjectRow({
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'auto 1fr',
-      gap: 'var(--space-sm)',
+      gap: 'var(--sp-4)',
       position: 'relative',
-      paddingBottom: isLast ? 0 : 'var(--space-md)',
+      paddingBottom: isLast ? 0 : 'var(--sp-6)',
     }}>
       {/* Bullet + vertical line */}
       <div style={{ position: 'relative', width: 28, display: 'flex', justifyContent: 'center' }}>

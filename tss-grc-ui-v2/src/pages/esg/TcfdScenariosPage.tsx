@@ -167,7 +167,7 @@ export function TcfdScenariosPage() {
           : 'NGFS orderly / disorderly / hot-house scenarios applied to the loan portfolio — required for IFRS S2 disclosure and the SAMA climate-risk supervisory plan.'}
       />
 
-      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
         <Kpi
           Icon={CloudLightning}
           label={isAr ? 'إجمالي السيناريوهات' : 'Total scenarios'}
@@ -195,7 +195,7 @@ export function TcfdScenariosPage() {
 
       {weighted?.warning && (
         <Card>
-          <div className="cluster" style={{ alignItems: 'center', gap: 'var(--space-sm)' }}>
+          <div className="cluster" style={{ alignItems: 'center', gap: 'var(--sp-4)' }}>
             <AlertTriangle size={20} />
             <span>{weighted.warning}</span>
           </div>
@@ -368,11 +368,11 @@ export function TcfdScenariosPage() {
               </ul>
             </div>
           )}
-          <div className="cluster" style={{ justifyContent: 'space-between', marginTop: 'var(--space-md)' }}>
+          <div className="cluster" style={{ justifyContent: 'space-between', marginTop: 'var(--sp-6)' }}>
             <Button variant="secondary" Icon={ChevronLeft} onClick={prevStep} disabled={wizardStep === 1}>
               {isAr ? 'السابق' : 'Back'}
             </Button>
-            <div className="cluster" style={{ gap: 'var(--space-sm)' }}>
+            <div className="cluster" style={{ gap: 'var(--sp-4)' }}>
               <Button variant="secondary" onClick={resetWizard}>
                 {isAr ? 'إلغاء' : 'Cancel'}
               </Button>
@@ -396,11 +396,11 @@ export function TcfdScenariosPage() {
 const th: React.CSSProperties = {
   textAlign: 'start',
   padding: '8px 12px',
-  borderBottom: '1px solid var(--color-border)',
+  borderBottom: '1px solid var(--border)',
   fontWeight: 600,
 };
 const td: React.CSSProperties = {
   padding: '8px 12px',
-  borderBottom: '1px solid var(--color-border)',
+  borderBottom: '1px solid var(--border)',
   verticalAlign: 'top',
 };

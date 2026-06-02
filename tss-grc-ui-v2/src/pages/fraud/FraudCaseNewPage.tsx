@@ -308,7 +308,7 @@ export function FraudCaseNewPage() {
             {demoMode && (
               <div style={{
                 padding: '8px 12px',
-                background: 'var(--color-bg-muted)',
+                background: 'var(--surface-2)',
                 borderRadius: 6,
                 fontSize: 13,
                 color: 'var(--ink-3)',

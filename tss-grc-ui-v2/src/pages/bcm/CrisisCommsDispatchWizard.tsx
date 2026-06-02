@@ -353,7 +353,7 @@ export function CrisisCommsDispatchWizard() {
             </Badge>
           </div>
           <div style={{
-            padding: 16, background: 'var(--surface-alt)', borderRadius: 6,
+            padding: 16, background: 'var(--surface-2)', borderRadius: 6,
             fontFamily: 'var(--font-mono)', fontSize: 13, whiteSpace: 'pre-wrap',
             border: '1px solid var(--border)',
           }}>

@@ -101,7 +101,7 @@ export function OutsourcingDashboardPage() {
       />
 
       {error && (
-        <section style={{ padding: 12, marginBottom: 16, borderInlineStart: '4px solid var(--color-danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <section style={{ padding: 12, marginBottom: 16, borderInlineStart: '4px solid var(--danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
           <strong>{lang === 'ar' ? 'خطأ' : 'Error'}:</strong> {error}
         </section>
       )}
@@ -229,7 +229,7 @@ export function OutsourcingDashboardPage() {
       </section>
 
       {data?.overdueReviews && data.overdueReviews.length > 0 && (
-        <section style={{ padding: 16, borderInlineStart: '4px solid var(--color-danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <section style={{ padding: 16, borderInlineStart: '4px solid var(--danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
           <h3 style={{ margin: '0 0 12px 0', fontSize: 14 }}>
             {lang === 'ar' ? 'مراجعات متأخرة (AR-269)' : 'Overdue reviews (AR-269)'}
           </h3>

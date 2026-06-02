@@ -109,8 +109,8 @@ export function SanctionsChecksPage() {
                 padding: '4px 10px',
                 borderRadius: 'var(--r-sm)',
                 border: '1px solid var(--border)',
-                background: filter === f.value ? 'var(--accent-bg)' : 'transparent',
-                color: filter === f.value ? 'var(--accent-fg)' : 'var(--ink-2)',
+                background: filter === f.value ? 'var(--accent-50)' : 'transparent',
+                color: filter === f.value ? 'var(--accent-700)' : 'var(--ink-2)',
                 cursor: 'pointer',
               }}>
               {isAr ? f.ar : f.en}

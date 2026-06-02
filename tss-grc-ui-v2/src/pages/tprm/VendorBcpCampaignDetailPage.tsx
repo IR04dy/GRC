@@ -174,7 +174,7 @@ export function VendorBcpCampaignDetailPage() {
         }
       />
 
-      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
         <Kpi
           Icon={ClipboardCheck}
           label={isAr ? 'الحالة' : 'Status'}

@@ -160,7 +160,7 @@ export function EvidenceChainPage() {
                         </tr>
                         {open && (
                           <tr>
-                            <td colSpan={8} style={{ background: 'var(--muted)' }}>
+                            <td colSpan={8} style={{ background: 'var(--surface-2)' }}>
                               <div style={{ padding: 12, fontSize: 13 }}>
                                 {!rep ? (
                                   <span style={{ color: 'var(--ink-3)' }}>{t('loading')}</span>

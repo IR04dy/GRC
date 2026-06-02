@@ -180,7 +180,7 @@ export function MtpdInheritanceDetailPage() {
       />
 
       {assessment && (
-        <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+        <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
           <Kpi
             Icon={GitBranch}
             label={isAr ? 'العمليات المفحوصة' : 'Processes scanned'}

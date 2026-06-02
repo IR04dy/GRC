@@ -123,13 +123,13 @@ export function ExerciseScenarioLibraryPage() {
       <div style={{
         display: 'grid',
         gridTemplateColumns: '260px 1fr',
-        gap: 'var(--space-lg)',
+        gap: 'var(--sp-8)',
         alignItems: 'start',
       }}>
         {/* ─── Filter sidebar ─────────────────────────────────────── */}
-        <aside className="stack" style={{ gap: 'var(--space-md)', position: 'sticky', top: 0 }}>
+        <aside className="stack" style={{ gap: 'var(--sp-6)', position: 'sticky', top: 0 }}>
           <Card title={isAr ? 'تصفية' : 'Filters'} Icon={Filter}>
-            <div className="stack" style={{ gap: 'var(--space-sm)' }}>
+            <div className="stack" style={{ gap: 'var(--sp-4)' }}>
               {/* Free-text */}
               <div>
                 <label style={{
@@ -233,7 +233,7 @@ export function ExerciseScenarioLibraryPage() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ width: '100%', marginTop: 'var(--space-xs)' }}
+                  style={{ width: '100%', marginTop: 'var(--sp-2)' }}
                   onClick={clearFilters}
                 >
                   {isAr ? `إزالة التصفية (${activeFilterCount})` : `Clear filters (${activeFilterCount})`}
@@ -253,7 +253,7 @@ export function ExerciseScenarioLibraryPage() {
         </aside>
 
         {/* ─── Main grid ──────────────────────────────────────────── */}
-        <div className="stack" style={{ gap: 'var(--space-md)' }}>
+        <div className="stack" style={{ gap: 'var(--sp-6)' }}>
           {/* "Popular this quarter" pinned section */}
           {popular.length > 0 && activeFilterCount === 0 && (
             <Card
@@ -263,7 +263,7 @@ export function ExerciseScenarioLibraryPage() {
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: 'var(--space-sm)',
+                gap: 'var(--sp-4)',
               }}>
                 {popular.map(s => (
                   <ScenarioCard
@@ -292,7 +292,7 @@ export function ExerciseScenarioLibraryPage() {
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: 'var(--space-sm)',
+                gap: 'var(--sp-4)',
               }}>
                 {items.map(s => (
                   <ScenarioCard
@@ -328,7 +328,7 @@ function ScenarioCard({
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
       style={{
-        padding: 'var(--space-sm)',
+        padding: 'var(--sp-4)',
         border: '1px solid var(--border)',
         borderRadius: 8,
         background: 'var(--surface)',

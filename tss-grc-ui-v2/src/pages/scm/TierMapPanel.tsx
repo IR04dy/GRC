@@ -115,7 +115,7 @@ function ServiceNode({ label }: { label: string }) {
 function Connector({ link }: { link: TierLink }) {
   // Pick visual styling per tier
   const tone =
-    link.tier === 1 ? { bg: 'var(--accent-bg)',  fg: 'var(--accent-700)',  border: 'var(--accent-700)' } :
+    link.tier === 1 ? { bg: 'var(--accent-50)',  fg: 'var(--accent-700)',  border: 'var(--accent-700)' } :
     link.tier === 2 ? { bg: 'var(--surface-3)',  fg: 'var(--ink-1)',       border: 'var(--cat-2)' } :
                       { bg: 'var(--surface-3)',  fg: 'var(--ink-2)',       border: 'var(--ink-4)' };
   return (

@@ -385,7 +385,7 @@ export function RegReportingFilingDetailPage() {
           zIndex: 50,
         }} onClick={closeModal}>
           <div style={{
-            background: 'var(--card-bg)',
+            background: 'var(--surface)',
             padding: 20, borderRadius: 8,
             minWidth: 420, maxWidth: 600,
           }} onClick={e => e.stopPropagation()}>

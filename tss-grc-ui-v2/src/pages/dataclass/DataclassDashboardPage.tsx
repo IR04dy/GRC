@@ -151,7 +151,7 @@ export function DataclassDashboardPage() {
       />
 
       {error && (
-        <section style={{ padding: 12, marginBottom: 16, borderInlineStart: '4px solid var(--color-danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <section style={{ padding: 12, marginBottom: 16, borderInlineStart: '4px solid var(--danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
           <strong>{lang === 'ar' ? 'خطأ' : 'Error'}:</strong> {error}
         </section>
       )}
@@ -234,7 +234,7 @@ export function DataclassDashboardPage() {
       </section>
 
       {data?.recentCrossBorderFlows && data.recentCrossBorderFlows.length > 0 && (
-        <section style={{ padding: 16, borderInlineStart: '4px solid var(--color-warning)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <section style={{ padding: 16, borderInlineStart: '4px solid var(--warning)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
           <h3 style={{ margin: '0 0 12px 0', fontSize: 14 }}>
             {lang === 'ar' ? 'تدفقات عبر الحدود (AR-285)' : 'Cross-border flows (AR-285)'}
           </h3>

@@ -199,7 +199,7 @@ export function OpResDashboardPage() {
                        borderRadius: 8,
                        padding: 12,
                        cursor: 'pointer',
-                       background: 'var(--card-bg)',
+                       background: 'var(--surface)',
                      }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8,
                                 marginBottom: 6 }}>

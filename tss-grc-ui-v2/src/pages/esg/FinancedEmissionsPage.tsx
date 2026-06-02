@@ -114,7 +114,7 @@ export function FinancedEmissionsPage() {
           : 'PCAF Scope-3 Category 15 — credit-portfolio emissions attributed across asset classes for IFRS S2 reporting.'}
       />
 
-      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+      <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
         <Kpi
           Icon={Factory}
           label={isAr ? 'إجمالي الانبعاثات المُموَّلة' : 'Total financed emissions'}
@@ -142,7 +142,7 @@ export function FinancedEmissionsPage() {
       </div>
 
       <Card>
-        <div className="cluster" style={{ gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+        <div className="cluster" style={{ gap: 'var(--sp-4)', marginBottom: 'var(--sp-6)' }}>
           <Button variant={tab === 'records' ? 'primary' : 'secondary'} onClick={() => setTab('records')}>
             {isAr ? 'السجلّات' : 'Records'}
           </Button>
@@ -337,11 +337,11 @@ function TrendChart({
 const th: React.CSSProperties = {
   textAlign: 'start',
   padding: '8px 12px',
-  borderBottom: '1px solid var(--color-border)',
+  borderBottom: '1px solid var(--border)',
   fontWeight: 600,
 };
 const td: React.CSSProperties = {
   padding: '8px 12px',
-  borderBottom: '1px solid var(--color-border)',
+  borderBottom: '1px solid var(--border)',
   verticalAlign: 'top',
 };

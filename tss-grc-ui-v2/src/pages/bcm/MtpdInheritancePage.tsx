@@ -238,7 +238,7 @@ export function MtpdInheritancePage() {
       />
 
       {/* Tabs */}
-      <div className="cluster" style={{ gap: 8, marginBottom: 'var(--space-md)' }}>
+      <div className="cluster" style={{ gap: 8, marginBottom: 'var(--sp-6)' }}>
         <Button
           variant={tab === 'assessments' ? 'primary' : 'secondary'}
           Icon={AlertOctagon}
@@ -255,7 +255,7 @@ export function MtpdInheritancePage() {
 
       {tab === 'assessments' && (
         <>
-          <div className="kpi-grid-sm" style={{ marginBottom: 'var(--space-md)' }}>
+          <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
             <Kpi
               Icon={GitBranch}
               label={isAr ? 'إجمالي التقييمات' : 'Total assessments'}

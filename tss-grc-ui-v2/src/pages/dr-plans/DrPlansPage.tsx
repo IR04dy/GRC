@@ -221,7 +221,7 @@ export function DrPlansPage() {
                         </tr>
                         {open && (
                           <tr>
-                            <td colSpan={10} style={{ background: 'var(--muted)' }}>
+                            <td colSpan={10} style={{ background: 'var(--surface-2)' }}>
                               <div style={{ padding: 12, fontSize: 13 }}>
                                 {r.descriptionEn && (
                                   <p style={{ marginBottom: 6 }}>

@@ -134,7 +134,7 @@ export function AiLifecycleDashboardPage() {
       />
 
       {error && (
-        <section style={{ padding: 12, marginBottom: 16, borderInlineStart: '4px solid var(--color-danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <section style={{ padding: 12, marginBottom: 16, borderInlineStart: '4px solid var(--danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
           <strong>{lang === 'ar' ? 'خطأ' : 'Error'}:</strong> {error}
         </section>
       )}
@@ -229,7 +229,7 @@ export function AiLifecycleDashboardPage() {
       </section>
 
       {data?.overdueRecertifications && data.overdueRecertifications.length > 0 && (
-        <section style={{ padding: 16, borderInlineStart: '4px solid var(--color-danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <section style={{ padding: 16, borderInlineStart: '4px solid var(--danger)', borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
           <h3 style={{ margin: '0 0 12px 0', fontSize: 14 }}>
             {lang === 'ar' ? 'إعادة اعتماد متأخرة (AR-278)' : 'Overdue recertifications (AR-278)'}
           </h3>

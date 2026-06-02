@@ -135,7 +135,7 @@ export function CyberPdplBridgePage() {
                         </tr>
                         {open && (
                           <tr>
-                            <td colSpan={9} style={{ background: 'var(--muted)' }}>
+                            <td colSpan={9} style={{ background: 'var(--surface-2)' }}>
                               <div style={{ padding: 12, fontSize: 13 }}>
                                 {r.triggerReason && (
                                   <p style={{ marginBottom: 8 }}>
