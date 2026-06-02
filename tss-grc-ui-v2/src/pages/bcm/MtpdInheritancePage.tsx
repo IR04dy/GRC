@@ -12,6 +12,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError, bcmApi, tprmApi } from '../../lib/api';
@@ -418,13 +419,11 @@ export function MtpdInheritancePage() {
                       </td>
                       <td>
                         <Badge tone={dependencyTypeTone(d.dependencyType)}>
-                          {isAr ? DEPENDENCY_TYPE_LABELS[d.dependencyType].ar
-                                : DEPENDENCY_TYPE_LABELS[d.dependencyType].en}
+                          {tlabel(DEPENDENCY_TYPE_LABELS, d.dependencyType, isAr)}
                         </Badge>
                       </td>
                       <td>
-                        {isAr ? DEPENDENCY_STRENGTH_LABELS[d.dependencyStrength].ar
-                              : DEPENDENCY_STRENGTH_LABELS[d.dependencyStrength].en}
+                        {tlabel(DEPENDENCY_STRENGTH_LABELS, d.dependencyStrength, isAr)}
                       </td>
                       <td>
                         <Button size="sm" variant="ghost" Icon={Trash2}

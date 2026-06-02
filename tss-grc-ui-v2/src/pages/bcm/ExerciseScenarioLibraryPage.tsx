@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -176,7 +177,7 @@ export function ExerciseScenarioLibraryPage() {
                   <option value="">{isAr ? 'الكل' : 'All'}</option>
                   {SCENARIO_TYPES.map(t => (
                     <option key={t} value={t}>
-                      {isAr ? SCENARIO_TYPE_LABELS[t].ar : SCENARIO_TYPE_LABELS[t].en}
+                      {tlabel(SCENARIO_TYPE_LABELS, t, isAr)}
                     </option>
                   ))}
                 </select>
@@ -199,7 +200,7 @@ export function ExerciseScenarioLibraryPage() {
                   <option value="">{isAr ? 'الكل' : 'All'}</option>
                   {COMPLEXITIES.map(c => (
                     <option key={c} value={c}>
-                      {isAr ? COMPLEXITY_LABELS[c].ar : COMPLEXITY_LABELS[c].en}
+                      {tlabel(COMPLEXITY_LABELS, c, isAr)}
                     </option>
                   ))}
                 </select>
@@ -369,14 +370,12 @@ function ScenarioCard({
       <div className="cluster" style={{ gap: 4, flexWrap: 'wrap' }}>
         {s.scenarioType && (
           <Badge tone={scenarioTypeTone(s.scenarioType)}>
-            {isAr ? SCENARIO_TYPE_LABELS[s.scenarioType].ar
-                  : SCENARIO_TYPE_LABELS[s.scenarioType].en}
+            {tlabel(SCENARIO_TYPE_LABELS, s.scenarioType, isAr)}
           </Badge>
         )}
         {s.complexity && (
           <Badge tone={complexityTone(s.complexity)}>
-            {isAr ? COMPLEXITY_LABELS[s.complexity].ar
-                  : COMPLEXITY_LABELS[s.complexity].en}
+            {tlabel(COMPLEXITY_LABELS, s.complexity, isAr)}
           </Badge>
         )}
       </div>

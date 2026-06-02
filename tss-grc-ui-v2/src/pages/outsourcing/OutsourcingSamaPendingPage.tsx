@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -105,11 +106,11 @@ export function OutsourcingSamaPendingPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {isAr ? SERVICE_TYPE_LABELS[a.serviceType].ar : SERVICE_TYPE_LABELS[a.serviceType].en}
+                      {tlabel(SERVICE_TYPE_LABELS, a.serviceType, isAr)}
                     </td>
                     <td className="px-3 py-2">
                       <Badge tone={lifecycleTone(a.lifecycleStage)}>
-                        {isAr ? LIFECYCLE_LABELS[a.lifecycleStage].ar : LIFECYCLE_LABELS[a.lifecycleStage].en}
+                        {tlabel(LIFECYCLE_LABELS, a.lifecycleStage, isAr)}
                       </Badge>
                     </td>
                     <td className="px-3 py-2 text-xs">{a.contractStartDate ?? '—'}</td>

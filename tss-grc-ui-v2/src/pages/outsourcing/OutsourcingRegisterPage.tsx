@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -150,7 +151,7 @@ export function OutsourcingRegisterPage() {
             >
               <option value="">{isAr ? 'الكل' : 'All'}</option>
               {LIFECYCLE_STAGES.map(s => (
-                <option key={s} value={s}>{isAr ? LIFECYCLE_LABELS[s].ar : LIFECYCLE_LABELS[s].en}</option>
+                <option key={s} value={s}>{tlabel(LIFECYCLE_LABELS, s, isAr)}</option>
               ))}
             </select>
           </label>
@@ -227,7 +228,7 @@ export function OutsourcingRegisterPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {isAr ? SERVICE_TYPE_LABELS[a.serviceType].ar : SERVICE_TYPE_LABELS[a.serviceType].en}
+                      {tlabel(SERVICE_TYPE_LABELS, a.serviceType, isAr)}
                     </td>
                     <td className="px-3 py-2">
                       {a.isMaterial
@@ -236,7 +237,7 @@ export function OutsourcingRegisterPage() {
                     </td>
                     <td className="px-3 py-2">
                       <Badge tone={lifecycleTone(a.lifecycleStage)}>
-                        {isAr ? LIFECYCLE_LABELS[a.lifecycleStage].ar : LIFECYCLE_LABELS[a.lifecycleStage].en}
+                        {tlabel(LIFECYCLE_LABELS, a.lifecycleStage, isAr)}
                       </Badge>
                     </td>
                     <td className="px-3 py-2 text-xs">
@@ -249,7 +250,7 @@ export function OutsourcingRegisterPage() {
                     <td className="px-3 py-2 text-xs">
                       {a.criticalFunction === 'NA'
                         ? <span className="text-muted-foreground">—</span>
-                        : (isAr ? CRITICAL_FUNCTION_LABELS[a.criticalFunction].ar : CRITICAL_FUNCTION_LABELS[a.criticalFunction].en)}
+                        : (tlabel(CRITICAL_FUNCTION_LABELS, a.criticalFunction, isAr))}
                     </td>
                     <td className="px-3 py-2 text-end font-mono text-xs">
                       {fmtSar(a.contractValueSarAnnual)}

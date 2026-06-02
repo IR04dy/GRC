@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -137,7 +138,7 @@ export function ObligationsPage() {
             <option value="">{isAr ? 'كل الجهات' : 'All regulators'}</option>
             {REGULATORS.map(r => (
               <option key={r} value={r}>
-                {isAr ? REGULATOR_LABELS[r].ar : REGULATOR_LABELS[r].en}
+                {tlabel(REGULATOR_LABELS, r, isAr)}
               </option>
             ))}
           </select>
@@ -149,7 +150,7 @@ export function ObligationsPage() {
             <option value="">{isAr ? 'كل الحالات' : 'All stages'}</option>
             {LIFECYCLE_STAGES.map(s => (
               <option key={s} value={s}>
-                {isAr ? LIFECYCLE_LABELS[s].ar : LIFECYCLE_LABELS[s].en}
+                {tlabel(LIFECYCLE_LABELS, s, isAr)}
               </option>
             ))}
           </select>
@@ -200,17 +201,17 @@ export function ObligationsPage() {
                         )}
                       </td>
                       <td style={{ fontSize: 13 }}>
-                        {isAr ? REGULATOR_LABELS[o.regulator].ar : REGULATOR_LABELS[o.regulator].en}
+                        {tlabel(REGULATOR_LABELS, o.regulator, isAr)}
                       </td>
                       <td style={{ fontSize: 13 }}>
-                        {isAr ? TYPE_LABELS[o.obligationType].ar : TYPE_LABELS[o.obligationType].en}
+                        {tlabel(TYPE_LABELS, o.obligationType, isAr)}
                       </td>
                       <td style={{ fontSize: 13 }}>
-                        {isAr ? FREQUENCY_LABELS[o.frequency].ar : FREQUENCY_LABELS[o.frequency].en}
+                        {tlabel(FREQUENCY_LABELS, o.frequency, isAr)}
                       </td>
                       <td>
                         <Badge tone={severityTone(o.severityIfMissed)}>
-                          {isAr ? SEVERITY_LABELS[o.severityIfMissed].ar : SEVERITY_LABELS[o.severityIfMissed].en}
+                          {tlabel(SEVERITY_LABELS, o.severityIfMissed, isAr)}
                         </Badge>
                       </td>
                       <td style={{ fontSize: 13, color: dueColor, fontVariantNumeric: 'tabular-nums' }}>
@@ -225,7 +226,7 @@ export function ObligationsPage() {
                       </td>
                       <td>
                         <Badge tone={lifecycleTone(o.lifecycleStage)}>
-                          {isAr ? LIFECYCLE_LABELS[o.lifecycleStage].ar : LIFECYCLE_LABELS[o.lifecycleStage].en}
+                          {tlabel(LIFECYCLE_LABELS, o.lifecycleStage, isAr)}
                         </Badge>
                       </td>
                     </tr>

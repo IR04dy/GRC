@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
@@ -261,12 +262,12 @@ export function ObligationCampaignsPage() {
                       </td>
                       <td>
                         <Badge tone={campaignStatusTone(c.status)}>
-                          {isAr ? CAMPAIGN_STATUS_LABELS[c.status].ar : CAMPAIGN_STATUS_LABELS[c.status].en}
+                          {tlabel(CAMPAIGN_STATUS_LABELS, c.status, isAr)}
                         </Badge>
                       </td>
                       <td style={{ fontSize: 13 }}>
                         {c.regulatorFilter
-                          ? (isAr ? REGULATOR_LABELS[c.regulatorFilter].ar : REGULATOR_LABELS[c.regulatorFilter].en)
+                          ? (tlabel(REGULATOR_LABELS, c.regulatorFilter, isAr))
                           : (isAr ? 'كل الجهات' : 'All regulators')}
                         {c.cycleQuarter ? ` · ${c.cycleQuarter}` : ''} · {c.cycleYear}
                       </td>
