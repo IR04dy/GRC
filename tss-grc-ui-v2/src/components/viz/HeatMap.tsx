@@ -74,6 +74,17 @@ export function HeatMap({ data, onCellClick, selected }: HeatMapProps) {
         </tbody>
       </table>
       <div className="heatmap-axis-x">{t('riskAxisLikelihood')}</div>
+      {/* Colour legend — the cell colours are meaningless without it. Stepped
+          low→critical bar (mirrors `colorFor`'s six bands) with end labels. */}
+      <div className="heatmap-legend">
+        <span className="heatmap-legend-lbl">{t('heatLegendLow')}</span>
+        <span className="heatmap-legend-bar" aria-hidden="true">
+          {[2, 6, 10, 14, 18, 24].map(s => (
+            <i key={s} style={{ background: colorFor(s) }} />
+          ))}
+        </span>
+        <span className="heatmap-legend-lbl">{t('heatLegendHigh')}</span>
+      </div>
     </div>
   );
 }

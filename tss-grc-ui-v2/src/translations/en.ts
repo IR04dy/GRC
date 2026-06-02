@@ -455,6 +455,8 @@ export const en = {
   riskAxisImpact: 'Impact',
   riskAxisLikelihood: 'Likelihood',
   heatLevels: 'VL,L,M,H,VH',
+  heatLegendLow: 'Low',
+  heatLegendHigh: 'Critical',
 
   // Risk lifecycle workflow actions (ISO 31000 / COSO ERM)
   riskActSubmitReview: 'Submit for Review',

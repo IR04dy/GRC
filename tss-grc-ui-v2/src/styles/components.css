@@ -513,6 +513,28 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   text-transform: uppercase;
   margin-top: 4px;
 }
+/* Colour legend — spans the full grid width on a new row under the axes. */
+.heatmap-legend {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.heatmap-legend-bar {
+  display: inline-flex;
+  border-radius: var(--r-xs);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.heatmap-legend-bar i { width: 18px; height: 8px; display: block; }
+.heatmap-legend-lbl {
+  font: 700 var(--text-3xs) var(--font-sans);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
 .heatmap-table { border-collapse: separate; border-spacing: 5px; width: 100%; }
 .heatmap-row-lbl, .heatmap-col-lbl {
   font: 700 10px var(--font-mono);
