@@ -13,6 +13,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
+import { CrosswalkFan } from '../../components/viz/CrosswalkFan';
 import { complianceApi, type ComplianceControlDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -56,6 +57,7 @@ export function ControlDetailPage() {
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const name = lang === 'ar' && item.nameAr ? item.nameAr : item.nameEn;
+  const anchors = CONTROL_ANCHORS_BY_ID[item.id] ?? [];
   const tabs: TabItem<TabId>[] = [
     { id: 'overview',    label: t('detailTabOverview') },
     { id: 'subcontrols', label: t('detailTabSubControls') },
@@ -118,15 +120,34 @@ export function ControlDetailPage() {
           <Tabs items={tabs} active={tab} onChange={setTab} />
 
           {tab === 'overview' && (
-            <Card title={t('detailTabOverview')} Icon={ClipboardCheck}>
-              <Field label={t('fldCode')}     value={item.code} mono bold />
-              <Field label={t('colControl')}  value={name} bold />
-              <Field label={t('fldDomain')}   value={item.domain ?? '—'} />
-              <Field label={t('colMaturity')} value={`L${item.maturityLevel ?? 0}`} mono />
-              <Field label={t('colOwner')}    value={item.owner ?? '—'} />
-              <Field label={t('colFramework')} value={(item.framework ?? '').replace(/_/g, ' ')} />
-              <Field label={t('detailDescription')} value={item.description ?? '—'} multiline />
-            </Card>
+            <>
+              {anchors.length > 0 && (
+                <Card
+                  title={lang === 'ar' ? 'مصفوفة التغطية — اختبر مرة، تلتزم مراراً' : 'Coverage crosswalk — test once, satisfy many'}
+                  Icon={Link2}
+                  action={<Badge tone="primary">×{anchors.length} {lang === 'ar' ? 'استشهاد' : 'citations'}</Badge>}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>
+                    {lang === 'ar'
+                      ? `هذا الضابط يلبّي ${anchors.length} استشهاداً تنظيمياً عبر ${new Set(anchors.map(a => a.authorityCode)).size} جهات. مرّر فوق استشهاد لتتبّع مساره.`
+                      : `This single control satisfies ${anchors.length} regulatory citations across ${new Set(anchors.map(a => a.authorityCode)).size} authorities. Hover a citation to trace its ribbon.`}
+                  </div>
+                  <CrosswalkFan
+                    controlCode={item.code}
+                    citations={anchors}
+                    ar={lang === 'ar'}
+                    onCitationClick={(c) => navigate(`/compliance/posture?authority=${encodeURIComponent(c.authorityCode)}`)} />
+                </Card>
+              )}
+              <Card title={t('detailTabOverview')} Icon={ClipboardCheck}>
+                <Field label={t('fldCode')}     value={item.code} mono bold />
+                <Field label={t('colControl')}  value={name} bold />
+                <Field label={t('fldDomain')}   value={item.domain ?? '—'} />
+                <Field label={t('colMaturity')} value={`L${item.maturityLevel ?? 0}`} mono />
+                <Field label={t('colOwner')}    value={item.owner ?? '—'} />
+                <Field label={t('colFramework')} value={(item.framework ?? '').replace(/_/g, ' ')} />
+                <Field label={t('detailDescription')} value={item.description ?? '—'} multiline />
+              </Card>
+            </>
           )}
 
       {tab === 'subcontrols' && (

@@ -590,7 +590,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 /* Fade in when the tbody subtree is replaced (filter applied, saved
  * view loaded, WebSocket pushed a row). Runs only on React remount,
  * so it's cheap — no per-render cost. */
-.risk-table tbody { animation: fade-in var(--dur-md) ease-out; }
+.risk-table tbody { animation: fade-in var(--dur-normal) ease-out; }
 /* .mono — monospace for codes, IDs, timestamps, hex values, file paths.
  * `unicode-bidi: isolate` + `direction: ltr` lock the strong-LTR
  * direction so an Arabic UI doesn't reorder "INC-0042" / "AC-2.1.2" /
@@ -811,7 +811,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--sp-5) var(--sp-6);
   border: 1px solid var(--danger-border, var(--danger));
   background: var(--danger-bg, var(--surface-2));
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--r-md);
   color: var(--ink-1);
 }
 .error-state-compact {
@@ -841,7 +841,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   gap: var(--sp-5);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--r-lg);
   overflow: hidden;
 }
 @media (max-width: 768px) {
@@ -859,7 +859,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .wizard-rail-button {
   width: 100%;
   display: flex; align-items: flex-start; gap: var(--sp-3);
-  padding: var(--sp-3); border-radius: var(--radius-md, 8px);
+  padding: var(--sp-3); border-radius: var(--r-md);
   background: transparent; border: 1px solid transparent;
   color: var(--ink-2); cursor: pointer; text-align: start;
   font: 500 var(--text-sm) var(--font-sans);
@@ -956,7 +956,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--r-md);
 }
 .wf-hub-filters .input { width: auto; min-height: 38px; padding: 8px 10px; font-weight: 500; }
 .wf-hub-grid {
@@ -967,7 +967,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .wf-hub-card-wrap {
   text-decoration: none; color: inherit;
   display: block;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--r-md);
 }
 .wf-hub-card-wrap:focus-visible {
   outline: none;
@@ -979,7 +979,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--sp-4);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--r-md);
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
   min-height: 200px;
   height: 100%;
@@ -1032,7 +1032,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--r-md);
 }
 .wf-submissions-panel-head {
   display: flex; align-items: center; gap: 6px;
@@ -1113,7 +1113,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--r-md);
 }
 .wf-quick-launch-head {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1188,7 +1188,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--r-sm);
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
@@ -1211,7 +1211,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   padding: var(--sp-4) var(--sp-5);
   background: var(--primary-50, var(--surface-2));
   border: 1px solid var(--primary-200, var(--border));
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--r-sm);
   font: 500 var(--text-sm) var(--font-sans);
   color: var(--ink-1);
   display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
@@ -1370,7 +1370,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   color: var(--ink-1);
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--r-sm);
   padding: var(--sp-4);
   margin: 0;
   white-space: pre-wrap;
@@ -1385,7 +1385,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   color: var(--ink-2);
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--r-sm);
   padding: var(--sp-3);
   margin: 6px 0 0;
   white-space: pre-wrap;
@@ -1410,7 +1410,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   text-align: center;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--r-lg);
   color: var(--ink-1);
 }
 .error-boundary-card svg { color: var(--danger, #ef4444); margin-bottom: var(--sp-3); }
@@ -1420,7 +1420,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   font: 500 11.5px var(--font-mono);
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--r-sm);
   padding: var(--sp-3);
   margin: var(--sp-3) 0;
   color: var(--ink-2);

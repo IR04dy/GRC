@@ -1,0 +1,83 @@
+/* ============================================================================
+ * motion.css — Visualization motion & utility kit (front-end design Phase A)
+ *
+ * The shared "premium polish" layer prescribed by the design playbook: one
+ * hover shadow token, tabular numerals, interactive-card lift, a single
+ * "live/unresolved" pulse, skeleton shimmer, staggered entrance, and a
+ * draw-on helper for SVG heroes. Everything is token-driven and fully gated
+ * behind prefers-reduced-motion (regulator-facing accessibility).
+ * ==========================================================================*/
+
+:root {
+  /* Promoted from the repeated inline KPI hover shadow → one source of truth. */
+  --shadow-hover: 0 6px 18px rgba(11, 80, 80, 0.10);
+}
+[data-theme="dark"] {
+  --shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Tabular numerals — metrics, axes, counters never jitter or misalign ── */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ── Interactive card: subtle lift on hover (one canonical behaviour) ── */
+.card--interactive {
+  transition: transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+.card--interactive:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ── "Live / unresolved" pulse — reserved meaning: look here ── */
+@keyframes viz-pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.viz-pulse { animation: viz-pulse-soft 2s var(--ease-standard) infinite; }
+
+/* ── Skeleton shimmer (chart/card loading that matches the final layout) ── */
+@keyframes viz-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.viz-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-3) 0%,
+    color-mix(in oklab, var(--surface-3) 60%, var(--surface-1)) 50%,
+    var(--surface-3) 100%
+  );
+  background-size: 200% 100%;
+  animation: viz-shimmer 1.4s linear infinite;
+  border-radius: var(--r-md);
+}
+
+/* ── Staggered entrance — fade + rise; apply .viz-stagger to the container ── */
+@keyframes viz-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.viz-stagger > * { animation: viz-rise var(--dur-normal) var(--ease-out) both; }
+.viz-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.viz-stagger > *:nth-child(2) { animation-delay: 45ms; }
+.viz-stagger > *:nth-child(3) { animation-delay: 90ms; }
+.viz-stagger > *:nth-child(4) { animation-delay: 135ms; }
+.viz-stagger > *:nth-child(5) { animation-delay: 180ms; }
+.viz-stagger > *:nth-child(6) { animation-delay: 225ms; }
+.viz-stagger > *:nth-child(7) { animation-delay: 270ms; }
+.viz-stagger > *:nth-child(8) { animation-delay: 315ms; }
+
+/* ── Draw-on for SVG strokes (arcs, lines, vectors) ── */
+@keyframes viz-draw { from { stroke-dashoffset: var(--viz-draw-len, 1); } to { stroke-dashoffset: 0; } }
+.viz-draw {
+  stroke-dasharray: var(--viz-draw-len, 1);
+  stroke-dashoffset: var(--viz-draw-len, 1);
+  animation: viz-draw var(--dur-slow) var(--ease-out) forwards;
+}
+
+/* ── Reduced motion: snap to final state, no looping motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .viz-pulse,
+  .viz-skeleton,
+  .viz-stagger > *,
+  .viz-draw {
+    animation: none !important;
+  }
+  .viz-draw { stroke-dashoffset: 0; }
+  .viz-stagger > * { opacity: 1; transform: none; }
+}

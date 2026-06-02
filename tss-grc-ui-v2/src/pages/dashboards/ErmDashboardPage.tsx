@@ -10,8 +10,9 @@ import { Badge } from '../../components/ui/Badge';
 import { BarChart } from '../../components/charts/BarChart';
 import { PieChart, type PieDatum } from '../../components/charts/PieChart';
 import { LineChart } from '../../components/charts/LineChart';
+import { RiskMatrix5x5, type RiskMovement } from '../../components/viz/RiskMatrix5x5';
 import { useI18n } from '../../lib/i18n';
-import { dashboardApi, ermAdvancedApi, type DashboardStats, ApiError } from '../../lib/api';
+import { dashboardApi, ermAdvancedApi, riskApi, type DashboardStats, ApiError } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 
 /**
@@ -43,6 +44,8 @@ export function ErmDashboardPage() {
   const [kri, setKri] = useState<KriBands | null>(null);
   const [appetite, setAppetite] = useState<AppetiteSummary | null>(null);
   const [trend, setTrend] = useState<Array<{ week: string; open: number; critical: number }>>([]);
+  const [movements, setMovements] = useState<RiskMovement[]>([]);
+  const [showVectors, setShowVectors] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +53,7 @@ export function ErmDashboardPage() {
     if (!isAuthenticated()) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [s, h, c, k, a, tRisks, tCrit] = await Promise.all([
+      const [s, h, c, k, a, tRisks, tCrit, risks] = await Promise.all([
         dashboardApi.stats(),
         dashboardApi.heatmap() as Promise<{ cells: HeatmapCell[] }>,
         dashboardApi.riskByCategory() as Promise<CategoryBucket>,
@@ -58,6 +61,7 @@ export function ErmDashboardPage() {
         ermAdvancedApi.appetiteDashboard().catch(() => null),
         dashboardApi.kpiTrend('risks', 12).catch(() => []),
         dashboardApi.kpiTrend('critical_risks', 12).catch(() => []),
+        riskApi.list(undefined, 0, 200).catch(() => null),
       ]);
       setStats(s);
       setHeatmap(h?.cells ?? []);
@@ -65,6 +69,16 @@ export function ErmDashboardPage() {
       setKri(k ?? null);
       setAppetite(a as AppetiteSummary | null);
       setTrend(tRisks.map((p, i) => ({ week: p.label, open: p.value, critical: tCrit[i]?.value ?? 0 })));
+      // Inherent→residual movement vectors (control effectiveness made visible).
+      const movs: RiskMovement[] = (risks?.content ?? [])
+        .filter(r => r.residualLikelihood != null && r.residualImpact != null)
+        .map(r => ({
+          fromL: r.inherentLikelihood, fromI: r.inherentImpact,
+          toL: r.residualLikelihood as number, toI: r.residualImpact as number,
+        }))
+        .filter(m => m.fromL >= 1 && m.fromL <= 5 && m.fromI >= 1 && m.fromI <= 5
+                  && m.toL >= 1 && m.toL <= 5 && m.toI >= 1 && m.toI <= 5);
+      setMovements(movs);
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load dashboard');
@@ -193,11 +207,26 @@ export function ErmDashboardPage() {
       {/* ── Charts row 2: heat-map + categories bar ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12, marginBottom: 16 }}>
         <Card>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>
-            {isAr ? 'مصفوفة المخاطر الكامنة (٥×٥)' : 'Inherent risk heat-map (5×5)'}
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontWeight: 700 }}>
+              {isAr ? 'مصفوفة المخاطر (٥×٥) — الكامن ← المتبقي' : 'Risk matrix (5×5) — inherent → residual'}
+            </div>
+            {movements.length > 0 && (
+              <button type="button" onClick={() => setShowVectors(v => !v)}
+                className="card--interactive"
+                style={{
+                  font: '600 11px var(--font-sans)', cursor: 'pointer',
+                  padding: '4px 10px', borderRadius: 'var(--r-pill)',
+                  border: '1px solid var(--border)',
+                  background: showVectors ? 'var(--primary-soft)' : 'var(--surface)',
+                  color: showVectors ? 'var(--primary-700)' : 'var(--ink-3)',
+                }}>
+                {isAr ? 'إظهار الحركة' : 'Show movement'}
+              </button>
+            )}
           </div>
-          <div style={{ padding: 14 }}>
-            <HeatMatrix cells={heatmap} ar={isAr}
+          <div style={{ padding: 14, display: 'flex', justifyContent: 'center' }}>
+            <RiskMatrix5x5 cells={heatmap} movements={movements} showVectors={showVectors} ar={isAr}
               onCellClick={(L, I) => navigate(`/risk?likelihood=${L}&impact=${I}`)} />
           </div>
         </Card>
@@ -242,87 +271,6 @@ interface HeatmapCell { likelihood: number; impact: number; count: number; }
 interface CategoryBucket { labels: string[]; values: number[]; }
 interface KriBands { totalKris: number; green: number; amber: number; red: number; noData: number; openBreaches: number; }
 interface AppetiteSummary { total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number; }
-
-/** 5x5 inherent-risk matrix with traffic-light shading. Likelihood 1-5 on
- *  X axis, impact 1-5 on Y axis (impact 5 at top). Clicking a cell drills
- *  into the risk register filtered to that L/I bucket. */
-function HeatMatrix({ cells, ar, onCellClick }: { cells: HeatmapCell[]; ar: boolean; onCellClick: (L: number, I: number) => void }) {
-  // Score thresholds for cell colour. Standard 5x5 ERM colouring: ≥15 red,
-  // ≥8 amber, else green. Empty cells stay neutral.
-  function score(L: number, I: number) { return L * I; }
-  function colourFor(L: number, I: number, count: number): string {
-    if (count === 0) return 'rgba(0,0,0,0.04)';
-    const s = score(L, I);
-    if (s >= 15) return 'rgba(220,38,38,0.85)'; // red
-    if (s >= 8)  return 'rgba(202,138,4,0.78)';  // amber
-    return 'rgba(22,163,74,0.78)';                // green
-  }
-  function countFor(L: number, I: number): number {
-    return cells.find(c => c.likelihood === L && c.impact === I)?.count ?? 0;
-  }
-
-  const impacts = [5, 4, 3, 2, 1]; // top-down (5 at top)
-  const likelihoods = [1, 2, 3, 4, 5];
-
-  return (
-    <div style={{ overflow: 'auto' }}>
-      <table style={{ borderCollapse: 'collapse', margin: '0 auto', fontSize: 11 }}>
-        <thead>
-          <tr>
-            <th style={{ writingMode: 'vertical-rl', padding: 4, textAlign: 'center', color: 'var(--text-2)' }}>
-              ↑ {ar ? 'الأثر' : 'Impact'}
-            </th>
-            {likelihoods.map(() => null)}
-          </tr>
-        </thead>
-        <tbody>
-          {impacts.map(I => (
-            <tr key={I}>
-              <td style={{ padding: 4, textAlign: 'center', fontWeight: 700, color: 'var(--text-2)' }}>{I}</td>
-              {likelihoods.map(L => {
-                const c = countFor(L, I);
-                return (
-                  <td key={L}
-                      onClick={() => c > 0 && onCellClick(L, I)}
-                      style={{
-                        width: 56, height: 50,
-                        background: colourFor(L, I, c),
-                        color: c > 0 ? '#fff' : '#94a3b8',
-                        fontWeight: 700, fontSize: 14,
-                        textAlign: 'center', verticalAlign: 'middle',
-                        border: '1px solid rgba(255,255,255,0.5)',
-                        cursor: c > 0 ? 'pointer' : 'default',
-                        userSelect: 'none',
-                      }}
-                      title={`L=${L} × I=${I} → ${c} ${ar ? 'مخاطرة' : 'risk(s)'}`}>
-                    {c || '—'}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-          <tr>
-            <td></td>
-            {likelihoods.map(L => (
-              <td key={L} style={{ padding: 4, textAlign: 'center', fontWeight: 700, color: 'var(--text-2)' }}>{L}</td>
-            ))}
-          </tr>
-          <tr>
-            <td></td>
-            <td colSpan={5} style={{ padding: '4px 0', textAlign: 'center', color: 'var(--text-2)' }}>
-              {ar ? 'الاحتمال →' : '→ Likelihood'}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12, fontSize: 11 }}>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'rgba(220,38,38,0.85)', marginInlineEnd: 4, verticalAlign: 'middle' }}/>{ar ? 'حرج (≥١٥)' : 'Critical (≥15)'}</span>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'rgba(202,138,4,0.78)', marginInlineEnd: 4, verticalAlign: 'middle' }}/>{ar ? 'متوسط (٨-١٤)' : 'Medium (8-14)'}</span>
-        <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'rgba(22,163,74,0.78)', marginInlineEnd: 4, verticalAlign: 'middle' }}/>{ar ? 'منخفض (<٨)' : 'Low (<8)'}</span>
-      </div>
-    </div>
-  );
-}
 
 function AppetiteTile({ label, value, tone }: { label: string; value: number; tone?: 'success' | 'warning' | 'danger' }) {
   const color = tone === 'success' ? '#16a34a' : tone === 'warning' ? '#ca8a04' : tone === 'danger' ? '#dc2626' : 'inherit';

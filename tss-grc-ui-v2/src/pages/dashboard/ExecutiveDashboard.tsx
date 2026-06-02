@@ -10,6 +10,7 @@ import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { TimeSeries, type TimeSeriesPoint } from '../../components/viz/TimeSeries';
+import { RadialGauge } from '../../components/viz/RadialGauge';
 import { Progress } from '../../components/ui/Progress';
 import { dashboardApi, type DashboardStats, type TrendPoint } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
@@ -157,8 +158,6 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
   // when the backend lands that endpoint. Sign-only for now, magnitude is
   // derived from the current posture so the chip moves coherently.
   const deltaPct = posture >= 75 ? +2 : posture >= 60 ? -1 : -4;
-  const tone: 'success' | 'warning' | 'danger' =
-    posture >= 80 ? 'success' : posture >= 60 ? 'warning' : 'danger';
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -219,35 +218,30 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
         </div>
       </div>
 
-      {/* Right: big composite posture number */}
+      {/* Right: composite posture as an arc-as-number gauge */}
       <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
-        gap: 6, padding: '8px 0',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 8, padding: '4px 0',
       }}>
-        <span style={{
-          font: '700 10px var(--font-sans)', color: 'var(--ink-3)',
-          textTransform: 'uppercase', letterSpacing: '0.1em',
-        }}>
-          {isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC Posture Score'}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <span style={{
-            font: '800 56px/1 var(--font-sans)',
-            color: `var(--${tone}-fg)`,
-            letterSpacing: '-0.04em',
-          }}>
-            {posture}
-          </span>
-          <span style={{ font: '700 18px var(--font-sans)', color: 'var(--ink-3)' }}>
-            / 100
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <Badge tone={deltaPct >= 0 ? 'success' : 'danger'}>
-            {deltaPct >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-            {deltaPct >= 0 ? '+' : ''}{deltaPct}% {isAr ? '/ 30 يوم' : 'vs 30d'}
-          </Badge>
-        </div>
+        <RadialGauge
+          value={posture}
+          max={100}
+          size={172}
+          thickness={15}
+          unit="/100"
+          rtl={isAr}
+          caption={isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC Posture Score'}
+          aria-label={`${isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC posture score'}: ${posture} / 100`}
+          bands={[
+            { from: 0,  to: 60,  color: 'var(--danger)' },
+            { from: 60, to: 80,  color: 'var(--warning)' },
+            { from: 80, to: 101, color: 'var(--success)' },
+          ]}
+        />
+        <Badge tone={deltaPct >= 0 ? 'success' : 'danger'}>
+          {deltaPct >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+          {deltaPct >= 0 ? '+' : ''}{deltaPct}% {isAr ? '/ 30 يوم' : 'vs 30d'}
+        </Badge>
       </div>
     </div>
   );

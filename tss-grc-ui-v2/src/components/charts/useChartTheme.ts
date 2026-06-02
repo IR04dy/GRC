@@ -18,28 +18,37 @@ export interface ChartTheme {
   rtl: boolean;
 }
 
-const PALETTE = [
-  '#0c5460',  // teal — brand primary
-  '#dc2626',  // red — danger
-  '#f59e0b',  // amber — warning
-  '#16a34a',  // green — success
-  '#2563eb',  // blue — info
-  '#9333ea',  // purple
-  '#ec4899',  // pink
-  '#0891b2',  // cyan
+// On-brand categorical palette fallbacks — these mirror the `--cat-1..8` design
+// tokens so charts stay branded even before styles resolve (SSR/first paint).
+// The live values are read from the tokens at runtime (see below), so dark mode
+// and white-label themes propagate automatically.
+const CAT_FALLBACK = [
+  '#0E5E5E', // --cat-1 teal-petrol (brand primary)
+  '#C8932A', // --cat-2 sand-amber (accent)
+  '#5F8A8A', // --cat-3 desaturated teal
+  '#8E5A7A', // --cat-4 mauve
+  '#3F8C5C', // --cat-5 green
+  '#B5663C', // --cat-6 terracotta
+  '#6A4E8E', // --cat-7 purple
+  '#C8B042', // --cat-8 gold
 ];
 
 export function useChartTheme(): ChartTheme {
   const { lang } = useI18n();
   // Read CSS custom-properties at runtime so dark/light/white-label themes work.
   const css = typeof window !== 'undefined' ? getComputedStyle(document.documentElement) : null;
-  const ink2   = css?.getPropertyValue('--ink-2').trim() || '#475569';
-  const ink3   = css?.getPropertyValue('--ink-3').trim() || '#94a3b8';
-  const surf1  = css?.getPropertyValue('--surface-1').trim() || '#ffffff';
-  const border = css?.getPropertyValue('--border').trim() || '#e2e8f0';
+  const tok = (name: string, fallback: string) => css?.getPropertyValue(name).trim() || fallback;
+  const ink2   = tok('--ink-2', '#475569');
+  const ink3   = tok('--ink-3', '#94a3b8');
+  const surf1  = tok('--surface-1', '#ffffff');
+  const border = tok('--border', '#e2e8f0');
+
+  // Series colours come from the canonical `--cat-1..8` tokens, not a hardcoded
+  // off-brand palette — one source of truth, dark-mode-correct.
+  const series = CAT_FALLBACK.map((fb, i) => tok(`--cat-${i + 1}`, fb));
 
   return {
-    series: PALETTE,
+    series,
     axis: ink3,
     grid: border,
     tick: { fill: ink3, fontSize: 11 },

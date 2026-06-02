@@ -5,6 +5,7 @@ import './styles/tokens.css';
 import './styles/globals.css';
 import './styles/shell.css';
 import './styles/components.css';
+import './styles/motion.css';
 import './styles/breakpoints.css';
 import './components/ui/data-table/dataTable.css';
 import './components/ui/filter/filter.css';
