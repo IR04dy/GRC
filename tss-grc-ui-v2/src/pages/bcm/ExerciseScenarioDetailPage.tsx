@@ -13,6 +13,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
@@ -176,14 +177,12 @@ export function ExerciseScenarioDetailPage() {
         <div className="cluster" style={{ gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           {s.scenarioType && (
             <Badge tone={scenarioTypeTone(s.scenarioType)}>
-              {isAr ? SCENARIO_TYPE_LABELS[s.scenarioType].ar
-                    : SCENARIO_TYPE_LABELS[s.scenarioType].en}
+              {tlabel(SCENARIO_TYPE_LABELS, s.scenarioType, isAr)}
             </Badge>
           )}
           {s.complexity && (
             <Badge tone={complexityTone(s.complexity)}>
-              {isAr ? COMPLEXITY_LABELS[s.complexity].ar
-                    : COMPLEXITY_LABELS[s.complexity].en}
+              {tlabel(COMPLEXITY_LABELS, s.complexity, isAr)}
             </Badge>
           )}
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
@@ -466,8 +465,7 @@ function InjectRow({
             {fmtTimeOffset(inj.timeOffsetMinutes, isAr)}
           </span>
           <Badge tone={injectTypeTone(inj.injectType)}>
-            {isAr ? INJECT_TYPE_LABELS[inj.injectType].ar
-                  : INJECT_TYPE_LABELS[inj.injectType].en}
+            {tlabel(INJECT_TYPE_LABELS, inj.injectType, isAr)}
           </Badge>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             #{inj.injectOrder}

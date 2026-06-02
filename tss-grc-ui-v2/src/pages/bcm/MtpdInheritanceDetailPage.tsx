@@ -13,6 +13,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Modal } from '../../components/ui/Modal';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
@@ -237,7 +238,7 @@ export function MtpdInheritanceDetailPage() {
                   className={`chip ${severityFilter.has(s) ? 'chip-active' : ''}`}
                   onClick={() => setSeverityFilter(prev => toggle(prev, s))}>
                   <Badge tone={severityTone(s)}>
-                    {isAr ? SEVERITY_LABELS[s].ar : SEVERITY_LABELS[s].en}
+                    {tlabel(SEVERITY_LABELS, s, isAr)}
                   </Badge>
                 </button>
               ))}
@@ -254,7 +255,7 @@ export function MtpdInheritanceDetailPage() {
                   className={`chip ${typeFilter.has(t) ? 'chip-active' : ''}`}
                   onClick={() => setTypeFilter(prev => toggle(prev, t))}>
                   <Badge tone={findingTypeTone(t)}>
-                    {isAr ? FINDING_TYPE_LABELS[t].ar : FINDING_TYPE_LABELS[t].en}
+                    {tlabel(FINDING_TYPE_LABELS, t, isAr)}
                   </Badge>
                 </button>
               ))}
@@ -270,7 +271,7 @@ export function MtpdInheritanceDetailPage() {
                   key={s}
                   className={`chip ${strengthFilter.has(s) ? 'chip-active' : ''}`}
                   onClick={() => setStrengthFilter(prev => toggle(prev, s))}>
-                  {isAr ? DEPENDENCY_STRENGTH_LABELS[s].ar : DEPENDENCY_STRENGTH_LABELS[s].en}
+                  {tlabel(DEPENDENCY_STRENGTH_LABELS, s, isAr)}
                 </button>
               ))}
             </div>
@@ -318,12 +319,12 @@ export function MtpdInheritanceDetailPage() {
                       onClick={() => setDrawer(f)}>
                     <td>
                       <Badge tone={severityTone(f.severity)}>
-                        {isAr ? SEVERITY_LABELS[f.severity].ar : SEVERITY_LABELS[f.severity].en}
+                        {tlabel(SEVERITY_LABELS, f.severity, isAr)}
                       </Badge>
                     </td>
                     <td>
                       <Badge tone={findingTypeTone(f.findingType)}>
-                        {isAr ? FINDING_TYPE_LABELS[f.findingType].ar : FINDING_TYPE_LABELS[f.findingType].en}
+                        {tlabel(FINDING_TYPE_LABELS, f.findingType, isAr)}
                       </Badge>
                     </td>
                     <td>
@@ -338,8 +339,7 @@ export function MtpdInheritanceDetailPage() {
                       {f.varianceHours == null ? '—'
                         : (f.varianceHours > 0 ? `+${f.varianceHours}` : String(f.varianceHours)) + (isAr ? ' س' : 'h')}
                     </td>
-                    <td>{isAr ? DEPENDENCY_STRENGTH_LABELS[f.dependencyStrength].ar
-                              : DEPENDENCY_STRENGTH_LABELS[f.dependencyStrength].en}</td>
+                    <td>{tlabel(DEPENDENCY_STRENGTH_LABELS, f.dependencyStrength, isAr)}</td>
                     <td>
                       {f.capaExternalId
                         ? <Badge tone="info">{f.capaExternalId}</Badge>
@@ -357,20 +357,19 @@ export function MtpdInheritanceDetailPage() {
       {drawer && (
         <Modal
           open={!!drawer}
-          title={`${isAr ? FINDING_TYPE_LABELS[drawer.findingType].ar : FINDING_TYPE_LABELS[drawer.findingType].en} — ${isAr && drawer.businessProcessNameAr ? drawer.businessProcessNameAr : drawer.businessProcessNameEn} ↔ ${drawer.vendorName}`}
+          title={`${tlabel(FINDING_TYPE_LABELS, drawer.findingType, isAr)} — ${isAr && drawer.businessProcessNameAr ? drawer.businessProcessNameAr : drawer.businessProcessNameEn} ↔ ${drawer.vendorName}`}
           onClose={() => setDrawer(null)}
         >
           <div className="stack" style={{ gap: 12 }}>
             <div className="cluster" style={{ gap: 8 }}>
               <Badge tone={severityTone(drawer.severity)}>
-                {isAr ? SEVERITY_LABELS[drawer.severity].ar : SEVERITY_LABELS[drawer.severity].en}
+                {tlabel(SEVERITY_LABELS, drawer.severity, isAr)}
               </Badge>
               <Badge tone={findingTypeTone(drawer.findingType)}>
-                {isAr ? FINDING_TYPE_LABELS[drawer.findingType].ar : FINDING_TYPE_LABELS[drawer.findingType].en}
+                {tlabel(FINDING_TYPE_LABELS, drawer.findingType, isAr)}
               </Badge>
               <Badge tone="neutral">
-                {isAr ? DEPENDENCY_STRENGTH_LABELS[drawer.dependencyStrength].ar
-                      : DEPENDENCY_STRENGTH_LABELS[drawer.dependencyStrength].en}
+                {tlabel(DEPENDENCY_STRENGTH_LABELS, drawer.dependencyStrength, isAr)}
               </Badge>
             </div>
             <table className="table">

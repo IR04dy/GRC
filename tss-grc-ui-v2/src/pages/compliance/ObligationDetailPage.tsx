@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
@@ -164,8 +165,8 @@ export function ObligationDetailPage() {
   async function onTransition(to: 'ACTIVE' | 'SUSPENDED' | 'RETIRED') {
     if (!obligation) return;
     const ok = await dialog.confirm({
-      title: isAr ? `نقل الالتزام إلى "${LIFECYCLE_LABELS[to].ar}"؟`
-        : `Transition obligation to "${LIFECYCLE_LABELS[to].en}"?`,
+      title: isAr ? `نقل الالتزام إلى "${tlabel(LIFECYCLE_LABELS, to, true)}"؟`
+        : `Transition obligation to "${tlabel(LIFECYCLE_LABELS, to, false)}"?`,
       destructive: to === 'RETIRED',
     });
     if (!ok) return;
@@ -200,7 +201,7 @@ export function ObligationDetailPage() {
       <PageHeader
         eyebrow={isAr ? 'الالتزام والامتثال' : 'Compliance'}
         title={isAr ? obligation.titleAr : obligation.titleEn}
-        sub={`${obligation.obligationCode} · ${isAr ? REGULATOR_LABELS[obligation.regulator].ar : REGULATOR_LABELS[obligation.regulator].en}`}
+        sub={`${obligation.obligationCode} · ${tlabel(REGULATOR_LABELS, obligation.regulator, isAr)}`}
         actions={
           <div className="cluster" style={{ gap: 8 }}>
             <Button variant="secondary" Icon={ArrowLeft}
@@ -217,24 +218,22 @@ export function ObligationDetailPage() {
       <Card title={isAr ? 'تفاصيل الالتزام' : 'Obligation details'} Icon={FileCheck2}>
         <div className="grid-2col" style={{ gap: 'var(--space-md)' }}>
           <Field label={isAr ? 'الجهة الرقابية' : 'Regulator'}
-            value={isAr ? REGULATOR_LABELS[obligation.regulator].ar : REGULATOR_LABELS[obligation.regulator].en} />
+            value={tlabel(REGULATOR_LABELS, obligation.regulator, isAr)} />
           <Field label={isAr ? 'المرجع' : 'Reference'} value={obligation.regulationReference ?? '—'} />
           <Field label={isAr ? 'النوع' : 'Type'}
-            value={isAr ? TYPE_LABELS[obligation.obligationType].ar : TYPE_LABELS[obligation.obligationType].en} />
+            value={tlabel(TYPE_LABELS, obligation.obligationType, isAr)} />
           <Field label={isAr ? 'التكرار' : 'Frequency'}
-            value={isAr ? FREQUENCY_LABELS[obligation.frequency].ar : FREQUENCY_LABELS[obligation.frequency].en} />
+            value={tlabel(FREQUENCY_LABELS, obligation.frequency, isAr)} />
           <Field label={isAr ? 'الخطورة عند التخلف' : 'Severity if missed'}
             value={
               <Badge tone={severityTone(obligation.severityIfMissed)}>
-                {isAr ? SEVERITY_LABELS[obligation.severityIfMissed].ar
-                  : SEVERITY_LABELS[obligation.severityIfMissed].en}
+                {tlabel(SEVERITY_LABELS, obligation.severityIfMissed, isAr)}
               </Badge>
             } />
           <Field label={isAr ? 'الحالة' : 'Lifecycle stage'}
             value={
               <Badge tone={lifecycleTone(obligation.lifecycleStage)}>
-                {isAr ? LIFECYCLE_LABELS[obligation.lifecycleStage].ar
-                  : LIFECYCLE_LABELS[obligation.lifecycleStage].en}
+                {tlabel(LIFECYCLE_LABELS, obligation.lifecycleStage, isAr)}
               </Badge>
             } />
           <Field label={isAr ? 'تاريخ الاستحقاق التالي' : 'Next due'} value={fmtDate(obligation.nextDueDate)} />
@@ -302,8 +301,7 @@ export function ObligationDetailPage() {
                     <td style={{ fontSize: 13 }}>{fmtDate(a.dueDate)}</td>
                     <td>
                       <Badge tone={attestationStatusTone(a.attestationStatus)}>
-                        {isAr ? ATTESTATION_STATUS_LABELS[a.attestationStatus].ar
-                          : ATTESTATION_STATUS_LABELS[a.attestationStatus].en}
+                        {tlabel(ATTESTATION_STATUS_LABELS, a.attestationStatus, isAr)}
                       </Badge>
                       {a.exceptionsNotedEn && (
                         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
@@ -316,8 +314,7 @@ export function ObligationDetailPage() {
                       {a.reviewerDecision ? (
                         <Badge tone={a.reviewerDecision === 'ACCEPTED' ? 'success'
                           : a.reviewerDecision === 'REJECTED' ? 'danger' : 'warning'}>
-                          {isAr ? REVIEWER_DECISION_LABELS[a.reviewerDecision].ar
-                            : REVIEWER_DECISION_LABELS[a.reviewerDecision].en}
+                          {tlabel(REVIEWER_DECISION_LABELS, a.reviewerDecision, isAr)}
                         </Badge>
                       ) : '—'}
                       {a.reviewerCommentEn && (

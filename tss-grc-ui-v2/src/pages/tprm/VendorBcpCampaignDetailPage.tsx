@@ -14,6 +14,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
@@ -177,7 +178,7 @@ export function VendorBcpCampaignDetailPage() {
         <Kpi
           Icon={ClipboardCheck}
           label={isAr ? 'الحالة' : 'Status'}
-          value={isAr ? CAMPAIGN_STATUS_LABELS[campaign.status].ar : CAMPAIGN_STATUS_LABELS[campaign.status].en}
+          value={tlabel(CAMPAIGN_STATUS_LABELS, campaign.status, isAr)}
           tone={campaignStatusTone(campaign.status) === 'danger' ? 'danger' : 'primary'}
         />
         <Kpi
@@ -217,7 +218,7 @@ export function VendorBcpCampaignDetailPage() {
             const count = counts[t] ?? 0;
             const label = t === 'ALL'
               ? (isAr ? 'الكل' : 'All')
-              : (isAr ? ATTESTATION_STATUS_LABELS[t].ar : ATTESTATION_STATUS_LABELS[t].en);
+              : (tlabel(ATTESTATION_STATUS_LABELS, t, isAr));
             return (
               <button key={t}
                 className={`tab ${activeTab === t ? 'tab-active' : ''}`}
@@ -255,7 +256,7 @@ export function VendorBcpCampaignDetailPage() {
                     </td>
                     <td>
                       <Badge tone={attestationStatusTone(a.status)}>
-                        {isAr ? ATTESTATION_STATUS_LABELS[a.status].ar : ATTESTATION_STATUS_LABELS[a.status].en}
+                        {tlabel(ATTESTATION_STATUS_LABELS, a.status, isAr)}
                       </Badge>
                     </td>
                     <td style={{ fontSize: 13 }}>{fmtDate(a.invitedAt, isAr)}</td>
@@ -325,7 +326,7 @@ function AttestationDrawer({
               {(isAr ? item.vendorNameAr : item.vendorName) || `#${item.vendorId}`}
             </h3>
             <Badge tone={attestationStatusTone(item.status)}>
-              {isAr ? ATTESTATION_STATUS_LABELS[item.status].ar : ATTESTATION_STATUS_LABELS[item.status].en}
+              {tlabel(ATTESTATION_STATUS_LABELS, item.status, isAr)}
             </Badge>
           </div>
           <Button variant="ghost" onClick={onClose}>
