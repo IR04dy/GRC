@@ -151,7 +151,7 @@ export function RiskMatrix5x5({
       </svg>
 
       {/* Legend */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 8, flexWrap: 'wrap', fontSize: 11, color: 'var(--ink-3)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--sp-5)', marginTop: 8, flexWrap: 'wrap', fontSize: 11, color: 'var(--ink-3)' }}>
         <LegendSwatch color="var(--risk-crit)" label={ar ? 'حرج (≥٢٠)' : 'Critical (≥20)'} />
         <LegendSwatch color="var(--risk-high)" label={ar ? 'مرتفع (١٠-١٤)' : 'High (10-14)'} />
         <LegendSwatch color="var(--risk-low)" label={ar ? 'منخفض (<٥)' : 'Low (<5)'} />

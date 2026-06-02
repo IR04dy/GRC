@@ -148,7 +148,7 @@ export function ResidencyMap({ flows, ar = false, size = 400, onFlowClick }: Res
       </svg>
 
       {/* Legend */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginTop: 8, fontSize: 11, color: 'var(--ink-3)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--sp-5)', flexWrap: 'wrap', marginTop: 8, fontSize: 11, color: 'var(--ink-3)' }}>
         {ZONES.map((z) => (
           <span key={z} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 10, height: 10, borderRadius: 999, background: ZONE_COLOR[z], display: 'inline-block' }} />
