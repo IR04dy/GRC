@@ -27,6 +27,9 @@ export interface CountdownRingProps {
   live?: boolean;
   caption?: ReactNode;
   rtl?: boolean;
+  /** Compact mode for in-row use: centre shows days ("12d") not HH:MM:SS, and
+   *  the caption line is dropped. Pair with `live={false}` for long windows. */
+  compact?: boolean;
 }
 
 function fmt(ms: number): string {
@@ -37,6 +40,10 @@ function fmt(ms: number): string {
   const ss = s % 60;
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${neg ? '-' : ''}${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+}
+
+function fmtDays(ms: number): string {
+  return `${Math.ceil(ms / 86_400_000)}d`;
 }
 
 function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): string {
@@ -61,6 +68,7 @@ export function CountdownRing({
   live = true,
   caption,
   rtl = false,
+  compact = false,
 }: CountdownRingProps) {
   const [now, setNow] = useState(() => Date.now());
   const reduceRef = useRef(
@@ -126,12 +134,14 @@ export function CountdownRing({
         )}
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-        <span className="tnum" style={{ font: `800 ${Math.round(size * 0.16)}px/1 var(--font-mono)`, color, letterSpacing: '0.01em' }}>
-          {fmt(remaining)}
+        <span className="tnum" style={{ font: `800 ${Math.round(size * (compact ? 0.3 : 0.16))}px/1 var(--font-mono)`, color, letterSpacing: '0.01em' }}>
+          {compact ? (overdue ? '!' : fmtDays(remaining)) : fmt(remaining)}
         </span>
-        <span style={{ font: '700 9px var(--font-sans)', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>
-          {overdue ? (caption ?? 'OVERDUE') : caption}
-        </span>
+        {!compact && (
+          <span style={{ font: '700 9px var(--font-sans)', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>
+            {overdue ? (caption ?? 'OVERDUE') : caption}
+          </span>
+        )}
       </div>
     </div>
   );

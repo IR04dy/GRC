@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
+import { CountdownRing } from '../../components/viz/CountdownRing';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
@@ -117,14 +118,22 @@ export function DsrPage() {
     { header: ar ? 'الحالة' : 'Status', width: '160px',
       cell: d => <Badge tone={DSR_STATUS_TONE[d.status]}>
         {DSR_STATUS_LABEL[d.status][ar ? 'ar' : 'en']}</Badge> },
-    { header: ar ? 'المهلة' : 'SLA', width: '110px',
+    { header: ar ? 'المهلة' : 'SLA', width: '130px',
       cell: d => {
         if (d.hoursLeft == null) return <span style={{ fontSize: 12, opacity: 0.5 }}>—</span>;
         const overdue = d.hoursLeft < 0;
-        return <span style={{ fontSize: 12, color: overdue ? 'var(--danger,#d92d20)' : undefined, fontWeight: overdue ? 700 : undefined }}>
-          {overdue ? (ar ? `متأخّر ${Math.abs(d.hoursLeft)}س` : `${Math.abs(d.hoursLeft)}h late`)
-                   : (ar ? `${d.hoursLeft}س متبقية` : `${d.hoursLeft}h left`)}
-        </span>;
+        // Per-row 30-day SLA ring (720h window) depleting green→amber→red.
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <CountdownRing compact live={false} size={34} thickness={5} rtl={ar}
+              deadlineMs={Date.now() + d.hoursLeft * 3_600_000}
+              totalMs={720 * 3_600_000} />
+            <span style={{ fontSize: 11, color: overdue ? 'var(--danger)' : 'var(--ink-3)', fontWeight: overdue ? 700 : 500 }}>
+              {overdue ? (ar ? `متأخّر ${Math.abs(d.hoursLeft)}س` : `${Math.abs(d.hoursLeft)}h late`)
+                       : (ar ? `${d.hoursLeft}س` : `${d.hoursLeft}h`)}
+            </span>
+          </span>
+        );
       } },
     { header: '', width: '140px',
       cell: d => {
