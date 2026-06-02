@@ -187,6 +187,10 @@
   --chip-pad:     3px 9px;
   --chip-pad-sm:  1px 7px;
   --chip-radius:  var(--r-pill);
+  /* Single-source card padding (S2) — collapses the 14/16/18 dialects so a
+   * Card, Modal and KPI share one gutter. On the --sp-* scale. */
+  --card-pad-x:   var(--sp-6);   /* 16 */
+  --card-pad-y:   var(--sp-6);   /* 16 */
 
   /* ─── Touch targets (icon-button ladder) ──────────────
    * Two documented sizes instead of an undocumented 38 / 28 / 24 spread.

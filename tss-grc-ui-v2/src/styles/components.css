@@ -4,7 +4,7 @@
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: var(--sp-4) var(--sp-6);   /* S1 — was 8px 14px (14 off-scale) */
   border-radius: var(--r-md);
   font: 600 13px var(--font-sans);
   letter-spacing: .005em;
@@ -209,12 +209,12 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .card-header {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px;
-  padding: 14px 18px;
+  padding: var(--sp-5) var(--card-pad-x);   /* S1/S2 — was 14px 18px */
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 .card-title { display: flex; align-items: center; gap: 8px; font: 700 13px var(--font-sans); color: var(--ink-1); }
-.card-body { padding: 16px 18px; }
+.card-body { padding: var(--card-pad-y) var(--card-pad-x); }   /* S1/S2 — was 16px 18px */
 
 /* ─── KPI ──────────────────────────────────────────
  * UX retune. Old issues:
@@ -843,7 +843,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 22px;
+  padding: var(--sp-6) var(--sp-7);   /* S1 — was 18px 22px (both off-scale) */
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
