@@ -140,7 +140,7 @@ export function ErmDashboardPage() {
         }
       />
 
-      {error && <Card><div style={{ padding: 12, color: 'var(--danger,#a00)' }}>{error}</div></Card>}
+      {error && <Card><div style={{ color: 'var(--danger)' }}>{error}</div></Card>}
 
       {/* ── KPI strip ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -154,107 +154,83 @@ export function ErmDashboardPage() {
 
       {/* ── Charts row 1: severity donut + KRI donut ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <Card>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 700 }}>{isAr ? 'توزيع المخاطر حسب الشدّة' : 'Risk by severity'}</div>
-            <Badge>{stats ? stats.totalRisks : 0}</Badge>
-          </div>
-          <div style={{ padding: 12 }}>
-            <PieChart data={severityPie} innerRadius={55} legend height={240}
-              onPointClick={(d) => navigate(`/risk?severity=${d.name.toUpperCase()}`)}
-              emptyState={isAr ? 'لا توجد مخاطر' : 'No risks yet'} />
-          </div>
+        <Card title={isAr ? 'توزيع المخاطر حسب الشدّة' : 'Risk by severity'}
+          action={<Badge>{stats ? stats.totalRisks : 0}</Badge>}>
+          <PieChart data={severityPie} innerRadius={55} legend height={240}
+            onPointClick={(d) => navigate(`/risk?severity=${d.name.toUpperCase()}`)}
+            emptyState={isAr ? 'لا توجد مخاطر' : 'No risks yet'} />
         </Card>
-        <Card>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 700 }}>{isAr ? 'مؤشرات المخاطر الرئيسية (KRI)' : 'KRI bands'}</div>
+        <Card title={isAr ? 'مؤشرات المخاطر الرئيسية (KRI)' : 'KRI bands'}
+          action={
             <div style={{ display: 'flex', gap: 6, fontSize: 12 }}>
               {kri && <Badge tone="success">{kri.green}</Badge>}
               {kri && <Badge tone="warning">{kri.amber}</Badge>}
               {kri && <Badge tone="danger">{kri.red}</Badge>}
             </div>
-          </div>
-          <div style={{ padding: 12 }}>
-            <PieChart data={kriPie} innerRadius={55} legend height={240}
-              onPointClick={() => navigate('/risk?tab=kri')}
-              emptyState={isAr ? 'لا توجد قراءات' : 'No KRI readings'} />
-          </div>
+          }>
+          <PieChart data={kriPie} innerRadius={55} legend height={240}
+            onPointClick={() => navigate('/risk?tab=kri')}
+            emptyState={isAr ? 'لا توجد قراءات' : 'No KRI readings'} />
         </Card>
       </div>
 
       {/* ── Risk trend over time (real, 12 weeks from /kpi-trend) ── */}
       <div style={{ marginBottom: 16 }}>
-        <Card>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 700 }}>{isAr ? 'اتجاه المخاطر المفتوحة — 12 أسبوع' : 'Open-risk trend · 12 weeks'}</div>
-            <Badge tone="neutral">{trend.length ? trend[trend.length - 1].open : 0}</Badge>
-          </div>
-          <div style={{ padding: 12 }}>
-            <LineChart
-              data={trend}
-              xKey="week"
-              height={220}
-              series={[
-                { key: 'open', name: isAr ? 'مخاطر مفتوحة' : 'Open risks', color: 'var(--primary)' },
-                { key: 'critical', name: isAr ? 'حرجة' : 'Critical', color: 'var(--danger)' },
-              ]}
-              emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'}
-              onPointClick={() => navigate('/risk')} />
-          </div>
+        <Card title={isAr ? 'اتجاه المخاطر المفتوحة — 12 أسبوع' : 'Open-risk trend · 12 weeks'}
+          action={<Badge tone="neutral">{trend.length ? trend[trend.length - 1].open : 0}</Badge>}>
+          <LineChart
+            data={trend}
+            xKey="week"
+            height={220}
+            series={[
+              { key: 'open', name: isAr ? 'مخاطر مفتوحة' : 'Open risks', color: 'var(--primary)' },
+              { key: 'critical', name: isAr ? 'حرجة' : 'Critical', color: 'var(--danger)' },
+            ]}
+            emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'}
+            onPointClick={() => navigate('/risk')} />
         </Card>
       </div>
 
       {/* ── Charts row 2: heat-map + categories bar ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12, marginBottom: 16 }}>
-        <Card>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <div style={{ fontWeight: 700 }}>
-              {isAr ? 'مصفوفة المخاطر (٥×٥) — الكامن ← المتبقي' : 'Risk matrix (5×5) — inherent → residual'}
-            </div>
-            {movements.length > 0 && (
-              <button type="button" onClick={() => setShowVectors(v => !v)}
-                className="card--interactive"
-                style={{
-                  font: '600 11px var(--font-sans)', cursor: 'pointer',
-                  padding: '4px 10px', borderRadius: 'var(--r-pill)',
-                  border: '1px solid var(--border)',
-                  background: showVectors ? 'var(--primary-soft)' : 'var(--surface)',
-                  color: showVectors ? 'var(--primary-700)' : 'var(--ink-3)',
-                }}>
-                {isAr ? 'إظهار الحركة' : 'Show movement'}
-              </button>
-            )}
-          </div>
-          <div style={{ padding: 14, display: 'flex', justifyContent: 'center' }}>
+        <Card title={isAr ? 'مصفوفة المخاطر (٥×٥) — الكامن ← المتبقي' : 'Risk matrix (5×5) — inherent → residual'}
+          action={movements.length > 0 ? (
+            <button type="button" onClick={() => setShowVectors(v => !v)}
+              className="card--interactive"
+              style={{
+                font: '600 11px var(--font-sans)', cursor: 'pointer',
+                padding: '4px 10px', borderRadius: 'var(--r-pill)',
+                border: '1px solid var(--border)',
+                background: showVectors ? 'var(--primary-soft)' : 'var(--surface)',
+                color: showVectors ? 'var(--primary-700)' : 'var(--ink-3)',
+              }}>
+              {isAr ? 'إظهار الحركة' : 'Show movement'}
+            </button>
+          ) : undefined}>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
             <RiskMatrix5x5 cells={heatmap} movements={movements} showVectors={showVectors} ar={isAr}
               onCellClick={(L, I) => navigate(`/risk?likelihood=${L}&impact=${I}`)} />
           </div>
         </Card>
-        <Card>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>
-            {isAr ? 'المخاطر حسب الفئة — أعلى ٨' : 'Risks by category — top 8'}
-          </div>
-          <div style={{ padding: 12 }}>
-            <BarChart data={categoryBars}
-              xKey="label"
-              series={[{ key: 'value', name: isAr ? 'العدد' : 'Risks', color: 'var(--cat-1)' }]}
-              height={260}
-              onPointClick={(d) => navigate(`/risk?category=${encodeURIComponent(d.label)}`)}
-              emptyState={isAr ? 'لا توجد فئات' : 'No categories'} />
-          </div>
+        <Card title={isAr ? 'المخاطر حسب الفئة — أعلى ٨' : 'Risks by category — top 8'}>
+          <BarChart data={categoryBars}
+            xKey="label"
+            series={[{ key: 'value', name: isAr ? 'العدد' : 'Risks', color: 'var(--cat-1)' }]}
+            height={260}
+            onPointClick={(d) => navigate(`/risk?category=${encodeURIComponent(d.label)}`)}
+            emptyState={isAr ? 'لا توجد فئات' : 'No categories'} />
         </Card>
       </div>
 
       {/* ── Appetite tile ── */}
       {appetite && (
-        <Card>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 700 }}>{isAr ? 'شهية المخاطر — حالة الاختراق' : 'Risk appetite — breach status'}</div>
+        <Card title={isAr ? 'شهية المخاطر — حالة الاختراق' : 'Risk appetite — breach status'}
+          action={
             <Badge tone={appetite.exceeded > 0 || appetite.critical > 0 ? 'danger' : 'success'}>
               {appetite.exceeded + appetite.critical > 0 ? (isAr ? 'مُخترَقة' : 'BREACHED') : (isAr ? 'ضمن الحدود' : 'WITHIN')}
             </Badge>
-          </div>
-          <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, textAlign: 'center' }}>
+          }>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, textAlign: 'center' }}>
             <AppetiteTile label={isAr ? 'إجمالي' : 'Total'} value={appetite.total} />
             <AppetiteTile label={isAr ? 'ضمن الحدود' : 'Within tolerance'} value={appetite.withinTolerance} tone="success" />
             <AppetiteTile label={isAr ? 'تجاوز' : 'Exceeded'} value={appetite.exceeded} tone="warning" />
@@ -277,7 +253,7 @@ function AppetiteTile({ label, value, tone }: { label: string; value: number; to
   return (
     <div>
       <div style={{ fontSize: 24, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{label}</div>
     </div>
   );
 }
