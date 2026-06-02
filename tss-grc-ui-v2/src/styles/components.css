@@ -1322,7 +1322,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
   padding: 6px 10px 6px 8px;
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--ink-1);
   text-decoration: none;
   font: 600 var(--text-xs) var(--font-sans);
@@ -1446,7 +1446,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
   width: 18px; height: 18px;
   border: none; background: transparent; cursor: pointer; padding: 0;
   color: var(--primary-700, var(--ink-2));
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   margin-inline-start: 2px;
   transition: background 120ms ease, color 120ms ease;
 }
@@ -1793,14 +1793,14 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
 .preset-swatches { display: flex; gap: 4px; }
 .preset-swatch {
   width: 18px; height: 18px;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   border: 1px solid rgba(21,32,29,.06);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
 }
 
 .preset-sidebar-strip {
   height: 14px;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   position: relative;
   border: 1px solid rgba(21,32,29,.08);
 }

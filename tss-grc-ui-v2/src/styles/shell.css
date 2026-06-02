@@ -27,7 +27,7 @@
 .sb-mark {
   width: 40px; height: 40px;
   background: linear-gradient(135deg, var(--primary-300), var(--accent-300));
-  border-radius: 11px;
+  border-radius: var(--r-lg);
   display: flex; align-items: center; justify-content: center;
   color: #fff;
   box-shadow: 0 4px 12px rgba(46,158,158,.25), inset 0 1px 0 rgba(255,255,255,.2);
