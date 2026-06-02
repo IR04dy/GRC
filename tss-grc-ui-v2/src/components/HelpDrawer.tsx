@@ -197,9 +197,9 @@ export function HelpDrawer({
           )}
           {error && (
             <div style={{
-              padding: 12, background: 'var(--danger-50, #fef2f2)',
-              border: '1px solid var(--danger, #ef4444)', borderRadius: 6,
-              fontSize: 12, color: 'var(--danger-700, #991b1b)',
+              padding: 12, background: 'var(--danger-50, #F8E5E2)',
+              border: '1px solid var(--danger, #C0413A)', borderRadius: 6,
+              fontSize: 12, color: 'var(--danger-700, #7E2A25)',
             }}>
               {error}
             </div>
@@ -273,9 +273,9 @@ function HelpTopicCard({
     topic.severity === 'TIP'     ? Lightbulb     :
     Info;
   const severityTone =
-    topic.severity === 'WARNING' ? 'var(--warning, #f59e0b)' :
+    topic.severity === 'WARNING' ? 'var(--warning, #C8932A)' :
     topic.severity === 'TIP'     ? 'var(--success, #10b981)' :
-    'var(--primary, #3b82f6)';
+    'var(--primary, #5F8A8A)';
 
   const workflows = (topic.relatedWorkflowCodes ?? '')
     .split(',').map(s => s.trim()).filter(Boolean);
@@ -364,7 +364,7 @@ function RegulatorCallout({
   return (
     <div style={{
       marginTop: 12, padding: '10px 12px',
-      background: 'var(--primary-50, #eff6ff)',
+      background: 'var(--primary-50, #E8EFEF)',
       border: '1px solid var(--primary-200, #bfdbfe)',
       borderRadius: 6,
     }}>

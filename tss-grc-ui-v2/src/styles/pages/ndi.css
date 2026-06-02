@@ -280,11 +280,11 @@
 .ndi-banner--mt-sm { margin-top: var(--sp-4); }
 .ndi-banner--mt-md { margin-top: var(--sp-6); }
 .ndi-banner--danger {
-  background: var(--danger-bg, #fef2f2);
+  background: var(--danger-bg, #F8E5E2);
   border-inline-start: 3px solid var(--danger);
 }
 .ndi-banner--warning {
-  background: var(--warning-bg, #fffbeb);
+  background: var(--warning-bg, #FBF3DD);
   border-inline-start: 3px solid var(--warning);
 }
 .ndi-banner-list {

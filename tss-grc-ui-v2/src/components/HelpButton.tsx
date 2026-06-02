@@ -53,7 +53,7 @@ export function HelpButton() {
           insetBlockEnd: 24,
           width: 48, height: 48,
           borderRadius: '50%',
-          background: 'var(--primary, #2563eb)',
+          background: 'var(--primary, #0E5E5E)',
           color: '#fff',
           border: 'none',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',

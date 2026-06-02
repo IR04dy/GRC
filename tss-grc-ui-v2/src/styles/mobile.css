@@ -43,40 +43,40 @@
 .mob-topbar-sub   { font-size: 12px; color: var(--ink-3, #6b7280); margin-top: 2px; }
 
 .mob-critical-banner {
-  background: var(--danger-bg, #fee2e2);
-  color: var(--danger-strong, #991b1b);
+  background: var(--danger-bg, #F8E5E2);
+  color: var(--danger-strong, #7E2A25);
   font-weight: 800;
   font-size: 14px;
   padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--danger, #dc2626);
+  border-bottom: 1px solid var(--danger, #C0413A);
   animation: mob-pulse 2.4s ease-in-out infinite;
 }
 @keyframes mob-pulse {
-  0%, 100% { box-shadow: inset 0 -2px 0 var(--danger, #dc2626); }
-  50%      { box-shadow: inset 0 -4px 0 var(--danger, #dc2626); }
+  0%, 100% { box-shadow: inset 0 -2px 0 var(--danger, #C0413A); }
+  50%      { box-shadow: inset 0 -4px 0 var(--danger, #C0413A); }
 }
 
 .mob-banner {
-  background: var(--info-bg, #eff6ff);
-  color: var(--info-strong, #1e40af);
+  background: var(--info-bg, #E8EFEF);
+  color: var(--info-strong, #2E5252);
   font-size: 14px;
   padding: 10px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--info, #3b82f6);
+  border-bottom: 1px solid var(--info, #5F8A8A);
 }
 .mob-banner button {
   margin-inline-start: auto;
   min-height: 44px;
   min-width: 60px;
   border-radius: 999px;
-  border: 1px solid var(--info, #3b82f6);
+  border: 1px solid var(--info, #5F8A8A);
   background: var(--surface, #fff);
-  color: var(--info-strong, #1e40af);
+  color: var(--info-strong, #2E5252);
   font-weight: 700;
   padding: 8px 14px;
 }
@@ -118,10 +118,10 @@
   margin-top: 5px;
   box-shadow: 0 0 0 3px var(--surface, #fff);
 }
-.mob-sev-1 { background: var(--success, #16a34a); }
-.mob-sev-2 { background: var(--info, #3b82f6); }
-.mob-sev-3 { background: var(--warning, #f59e0b); }
-.mob-sev-4 { background: var(--danger, #dc2626); }
+.mob-sev-1 { background: var(--success, #3F8C5C); }
+.mob-sev-2 { background: var(--info, #5F8A8A); }
+.mob-sev-3 { background: var(--warning, #C8932A); }
+.mob-sev-4 { background: var(--danger, #C0413A); }
 .mob-sev-5 { background: #7f1d1d; }
 
 .mob-chip-row {
@@ -142,10 +142,10 @@
   color: var(--ink-2, #374151);
   white-space: nowrap;
 }
-.mob-chip-danger  { background: var(--danger-bg, #fee2e2);  color: var(--danger-strong, #991b1b); }
-.mob-chip-warning { background: var(--warning-bg, #fef3c7); color: var(--warning-strong, #92400e); }
-.mob-chip-info    { background: var(--info-bg, #eff6ff);    color: var(--info-strong, #1e40af); }
-.mob-chip-success { background: var(--success-bg, #dcfce7); color: var(--success-strong, #166534); }
+.mob-chip-danger  { background: var(--danger-bg, #F8E5E2);  color: var(--danger-strong, #7E2A25); }
+.mob-chip-warning { background: var(--warning-bg, #FBF3DD); color: var(--warning-strong, #876019); }
+.mob-chip-info    { background: var(--info-bg, #E8EFEF);    color: var(--info-strong, #2E5252); }
+.mob-chip-success { background: var(--success-bg, #E6F0E9); color: var(--success-strong, #235D3D); }
 
 .mob-action-row {
   display: grid;
@@ -172,8 +172,8 @@
 }
 .mob-btn:active { transform: scale(.97); background: var(--surface-2, #f3f4f6); }
 .mob-btn[disabled] { opacity: .5; cursor: not-allowed; }
-.mob-btn-primary { background: var(--primary, #14b8a6); border-color: var(--primary, #14b8a6); color: #fff; }
-.mob-btn-danger  { background: var(--danger, #dc2626);  border-color: var(--danger, #dc2626);  color: #fff; }
+.mob-btn-primary { background: var(--primary, #0E5E5E); border-color: var(--primary, #0E5E5E); color: #fff; }
+.mob-btn-danger  { background: var(--danger, #C0413A);  border-color: var(--danger, #C0413A);  color: #fff; }
 
 .mob-empty {
   text-align: center;
@@ -251,13 +251,13 @@
 }
 .mob-contact-role  { font-size: 12px; color: var(--ink-3, #6b7280); }
 .mob-contact-name  { font-weight: 700; }
-.mob-contact-phone { margin-inline-start: auto; font-weight: 700; color: var(--primary, #14b8a6); font: 700 14px var(--font-mono, monospace); }
+.mob-contact-phone { margin-inline-start: auto; font-weight: 700; color: var(--primary, #0E5E5E); font: 700 14px var(--font-mono, monospace); }
 
 /* Owner avatar (initials circle) */
 .mob-avatar {
   width: 28px; height: 28px;
   border-radius: 50%;
-  background: var(--primary, #14b8a6);
+  background: var(--primary, #0E5E5E);
   color: #fff;
   display: inline-flex;
   align-items: center;

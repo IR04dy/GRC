@@ -1084,9 +1084,9 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   box-shadow: 0 0 0 4px var(--primary-50, rgba(14, 94, 94, 0.10));
 }
 .wizard-rail-step.is-done .wizard-rail-marker {
-  background: var(--success, #16a34a);
+  background: var(--success, #3F8C5C);
   color: var(--ink-0, #fff);
-  border-color: var(--success, #16a34a);
+  border-color: var(--success, #3F8C5C);
 }
 .wizard-rail-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .wizard-rail-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
@@ -1125,7 +1125,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .wizard-hint {
   font: 500 var(--text-xs) var(--font-sans);
-  color: var(--danger, #ef4444);
+  color: var(--danger, #C0413A);
 }
 
 /* ─── Workflow Hub catalog page ──────────────────── */
@@ -1358,7 +1358,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.wf-required { color: var(--danger, #ef4444); }
+.wf-required { color: var(--danger, #C0413A); }
 
 .wf-score-row {
   display: grid;
@@ -1595,7 +1595,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   border-radius: var(--r-lg);
   color: var(--ink-1);
 }
-.error-boundary-card svg { color: var(--danger, #ef4444); margin-bottom: var(--sp-3); }
+.error-boundary-card svg { color: var(--danger, #C0413A); margin-bottom: var(--sp-3); }
 .error-boundary-card h2 { font: 700 18px var(--font-sans); margin: 0 0 var(--sp-2); }
 .error-boundary-card p { font: 500 13px var(--font-sans); color: var(--ink-3); margin: 0 0 var(--sp-4); }
 .error-boundary-detail {
@@ -1763,7 +1763,9 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 .preset-card.active {
   border-color: var(--primary);
-  box-shadow: var(--focus-ring);
+  /* R4 — resting "selected" glow is a brand ring, not --focus-ring; the latter
+   * is reserved for :focus-visible so the keyboard-focus affordance stays distinct. */
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
 .preset-name {
