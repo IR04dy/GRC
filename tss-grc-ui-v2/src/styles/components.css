@@ -400,6 +400,35 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   font-size: 12px;
 }
 
+/* ─── RTL capped-label normalization (T4) ──────────────────────────────
+ * Latin small-caps labels combine text-transform:uppercase with positive
+ * letter-spacing. On Arabic both are wrong: uppercase is a no-op, and the
+ * tracking forces apart cursive glyphs that must join (e.g. م-خ in
+ * "المخاطر"). The .kpi-label / .stat-tile-label fixes above were applied to
+ * only 2 of ~12 capped labels; generalize them to every shared capped label
+ * so Arabic table headers, axes, form/wizard labels and eyebrows all read
+ * naturally instead of stretched-and-split. */
+[dir="rtl"] .heatmap-axis-x,
+[dir="rtl"] .heatmap-axis-y,
+[dir="rtl"] .heatmap-legend-lbl,
+[dir="rtl"] .risk-table th,
+[dir="rtl"] .grc-table th,
+[dir="rtl"] .tbl th,
+[dir="rtl"] .field__label,
+[dir="rtl"] .input-label,
+[dir="rtl"] .login-eyebrow,
+[dir="rtl"] .text-eyebrow,
+[dir="rtl"] .wf-label,
+[dir="rtl"] .wf-active-filters-label,
+[dir="rtl"] .wf-submissions-panel-head,
+[dir="rtl"] .wf-submissions-panel-wizard,
+[dir="rtl"] .wf-quick-launch-head,
+[dir="rtl"] .cf-section,
+[dir="rtl"] .step-label {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 /* ─── ModuleCard ─────────────────────────────────── */
 .module-card {
   background: var(--surface);
