@@ -1958,10 +1958,14 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .row-actions {
   display: inline-flex; gap: 4px;
   align-items: center;
-  opacity: 0.55;
+  opacity: 0.7;            /* L5 — resting state discoverable (was 0.55) */
   transition: opacity var(--dur-fast);
 }
 tr:hover .row-actions { opacity: 1; }
+/* L5 — touch devices have no hover, so row actions must stay fully opaque. */
+@media (hover: none) {
+  .row-actions { opacity: 1; }
+}
 
 .row-action-btn {
   width: var(--touch-sm); height: var(--touch-sm);

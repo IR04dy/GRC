@@ -133,7 +133,7 @@ export function ObligationsPage() {
           <select
             value={regulatorFilter}
             onChange={e => setRegulatorFilter(e.target.value as Regulator | '')}
-            style={{ padding: '4px 8px', fontSize: 13 }}
+            className="input" style={{ width: 'auto', maxWidth: 220 }}
           >
             <option value="">{isAr ? 'كل الجهات' : 'All regulators'}</option>
             {REGULATORS.map(r => (
@@ -145,7 +145,7 @@ export function ObligationsPage() {
           <select
             value={stageFilter}
             onChange={e => setStageFilter(e.target.value as LifecycleStage | '')}
-            style={{ padding: '4px 8px', fontSize: 13 }}
+            className="input" style={{ width: 'auto', maxWidth: 220 }}
           >
             <option value="">{isAr ? 'كل الحالات' : 'All stages'}</option>
             {LIFECYCLE_STAGES.map(s => (
