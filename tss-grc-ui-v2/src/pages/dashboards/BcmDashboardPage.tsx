@@ -4,6 +4,7 @@ import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidg
 import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
 import { LineChart } from '../../components/charts/LineChart';
+import { RadialGauge } from '../../components/viz/RadialGauge';
 import { useI18n } from '../../lib/i18n';
 import { bcmApi, dashboardApi } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
@@ -73,7 +74,30 @@ export function BcmDashboardPage() {
       tone: (stats.openGaps ?? 0) > 0 ? 'warning' : 'success' },
   ];
 
+  const readinessBands = [
+    { from: 0,  to: 60,  color: 'var(--danger)' },
+    { from: 60, to: 85,  color: 'var(--warning)' },
+    { from: 85, to: 101, color: 'var(--success)' },
+  ];
   const widgets: DomainDashboardWidget[] = [
+    {
+      id: 'programme-readiness',
+      title: isAr ? 'جاهزية برنامج الاستمرارية' : 'Continuity programme readiness',
+      body: (
+        <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
+          {[
+            { label: 'BIA', v: stats.biaCompletionPercent ?? 0 },
+            { label: 'BCP', v: stats.bcpCompletionPercent ?? 0 },
+            { label: 'DRP', v: stats.drpCompletionPercent ?? 0 },
+          ].map(g => (
+            <RadialGauge key={g.label} value={g.v} max={100} size={108} thickness={10}
+              caption={g.label} unit="%" rtl={isAr} bands={readinessBands}
+              aria-label={`${g.label} ${isAr ? 'اكتمال' : 'completion'} ${g.v}%`} />
+          ))}
+        </div>
+      ),
+      href: '/bcm',
+    },
     {
       id: 'exercise-cadence',
       title: isAr ? 'وتيرة التمارين المنفّذة — 12 أسبوع' : 'Exercises conducted · 12 weeks',

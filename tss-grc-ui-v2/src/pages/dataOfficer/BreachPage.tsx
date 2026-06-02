@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Plus, Siren, FolderOpen } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Siren, FolderOpen, ShieldCheck } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EntityDocsModal } from '../../components/ui/EntityDocsModal';
+import { CountdownRing } from '../../components/viz/CountdownRing';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -56,6 +57,16 @@ export function BreachPage() {
     catch (err) { setError(err instanceof ApiError ? err.message : 'Failed to load'); }
   };
   useEffect(() => { void reload(); }, [demoMode]);
+
+  // Nearest-deadline open (un-notified) breach → the 72h SDAIA war-room hero.
+  const urgent = useMemo(() => {
+    const open = rows.filter(b => !b.sdaiaNotifiedAt && b.hoursToSdaiaDeadline != null
+      && b.status !== 'CLOSED' && b.status !== 'FALSE_POSITIVE');
+    if (open.length === 0) return null;
+    const b = open.reduce((a, c) =>
+      ((c.hoursToSdaiaDeadline as number) < (a.hoursToSdaiaDeadline as number) ? c : a));
+    return { b, deadlineMs: Date.now() + (b.hoursToSdaiaDeadline as number) * 3600_000 };
+  }, [rows]);
 
   async function submitCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -160,6 +171,48 @@ export function BreachPage() {
       />
 
       {error && <Card><div style={{ padding: 12, color: 'var(--danger,#a00)' }}>{error}</div></Card>}
+
+      {urgent && (
+        <div style={{
+          display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap',
+          padding: 18, marginBottom: 16, borderRadius: 'var(--r-lg)',
+          background: 'linear-gradient(135deg, #0C1A1A 0%, #15292A 100%)',
+          border: '1px solid rgba(95,138,138,0.28)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+        }}>
+          <CountdownRing
+            deadlineMs={urgent.deadlineMs}
+            totalMs={72 * 3600_000}
+            size={150}
+            rtl={ar}
+            caption={ar ? 'مهلة سدايا ٧٢ ساعة' : 'SDAIA 72h'} />
+          <div style={{ flex: 1, minWidth: 220, color: '#E6EEEE' }}>
+            <div style={{ font: '700 10px var(--font-sans)', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#86A8A8', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Siren size={12} /> {ar ? 'غرفة الطوارئ — أقرب خرق للموعد التنظيمي' : 'War room — nearest regulatory deadline'}
+            </div>
+            <div style={{ font: '800 19px var(--font-sans)', margin: '6px 0' }}>
+              {(ar ? urgent.b.titleAr : urgent.b.titleEn)}{' '}
+              <span className="mono" style={{ opacity: 0.6, fontSize: 13, fontWeight: 600 }}>{urgent.b.reference}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Badge tone={urgent.b.severity === 'CRITICAL' ? 'danger' : urgent.b.severity === 'HIGH' ? 'warning' : 'neutral'}>{urgent.b.severity}</Badge>
+              {urgent.b.affectedSubjectCount != null && (
+                <Badge tone="info">{urgent.b.affectedSubjectCount} {ar ? 'متأثر' : 'affected'}</Badge>
+              )}
+              {urgent.b.isSpecialCategory && <Badge tone="danger">{ar ? 'بيانات حسّاسة (م.٤)' : 'Special category (Art.4)'}</Badge>}
+              {urgent.b.isCrossBorder && <Badge tone="warning">{ar ? 'عبر الحدود' : 'Cross-border'}</Badge>}
+            </div>
+          </div>
+          <Button variant="primary" Icon={ShieldCheck}
+            onClick={() => {
+              const next = nextBreachStatuses(urgent.b.status);
+              setMoveTarget(urgent.b);
+              setToStatus(next.includes('NOTIFIED_SDAIA') ? 'NOTIFIED_SDAIA' : (next[0] ?? null));
+            }}>
+            {ar ? 'إبلاغ سدايا' : 'Notify SDAIA'}
+          </Button>
+        </div>
+      )}
 
       {showNew && (
         <Card>
