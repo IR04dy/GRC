@@ -133,6 +133,16 @@ export function OutsourcingDetailPage() {
         eyebrow={`${arrangement.arrangementCode}`}
         title={isAr ? arrangement.titleAr : arrangement.titleEn}
         sub={isAr ? arrangement.titleEn : arrangement.titleAr}
+        badges={
+          <>
+            {arrangement.isMaterial
+              ? <Badge tone="warning">{isAr ? 'إسناد جوهري' : 'Material'}</Badge>
+              : <Badge tone="neutral">{isAr ? 'غير جوهري' : 'Non-material'}</Badge>}
+            <Badge tone={lifecycleTone(arrangement.lifecycleStage)}>
+              {LIFECYCLE_LABELS[arrangement.lifecycleStage]?.[isAr ? 'ar' : 'en'] ?? arrangement.lifecycleStage}
+            </Badge>
+          </>
+        }
         actions={
           <div style={row}>
             <Button variant="ghost" Icon={ArrowLeft} onClick={() => navigate('/tprm/outsourcing')}>
@@ -145,21 +155,15 @@ export function OutsourcingDetailPage() {
         }
       />
 
-      {/* Header summary chips */}
+      {/* Regulatory-context chips (status + materiality now sit by the title) */}
       <Card>
         <div style={{ ...row, flexWrap: 'wrap' }}>
-          {arrangement.isMaterial
-            ? <Badge tone="warning">{isAr ? 'إسناد جوهري' : 'Material'}</Badge>
-            : <Badge tone="neutral">{isAr ? 'غير جوهري' : 'Non-material'}</Badge>}
-          <Badge tone={lifecycleTone(arrangement.lifecycleStage)}>
-            {isAr ? LIFECYCLE_LABELS[arrangement.lifecycleStage].ar : LIFECYCLE_LABELS[arrangement.lifecycleStage].en}
-          </Badge>
           <Badge tone="info">
-            {isAr ? SERVICE_TYPE_LABELS[arrangement.serviceType].ar : SERVICE_TYPE_LABELS[arrangement.serviceType].en}
+            {SERVICE_TYPE_LABELS[arrangement.serviceType]?.[isAr ? 'ar' : 'en'] ?? arrangement.serviceType}
           </Badge>
           {arrangement.criticalFunction !== 'NA' && (
             <Badge tone="warning">
-              {isAr ? CRITICAL_FUNCTION_LABELS[arrangement.criticalFunction].ar : CRITICAL_FUNCTION_LABELS[arrangement.criticalFunction].en}
+              {CRITICAL_FUNCTION_LABELS[arrangement.criticalFunction]?.[isAr ? 'ar' : 'en'] ?? arrangement.criticalFunction}
             </Badge>
           )}
           {arrangement.samaNonObjectionRequired && (
@@ -261,8 +265,8 @@ export function OutsourcingDetailPage() {
               <div style={rowStart}>
                 <div>
                   <div style={{ ...row, flexWrap: 'wrap' }}>
-                    <Badge tone={severityTone(e.severity)}>{isAr ? SEVERITY_LABELS[e.severity].ar : SEVERITY_LABELS[e.severity].en}</Badge>
-                    <Badge tone="info">{isAr ? EVENT_TYPE_LABELS[e.eventType].ar : EVENT_TYPE_LABELS[e.eventType].en}</Badge>
+                    <Badge tone={severityTone(e.severity)}>{SEVERITY_LABELS[e.severity]?.[isAr ? 'ar' : 'en'] ?? e.severity}</Badge>
+                    <Badge tone="info">{EVENT_TYPE_LABELS[e.eventType]?.[isAr ? 'ar' : 'en'] ?? e.eventType}</Badge>
                     {e.resolved
                       ? <Badge tone="success">{isAr ? 'مُغلَق' : 'Resolved'}</Badge>
                       : <Badge tone="warning">{isAr ? 'مفتوح' : 'Open'}</Badge>}
@@ -290,7 +294,7 @@ export function OutsourcingDetailPage() {
               <Card title={isAr ? 'خطة الخروج' : 'Exit plan'} Icon={LogOut} action={
                 <div style={row}>
                   <Badge tone={exitPlan.lastTestedDate ? 'success' : 'warning'}>
-                    {isAr ? TEST_FREQUENCY_LABELS[exitPlan.testFrequency].ar : TEST_FREQUENCY_LABELS[exitPlan.testFrequency].en}
+                    {TEST_FREQUENCY_LABELS[exitPlan.testFrequency]?.[isAr ? 'ar' : 'en'] ?? exitPlan.testFrequency}
                   </Badge>
                   {exitPlan.lastTestedDate && (
                     <span style={{ fontSize: 11, ...muted }}>

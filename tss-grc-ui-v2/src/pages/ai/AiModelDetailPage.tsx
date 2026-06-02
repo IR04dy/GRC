@@ -139,7 +139,7 @@ export function AiModelDetailPage() {
         eyebrow={lang === 'ar' ? 'حوكمة الذكاء الاصطناعي' : 'AI Governance'}
         title={lang === 'ar' && model.titleAr ? model.titleAr : model.titleEn}
         sub={`${model.modelCode} · ${ML_DOMAIN_LABEL[model.businessDomain][lang === 'ar' ? 'ar' : 'en']}`}
-        actions={
+        badges={
           <>
             <Badge tone={ML_TIER_TONE[model.riskTier]} dot>
               {ML_TIER_LABEL[model.riskTier][lang === 'ar' ? 'ar' : 'en']}
@@ -147,12 +147,14 @@ export function AiModelDetailPage() {
             <Badge tone={ML_STAGE_TONE[model.lifecycleStage]} dot>
               {ML_STAGE_LABEL[model.lifecycleStage][lang === 'ar' ? 'ar' : 'en']}
             </Badge>
-            {model.lifecycleStage !== 'DECOMMISSIONED' && (
-              <Button variant="ghost" Icon={PowerOff} onClick={() => setShowDecomModal(true)}>
-                {lang === 'ar' ? 'خارج الخدمة' : 'Decommission'}
-              </Button>
-            )}
           </>
+        }
+        actions={
+          model.lifecycleStage !== 'DECOMMISSIONED' ? (
+            <Button variant="ghost" Icon={PowerOff} onClick={() => setShowDecomModal(true)}>
+              {lang === 'ar' ? 'خارج الخدمة' : 'Decommission'}
+            </Button>
+          ) : undefined
         }
       />
 
