@@ -142,6 +142,13 @@
   color: var(--ink-3);
   cursor: not-allowed;
 }
+/* A11y — invalid field (aria-invalid): danger border + danger focus ring so the
+   error reads visually as well as via the role="alert" message. */
+.input.is-error { border-color: var(--danger); }
+.input.is-error:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
+}
 textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-normal); }
 
 /* Optional hint / helper line under an input — softer than the label but
