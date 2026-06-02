@@ -119,7 +119,10 @@
 
 /* ─── Modal/Drawer fill width on mobile ────────────────────────────── */
 @media (max-width: 639px) {
-  .modal-content, .drawer-content {
+  /* Modal renders `.modal-card` inside `.modal-scrim`; target the real class
+     (the previous `.modal-content`/`.drawer-content` selectors matched nothing). */
+  .modal-scrim { padding: 0 !important; }
+  .modal-card, .modal-content, .drawer-content {
     width: 100vw !important;
     max-width: 100vw !important;
     height: 100vh !important;

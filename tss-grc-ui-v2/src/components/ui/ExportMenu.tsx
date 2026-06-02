@@ -60,7 +60,7 @@ export function ExportMenu({
       </Button>
       {open && (
         <div role="menu" style={{
-          position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+          position: 'absolute', top: 'calc(100% + 6px)', insetInlineEnd: 0,
           minWidth: 180, background: 'var(--surface)',
           border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
           boxShadow: 'var(--shadow-3)', padding: 4, zIndex: 1000,

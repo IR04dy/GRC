@@ -228,7 +228,7 @@ export function GrcExpertPage() {
               fontSize: 13,
               fontWeight: 600,
               border: '1.5px solid',
-              borderColor: activeFamily === fam ? 'var(--primary)' : 'var(--card-border)',
+              borderColor: activeFamily === fam ? 'var(--primary)' : 'var(--border)',
               background: activeFamily === fam ? 'var(--primary)' : 'var(--surface-1)',
               color: activeFamily === fam ? '#fff' : 'var(--ink-2)',
               cursor: 'pointer',
@@ -274,8 +274,8 @@ export function GrcExpertPage() {
                     textAlign: lang === 'ar' ? 'right' : 'left',
                     padding: '10px 14px',
                     border: 'none',
-                    borderBottom: '1px solid var(--card-border)',
-                    background: selectedFwId === fw.id ? 'var(--primary-wash, rgba(var(--primary-rgb,37,99,235),0.08))' : 'transparent',
+                    borderBottom: '1px solid var(--border)',
+                    background: selectedFwId === fw.id ? 'var(--primary-50)' : 'transparent',
                     cursor: 'pointer',
                     transition: 'background 0.12s',
                     display: 'block',
@@ -526,7 +526,7 @@ function ControlAccordion({
           gap: 8,
           padding: '10px 14px',
           background: 'var(--surface-1)',
-          border: '1px solid var(--card-border)',
+          border: '1px solid var(--border)',
           borderRadius: expanded ? '8px 8px 0 0' : 8,
           cursor: 'pointer',
           transition: 'background 0.12s',
@@ -537,7 +537,7 @@ function ControlAccordion({
           : <ChevronRight size={16} style={{ flexShrink: 0, opacity: 0.5 }} />
         }
         <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginInlineEnd: 6 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, opacity: 0.6, marginInlineEnd: 6 }}>
             {control.code}
           </span>
           {lang === 'ar' ? control.nameAr : control.nameEn}
@@ -551,7 +551,7 @@ function ControlAccordion({
 
       {expanded && (
         <div style={{
-          border: '1px solid var(--card-border)',
+          border: '1px solid var(--border)',
           borderTop: 'none',
           borderRadius: '0 0 8px 8px',
           overflow: 'hidden',
@@ -591,8 +591,8 @@ function SubControlRow({
   return (
     <div style={{
       padding: '12px 16px',
-      borderBottom: isLast ? 'none' : '1px solid var(--card-border)',
-      background: 'var(--surface-0, var(--bg))',
+      borderBottom: isLast ? 'none' : '1px solid var(--border)',
+      background: 'var(--surface-2)',
       display: 'flex',
       gap: 12,
       alignItems: 'flex-start',
@@ -600,7 +600,7 @@ function SubControlRow({
       {/* Left: code + name + guidance */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6 }}>{sc.code}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, opacity: 0.6 }}>{sc.code}</span>
           <span style={{ fontWeight: 600, fontSize: 13 }}>
             {lang === 'ar' ? sc.nameAr : sc.nameEn}
           </span>
@@ -689,7 +689,7 @@ function KpiTile({ label, value, tone }: {
     <div style={{
       padding: '12px 20px',
       background: 'var(--surface-1)',
-      border: '1px solid var(--card-border)',
+      border: '1px solid var(--border)',
       borderRadius: 8,
       minWidth: 100,
       textAlign: 'center',
@@ -730,12 +730,12 @@ function StatusChip({ count, tone, label, Icon: IconProp }: {
 
 const inputStyle: React.CSSProperties = {
   padding: '6px 8px',
-  border: '1px solid var(--card-border)',
+  border: '1px solid var(--border)',
   borderRadius: 4,
   fontSize: 13,
   width: '100%',
   fontFamily: 'inherit',
-  background: 'var(--surface-0, var(--bg))',
+  background: 'var(--surface-2)',
   color: 'var(--ink-1)',
 };
 

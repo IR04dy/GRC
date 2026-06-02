@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -37,6 +37,15 @@ import {
 } from '../../lib/outsourcing';
 
 type TabId = 'overview' | 'dd' | 'events' | 'exit' | 'activity';
+
+// Shared token-driven styles (the page previously used non-existent Tailwind
+// utility classes — these render the intended layout with design tokens).
+const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
+const rowStart: CSSProperties = { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 };
+const stack: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 };
+const overviewGrid: CSSProperties = { display: 'grid', gap: 16, marginTop: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' };
+const fullSpan: CSSProperties = { gridColumn: '1 / -1' };
+const muted: CSSProperties = { color: 'var(--ink-3)' };
 
 export function OutsourcingDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -91,28 +100,28 @@ export function OutsourcingDetailPage() {
 
   const tabs: TabItem<TabId>[] = useMemo(() => [
     { id: 'overview', label: isAr ? 'نظرة عامة' : 'Overview' },
-    { id: 'dd',       label: isAr ? `العناية الواجبة (${dd.length})` : `Due Diligence (${dd.length})` },
-    { id: 'events',   label: isAr ? `المراقبة المستمرّة (${events.length})` : `Monitoring (${events.length})` },
+    { id: 'dd',       label: isAr ? 'العناية الواجبة' : 'Due Diligence', count: dd.length },
+    { id: 'events',   label: isAr ? 'المراقبة المستمرّة' : 'Monitoring', count: events.length },
     { id: 'exit',     label: isAr ? 'خطة الخروج' : 'Exit Plan' },
     { id: 'activity', label: isAr ? 'النشاط' : 'Activity' },
   ], [isAr, dd.length, events.length]);
 
   if (!Number.isFinite(arrangementId)) {
-    return <Shell><div className="p-6">{isAr ? 'معرّف غير صحيح' : 'Invalid id'}</div></Shell>;
+    return <Shell><div style={{ padding: 24 }}>{isAr ? 'معرّف غير صحيح' : 'Invalid id'}</div></Shell>;
   }
 
   if (loading && !arrangement) {
-    return <Shell><div className="p-6">{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div></Shell>;
+    return <Shell><div style={{ padding: 24 }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div></Shell>;
   }
 
   if (!arrangement) {
     return (
       <Shell>
-        <div className="p-6">
+        <div style={{ padding: 24 }}>
           <Button variant="ghost" Icon={ArrowLeft} onClick={() => navigate('/tprm/outsourcing')}>
             {isAr ? 'الرجوع للسجل' : 'Back to register'}
           </Button>
-          <div className="mt-4">{isAr ? 'ترتيب غير موجود' : 'Arrangement not found'}</div>
+          <div style={{ marginTop: 16 }}>{isAr ? 'ترتيب غير موجود' : 'Arrangement not found'}</div>
         </div>
       </Shell>
     );
@@ -125,7 +134,7 @@ export function OutsourcingDetailPage() {
         title={isAr ? arrangement.titleAr : arrangement.titleEn}
         sub={isAr ? arrangement.titleEn : arrangement.titleAr}
         actions={
-          <div className="flex items-center gap-2">
+          <div style={row}>
             <Button variant="ghost" Icon={ArrowLeft} onClick={() => navigate('/tprm/outsourcing')}>
               {isAr ? 'الرجوع' : 'Back'}
             </Button>
@@ -138,7 +147,7 @@ export function OutsourcingDetailPage() {
 
       {/* Header summary chips */}
       <Card>
-        <div className="flex flex-wrap items-center gap-2">
+        <div style={{ ...row, flexWrap: 'wrap' }}>
           {arrangement.isMaterial
             ? <Badge tone="warning">{isAr ? 'إسناد جوهري' : 'Material'}</Badge>
             : <Badge tone="neutral">{isAr ? 'غير جوهري' : 'Non-material'}</Badge>}
@@ -161,10 +170,12 @@ export function OutsourcingDetailPage() {
         </div>
       </Card>
 
-      <Tabs items={tabs} active={tab} onChange={(id) => setTab(id as TabId)} />
+      <div style={{ marginTop: 16 }}>
+        <Tabs items={tabs} active={tab} onChange={(id) => setTab(id as TabId)} />
+      </div>
 
       {tab === 'overview' && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div style={overviewGrid}>
           <Card title={isAr ? 'العقد' : 'Contract'} Icon={FileText}>
             <DataPair label={isAr ? 'القيمة السنوية' : 'Annual value'} value={fmtSar(arrangement.contractValueSarAnnual)} />
             <DataPair label={isAr ? 'بداية العقد' : 'Contract start'} value={arrangement.contractStartDate ?? '—'} />
@@ -181,22 +192,22 @@ export function OutsourcingDetailPage() {
               <DataPair label={isAr ? 'ضمانة عبر الحدود' : 'Cross-border safeguard'} value={arrangement.crossBorderSafeguardType} />
             )}
           </Card>
-          <div className="lg:col-span-2">
+          <div style={fullSpan}>
             <Card>
               <AttachmentsField entityType="OUTSOURCING" entityId={arrangement.id} />
             </Card>
           </div>
-          <div className="lg:col-span-2">
+          <div style={fullSpan}>
             <Card>
               <ControlMappingPicker entityType="OUTSOURCING" entityId={arrangement.id} evidence={false} />
             </Card>
           </div>
-          <div className="lg:col-span-2">
+          <div style={fullSpan}>
             <Card title={isAr ? 'جاهزية الأدلة' : 'Evidence readiness'}>
               <EvidenceReadinessPanel entityType="OUTSOURCING" entityId={arrangement.id} />
             </Card>
           </div>
-          <div className="lg:col-span-2">
+          <div style={fullSpan}>
             <Card title={isAr ? 'الجوهرية' : 'Materiality'} Icon={AlertTriangle}>
               <DataPair label={isAr ? 'مُصنَّفة' : 'Classified'} value={arrangement.isMaterial ? (isAr ? 'جوهرية' : 'Material') : (isAr ? 'غير جوهرية' : 'Non-material')} />
               {arrangement.materialityBasisEn && (
@@ -208,25 +219,25 @@ export function OutsourcingDetailPage() {
       )}
 
       {tab === 'dd' && (
-        <div className="mt-4 space-y-3">
+        <div style={stack}>
           {dd.length === 0 && <Card><InlineEmpty text={isAr ? 'لا توجد سجلات عناية واجبة' : 'No due diligence records'} /></Card>}
           {dd.map(d => (
             <Card key={d.id}>
-              <div className="flex items-start justify-between">
+              <div style={rowStart}>
                 <div>
-                  <div className="text-sm font-semibold">
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
                     {isAr ? 'تاريخ التقييم:' : 'Assessment date:'} {d.assessmentDate}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div style={{ fontSize: 11, ...muted }}>
                     {isAr ? 'المُقيِّم' : 'Assessor'} #{d.assessorUserId}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div style={row}>
                   <Badge tone={recommendationTone(d.recommendation)}>{d.recommendation}</Badge>
-                  <span className="text-2xl font-bold">{d.compositeScore.toFixed(2)}</span>
+                  <span className="tnum" style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em' }}>{d.compositeScore.toFixed(2)}</span>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6 text-xs">
+              <div style={{ marginTop: 12, display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))' }}>
                 <ScoreCell label={isAr ? 'المالية' : 'Financial'} score={d.financialHealthScore} />
                 <ScoreCell label={isAr ? 'التشغيلية' : 'Operational'} score={d.operationalCapabilityScore} />
                 <ScoreCell label={isAr ? 'السيبراني' : 'Cyber'} score={d.cybersecurityScore} />
@@ -234,7 +245,7 @@ export function OutsourcingDetailPage() {
                 <ScoreCell label={isAr ? 'PDPL' : 'PDPL'} score={d.pdplComplianceScore} />
                 <ScoreCell label={isAr ? 'السمعة' : 'Reputation'} score={d.reputationScore} />
               </div>
-              <div className="mt-3 text-sm text-muted-foreground">
+              <div style={{ marginTop: 12, fontSize: 13, ...muted }}>
                 {isAr ? d.rationaleAr : d.rationaleEn}
               </div>
             </Card>
@@ -243,25 +254,25 @@ export function OutsourcingDetailPage() {
       )}
 
       {tab === 'events' && (
-        <div className="mt-4 space-y-3">
+        <div style={stack}>
           {events.length === 0 && <Card><InlineEmpty text={isAr ? 'لا توجد أحداث مراقبة' : 'No monitoring events'} /></Card>}
           {events.map(e => (
             <Card key={e.id}>
-              <div className="flex items-start justify-between gap-2">
+              <div style={rowStart}>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div style={{ ...row, flexWrap: 'wrap' }}>
                     <Badge tone={severityTone(e.severity)}>{isAr ? SEVERITY_LABELS[e.severity].ar : SEVERITY_LABELS[e.severity].en}</Badge>
                     <Badge tone="info">{isAr ? EVENT_TYPE_LABELS[e.eventType].ar : EVENT_TYPE_LABELS[e.eventType].en}</Badge>
                     {e.resolved
                       ? <Badge tone="success">{isAr ? 'مُغلَق' : 'Resolved'}</Badge>
                       : <Badge tone="warning">{isAr ? 'مفتوح' : 'Open'}</Badge>}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{e.eventDate}</div>
+                  <div style={{ marginTop: 4, fontSize: 11, ...muted }}>{e.eventDate}</div>
                 </div>
               </div>
-              <p className="mt-2 text-sm">{isAr ? e.descriptionAr : e.descriptionEn}</p>
+              <p style={{ marginTop: 8, fontSize: 13 }}>{isAr ? e.descriptionAr : e.descriptionEn}</p>
               {(e.actionTakenEn || e.actionTakenAr) && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p style={{ marginTop: 4, fontSize: 11, ...muted }}>
                   <strong>{isAr ? 'الإجراء المُتَّخذ: ' : 'Action: '}</strong>
                   {isAr ? e.actionTakenAr : e.actionTakenEn}
                 </p>
@@ -272,17 +283,17 @@ export function OutsourcingDetailPage() {
       )}
 
       {tab === 'exit' && (
-        <div className="mt-4">
+        <div style={{ marginTop: 16 }}>
           {!exitPlan
             ? <Card><InlineEmpty text={isAr ? 'لا توجد خطة خروج لهذا الترتيب' : 'No exit plan for this arrangement'} /></Card>
             : (
               <Card title={isAr ? 'خطة الخروج' : 'Exit plan'} Icon={LogOut} action={
-                <div className="flex items-center gap-2">
+                <div style={row}>
                   <Badge tone={exitPlan.lastTestedDate ? 'success' : 'warning'}>
                     {isAr ? TEST_FREQUENCY_LABELS[exitPlan.testFrequency].ar : TEST_FREQUENCY_LABELS[exitPlan.testFrequency].en}
                   </Badge>
                   {exitPlan.lastTestedDate && (
-                    <span className="text-xs text-muted-foreground">
+                    <span style={{ fontSize: 11, ...muted }}>
                       {isAr ? 'آخر اختبار:' : 'Last test:'} {exitPlan.lastTestedDate}
                     </span>
                   )}
@@ -299,8 +310,8 @@ export function OutsourcingDetailPage() {
                   />
                 )}
                 {exitPlan.exitStepsJson && (
-                  <div className="mt-3">
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, ...muted }}>
                       {isAr ? 'خطوات الخروج' : 'Exit steps'}
                     </div>
                     <ExitSteps json={exitPlan.exitStepsJson} isAr={isAr} />
@@ -312,9 +323,9 @@ export function OutsourcingDetailPage() {
       )}
 
       {tab === 'activity' && (
-        <div className="mt-4">
+        <div style={{ marginTop: 16 }}>
           <Card title={isAr ? 'سجل النشاط' : 'Activity log'} Icon={History}>
-            <p className="text-sm text-muted-foreground">
+            <p style={{ fontSize: 13, ...muted }}>
               {isAr
                 ? 'يُجلب سجل التدقيق من خدمة F7 على مستوى المنصة.'
                 : 'F7 platform-level audit log entries are surfaced via the audit module.'}
@@ -328,22 +339,22 @@ export function OutsourcingDetailPage() {
 
 function DataPair({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="grid grid-cols-3 gap-2 py-1 text-sm">
-      <div className="text-muted-foreground">{label}</div>
-      <div className="col-span-2 font-medium">{value}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 2fr', gap: 8, padding: '4px 0', fontSize: 13, alignItems: 'baseline' }}>
+      <div style={{ color: 'var(--ink-3)' }}>{label}</div>
+      <div style={{ fontWeight: 500, color: 'var(--ink-1)' }}>{value}</div>
     </div>
   );
 }
 
 function ScoreCell({ label, score }: { label: string; score: number }) {
-  const tone =
-    score >= 85 ? 'text-green-600'
-    : score >= 70 ? 'text-amber-600'
-    : 'text-red-600';
+  const color =
+    score >= 85 ? 'var(--success)'
+    : score >= 70 ? 'var(--warning)'
+    : 'var(--danger)';
   return (
-    <div className="rounded-md border bg-muted/20 p-2">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`text-lg font-bold ${tone}`}>{score}</div>
+    <div style={{ borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-2)', padding: 8 }}>
+      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)' }}>{label}</div>
+      <div className="tnum" style={{ fontSize: 18, fontWeight: 700, color }}>{score}</div>
     </div>
   );
 }
@@ -354,19 +365,19 @@ function ExitSteps({ json, isAr }: { json: string; isAr: boolean }) {
   let parsed: ExitStep[] = [];
   try { parsed = JSON.parse(json) as ExitStep[]; } catch { /* ignore */ }
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    return <pre className="text-xs whitespace-pre-wrap">{json}</pre>;
+    return <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}>{json}</pre>;
   }
   return (
-    <ol className="space-y-1 text-sm">
+    <ol style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, margin: 0, paddingInlineStart: 0, listStyle: 'none' }}>
       {parsed.map((s, i) => (
-        <li key={i} className="flex items-start gap-2">
-          <span className="font-mono text-xs text-muted-foreground">{i + 1}.</span>
-          <div className="flex-1">
+        <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{i + 1}.</span>
+          <div style={{ flex: 1 }}>
             <div>{s.step}</div>
-            <div className="text-xs text-muted-foreground">
+            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
               {s.owner && <span>{isAr ? 'المسؤول: ' : 'Owner: '}{s.owner}</span>}
               {typeof s.target_date_relative_days === 'number' && (
-                <span className="ms-3">
+                <span style={{ marginInlineStart: 12 }}>
                   {isAr
                     ? `الموعد المُستهدف: +${s.target_date_relative_days} يوم`
                     : `Target: T+${s.target_date_relative_days}d`}
