@@ -5,7 +5,9 @@
 > **Nature:** Front‑end **design** only — visual language, information design, interaction, motion, visualization, accessibility, RTL/bilingual. No backend or business‑logic changes.
 > **Date:** 2026‑06‑02 · **Method:** 6 parallel domain audits across the full component tree + live DOM/token verification (304 routes, ~110 nav items, ~43 detail pages, ~70+ register pages).
 >
-> **Companion document:** [`frontend-visualization-playbook.md`](./frontend-visualization-playbook.md) — a committee of GRC‑tool design leaders prescribing, **page by page**, the signature charts/diagrams, interactive effects, and high‑end modern treatment (benchmarked against ServiceNow IRM, RSA Archer, OneTrust, AuditBoard, Diligent, Drata, Credo AI…). This review says *what to fix*; the playbook says *what to build*.
+> **Companion documents:**
+> - [`frontend-visualization-playbook.md`](./frontend-visualization-playbook.md) — a committee prescribing, **page by page**, the signature charts/diagrams, interactive effects, and high‑end modern treatment. (This review says *what to fix*; the playbook says *what to build*.)
+> - [`frontend-visual-craft-review.md`](./frontend-visual-craft-review.md) — a committee's **pixel/token‑level craft** audit (component sizing & proportion, alignment, colour matching, typography, spacing rhythm, RTL/responsive precision), with concrete design‑QA bugs and a token‑enforcement roadmap. (*How it's polished.*)
 
 ---
 
