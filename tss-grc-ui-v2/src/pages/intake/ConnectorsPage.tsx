@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play,
+  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play, PlayCircle, RefreshCw, ServerCog,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -15,6 +15,12 @@ import {
   CONNECTOR_STATUS_TONE, CONNECTOR_STATUS_LABEL,
   type ConnectorDefinition, type ConnectorStatus,
 } from '../../lib/connectors';
+import {
+  listCcmTests, getCcmDashboard, enableCcmTest, disableCcmTest, runCcmTestNow,
+  ccmStatusTone, ccmSeverityTone, ccmStatusLabel,
+  type CcmTestDefinition, type CcmDashboardSnapshot,
+} from '../../lib/ccmApi';
+import { ApiError } from '../../lib/api';
 import { CcmDashboard } from '../../components/compliance/CcmDashboard';
 
 /**
@@ -73,6 +79,13 @@ export function ConnectorsPage() {
         <Kpi Icon={Zap}      label={t('connectorsKpiIntake30d')}  value={intake30d}         tone="accent" />
       </div>
 
+      {/* L3 — Live integration: the real CCM engine (/api/v1/ccm). Lists the
+          persisted control-test definitions and lets an operator enable /
+          disable and run each one for real against its target system. */}
+      <div style={{ marginBottom: 16 }}>
+        <LiveControlTests />
+      </div>
+
       {/* Sprint 4 — Continuous Control Monitoring panel sits above the
           connector registry. Every check the connectors run is graded by
           freshness; stale or expired evidence becomes a workflow instance
@@ -104,6 +117,147 @@ export function ConnectorsPage() {
         </div>
       </Card>
     </Shell>
+  );
+}
+
+/**
+ * Live CCM integration (L3). Drives the real backend monitoring engine:
+ * lists persisted control-test definitions, toggles them, and runs them
+ * synchronously — each run executes a real runner and is recorded server-side.
+ */
+function LiveControlTests() {
+  const { lang } = useI18n();
+  const isAr = lang === 'ar';
+  const toast = useToast();
+  const [tests, setTests] = useState<CcmTestDefinition[]>([]);
+  const [dash, setDash] = useState<CcmDashboardSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [ts, d] = await Promise.all([listCcmTests(), getCcmDashboard()]);
+      setTests([...ts].sort((a, b) => (a.testCode ?? '').localeCompare(b.testCode ?? '')));
+      setDash(d);
+      setFailed(false);
+    } catch (e) {
+      setFailed(true);
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل محرّك المراقبة' : 'Failed to load CCM engine'));
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void reload(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggle(test: CcmTestDefinition) {
+    setBusyId(test.externalId);
+    try {
+      const updated = test.isEnabled ? await disableCcmTest(test.externalId) : await enableCcmTest(test.externalId);
+      setTests(prev => prev.map(x => x.externalId === updated.externalId ? updated : x));
+      setDash(await getCcmDashboard());
+      toast.success(updated.isEnabled
+        ? (isAr ? 'تم تفعيل الفحص' : 'Test enabled')
+        : (isAr ? 'تم تعطيل الفحص' : 'Test disabled'));
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التبديل' : 'Toggle failed'));
+    } finally { setBusyId(null); }
+  }
+
+  async function runNow(test: CcmTestDefinition) {
+    setBusyId(test.externalId);
+    try {
+      const run = await runCcmTestNow(test.externalId);
+      const label = `${test.testCode ?? test.titleEn}: ${ccmStatusLabel(run.status, isAr ? 'ar' : 'en')}`;
+      if (run.status?.toUpperCase() === 'PASS') toast.success(label);
+      else toast.danger(run.failureReason ? `${label} — ${run.failureReason}` : label);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التشغيل' : 'Run failed'));
+    } finally { setBusyId(null); }
+  }
+
+  const passRate = dash ? Math.round((dash.passRateLast24h ?? 0) * (dash.passRateLast24h <= 1 ? 100 : 1)) : 0;
+
+  return (
+    <Card title={isAr ? 'محرّك المراقبة المستمرة للضوابط (مباشر)' : 'Continuous control-monitoring engine (live)'}
+      Icon={ServerCog}
+      action={
+        <Button variant="ghost" size="sm" Icon={RefreshCw} onClick={() => void reload()} disabled={loading}>
+          {isAr ? 'تحديث' : 'Refresh'}
+        </Button>
+      }>
+      <p style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+        {isAr
+          ? 'فحوصات حقيقية تعمل على /api/v1/ccm — فعِّل أو عطِّل أو شغِّل أي فحص الآن؛ كل تشغيل يُنفَّذ فعلياً ويُسجَّل في الخادم.'
+          : 'Real checks backed by /api/v1/ccm — enable, disable, or run any test now; every run executes for real and is recorded server-side.'}
+      </p>
+
+      {dash && (
+        <div className="kpi-grid" style={{ marginBottom: 14 }}>
+          <Kpi Icon={Database}   label={isAr ? 'إجمالي الفحوصات' : 'Total tests'}   value={dash.totalTests}   tone="primary" />
+          <Kpi Icon={Activity}   label={isAr ? 'المُفعَّلة' : 'Enabled'}            value={dash.enabledTests} tone="success" />
+          <Kpi Icon={PlayCircle} label={isAr ? 'ناجحة (24س)' : 'Passing (24h)'}     value={dash.passingLast24h} tone="info" />
+          <Kpi Icon={Zap}        label={isAr ? 'نسبة النجاح (24س)' : 'Pass rate (24h)'} value={`${passRate}%`} tone="accent" />
+        </div>
+      )}
+
+      {loading && tests.length === 0
+        ? <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>
+        : failed && tests.length === 0
+          ? <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>{isAr ? 'محرّك المراقبة غير متاح حالياً' : 'Monitoring engine unavailable right now'}</div>
+          : tests.length === 0
+            ? <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>{isAr ? 'لا توجد فحوصات معرّفة' : 'No control tests defined'}</div>
+            : <table className="grc-table">
+                <thead><tr>
+                  <th>{isAr ? 'الكود' : 'Code'}</th>
+                  <th>{isAr ? 'الفحص' : 'Test'}</th>
+                  <th>{isAr ? 'النظام المستهدف' : 'Target'}</th>
+                  <th>{isAr ? 'الخطورة' : 'Severity'}</th>
+                  <th>{isAr ? 'آخر نتيجة' : 'Last result'}</th>
+                  <th>{isAr ? 'الحالة' : 'State'}</th>
+                  <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+                </tr></thead>
+                <tbody>
+                  {tests.map(test => {
+                    const busy = busyId === test.externalId;
+                    return (
+                      <tr key={test.externalId}>
+                        <td className="mono text-2xs">{test.testCode ?? '—'}</td>
+                        <td>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{isAr && test.titleAr ? test.titleAr : test.titleEn}</div>
+                          <div className="text-2xs text-muted mono">{test.testType}</div>
+                        </td>
+                        <td className="text-2xs">{test.targetSystemType}</td>
+                        <td>{test.severity
+                          ? <Badge tone={ccmSeverityTone(test.severity)}>{test.severity}</Badge>
+                          : <span className="text-muted text-2xs">—</span>}</td>
+                        <td>
+                          {test.lastRunStatus
+                            ? <Badge tone={ccmStatusTone(test.lastRunStatus)} dot>{ccmStatusLabel(test.lastRunStatus, isAr ? 'ar' : 'en')}</Badge>
+                            : <span className="text-muted text-2xs">{isAr ? 'لم يُشغَّل' : 'Never run'}</span>}
+                          {test.lastRunAt && <div className="text-2xs text-muted mono">{test.lastRunAt.slice(5, 16).replace('T', ' ')}</div>}
+                        </td>
+                        <td>
+                          <Badge tone={test.isEnabled ? 'success' : 'neutral'} dot>
+                            {test.isEnabled ? (isAr ? 'مُفعَّل' : 'Enabled') : (isAr ? 'مُعطَّل' : 'Disabled')}
+                          </Badge>
+                        </td>
+                        <td style={{ textAlign: 'end' }}>
+                          <div style={{ display: 'inline-flex', gap: 4 }}>
+                            <Button size="sm" variant="primary" Icon={Play} disabled={busy} onClick={() => void runNow(test)}>
+                              {isAr ? 'تشغيل' : 'Run now'}
+                            </Button>
+                            <Button size="sm" variant="ghost" Icon={test.isEnabled ? Pause : PlayCircle} disabled={busy} onClick={() => void toggle(test)}>
+                              {test.isEnabled ? (isAr ? 'تعطيل' : 'Disable') : (isAr ? 'تفعيل' : 'Enable')}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>}
+    </Card>
   );
 }
 
