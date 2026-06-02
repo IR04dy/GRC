@@ -44,38 +44,9 @@
   color: var(--ink-3);
 }
 
-/* ─── Tab bar (in card) ────────────────────────────────── */
-.aimd-tabs {
-  display: flex;
-  gap: var(--sp-2);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: var(--sp-6);
-}
-.aimd-tab-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-6);
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--ink-2);
-  font-weight: 400;
-  font-size: var(--text-sm);
-}
-.aimd-tab-btn--on {
-  border-bottom-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-}
-.aimd-tab-count {
-  font-size: var(--text-2xs);
-  padding: 1px 6px;
-  background: var(--surface-2);
-  border-radius: 8px;
-  color: var(--ink-3);
-}
+/* Tab bar now uses the shared <Tabs> component (.tabs/.tab in components.css)
+   — the bespoke .aimd-tab* classes were removed when AI Model was converged
+   onto the one tab component (DT2). */
 
 /* ─── Activity tab empty state ─────────────────────────── */
 .aimd-activity-empty {

@@ -21,6 +21,7 @@ import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 import { ApiError, controlLinksApi, type ControlEvidenceDto } from '../../lib/api';
 import { EvidenceReadinessPanel } from '../../components/ui/EvidenceReadinessPanel';
+import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import {
   mlModelApi,
   approvalGateMissing, ML_NEXT_STAGES,
@@ -35,7 +36,6 @@ import {
   type MlModelAuditResponse, type MlAuditType, type MlAuditStatus,
   type DriftObservationResponse,
 } from '../../lib/aiGovernance';
-import type { LucideIcon } from 'lucide-react';
 import '../../styles/pages/ai-model-detail.css';
 
 /**
@@ -225,15 +225,19 @@ export function AiModelDetailPage() {
 
       {/* Tabs */}
       <Card padded>
-        <div className="aimd-tabs">
-          <TabButton id="overview"   label={lang === 'ar' ? 'نظرة عامة' : 'Overview'}        active={tab} setActive={setTab} Icon={ListChecks} />
-          <TabButton id="provenance" label={lang === 'ar' ? 'المصدر' : 'Provenance'}         active={tab} setActive={setTab} Icon={Database} />
-          <TabButton id="compliance" label={lang === 'ar' ? 'الامتثال' : 'Compliance'}        active={tab} setActive={setTab} Icon={ShieldAlert} />
-          <TabButton id="evidence"   label={lang === 'ar' ? 'جاهزية الأدلة' : 'Evidence'}     active={tab} setActive={setTab} Icon={FileCheck2} count={controlEv.length} />
-          <TabButton id="audits"     label={lang === 'ar' ? 'التدقيقات' : 'Audits'}           active={tab} setActive={setTab} Icon={ClipboardCheck} count={audits.length} />
-          <TabButton id="drift"      label={lang === 'ar' ? 'الانحراف' : 'Drift'}             active={tab} setActive={setTab} Icon={Activity} count={drift.length} />
-          <TabButton id="activity"   label={lang === 'ar' ? 'سجل النشاط' : 'Activity'}        active={tab} setActive={setTab} Icon={FileSearch} />
-        </div>
+        <Tabs<Tab>
+          active={tab}
+          onChange={setTab}
+          items={[
+            { id: 'overview',   label: lang === 'ar' ? 'نظرة عامة' : 'Overview',       Icon: ListChecks },
+            { id: 'provenance', label: lang === 'ar' ? 'المصدر' : 'Provenance',        Icon: Database },
+            { id: 'compliance', label: lang === 'ar' ? 'الامتثال' : 'Compliance',       Icon: ShieldAlert },
+            { id: 'evidence',   label: lang === 'ar' ? 'جاهزية الأدلة' : 'Evidence',    Icon: FileCheck2,     count: controlEv.length },
+            { id: 'audits',     label: lang === 'ar' ? 'التدقيقات' : 'Audits',          Icon: ClipboardCheck, count: audits.length },
+            { id: 'drift',      label: lang === 'ar' ? 'الانحراف' : 'Drift',            Icon: Activity,       count: drift.length },
+            { id: 'activity',   label: lang === 'ar' ? 'سجل النشاط' : 'Activity',       Icon: FileSearch },
+          ] satisfies TabItem<Tab>[]}
+        />
 
         {tab === 'overview' && <OverviewTab model={model} lang={lang} gateMissing={gateMissing} onTransition={doTransition} />}
         {tab === 'provenance' && <ProvenanceTab model={model} lang={lang} />}
@@ -271,34 +275,6 @@ export function AiModelDetailPage() {
         />
       )}
     </Shell>
-  );
-}
-
-// ─── Tab button ────────────────────────────────────────────────────
-
-interface TabButtonProps {
-  id: Tab;
-  label: string;
-  active: Tab;
-  setActive: (t: Tab) => void;
-  Icon: LucideIcon;
-  count?: number;
-}
-
-function TabButton({ id, label, active, setActive, Icon, count }: TabButtonProps) {
-  const isActive = active === id;
-  return (
-    <button
-      type="button"
-      onClick={() => setActive(id)}
-      className={`aimd-tab-btn${isActive ? ' aimd-tab-btn--on' : ''}`}
-    >
-      <Icon size={14} />
-      {label}
-      {count != null && (
-        <span className="aimd-tab-count">{count}</span>
-      )}
-    </button>
   );
 }
 
