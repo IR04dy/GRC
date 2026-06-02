@@ -111,7 +111,13 @@
 
 /* ─── Tap targets ≥ 44×44 on touch devices ─────────────────────────── */
 @media (pointer: coarse) {
-  button, .btn, [role="button"] {
+  /* Standalone controls get a 44px tap target — but NOT the dense inline
+   * controls the ladder sizes deliberately: .btn-sm and the 28px in-row
+   * .row-action-btn icons. 44px would blow those apart inside table rows and
+   * toolbars on tablets (SP4). */
+  button:not(.btn-sm):not(.row-action-btn),
+  .btn:not(.btn-sm),
+  [role="button"]:not(.row-action-btn) {
     min-height: 44px;
     min-width: 44px;
   }
