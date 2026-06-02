@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, Plus, Check } from 'lucide-react';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
+import { FieldError } from './Input';
 
 export interface SelectOption {
   value: string;
@@ -30,6 +31,8 @@ interface SearchableSelectProps {
   /** Helper text shown beneath the input when the option list is empty. */
   emptyHint?: string;
   disabled?: boolean;
+  /** Inline validation message — sets aria-invalid + renders a role="alert". */
+  error?: string;
 }
 
 /**
@@ -52,7 +55,7 @@ interface SearchableSelectProps {
  */
 export function SearchableSelect({
   id, label, required, value, onChange, options,
-  placeholder, onCreate, createLabel, emptyHint, disabled,
+  placeholder, onCreate, createLabel, emptyHint, disabled, error,
 }: SearchableSelectProps) {
   const { t, lang } = useI18n();
   const isAr = lang === 'ar';
@@ -144,6 +147,7 @@ export function SearchableSelect({
   const displayText = selected
     ? selected.label
     : (placeholder ?? (isAr ? 'اختر…' : 'Select…'));
+  const errId = error ? `${id}-err` : undefined;
 
   return (
     <label htmlFor={id} style={{ display: 'block', position: 'relative' }}>
@@ -156,7 +160,7 @@ export function SearchableSelect({
         id={id}
         disabled={disabled}
         onClick={() => { if (!disabled) { setOpen(o => !o); setTimeout(() => inputRef.current?.focus(), 0); } }}
-        className="input"
+        className={cn('input', error && 'is-error')}
         style={{
           textAlign: isAr ? 'right' : 'left',
           cursor: disabled ? 'not-allowed' : 'pointer',
@@ -166,6 +170,8 @@ export function SearchableSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-required={required}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={errId}
       >
         <span style={{
           color: selected ? 'var(--ink-1)' : 'var(--ink-3)',
@@ -186,6 +192,8 @@ export function SearchableSelect({
       {options.length === 0 && !onCreate && emptyHint && (
         <span className="input-hint">{emptyHint}</span>
       )}
+
+      <FieldError id={errId} error={error} />
 
       {/* Popover */}
       {open && (

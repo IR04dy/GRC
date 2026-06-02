@@ -81,16 +81,53 @@ function spanFor(f: FieldDef): number {
 export function FormModal<T>({
   open, title, fields, initial, onClose, onSubmit, submitLabel, size = 'lg',
 }: FormModalProps<T>) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isAr = lang === 'ar';
   const toast = useToast();
   const [values, setValues] = useState<T>(initial);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   // Reset to `initial` whenever the modal opens. Keeps the form fresh between create / edit calls.
-  useEffect(() => { if (open) setValues(initial); }, [open, initial]);
+  useEffect(() => { if (open) { setValues(initial); setErrors({}); } }, [open, initial]);
+
+  // Per-field validation — required (all kinds), plus number min/max and text
+  // maxLength. Returns a key→message map so the fields can show inline errors
+  // (aria-invalid + role="alert") instead of only the native browser bubble.
+  function validate(): Record<string, string> {
+    const bag = values as unknown as Record<string, unknown>;
+    const errs: Record<string, string> = {};
+    for (const f of fields) {
+      if (f.kind === 'attachments') continue;
+      const fv = bag[f.key];
+      const empty = fv === undefined || fv === null || fv === '' || (typeof fv === 'number' && Number.isNaN(fv));
+      const req = (f as { required?: boolean }).required;
+      if (req && empty) {
+        errs[f.key] = isAr ? 'هذا الحقل مطلوب' : 'This field is required';
+        continue;
+      }
+      if (f.kind === 'number' && !empty) {
+        const num = Number(fv);
+        if (f.min != null && num < f.min) errs[f.key] = isAr ? `الحد الأدنى ${f.min}` : `Must be ≥ ${f.min}`;
+        else if (f.max != null && num > f.max) errs[f.key] = isAr ? `الحد الأقصى ${f.max}` : `Must be ≤ ${f.max}`;
+      }
+      if (f.kind === 'text' && f.maxLength != null && typeof fv === 'string' && fv.length > f.maxLength) {
+        errs[f.key] = isAr ? `الحد ${f.maxLength} حرفًا` : `Max ${f.maxLength} characters`;
+      }
+    }
+    return errs;
+  }
 
   async function handle(e: FormEvent) {
     e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      const firstKey = fields.find(f => errs[f.key])?.key;
+      if (firstKey) requestAnimationFrame(() => document.getElementById(firstKey)?.focus());
+      return;
+    }
+    setErrors({});
     setSubmitting(true);
     try {
       const result = await onSubmit(values);
@@ -133,6 +170,7 @@ export function FormModal<T>({
       <form
         id="entity-form"
         className="form-12col"
+        noValidate
         onSubmit={handle}
         style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '14px 16px' }}
       >
@@ -140,46 +178,51 @@ export function FormModal<T>({
           const span = spanFor(f);
           const bag = values as unknown as Record<string, unknown>;
           const v = bag[f.key];
-          const setV = (newValue: unknown) => setValues(prev => ({ ...(prev as object), [f.key]: newValue } as T));
+          const setV = (newValue: unknown) => {
+            setValues(prev => ({ ...(prev as object), [f.key]: newValue } as T));
+            // Clear the field's error as soon as the user edits it.
+            setErrors(prev => (prev[f.key] ? { ...prev, [f.key]: '' } : prev));
+          };
+          const fieldErr = errors[f.key] || undefined;
           const wrap = (child: React.ReactNode) => <div key={f.key} style={{ gridColumn: `span ${span}` }}>{child}</div>;
 
           switch (f.kind) {
             case 'text':
               return wrap(
-                <Input id={f.key} label={f.label}
+                <Input id={f.key} label={f.label} error={fieldErr}
                   required={f.required} maxLength={f.maxLength} placeholder={f.placeholder}
                   value={(v as string) ?? ''}
                   onChange={e => setV(e.currentTarget.value)} />
               );
             case 'textarea':
               return wrap(
-                <Textarea id={f.key} label={f.label} rows={f.rows ?? 3}
+                <Textarea id={f.key} label={f.label} error={fieldErr} rows={f.rows ?? 3}
                   value={(v as string) ?? ''}
                   onChange={e => setV(e.currentTarget.value)} />
               );
             case 'number':
               return wrap(
-                <Input id={f.key} label={f.label}
+                <Input id={f.key} label={f.label} error={fieldErr}
                   type="number" min={f.min} max={f.max} required={f.required}
                   value={(v as number) ?? ''}
                   onChange={e => setV(Number(e.currentTarget.value))} />
               );
             case 'date':
               return wrap(
-                <Input id={f.key} label={f.label} type="date"
+                <Input id={f.key} label={f.label} type="date" error={fieldErr}
                   value={(v as string) ?? ''}
                   onChange={e => setV(e.currentTarget.value)} />
               );
             case 'select':
               return wrap(
-                <Select id={f.key} label={f.label}
+                <Select id={f.key} label={f.label} error={fieldErr}
                   required={f.required} options={f.options}
                   value={(v as string) ?? ''}
                   onChange={e => setV(e.currentTarget.value)} />
               );
             case 'select-searchable':
               return wrap(
-                <SearchableSelect id={f.key} label={f.label}
+                <SearchableSelect id={f.key} label={f.label} error={fieldErr}
                   required={f.required} options={f.options}
                   placeholder={f.placeholder}
                   onCreate={f.onCreate}
