@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play, PlayCircle, RefreshCw, ServerCog,
+  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play, PlayCircle, RefreshCw, ServerCog, Cable, HeartPulse,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -20,6 +20,10 @@ import {
   ccmStatusTone, ccmSeverityTone, ccmStatusLabel,
   type CcmTestDefinition, type CcmDashboardSnapshot,
 } from '../../lib/ccmApi';
+import {
+  getIntegrationStatus, pollIntegration, integrationModeTone,
+  INTEGRATION_ADAPTERS, type IntegrationKey, type IntegrationStatus,
+} from '../../lib/integrationsApi';
 import { ApiError } from '../../lib/api';
 import { CcmDashboard } from '../../components/compliance/CcmDashboard';
 
@@ -86,6 +90,13 @@ export function ConnectorsPage() {
         <LiveControlTests />
       </div>
 
+      {/* L3 — Live external integration adapters (Tenable / CrowdStrike /
+          Splunk / ServiceNow). Surfaces the real /api/v1/integrations/* status
+          and lets an admin poll the inbound scanners on demand. */}
+      <div style={{ marginBottom: 16 }}>
+        <LiveIntegrationAdapters />
+      </div>
+
       {/* Sprint 4 — Continuous Control Monitoring panel sits above the
           connector registry. Every check the connectors run is graded by
           freshness; stale or expired evidence becomes a workflow instance
@@ -117,6 +128,111 @@ export function ConnectorsPage() {
         </div>
       </Card>
     </Shell>
+  );
+}
+
+/**
+ * Live external integration adapters (L3). Surfaces the real
+ * /api/v1/integrations/* adapters — status straight from the backend and an
+ * on-demand poll for the inbound scanners (Tenable / CrowdStrike). STUB mode
+ * in dev, so every status + poll is real.
+ */
+function LiveIntegrationAdapters() {
+  const { lang } = useI18n();
+  const isAr = lang === 'ar';
+  const toast = useToast();
+  const [statuses, setStatuses] = useState<Record<string, IntegrationStatus | null>>({});
+  const [loading, setLoading] = useState(true);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    const entries = await Promise.all(INTEGRATION_ADAPTERS.map(async a => {
+      try { return [a.key, await getIntegrationStatus(a.key)] as const; }
+      catch { return [a.key, null] as const; }
+    }));
+    setStatuses(Object.fromEntries(entries));
+    setLoading(false);
+  }
+  useEffect(() => { void reload(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function poll(key: IntegrationKey) {
+    if (key !== 'tenable' && key !== 'crowdstrike') return;
+    setBusyKey(key);
+    try {
+      const res = await pollIntegration(key);
+      toast.success(isAr ? `تم الاستقصاء — ${res.ingested} سجلاً` : `Polled — ${res.ingested} record(s) ingested`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل الاستقصاء' : 'Poll failed'));
+    } finally { setBusyKey(null); }
+  }
+
+  const reachableCount = INTEGRATION_ADAPTERS.filter(a => statuses[a.key] != null).length;
+  const healthyCount = INTEGRATION_ADAPTERS.filter(a => statuses[a.key]?.healthy).length;
+
+  return (
+    <Card title={isAr ? 'موصِّلات الأنظمة الخارجية (مباشر)' : 'External integration adapters (live)'}
+      Icon={Cable}
+      action={
+        <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <Badge tone={reachableCount > 0 && healthyCount === reachableCount ? 'success' : 'warning'}>
+            <HeartPulse size={11} style={{ marginInlineEnd: 4 }} />{healthyCount}/{INTEGRATION_ADAPTERS.length}
+          </Badge>
+          <Button variant="ghost" size="sm" Icon={RefreshCw} onClick={() => void reload()} disabled={loading}>
+            {isAr ? 'تحديث' : 'Refresh'}
+          </Button>
+        </div>
+      }>
+      <p style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+        {isAr
+          ? 'موصِّلات حقيقية على /api/v1/integrations — الحالة مباشرة من الخادم (وضع STUB في بيئة التطوير). استقصِ فاحصات الإدخال عند الطلب.'
+          : 'Real adapters on /api/v1/integrations — status straight from the backend (STUB mode in dev). Poll the inbound scanners on demand.'}
+      </p>
+      <table className="grc-table">
+        <thead><tr>
+          <th>{isAr ? 'المُوصِّل' : 'Adapter'}</th>
+          <th>{isAr ? 'النوع' : 'Kind'}</th>
+          <th>{isAr ? 'الوضع' : 'Mode'}</th>
+          <th>{isAr ? 'الحالة' : 'Health'}</th>
+          <th>{isAr ? 'النقطة' : 'Endpoint'}</th>
+          <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
+        </tr></thead>
+        <tbody>
+          {INTEGRATION_ADAPTERS.map(a => {
+            const s = statuses[a.key];
+            const busy = busyKey === a.key;
+            const reachable = s != null;
+            return (
+              <tr key={a.key}>
+                <td style={{ fontWeight: 600 }}>{isAr ? a.nameAr : a.nameEn}</td>
+                <td className="text-2xs">{isAr ? a.kindAr : a.kindEn}</td>
+                <td>{reachable
+                  ? <Badge tone={integrationModeTone(s.mode)}>{s.mode ?? '—'}</Badge>
+                  : <span className="text-muted text-2xs">—</span>}</td>
+                <td>{!reachable
+                  ? <Badge tone="neutral" dot>{loading ? (isAr ? '…' : '…') : (isAr ? 'غير متاح' : 'Unreachable')}</Badge>
+                  : s.enabled === false
+                    ? <Badge tone="neutral" dot>{isAr ? 'معطَّل' : 'Disabled'}</Badge>
+                    : s.healthy
+                      ? <Badge tone="success" dot>{isAr ? 'سليم' : 'Healthy'}</Badge>
+                      : <Badge tone="danger" dot>{isAr ? 'غير سليم' : 'Down'}</Badge>}</td>
+                <td className="mono text-2xs" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {s?.baseUrl ?? s?.platform ?? '—'}
+                </td>
+                <td style={{ textAlign: 'end' }}>
+                  {a.canPoll
+                    ? <Button size="sm" variant="primary" Icon={Play} disabled={busy || !reachable} onClick={() => void poll(a.key)}>
+                        {isAr ? 'استقصاء' : 'Poll now'}
+                      </Button>
+                    : <span className="text-2xs text-muted">{isAr ? 'صادر فقط' : 'Outbound only'}</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
   );
 }
 
