@@ -12,6 +12,8 @@ import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLau
 import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { RadialGauge } from '../../components/viz/RadialGauge';
+import { ragBands } from '../../lib/ragColors';
 import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
@@ -324,6 +326,25 @@ export function CompliancePage() {
   const promotedPolicies    = usePromoted('POLICY').map(toPolicyDto);
   const allFindings    = useMemo(() => [...promotedFindings, ...findings.data],       [promotedFindings, findings.data]);
   const allEngagements = useMemo(() => [...promotedEngagements, ...engagements.data], [promotedEngagements, engagements.data]);
+
+  // Per-framework coverage for the ring cluster (playbook framework-ring hero).
+  // Coverage% = implemented + half-credit for partial, over the framework's
+  // control count — real data from the controls register, not a fabricated curve.
+  const frameworkCoverage = useMemo(() => {
+    const by = new Map<string, { total: number; impl: number; partial: number }>();
+    for (const c of controls.data) {
+      const fw = c.framework || 'Other';
+      const e = by.get(fw) ?? { total: 0, impl: 0, partial: 0 };
+      e.total++;
+      if (c.status === 'IMPLEMENTED') e.impl++;
+      else if (c.status === 'PARTIAL') e.partial++;
+      by.set(fw, e);
+    }
+    return [...by.entries()]
+      .map(([fw, e]) => ({ fw, pct: Math.round(((e.impl + e.partial * 0.5) / e.total) * 100), total: e.total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [controls.data]);
   const allPolicies    = useMemo(() => [...promotedPolicies, ...policies.data],       [promotedPolicies, policies.data]);
 
   const changeS = useEntityState<RegulatoryChangeDto>();
@@ -766,6 +787,22 @@ export function CompliancePage() {
         postureTitle={t('compliancePostureTitle')}
         anchors={COMPLIANCE_ANCHORS}
         />
+
+      {frameworkCoverage.length > 0 && (
+        <Card title={lang === 'ar' ? 'تغطية الأطر التنظيمية' : 'Framework coverage'}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-8)', justifyContent: 'center', padding: 'var(--sp-4) 0' }}>
+            {frameworkCoverage.map(f => (
+              <button key={f.fw} type="button" onClick={() => setTab('frameworks')}
+                className="card--interactive"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center', padding: 'var(--sp-3)', borderRadius: 'var(--r-md)' }}>
+                <RadialGauge value={f.pct} max={100} size={116} bands={ragBands()} format={(v) => `${Math.round(v)}%`} />
+                <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2, color: 'var(--ink-1)' }} dir="ltr">{f.fw}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{f.total} {lang === 'ar' ? 'ضابط' : 'controls'}</div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
