@@ -751,7 +751,7 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
       </div>
     ) },
     { header: t('amlFldSubjectName'), cell: a => a.subjectName ?? '—', width: '180px' },
-    { header: t('amlFldAmount'),   cell: a => a.aggregateAmount
+    { header: t('amlFldAmount'),   numeric: true, cell: a => a.aggregateAmount
         ? <span className="mono">{a.aggregateAmount.toLocaleString()} {a.currency ?? 'SAR'}</span>
         : '—', width: '160px' },
     { header: t('amlFldSeverity'), cell: a => <Badge tone={AML_SEVERITY_TONE[a.severity] ?? 'neutral'} dot>{a.severity}</Badge>, width: '110px' },

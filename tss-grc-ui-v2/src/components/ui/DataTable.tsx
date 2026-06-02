@@ -12,6 +12,18 @@ export interface Column<T> {
   align?: 'start' | 'end' | 'center';
   /** Renders cell with the monospace token (e.g. for IDs and codes). */
   mono?: boolean;
+  /**
+   * Numeric column: end-aligns the cell (so digits line up on the decimal
+   * edge for scanning) and applies `tabular-nums` so figures don't jitter
+   * between rows. Use for counts, scores, currency, percentages. An explicit
+   * `align` still wins if you set one.
+   */
+  numeric?: boolean;
+}
+
+/** Resolve the effective alignment: explicit `align` wins, else numeric → end. */
+function colAlign<T>(c: Column<T>): 'start' | 'end' | 'center' | undefined {
+  return c.align ?? (c.numeric ? 'end' : undefined);
 }
 
 interface DataTableProps<T extends { id: string | number }> {
@@ -33,7 +45,7 @@ export function DataTable<T extends { id: string | number }>({ columns, rows, em
       <thead>
         <tr>
           {columns.map(c => (
-            <th key={c.header} style={{ width: c.width, textAlign: c.align }}>{c.header}</th>
+            <th key={c.header} style={{ width: c.width, textAlign: colAlign(c) }}>{c.header}</th>
           ))}
         </tr>
       </thead>
@@ -59,11 +71,21 @@ export function DataTable<T extends { id: string | number }>({ columns, rows, em
               className={href ? 'row-clickable' : undefined}
               style={href ? { cursor: 'pointer' } : undefined}
             >
-              {columns.map((c, i) => (
-                <td key={i} className={c.mono ? 'mono' : undefined} style={{ textAlign: c.align }}>
-                  {c.cell(row)}
-                </td>
-              ))}
+              {columns.map((c, i) => {
+                const align = colAlign(c);
+                // End-aligned columns are numeric (or actions, where it's a
+                // no-op) — give them tabular figures so digits don't jitter.
+                const tnum = c.numeric || align === 'end';
+                return (
+                  <td
+                    key={i}
+                    className={c.mono ? 'mono' : undefined}
+                    style={{ textAlign: align, fontVariantNumeric: tnum ? 'tabular-nums' : undefined }}
+                  >
+                    {c.cell(row)}
+                  </td>
+                );
+              })}
             </tr>
           );
         })}
