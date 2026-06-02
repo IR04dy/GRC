@@ -180,7 +180,7 @@ export function PdplExtensionsPage() {
 function CbtTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen, prefillRopaCode }: any) {
   const stats = countByStatus(rows, 'status');
   const FIELDS: FieldDef[] = [
-    { kind: 'text', key: 'ropaCode', label: 'ROPA code *', required: true, span: 6 },
+    { kind: 'text', key: 'ropaCode', label: 'ROPA code', required: true, span: 6 },
     { kind: 'text', key: 'ropaTitleEn', label: 'ROPA title (EN)', span: 6 },
     { kind: 'text', key: 'destinationCountry', label: t('pdplExtCbtDestCountry') + ' *', required: true, maxLength: 3, span: 4 },
     { kind: 'text', key: 'destinationOrgName', label: t('pdplExtCbtDestOrg') + ' *', required: true, span: 8 },

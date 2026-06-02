@@ -89,6 +89,13 @@
   margin-bottom: 6px;
   letter-spacing: .02em;
 }
+/* The one required marker — rendered from the field's `required` prop, never
+   baked into the label string. Logical margin so it sits correctly in RTL. */
+.input-required {
+  color: var(--danger);
+  margin-inline-start: 3px;
+  font-weight: 700;
+}
 .input {
   width: 100%;
   padding: 10px 12px;
