@@ -39,10 +39,13 @@ import { TprmConsolidatedOverview } from '../../components/tprm/TprmConsolidated
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 import {
   listQtTemplates, listQtQuestions, transitionQtTemplate,
+  createQtTemplate, updateQtTemplate,
+  createQtQuestion, updateQtQuestion, deleteQtQuestion,
   listVendorAssessments, assignTemplateToAssessment, listAssessmentResponses,
   upsertResponse, completeAssessment, reviewAssessment,
   qtStatusTone, qtStatusLabel, riskRatingTone, workflowStatusTone,
   type QuestionnaireTemplate, type QuestionnaireQuestion, type QtStatus,
+  type QtCategory, type AnswerType,
   type QtVendorAssessment, type QuestionnaireResponse,
 } from '../../lib/tprmQuestionnaire';
 import { useDialog } from '../../lib/dialog';
@@ -345,6 +348,35 @@ function LoadingRow() {
 
 // ─── Questionnaires tab — V81 ────────────────────────────────────────
 
+// L2 — Questionnaire builder: form-value shapes + option catalogs.
+const QT_CATEGORY_OPTIONS: { value: QtCategory; label: string }[] = [
+  { value: 'CYBER', label: 'Cyber' }, { value: 'PRIVACY', label: 'Privacy' },
+  { value: 'FINANCIAL', label: 'Financial' }, { value: 'OPERATIONAL', label: 'Operational' },
+  { value: 'COMPLIANCE', label: 'Compliance' }, { value: 'GENERAL', label: 'General' },
+];
+const QT_ANSWER_TYPE_OPTIONS: { value: AnswerType; label: string }[] = [
+  { value: 'SCALE_1_5', label: 'Scale 1–5' }, { value: 'BOOLEAN', label: 'Yes / No' },
+  { value: 'SELECT', label: 'Select (options)' }, { value: 'TEXT', label: 'Free text' },
+];
+
+interface TemplateFormValues {
+  templateCode: string; version: string;
+  nameEn: string; nameAr: string;
+  descriptionEn: string; descriptionAr: string;
+  category: QtCategory; applicableTo: string;
+  thresholdLowMax: number; thresholdMediumMax: number; thresholdHighMax: number;
+  notes: string;
+}
+interface QuestionFormValues {
+  sectionCode: string; sectionNameEn: string; sectionNameAr: string;
+  questionCode: string; questionEn: string; questionAr: string;
+  answerType: AnswerType; optionsJson: string;
+  weight: number; sequenceOrder: number;
+  mandatory: string;    // 'true' | 'false' (FormModal select returns strings)
+  invertScore: string;  // 'true' | 'false'
+  guidanceEn: string; guidanceAr: string;
+}
+
 function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
   const { lang } = useI18n();
   const toast = useToast();
@@ -363,6 +395,12 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
   const [fillQuestions, setFillQuestions] = useState<QuestionnaireQuestion[]>([]);
   const [fillResponses, setFillResponses] = useState<Record<number, QuestionnaireResponse>>({});
   const [fillBusy, setFillBusy] = useState(false);
+
+  // Builder (L2) — template + question authoring (DRAFT templates only)
+  const [tplFormOpen, setTplFormOpen] = useState(false);
+  const [tplEditing, setTplEditing] = useState<QuestionnaireTemplate | null>(null);
+  const [qFormOpen, setQFormOpen] = useState(false);
+  const [qEditing, setQEditing] = useState<QuestionnaireQuestion | null>(null);
 
   async function reloadVendorAssessments() {
     try { setVendorAssessments(await listVendorAssessments()); }
@@ -517,18 +555,191 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Archive failed'); }
   }
 
+  // ─── Builder (L2) — template + question authoring ────────────────
+
+  function openNewTemplate() { setTplEditing(null); setTplFormOpen(true); }
+  function openEditTemplate(t: QuestionnaireTemplate) { setTplEditing(t); setTplFormOpen(true); }
+  function openNewQuestion() { setQEditing(null); setQFormOpen(true); }
+  function openEditQuestion(q: QuestionnaireQuestion) { setQEditing(q); setQFormOpen(true); }
+
+  async function saveTemplate(v: TemplateFormValues): Promise<void> {
+    const lo = Number(v.thresholdLowMax), me = Number(v.thresholdMediumMax), hi = Number(v.thresholdHighMax);
+    if (!(lo < me && me < hi && hi <= 100)) {
+      toast.danger(isAr
+        ? 'العتبات يجب أن تتصاعد: منخفض < متوسط < مرتفع ≤ 100'
+        : 'Thresholds must ascend: Low < Medium < High ≤ 100');
+      return;  // keep modal open
+    }
+    const common: Partial<QuestionnaireTemplate> = {
+      nameEn: v.nameEn.trim(), nameAr: v.nameAr.trim() || undefined,
+      descriptionEn: v.descriptionEn.trim() || undefined,
+      descriptionAr: v.descriptionAr.trim() || undefined,
+      category: v.category, applicableTo: v.applicableTo.trim() || undefined,
+      thresholdLowMax: lo, thresholdMediumMax: me, thresholdHighMax: hi,
+      notes: v.notes.trim() || undefined,
+    };
+    try {
+      if (tplEditing?.id) {
+        const updated = await updateQtTemplate(tplEditing.id, common);
+        toast.success(isAr ? 'تم تحديث النموذج' : 'Template updated');
+        setTplFormOpen(false); setTplEditing(null);
+        await reload();
+        setSelected(prev => (prev?.id === updated.id ? updated : prev));
+      } else {
+        const created = await createQtTemplate({
+          templateCode: v.templateCode.trim(),
+          version: v.version.trim() || '1.0',
+          status: 'DRAFT', ...common,
+        });
+        toast.success(isAr ? 'تم إنشاء النموذج' : 'Template created');
+        setTplFormOpen(false); setTplEditing(null);
+        await reload();
+        if (created?.id) await loadQuestions(created);   // auto-select so questions can be added at once
+      }
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }
+
+  async function saveQuestion(v: QuestionFormValues): Promise<void> {
+    if (!selected?.id) return;
+    if (!v.questionEn.trim()) {
+      toast.danger(isAr ? 'نص السؤال (EN) مطلوب' : 'Question text (EN) is required');
+      return;  // keep modal open
+    }
+    const optionsJson = v.answerType === 'SELECT' ? (v.optionsJson.trim() || undefined) : undefined;
+    if (optionsJson) {
+      try { JSON.parse(optionsJson); }
+      catch { toast.danger(isAr ? 'صيغة خيارات JSON غير صالحة' : 'SELECT options JSON is invalid'); return; }
+    }
+    const body: Partial<QuestionnaireQuestion> = {
+      sectionCode: v.sectionCode.trim(),
+      sectionNameEn: v.sectionNameEn.trim() || undefined,
+      sectionNameAr: v.sectionNameAr.trim() || undefined,
+      questionCode: v.questionCode.trim(),
+      questionEn: v.questionEn.trim(),
+      questionAr: v.questionAr.trim() || undefined,
+      answerType: v.answerType, optionsJson,
+      weight: Number(v.weight), sequenceOrder: Number(v.sequenceOrder),
+      mandatory: v.mandatory === 'true', invertScore: v.invertScore === 'true',
+      guidanceEn: v.guidanceEn.trim() || undefined,
+      guidanceAr: v.guidanceAr.trim() || undefined,
+    };
+    try {
+      if (qEditing?.id) {
+        await updateQtQuestion(qEditing.id, body);
+        toast.success(isAr ? 'تم تحديث السؤال' : 'Question updated');
+      } else {
+        await createQtQuestion(selected.id, body);
+        toast.success(isAr ? 'تمت إضافة السؤال' : 'Question added');
+      }
+      setQFormOpen(false); setQEditing(null);
+      await loadQuestions(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }
+
+  async function onDeleteQuestion(q: QuestionnaireQuestion) {
+    const ok = await dialog.confirm({
+      title: isAr ? 'حذف السؤال' : 'Delete question',
+      body: isAr ? `حذف السؤال ${q.questionCode}؟` : `Delete question ${q.questionCode}?`,
+      submitLabel: isAr ? 'حذف' : 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteQtQuestion(q.id!);
+      toast.success(isAr ? 'تم الحذف' : 'Deleted');
+      if (selected) await loadQuestions(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  const yesNoOptions = [
+    { value: 'true', label: isAr ? 'نعم' : 'Yes' },
+    { value: 'false', label: isAr ? 'لا' : 'No' },
+  ];
+
+  const tplInitial: TemplateFormValues = useMemo(() => tplEditing ? {
+    templateCode: tplEditing.templateCode, version: tplEditing.version,
+    nameEn: tplEditing.nameEn, nameAr: tplEditing.nameAr ?? '',
+    descriptionEn: tplEditing.descriptionEn ?? '', descriptionAr: tplEditing.descriptionAr ?? '',
+    category: tplEditing.category, applicableTo: tplEditing.applicableTo ?? '',
+    thresholdLowMax: tplEditing.thresholdLowMax, thresholdMediumMax: tplEditing.thresholdMediumMax,
+    thresholdHighMax: tplEditing.thresholdHighMax, notes: tplEditing.notes ?? '',
+  } : {
+    templateCode: '', version: '1.0', nameEn: '', nameAr: '',
+    descriptionEn: '', descriptionAr: '', category: 'GENERAL', applicableTo: '',
+    thresholdLowMax: 30, thresholdMediumMax: 60, thresholdHighMax: 80, notes: '',
+  }, [tplEditing]);
+
+  const qInitial: QuestionFormValues = useMemo(() => qEditing ? {
+    sectionCode: qEditing.sectionCode, sectionNameEn: qEditing.sectionNameEn ?? '', sectionNameAr: qEditing.sectionNameAr ?? '',
+    questionCode: qEditing.questionCode, questionEn: qEditing.questionEn, questionAr: qEditing.questionAr ?? '',
+    answerType: qEditing.answerType, optionsJson: qEditing.optionsJson ?? '',
+    weight: qEditing.weight, sequenceOrder: qEditing.sequenceOrder,
+    mandatory: qEditing.mandatory ? 'true' : 'false', invertScore: qEditing.invertScore ? 'true' : 'false',
+    guidanceEn: qEditing.guidanceEn ?? '', guidanceAr: qEditing.guidanceAr ?? '',
+  } : {
+    sectionCode: '', sectionNameEn: '', sectionNameAr: '',
+    questionCode: '', questionEn: '', questionAr: '',
+    answerType: 'SCALE_1_5', optionsJson: '',
+    weight: 1, sequenceOrder: (questions.length + 1) * 10,
+    mandatory: 'true', invertScore: 'false', guidanceEn: '', guidanceAr: '',
+  }, [qEditing, questions.length]);
+
+  const tplFields: FieldDef[] = [
+    ...(tplEditing ? [] : [
+      { kind: 'text', key: 'templateCode', label: isAr ? 'كود النموذج *' : 'Template code *', required: true, maxLength: 40, span: 6 },
+      { kind: 'text', key: 'version', label: isAr ? 'الإصدار *' : 'Version *', required: true, maxLength: 20, span: 6 },
+    ] as FieldDef[]),
+    { kind: 'text', key: 'nameEn', label: isAr ? 'الاسم (EN) *' : 'Name (EN) *', required: true, span: 6 },
+    { kind: 'text', key: 'nameAr', label: isAr ? 'الاسم (AR)' : 'Name (AR)', span: 6 },
+    { kind: 'select', key: 'category', label: isAr ? 'الفئة *' : 'Category *', required: true, options: QT_CATEGORY_OPTIONS, span: 6 },
+    { kind: 'text', key: 'applicableTo', label: isAr ? 'ينطبق على (أنواع الموردين)' : 'Applicable to (vendor types)', placeholder: 'CRITICAL,HIGH', span: 6 },
+    { kind: 'textarea', key: 'descriptionEn', label: isAr ? 'الوصف (EN)' : 'Description (EN)', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'descriptionAr', label: isAr ? 'الوصف (AR)' : 'Description (AR)', rows: 2, span: 12 },
+    { kind: 'number', key: 'thresholdLowMax', label: isAr ? 'عتبة منخفض ≤' : 'Low risk ≤', min: 1, max: 99, required: true, span: 4 },
+    { kind: 'number', key: 'thresholdMediumMax', label: isAr ? 'عتبة متوسط ≤' : 'Medium risk ≤', min: 1, max: 99, required: true, span: 4 },
+    { kind: 'number', key: 'thresholdHighMax', label: isAr ? 'عتبة مرتفع ≤' : 'High risk ≤', min: 1, max: 100, required: true, span: 4 },
+    { kind: 'textarea', key: 'notes', label: isAr ? 'ملاحظات' : 'Notes', rows: 2, span: 12 },
+  ];
+
+  const qFields: FieldDef[] = [
+    { kind: 'text', key: 'sectionCode', label: isAr ? 'كود القسم *' : 'Section code *', required: true, maxLength: 40, span: 4 },
+    { kind: 'text', key: 'questionCode', label: isAr ? 'كود السؤال *' : 'Question code *', required: true, maxLength: 40, span: 4 },
+    { kind: 'number', key: 'sequenceOrder', label: isAr ? 'الترتيب' : 'Order', min: 0, span: 4 },
+    { kind: 'text', key: 'sectionNameEn', label: isAr ? 'اسم القسم (EN)' : 'Section name (EN)', span: 6 },
+    { kind: 'text', key: 'sectionNameAr', label: isAr ? 'اسم القسم (AR)' : 'Section name (AR)', span: 6 },
+    { kind: 'textarea', key: 'questionEn', label: isAr ? 'السؤال (EN) *' : 'Question (EN) *', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'questionAr', label: isAr ? 'السؤال (AR)' : 'Question (AR)', rows: 2, span: 12 },
+    { kind: 'select', key: 'answerType', label: isAr ? 'نوع الإجابة *' : 'Answer type *', required: true, options: QT_ANSWER_TYPE_OPTIONS, span: 6 },
+    { kind: 'number', key: 'weight', label: isAr ? 'الوزن *' : 'Weight *', min: 0, required: true, span: 6 },
+    { kind: 'select', key: 'mandatory', label: isAr ? 'إلزامي' : 'Mandatory', options: yesNoOptions, span: 6 },
+    { kind: 'select', key: 'invertScore', label: isAr ? 'مقلوب (الأقل = أفضل)' : 'Inverted (lower = better)', options: yesNoOptions, span: 6 },
+    { kind: 'textarea', key: 'optionsJson', label: isAr ? 'خيارات SELECT — JSON: [{"value","label"}]' : 'SELECT options — JSON: [{"value","label"}]', rows: 2, span: 12 },
+    { kind: 'textarea', key: 'guidanceEn', label: isAr ? 'إرشادات (EN)' : 'Guidance (EN)', rows: 2, span: 6 },
+    { kind: 'textarea', key: 'guidanceAr', label: isAr ? 'إرشادات (AR)' : 'Guidance (AR)', rows: 2, span: 6 },
+  ];
+
   return (
     <div className="dash-grid">
       <Card title={isAr ? 'مكتبة النماذج' : 'Template library'}
         action={
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as QtStatus | '')}
-            style={{ padding: '6px 10px', fontSize: 12, minWidth: 140, border: '1px solid var(--border)',
-                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
-            <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
-            <option value="DRAFT">{qtStatusLabel('DRAFT', isAr ? 'ar' : 'en')}</option>
-            <option value="ACTIVE">{qtStatusLabel('ACTIVE', isAr ? 'ar' : 'en')}</option>
-            <option value="ARCHIVED">{qtStatusLabel('ARCHIVED', isAr ? 'ar' : 'en')}</option>
-          </select>
+          <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as QtStatus | '')}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 140, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
+              <option value="DRAFT">{qtStatusLabel('DRAFT', isAr ? 'ar' : 'en')}</option>
+              <option value="ACTIVE">{qtStatusLabel('ACTIVE', isAr ? 'ar' : 'en')}</option>
+              <option value="ARCHIVED">{qtStatusLabel('ARCHIVED', isAr ? 'ar' : 'en')}</option>
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={openNewTemplate}>
+              {isAr ? 'نموذج جديد' : 'New template'}
+            </Button>
+          </div>
         }>
         {loading ? <LoadingRow />
          : templates.length === 0
@@ -560,9 +771,14 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
                     <td style={{ textAlign: 'end' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'inline-flex', gap: 4 }}>
                         {t.status === 'DRAFT' && (
-                          <Button size="sm" variant="primary" onClick={() => onActivate(t)}>
-                            {isAr ? 'تفعيل' : 'Activate'}
-                          </Button>
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => openEditTemplate(t)}>
+                              {isAr ? 'تعديل' : 'Edit'}
+                            </Button>
+                            <Button size="sm" variant="primary" onClick={() => onActivate(t)}>
+                              {isAr ? 'تفعيل' : 'Activate'}
+                            </Button>
+                          </>
                         )}
                         {t.status === 'ACTIVE' && (
                           <Button size="sm" variant="ghost" onClick={() => onArchive(t)}>
@@ -577,12 +793,25 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
             </table>}
       </Card>
 
-      {selected && (
+      {selected && (() => {
+        const draft = selected.status === 'DRAFT';
+        return (
         <Card title={`${selected.templateCode} v${selected.version} — ${isAr ? 'الأسئلة' : 'Questions'}`}
-          action={<Badge tone="primary">{questions.length}</Badge>}>
+          action={
+            <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+              <Badge tone="primary">{questions.length}</Badge>
+              {draft
+                ? <Button size="sm" variant="primary" Icon={Plus} onClick={openNewQuestion}>
+                    {isAr ? 'سؤال' : 'Add question'}
+                  </Button>
+                : <span className="text-2xs text-muted">{isAr ? 'مجمّد (غير مسوّدة)' : 'Frozen (not draft)'}</span>}
+            </div>
+          }>
           {questions.length === 0
             ? <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>
-                {isAr ? 'لا توجد أسئلة' : 'No questions yet'}
+                {draft
+                  ? (isAr ? 'لا توجد أسئلة بعد — أضِف أول سؤال لتفعيل النموذج.' : 'No questions yet — add the first question, then activate.')
+                  : (isAr ? 'لا توجد أسئلة' : 'No questions')}
               </div>
             : <table className="grc-table">
                 <thead><tr>
@@ -592,6 +821,7 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
                   <th>{isAr ? 'النوع' : 'Type'}</th>
                   <th>{isAr ? 'الوزن' : 'Weight'}</th>
                   <th>{isAr ? 'إلزامي' : 'Mandatory'}</th>
+                  {draft && <th style={{ textAlign: 'end' }}>{isAr ? 'إجراءات' : 'Actions'}</th>}
                 </tr></thead>
                 <tbody>
                   {questions.map(q => (
@@ -605,12 +835,21 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
                       <td className="text-2xs">{q.answerType}</td>
                       <td className="mono text-2xs">{q.weight}</td>
                       <td>{q.mandatory ? <Badge tone="info">✓</Badge> : <span className="text-muted text-2xs">—</span>}</td>
+                      {draft && (
+                        <td style={{ textAlign: 'end' }}>
+                          <div style={{ display: 'inline-flex', gap: 4 }}>
+                            <Button size="sm" variant="ghost" onClick={() => openEditQuestion(q)}>{isAr ? 'تعديل' : 'Edit'}</Button>
+                            <Button size="sm" variant="ghost" onClick={() => onDeleteQuestion(q)}>{isAr ? 'حذف' : 'Delete'}</Button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>}
         </Card>
-      )}
+        );
+      })()}
 
       {/* ─── Vendor assessments — fill out questionnaires ───────────── */}
       <Card title={isAr ? 'تقييمات المورّدين' : 'Vendor assessments'}
@@ -820,6 +1059,30 @@ function QuestionnairesTab({ vendors }: { vendors: TprmVendorDto[] }) {
           </div>
         )}
       </Modal>
+
+      {/* ─── Builder (L2) — template + question authoring modals ────── */}
+      <FormModal<TemplateFormValues>
+        open={tplFormOpen}
+        title={tplEditing
+          ? (isAr ? `تعديل النموذج — ${tplEditing.templateCode}` : `Edit template — ${tplEditing.templateCode}`)
+          : (isAr ? 'نموذج استبيان جديد' : 'New questionnaire template')}
+        fields={tplFields}
+        initial={tplInitial}
+        onClose={() => { setTplFormOpen(false); setTplEditing(null); }}
+        onSubmit={saveTemplate}
+        submitLabel={tplEditing ? (isAr ? 'حفظ' : 'Save') : (isAr ? 'إنشاء' : 'Create')}
+      />
+      <FormModal<QuestionFormValues>
+        open={qFormOpen}
+        title={qEditing
+          ? (isAr ? `تعديل السؤال — ${qEditing.questionCode}` : `Edit question — ${qEditing.questionCode}`)
+          : (isAr ? 'سؤال جديد' : 'New question')}
+        fields={qFields}
+        initial={qInitial}
+        onClose={() => { setQFormOpen(false); setQEditing(null); }}
+        onSubmit={saveQuestion}
+        submitLabel={qEditing ? (isAr ? 'حفظ' : 'Save') : (isAr ? 'إضافة' : 'Add')}
+      />
     </div>
   );
 }
