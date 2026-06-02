@@ -130,6 +130,7 @@ export function OutsourcingDetailPage() {
   return (
     <Shell>
       <PageHeader
+        backTo="/tprm/outsourcing"
         eyebrow={`${arrangement.arrangementCode}`}
         title={isAr ? arrangement.titleAr : arrangement.titleEn}
         sub={isAr ? arrangement.titleEn : arrangement.titleAr}
@@ -144,14 +145,9 @@ export function OutsourcingDetailPage() {
           </>
         }
         actions={
-          <div style={row}>
-            <Button variant="ghost" Icon={ArrowLeft} onClick={() => navigate('/tprm/outsourcing')}>
-              {isAr ? 'الرجوع' : 'Back'}
-            </Button>
-            <Button variant="secondary" Icon={RefreshCw} onClick={onRecordReview}>
-              {isAr ? 'تسجيل مراجعة' : 'Record review'}
-            </Button>
-          </div>
+          <Button variant="secondary" Icon={RefreshCw} onClick={onRecordReview}>
+            {isAr ? 'تسجيل مراجعة' : 'Record review'}
+          </Button>
         }
       />
 

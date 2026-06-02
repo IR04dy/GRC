@@ -255,6 +255,7 @@
 .page { padding: 24px 28px; overflow-y: auto; height: calc(100vh - var(--header-h)); max-width: var(--content-max); width: 100%; }
 
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
+.page-header-lead { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .eyebrow { font: 800 10px var(--font-mono); color: var(--primary); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; }
 .page-title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .page-title { font: 800 26px/1.15 var(--font-sans); color: var(--ink-1); letter-spacing: -.02em; margin: 0; }

@@ -5,11 +5,6 @@
  * apply automatically. RTL-safe (uses logical properties).
  */
 
-/* ─── Back nav above title ─────────────────────────────── */
-.aimd-back {
-  margin-bottom: var(--sp-4);
-}
-
 /* ─── Drift dashboard tile ─────────────────────────────── */
 .aimd-drift-head {
   display: flex;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ShieldAlert, Activity, FileSearch, ClipboardCheck,
+  ShieldAlert, Activity, FileSearch, ClipboardCheck,
   BadgeAlert, Database, PowerOff, AlertTriangle, ListChecks, FileCheck2,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -52,7 +52,6 @@ type Tab = 'overview' | 'provenance' | 'compliance' | 'evidence' | 'audits' | 'd
 export function AiModelDetailPage() {
   const { lang } = useI18n();
   const toast = useToast();
-  const navigate = useNavigate();
   const { externalId = '' } = useParams<{ externalId: string }>();
   const demoMode = !isAuthenticated();
 
@@ -137,12 +136,8 @@ export function AiModelDetailPage() {
 
   return (
     <Shell title={`${model.modelCode} — ${lang === 'ar' && model.titleAr ? model.titleAr : model.titleEn}`}>
-      <div className="aimd-back">
-        <Button variant="ghost" size="sm" Icon={ArrowLeft} onClick={() => navigate('/ai/models')}>
-          {lang === 'ar' ? 'الرجوع إلى السجل' : 'Back to registry'}
-        </Button>
-      </div>
       <PageHeader
+        backTo="/ai/models"
         eyebrow={lang === 'ar' ? 'حوكمة الذكاء الاصطناعي' : 'AI Governance'}
         title={lang === 'ar' && model.titleAr ? model.titleAr : model.titleEn}
         sub={`${model.modelCode} · ${ML_DOMAIN_LABEL[model.businessDomain][lang === 'ar' ? 'ar' : 'en']}`}
