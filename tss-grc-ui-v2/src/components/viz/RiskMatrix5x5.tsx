@@ -26,6 +26,9 @@ export interface RiskMatrix5x5Props {
   cell?: number;
 }
 
+// SVG corner-radius scale (R1) — numeric literals since SVG `rx` can't reliably
+// read CSS vars: cells/chips = 4 (≈ --r-xs), boxes/nodes = 8 (--r-md), square
+// legend swatches = 3. Round indicator dots stay 999.
 const GAP = 4;
 const PAD_START = 30; // room for the impact axis (numbers + label)
 const PAD_END = 28;   // room for the likelihood axis below
@@ -100,7 +103,7 @@ export function RiskMatrix5x5({
                 onClick={() => count > 0 && onCellClick?.(L, I)}
                 style={{ cursor: count > 0 && onCellClick ? 'pointer' : 'default' }}>
                 <title>{`${ar ? 'احتمال' : 'L'}=${L} × ${ar ? 'أثر' : 'I'}=${I} → ${count} ${ar ? 'مخاطرة' : 'risk(s)'}`}</title>
-                <rect x={xFor(L)} y={yFor(I)} width={cell} height={cell} rx={7}
+                <rect x={xFor(L)} y={yFor(I)} width={cell} height={cell} rx={4}
                   fill={fill} fillOpacity={count > 0 ? 0.95 : 1}
                   stroke="var(--surface)" strokeWidth={2} />
                 <text x={cxFor(L)} y={cyFor(I)} textAnchor="middle" dominantBaseline="central"

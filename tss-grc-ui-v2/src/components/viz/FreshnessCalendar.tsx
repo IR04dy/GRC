@@ -110,7 +110,7 @@ export function FreshnessCalendar({
         ))}
         {/* Day cells */}
         {days.map((d) => (
-          <rect key={d.date} x={xFor(d.col)} y={TOP + d.row * step} width={cell} height={cell} rx={2.5}
+          <rect key={d.date} x={xFor(d.col)} y={TOP + d.row * step} width={cell} height={cell} rx={4}
             fill={fillFor(d.v)} stroke={hover === d.date ? 'var(--primary)' : 'var(--border)'} strokeWidth={hover === d.date ? 1.5 : 0.5}
             onMouseEnter={() => setHover(d.date)} onMouseLeave={() => setHover(null)}
             onClick={() => onDayClick?.(d.date, d.v)}
@@ -123,7 +123,7 @@ export function FreshnessCalendar({
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: ar ? 'flex-start' : 'flex-end', marginTop: 6, fontSize: 10, color: 'var(--ink-3)' }}>
         <span>{ar ? 'أقل' : 'Less'}</span>
         {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
-          <span key={i} style={{ width: 11, height: 11, borderRadius: 2.5, display: 'inline-block',
+          <span key={i} style={{ width: 11, height: 11, borderRadius: 3, display: 'inline-block',
             background: t === 0 ? 'var(--surface-3)' : `color-mix(in oklab, var(--primary) ${Math.round(25 + t * 65)}%, var(--surface-1))` }} />
         ))}
         <span>{ar ? 'أكثر' : 'More'}</span>

@@ -92,7 +92,7 @@ export function CrosswalkFan({ controlCode, citations, ar = false, onCitationCli
         {/* Control node */}
         <g onMouseEnter={() => setHoverControl(true)} onMouseLeave={() => setHoverControl(false)}
           style={{ cursor: 'default' }}>
-          <rect x={controlX} y={controlCy - CONTROL_H / 2} width={CONTROL_W} height={CONTROL_H} rx={10}
+          <rect x={controlX} y={controlCy - CONTROL_H / 2} width={CONTROL_W} height={CONTROL_H} rx={8}
             fill="var(--primary)" />
           <text x={controlX + CONTROL_W / 2} y={controlCy - 6} textAnchor="middle"
             style={{ font: '700 13px var(--font-mono)', fill: 'var(--ink-0)' }}>{controlCode}</text>
@@ -111,7 +111,7 @@ export function CrosswalkFan({ controlCode, citations, ar = false, onCitationCli
               onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
               onClick={() => onCitationClick?.(c)}
               style={{ cursor: onCitationClick ? 'pointer' : 'default' }}>
-              <rect x={citX} y={y} width={CIT_W} height={CIT_H} rx={7}
+              <rect x={citX} y={y} width={CIT_W} height={CIT_H} rx={8}
                 fill={active ? 'var(--surface-2)' : 'var(--surface)'}
                 stroke={col} strokeWidth={active ? 2 : 1}
                 style={{ transition: 'fill var(--dur-fast), stroke-width var(--dur-fast)' }} />

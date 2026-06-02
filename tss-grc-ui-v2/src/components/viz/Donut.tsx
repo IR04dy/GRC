@@ -98,7 +98,7 @@ export function Donut({
               onMouseEnter={clickable ? (e) => (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)' : undefined}
               onMouseLeave={clickable ? (e) => (e.currentTarget as HTMLElement).style.background = 'transparent' : undefined}
             >
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
               <span style={{ color: 'var(--ink-2)', flex: 1 }}>{s.label}</span>
               <span className="mono" style={{ fontWeight: 700, color: 'var(--ink-1)' }}>{s.value}</span>
             </div>
