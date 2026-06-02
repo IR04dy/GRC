@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { PillTabs } from '../../components/ui/PillTabs';
 import { useI18n } from '../../lib/i18n';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
@@ -104,29 +105,17 @@ export function ControlLibraryPage() {
         <Kpi Icon={Shield} label={isAr ? 'العائلات النشطة' : 'Active domains'} value={byDomain.size} />
       </div>
 
-      {/* Domain chips */}
-      <div className="chip-row">
-        <button
-          type="button"
-          onClick={() => setDomain('')}
-          aria-label={isAr ? 'تصفية: جميع المجالات' : 'Filter: all domains'}
-          aria-pressed={domain === ''}
-          style={chip(domain === '')}>
-          {isAr ? 'الكل' : 'All'}
-          <span className="mono text-2xs chip-row__count">{controls.length}</span>
-        </button>
-        {DOMAINS.map(d => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => setDomain(d)}
-            aria-label={(isAr ? 'تصفية بمجال: ' : 'Filter by domain: ') + domainLabel(d, isAr ? 'ar' : 'en')}
-            aria-pressed={domain === d}
-            style={chip(domain === d)}>
-            {domainLabel(d, isAr ? 'ar' : 'en')}
-            <span className="mono text-2xs chip-row__count">{byDomain.get(d) ?? 0}</span>
-          </button>
-        ))}
+      {/* Domain filter — one shared pill control */}
+      <div style={{ marginBottom: 14 }}>
+        <PillTabs
+          aria-label={isAr ? 'تصفية بالمجال' : 'Filter by domain'}
+          active={domain}
+          onChange={setDomain}
+          options={[
+            { id: '', label: isAr ? 'الكل' : 'All', count: controls.length },
+            ...DOMAINS.map(d => ({ id: d, label: domainLabel(d, isAr ? 'ar' : 'en'), count: byDomain.get(d) ?? 0 })),
+          ]}
+        />
       </div>
 
       <div className="list-detail-grid">
@@ -313,14 +302,3 @@ function Section({ title, count, children }: { title: string; count: number; chi
   );
 }
 
-function chip(active: boolean): React.CSSProperties {
-  return {
-    padding: '6px 12px', fontSize: 12,
-    border: '1px solid var(--border)',
-    borderRadius: 999,
-    background: active ? 'var(--primary)' : 'var(--surface-1)',
-    color: active ? '#fff' : 'var(--ink-1)',
-    cursor: 'pointer',
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-  };
-}

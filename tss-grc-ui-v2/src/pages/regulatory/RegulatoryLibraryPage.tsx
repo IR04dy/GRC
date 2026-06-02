@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { PillTabs } from '../../components/ui/PillTabs';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
@@ -119,23 +120,17 @@ export function RegulatoryLibraryPage() {
         <Kpi Icon={BookOpen} label={isAr ? 'نص عربي رسمي' : 'AR official'} value={arOfficialCount} />
       </div>
 
-      {/* Family filter */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        <button
-          onClick={() => setFamilyFilter('')}
-          style={chipStyle(familyFilter === '')}>
-          {isAr ? 'الكل' : 'All'}
-          <span className="mono text-2xs" style={{ marginInlineStart: 6, opacity: 0.7 }}>
-            {Object.values(rollup).reduce((a, b) => a + b, 0)}
-          </span>
-        </button>
-        {families.map(f => (
-          <button key={f} onClick={() => setFamilyFilter(f)}
-            style={chipStyle(familyFilter === f)}>
-            {f}
-            <span className="mono text-2xs" style={{ marginInlineStart: 6, opacity: 0.7 }}>{rollup[f]}</span>
-          </button>
-        ))}
+      {/* Family filter — one shared pill control */}
+      <div style={{ marginBottom: 14 }}>
+        <PillTabs
+          aria-label={isAr ? 'تصفية بالعائلة' : 'Filter by family'}
+          active={familyFilter}
+          onChange={setFamilyFilter}
+          options={[
+            { id: '', label: isAr ? 'الكل' : 'All', count: Object.values(rollup).reduce((a, b) => a + b, 0) },
+            ...families.map(f => ({ id: f, label: f, count: rollup[f] })),
+          ]}
+        />
       </div>
 
       <div className="dash-grid" style={{ gridTemplateColumns: 'minmax(420px, 1fr) minmax(0, 1.4fr)' }}>
@@ -265,14 +260,3 @@ function CitationRow({ node, depth, isAr }: { node: CitationNode; depth: number;
   );
 }
 
-function chipStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: '6px 12px', fontSize: 12,
-    border: '1px solid var(--border)',
-    borderRadius: 999,
-    background: active ? 'var(--primary)' : 'var(--surface-1)',
-    color: active ? '#fff' : 'var(--ink-1)',
-    cursor: 'pointer',
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-  };
-}
