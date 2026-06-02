@@ -12,6 +12,7 @@ import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { TimeSeries, type TimeSeriesPoint } from '../../components/viz/TimeSeries';
 import { RadialGauge } from '../../components/viz/RadialGauge';
 import { GAUGE_HERO } from '../../lib/gaugeSizes';
+import { ragBands } from '../../lib/ragColors';
 import { Progress } from '../../components/ui/Progress';
 import { dashboardApi, type DashboardStats, type TrendPoint } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
@@ -232,11 +233,7 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
           rtl={isAr}
           caption={isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC Posture Score'}
           aria-label={`${isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC posture score'}: ${posture} / 100`}
-          bands={[
-            { from: 0,  to: 60,  color: 'var(--danger)' },
-            { from: 60, to: 80,  color: 'var(--warning)' },
-            { from: 80, to: 101, color: 'var(--success)' },
-          ]}
+          bands={ragBands()}
         />
         <Badge tone={deltaPct >= 0 ? 'success' : 'danger'}>
           {deltaPct >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}

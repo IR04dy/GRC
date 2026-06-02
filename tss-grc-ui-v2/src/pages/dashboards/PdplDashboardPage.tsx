@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { LineChart } from '../../components/charts/LineChart';
 import { RadialGauge } from '../../components/viz/RadialGauge';
 import { GAUGE_MD } from '../../lib/gaugeSizes';
+import { ragBands } from '../../lib/ragColors';
 import { useI18n } from '../../lib/i18n';
 import { privacyApi, dashboardApi } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
@@ -121,11 +122,7 @@ export function PdplDashboardPage() {
             <RadialGauge value={slaHealth} max={100} {...GAUGE_MD} unit="%" rtl={isAr}
               caption={isAr ? 'ضمن SLA' : 'within SLA'}
               aria-label={`${isAr ? 'صحة SLA لطلبات أصحاب البيانات' : 'DSR SLA health'} ${slaHealth}%`}
-              bands={[
-                { from: 0, to: 70, color: 'var(--danger)' },
-                { from: 70, to: 90, color: 'var(--warning)' },
-                { from: 90, to: 101, color: 'var(--success)' },
-              ]} />
+              bands={ragBands()} />
             <div className="text-xs" style={{ lineHeight: 1.8, minWidth: 130 }}>
               <div>{isAr ? 'طلبات مفتوحة' : 'Open requests'}: <strong>{stats.dsrOpen}</strong></div>
               <div>{isAr ? 'خرق SLA' : 'SLA breaches'}: <Badge tone="danger">{stats.dsrSlaBreaches}</Badge></div>

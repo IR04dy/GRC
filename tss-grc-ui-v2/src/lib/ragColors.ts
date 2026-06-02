@@ -10,6 +10,7 @@
  */
 
 import type { BadgeTone } from '../components/ui/Badge';
+import type { GaugeBand } from '../components/viz/RadialGauge';
 
 /** Map a 1–25 risk score (likelihood × impact) to a `--risk-*` token colour. */
 export function riskColorForScore(score: number): string {
@@ -63,6 +64,37 @@ export function ragForPercent(
   if (v >= ok)   return 'info';
   if (v >= warn) return 'warning';
   return 'danger';
+}
+
+/**
+ * Canonical RAG breakpoints for a "higher is better" 0–100 percentage —
+ * readiness, compliance, completion, SLA health. ONE set everywhere so a
+ * gauge and its KPI can never disagree. Before this the gauges banded at
+ * 60/85 (Cyber, BCM), 70/90 (PDPL) and 60/80 (Executive) while the KPI
+ * `tonePct` used 30/60/85 with a blue `info` tier — so a 50% metric was red
+ * on the gauge but amber on the KPI, and a 70% metric amber vs blue.
+ */
+export const RAG_PCT = { warn: 60, good: 85 } as const;
+
+/**
+ * RAG tone for a higher-is-better percentage, keyed on RAG_PCT. Three bands
+ * (no `info`) so it lines up exactly with the gauge zones from `ragBands()`.
+ */
+export function ragTonePercent(pct: number | null | undefined): Rag {
+  const v = pct ?? 0;
+  if (v >= RAG_PCT.good) return 'success';
+  if (v >= RAG_PCT.warn) return 'warning';
+  return 'danger';
+}
+
+/** Faint RAG zones for a RadialGauge, aligned to RAG_PCT (so arc-colour and
+ *  the KPI tone agree at every value). `to: 101` keeps 100% inside green. */
+export function ragBands(): GaugeBand[] {
+  return [
+    { from: 0,            to: RAG_PCT.warn, color: 'var(--danger)'  },
+    { from: RAG_PCT.warn, to: RAG_PCT.good, color: 'var(--warning)' },
+    { from: RAG_PCT.good, to: 101,          color: 'var(--success)' },
+  ];
 }
 
 /** The `var(--…)` colour for a RAG tone. */

@@ -6,6 +6,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { LineChart } from '../../components/charts/LineChart';
 import { RadialGauge } from '../../components/viz/RadialGauge';
 import { GAUGE_MD } from '../../lib/gaugeSizes';
+import { ragBands, ragTonePercent as tonePct } from '../../lib/ragColors';
 import { useI18n } from '../../lib/i18n';
 import { cyberApi, dashboardApi, type CyberDashboardDto } from '../../lib/api';
 
@@ -146,11 +147,7 @@ export function CyberDashboardPage() {
               <RadialGauge key={f.code} value={f.pct} max={100} {...GAUGE_MD}
                 caption={f.code} unit="%" rtl={isAr}
                 aria-label={`${f.code} ${isAr ? 'الالتزام' : 'compliance'} ${f.pct}%`}
-                bands={[
-                  { from: 0, to: 60, color: 'var(--danger)' },
-                  { from: 60, to: 85, color: 'var(--warning)' },
-                  { from: 85, to: 101, color: 'var(--success)' },
-                ]} />
+                bands={ragBands()} />
             ))}
           </div>
           <div className="cyber-dashboard__hint text-muted">
@@ -218,12 +215,4 @@ export function CyberDashboardPage() {
       widgets={widgets}
     />
   );
-}
-
-function tonePct(v?: number): 'success' | 'warning' | 'danger' | 'info' {
-  const n = v ?? 0;
-  if (n >= 85) return 'success';
-  if (n >= 60) return 'info';
-  if (n >= 30) return 'warning';
-  return 'danger';
 }
