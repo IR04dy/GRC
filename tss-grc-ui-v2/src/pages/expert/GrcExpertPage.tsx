@@ -408,7 +408,7 @@ export function GrcExpertPage() {
               <input
                 value={collectTitle}
                 onChange={e => setCollectTitle(e.target.value)}
-                style={inputStyle}
+                className="input"
                 maxLength={256}
               />
             </FieldRow>
@@ -418,21 +418,21 @@ export function GrcExpertPage() {
                 value={collectDesc}
                 onChange={e => setCollectDesc(e.target.value)}
                 rows={3}
-                style={{ ...inputStyle, resize: 'vertical' }}
+                className="input"
               />
             </FieldRow>
 
             {/* Who is this requested from — a person and/or a department (required). */}
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', marginTop: 4 }}>
               {lang === 'ar' ? 'الطلب موجَّه إلى' : 'Request from'}
-              <span style={{ color: 'var(--danger-fg, #c0392b)' }}> *</span>
+              <span style={{ color: 'var(--danger-fg)' }}> *</span>
             </div>
 
             <FieldRow label={lang === 'ar' ? 'المسؤول (شخص)' : 'Assignee (person)'}>
               <select
                 value={collectAssignee}
                 onChange={e => setCollectAssignee(e.target.value === '' ? '' : Number(e.target.value))}
-                style={inputStyle}
+                className="input"
               >
                 <option value="">{lang === 'ar' ? '— اختر شخصًا —' : '— Select a person —'}</option>
                 {users.map(u => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
@@ -443,7 +443,7 @@ export function GrcExpertPage() {
               <select
                 value={collectDept}
                 onChange={e => setCollectDept(e.target.value === '' ? '' : Number(e.target.value))}
-                style={inputStyle}
+                className="input"
               >
                 <option value="">{lang === 'ar' ? '— اختر إدارة —' : '— Select a department —'}</option>
                 {departments.map(d => <option key={d.id} value={d.id}>{deptLabel(d)}</option>)}
@@ -457,7 +457,7 @@ export function GrcExpertPage() {
                     type="date"
                     value={collectDue}
                     onChange={e => setCollectDue(e.target.value)}
-                    style={inputStyle}
+                    className="input"
                   />
                 </FieldRow>
               </div>
@@ -466,7 +466,7 @@ export function GrcExpertPage() {
                   <select
                     value={collectPriority}
                     onChange={e => setCollectPriority(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH')}
-                    style={inputStyle}
+                    className="input"
                   >
                     <option value="LOW">{lang === 'ar' ? 'منخفضة' : 'Low'}</option>
                     <option value="MEDIUM">{lang === 'ar' ? 'متوسطة' : 'Medium'}</option>
@@ -716,17 +716,6 @@ function StatusChip({ count, tone, label, Icon: IconProp }: {
     </Badge>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: '6px 8px',
-  border: '1px solid var(--border)',
-  borderRadius: 4,
-  fontSize: 13,
-  width: '100%',
-  fontFamily: 'inherit',
-  background: 'var(--surface-2)',
-  color: 'var(--ink-1)',
-};
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (

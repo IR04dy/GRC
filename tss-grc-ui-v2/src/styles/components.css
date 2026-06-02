@@ -1026,7 +1026,12 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 }
 @media (max-width: 768px) {
   .wizard-shell { grid-template-columns: 1fr; }
+  /* F5 — collapse the vertical rail into a compact horizontal progress strip:
+   * steps size to content (not full-width cards) and the sub-hint is hidden. */
   .wizard-rail { flex-direction: row; overflow-x: auto; }
+  .wizard-rail-button { width: auto; }
+  .wizard-rail-sub { display: none; }
+  .wizard-rail-marker { width: 24px; height: 24px; }
 }
 
 .wizard-rail {
@@ -1097,8 +1102,14 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   min-height: 480px;
 }
 .wizard-content {
-  padding: var(--sp-6);
+  padding: var(--sp-7) var(--sp-8);   /* F5 — 20/24, ≥ the 20px modal body */
   flex: 1; min-width: 0;
+}
+/* F5 — "Step n of N" progress caption above the active pane. */
+.wizard-step-count {
+  font: 600 var(--text-xs) var(--font-sans);
+  color: var(--ink-3);
+  margin-bottom: var(--sp-4);
 }
 .wizard-step-pane[hidden] { display: none; }
 .wizard-step-pane:not([hidden]) {

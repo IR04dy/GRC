@@ -151,6 +151,9 @@ export function WizardShell({
       {/* Step body */}
       <div className="wizard-body">
         <div className="wizard-content">
+          <div className="wizard-step-count">
+            {rtl ? `الخطوة ${active + 1} من ${steps.length}` : `Step ${active + 1} of ${steps.length}`}
+          </div>
           {steps.map((s, i) => (
             <div key={s.id}
                  className="wizard-step-pane"

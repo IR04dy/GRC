@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, Plus, Check } from 'lucide-react';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
@@ -62,6 +62,19 @@ export function SearchableSelect({
   const [creating, setCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // F6 — collision flip: open upward (and clamp height) when the trigger sits
+  // near the bottom of a scrolling modal, so the popover never clips off-screen.
+  const [placement, setPlacement] = useState<{ up: boolean; maxH: number }>({ up: false, maxH: 320 });
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const margin = 12;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const up = spaceBelow < 220 && spaceAbove > spaceBelow;
+    setPlacement({ up, maxH: Math.max(160, Math.min(320, up ? spaceAbove : spaceBelow)) });
+  }, [open]);
 
   const selected = options.find(o => o.value === value);
 
@@ -138,6 +151,7 @@ export function SearchableSelect({
 
       {/* Trigger — looks like a regular .input field for visual consistency */}
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         disabled={disabled}
@@ -180,13 +194,13 @@ export function SearchableSelect({
           style={{
             position: 'absolute',
             insetInlineStart: 0, insetInlineEnd: 0,
-            top: 'calc(100% + 4px)',
+            ...(placement.up ? { bottom: 'calc(100% + 4px)' } : { top: 'calc(100% + 4px)' }),
             zIndex: 1100,
             background: 'var(--surface)',
             border: '1px solid var(--border-strong)',
             borderRadius: 'var(--r-md)',
             boxShadow: 'var(--shadow-3)',
-            maxHeight: 320,
+            maxHeight: placement.maxH,
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
           }}>
