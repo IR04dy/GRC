@@ -20,6 +20,31 @@ body {
   border-radius: var(--r-sm);
 }
 
+/* A11y — skip-to-content link. Off-screen until focused, then slides in.
+   Logical inset so it lands on the correct edge in RTL. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  inset-inline-start: 8px;
+  z-index: 2000;
+  padding: 10px 16px;
+  background: var(--primary);
+  color: var(--on-primary, #fff);
+  border-radius: var(--r-md);
+  font: 600 var(--text-sm) var(--font-sans);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-150%);
+  transition: transform var(--dur-fast);
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--on-primary, #fff);
+  outline-offset: 2px;
+}
+/* The main region is programmatically focusable (tabIndex=-1) for the
+   skip-link, but should never show a focus ring of its own. */
+#main-content:focus { outline: none; box-shadow: none; }
+
 /* Buttons reset */
 button {
   font: inherit;

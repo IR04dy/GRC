@@ -33,7 +33,7 @@ export function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
             <Sep size={12} style={{ color: 'var(--ink-4)', transform: lang === 'ar' ? 'scaleX(-1)' : undefined }} />
             {item.to && !isLast
               ? <Link to={item.to} style={{ color: 'var(--ink-2)', textDecoration: 'none', fontWeight: 500 }}>{item.label}</Link>
-              : <span style={{ color: isLast ? 'var(--ink-1)' : 'var(--ink-2)', fontWeight: isLast ? 600 : 500 }}>{item.label}</span>
+              : <span aria-current={isLast ? 'page' : undefined} style={{ color: isLast ? 'var(--ink-1)' : 'var(--ink-2)', fontWeight: isLast ? 600 : 500 }}>{item.label}</span>
             }
           </span>
         );
