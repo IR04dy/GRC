@@ -3,8 +3,9 @@ import { AlertTriangle, ClipboardCheck, FileText, ShieldCheck, Timer, Building2,
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
 import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
+import { LineChart } from '../../components/charts/LineChart';
 import { useI18n } from '../../lib/i18n';
-import { bcmApi } from '../../lib/api';
+import { bcmApi, dashboardApi } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
 import { boardPackSection, type BoardPackSection } from '../../lib/bcmBoardPack';
 import { regulatorCountdownSummary, type CountdownSummary } from '../../lib/bcmRegulatorCountdown';
@@ -43,9 +44,13 @@ export function BcmDashboardPage() {
   // Supplementary Sprint-7 tiles — load in parallel; failures degrade silently.
   const [boardPack, setBoardPack] = useState<BoardPackSection | null>(null);
   const [countdowns, setCountdowns] = useState<CountdownSummary | null>(null);
+  const [trend, setTrend] = useState<Array<{ week: string; exercises: number }>>([]);
   useEffect(() => {
     boardPackSection().then(setBoardPack).catch(() => setBoardPack(null));
     regulatorCountdownSummary().then(setCountdowns).catch(() => setCountdowns(null));
+    dashboardApi.kpiTrend('bcm_exercises', 12)
+      .then(pts => setTrend(pts.map(p => ({ week: p.label, exercises: p.value }))))
+      .catch(() => setTrend([]));
   }, []);
 
   if (state === 'loading') return <DashboardLoading title={title} eyebrow={eyebrow} />;
@@ -69,6 +74,19 @@ export function BcmDashboardPage() {
   ];
 
   const widgets: DomainDashboardWidget[] = [
+    {
+      id: 'exercise-cadence',
+      title: isAr ? 'وتيرة التمارين المنفّذة — 12 أسبوع' : 'Exercises conducted · 12 weeks',
+      body: (
+        <LineChart
+          data={trend}
+          xKey="week"
+          height={200}
+          series={[{ key: 'exercises', name: isAr ? 'تمارين منفّذة (تراكمي)' : 'Conducted (cumulative)', color: 'var(--primary)' }]}
+          emptyState={isAr ? 'لا توجد بيانات اتجاه' : 'No trend data yet'} />
+      ),
+      href: '/bcm?tab=exercises',
+    },
     {
       id: 'rto-rpo',
       title: isAr ? 'الالتزام بأهداف الاستعادة' : 'Recovery objectives compliance',

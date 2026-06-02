@@ -126,26 +126,34 @@ public class DashboardService {
     // cumulative count of still-open items created on or before that week.
     // No snapshot table needed — derived from created_at + current status.
 
-    private record MetricSource(String table, String openFilter, String extra) {}
+    // dateColumn = the timestamp the weekly buckets are keyed on. For most
+    // registers this is created_at (when the item appeared); for point-in-time
+    // events like BCM exercises it is the date the event actually happened
+    // (executed_date), which is the meaningful axis for a cadence trend.
+    private record MetricSource(String table, String openFilter, String extra, String dateColumn) {}
 
     private static final Map<String, MetricSource> METRICS = Map.ofEntries(
-        Map.entry("risks",          new MetricSource("risk.risks",     " AND status <> 'CLOSED'", "")),
-        Map.entry("open_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", "")),
-        Map.entry("critical_risks", new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'CRITICAL'")),
-        Map.entry("high_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'HIGH'")),
-        Map.entry("incidents",      new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "")),
-        Map.entry("open_incidents", new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "")),
+        Map.entry("risks",          new MetricSource("risk.risks",     " AND status <> 'CLOSED'", "", "created_at")),
+        Map.entry("open_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", "", "created_at")),
+        Map.entry("critical_risks", new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'CRITICAL'", "created_at")),
+        Map.entry("high_risks",     new MetricSource("risk.risks",     " AND status <> 'CLOSED'", " AND risk_level = 'HIGH'", "created_at")),
+        Map.entry("incidents",      new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "", "created_at")),
+        Map.entry("open_incidents", new MetricSource("cyber.incidents", " AND status NOT IN ('CLOSED','RESOLVED')", "", "created_at")),
         // Compliance / audit findings still open (not closed or remediated).
         Map.entry("findings",       new MetricSource("compliance.findings",
-                " AND status NOT IN ('CLOSED','RESOLVED','REMEDIATED','VERIFIED','DONE')", "")),
+                " AND status NOT IN ('CLOSED','RESOLVED','REMEDIATED','VERIFIED','DONE')", "", "created_at")),
         // PDPL data-subject requests still in flight.
         Map.entry("dsr",            new MetricSource("privacy.data_subject_requests",
-                " AND status NOT IN ('COMPLETED','RESOLVED','REJECTED','CLOSED')", "")),
+                " AND status NOT IN ('COMPLETED','RESOLVED','REJECTED','CLOSED')", "", "created_at")),
         // Privacy breaches not yet closed out.
         Map.entry("breaches",       new MetricSource("privacy.data_breaches",
-                " AND status NOT IN ('CLOSED','RESOLVED','REMEDIATED')", "")),
+                " AND status NOT IN ('CLOSED','RESOLVED','REMEDIATED')", "", "created_at")),
         // Third-party / supplier vendors on the books (excludes terminated).
-        Map.entry("vendors",        new MetricSource("scm.vendors", " AND status <> 'TERMINATED'", ""))
+        Map.entry("vendors",        new MetricSource("scm.vendors", " AND status <> 'TERMINATED'", "", "created_at")),
+        // BCM exercises actually conducted — cadence keyed on executed_date, not
+        // when the row was logged. Cumulative count of completed tests over time.
+        Map.entry("bcm_exercises",  new MetricSource("bcm.exercises",
+                " AND status = 'COMPLETED' AND executed_date IS NOT NULL", "", "executed_date"))
     );
 
     @Transactional(readOnly = true)
@@ -157,27 +165,31 @@ public class DashboardService {
                 .minusWeeks(n - 1L)
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 
+        String dateCol = src.dateColumn();
         String base = " FROM " + src.table()
                 + " WHERE organisation_id = :org AND is_deleted = 0" + src.openFilter() + src.extra();
 
         long baseline = ((Number) em.createNativeQuery(
-                "SELECT COUNT(*)" + base + " AND created_at < :start")
+                "SELECT COUNT(*)" + base + " AND " + dateCol + " < :start")
                 .setParameter("org", orgId)
                 .setParameter("start", windowStart.atStartOfDay())
                 .getSingleResult()).longValue();
 
-        // Fetch creation timestamps inside the window and bucket by week in Java.
+        // Fetch the keyed timestamps inside the window and bucket by week in Java.
         // (SQL Server won't GROUP BY a parameterised DATEDIFF, so we bucket here.)
         @SuppressWarnings("unchecked")
         List<Object> stamps = em.createNativeQuery(
-                "SELECT created_at" + base + " AND created_at >= :start")
+                "SELECT " + dateCol + base + " AND " + dateCol + " >= :start")
                 .setParameter("org", orgId)
                 .setParameter("start", windowStart.atStartOfDay())
                 .getResultList();
         Map<Integer, Long> byWeek = new HashMap<>();
         for (Object o : stamps) {
+            if (o == null) continue;
             LocalDate created = o instanceof java.sql.Timestamp ts ? ts.toLocalDateTime().toLocalDate()
+                    : o instanceof java.sql.Date d ? d.toLocalDate()
                     : o instanceof java.time.LocalDateTime ldt ? ldt.toLocalDate()
+                    : o instanceof LocalDate ld ? ld
                     : LocalDate.parse(o.toString().substring(0, 10));
             int w = (int) java.time.temporal.ChronoUnit.WEEKS.between(windowStart, created);
             if (w >= 0 && w < n) byWeek.merge(w, 1L, Long::sum);

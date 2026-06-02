@@ -53,9 +53,9 @@ public class DashboardController {
     }
 
     /** Real weekly KPI trend (metric = risks | critical_risks | high_risks | incidents
-     *  | findings | dsr | breaches | vendors). */
+     *  | findings | dsr | breaches | vendors | bcm_exercises). */
     @GetMapping("/kpi-trend")
-    @PreAuthorize("hasAnyAuthority('RISK_READ','INCIDENT_READ','COMPLIANCE_READ','CYBER_READ','PRIVACY_READ','SCM_READ')")
+    @PreAuthorize("hasAnyAuthority('RISK_READ','INCIDENT_READ','COMPLIANCE_READ','CYBER_READ','PRIVACY_READ','SCM_READ','BCM_READ')")
     public List<com.tss.grc.module.dashboard.dto.TrendPoint> kpiTrend(
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "risks") String metric,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "12") int weeks) {
