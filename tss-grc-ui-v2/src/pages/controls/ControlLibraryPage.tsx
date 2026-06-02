@@ -219,7 +219,7 @@ export function ControlLibraryPage() {
                             {mappings.map(m => (
                               <tr key={m.id}>
                                 <td className="mono text-2xs">#{m.citationId}</td>
-                                <td><Badge tone={coverageTone(m.coverage)}>{m.coverage}</Badge></td>
+                                <td><Badge size="sm" tone={coverageTone(m.coverage)}>{m.coverage}</Badge></td>
                                 <td className="text-xs" style={{ maxWidth: 360 }}>
                                   {(isAr && m.rationaleAr ? m.rationaleAr : m.rationaleEn) ?? '—'}
                                 </td>
@@ -247,8 +247,8 @@ export function ControlLibraryPage() {
                             {riskLinks.map(l => (
                               <tr key={l.id}>
                                 <td className="mono text-2xs">#{l.riskId}</td>
-                                <td><Badge tone="info">{l.linkType}</Badge></td>
-                                <td><Badge tone={effectivenessTone(l.effectiveness)}>{l.effectiveness ?? '—'}</Badge></td>
+                                <td><Badge size="sm" tone="info">{l.linkType}</Badge></td>
+                                <td><Badge size="sm" tone={effectivenessTone(l.effectiveness)}>{l.effectiveness ?? '—'}</Badge></td>
                                 <td className="mono text-2xs">{l.lastReviewedAt?.substring(0, 10) ?? '—'}</td>
                               </tr>
                             ))}
@@ -273,9 +273,9 @@ export function ControlLibraryPage() {
                             {assessments.map(a => (
                               <tr key={a.id}>
                                 <td className="mono text-2xs">{a.assessmentDate}</td>
-                                <td><Badge tone={effectivenessTone(a.effectiveness)}>{a.effectiveness}</Badge></td>
+                                <td><Badge size="sm" tone={effectivenessTone(a.effectiveness)}>{a.effectiveness}</Badge></td>
                                 <td className="text-xs">{a.assessorName ?? '—'}</td>
-                                <td><Badge tone="neutral">{a.workflowStatus}</Badge></td>
+                                <td><Badge size="sm" tone="neutral">{a.workflowStatus}</Badge></td>
                               </tr>
                             ))}
                           </tbody>
