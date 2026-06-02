@@ -133,7 +133,7 @@ export function PosturePage() {
                         <th>{isAr ? 'المرجعية' : 'Document'}</th>
                         <th>{isAr ? 'التغطية' : 'Coverage'}</th>
                         {domains.map(d => (
-                          <th key={d} style={{ textAlign: 'center', minWidth: 56 }}>{shortDomain(d)}</th>
+                          <th key={d} title={d} style={{ textAlign: 'center', minWidth: 56 }}>{shortDomain(d)}</th>
                         ))}
                       </tr>
                     </thead>
@@ -172,6 +172,23 @@ export function PosturePage() {
                       ))}
                     </tbody>
                   </table>
+                  {/* SP3 — intensity legend (count → green tint). */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                    gap: 'var(--sp-5)', marginTop: 'var(--sp-4)', flexWrap: 'wrap',
+                    fontSize: 11, color: 'var(--ink-3)',
+                  }}>
+                    <span>{isAr ? 'عدد الضوابط' : 'Controls mapped'}</span>
+                    {[1, 2, 4, 6].map(k => (
+                      <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{
+                          width: 16, height: 14, borderRadius: 'var(--r-xs)', display: 'inline-block',
+                          background: `color-mix(in srgb, var(--success) ${heatPct(k)}%, transparent)`,
+                        }} />
+                        {k === 6 ? '6+' : k}
+                      </span>
+                    ))}
+                  </div>
                 </div>}
         </Card>
 
@@ -307,15 +324,24 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'su
   );
 }
 
+/** Tinted-green intensity for a control count (SP3). color-mix with the
+ *  --success token (not a hardcoded rgba) so the ramp tracks light/dark mode.
+ *  Range 20%→92%. */
+function heatPct(n: number): number {
+  return Math.round((0.2 + Math.min(n, 6) * 0.12) * 100);
+}
+
 function HeatCell({ n }: { n: number }) {
-  // Darker green for higher control counts. Pure CSS so RTL flips
-  // safely.
-  const intensity = Math.min(n, 6);
-  const bg = `rgba(46, 156, 94, ${0.2 + intensity * 0.12})`;
+  const pct = heatPct(n);
+  // Above ~60% the green is saturated enough to need inverting text (--ink-0).
+  const lightText = pct > 60;
   return (
     <span style={{
       display: 'inline-block', minWidth: 28, padding: '2px 6px',
-      borderRadius: 4, background: bg, fontSize: 11, fontWeight: 600,
+      borderRadius: 'var(--r-xs)',
+      background: `color-mix(in srgb, var(--success) ${pct}%, transparent)`,
+      color: lightText ? 'var(--ink-0)' : 'var(--ink-1)',
+      fontSize: 11, fontWeight: 600,
     }}>{n}</span>
   );
 }
