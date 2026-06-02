@@ -405,7 +405,7 @@ export function RrpCycleDetailPage() {
       {/* Tabs */}
       <div style={{
         display: 'flex', gap: 4, marginTop: 16, marginBottom: 8,
-        borderBottom: '1px solid var(--card-border)',
+        borderBottom: '1px solid var(--border)',
       }}>
         {(['options', 'critical', 'indicators', 'timeline'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
@@ -492,7 +492,7 @@ export function RrpCycleDetailPage() {
                   display: 'grid',
                   gridTemplateColumns: '160px 1fr',
                   padding: '8px 0',
-                  borderBottom: '1px solid var(--card-border)',
+                  borderBottom: '1px solid var(--border)',
                   fontSize: 13,
                 }}>
                   <div style={{ color: 'var(--ink-muted)' }}>
@@ -769,7 +769,7 @@ export function RrpCycleDetailPage() {
 
 const inputStyle: React.CSSProperties = {
   padding: 6,
-  border: '1px solid var(--card-border)',
+  border: '1px solid var(--border)',
   borderRadius: 4,
   fontSize: 13,
   width: '100%',

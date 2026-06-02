@@ -348,7 +348,7 @@ export function RegReportingFilingDetailPage() {
                   display: 'grid',
                   gridTemplateColumns: '160px 1fr',
                   padding: '8px 0',
-                  borderBottom: '1px solid var(--card-border)',
+                  borderBottom: '1px solid var(--border)',
                   fontSize: 13,
                 }}>
                   <div style={{ color: 'var(--ink-muted)' }}>
@@ -491,7 +491,7 @@ export function RegReportingFilingDetailPage() {
 
 const inputStyle: React.CSSProperties = {
   padding: 6,
-  border: '1px solid var(--card-border)',
+  border: '1px solid var(--border)',
   borderRadius: 4,
   fontSize: 13,
   width: '100%',

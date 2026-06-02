@@ -233,23 +233,23 @@ export function RegInspectWorkspaceDetailPage() {
 
         {showNewDr && (
           <div style={{ marginBottom: 12, padding: 12,
-                        border: '1px solid var(--card-border)',
+                        border: '1px solid var(--border)',
                         borderRadius: 6, background: 'var(--surface-hover)' }}>
             <div style={{ display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                           gap: 8 }}>
               <input type="text" placeholder={lang === 'ar' ? 'العنوان (إنجليزي)' : 'Title (EN)'}
                 value={drTitleEn} onChange={e => setDrTitleEn(e.target.value)}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13 }} />
               <input type="text" dir="rtl"
                 placeholder={lang === 'ar' ? 'العنوان (عربي)' : 'Title (AR)'}
                 value={drTitleAr} onChange={e => setDrTitleAr(e.target.value)}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13 }} />
               <input type="date"
                 value={drDueDate} onChange={e => setDrDueDate(e.target.value)}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13 }} />
             </div>
             <div style={{ display: 'grid',
@@ -257,12 +257,12 @@ export function RegInspectWorkspaceDetailPage() {
                           gap: 8, marginTop: 8 }}>
               <textarea rows={2} placeholder={lang === 'ar' ? 'الوصف (إنجليزي)' : 'Description (EN)'}
                 value={drDescEn} onChange={e => setDrDescEn(e.target.value)}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
               <textarea rows={2} dir="rtl"
                 placeholder={lang === 'ar' ? 'الوصف (عربي)' : 'Description (AR)'}
                 value={drDescAr} onChange={e => setDrDescAr(e.target.value)}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
             </div>
             <div style={{ marginTop: 8 }}>
@@ -283,7 +283,7 @@ export function RegInspectWorkspaceDetailPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {drs.map(dr => (
               <div key={dr.id} style={{
-                border: '1px solid var(--card-border)',
+                border: '1px solid var(--border)',
                 borderRadius: 6, padding: 12,
                 background: dr.overdue ? 'rgba(220,38,38,0.05)' : 'var(--card-bg)',
               }}>
@@ -359,7 +359,7 @@ export function RegInspectWorkspaceDetailPage() {
                 placeholder={lang === 'ar'
                   ? 'مثال: شاريبوينت/INSP-2026/Q2/DR-001…'
                   : 'e.g. SharePoint/INSP-2026/Q2/DR-001…'}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13 }} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4,
@@ -369,7 +369,7 @@ export function RegInspectWorkspaceDetailPage() {
               </span>
               <textarea rows={3} maxLength={4000}
                 value={submitNotesEn} onChange={e => setSubmitNotesEn(e.target.value)}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4,
@@ -379,7 +379,7 @@ export function RegInspectWorkspaceDetailPage() {
               </span>
               <textarea rows={3} maxLength={4000} dir="rtl"
                 value={submitNotesAr} onChange={e => setSubmitNotesAr(e.target.value)}
-                style={{ padding: 6, border: '1px solid var(--card-border)',
+                style={{ padding: 6, border: '1px solid var(--border)',
                          borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
             </label>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

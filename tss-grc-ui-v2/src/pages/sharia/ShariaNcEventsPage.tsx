@@ -370,7 +370,7 @@ export function ShariaNcEventsPage() {
 }
 
 const inputStyle: React.CSSProperties = {
-  padding: 6, border: '1px solid var(--card-border)', borderRadius: 4,
+  padding: 6, border: '1px solid var(--border)', borderRadius: 4,
   fontSize: 13, width: '100%', fontFamily: 'inherit',
 };
 

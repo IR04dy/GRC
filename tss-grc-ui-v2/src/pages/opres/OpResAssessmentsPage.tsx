@@ -177,7 +177,7 @@ export function OpResAssessmentsPage() {
                 <input type="number" min={2000} max={2100}
                   value={fy}
                   onChange={e => setFy(parseInt(e.target.value, 10) || today.getFullYear())}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -187,7 +187,7 @@ export function OpResAssessmentsPage() {
                 <input type="date"
                   value={dueDate}
                   onChange={e => setDueDate(e.target.value)}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -198,7 +198,7 @@ export function OpResAssessmentsPage() {
                   value={titleEn}
                   onChange={e => setTitleEn(e.target.value)}
                   placeholder="FY2026 SAMA Op-Res Annual Self-Assessment"
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -209,7 +209,7 @@ export function OpResAssessmentsPage() {
                   value={titleAr}
                   onChange={e => setTitleAr(e.target.value)}
                   placeholder="التقييم الذاتي السنوي للصمود التشغيلي 2026"
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
             </div>

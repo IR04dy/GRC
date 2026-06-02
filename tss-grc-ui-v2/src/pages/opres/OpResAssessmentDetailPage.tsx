@@ -332,7 +332,7 @@ export function OpResAssessmentDetailPage() {
                         {rubric.map(r => (
                           <div key={r.level}
                                style={{
-                                 border: '1px solid var(--card-border)',
+                                 border: '1px solid var(--border)',
                                  borderRadius: 6, padding: 8,
                                  fontSize: 11, lineHeight: 1.4,
                                  background: curN === r.level
@@ -367,7 +367,7 @@ export function OpResAssessmentDetailPage() {
                         onChange={e => updateDraft(p.id, {
                           currentScore: e.target.value === '' ? '' : Number(e.target.value),
                         })}
-                        style={{ padding: 6, border: '1px solid var(--card-border)',
+                        style={{ padding: 6, border: '1px solid var(--border)',
                                  borderRadius: 4, fontSize: 13 }}>
                         <option value="">— {lang === 'ar' ? 'لم تُحدَّد' : 'unset'} —</option>
                         {[1,2,3,4,5].map(n => (
@@ -386,7 +386,7 @@ export function OpResAssessmentDetailPage() {
                         onChange={e => updateDraft(p.id, {
                           targetScore: e.target.value === '' ? '' : Number(e.target.value),
                         })}
-                        style={{ padding: 6, border: '1px solid var(--card-border)',
+                        style={{ padding: 6, border: '1px solid var(--border)',
                                  borderRadius: 4, fontSize: 13 }}>
                         <option value="">— {lang === 'ar' ? 'لم يُحدَّد' : 'unset'} —</option>
                         {[1,2,3,4,5].map(n => (
@@ -406,7 +406,7 @@ export function OpResAssessmentDetailPage() {
                         placeholder={lang === 'ar'
                           ? 'مثال: BCM-2026-Q1-EVID-1، شاريبوينت/درايف…'
                           : 'e.g. BCM-2026-Q1-EVID-1, SharePoint/Drive link…'}
-                        style={{ padding: 6, border: '1px solid var(--card-border)',
+                        style={{ padding: 6, border: '1px solid var(--border)',
                                  borderRadius: 4, fontSize: 13 }} />
                     </label>
                   </div>
@@ -422,7 +422,7 @@ export function OpResAssessmentDetailPage() {
                         value={d.rationaleEn}
                         onChange={e => updateDraft(p.id, { rationaleEn: e.target.value })}
                         placeholder="What evidence supports your current and target maturity claims?"
-                        style={{ padding: 6, border: '1px solid var(--card-border)',
+                        style={{ padding: 6, border: '1px solid var(--border)',
                                  borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -433,7 +433,7 @@ export function OpResAssessmentDetailPage() {
                         value={d.rationaleAr}
                         onChange={e => updateDraft(p.id, { rationaleAr: e.target.value })}
                         placeholder="ما الأدلّة الداعمة للنضج الحالي والمستهدف؟"
-                        style={{ padding: 6, border: '1px solid var(--card-border)',
+                        style={{ padding: 6, border: '1px solid var(--border)',
                                  borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
                     </label>
                   </div>

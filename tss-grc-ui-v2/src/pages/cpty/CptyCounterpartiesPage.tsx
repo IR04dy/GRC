@@ -277,7 +277,7 @@ export function CptyCounterpartiesPage() {
 
 const inputStyle: React.CSSProperties = {
   padding: 6,
-  border: '1px solid var(--card-border)',
+  border: '1px solid var(--border)',
   borderRadius: 4,
   fontSize: 13,
 };

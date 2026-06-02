@@ -195,7 +195,7 @@ export function OpResDashboardPage() {
                 <div key={p.id}
                      onClick={() => nav(`/opres/assessments/${latest.id}`)}
                      style={{
-                       border: '1px solid var(--card-border)',
+                       border: '1px solid var(--border)',
                        borderRadius: 8,
                        padding: 12,
                        cursor: 'pointer',

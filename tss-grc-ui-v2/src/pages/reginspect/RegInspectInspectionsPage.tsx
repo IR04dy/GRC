@@ -191,7 +191,7 @@ export function RegInspectInspectionsPage() {
                 </span>
                 <select value={regulator}
                   onChange={e => setRegulator(e.target.value as Regulator)}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }}>
                   {REGULATORS.map(r => (
                     <option key={r} value={r}>
@@ -206,7 +206,7 @@ export function RegInspectInspectionsPage() {
                 </span>
                 <input type="date" value={notifiedAt}
                   onChange={e => setNotifiedAt(e.target.value)}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -215,7 +215,7 @@ export function RegInspectInspectionsPage() {
                 </span>
                 <input type="date" value={entryDate}
                   onChange={e => setEntryDate(e.target.value)}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -224,7 +224,7 @@ export function RegInspectInspectionsPage() {
                 </span>
                 <input type="date" value={exitDate}
                   onChange={e => setExitDate(e.target.value)}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4,
@@ -235,7 +235,7 @@ export function RegInspectInspectionsPage() {
                 <input type="text" maxLength={256}
                   value={titleEn} onChange={e => setTitleEn(e.target.value)}
                   placeholder="FY2026 SAMA on-site — Cyber+AML+OpRes posture"
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4,
@@ -246,7 +246,7 @@ export function RegInspectInspectionsPage() {
                 <input type="text" maxLength={256} dir="rtl"
                   value={titleAr} onChange={e => setTitleAr(e.target.value)}
                   placeholder="تفتيش ساما الميداني 2026 — الوضع السيبراني ومكافحة غسل الأموال والصمود التشغيلي"
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13 }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4,
@@ -256,7 +256,7 @@ export function RegInspectInspectionsPage() {
                 </span>
                 <textarea rows={2} maxLength={4000}
                   value={scopeEn} onChange={e => setScopeEn(e.target.value)}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4,
@@ -266,7 +266,7 @@ export function RegInspectInspectionsPage() {
                 </span>
                 <textarea rows={2} maxLength={4000} dir="rtl"
                   value={scopeAr} onChange={e => setScopeAr(e.target.value)}
-                  style={{ padding: 6, border: '1px solid var(--card-border)',
+                  style={{ padding: 6, border: '1px solid var(--border)',
                            borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
               </label>
             </div>

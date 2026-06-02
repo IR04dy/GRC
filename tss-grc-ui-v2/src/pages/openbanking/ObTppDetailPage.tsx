@@ -354,7 +354,7 @@ export function ObTppDetailPage() {
 
 const inputStyle: React.CSSProperties = {
   padding: 6,
-  border: '1px solid var(--card-border)',
+  border: '1px solid var(--border)',
   borderRadius: 4,
   fontSize: 13,
   width: '100%',
@@ -386,8 +386,8 @@ function TabBtn({ active, onClick, Icon, label }:
     <button onClick={onClick} style={{
       padding: '6px 12px',
       background: active ? 'var(--card-bg)' : 'transparent',
-      border: '1px solid var(--card-border)',
-      borderBottom: active ? '2px solid var(--accent)' : '1px solid var(--card-border)',
+      border: '1px solid var(--border)',
+      borderBottom: active ? '2px solid var(--accent)' : '1px solid var(--border)',
       borderRadius: '4px 4px 0 0',
       cursor: 'pointer',
       display: 'inline-flex', gap: 6, alignItems: 'center',
