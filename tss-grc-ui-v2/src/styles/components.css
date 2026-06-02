@@ -33,7 +33,7 @@
 .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
 .btn-danger:hover:not(:disabled) { background: var(--danger-fg); border-color: var(--danger-fg); }
 
-.btn-icon { width: 38px; padding: 0; height: 38px; }
+.btn-icon { width: var(--touch-lg); padding: 0; height: var(--touch-lg); }
 
 /* ─── Badge ──────────────────────────────────────── */
 .badge {
@@ -1907,7 +1907,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 tr:hover .row-actions { opacity: 1; }
 
 .row-action-btn {
-  width: 28px; height: 28px;
+  width: var(--touch-sm); height: var(--touch-sm);
   border-radius: var(--r-sm);
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent;

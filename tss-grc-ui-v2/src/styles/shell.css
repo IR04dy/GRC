@@ -94,7 +94,7 @@
   inset-inline-end: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 24px; height: 24px;
+  width: var(--touch-sm); height: var(--touch-sm);
   display: flex; align-items: center; justify-content: center;
   background: transparent;
   border: 0;
