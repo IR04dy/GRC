@@ -792,14 +792,19 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .modal-header h3 { margin: 0; font: 800 18px var(--font-sans); color: var(--ink-1); letter-spacing: -.01em; }
-.modal-body { padding: 20px 22px; overflow-y: auto; }
+/* flex:1 + min-height:0 lets a tall form scroll WITHIN the card while the
+ * header/footer (flex-shrink:0) stay pinned — otherwise a long modal pushes
+ * the action buttons off-screen / compresses the header. */
+.modal-body { padding: 20px 22px; overflow-y: auto; flex: 1; min-height: 0; }
 .modal-footer {
   display: flex; gap: 8px; justify-content: flex-end;
   padding: 14px 22px;
   border-top: 1px solid var(--border);
   background: var(--surface-2);
+  flex-shrink: 0;
 }
 
 /* ─── Toast ──────────────────────────────────────── */

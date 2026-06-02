@@ -243,7 +243,7 @@ export function GrcExpertPage() {
       )}
 
       {!loading && !error && (
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, alignItems: 'start' }}>
+        <div className="rail-layout" style={{ alignItems: 'start' }}>
 
           {/* ── Left: framework list ── */}
           <Card padded={false} title={lang === 'ar' ? 'الأطر' : t('expert.frameworks')}>
