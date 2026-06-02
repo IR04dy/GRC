@@ -134,7 +134,7 @@ export function FormModal<T>({
         id="entity-form"
         className="form-12col"
         onSubmit={handle}
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '14px 12px' }}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '14px 16px' }}
       >
         {fields.map(f => {
           const span = spanFor(f);
