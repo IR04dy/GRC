@@ -12,6 +12,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
+import { ResidencyMap } from '../../components/viz/ResidencyMap';
 import {
   dataclassApi,
   FLOW_STATUS_LABEL, FLOW_STATUS_TONE,
@@ -188,6 +189,49 @@ export function DataclassFlowsPage() {
       {error && (
         <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>{error}</div>
       )}
+
+      {rows.length > 0 && (() => {
+        const crossBorder = rows.filter(r => r.destinationAdequacy && r.destinationAdequacy !== 'IN_KINGDOM');
+        const missingArt7 = crossBorder.filter(r => !r.pdplArt7TransferRef).length;
+        return (
+          <div style={{ marginBottom: 16 }}>
+          <Card padded>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <ResidencyMap
+                ar={lang === 'ar'}
+                flows={rows.map(r => ({
+                  id: r.id,
+                  zone: r.destinationAdequacy,
+                  sourceLabel: r.sourceSystemLabel,
+                  destLabel: r.destinationSystemLabel,
+                  destCountry: r.destinationCountry,
+                  hasArt7Ref: !!r.pdplArt7TransferRef,
+                }))} />
+              <div style={{ minWidth: 200, maxWidth: 280 }}>
+                <div style={{ font: '700 11px var(--font-sans)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-3)' }}>
+                  {lang === 'ar' ? 'بوّابة النقل عبر الحدود — مادة ٧' : 'Cross-border transfer gate — Art. 7'}
+                </div>
+                <div style={{ display: 'flex', gap: 18, marginTop: 12 }}>
+                  <div>
+                    <div className="tnum" style={{ font: '800 28px var(--font-sans)', color: 'var(--ink-1)' }}>{crossBorder.length}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{lang === 'ar' ? 'تدفّقات عبر الحدود' : 'cross-border flows'}</div>
+                  </div>
+                  <div>
+                    <div className="tnum" style={{ font: '800 28px var(--font-sans)', color: missingArt7 > 0 ? 'var(--danger)' : 'var(--success)' }}>{missingArt7}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{lang === 'ar' ? 'ينقصها مرجع م.٧' : 'missing Art. 7 ref'}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 12, lineHeight: 1.6 }}>
+                  {lang === 'ar'
+                    ? 'كل تدفّق يغادر المملكة بدون مرجع نقل (مادة ٧) يظهر كشعاع أحمر متقطّع.'
+                    : 'Every flow leaving the Kingdom without an Art. 7 transfer reference shows as a dashed red, pulsing ray.'}
+                </div>
+              </div>
+            </div>
+          </Card>
+          </div>
+        );
+      })()}
 
       {showNew && (
         <div style={{ marginBottom: 16 }}>

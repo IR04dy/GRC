@@ -16,6 +16,7 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Stepper } from '../../components/ui/Stepper';
 import { BarChart3D } from '../../components/viz/BarChart3D';
+import { BubbleQuadrant } from '../../components/viz/BubbleQuadrant';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -862,6 +863,41 @@ export function ScmPage() {
 
       {tab === 'overview' && (
         <>
+          {vendors.data.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <Card title={lang === 'ar' ? 'الموردون: المخاطر مقابل الأهمية' : 'Vendors — risk vs criticality'} Icon={AlertTriangle}>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <BubbleQuadrant
+                    ar={lang === 'ar'}
+                    xMax={5} yMax={5}
+                    xLabel={lang === 'ar' ? 'الأهمية' : 'Criticality'}
+                    yLabel={lang === 'ar' ? 'مستوى المخاطر' : 'Risk level'}
+                    xTicks={[t('severityLow'), t('severityMedium'), t('severityHigh'), t('severityCritical')]}
+                    yTicks={[t('severityLow'), t('severityMedium'), t('severityHigh'), t('severityCritical')]}
+                    onPointClick={() => setTab('suppliers')}
+                    points={vendors.data.map(v => {
+                      const lvl = (s?: string) => (({ LOW: 1, MEDIUM: 2, MED: 2, HIGH: 3, CRITICAL: 4, VERY_HIGH: 4 } as Record<string, number>)[(s ?? '').toUpperCase()] ?? 1);
+                      const jit = (id: number, seed: number) => (((id * seed) % 100) / 100 - 0.5) * 0.5;
+                      return {
+                        id: v.id,
+                        x: lvl(v.criticality) + jit(v.id, 37),
+                        y: lvl(v.riskLevel) + jit(v.id, 53),
+                        size: v.criticality === 'CRITICAL' ? 11 : 8,
+                        color: v.status === 'UNDER_REVIEW' ? 'var(--warning)' : v.status === 'ACTIVE' ? 'var(--primary)' : 'var(--ink-4)',
+                        label: lang === 'ar' ? (v.nameAr ?? v.nameEn) : v.nameEn,
+                        meta: `${v.criticality ?? '—'} · ${v.riskLevel ?? '—'}`,
+                      };
+                    })}
+                  />
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', maxWidth: 220, lineHeight: 1.6 }}>
+                    {lang === 'ar'
+                      ? 'الربع العلوي (أهمية عالية × مخاطر عالية) هو منطقة «الإدارة عن قرب». نقطة برتقالية = قيد المراجعة.'
+                      : 'The top-right quadrant (high criticality × high risk) is the "manage closely" zone. An amber dot = under review.'}
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
           <div className="dash-grid">
             <Card title="Suppliers by Country" Icon={BarChart3}>
               <BarChart3D items={countryDistribution(vendors.data)} />
