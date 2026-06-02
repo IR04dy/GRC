@@ -237,7 +237,7 @@ export function GrcExpertPage() {
       )}
 
       {loading && (
-        <p style={{ fontSize: 13, opacity: 0.6 }}>
+        <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>
           {lang === 'ar' ? 'جارٍ التحميل…' : 'Loading…'}
         </p>
       )}
@@ -249,7 +249,7 @@ export function GrcExpertPage() {
           <Card padded={false} title={lang === 'ar' ? 'الأطر' : t('expert.frameworks')}>
             <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               {familyFrameworks.length === 0 && (
-                <div style={{ padding: 16, fontSize: 13, opacity: 0.6 }}>
+                <div style={{ padding: 16, fontSize: 13, color: 'var(--ink-3)' }}>
                   {lang === 'ar' ? 'لا توجد أطر في هذا المجال' : 'No frameworks in this family'}
                 </div>
               )}
@@ -271,7 +271,7 @@ export function GrcExpertPage() {
                   }}
                 >
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: selectedFwId === fw.id ? 'var(--primary)' : 'var(--ink-1)' }}>
-                    <span style={{ opacity: 0.7, marginInlineEnd: 4 }}>{fw.code}</span>
+                    <span style={{ color: 'var(--ink-3)', marginInlineEnd: 4 }}>{fw.code}</span>
                     {lang === 'ar' ? fw.nameAr : fw.nameEn}
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -299,7 +299,7 @@ export function GrcExpertPage() {
           <div>
             {!selectedFw && (
               <Card padded>
-                <p style={{ fontSize: 13, opacity: 0.6, textAlign: 'center', padding: '24px 0' }}>
+                <p style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'center', padding: '24px 0' }}>
                   {lang === 'ar' ? 'اختر إطاراً من القائمة' : 'Select a framework from the list'}
                 </p>
               </Card>
@@ -312,7 +312,7 @@ export function GrcExpertPage() {
                 <Card padded>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, opacity: 0.5, marginBottom: 2 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--ink-3)', marginBottom: 2 }}>
                         {FAMILY_LABELS[selectedFw.family][lang === 'ar' ? 'ar' : 'en']}
                         {selectedFw.version && ` · ${selectedFw.version}`}
                       </div>
@@ -320,7 +320,7 @@ export function GrcExpertPage() {
                         {lang === 'ar' ? selectedFw.nameAr : selectedFw.nameEn}
                       </div>
                       {selectedFw.descriptionEn && lang !== 'ar' && (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>{selectedFw.descriptionEn}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{selectedFw.descriptionEn}</div>
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -353,7 +353,7 @@ export function GrcExpertPage() {
 
                 {selectedFw.controls.length === 0 && (
                   <Card padded>
-                    <p style={{ fontSize: 13, opacity: 0.6, textAlign: 'center', padding: '24px 0' }}>
+                    <p style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'center', padding: '24px 0' }}>
                       {lang === 'ar' ? 'لا توجد ضوابط في هذا الإطار بعد' : 'No controls loaded for this framework yet'}
                     </p>
                   </Card>
@@ -523,10 +523,10 @@ function ControlAccordion({
       >
         {expanded
           ? <ChevronDown size={16} style={{ flexShrink: 0, color: 'var(--primary)' }} />
-          : <ChevronRight size={16} style={{ flexShrink: 0, opacity: 0.5 }} />
+          : <ChevronRight size={16} style={{ flexShrink: 0, color: 'var(--ink-4)' }} />
         }
         <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, opacity: 0.6, marginInlineEnd: 6 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginInlineEnd: 6 }}>
             {control.code}
           </span>
           {lang === 'ar' ? control.nameAr : control.nameEn}
@@ -546,7 +546,7 @@ function ControlAccordion({
           overflow: 'hidden',
         }}>
           {control.subControls.length === 0 && (
-            <div style={{ padding: '12px 16px', fontSize: 12, opacity: 0.6 }}>
+            <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--ink-3)' }}>
               {lang === 'ar' ? 'لا توجد ضوابط فرعية' : 'No sub-controls'}
             </div>
           )}
@@ -589,7 +589,7 @@ function SubControlRow({
       {/* Left: code + name + guidance */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, opacity: 0.6 }}>{sc.code}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{sc.code}</span>
           <span style={{ fontWeight: 600, fontSize: 13 }}>
             {lang === 'ar' ? sc.nameAr : sc.nameEn}
           </span>
@@ -608,7 +608,7 @@ function SubControlRow({
             borderRadius: 4,
             borderInlineStart: '3px solid var(--primary)',
           }}>
-            <span style={{ fontWeight: 700, opacity: 0.6, marginInlineEnd: 4 }}>
+            <span style={{ fontWeight: 700, color: 'var(--ink-3)', marginInlineEnd: 4 }}>
               {lang === 'ar' ? 'الدليل الموصى به:' : t('expert.recommendedEvidence', 'Recommended evidence:')}
             </span>
             {lang === 'ar' && sc.evidenceGuidanceAr ? sc.evidenceGuidanceAr : sc.evidenceGuidance}
@@ -686,7 +686,7 @@ function KpiTile({ label, value, tone }: {
       <div style={{ fontSize: 24, fontWeight: 700, color: colors[tone] ?? 'var(--ink-1)' }}>
         {value.toLocaleString()}
       </div>
-      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{label}</div>
     </div>
   );
 }
