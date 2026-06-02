@@ -43,6 +43,9 @@
   --primary-hover:  var(--primary-600);
   --primary-press:  var(--primary-700);
   --primary-soft:   var(--primary-50);
+  /* Text/icon colour on a --primary fill (buttons, active pills). Light:
+     --primary is dark teal → white; dark theme overrides to dark ink. */
+  --on-primary:     #FFFFFF;
 
   /* ─── Color · Accent (warm sand-amber) ────────────── */
   --accent-50:  #FBF3DD;
@@ -237,6 +240,7 @@
   --primary-hover:  var(--primary-400);
   --primary-press:  var(--primary-300);
   --primary-soft:   var(--primary-50);
+  --on-primary:     #0B1410;  /* dark ink — --primary is light teal in dark mode */
 
   --accent-50:  #3A2A0E;
   --accent-100: #4D3712;

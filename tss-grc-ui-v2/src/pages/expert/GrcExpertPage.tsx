@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, FileCheck2, AlertCircle, Clock, X, type Luci
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Badge } from '../../components/ui/Badge';
+import { PillTabs } from '../../components/ui/PillTabs';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
@@ -216,28 +217,16 @@ export function GrcExpertPage() {
       </div>
 
       {/* ── Family tabs ── */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
-        {visibleFamilies.map(fam => (
-          <button
-            key={fam}
-            type="button"
-            onClick={() => setActiveFamily(fam)}
-            style={{
-              padding: '6px 18px',
-              borderRadius: 20,
-              fontSize: 13,
-              fontWeight: 600,
-              border: '1.5px solid',
-              borderColor: activeFamily === fam ? 'var(--primary)' : 'var(--border)',
-              background: activeFamily === fam ? 'var(--primary)' : 'var(--surface-1)',
-              color: activeFamily === fam ? '#fff' : 'var(--ink-2)',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            {FAMILY_LABELS[fam][lang === 'ar' ? 'ar' : 'en']}
-          </button>
-        ))}
+      <div style={{ marginBottom: 20 }}>
+        <PillTabs
+          aria-label={lang === 'ar' ? 'عائلات الأطر' : 'Framework families'}
+          active={activeFamily}
+          onChange={(fam) => setActiveFamily(fam)}
+          options={visibleFamilies.map(fam => ({
+            id: fam,
+            label: FAMILY_LABELS[fam][lang === 'ar' ? 'ar' : 'en'],
+          }))}
+        />
       </div>
 
       {error && (

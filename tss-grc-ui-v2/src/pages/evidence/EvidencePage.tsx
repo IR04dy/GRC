@@ -9,6 +9,7 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { FreshnessCalendar } from '../../components/viz/FreshnessCalendar';
+import { PillTabs } from '../../components/ui/PillTabs';
 import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
@@ -399,20 +400,13 @@ export function EvidencePage() {
               : (
                 <>
                   {/* Framework selector tabs (sub-tabs) */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 0 16px' }}>
-                    {matrix.map(fw => (
-                      <button key={fw.frameworkId}
-                        onClick={() => setActiveFrameworkId(fw.frameworkId)}
-                        style={{
-                          padding: '6px 14px', borderRadius: 'var(--r-pill)',
-                          fontSize: 13, fontWeight: 600,
-                          background: fw.frameworkId === (activeFramework?.frameworkId ?? -1) ? 'var(--primary)' : 'var(--surface-2)',
-                          color:      fw.frameworkId === (activeFramework?.frameworkId ?? -1) ? 'var(--ink-on-primary)' : 'var(--ink-1)',
-                          border: '1px solid var(--border)', cursor: 'pointer',
-                        }}>
-                        {fw.code} <span style={{ opacity: 0.7, fontWeight: 400 }}>· {fw.controlCount}</span>
-                      </button>
-                    ))}
+                  <div style={{ padding: '8px 0 16px' }}>
+                    <PillTabs
+                      aria-label={ar ? 'اختيار الإطار' : 'Select framework'}
+                      active={activeFramework?.frameworkId ?? -1}
+                      onChange={(id) => setActiveFrameworkId(id as number)}
+                      options={matrix.map(fw => ({ id: fw.frameworkId, label: fw.code, count: fw.controlCount }))}
+                    />
                   </div>
 
                   {activeFramework && (

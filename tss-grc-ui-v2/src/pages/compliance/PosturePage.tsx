@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { PillTabs } from '../../components/ui/PillTabs';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -98,21 +99,19 @@ export function PosturePage() {
       </div>
 
       {/* Family filter chips — the "audience selector" */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
         <span className="text-2xs text-muted" style={{ marginInlineEnd: 4 }}>
           {isAr ? 'تصفية حسب العائلة:' : 'Filter by family:'}
         </span>
-        <button onClick={() => setFamilyFilter('')} style={chip(familyFilter === '')}>
-          {isAr ? 'الكل' : 'All'}
-        </button>
-        {families.map(f => (
-          <button key={f} onClick={() => setFamilyFilter(f)} style={chip(familyFilter === f)}>
-            {f}
-            <span className="mono text-2xs" style={{ marginInlineStart: 6, opacity: 0.7 }}>
-              {data?.familyTotals[f] ?? 0}
-            </span>
-          </button>
-        ))}
+        <PillTabs
+          aria-label={isAr ? 'تصفية حسب العائلة' : 'Filter by family'}
+          active={familyFilter}
+          onChange={setFamilyFilter}
+          options={[
+            { id: '', label: isAr ? 'الكل' : 'All' },
+            ...families.map(f => ({ id: f, label: f, count: data?.familyTotals[f] ?? 0 })),
+          ]}
+        />
       </div>
 
       <div className="dash-grid" style={{ gridTemplateColumns: 'minmax(520px, 1fr) minmax(0, 1fr)' }}>
@@ -333,15 +332,4 @@ function shortDomain(d: string): string {
     case 'GENERAL':    return 'Gen';
     default:           return d;
   }
-}
-
-function chip(active: boolean): React.CSSProperties {
-  return {
-    padding: '6px 12px', fontSize: 12,
-    border: '1px solid var(--border)', borderRadius: 999,
-    background: active ? 'var(--primary)' : 'var(--surface-1)',
-    color: active ? '#fff' : 'var(--ink-1)',
-    cursor: 'pointer',
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-  };
 }

@@ -621,6 +621,34 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   background: color-mix(in srgb, var(--surface-3) 35%, transparent);
 }
 .grc-table tr:last-child td, .tbl tr:last-child td { border-bottom: none; }
+
+/* ── PillTabs — one segmented/filter-pill control ────────────────────
+ * Consolidates 4 hand-rolled pill implementations (GrcExpert family tabs
+ * at radius 20, Posture family chips at 999, Evidence framework sub-tabs)
+ * into one token-driven control. Active = --primary fill with --on-primary
+ * text (theme-correct in both light and dark). */
+.pill-tabs { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: var(--r-pill);
+  border: 1px solid var(--border); background: var(--surface);
+  font: 600 13px var(--font-sans); color: var(--ink-2);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.pill-tab:hover { background: var(--surface-2); }
+.pill-tab:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pill-tab[aria-pressed="true"] {
+  background: var(--primary); color: var(--on-primary); border-color: var(--primary);
+}
+.pill-tab__count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px; padding: 0 5px; border-radius: var(--r-pill);
+  font: 700 10px var(--font-sans); background: var(--surface-3); color: var(--ink-3);
+}
+.pill-tab[aria-pressed="true"] .pill-tab__count {
+  background: color-mix(in srgb, var(--on-primary) 22%, transparent); color: var(--on-primary);
+}
 /* .mono — monospace for codes, IDs, timestamps, hex values, file paths.
  * `unicode-bidi: isolate` + `direction: ltr` lock the strong-LTR
  * direction so an Arabic UI doesn't reorder "INC-0042" / "AC-2.1.2" /
