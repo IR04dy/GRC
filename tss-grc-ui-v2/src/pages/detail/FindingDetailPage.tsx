@@ -9,6 +9,7 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { SignaturePanel } from '../../components/ui/SignaturePanel';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -24,7 +25,7 @@ import { CommsPanel } from '../../components/comms/CommsPanel';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { EntityAutomationRuns } from '../../components/audit/EntityAutomationRuns';
 
-type TabId = 'overview' | 'capa' | 'evidence' | 'docs' | 'links' | 'history' | 'comms';
+type TabId = 'overview' | 'capa' | 'evidence' | 'docs' | 'signoff' | 'links' | 'history' | 'comms';
 
 const CAPA_STAGE_TONE: Record<string, BadgeTone> = {
   IDENTIFIED: 'neutral', IMPLEMENTING: 'info', OWNER_TESTED: 'primary',
@@ -64,6 +65,7 @@ export function FindingDetailPage() {
     { id: 'capa',     label: t('detailTabCapa') },
     { id: 'evidence', label: t('detailTabEvidence') },
     { id: 'docs',     label: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },
+    { id: 'signoff',  label: lang === 'ar' ? 'الاعتماد' : 'Sign-off' },
     { id: 'links',    label: t('detailTabLinks') },
     { id: 'history',  label: t('detailTabHistory') },
     { id: 'comms',    label: t('detailTabComms') },
@@ -179,6 +181,11 @@ export function FindingDetailPage() {
             <div style={{ borderTop: '1px solid var(--border)' }} />
             <ControlMappingPicker entityType="AUDIT_FINDING" entityId={item.id} />
           </div>
+        </Card>
+      )}
+      {tab === 'signoff' && (
+        <Card title={lang === 'ar' ? 'اعتماد الملاحظة' : 'Finding sign-off'} Icon={Stamp}>
+          <SignaturePanel entityType="AUDIT_FINDING" entityId={item.id} />
         </Card>
       )}
       {tab === 'links' && (

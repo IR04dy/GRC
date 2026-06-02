@@ -9,6 +9,7 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { SignaturePanel } from '../../components/ui/SignaturePanel';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { EvidenceReadinessPanel } from '../../components/ui/EvidenceReadinessPanel';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -20,7 +21,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { VENDORS, VENDOR_ASSESSMENTS_BY_ID, VENDOR_CONTRACTS_BY_ID } from '../tprm/mockTprm';
 
-type TabId = 'overview' | 'assessments' | 'contracts' | 'docs' | 'links' | 'activity';
+type TabId = 'overview' | 'assessments' | 'contracts' | 'docs' | 'signoff' | 'links' | 'activity';
 
 const RISK_TONE: Record<string, BadgeTone> = {
   LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger',
@@ -58,6 +59,7 @@ export function VendorDetailPage() {
     { id: 'assessments', label: t('detailTabAssessments') },
     { id: 'contracts',   label: t('detailTabContracts') },
     { id: 'docs',        label: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },
+    { id: 'signoff',     label: lang === 'ar' ? 'الاعتماد' : 'Sign-off' },
     { id: 'links',       label: t('detailTabLinks') },
     { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
@@ -172,6 +174,11 @@ export function VendorDetailPage() {
               <EvidenceReadinessPanel entityType="TPRM_VENDOR" entityId={item.id} />
             </div>
           </div>
+        </Card>
+      )}
+      {tab === 'signoff' && (
+        <Card title={lang === 'ar' ? 'اعتماد المورّد' : 'Vendor sign-off'} Icon={CheckCheck}>
+          <SignaturePanel entityType="TPRM_VENDOR" entityId={item.id} />
         </Card>
       )}
       {tab === 'links' && (

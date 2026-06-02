@@ -9,6 +9,7 @@ import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { SignaturePanel } from '../../components/ui/SignaturePanel';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -21,7 +22,7 @@ import {
   DPIAS, DPIA_QUESTIONS_BY_ID, DPIA_MITIGATIONS_BY_ID, DPIA_REVIEWS_BY_ID,
 } from '../privacy/mockPrivacy';
 
-type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'docs' | 'links' | 'activity';
+type TabId = 'overview' | 'questions' | 'mitigations' | 'reviews' | 'docs' | 'signoff' | 'links' | 'activity';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', IN_REVIEW: 'warning', APPROVED: 'success', REJECTED: 'danger', EXPIRED: 'neutral',
@@ -63,6 +64,7 @@ export function DpiaDetailPage() {
     { id: 'mitigations', label: t('detailTabMitigations') },
     { id: 'reviews',     label: t('detailTabReviews') },
     { id: 'docs',        label: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },
+    { id: 'signoff',     label: lang === 'ar' ? 'الاعتماد' : 'Sign-off' },
     { id: 'links',       label: t('detailTabLinks') },
     { id: 'activity',    label: lang === 'ar' ? 'سجل النشاط' : 'Activity' },
   ];
@@ -195,6 +197,11 @@ export function DpiaDetailPage() {
             <div style={{ borderTop: '1px solid var(--border)' }} />
             <ControlMappingPicker entityType="DPIA" entityId={item.id} />
           </div>
+        </Card>
+      )}
+      {tab === 'signoff' && (
+        <Card title={lang === 'ar' ? 'اعتماد تقييم الأثر' : 'DPIA sign-off'} Icon={CheckCheck}>
+          <SignaturePanel entityType="DPIA" entityId={item.id} />
         </Card>
       )}
       {tab === 'links' && (
