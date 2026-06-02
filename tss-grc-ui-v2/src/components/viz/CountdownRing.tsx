@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ShieldCheck } from 'lucide-react';
+import { DEFAULT_GAUGE_STROKE } from '../../lib/gaugeSizes';
 
 /**
  * CountdownRing — a live, self-depleting regulatory-deadline clock.
@@ -56,7 +57,7 @@ export function CountdownRing({
   sealed = false,
   sealLabel,
   size = 168,
-  thickness = 13,
+  thickness = DEFAULT_GAUGE_STROKE,
   live = true,
   caption,
   rtl = false,

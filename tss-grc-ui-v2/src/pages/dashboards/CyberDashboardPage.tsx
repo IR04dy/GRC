@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { LineChart } from '../../components/charts/LineChart';
 import { RadialGauge } from '../../components/viz/RadialGauge';
+import { GAUGE_MD } from '../../lib/gaugeSizes';
 import { useI18n } from '../../lib/i18n';
 import { cyberApi, dashboardApi, type CyberDashboardDto } from '../../lib/api';
 
@@ -142,7 +143,7 @@ export function CyberDashboardPage() {
               { code: 'CCC', pct: stats.cccScore ?? 0 },
               { code: 'OTCC', pct: stats.otccScore ?? 0 },
             ].map(f => (
-              <RadialGauge key={f.code} value={f.pct} max={100} size={96} thickness={9}
+              <RadialGauge key={f.code} value={f.pct} max={100} {...GAUGE_MD}
                 caption={f.code} unit="%" rtl={isAr}
                 aria-label={`${f.code} ${isAr ? 'الالتزام' : 'compliance'} ${f.pct}%`}
                 bands={[

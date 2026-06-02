@@ -5,6 +5,7 @@ import { DashboardLoading, DashboardError } from '../../components/dashboard/Das
 import { Badge } from '../../components/ui/Badge';
 import { LineChart } from '../../components/charts/LineChart';
 import { RadialGauge } from '../../components/viz/RadialGauge';
+import { GAUGE_MD } from '../../lib/gaugeSizes';
 import { useI18n } from '../../lib/i18n';
 import { bcmApi, dashboardApi } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
@@ -90,7 +91,7 @@ export function BcmDashboardPage() {
             { label: 'BCP', v: stats.bcpCompletionPercent ?? 0 },
             { label: 'DRP', v: stats.drpCompletionPercent ?? 0 },
           ].map(g => (
-            <RadialGauge key={g.label} value={g.v} max={100} size={108} thickness={10}
+            <RadialGauge key={g.label} value={g.v} max={100} {...GAUGE_MD}
               caption={g.label} unit="%" rtl={isAr} bands={readinessBands}
               aria-label={`${g.label} ${isAr ? 'اكتمال' : 'completion'} ${g.v}%`} />
           ))}

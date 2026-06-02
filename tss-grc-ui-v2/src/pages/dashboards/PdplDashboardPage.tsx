@@ -5,6 +5,7 @@ import { DashboardLoading, DashboardError } from '../../components/dashboard/Das
 import { Badge } from '../../components/ui/Badge';
 import { LineChart } from '../../components/charts/LineChart';
 import { RadialGauge } from '../../components/viz/RadialGauge';
+import { GAUGE_MD } from '../../lib/gaugeSizes';
 import { useI18n } from '../../lib/i18n';
 import { privacyApi, dashboardApi } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
@@ -117,7 +118,7 @@ export function PdplDashboardPage() {
         const slaHealth = open > 0 ? Math.round(((open - breaches) / open) * 100) : 100;
         return (
           <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-            <RadialGauge value={slaHealth} max={100} size={96} thickness={9} unit="%" rtl={isAr}
+            <RadialGauge value={slaHealth} max={100} {...GAUGE_MD} unit="%" rtl={isAr}
               caption={isAr ? 'ضمن SLA' : 'within SLA'}
               aria-label={`${isAr ? 'صحة SLA لطلبات أصحاب البيانات' : 'DSR SLA health'} ${slaHealth}%`}
               bands={[

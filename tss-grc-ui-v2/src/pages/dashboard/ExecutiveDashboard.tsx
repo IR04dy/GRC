@@ -11,6 +11,7 @@ import { useI18n } from '../../lib/i18n';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { TimeSeries, type TimeSeriesPoint } from '../../components/viz/TimeSeries';
 import { RadialGauge } from '../../components/viz/RadialGauge';
+import { GAUGE_HERO } from '../../lib/gaugeSizes';
 import { Progress } from '../../components/ui/Progress';
 import { dashboardApi, type DashboardStats, type TrendPoint } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
@@ -226,8 +227,7 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
         <RadialGauge
           value={posture}
           max={100}
-          size={172}
-          thickness={15}
+          {...GAUGE_HERO}
           unit="/100"
           rtl={isAr}
           caption={isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC Posture Score'}

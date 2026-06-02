@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { useCountUp } from '../../lib/useCountUp';
+import { DEFAULT_GAUGE_STROKE } from '../../lib/gaugeSizes';
 
 /**
  * RadialGauge — the platform's "arc-as-number" hero primitive.
@@ -64,7 +65,7 @@ export function RadialGauge({
   value,
   max = 100,
   size = 168,
-  thickness = 14,
+  thickness = DEFAULT_GAUGE_STROKE,
   sweepDeg = 240,
   bands,
   valueColor,
