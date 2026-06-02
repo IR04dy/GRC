@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 /**
  * DriftChart — model-monitoring drift over time with a threshold band.
@@ -41,8 +41,29 @@ const PAD_R = 12;
 const PAD_T = 12;
 const PAD_B = 26;
 
-export function DriftChart({ points, metricName, ar = false, width = 520, height = 240 }: DriftChartProps) {
+export function DriftChart({ points, metricName, ar = false, width: widthProp, height = 240 }: DriftChartProps) {
   const [hover, setHover] = useState<number | null>(null);
+  // Fluid by default: measure the container so a time-series stretches to fill
+  // its card instead of leaving a fixed-520px gutter (review DT6). An explicit
+  // `width` prop still wins. Callback ref so the observer attaches even though
+  // the component early-returns null when there are no points.
+  const [measuredW, setMeasuredW] = useState(0);
+  const roRef = useRef<ResizeObserver | null>(null);
+  const setWrap = useCallback((node: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    if (node && widthProp == null) {
+      const measure = () => {
+        const w = node.getBoundingClientRect().width;
+        if (w) setMeasuredW(Math.round(w));
+      };
+      measure(); // synchronous read on attach (node is laid out at commit)
+      const ro = new ResizeObserver(measure);
+      ro.observe(node);
+      roRef.current = ro;
+    }
+  }, [widthProp]);
+  const width = widthProp ?? (measuredW > 0 ? Math.max(280, measuredW) : 520);
+
   const pts = [...points].sort((a, b) => (a.observedAt < b.observedAt ? -1 : 1));
   if (pts.length === 0) return null;
 
@@ -76,11 +97,11 @@ export function DriftChart({ points, metricName, ar = false, width = 520, height
   const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2));
 
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div ref={setWrap} style={{ width: '100%' }}>
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img"
         aria-label={ar ? `مخطط انحراف${metricName ? ' لـ ' + metricName : ''} عبر ${n} ملاحظة`
                        : `Drift chart${metricName ? ' for ' + metricName : ''} over ${n} observations`}
-        style={{ maxWidth: '100%' }}>
+        style={{ display: 'block', width: '100%', maxWidth: '100%' }}>
         <defs>
           <linearGradient id="drift-area" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.18" />

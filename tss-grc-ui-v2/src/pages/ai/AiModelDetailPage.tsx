@@ -548,7 +548,7 @@ function DriftTab({ drift, lang, onAck }: {
   return (
     <>
       {dominant && dominant[1].length >= 2 && (
-        <div style={{ marginBottom: 14, padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface)' }}>
+        <div style={{ marginBottom: 14 }}>
           <div style={{ font: '700 12px var(--font-sans)', color: 'var(--ink-2)', marginBottom: 6 }}>
             {lang === 'ar' ? `انحراف المقياس: ${dominant[0]}` : `Metric drift: ${dominant[0]}`}
           </div>
