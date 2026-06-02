@@ -45,7 +45,7 @@ export function DetailHeader({
           </div>
           {sub && <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.5 }}>{sub}</div>}
         </div>
-        {actions && <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>{actions}</div>}
+        {actions && <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignSelf: 'center' }}>{actions}</div>}
       </div>
     </header>
   );

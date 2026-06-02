@@ -13,7 +13,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = 'primary', size = 'md', Icon, children, className, type, ...rest }: ButtonProps) {
-  const iconSize = size === 'sm' ? 14 : size === 'lg' ? 17 : 16;
+  const iconSize = size === 'sm' ? 14 : size === 'lg' ? 18 : 16;
   // Default to type="button" so a Button inside a <form> does NOT auto-submit
   // the surrounding form on click. Callers that want submit-behaviour
   // (e.g. FormModal's main action) pass type="submit" explicitly.

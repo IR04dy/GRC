@@ -275,6 +275,7 @@ function KpiTile({ Icon, label, value, to, tone, spark, delta, segments }: KpiTi
   return (
     <Link to={to} style={{
       display: 'flex', flexDirection: 'column', gap: 10,
+      minHeight: 132,
       padding: 16, borderRadius: 'var(--r-md)',
       background: 'var(--surface)',
       border: '1px solid var(--border)',
