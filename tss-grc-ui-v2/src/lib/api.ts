@@ -1807,6 +1807,9 @@ export interface EvidenceItemDto {
   descriptionEn?: string; descriptionAr?: string;
   evidenceType: string; status?: string;
   collectedDate?: string; expiryDate?: string;
+  /** When the evidence was actually collected (maps to collected_at). */
+  collectedAt?: string;
+  validFrom?: string; validTo?: string; isExpired?: boolean; createdAt?: string;
   fileName?: string; fileSize?: number; mimeType?: string;
 }
 export interface EvidenceItemRequest {

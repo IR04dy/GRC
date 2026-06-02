@@ -8,6 +8,7 @@ import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
+import { FreshnessCalendar } from '../../components/viz/FreshnessCalendar';
 import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
@@ -91,6 +92,7 @@ function dueCell(r: EvidenceRequestDto, lang: string) {
 
 export function EvidencePage() {
   const { t, lang } = useI18n();
+  const ar = lang === 'ar';
   const toast = useToast();
   const [tab, setTab] = useState<TabId>('overview');
   const [open, setOpen] = useState(false);
@@ -348,6 +350,25 @@ export function EvidencePage() {
 
       {tab === 'overview' && (
         <>
+          {items.data.some(i => i.collectedAt ?? i.collectedDate ?? i.createdAt) && (
+            <div style={{ marginBottom: 16 }}>
+              <Card title={ar ? 'وتيرة جمع الأدلة — ٦ أشهر' : 'Evidence collection cadence — 6 months'} Icon={BarChart3}
+                action={<Badge tone={expiredItems.length > 0 ? 'danger' : 'success'}>{expiredItems.length} {ar ? 'منتهية' : 'expired'}</Badge>}>
+                <FreshnessCalendar
+                  ar={ar}
+                  weeks={26}
+                  data={items.data
+                    .map(i => i.collectedAt ?? i.collectedDate ?? i.createdAt)
+                    .filter((d): d is string => !!d)
+                    .map(d => ({ date: d, value: 1 }))} />
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.6 }}>
+                  {ar
+                    ? 'كل خلية = الأدلة المُجمَّعة في ذلك اليوم. الفجوات الباهتة المتتالية تكشف توقّف الجمع («الفترة الباردة») — وهو السبب الأول لفشل التدقيق.'
+                    : 'Each cell = evidence collected that day. A run of faint cells is a collection lapse (the "cold streak") — the #1 cause of audit failure.'}
+                </div>
+              </Card>
+            </div>
+          )}
           <div className="dash-grid">
             <Card title={t('evidenceTabCatalog')} Icon={BarChart3} action={<Badge tone="primary">By framework</Badge>}>
               {frameworks.length === 0

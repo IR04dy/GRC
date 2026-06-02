@@ -30,5 +30,6 @@ public record EvidenceItemResponse(
     Long fileSize,
     String mimeType,
     LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    LocalDateTime updatedAt,
+    LocalDateTime collectedAt
 ) {}

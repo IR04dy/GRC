@@ -417,7 +417,7 @@ public class EvidenceItemService {
                 e.getOwnerId(), ownerName, e.getVersion(),
                 e.getValidFrom(), e.getValidTo(), isExpired,
                 e.getStatus(), e.getFileName(), e.getFileSize(), e.getMimeType(),
-                e.getCreatedAt(), e.getUpdatedAt()
+                e.getCreatedAt(), e.getUpdatedAt(), e.getCollectedAt()
         );
     }
 }

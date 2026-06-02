@@ -4,6 +4,7 @@ import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidg
 import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
 import { LineChart } from '../../components/charts/LineChart';
+import { RadialGauge } from '../../components/viz/RadialGauge';
 import { useI18n } from '../../lib/i18n';
 import { privacyApi, dashboardApi } from '../../lib/api';
 import { useDashboardLoader } from '../../lib/useDashboardLoader';
@@ -110,16 +111,31 @@ export function PdplDashboardPage() {
       title: isAr ? 'طلبات أصحاب البيانات' : 'Data subject requests',
       badge: (stats.dsrSlaBreaches ?? 0) > 0 ? String(stats.dsrSlaBreaches) : undefined,
       badgeTone: 'danger',
-      body: (
-        <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'طلبات مفتوحة' : 'Open requests'}: <strong>{stats.dsrOpen}</strong></div>
-          <div>{isAr ? 'خرق SLA' : 'SLA breaches'}: <Badge tone="danger">{stats.dsrSlaBreaches}</Badge></div>
-          <div className="text-muted" style={{ marginTop: 4 }}>
-            {isAr ? 'SLA 30 يوم (PDPL مادة 18) — قابل للتمديد 60 يوماً بمبرر.'
-                  : '30-day SLA (PDPL Art. 18) — extendable by 60 days with justification.'}
+      body: (() => {
+        const open = stats.dsrOpen ?? 0;
+        const breaches = Math.min(stats.dsrSlaBreaches ?? 0, open);
+        const slaHealth = open > 0 ? Math.round(((open - breaches) / open) * 100) : 100;
+        return (
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+            <RadialGauge value={slaHealth} max={100} size={96} thickness={9} unit="%" rtl={isAr}
+              caption={isAr ? 'ضمن SLA' : 'within SLA'}
+              aria-label={`${isAr ? 'صحة SLA لطلبات أصحاب البيانات' : 'DSR SLA health'} ${slaHealth}%`}
+              bands={[
+                { from: 0, to: 70, color: 'var(--danger)' },
+                { from: 70, to: 90, color: 'var(--warning)' },
+                { from: 90, to: 101, color: 'var(--success)' },
+              ]} />
+            <div className="text-xs" style={{ lineHeight: 1.8, minWidth: 130 }}>
+              <div>{isAr ? 'طلبات مفتوحة' : 'Open requests'}: <strong>{stats.dsrOpen}</strong></div>
+              <div>{isAr ? 'خرق SLA' : 'SLA breaches'}: <Badge tone="danger">{stats.dsrSlaBreaches}</Badge></div>
+              <div className="text-muted" style={{ marginTop: 4 }}>
+                {isAr ? 'SLA 30 يوم (PDPL مادة 18) — قابل للتمديد 60 يوماً بمبرر.'
+                      : '30-day SLA (PDPL Art. 18) — extendable by 60 days with justification.'}
+              </div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      })(),
       href: '/privacy?tab=dsr',
     },
     {

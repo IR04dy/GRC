@@ -4,6 +4,7 @@ import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidg
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { LineChart } from '../../components/charts/LineChart';
+import { RadialGauge } from '../../components/viz/RadialGauge';
 import { useI18n } from '../../lib/i18n';
 import { cyberApi, dashboardApi, type CyberDashboardDto } from '../../lib/api';
 
@@ -134,14 +135,27 @@ export function CyberDashboardPage() {
       title: isAr ? 'النتائج حسب الإطار' : 'Score by framework',
       body: (
         <div className="cyber-dashboard__frameworks">
-          <FrameworkRow code="ECC v2" pct={stats.eccScore} />
-          <FrameworkRow code="CSCC" pct={stats.csccScore} />
-          <FrameworkRow code="CCC" pct={stats.cccScore} />
-          <FrameworkRow code="OTCC" pct={stats.otccScore} />
+          <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
+            {[
+              { code: 'ECC v2', pct: stats.eccScore ?? 0 },
+              { code: 'CSCC', pct: stats.csccScore ?? 0 },
+              { code: 'CCC', pct: stats.cccScore ?? 0 },
+              { code: 'OTCC', pct: stats.otccScore ?? 0 },
+            ].map(f => (
+              <RadialGauge key={f.code} value={f.pct} max={100} size={96} thickness={9}
+                caption={f.code} unit="%" rtl={isAr}
+                aria-label={`${f.code} ${isAr ? 'الالتزام' : 'compliance'} ${f.pct}%`}
+                bands={[
+                  { from: 0, to: 60, color: 'var(--danger)' },
+                  { from: 60, to: 85, color: 'var(--warning)' },
+                  { from: 85, to: 101, color: 'var(--success)' },
+                ]} />
+            ))}
+          </div>
           <div className="cyber-dashboard__hint text-muted">
             {isAr
               ? 'الـ0٪ يعني أن دورة التقييم لم تُفتح بعد لذلك الإطار.'
-              : 'A 0% bar means the assessment cycle hasn’t opened yet for that framework.'}
+              : 'A 0% ring means the assessment cycle hasn’t opened yet for that framework.'}
           </div>
         </div>
       ),
@@ -202,20 +216,6 @@ export function CyberDashboardPage() {
       kpis={kpis}
       widgets={widgets}
     />
-  );
-}
-
-function FrameworkRow({ code, pct }: { code: string; pct?: number }) {
-  const value = pct ?? 0;
-  const tone = tonePct(pct);
-  return (
-    <div className="framework-row">
-      <span className="mono framework-row__code">{code}</span>
-      <div className="framework-row__bar">
-        <div className="framework-row__fill" data-tone={tone} style={{ width: `${value}%` }} />
-      </div>
-      <span className="mono framework-row__value">{value}%</span>
-    </div>
   );
 }
 
