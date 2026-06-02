@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cloud, Building2, ShieldCheck, ShieldAlert, Database, LogOut } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -8,6 +8,9 @@ import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Kpi } from '../../components/ui/Kpi';
+import { Card } from '../../components/ui/Card';
+import { BubbleQuadrant } from '../../components/viz/BubbleQuadrant';
+import { severityColor } from '../../lib/ragColors';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
@@ -30,6 +33,7 @@ export function OutsourcingDashboardPage() {
   const demoMode = !isAuthenticated();
 
   const [data, setData] = useState<DashboardResponse | null>(null);
+  const [arrangements, setArrangements] = useState<ArrangementResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,6 +44,8 @@ export function OutsourcingDashboardPage() {
       try {
         const r = await outsourcingCloudApi.dashboard();
         if (!cancelled) setData(r);
+        const list = await outsourcingCloudApi.listArrangements().catch(() => [] as ArrangementResponse[]);
+        if (!cancelled) setArrangements(list);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message :
@@ -51,6 +57,24 @@ export function OutsourcingDashboardPage() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // SAMA materiality × criticality matrix — bubble per arrangement, size = annual
+  // spend, colour = risk rating; the MATERIAL × core-activity quadrant is tinted
+  // (the SAMA non-objection zone). Real data from the arrangements list.
+  const matrixPoints = useMemo(() => {
+    if (!arrangements.length) return [];
+    const maxSpend = Math.max(1, ...arrangements.map(x => x.annualSpendSar ?? 0));
+    const jit = (id: number, seed: number) => (((id * seed) % 100) / 100 - 0.5) * 0.7;
+    return arrangements.map(a => ({
+      id: a.id,
+      x: (a.isCoreActivity ? 4 : 1.6) + jit(a.id, 37),
+      y: (a.materiality === 'MATERIAL' ? 4 : 1.6) + jit(a.id, 53),
+      size: 6 + Math.round((Math.sqrt(a.annualSpendSar ?? 0) / Math.sqrt(maxSpend)) * 10),
+      color: severityColor(a.riskRating),
+      label: a.reference,
+      meta: lang === 'ar' ? a.providerLegalNameAr : a.providerLegalNameEn,
+    }));
+  }, [arrangements, lang]);
 
   const cols: Column<ArrangementResponse>[] = [
     {
@@ -154,6 +178,26 @@ export function OutsourcingDashboardPage() {
           Icon={LogOut}
         />
       </div>
+
+      {matrixPoints.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Card title={lang === 'ar' ? 'مصفوفة ساما: الجوهرية × الأهمية' : 'SAMA materiality × criticality matrix'}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <BubbleQuadrant
+                ar={lang === 'ar'}
+                xMax={5} yMax={5}
+                xLabel={lang === 'ar' ? 'الأهمية (نشاط أساسي)' : 'Criticality (core activity)'}
+                yLabel={lang === 'ar' ? 'الجوهرية' : 'Materiality'}
+                xTicks={lang === 'ar' ? ['غير أساسي', 'أساسي'] : ['Non-core', 'Core']}
+                yTicks={lang === 'ar' ? ['غير جوهري', 'جوهري'] : ['Non-material', 'Material']}
+                dangerQuadrant
+                points={matrixPoints}
+                onPointClick={(p) => nav(`/tprm/outsourcing/${p.id}`)}
+              />
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 16 }}>
         <section style={{ padding: 16, borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
