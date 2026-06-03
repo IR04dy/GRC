@@ -126,6 +126,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'obligations',  to: '/compliance/obligations', Icon: FileCheck2,     labelKey: 'obligationRegisterSidebar' },
       { id: 'reg-library',  to: '/regulatory/library',     Icon: Landmark,       labelKey: 'regLibrarySidebar' },
       { id: 'reg-change',   to: '/regulatory-change',      Icon: Newspaper,      labelKey: 'regChangeSidebar' },
+      { id: 'reg-horizon',  to: '/regulatory/horizon',     Icon: Compass,        labelKey: 'regHorizonSidebar' },
       { id: 'ctrl-library', to: '/controls/library',       Icon: ShieldCheck,    labelKey: 'ctrlLibrarySidebar' },
       { id: 'crosswalk',    to: '/control-crosswalk',      Icon: GitBranch,      labelKey: 'cwSidebar' },
       { id: 'ccm-dash',     to: '/ccm/dashboard',          Icon: Activity,       labelKey: 'ccmDashSidebar' },

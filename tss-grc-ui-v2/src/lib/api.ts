@@ -1595,6 +1595,38 @@ export const complianceApi = {
   auditEngagementStats:   () => api.get<Record<string, number>>('/api/v1/compliance/audit-engagements/stats'),
 };
 
+// ─── Regulatory horizon scanner (Sprint-8 Slice 8-B) ─────────────────────────
+// GET /api/v1/compliance/regulatory-horizon — tenant-wide snapshot of every
+// not-yet-closed regulatory change bucketed by effective date, with authority
+// + impact distributions for an executive horizon dashboard.
+export type HorizonBucket = 'PAST_DUE' | 'IMMINENT' | 'NEAR_TERM' | 'QUARTER' | 'HORIZON';
+
+export interface RegulatoryHorizonRowDto {
+  id: number;
+  sourceAuthority: string;        // SAMA / NCA / SDAIA / CMA / NCEMA / ZATCA / MOH / OTHER
+  titleEn: string;
+  titleAr?: string;
+  citation?: string;
+  effectiveDate?: string;
+  daysUntilEffective: number;     // negative for PAST_DUE
+  bucket: HorizonBucket;
+  applicability: string;          // UNKNOWN / APPLICABLE / NOT_APPLICABLE / PARTIAL
+  impactLevel: string;            // UNKNOWN / LOW / MEDIUM / HIGH / CRITICAL
+  status: string;
+  assignedToId?: number;
+}
+export interface RegulatoryHorizonDto {
+  evaluatedOn: string;
+  activeChangeCount: number;
+  byBucket: Record<string, number>;
+  bySourceAuthority: Record<string, number>;
+  byImpactLevel: Record<string, number>;
+  rows: RegulatoryHorizonRowDto[];
+}
+export const regulatoryHorizonApi = {
+  scan: () => api.get<RegulatoryHorizonDto>('/api/v1/compliance/regulatory-horizon'),
+};
+
 // ─── Compliance frameworks (IA-1 framework anchor) ───────────────────────────
 export interface FrameworkDto {
   id: number; code: string;

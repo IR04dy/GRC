@@ -621,6 +621,66 @@ for auth, title_en, title_ar, cite, applic, impact, status, days_ago in REG_CHAN
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# Regulatory HORIZON feed — in-flight changes for the horizon scanner.
+#
+# The horizon scanner (GET /api/v1/compliance/regulatory-horizon) only
+# surfaces rows whose status is one of the canonical state-machine values
+# NEW | APPLICABILITY_ASSESSED | IMPACT_ASSESSED | CONTROLS_UPDATED and
+# whose `applicability` is a real enum value. These rows are authored with
+# canonical values + explicit effective dates so the horizon view shows a
+# full spread across PAST_DUE / IMMINENT / NEAR_TERM / QUARTER / HORIZON.
+# ──────────────────────────────────────────────────────────────────────
+section("compliance.regulatory_changes — horizon scanner feed (in-flight)")
+
+REG_HORIZON = [
+    # (authority, title_en, title_ar, citation, applicability, impact, status, eff_offset_days)
+    ("SAMA",  "Counter-Fraud Framework — real-time transaction monitoring mandate",
+              "إطار مكافحة الاحتيال — إلزام المراقبة الآنية للمعاملات",
+              "SAMA/CFF/2026/HZN",     "APPLICABLE", "CRITICAL", "CONTROLS_UPDATED",       -45),
+    ("NCA",   "Essential Cybersecurity Controls ECC-2 — 7-day critical CVE remediation",
+              "الضوابط الأساسية للأمن السيبراني ECC-2 — معالجة الثغرات الحرجة خلال 7 أيام",
+              "NCA/ECC-2/MTTR/HZN",    "APPLICABLE", "CRITICAL", "IMPACT_ASSESSED",          12),
+    ("SDAIA", "PDPL cross-border transfer — standard contractual clauses v1",
+              "نقل البيانات خارج الحدود — الشروط التعاقدية النموذجية الإصدار 1",
+              "SDAIA/SCC/2026/HZN",    "APPLICABLE", "HIGH",     "APPLICABILITY_ASSESSED",   25),
+    ("ZATCA", "E-Invoicing Phase 2 — Wave 24 onboarding",
+              "الفوترة الإلكترونية المرحلة 2 — انضمام الموجة 24",
+              "ZATCA/E-INV/W24/HZN",   "PARTIAL",    "MEDIUM",   "NEW",                      60),
+    ("CMA",   "Sustainability disclosure — limited assurance requirement FY26",
+              "إفصاح الاستدامة — اشتراط التأكيد المحدود للعام المالي 2026",
+              "CMA/SUST/ASSURE/HZN",   "APPLICABLE", "HIGH",     "IMPACT_ASSESSED",          80),
+    ("SAMA",  "Operational Resilience — impact tolerance thresholds for critical services",
+              "المرونة التشغيلية — حدود تحمّل الأثر للخدمات الحرجة",
+              "SAMA/OPRES/IT/HZN",     "APPLICABLE", "HIGH",     "APPLICABILITY_ASSESSED",  120),
+    ("NCA",   "Operational Technology Cybersecurity Controls OTCC-1 — phase 1",
+              "ضوابط الأمن السيبراني للأنظمة التشغيلية OTCC-1 — المرحلة 1",
+              "NCA/OTCC-1/HZN",        "PARTIAL",    "MEDIUM",   "NEW",                     150),
+    ("NCEMA", "Business Continuity Management Standard — NCEMA 7000 refresh",
+              "معيار إدارة استمرارية الأعمال — تحديث NCEMA 7000",
+              "NCEMA/7000/2027/HZN",   "APPLICABLE", "MEDIUM",   "NEW",                     220),
+    ("SDAIA", "AI system registration & risk-tiering — high-risk use cases",
+              "تسجيل أنظمة الذكاء الاصطناعي وتصنيف المخاطر — الحالات عالية الخطورة",
+              "SDAIA/AI-REG/2027/HZN", "APPLICABLE", "HIGH",     "APPLICABILITY_ASSESSED",  300),
+]
+for auth, title_en, title_ar, cite, applic, impact, status, eff in REG_HORIZON:
+    run(
+        f"""
+        IF NOT EXISTS (SELECT 1 FROM compliance.regulatory_changes
+                       WHERE citation = ? AND organisation_id = ? AND is_deleted = 0)
+        INSERT INTO compliance.regulatory_changes (external_id, organisation_id, source_authority,
+            title_en, title_ar, citation, summary_ar, published_date, effective_date,
+            applicability, impact_level, status, controls_updated_count, is_deleted, created_at)
+        VALUES (NEWID(), ?, ?, ?, ?, ?, ?, DATEADD(day, -30, CAST(GETDATE() AS DATE)),
+            DATEADD(day, {eff}, CAST(GETDATE() AS DATE)), ?, ?, ?, 0, 0, GETDATE())
+        """,
+        cite, ORG_TSS,
+        ORG_TSS, auth, title_en, title_ar, cite,
+        f"تغيير تنظيمي من {auth} قيد المعالجة — يتطلّب تقييم الانطباق وتحديث الضوابط قبل تاريخ النفاذ.",
+        applic, impact, status,
+        label=f"horizon: [{auth}] {title_en[:50]}",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # ESG materiality topics — CMA Art.91-94 themes
 # ──────────────────────────────────────────────────────────────────────
 section("sust.material_topic — CMA Art.91-94 materiality matrix")

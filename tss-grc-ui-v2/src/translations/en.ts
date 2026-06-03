@@ -4606,6 +4606,7 @@ export const en = {
   connectorsTitle:             'Connectors',
   auditLogTitle:               'Audit log',
   issuesTitle:                 'Issues',
+  regHorizonSidebar:           'Regulatory horizon',
   connectorsSub:               'Automated intake — vulnerability scanners, SIEM, regulator-watch feeds, attestation watchers',
   connectorsPageSub:           'These connectors auto-create register records or intake submissions without a human in the loop. Each is governed by a regulator anchor and a cadence; intake counts are 30-day rolling.',
   connectorsRegistryTitle:     'Connector registry',
