@@ -59,8 +59,8 @@ function storageKey(): string {
 }
 
 const DEFAULT_CONFIG: WhiteLabelConfig = {
-  organisationNameEn: 'TSS GRC Platform',
-  organisationNameAr: 'منصة الحوكمة والمخاطر والامتثال',
+  organisationNameEn: 'Trusted Cybersecurity Services',
+  organisationNameAr: 'الخدمات الموثوقة للأمن السيبراني',
   taglineEn: 'Saudi-first GRC platform',
   taglineAr: 'منصة الحوكمة والمخاطر والامتثال — صناعة سعودية',
   // Brand palette from styles/tokens.css. Previously these were
