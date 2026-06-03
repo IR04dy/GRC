@@ -13,7 +13,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Scale,
          ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
          Cloud, ChevronRight, ScrollText, Archive, GraduationCap,
-         Calculator, Radar,
+         Calculator, Radar, Spline,
          type LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -205,6 +205,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'privacy',    to: '/privacy',               Icon: Fingerprint,     labelKey: 'modPdpl' },
       { id: 'privacy-lc', to: '/privacy-lifecycle',     Icon: UserCog,         labelKey: 'prcSidebar' },
       { id: 'ropa',       to: '/ropa',                  Icon: Files,           labelKey: 'ropaSidebar' },
+      { id: 'data-flow',  to: '/privacy/data-flow',     Icon: Spline,          labelKey: 'dataFlowSidebar' },
       { id: 'data-lc',    to: '/data-lifecycle',        Icon: Compass,         labelKey: 'pdplExtSidebar' },
       { id: 'cyb-pdpl',   to: '/cyber-pdpl-bridge',     Icon: Workflow,        labelKey: 'cpbSidebar' },
       { id: 'dsa',        to: '/data-sharing',          Icon: Share2,          labelKey: 'dsaSidebar' },

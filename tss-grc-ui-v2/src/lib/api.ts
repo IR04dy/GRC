@@ -1133,6 +1133,42 @@ export const dependencyCascadeApi = {
     api.get<CascadeResult>(`/api/v1/bcm/dependency-cascade/${failedProcessId}`),
 };
 
+// ─── PDPL data-flow graph (Sprint-8 Slice 8-C) ───────────────────────────────
+// GET /api/v1/privacy/data-flow-graph — a node-link graph over the RoPA
+// (privacy.processing_activities): CATEGORY → ACTIVITY → COUNTRY + MECHANISM,
+// the SDAIA PDPL "where does personal data flow" picture a DPO needs for
+// inspections. Pure read aggregator; bilingual labels carried through.
+export interface DataFlowNode {
+  id: string;                          // "ACTIVITY:7" | "CATEGORY:HEALTH" | "COUNTRY:United States" | "MECHANISM:SCC"
+  type: string;                        // ACTIVITY | CATEGORY | COUNTRY | MECHANISM
+  labelEn: string;
+  labelAr: string;
+  attrs: Record<string, string>;       // ACTIVITY: legalBasis/status/specialCategoryFlag/retentionPeriodMonths · COUNTRY: adequacy
+}
+export interface DataFlowEdge {
+  source: string;
+  target: string;
+  relation: string;                    // USED_BY | TRANSFERS_TO | GOVERNED_BY
+  label?: string | null;               // adequacy tag for TRANSFERS_TO; null otherwise
+}
+export interface DataFlowSummary {
+  activityCount: number;
+  crossBorderActivityCount: number;
+  distinctDestinations: number;
+  categoryEdgeCount: number;
+  nodesByType: Record<string, number>;
+  categoryFrequency: Record<string, number>;
+  mechanismFrequency: Record<string, number>;
+}
+export interface DataFlowGraph {
+  nodes: DataFlowNode[];
+  edges: DataFlowEdge[];
+  summary: DataFlowSummary;
+}
+export const pdplDataFlowApi = {
+  graph: () => api.get<DataFlowGraph>('/api/v1/privacy/data-flow-graph'),
+};
+
 // ─── Cyber · Controls ───────────────────────────────────────────────────────
 export interface CyberControlDto {
   id: number; frameworkId?: number; frameworkName?: string; domain?: string;

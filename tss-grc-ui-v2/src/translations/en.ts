@@ -1386,6 +1386,7 @@ export const en = {
 
   // ROPA + consent — B2.
   ropaSidebar:             'ROPA',
+  dataFlowSidebar:         'Data-flow graph',
   // ─── Personal-data lifecycle (gap-analysis items 6 / 7 / 8) ────────
   // Renamed from the developer-internal "PDPL extensions". The three
   // features under this page are the three PDPL articles that govern
