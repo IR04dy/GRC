@@ -357,6 +357,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'ethics',     to: '/ethics',                     Icon: ShieldAlert,   labelKey: 'modEthics' },
       { id: 'wb-cases',   to: '/ethics/whistleblower/cases', Icon: Megaphone,     labelKey: 'whistleblowerSidebar' },
+      { id: 'wb-retal',   to: '/ethics/whistleblower/retaliation', Icon: ShieldCheck, labelKey: 'wbRetaliationSidebar' },
       { id: 'coi',        to: '/ethics/coi',                 Icon: Scale,         labelKey: 'coi.title' },
       { id: 'complaints', to: '/complaints',                 Icon: MessageSquare, labelKey: 'complaints.sidebar' },
       { id: 'fraud',      to: '/fraud/dashboard',            Icon: ShieldX,       labelKey: 'fraud.sidebar' },

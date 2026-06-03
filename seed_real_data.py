@@ -703,6 +703,54 @@ for code, domain, ten, tar, ctype, auto, freq, den, dar in CONTROL_LIB:
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# ethics.whistleblower_retaliation_complaint — give the retaliation
+# protection sub-flow (GET/POST /api/v1/ethics/whistleblower/retaliation)
+# a worked example. The table ships empty, so the protector register was
+# blank. This links four retaliation claims to the seeded WB cases and
+# spreads them across the full state machine (RECEIVED → VALIDATED →
+# UPHELD / DISMISSED) so the validate / uphold / dismiss actions all have
+# a row to act on. related_case_id is resolved by case_code so this stays
+# robust to identity drift. row_version is an auto rowversion — never
+# inserted. Parameterised pyodbc (Arabic-safe), idempotent, SET NOCOUNT ON.
+# ──────────────────────────────────────────────────────────────────────
+section("ethics.whistleblower_retaliation_complaint — protector sub-flow")
+
+RETALIATION = [
+    # (case_code, claimant_name, claimed_actor, claimed_action, period_start, status)
+    ("WB-2026-002", "Layla Al-Harbi", "Retail-Ops Line Manager",
+     "Reassigned to night shifts and excluded from team meetings two weeks after filing the report.",
+     "2026-03-01", "RECEIVED"),
+    ("WB-2026-001", None, "Finance Supervisor",
+     "Issued an unjustified negative performance review shortly after the fraud disclosure.",
+     "2026-02-15", "VALIDATED"),
+    ("WB-2026-003", "Omar Al-Qahtani", "Procurement Director",
+     "Threatened non-renewal of the reporter's fixed-term contract following the conflict-of-interest report.",
+     "2026-04-05", "UPHELD"),
+    ("WB-2026-002", "Sara Al-Otaibi", "Department Head",
+     "Denied an approved training course and relocated the reporter's desk to an isolated area.",
+     "2026-03-20", "DISMISSED"),
+]
+for case_code, claimant, actor, action, period, status in RETALIATION:
+    run(
+        """
+        SET NOCOUNT ON;
+        DECLARE @cid BIGINT = (SELECT TOP 1 id FROM ethics.whistleblower_case
+                               WHERE organisation_id=? AND case_code=? AND is_deleted=0);
+        IF @cid IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM ethics.whistleblower_retaliation_complaint
+            WHERE organisation_id=? AND related_case_id=@cid AND claimed_actor=? AND is_deleted=0)
+        INSERT INTO ethics.whistleblower_retaliation_complaint
+            (organisation_id, related_case_id, claimant_name, claimed_actor, claimed_action,
+             claimed_at_period_start, status, is_deleted, created_at)
+        VALUES (?, @cid, ?, ?, ?, CAST(? AS date), ?, 0, SYSUTCDATETIME())
+        """,
+        ORG_TSS, case_code,
+        ORG_TSS, actor,
+        ORG_TSS, claimant, actor, action, period, status,
+        label=f"retaliation: {case_code} ({status})",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # Vendor onboarding rows — link to scm.vendors
 # ──────────────────────────────────────────────────────────────────────
 section("scm.vendor_onboarding — supplier onboarding pipeline")
