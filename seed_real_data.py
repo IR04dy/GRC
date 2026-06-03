@@ -23,7 +23,7 @@ Run it any number of times; it won't double-seed.
 Usage:
     python seed_real_data.py
 
-Targets the default tenant id = 1 (Trusted Cybersecurity Services —
+Targets the default tenant id = 1 (Trusted Security Solutions —
 الخدمات الموثوقة للأمن السيبراني) and also seeds id = 2 (Aramco) /
 id = 3 (STC Bank) where it makes sense.
 """
@@ -93,11 +93,11 @@ def section(name: str):
 
 # ──────────────────────────────────────────────────────────────────────
 # Tenant identity — enforce the canonical TSS name. "TSS" expands to
-# "Trusted Cybersecurity Services" / "الخدمات الموثوقة للأمن السيبراني";
-# the bootstrap had seeded a literal "Trusted Security Solutions" /
-# "حلول الأمان الموثوقة". This corrects org 1 on every run. The WHERE
-# clause makes it a no-op (skip) once the name is already canonical, so
-# the @@ROWCOUNT-based reporter stays honest. Parameterised → Arabic safe.
+# "Trusted Security Solutions" / "الخدمات الموثوقة للأمن السيبراني";
+# the bootstrap had seeded a mismatched Arabic literal "حلول الأمان
+# الموثوقة". This corrects org 1 on every run. The WHERE clause makes
+# it a no-op (skip) once the name is already canonical, so the
+# @@ROWCOUNT-based reporter stays honest. Parameterised → Arabic safe.
 # ──────────────────────────────────────────────────────────────────────
 section("platform.organisations — canonical TSS tenant name")
 run(
@@ -107,10 +107,10 @@ run(
        SET name_en=?, name_ar=?
      WHERE id=? AND (name_en<>? OR name_ar<>?)
     """,
-    'Trusted Cybersecurity Services', 'الخدمات الموثوقة للأمن السيبراني',
+    'Trusted Security Solutions', 'الخدمات الموثوقة للأمن السيبراني',
     ORG_TSS,
-    'Trusted Cybersecurity Services', 'الخدمات الموثوقة للأمن السيبراني',
-    label="org 1 → Trusted Cybersecurity Services / الخدمات الموثوقة للأمن السيبراني",
+    'Trusted Security Solutions', 'الخدمات الموثوقة للأمن السيبراني',
+    label="org 1 → Trusted Security Solutions / الخدمات الموثوقة للأمن السيبراني",
 )
 
 

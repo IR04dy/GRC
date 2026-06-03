@@ -59,7 +59,7 @@ function storageKey(): string {
 }
 
 const DEFAULT_CONFIG: WhiteLabelConfig = {
-  organisationNameEn: 'Trusted Cybersecurity Services',
+  organisationNameEn: 'Trusted Security Solutions',
   organisationNameAr: 'الخدمات الموثوقة للأمن السيبراني',
   taglineEn: 'Saudi-first GRC platform',
   taglineAr: 'منصة الحوكمة والمخاطر والامتثال — صناعة سعودية',
