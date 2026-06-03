@@ -2431,6 +2431,62 @@ export const auditLogApi = {
     api.get<AuditLogEntryDto[]>(`/api/v1/audit-log/trace/${encodeURIComponent(correlationId)}`),
 };
 
+// ── Issues — generic cross-module finding tracker ──────────────────────
+//    Backend: com.tss.grc.module.platform (IssueController + IssueService).
+//    Lifecycle OPEN → IN_PROGRESS → (BLOCKED →)? RESOLVED → CLOSED, or
+//    OPEN → CANCELLED. resolution required on RESOLVED/CLOSED.
+export interface IssueDto {
+  id: number;
+  externalId?: string;
+  issueCode?: string | null;
+  titleEn: string;
+  titleAr?: string | null;
+  description?: string | null;
+  sourceModule: string;
+  sourceEntityType?: string | null;
+  sourceEntityId?: number | null;
+  severity: string;
+  priority: string;
+  assigneeUserId?: number | null;
+  assigneeRole?: string | null;
+  dueDate?: string | null;
+  status: string;
+  resolution?: string | null;
+  resolutionNotes?: string | null;
+  resolvedAt?: string | null;
+  closedAt?: string | null;
+  capaId?: number | null;
+  evidenceId?: number | null;
+  createdAt?: string;
+}
+export interface IssuePageDto {
+  content: IssueDto[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+/** Allowed status transitions — mirrors IssueService's state machine. */
+export const ISSUE_TRANSITIONS: Record<string, string[]> = {
+  OPEN:        ['IN_PROGRESS', 'BLOCKED', 'RESOLVED', 'CANCELLED'],
+  IN_PROGRESS: ['BLOCKED', 'RESOLVED', 'CANCELLED'],
+  BLOCKED:     ['IN_PROGRESS', 'RESOLVED', 'CANCELLED'],
+  RESOLVED:    ['CLOSED', 'IN_PROGRESS'],
+  CLOSED:      [],
+  CANCELLED:   [],
+};
+export const ISSUE_RESOLUTIONS = ['FIXED', 'WONT_FIX', 'DUPLICATE', 'NOT_REPRODUCIBLE', 'DEFERRED'];
+export const ISSUE_SOURCE_MODULES = ['AUDIT', 'CYBER', 'BCM', 'RISK', 'COMPLIANCE', 'SCM', 'TPRM', 'PRIVACY', 'MANUAL'];
+export const issuesApi = {
+  list:       (page = 0, size = 50) => api.get<IssuePageDto>(`/api/v1/issues?page=${page}&size=${size}`),
+  bySource:   (module: string) => api.get<IssueDto[]>(`/api/v1/issues/by-source/${encodeURIComponent(module)}`),
+  get:        (id: number) => api.get<IssueDto>(`/api/v1/issues/${id}`),
+  create:     (body: Partial<IssueDto>) => api.post<IssueDto>('/api/v1/issues', body),
+  transition: (id: number, to: string, resolution?: string) =>
+    api.post<IssueDto>(`/api/v1/issues/${id}/transition`, { to, resolution }),
+  stats:      () => api.get<Record<string, number>>('/api/v1/issues/stats'),
+};
+
 // ── Automation rule runs — F8 ─────────────────────────────────────────
 //    PR #21 wired wizard submissions into the F8 engine + V127 seeded
 //    AR-21..AR-25. The submission detail page reads runs/for-entity to
