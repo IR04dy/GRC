@@ -3509,6 +3509,7 @@ export const ar = {
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',
+  bcmMgmtReviewsSidebar: 'مراجعات الإدارة',
   bcmWorkspaceSidebar: 'مساحة عمل BCM',
   bcpBuilderSidebar: 'محرر خطط BCP / DRP',
   adminSub: 'إدارة المستخدمين والأدوار والمؤسسات وسجلات التدقيق.',

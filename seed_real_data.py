@@ -602,6 +602,62 @@ for (code, ten, tar, system, site_type, site_loc, site_prov, owner,
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# bcm.management_reviews — ISO 22301 §9.3 BCMS management reviews.
+# The bootstrap seeded only one APPROVED review (MR-2026-Q1). Add an
+# in-progress Q2 review and a draft Q3 review so the new register page
+# exercises the full DRAFT → IN_PROGRESS → APPROVED → ARCHIVED lifecycle.
+# JSON columns carry attendees / agenda / KPI snapshot / decisions /
+# improvement actions. Idempotent by review_code; Arabic-safe (pyodbc
+# parameters), SET NOCOUNT ON so real inserts report cleanly.
+# ──────────────────────────────────────────────────────────────────────
+section("bcm.management_reviews — ISO 22301 §9.3 reviews")
+
+MR_REVIEWS = [
+    (
+        "MR-2026-Q2", "2026-07-15", "Khalid Al-Mutairi",
+        '[{"name":"Khalid Al-Mutairi","role":"BCM Manager"},{"name":"Sara Al-Anezi","role":"CISO"},{"name":"Mohammed Al-Faraj","role":"Core Banking Lead"},{"name":"Layla Al-Harbi","role":"Head of Operations"}]',
+        '[{"item":"Status of Q1 management-review actions","presenter":"BCM Manager","minutes":10},{"item":"Q2 DR test — core banking + SADAD","presenter":"IT Recovery Owner","minutes":15},{"item":"Open critical gaps","presenter":"BCM Manager","minutes":15},{"item":"Cyber-incident BCM interfaces","presenter":"CISO","minutes":10}]',
+        "Q2 cycle in progress; core-banking + SADAD DR test passed within RTO; 2 critical gaps remain (dual-feed power, MPLS contract); readiness score 78.5/100.",
+        "دورة الربع الثاني قيد التنفيذ؛ نجح اختبار التعافي للنظام المصرفي الأساسي وسداد ضمن زمن الاستهداف؛ تبقّت فجوتان حرجتان (التغذية الكهربائية المزدوجة وعقد MPLS)؛ مؤشر الجاهزية 78.5/100.",
+        '{"openGaps":6,"criticalGaps":2,"exercisesCompleted":3,"drTestsLast12mo":7,"avgReadinessScore":78.5}',
+        '[{"decision":"Escalate dual-feed power upgrade to board capex","rationale":"Single-feed risk to primary DC persists into Q2","owner":"CFO","dueDate":"2026-08-31"}]',
+        '[{"action":"Finalise Mobily MPLS secondary-link contract","owner":"CIO","dueDate":"2026-08-15"},{"action":"Close call-tree contact-data refresh","owner":"BCM Manager","dueDate":"2026-07-31"}]',
+        "IN_PROGRESS",
+        "Q2 review opened; KPI pack circulated; decisions pending chairperson approval.",
+        "فُتحت مراجعة الربع الثاني؛ عُمّمت حزمة المؤشرات؛ القرارات بانتظار اعتماد رئيس الجلسة.",
+    ),
+    (
+        "MR-2026-Q3", "2026-10-14", "Sara Al-Anezi",
+        '[{"name":"Sara Al-Anezi","role":"CISO"},{"name":"Khalid Al-Mutairi","role":"BCM Manager"}]',
+        '[{"item":"Q2 actions carry-over","presenter":"BCM Manager","minutes":10},{"item":"Annual BIA refresh outcomes","presenter":"BCM Manager","minutes":20},{"item":"SAMA BCM framework alignment","presenter":"CISO","minutes":15}]',
+        "Q3 management review scheduled; agenda and KPI pack under preparation; annual BIA refresh feeding inputs.",
+        "جُدولت مراجعة الربع الثالث؛ يجري إعداد جدول الأعمال وحزمة المؤشرات؛ تُغذّى المدخلات من التحديث السنوي لتحليل أثر الأعمال.",
+        None,
+        None,
+        None,
+        "DRAFT",
+        "Draft created from the annual BCMS review calendar.",
+        "أُنشئت كمسودة من التقويم السنوي لمراجعات نظام استمرارية الأعمال.",
+    ),
+]
+for (code, rdate, chair, att, agenda, in_en, in_ar, kpi, decs, acts, status, n_en, n_ar) in MR_REVIEWS:
+    run(
+        """
+        SET NOCOUNT ON;
+        IF NOT EXISTS (SELECT 1 FROM bcm.management_reviews
+                       WHERE review_code = ? AND organisation_id = ?)
+        INSERT INTO bcm.management_reviews (organisation_id, external_id, review_code, review_date,
+            chairperson_name, attendees_json, agenda_json, inputs_summary_en, inputs_summary_ar,
+            kpi_snapshot_json, decisions_json, improvement_actions_json, status, notes_en, notes_ar,
+            is_deleted, created_at)
+        VALUES (?, NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, GETDATE())
+        """,
+        code, ORG_TSS,
+        ORG_TSS, code, rdate, chair, att, agenda, in_en, in_ar, kpi, decs, acts, status, n_en, n_ar,
+        label=f"mgmt-review: {code} ({status})",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # platform.controls — Saudi-native unified control library. Gives the
 # AI-assisted control mapper (POST /api/v1/controls/ai/suggest) a real
 # corpus to score against. The bootstrap ships only a handful of stub

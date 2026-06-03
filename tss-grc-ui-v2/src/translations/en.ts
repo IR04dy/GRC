@@ -3523,6 +3523,7 @@ export const en = {
   bcmRemediationSidebar: 'BCM remediation',
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',
+  bcmMgmtReviewsSidebar: 'Management reviews',
   bcmWorkspaceSidebar: 'BCM workspace',
   bcpBuilderSidebar: 'BCP / DRP builder',
   adminSub: 'Manage users, roles, organisations and audit trails.',

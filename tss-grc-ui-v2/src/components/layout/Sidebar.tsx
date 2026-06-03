@@ -289,6 +289,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       { id: 'bcm-remediation', to: '/bcm/remediation', Icon: AlertOctagon, labelKey: 'bcmRemediationSidebar' },
       { id: 'bcm-compliance',  to: '/bcm/compliance',  Icon: Stamp,        labelKey: 'bcmComplianceSidebar' },
+      { id: 'bcm-mgmt-reviews', to: '/bcm/management-reviews', Icon: ClipboardList, labelKey: 'bcmMgmtReviewsSidebar' },
       { id: 'bcm-reports',     to: '/bcm/reports',     Icon: BarChart3,    labelKey: 'bcmReportsSidebar' },
       { id: 'opres-dash',      to: '/opres/dashboard', Icon: Shield,       labelKey: 'opres.sidebar' },
       { id: 'rrp-dash',        to: '/rrp/dashboard',   Icon: ShieldAlert,  labelKey: 'rrp.sidebar' },
