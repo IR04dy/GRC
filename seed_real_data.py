@@ -1905,6 +1905,42 @@ for wp_ref, wp_type, t_en, t_ar, author, status, hours in PAPERS:
         label=f"WP: [{wp_type}/{status}] {wp_ref} {t_en[:40]}",
     )
 
+# ──────────────────────────────────────────────────────────────────────
+# socops.iam_jml_event — privileged-access recertification windows
+#
+# SAMA CSF 3.3.5 / NCA ECC 2-2-3 require privileged entitlements to be
+# periodically re-attested. The privileged-reviews-due endpoint
+# (/api/v1/socops/iam-jml/privileged-reviews-due?days=N) reads review_due_at,
+# but the bootstrap left it null on the granted privileged events, so the
+# attestation queue was always empty. Stagger a fresh review date across the
+# 7 / 14 / 30 / 60-day windows over whatever privileged, non-revoked events
+# exist, relative to today so the demo always reads "due in N days".
+# Self-healing + idempotent: only touches rows whose review_due_at is null
+# or already in the past, so a same-day re-run skips (0 updated).
+# ──────────────────────────────────────────────────────────────────────
+section("socops.iam_jml_event — privileged-access review windows (org 1)")
+run(
+    """
+    SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; SET NOCOUNT ON;
+    WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY occurred_at) AS rn
+          FROM socops.iam_jml_event
+         WHERE organisation_id = ? AND is_deleted = 0
+           AND privileged = 1 AND revoked_at IS NULL
+           AND outcome NOT IN ('DENIED', 'REJECTED')
+           AND (review_due_at IS NULL OR review_due_at < GETDATE())
+    )
+    UPDATE e
+       SET review_due_at = DATEADD(day,
+             CASE r.rn WHEN 1 THEN 6 WHEN 2 THEN 13 WHEN 3 THEN 27 ELSE 44 END,
+             GETDATE())
+      FROM socops.iam_jml_event e
+      JOIN ranked r ON e.id = r.id
+    """,
+    ORG_TSS,
+    label="privileged-access review windows → 6/13/27/44-day spread",
+)
+
 # ══════════════════════════════════════════════════════════════════════
 # Multi-tenant — Aramco Trading Company (org_id = 2)
 # Energy industry: oil & gas, refinery, OT/SCADA, exporter operations.

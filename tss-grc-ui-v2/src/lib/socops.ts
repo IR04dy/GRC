@@ -353,6 +353,8 @@ export interface IamJmlEvent {
   requestedAt: string | null;
   approvedAt: string | null;
   completedAt: string | null;
+  revokedAt?: string | null;
+  reviewDueAt?: string | null;
 }
 
 // AppSec finding (SAST/DAST/IAST/SCA/secrets/IaC unified)
@@ -594,6 +596,10 @@ export const socopsApi = {
     api.get<PageResp<IamJmlEvent>>(`/api/v1/socops/iam-jml${pageQ(page, size)}`),
   iamJmlGet: (id: number) =>
     api.get<IamJmlEvent>(`/api/v1/socops/iam-jml/${id}`),
+  /** Privileged-access entitlements whose recertification is due within `days`
+   *  (SAMA CSF 3.3.5 / NCA ECC 2-2-3 periodic privileged-access review). */
+  iamJmlReviewsDue: (days = 30) =>
+    api.get<IamJmlEvent[]>(`/api/v1/socops/iam-jml/privileged-reviews-due?days=${days}`),
 
   appsec: (page = 0, size = 50) =>
     api.get<PageResp<AppsecFinding>>(`/api/v1/socops/appsec${pageQ(page, size)}`),

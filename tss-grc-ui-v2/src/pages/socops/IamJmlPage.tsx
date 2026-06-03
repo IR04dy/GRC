@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, RefreshCw, ShieldAlert, UserCheck, UserX } from 'lucide-react';
+import { Users, RefreshCw, ShieldAlert, UserCheck, UserX, KeyRound, CalendarClock } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -12,6 +12,24 @@ import { socopsApi, type IamJmlEvent, type PageResp } from '../../lib/socops';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 type Filter = 'all' | 'sod_violations' | 'privileged' | 'pending' | 'completed';
+
+const REVIEW_WINDOWS = [7, 14, 30, 60] as const;
+type ReviewWindow = typeof REVIEW_WINDOWS[number];
+
+/** Whole days from now until an ISO timestamp (negative = overdue). */
+function daysUntil(iso?: string | null): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  return Math.ceil(ms / 86_400_000);
+}
+
+/** Recertification urgency → badge tone. */
+function dueTone(days: number | null): 'danger' | 'warning' | 'info' | 'neutral' {
+  if (days == null) return 'neutral';
+  if (days <= 7) return 'danger';
+  if (days <= 14) return 'warning';
+  return 'info';
+}
 
 const TYPE_TONE: Record<string, 'success' | 'info' | 'danger' | 'warning' | 'neutral'> = {
   JOINER: 'success', MOVER: 'info', LEAVER: 'danger',
@@ -31,12 +49,28 @@ export function IamJmlPage() {
   const [filter, setFilter] = useState<Filter>('sod_violations');
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  // Privileged-access recertification queue (orphaned endpoint:
+  // /api/v1/socops/iam-jml/privileged-reviews-due?days=N).
+  const [reviewWindow, setReviewWindow] = useState<ReviewWindow>(30);
+  const [reviewsDue, setReviewsDue] = useState<IamJmlEvent[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
   async function load() {
     setState('loading'); setErrMsg(null);
     try { const r = await socopsApi.iamJml(pageIdx, 50); setPage(r); setState('ready'); }
     catch (e) { setErrMsg((e as Error)?.message ?? String(e)); setState('error'); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [pageIdx]);
+
+  async function loadReviews(days: ReviewWindow) {
+    setReviewsLoading(true);
+    try {
+      const list = await socopsApi.iamJmlReviewsDue(days);
+      setReviewsDue([...list].sort((a, b) => (a.reviewDueAt ?? '').localeCompare(b.reviewDueAt ?? '')));
+    } catch { setReviewsDue([]); }
+    finally { setReviewsLoading(false); }
+  }
+  useEffect(() => { void loadReviews(reviewWindow); }, [reviewWindow]);
 
   const rows = useMemo(() => {
     const all = page?.content ?? [];
@@ -65,14 +99,82 @@ export function IamJmlPage() {
         title={isAr ? 'دورة حياة الهويات والصلاحيات' : 'IAM joiner-mover-leaver + privileged access'}
         sub={isAr ? 'كل تغيير صلاحية موثّق — يكشف فصل المهام تلقائياً'
                   : 'Every entitlement change documented — SoD violations flagged automatically'}
-        actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
+        actions={<Button variant="ghost" size="sm" onClick={() => { void load(); void loadReviews(reviewWindow); }}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={ShieldAlert} label={isAr ? 'مخالفات SoD' : 'SoD violations'}        value={String(counts.sod)}        tone={counts.sod > 0 ? 'danger' : 'success'} />
         <Kpi Icon={Users}       label={isAr ? 'صلاحيات حرجة' : 'Privileged events'}    value={String(counts.privileged)} tone={counts.privileged > 0 ? 'warning' : 'neutral'} />
+        <Kpi Icon={KeyRound}    label={isAr ? `مراجعات مستحقة (${reviewWindow}ي)` : `Reviews due (${reviewWindow}d)`} value={String(reviewsDue.length)} tone={reviewsDue.length > 0 ? 'warning' : 'success'} />
         <Kpi Icon={UserCheck}   label={isAr ? 'قيد الانتظار' : 'Pending'}              value={String(counts.pending)}    tone={counts.pending > 0 ? 'warning' : 'success'} />
         <Kpi Icon={UserX}       label={isAr ? 'مكتمل' : 'Completed'}                    value={String(counts.completed)}  tone="info" />
       </div>
+
+      {/* Privileged-access recertification queue — SAMA CSF 3.3.5 / NCA ECC
+          2-2-3 require privileged entitlements to be periodically re-attested.
+          Driven by the dedicated privileged-reviews-due endpoint. */}
+      <Card
+        title={isAr ? 'مراجعات الصلاحيات الحرجة المستحقة' : 'Privileged access reviews due'}
+        Icon={CalendarClock}
+        action={
+          <div role="group" aria-label={isAr ? 'نافذة المراجعة' : 'Review window'}
+            style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', overflow: 'hidden' }}>
+            {REVIEW_WINDOWS.map(w => (
+              <button key={w} onClick={() => setReviewWindow(w)} aria-pressed={reviewWindow === w}
+                style={{ padding: '5px 11px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+                  background: reviewWindow === w ? 'var(--primary)' : 'var(--surface-2)',
+                  color: reviewWindow === w ? '#fff' : 'var(--ink-2)' }}>
+                {isAr ? `${w}ي` : `${w}d`}
+              </button>
+            ))}
+          </div>
+        }>
+        <p style={{ fontSize: 12, color: 'var(--ink-3)', margin: '0 0 12px' }}>
+          {isAr
+            ? 'صلاحيات حرجة قائمة تستحق إعادة الاعتماد خلال النافذة المحددة — وفق إطار ساما للأمن السيبراني ٣-٣-٥ والضوابط الأساسية للأمن السيبراني ٢-٢-٣.'
+            : 'Standing privileged entitlements whose recertification falls due inside the selected window — per SAMA CSF 3.3.5 and NCA ECC 2-2-3.'}
+        </p>
+        {reviewsLoading
+          ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>
+          : reviewsDue.length === 0
+            ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
+                {isAr ? 'لا مراجعات مستحقة في هذه النافذة 👍' : 'No reviews due in this window 👍'}
+              </div>
+            : <table className="tbl" style={{ width: '100%' }}>
+                <thead><tr>
+                  <th>{isAr ? 'الشخص' : 'Subject'}</th>
+                  <th>{isAr ? 'الدور/الصلاحية' : 'Role / entitlement'}</th>
+                  <th>{isAr ? 'النظام المستهدف' : 'Target system'}</th>
+                  <th>{isAr ? 'تاريخ الاستحقاق' : 'Review due'}</th>
+                  <th>{isAr ? 'المتبقّي' : 'Countdown'}</th>
+                </tr></thead>
+                <tbody>{reviewsDue.map(e => {
+                  const d = daysUntil(e.reviewDueAt);
+                  return (
+                    <tr key={e.id}>
+                      <td style={{ fontSize: 11 }}>
+                        <Link to={`/socops/iam-jml/${e.id}`} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>
+                          {e.subjectUsername ?? e.eventCode}
+                        </Link>
+                        {e.subjectJobTitle && <div style={{ fontSize: 9, color: 'var(--ink-3)' }}>{e.subjectJobTitle}</div>}
+                      </td>
+                      <td style={{ fontSize: 10 }}>{e.roleOrEntitlement ?? '—'}</td>
+                      <td style={{ fontSize: 10 }}>{e.targetSystem ?? '—'}</td>
+                      <td className="mono" style={{ fontSize: 10 }}>{e.reviewDueAt?.slice(0, 10)}</td>
+                      <td>
+                        <Badge tone={dueTone(d)}>
+                          {d == null ? '—'
+                            : d < 0 ? (isAr ? `متأخّر ${Math.abs(d)}ي` : `${Math.abs(d)}d overdue`)
+                            : d === 0 ? (isAr ? 'اليوم' : 'today')
+                            : (isAr ? `خلال ${d}ي` : `in ${d}d`)}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>}
+      </Card>
+
+      <div style={{ height: 16 }} />
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
         {([
