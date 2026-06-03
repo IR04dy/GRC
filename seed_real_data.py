@@ -658,6 +658,68 @@ for (code, rdate, chair, att, agenda, in_en, in_ar, kpi, decs, acts, status, n_e
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# nca_ecc.filings — annual NCA ECC-2:2024 self-assessment returns.
+# The bootstrap created four empty DRAFT shells (FY2023-2026) with no
+# domain scores. Enrich each with a five-domain maturity score, gap
+# summary and CAPA count, and stagger their lifecycle so the new register
+# page exercises DRAFT → PEER_REVIEW → CISO_APPROVAL → SUBMITTED →
+# ACKNOWLEDGED. Idempotent: only touches DRAFT shells whose overall_score
+# is still null. Arabic-safe (pyodbc), SET NOCOUNT ON for clean @@ROWCOUNT.
+# ──────────────────────────────────────────────────────────────────────
+section("nca_ecc.filings — five-domain maturity + lifecycle (org 1)")
+
+# (year, [d1..d5], overall, gap_en, gap_ar, capa, status,
+#  peer_reviewer, peer_started, peer_completed, peer_comments,
+#  ciso, ciso_at, submitted_at, submission_ref, acknowledged_at)
+NCA_FILINGS = [
+    (2023, 4, 3, 4, 3, 2, 3.20,
+     "ICS network segmentation gaps in legacy SCADA; cloud-vendor exit-testing incomplete; privileged-access reviews irregular.",
+     "فجوات في عزل شبكات أنظمة التحكم الصناعي القديمة؛ اختبار خروج مزوّد الحوسبة السحابية غير مكتمل؛ مراجعات الوصول المتميّز غير منتظمة.",
+     3, "ACKNOWLEDGED",
+     "Mohammed Al-Faraj", "2024-02-05", "2024-02-20",
+     "Domain 5 (ICS) below target; tracked via CAPA-OT-2024-03.",
+     "Sara Al-Anezi", "2024-03-01", "2024-03-15", "NCA-ECC-2023-004812", "2024-04-02"),
+    (2024, 4, 4, 4, 3, 3, 3.60,
+     "Third-party assurance coverage improving but cloud SLA evidence still partial; DR test cadence on track.",
+     "تحسّن تغطية ضمان الأطراف الخارجية مع بقاء أدلة اتفاقيات مستوى الخدمة السحابية جزئية؛ وتيرة اختبار التعافي ضمن المسار.",
+     2, "SUBMITTED",
+     "Mohammed Al-Faraj", "2025-02-10", "2025-02-25",
+     "Domains 1-3 at or above target; D4 cloud evidence flagged.",
+     "Sara Al-Anezi", "2025-03-05", "2025-03-20", "NCA-ECC-2024-006139", None),
+    (2025, 5, 4, 4, 4, 3, 4.00,
+     "Governance and defence mature; ICS remains the lagging domain pending OT-SOC rollout.",
+     "نضج الحوكمة والتحصين؛ تبقى أنظمة التحكم الصناعي المجال المتأخّر بانتظار تشغيل مركز عمليات أمن التقنية التشغيلية.",
+     1, "CISO_APPROVAL",
+     "Khalid Al-Mutairi", "2026-02-05", "2026-02-18",
+     "Ready for submission once OT-SOC go-live evidence is attached.",
+     "Sara Al-Anezi", "2026-03-02", None, None, None),
+    (2026, 4, 4, 3, 4, 3, 3.60,
+     "Q1 self-assessment in peer review; resilience domain dipped after the Q4 power incident.",
+     "التقييم الذاتي للربع الأول قيد مراجعة الأقران؛ تراجع مجال الصمود بعد حادثة الكهرباء في الربع الرابع.",
+     2, "PEER_REVIEW",
+     "Khalid Al-Mutairi", "2026-05-10", None, None,
+     None, None, None, None, None),
+]
+for (yr, d1, d2, d3, d4, d5, overall, gap_en, gap_ar, capa, status,
+     peer, p_start, p_done, p_comments, ciso, ciso_at, sub_at, sub_ref, ack_at) in NCA_FILINGS:
+    run(
+        """
+        SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; SET NOCOUNT ON;
+        UPDATE nca_ecc.filings
+           SET domain1_score=?, domain2_score=?, domain3_score=?, domain4_score=?, domain5_score=?,
+               overall_score=?, gap_summary_en=?, gap_summary_ar=?, capa_count=?, status=?,
+               peer_reviewer=?, peer_review_started_at=?, peer_review_completed_at=?, peer_review_comments_en=?,
+               ciso_approver=?, ciso_approval_at=?, submitted_at=?, submission_reference=?, acknowledged_at=?
+         WHERE fiscal_year=? AND organisation_id=? AND is_deleted=0
+           AND status='DRAFT' AND overall_score IS NULL
+        """,
+        d1, d2, d3, d4, d5, overall, gap_en, gap_ar, capa, status,
+        peer, p_start, p_done, p_comments, ciso, ciso_at, sub_at, sub_ref, ack_at,
+        yr, ORG_TSS,
+        label=f"nca-ecc filing: FY{yr} ({status}, {overall}/5)",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # platform.controls — Saudi-native unified control library. Gives the
 # AI-assisted control mapper (POST /api/v1/controls/ai/suggest) a real
 # corpus to score against. The bootstrap ships only a handful of stub

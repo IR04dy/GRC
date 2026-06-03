@@ -155,6 +155,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'audit-lc',     to: '/audit-lifecycle',        Icon: BookOpen,      labelKey: 'alcSidebar' },
       { id: 'ev-chain',     to: '/evidence-chain',         Icon: Fingerprint,   labelKey: 'echSidebar' },
       { id: 'nca-ecc',      to: '/nca-ecc-export',         Icon: ShieldCheck,   labelKey: 'ncaSidebar' },
+      { id: 'nca-ecc-filings', to: '/nca-ecc/filings',    Icon: FileText,      labelKey: 'ncaFilingsSidebar' },
       { id: 'reginspect',   to: '/reginspect/dashboard',   Icon: ClipboardList, labelKey: 'reginspect.sidebar' },
       { id: 'regreporting', to: '/regreporting/dashboard', Icon: CalendarDays,  labelKey: 'regreporting.sidebar' },
     ],

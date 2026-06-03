@@ -291,6 +291,7 @@ const BoardPackPage          = lazy(() => import('./pages/board-pack/BoardPackPa
 const RegulatoryChangePage   = lazy(() => import('./pages/regulatory-change/RegulatoryChangePage').then(m => ({ default: m.RegulatoryChangePage })));
 const VendorPortalPage       = lazy(() => import('./pages/portal/VendorPortalPage').then(m => ({ default: m.VendorPortalPage })));
 const NcaEccExportPage       = lazy(() => import('./pages/nca-ecc/NcaEccExportPage').then(m => ({ default: m.NcaEccExportPage })));
+const NcaEccFilingsPage      = lazy(() => import('./pages/nca-ecc/NcaEccFilingsPage').then(m => ({ default: m.NcaEccFilingsPage })));
 const NotificationDispatchPage = lazy(() => import('./pages/notifications/NotificationDispatchPage').then(m => ({ default: m.NotificationDispatchPage })));
 const ControlCrosswalkPage   = lazy(() => import('./pages/control-crosswalk/ControlCrosswalkPage').then(m => ({ default: m.ControlCrosswalkPage })));
 // ─── Sprint 4 §3.3 — Culled pages (imports removed; folders kept on disk
@@ -731,6 +732,7 @@ export function App() {
 
               {/* NCA ECC self-assessment export (Sprint 6) */}
               <Route path="/nca-ecc-export"     element={<NcaEccExportPage />} />
+              <Route path="/nca-ecc/filings"    element={<NcaEccFilingsPage />} />
 
               {/* Notification dispatch console (Sprint 6) */}
               <Route path="/notifications/dispatch" element={<NotificationDispatchPage />} />

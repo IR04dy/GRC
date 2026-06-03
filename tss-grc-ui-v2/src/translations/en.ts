@@ -1248,6 +1248,7 @@ export const en = {
 
   // NCA ECC self-assessment export — Sprint 6.
   ncaSidebar:               'NCA ECC export',
+  ncaFilingsSidebar:        'NCA ECC filings',
   ncaTitle:                 'NCA ECC-1 Self-Assessment Export',
   ncaSub:                   'Print-friendly + CSV submission template aligned to NCA ECC-1.',
   ncaSubmissionTemplate:    'Submission Template',

@@ -1251,6 +1251,7 @@ export const ar = {
 
   // تصدير التقييم الذاتي لـNCA ECC — السبرنت السادس.
   ncaSidebar:               'تصدير NCA ECC',
+  ncaFilingsSidebar:        'بلاغات NCA ECC',
   ncaTitle:                 'تصدير التقييم الذاتي لـNCA ECC-1',
   ncaSub:                   'قالب تقديم بصيغة طباعة + CSV متوافق مع NCA ECC-1.',
   ncaSubmissionTemplate:    'قالب التقديم',
