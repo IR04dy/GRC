@@ -1555,6 +1555,28 @@ export interface PrivacyBreachDto {
   breachType?: string; severity?: string; status?: string;
   occurredAt?: string; reportedAt?: string;
   affectedRecords?: number;
+  /** Backend's canonical affected-count field (DTO returns this, not affectedRecords). */
+  dataSubjectsAffectedCount?: number;
+  // SDAIA notification workflow (PDPL Article 31 — 72-hour notification)
+  discoveredAt?: string;
+  sdaiaNotificationStatus?: string;   // NOT_REPORTED | IN_PREPARATION | SUBMITTED | ACKNOWLEDGED
+  sdaiaSubmissionRef?: string | null;
+  sdaiaSubmittedAt?: string | null;
+}
+/** Authoritative SDAIA submission status for a breach (GET sdaia-submission). */
+export interface PrivacySdaiaStatus {
+  breachId: number;
+  discoveredAt?: string | null;
+  sdaiaNotificationStatus?: string;
+  sdaiaSubmissionRef?: string | null;
+  sdaiaSubmittedAt?: string | null;
+  /** discoveredAt + 72h — the PDPL Article 31 SDAIA notification deadline. */
+  pdplArticle31DeadlineAt?: string | null;
+}
+export interface SdaiaSubmissionRequest {
+  status?: string;            // SUBMITTED (default) | IN_PREPARATION | ACKNOWLEDGED
+  submissionRef?: string;
+  submittedAt?: string | null;
 }
 export interface PrivacyRopaDto {
   id: number; activityNameEn: string; activityNameAr?: string;
@@ -1593,6 +1615,10 @@ export const privacyApi = {
   containBreach:  (id: number) => api.post<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}/contain`),
   notifyDataOffice: (id: number) => api.post<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}/notify-data-office`),
   closeBreach:    (id: number) => api.post<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}/close`),
+  // SDAIA submission workflow (PDPL Article 31 — manual portal, recorded here)
+  sdaiaStatus:    (id: number) => api.get<PrivacySdaiaStatus>(`/api/v1/privacy/breaches/${id}/sdaia-submission`),
+  recordSdaiaSubmission: (id: number, body: SdaiaSubmissionRequest) =>
+    api.post<PrivacyBreachDto>(`/api/v1/privacy/breaches/${id}/sdaia-submission`, body),
   ropa:           (page = 0, size = 50) => api.get<PageResponse<PrivacyRopaDto>>(`/api/v1/privacy/ropa${pageQ(page, size)}`),
   createRopa:     (body: PrivacyRopaRequest) => api.post<PrivacyRopaDto>('/api/v1/privacy/ropa', body),
   updateRopa:     (id: number, body: PrivacyRopaRequest) => api.put<PrivacyRopaDto>(`/api/v1/privacy/ropa/${id}`, body),

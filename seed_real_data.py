@@ -325,6 +325,11 @@ section("privacy.data_breaches — PDPL Art.20 breaches")
 
 BREACHES = [
     # (title_en, description_en, type, subjects_affected, notify_required, status, days_ago)
+    # Fresh breach still inside the PDPL Art.31 72-hour SDAIA window — keeps the
+    # breach console's countdown + SDAIA submission panel live and actionable.
+    ("Open-banking API token leak — partner sandbox",
+     "تسرّب رمز وصول لواجهة المصرفية المفتوحة في بيئة شريك تجريبية؛ يجري احتواء النطاق وإبطال الرموز وعدد السجلات قيد التقييم.",
+     "UNAUTHORISED_ACCESS", 64, True, "ESCALATED", 1),
     ("Phishing-driven AD account compromise",
      "مهاجم استخدم بريداً تصيّدياً لاختراق حساب موظف خدمات مالية. تأثرت ~120 سجل عملاء.",
      "UNAUTHORISED_ACCESS", 120, True, "NOTIFIED", 90),
@@ -362,6 +367,7 @@ BREACHES = [
 for title, desc, btype, count, notify, status, days_ago in BREACHES:
     run(
         f"""
+        SET NOCOUNT ON;
         IF NOT EXISTS (SELECT 1 FROM privacy.data_breaches
                        WHERE title_en = ? AND organisation_id = ?)
         INSERT INTO privacy.data_breaches (external_id, organisation_id, title_en, description_en,

@@ -751,6 +751,19 @@ export const en = {
 
   // PDPL 72-hour breach response console — Sprint 4.
   pdplConsoleTitle:        'PDPL 72-hour breach response',
+  // SDAIA submission tracking (PDPL Article 31)
+  sdaiaPanelTitle:         'SDAIA notification',
+  sdaiaStatusNotReported:  'Not reported',
+  sdaiaStatusPreparing:    'In preparation',
+  sdaiaStatusSubmitted:    'Submitted',
+  sdaiaStatusAcknowledged: 'Acknowledged',
+  sdaiaDeadline:           'Article 31 deadline',
+  sdaiaSubmittedAt:        'Submitted at',
+  sdaiaRecordBtn:          'Record submission',
+  sdaiaUpdateBtn:          'Update submission',
+  sdaiaRecordTitle:        'Record SDAIA submission',
+  sdaiaFieldStatus:        'Notification status',
+  sdaiaFieldRef:           'SDAIA portal reference',
   pdplConsoleEmpty:        'No open personal-data breaches. All historical incidents are closed and notifications dispatched.',
   pdplActiveBreach:        'Active breach',
   pdplAwareLabel:          'Aware:',

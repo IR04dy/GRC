@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Fingerprint, Send, ShieldAlert, Clock, FileDown, AlertOctagon, CheckCircle2, Users } from 'lucide-react';
+import { Fingerprint, Send, ShieldAlert, Clock, FileDown, AlertOctagon, CheckCircle2, Users, Landmark } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Kpi } from '../ui/Kpi';
+import { FormModal, type FieldDef } from '../ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import {
   PDPL_BREACH_STAGES, computeBreachClock, classifySeverity,
@@ -12,7 +13,8 @@ import {
   type BreachClock, type PdplSeverity, type SdaiaNotificationPacket,
 } from '../../lib/pdplBreach';
 import { formatHijri } from '../../lib/sla';
-import type { PrivacyBreachDto } from '../../lib/api';
+import { useToast } from '../../lib/toast';
+import { privacyApi, ApiError, type PrivacyBreachDto, type PrivacySdaiaStatus, type SdaiaSubmissionRequest } from '../../lib/api';
 
 /**
  * PDPL 72-hour breach response console — Sprint 4.
@@ -25,7 +27,7 @@ import type { PrivacyBreachDto } from '../../lib/api';
  * Picks the most-time-sensitive open breach automatically. If none, returns
  * a "compliant" empty state.
  */
-export function PdplBreachConsole({ breaches, onDispatch }: {
+export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
   breaches: ReadonlyArray<PrivacyBreachDto>;
   /**
    * Real SDAIA dispatch action. When provided, the "Dispatch to SDAIA"
@@ -35,6 +37,12 @@ export function PdplBreachConsole({ breaches, onDispatch }: {
    * without actually transitioning state.
    */
   onDispatch?: (breach: PrivacyBreachDto) => Promise<void> | void;
+  /**
+   * Called after a SDAIA submission is recorded so the parent can reload
+   * its breach list (the console owns the API call + toast for this one,
+   * since it also owns the authoritative SDAIA status it fetched).
+   */
+  onRecorded?: () => void;
 }) {
   const { t, lang } = useI18n();
   const [dispatching, setDispatching] = useState(false);
@@ -54,12 +62,16 @@ export function PdplBreachConsole({ breaches, onDispatch }: {
   //      (still recoverable / actionable today).
   //   3. Any open breach (e.g. NOTIFIED awaiting data-subjects step).
   const target = useMemo(() => {
-    const open = breaches.filter(b => b.status !== 'CLOSED' && b.reportedAt);
+    // Awareness timestamp drives the 72h clock. The backend DTO only ships
+    // `discoveredAt` (no reportedAt/occurredAt), so fall back to it — otherwise
+    // the console renders an empty state against real data.
+    const awareOf = (b: PrivacyBreachDto) => b.reportedAt ?? b.occurredAt ?? b.discoveredAt ?? '';
+    const open = breaches.filter(b => b.status !== 'CLOSED' && awareOf(b));
     const needsSdaia = open.filter(b => b.status !== 'NOTIFIED');
     const pool = needsSdaia.length > 0 ? needsSdaia : open;
     const enriched = pool.map(b => ({
       breach: b,
-      clock: computeBreachClock(b.reportedAt ?? b.occurredAt ?? '', now),
+      clock: computeBreachClock(awareOf(b), now),
     }));
     const inWindow = enriched.filter(c => c.clock.hoursRemaining >= 0);
     if (inWindow.length > 0) {
@@ -80,12 +92,16 @@ export function PdplBreachConsole({ breaches, onDispatch }: {
   }
 
   const { breach, clock } = target;
+  // Backend DTO ships `dataSubjectsAffectedCount`, not `affectedRecords`.
+  const records = breach.affectedRecords ?? breach.dataSubjectsAffectedCount ?? 0;
+  const aware = breach.reportedAt ?? breach.occurredAt ?? breach.discoveredAt ?? '';
+  const nb = { ...breach, affectedRecords: records };
   const severity = classifySeverity({
-    affectedRecords: breach.affectedRecords,
-    financial: breach.breachType === 'CONFIDENTIALITY' && (breach.affectedRecords ?? 0) > 5_000,
+    affectedRecords: records,
+    financial: breach.breachType === 'CONFIDENTIALITY' && records > 5_000,
   });
 
-  const packet = generateSdaiaNotification(breach, severity);
+  const packet = generateSdaiaNotification(nb, severity);
   const needsDataSubjectNotice = requiresDataSubjectNotification(severity);
   const reportedReady = breach.status === 'NOTIFIED';
 
@@ -117,8 +133,8 @@ export function PdplBreachConsole({ breaches, onDispatch }: {
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <Badge tone={SEVERITY_TONE[severity]}>{t('pdplSev' + severity[0] + severity.slice(1).toLowerCase()) || severity}</Badge>
             <Badge tone="info">{breach.breachType ?? '—'}</Badge>
-            <Badge tone="neutral">{(breach.affectedRecords ?? 0).toLocaleString()} {t('pdplRecords')}</Badge>
-            <Badge tone="neutral">{t('pdplAwareLabel')} {fmtAware(breach.reportedAt ?? breach.occurredAt ?? '', lang)}</Badge>
+            <Badge tone="neutral">{records.toLocaleString()} {t('pdplRecords')}</Badge>
+            <Badge tone="neutral">{t('pdplAwareLabel')} {fmtAware(aware, lang)}</Badge>
           </div>
         </div>
       </div>
@@ -211,6 +227,9 @@ export function PdplBreachConsole({ breaches, onDispatch }: {
         <PacketPreview packet={packet} lang={lang} t={t} />
       </div>
 
+      {/* ── SDAIA submission tracking (authoritative, server-backed) ─── */}
+      <SdaiaSubmissionPanel breach={breach} onRecorded={onRecorded} />
+
       {/* ── Data-subjects notification card ─────────────────────── */}
       {needsDataSubjectNotice && (
         <div style={{
@@ -223,7 +242,7 @@ export function PdplBreachConsole({ breaches, onDispatch }: {
           </div>
           <div>
             {t('pdplDataSubjectsBody')
-              .replace('{count}', (breach.affectedRecords ?? 0).toLocaleString())
+              .replace('{count}', records.toLocaleString())
               .replace('{deadline}', packet.dataSubjectsNotificationPlannedAt
                 ? `${new Date(packet.dataSubjectsNotificationPlannedAt).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-GB')} · ${formatHijri(packet.dataSubjectsNotificationPlannedAt, lang)}`
                 : '—')}
@@ -235,6 +254,141 @@ export function PdplBreachConsole({ breaches, onDispatch }: {
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
+
+const SDAIA_STATUS_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success' | 'neutral'> = {
+  NOT_REPORTED: 'danger', IN_PREPARATION: 'warning', SUBMITTED: 'info', ACKNOWLEDGED: 'success',
+};
+
+function sdaiaStatusLabel(t: (k: string) => string, status?: string): string {
+  switch (status) {
+    case 'IN_PREPARATION': return t('sdaiaStatusPreparing');
+    case 'SUBMITTED':      return t('sdaiaStatusSubmitted');
+    case 'ACKNOWLEDGED':   return t('sdaiaStatusAcknowledged');
+    default:               return t('sdaiaStatusNotReported');
+  }
+}
+
+/**
+ * SDAIA submission tracking (PDPL Article 31). Reads the authoritative status
+ * from the backend — the server-computed 72h deadline, current notification
+ * status, portal reference and submitted-at — and lets the DPO record the
+ * outcome of the (manual) SDAIA-portal submission. Surfaces the orphaned
+ * GET/POST /breaches/{id}/sdaia-submission endpoints.
+ */
+function SdaiaSubmissionPanel({ breach, onRecorded }: {
+  breach: PrivacyBreachDto;
+  onRecorded?: () => void;
+}) {
+  const { t, lang } = useI18n();
+  const toast = useToast();
+  const [status, setStatus] = useState<PrivacySdaiaStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    privacyApi.sdaiaStatus(breach.id)
+      .then(s => { if (live) setStatus(s); })
+      .catch(() => { if (live) setStatus(null); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [breach.id]);
+
+  const deadline = status?.pdplArticle31DeadlineAt ? new Date(status.pdplArticle31DeadlineAt) : null;
+  const hoursToDeadline = deadline ? (deadline.getTime() - Date.now()) / 3_600_000 : null;
+  const reported = (status?.sdaiaNotificationStatus ?? 'NOT_REPORTED') !== 'NOT_REPORTED';
+  const st = status?.sdaiaNotificationStatus ?? 'NOT_REPORTED';
+
+  const fields: FieldDef[] = [
+    { kind: 'select', key: 'status', label: t('sdaiaFieldStatus'), required: true, span: 12,
+      options: [
+        { value: 'SUBMITTED',      label: t('sdaiaStatusSubmitted') },
+        { value: 'IN_PREPARATION', label: t('sdaiaStatusPreparing') },
+        { value: 'ACKNOWLEDGED',   label: t('sdaiaStatusAcknowledged') },
+      ] },
+    { kind: 'text', key: 'submissionRef', label: t('sdaiaFieldRef'), span: 12,
+      placeholder: 'SDAIA-2026-XXXXXX' },
+  ];
+  const initial = { status: 'SUBMITTED', submissionRef: status?.sdaiaSubmissionRef ?? '' };
+
+  async function submit(v: { status: string; submissionRef: string }): Promise<void> {
+    try {
+      const body: SdaiaSubmissionRequest = {
+        status: v.status,
+        submissionRef: v.submissionRef.trim() || undefined,
+        submittedAt: null, // server stamps now
+      };
+      await privacyApi.recordSdaiaSubmission(breach.id, body);
+      const fresh = await privacyApi.sdaiaStatus(breach.id);
+      setStatus(fresh);
+      setFormOpen(false);
+      toast.success(lang === 'ar' ? 'تم تسجيل إبلاغ سدايا' : 'SDAIA submission recorded');
+      onRecorded?.();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'فشل التسجيل' : 'Record failed'));
+    }
+  }
+
+  return (
+    <div style={{
+      marginBottom: 12, padding: 12, borderRadius: 'var(--r-md)',
+      border: '1px solid var(--border)', background: 'var(--surface-2)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <Landmark size={15} style={{ color: 'var(--primary)' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-1)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {t('sdaiaPanelTitle')}
+          </span>
+          <Badge tone={SDAIA_STATUS_TONE[st] ?? 'neutral'} dot>{sdaiaStatusLabel(t, st)}</Badge>
+        </div>
+        <Button variant={reported ? 'secondary' : 'primary'} size="sm" Icon={Landmark}
+          disabled={loading} onClick={() => setFormOpen(true)}>
+          {reported ? t('sdaiaUpdateBtn') : t('sdaiaRecordBtn')}
+        </Button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+        <SdaiaStat label={t('sdaiaDeadline')}
+          value={deadline ? deadline.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+          hint={hoursToDeadline == null ? undefined
+            : hoursToDeadline < 0 ? (lang === 'ar' ? `تجاوز ${Math.round(-hoursToDeadline)} ساعة` : `${Math.round(-hoursToDeadline)}h overdue`)
+            : (lang === 'ar' ? `خلال ${Math.round(hoursToDeadline)} ساعة` : `in ${Math.round(hoursToDeadline)}h`)}
+          tone={hoursToDeadline == null ? 'neutral' : hoursToDeadline < 0 ? 'danger' : hoursToDeadline < 24 ? 'warning' : 'success'} />
+        <SdaiaStat label={t('sdaiaFieldRef')} value={status?.sdaiaSubmissionRef || '—'} mono />
+        <SdaiaStat label={t('sdaiaSubmittedAt')}
+          value={status?.sdaiaSubmittedAt ? new Date(status.sdaiaSubmittedAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'} />
+      </div>
+
+      <FormModal<{ status: string; submissionRef: string }>
+        open={formOpen}
+        title={t('sdaiaRecordTitle')}
+        fields={fields}
+        initial={initial}
+        onClose={() => setFormOpen(false)}
+        onSubmit={submit}
+        submitLabel={t('sdaiaRecordBtn')}
+      />
+    </div>
+  );
+}
+
+function SdaiaStat({ label, value, hint, tone = 'neutral', mono }: {
+  label: string; value: string; hint?: string;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger'; mono?: boolean;
+}) {
+  const hintColour = tone === 'danger' ? 'var(--danger-fg)' : tone === 'warning' ? 'var(--warning-fg)' : tone === 'success' ? 'var(--success-fg)' : 'var(--ink-3)';
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>
+        {label}
+      </div>
+      <div className={mono ? 'mono' : undefined} style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-1)' }}>{value}</div>
+      {hint && <div style={{ fontSize: 10.5, fontWeight: 600, color: hintColour, marginTop: 2 }}>{hint}</div>}
+    </div>
+  );
+}
 
 function CountdownRing({ clock, t }: { clock: BreachClock; t: (k: string) => string }) {
   // Draw a 72-hour ring with the consumed wedge in red/amber/green.

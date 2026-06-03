@@ -390,7 +390,7 @@ export function PrivacyPage() {
               time-sensitive open breach automatically and surfaces the
               auto-generated SDAIA notification packet (PDPL Art. 25). */}
           <div style={{ marginBottom: 12 }}>
-            <PdplBreachConsole breaches={allBreaches} onDispatch={notifyDataOfficeAction} />
+            <PdplBreachConsole breaches={allBreaches} onDispatch={notifyDataOfficeAction} onRecorded={() => breaches.reload()} />
           </div>
           <Card padded={false}>
             {breaches.loading

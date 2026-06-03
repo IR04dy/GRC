@@ -747,6 +747,19 @@ export const ar = {
 
   // وحدة الاستجابة لاختراقات PDPL خلال 72 ساعة — السبرنت الرابع.
   pdplConsoleTitle:        'الاستجابة لاختراق PDPL خلال 72 ساعة',
+  // تتبّع الإبلاغ لسدايا (نظام حماية البيانات — المادة ٣١)
+  sdaiaPanelTitle:         'الإبلاغ إلى سدايا',
+  sdaiaStatusNotReported:  'لم يُبلَّغ',
+  sdaiaStatusPreparing:    'قيد الإعداد',
+  sdaiaStatusSubmitted:    'تم الإبلاغ',
+  sdaiaStatusAcknowledged: 'تم الإقرار',
+  sdaiaDeadline:           'مهلة المادة ٣١',
+  sdaiaSubmittedAt:        'وقت الإبلاغ',
+  sdaiaRecordBtn:          'تسجيل الإبلاغ',
+  sdaiaUpdateBtn:          'تحديث الإبلاغ',
+  sdaiaRecordTitle:        'تسجيل الإبلاغ إلى سدايا',
+  sdaiaFieldStatus:        'حالة الإبلاغ',
+  sdaiaFieldRef:           'مرجع بوابة سدايا',
   pdplConsoleEmpty:        'لا توجد اختراقات بيانات شخصية مفتوحة. جميع الحوادث السابقة مُغلقة والإبلاغات مُرسَلة.',
   pdplActiveBreach:        'اختراق نشط',
   pdplAwareLabel:          'العلم:',
