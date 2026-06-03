@@ -479,6 +479,99 @@ for proc, mtpd, rto, rpo, crit, impact, owner, bu, notes in CASCADE_BIAS:
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# BCM DR-test programme — give the Sprint-9 DR-test trend aggregator
+# (GET /api/v1/bcm/dr-test-trend) a believable rolling history. The seed
+# DRPs that ship in setup_bcm_db.py cluster in the two most-recent quarters,
+# so the rolling-8-quarter chart was almost empty. This adds a Saudi-bank
+# DR programme whose `last_tested_at` spreads across the earlier quarters
+# with a realistic improving-maturity arc (FAILED / PARTIAL early →
+# PASSED later) and all four outcome buckets represented. One DRP per
+# critical system; tenant-1 (TSS GRC / Saudi bank) only. Parameterised
+# pyodbc → Arabic passes cleanly. row_version is a plain bigint here, so we
+# set it explicitly to 0.
+# ──────────────────────────────────────────────────────────────────────
+section("bcm.dr_plans — Saudi-bank DR-test programme (quarterly trend)")
+
+DR_PLANS = [
+    # (code, title_en, title_ar, system, site_type, site_location, site_provider,
+    #  owner, rto, rpo, mtpd, tested_at, outcome, notes_en, desc_en)
+    ("DRP-SA-CBS", "Core Banking (Temenos T24) — DR plan",
+     "خطة التعافي — النظام البنكي الأساسي (تيمينوس T24)", "Temenos T24 Core Banking",
+     "ACTIVE_ACTIVE", "Jeddah DR Data Centre", "On-prem", "Head of Core Banking",
+     2, 0, 4, "2024-08-20 02:30:00", "FAILED",
+     "Q3-2024 failover exercise: ledger replication lag breached RPO; remediation tracked to closure.",
+     "Active-active recovery for the T24 core-banking ledger across the Riyadh/Jeddah twin data centres."),
+    ("DRP-SA-SADAD", "SADAD Bill-Payment Hub — DR plan",
+     "خطة التعافي — منصة سداد للمدفوعات", "SADAD Payment Hub",
+     "HOT", "Jeddah DR Data Centre", "On-prem", "Head of Payments",
+     4, 1, 8, "2024-11-18 01:00:00", "GAP",
+     "Q4-2024 test: hub recovered but biller-reconciliation queue had to be rebuilt manually.",
+     "Hot-standby recovery for the SADAD bill-payment hub and biller reconciliation."),
+    ("DRP-SA-MADA", "mada Card & ATM Switch — DR plan",
+     "خطة التعافي — مفتاح بطاقات مدى والصرّاف الآلي", "mada Card & ATM Switch",
+     "ACTIVE_ACTIVE", "Riyadh Primary / Jeddah DR", "On-prem", "Head of Cards",
+     2, 0, 4, "2025-02-24 03:15:00", "GAP",
+     "Q1-2025 test: switch failover OK; ATM driver re-pointing exceeded the RTO target.",
+     "Active-active recovery for the mada debit-card authorisation and ATM cash-dispense switch."),
+    ("DRP-SA-MUREX", "Murex Treasury & Trade Finance — DR plan",
+     "خطة التعافي — الخزينة وتمويل التجارة (ميوركس)", "Murex MX.3",
+     "WARM", "Jeddah DR Data Centre", "On-prem", "Head of Treasury",
+     8, 2, 24, "2025-05-19 18:00:00", "PASSED",
+     "Q2-2025 exercise passed within RTO/RPO; end-of-day batch validated on the DR instance.",
+     "Warm-standby recovery for Murex MX.3 treasury, FX and trade-finance (LC/guarantees)."),
+    ("DRP-SA-EXADATA", "Exadata Data Warehouse — DR plan",
+     "خطة التعافي — مستودع البيانات (إكسّاداتا)", "Oracle Exadata DW",
+     "WARM", "Jeddah DR Data Centre", "On-prem", "Head of Data Platform",
+     12, 4, 24, "2025-08-25 22:00:00", "PASSED",
+     "Q3-2025 exercise passed; Oracle Data Guard switchover completed within targets.",
+     "Warm-standby recovery for the Oracle Exadata regulatory & analytics data warehouse."),
+    ("DRP-SA-SWIFT", "SWIFT Gateway (cross-border) — DR plan",
+     "خطة التعافي — بوابة سويفت للتحويلات الدولية", "SWIFT Alliance Gateway",
+     "HOT", "Riyadh Primary / Jeddah DR", "On-prem", "Head of Correspondent Banking",
+     4, 1, 8, "2025-09-15 04:00:00", "FAILED",
+     "Q3-2025 test: HSM key ceremony on DR incomplete; message flow not restored within the window.",
+     "Hot-standby recovery for the SWIFT Alliance gateway and cross-border message flow."),
+    ("DRP-SA-CHANNELS", "Internet & Mobile Banking — DR plan",
+     "خطة التعافي — القنوات الرقمية (الإنترنت والجوال)", "Digital Channels Platform",
+     "HOT", "Jeddah DR Data Centre", "On-prem", "Head of Digital Channels",
+     4, 1, 8, "2025-11-24 05:30:00", "GAP",
+     "Q4-2025 test: web/app channels online; push-notification and SADAD inquiry degraded.",
+     "Hot-standby recovery for the internet- and mobile-banking digital channels platform."),
+    ("DRP-SA-SARIE", "SARIE RTGS Interface — DR plan",
+     "خطة التعافي — واجهة نظام سريع للتسوية الفورية", "SARIE RTGS Interface",
+     "ACTIVE_ACTIVE", "Riyadh Primary / Jeddah DR", "SAMA network", "Head of Payments",
+     2, 0, 4, "2026-01-27 06:00:00", "PASSED",
+     "Q1-2026 exercise passed; RTGS interface re-established within the SAMA settlement window.",
+     "Active-active recovery for the SARIE real-time gross-settlement interface to SAMA."),
+]
+for (code, ten, tar, system, site_type, site_loc, site_prov, owner,
+     rto, rpo, mtpd, tested, outcome, notes, desc) in DR_PLANS:
+    run(
+        """
+        SET NOCOUNT ON;
+        IF NOT EXISTS (SELECT 1 FROM bcm.dr_plans
+                       WHERE organisation_id=? AND plan_code=?)
+        INSERT INTO bcm.dr_plans
+            (organisation_id, plan_code, title_en, title_ar, description_en,
+             critical_system_name, dr_site_type, dr_site_location, dr_site_provider, owner,
+             rto_hours, rpo_hours, mtpd_hours, status,
+             last_tested_at, last_tested_outcome, last_test_notes_en, next_test_due,
+             is_deleted, is_active, row_version, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, 'APPROVED',
+                CAST(? AS datetime2), ?, ?, DATEADD(MONTH, 12, CAST(? AS date)),
+                0, 1, 0, GETDATE(), GETDATE())
+        """,
+        ORG_TSS, code,
+        ORG_TSS, code, ten, tar, desc,
+        system, site_type, site_loc, site_prov, owner,
+        rto, rpo, mtpd,
+        tested, outcome, notes, tested,
+        label=f"DRP: {code} ({outcome} @ {tested[:7]})",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # Vendor onboarding rows — link to scm.vendors
 # ──────────────────────────────────────────────────────────────────────
 section("scm.vendor_onboarding — supplier onboarding pipeline")

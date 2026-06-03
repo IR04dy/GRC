@@ -1133,6 +1133,44 @@ export const dependencyCascadeApi = {
     api.get<CascadeResult>(`/api/v1/bcm/dependency-cascade/${failedProcessId}`),
 };
 
+// ─── BCM DR-test trend (Sprint-9 Slice 9-B) ──────────────────────────────────
+// GET /api/v1/bcm/dr-test-trend?quarters=8 — rolling-quarter time-series of DR
+// test outcomes over bcm.dr_plans, plus a snapshot (total DRPs, never-tested,
+// overdue >12mo, recent-12mo pass rate). The DB outcome taxonomy is
+// PASSED / FAILED / GAP / NOT_TESTED, so the service's `partial` bucket is
+// always 0 and GAP/NOT_TESTED fall into `na`; the UI folds partial+na into a
+// single "gap / other" series. passRate / recentPassRate are 0..1.
+export interface DrQuarterStats {
+  quarter: string;            // "2026-Q1"
+  quarterStart: string;       // ISO date
+  quarterEnd: string;         // ISO date
+  totalTested: number;
+  passed: number;
+  failed: number;
+  partial: number;
+  na: number;
+  passRate: number;           // 0..1
+}
+export interface DrTrendSnapshot {
+  totalDrps: number;
+  neverTested: number;
+  testedOverdue: number;      // last test older than 12 months
+  testedRecently: number;     // last test within 12 months
+  passedRecently: number;
+  recentPassRate: number;     // 0..1
+}
+export interface DrTrendReport {
+  evaluatedOn: string;        // ISO date
+  series: DrQuarterStats[];
+  snapshot: DrTrendSnapshot;
+}
+export const DR_TREND_DEFAULT_QUARTERS = 8;
+export const DR_TREND_MAX_QUARTERS = 20;
+export const drTestTrendApi = {
+  trend: (quarters?: number) =>
+    api.get<DrTrendReport>(`/api/v1/bcm/dr-test-trend${quarters ? `?quarters=${quarters}` : ''}`),
+};
+
 // ─── PDPL data-flow graph (Sprint-8 Slice 8-C) ───────────────────────────────
 // GET /api/v1/privacy/data-flow-graph — a node-link graph over the RoPA
 // (privacy.processing_activities): CATEGORY → ACTIVITY → COUNTRY + MECHANISM,

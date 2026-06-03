@@ -2402,6 +2402,7 @@ export const ar = {
   bcmDashSidebar:         'لوحة الاستمرارية',
   bcmReadinessSidebar:    'جاهزية الاستمرارية',
   cascadeSidebar:         'تتالي الاعتمادية',
+  drTrendSidebar:         'اتجاه اختبارات التعافي',
   scmDashSidebar:         'لوحة سلسلة الإمداد',
   cyberDashSidebar:       'لوحة الأمن السيبراني',
   socopsSidebar:             'عمليات مركز الأمن',

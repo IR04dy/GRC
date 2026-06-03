@@ -278,6 +278,7 @@ const FairCalculatorPage     = lazy(() => import('./pages/risk/FairCalculatorPag
 const SessionsPage           = lazy(() => import('./pages/account/SessionsPage').then(m => ({ default: m.SessionsPage })));
 const ThreatIntelCorrelationPage = lazy(() => import('./pages/cyber/ThreatIntelCorrelationPage').then(m => ({ default: m.ThreatIntelCorrelationPage })));
 const DependencyCascadePage   = lazy(() => import('./pages/bcm/DependencyCascadePage').then(m => ({ default: m.DependencyCascadePage })));
+const DrTestTrendPage         = lazy(() => import('./pages/bcm/DrTestTrendPage').then(m => ({ default: m.DrTestTrendPage })));
 const DataFlowGraphPage       = lazy(() => import('./pages/privacy/DataFlowGraphPage').then(m => ({ default: m.DataFlowGraphPage })));
 const ApprovalInboxPage      = lazy(() => import('./pages/approvals/ApprovalInboxPage').then(m => ({ default: m.ApprovalInboxPage })));
 const SignaturesPage         = lazy(() => import('./pages/signatures/SignaturesPage').then(m => ({ default: m.SignaturesPage })));
@@ -817,6 +818,7 @@ export function App() {
               <Route path="/account/sessions"   element={<SessionsPage />} />
               <Route path="/cyber/threat-intel" element={<ThreatIntelCorrelationPage />} />
               <Route path="/bcm/dependency-cascade" element={<DependencyCascadePage />} />
+              <Route path="/bcm/dr-test-trend" element={<DrTestTrendPage />} />
               <Route path="/privacy/data-flow" element={<DataFlowGraphPage />} />
               <Route path="/attestations"       element={<AttestationCampaignsPage />} />
 

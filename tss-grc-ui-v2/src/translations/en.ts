@@ -2417,6 +2417,7 @@ export const en = {
   bcmDashSidebar:         'BCM dashboard',
   bcmReadinessSidebar:    'BCM readiness',
   cascadeSidebar:         'Dependency cascade',
+  drTrendSidebar:         'DR-test trend',
   scmDashSidebar:         'Supply chain dashboard',
   cyberDashSidebar:       'Cyber dashboard',
   socopsSidebar:             'SOC operations',
