@@ -4615,6 +4615,7 @@ export const ar = {
   auditLogTitle:               'سجل التدقيق',
   issuesTitle:                 'القضايا',
   regHorizonSidebar:           'الأفق التنظيمي',
+  cloudServicesSidebar:        'الخدمات السحابية',
   connectorsSub:               'استلام آلي — فاحصات الثغرات، SIEM، تغذية مراقبي الجهات، مراقبي دورات الإقرار',
   connectorsPageSub:           'تُنشئ هذه التكاملات سجلات أو استلامات تلقائياً دون تدخل بشري. كل تكامل محكوم بمرجع تنظيمي ودوريّة؛ أعداد الاستلام مُتحرِّكة لـ 30 يوماً.',
   connectorsRegistryTitle:     'سجل التكاملات',

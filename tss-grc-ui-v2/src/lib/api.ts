@@ -1931,6 +1931,47 @@ export const evidenceApi = {
   runConnector: (id: number) => api.post<ConnectorDefinitionDto>(`/api/v1/evidence/connectors/${id}/run`),
 };
 
+// ─── Cyber cloud-service inventory (NCA CSCC §1.1) ───────────────────────────
+// GET/POST/PATCH /api/v1/cyber/cloud-services — one row per (service × provider)
+// the tenant uses, with residency, CSCC tier, criticality, and security posture.
+// Distinct from /api/v1/outsourcing/cloud-services (SAMA materiality lens).
+export interface CyberCloudServiceDto {
+  id: number;
+  externalId?: string;
+  organisationId?: number;
+  serviceName: string;
+  provider: string;
+  serviceModel: string;        // IAAS | PAAS | SAAS | FAAS | DBAAS
+  deploymentModel: string;     // PUBLIC | PRIVATE | HYBRID | COMMUNITY
+  dataClassification?: string; // PUBLIC | INTERNAL | CONFIDENTIAL | RESTRICTED | TOP_SECRET
+  residencyRegion?: string;
+  kingdomDataResident: boolean;
+  csccTier?: string;
+  contractId?: number;
+  ownerUserId?: number;
+  criticality: string;         // LOW | MEDIUM | HIGH | CRITICAL
+  ssoEnabled: boolean;
+  mfaEnforced: boolean;
+  encryptionAtRest: boolean;
+  encryptionInTransit: boolean;
+  status: string;              // ACTIVE | UNDER_REVIEW | DEPROVISIONED | ARCHIVED
+  lastReviewDate?: string;
+  nextReviewDate?: string;
+  notes?: string;
+}
+export const CLOUD_SERVICE_MODELS = ['IAAS', 'PAAS', 'SAAS', 'FAAS', 'DBAAS'];
+export const CLOUD_DEPLOYMENT_MODELS = ['PUBLIC', 'PRIVATE', 'HYBRID', 'COMMUNITY'];
+export const CLOUD_DATA_CLASSES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED', 'TOP_SECRET'];
+export const CLOUD_CRITICALITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+export const CLOUD_STATUSES = ['ACTIVE', 'UNDER_REVIEW', 'DEPROVISIONED', 'ARCHIVED'];
+export const cyberCloudServicesApi = {
+  list:   () => api.get<CyberCloudServiceDto[]>('/api/v1/cyber/cloud-services'),
+  get:    (id: number) => api.get<CyberCloudServiceDto>(`/api/v1/cyber/cloud-services/${id}`),
+  create: (body: Partial<CyberCloudServiceDto>) => api.post<CyberCloudServiceDto>('/api/v1/cyber/cloud-services', body),
+  update: (id: number, body: Partial<CyberCloudServiceDto>) => api.patch<CyberCloudServiceDto>(`/api/v1/cyber/cloud-services/${id}`, body),
+  stats:  () => api.get<Record<string, number>>('/api/v1/cyber/cloud-services/stats'),
+};
+
 // ─── Departments (platform) — used to route an evidence request to an owner ──
 export interface DepartmentDto {
   id: number; code?: string; nameEn: string; nameAr?: string;

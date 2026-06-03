@@ -273,6 +273,7 @@ const ConnectorsPage         = lazy(() => import('./pages/intake/ConnectorsPage'
 const AuditLogPage           = lazy(() => import('./pages/platform/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const IssuesPage             = lazy(() => import('./pages/platform/IssuesPage').then(m => ({ default: m.IssuesPage })));
 const RegulatoryHorizonPage  = lazy(() => import('./pages/compliance/RegulatoryHorizonPage').then(m => ({ default: m.RegulatoryHorizonPage })));
+const CyberCloudServicesPage = lazy(() => import('./pages/cyber/CyberCloudServicesPage').then(m => ({ default: m.CyberCloudServicesPage })));
 const ApprovalInboxPage      = lazy(() => import('./pages/approvals/ApprovalInboxPage').then(m => ({ default: m.ApprovalInboxPage })));
 const SignaturesPage         = lazy(() => import('./pages/signatures/SignaturesPage').then(m => ({ default: m.SignaturesPage })));
 const AssetRegisterPage      = lazy(() => import('./pages/assets/AssetRegisterPage').then(m => ({ default: m.AssetRegisterPage })));
@@ -806,6 +807,7 @@ export function App() {
               <Route path="/audit-log"          element={<AuditLogPage />} />
               <Route path="/issues"             element={<IssuesPage />} />
               <Route path="/regulatory/horizon" element={<RegulatoryHorizonPage />} />
+              <Route path="/cyber/cloud-services" element={<CyberCloudServicesPage />} />
               <Route path="/attestations"       element={<AttestationCampaignsPage />} />
 
               {/* Cross-module approval inbox (Sprint 5) */}
