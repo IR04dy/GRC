@@ -1972,6 +1972,31 @@ export const cyberCloudServicesApi = {
   stats:  () => api.get<Record<string, number>>('/api/v1/cyber/cloud-services/stats'),
 };
 
+// ─── FAIR quantitative-risk calculator (Sprint-8 Slice 8-A) ──────────────────
+// POST /api/v1/risk/fair/calculate — stateless Monte-Carlo over four triangular
+// factors → annualised loss exposure (ALE) distribution. No DB, no persistence.
+export interface FairTriangular { min: number; mostLikely: number; max: number; }
+export interface FairInputs {
+  scenarioName: string;
+  threatEventFrequency: FairTriangular;  // events / year
+  vulnerability: FairTriangular;         // [0, 1] — share of threat events that become losses
+  primaryLoss: FairTriangular;           // SAR / event
+  secondaryLoss: FairTriangular;         // SAR / event
+  iterations?: number;                   // default 10_000, max 100_000
+}
+export interface FairResult {
+  scenarioName: string;
+  iterations: number;
+  aleMean: number; aleP10: number; aleP50: number; aleP90: number; aleMax: number;
+  lefMean: number;                       // mean Loss Event Frequency (events/yr)
+  lmMean: number;                        // mean Loss Magnitude (SAR/event)
+  aleHistogram: Record<string, number>;  // 10 buckets, key = "lo..hi"
+  currency: string;
+}
+export const fairApi = {
+  calculate: (body: FairInputs) => api.post<FairResult>('/api/v1/risk/fair/calculate', body),
+};
+
 // ─── Departments (platform) — used to route an evidence request to an owner ──
 export interface DepartmentDto {
   id: number; code?: string; nameEn: string; nameAr?: string;

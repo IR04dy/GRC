@@ -13,6 +13,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Scale,
          ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
          Cloud, ChevronRight, ScrollText, Archive, GraduationCap,
+         Calculator,
          type LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -107,6 +108,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'risk-lc',   to: '/risk-lifecycle',  Icon: GitBranch,       labelKey: 'rlcSidebar' },
       { id: 'scenarios', to: '/risk-scenarios',  Icon: Sigma,           labelKey: 'scnSidebar' },
       { id: 'bowtie',    to: '/risk/bowtie',     Icon: GitBranch,       labelKey: 'bowtieSidebar' },
+      { id: 'fair-calc', to: '/risk/fair',       Icon: Calculator,      labelKey: 'fairCalcSidebar' },
       { id: 'emerging',  to: '/emerging-risk',   Icon: Telescope,       labelKey: 'emrSidebar' },
       { id: 'incidents', to: '/incidents',       Icon: AlertOctagon,    labelKey: 'incidentsTitle' },
       { id: 'rca',       to: '/rca',             Icon: Microscope,      labelKey: 'rcaSidebar' },
