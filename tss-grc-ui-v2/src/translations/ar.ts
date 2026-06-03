@@ -3507,6 +3507,7 @@ export const ar = {
   observerTypeCompliance: 'امتثال',
   observerTypeGeneral: 'ملاحظة عامة',
   crisisCommsSidebar: 'اتصالات الأزمات',
+  siemBridgeSidebar: 'جسر SIEM',
   bcmRemediationSidebar: 'فجوات والإجراءات التصحيحية',
   bcmSettingsSidebar: 'إعدادات BCM',
   bcmComplianceSidebar: 'مطابقة الامتثال للاستمرارية',

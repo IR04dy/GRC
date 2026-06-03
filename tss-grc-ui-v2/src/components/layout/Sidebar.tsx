@@ -286,6 +286,7 @@ const NAV_GROUPS: NavGroup[] = [
         children: [
           { id: 'crisis-mobile', to: '/crisis/mobile',       Icon: Siren,    labelKey: 'crisisMobileSidebar' },
           { id: 'crisis-comms',  to: '/bcm/comms/templates', Icon: Megaphone, labelKey: 'crisisCommsSidebar' },
+          { id: 'siem-bridge',   to: '/bcm/siem-events',     Icon: Activity, labelKey: 'siemBridgeSidebar' },
         ],
       },
       { id: 'bcm-remediation', to: '/bcm/remediation', Icon: AlertOctagon, labelKey: 'bcmRemediationSidebar' },

@@ -658,6 +658,52 @@ for (code, rdate, chair, att, agenda, in_en, in_ar, kpi, decs, acts, status, n_e
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# bcm.siem_inbound_events — SOC/SIEM → BCM crisis bridge log.
+# The bootstrap left only three rows. Add a handful of realistic Saudi-bank
+# SOC alerts across sources/severities so the bridge register and its
+# status filters demo well. Seeded rows use EVALUATED (high-sev, triaged,
+# monitoring) / IGNORED (low-sev) — the live "Simulate alert" action is
+# what exercises ESCALATED + auto crisis-event creation. Idempotent by
+# title; Arabic-safe (pyodbc), SET NOCOUNT ON for clean @@ROWCOUNT.
+# ──────────────────────────────────────────────────────────────────────
+section("bcm.siem_inbound_events — SOC → BCM bridge alerts (org 1)")
+
+# (source, severity, title, summary, status, hours_ago)
+SIEM_ALERTS = [
+    ("QRADAR", 5, "Outbound data-exfiltration beacon to TOR exit node",
+     "T1041 exfiltration over C2 detected; ~2.3GB egress to 185.220.x.x; host FS-RYD-07 quarantined by NAC.",
+     "EVALUATED", 6),
+    ("SENTINEL", 4, "Impossible-travel sign-in on privileged account",
+     "Riyadh → Kyiv in 11 minutes on a Domain-Admin account; conditional-access block fired; credentials force-reset.",
+     "EVALUATED", 20),
+    ("CROWDSTRIKE", 4, "Ransomware canary file modified on core file server",
+     "Canary tripped on FS-RYD-03; offending process tree isolated by Falcon; no encryption spread observed.",
+     "EVALUATED", 33),
+    ("SPLUNK", 2, "Repeated port-scan from internal subnet",
+     "Authorised internal vulnerability scan (Tenable Nessus) from 10.40.2.15 — source whitelisted, no action.",
+     "IGNORED", 49),
+    ("ELASTIC", 1, "Expired TLS certificate on staging API gateway",
+     "Non-production staging gateway certificate expired; renewal ticketed CHG-2026-1184; no customer impact.",
+     "IGNORED", 70),
+]
+for source, sev, title, summary, status, hrs in SIEM_ALERTS:
+    run(
+        """
+        SET NOCOUNT ON;
+        IF NOT EXISTS (SELECT 1 FROM bcm.siem_inbound_events
+                       WHERE title = ? AND organisation_id = ?)
+        INSERT INTO bcm.siem_inbound_events (organisation_id, external_id, source_system,
+            source_alert_id, severity, title, summary, raw_payload_json, received_at,
+            processed_at, processing_status, is_deleted)
+        VALUES (?, NEWID(), ?, ?, ?, ?, ?, '{"seed":true}',
+            DATEADD(hour, -?, GETDATE()), DATEADD(hour, -?, GETDATE()), ?, 0)
+        """,
+        title, ORG_TSS,
+        ORG_TSS, source, f"SEED-{source}-{sev}", sev, title, summary, hrs, hrs, status,
+        label=f"siem: {source} sev{sev} ({status})",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # nca_ecc.filings — annual NCA ECC-2:2024 self-assessment returns.
 # The bootstrap created four empty DRAFT shells (FY2023-2026) with no
 # domain scores. Enrich each with a five-domain maturity score, gap

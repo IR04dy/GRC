@@ -3521,6 +3521,7 @@ export const en = {
   observerTypeCompliance: 'Compliance',
   observerTypeGeneral: 'General note',
   crisisCommsSidebar: 'Crisis Comms',
+  siemBridgeSidebar: 'SIEM bridge',
   bcmRemediationSidebar: 'BCM remediation',
   bcmSettingsSidebar: 'BCM settings',
   bcmComplianceSidebar: 'BCM compliance mapping',
