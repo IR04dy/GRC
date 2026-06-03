@@ -2400,6 +2400,7 @@ export const ar = {
   ermDashSidebar:         'لوحة المخاطر',
   bcmDashSidebar:         'لوحة الاستمرارية',
   bcmReadinessSidebar:    'جاهزية الاستمرارية',
+  cascadeSidebar:         'تتالي الاعتمادية',
   scmDashSidebar:         'لوحة سلسلة الإمداد',
   cyberDashSidebar:       'لوحة الأمن السيبراني',
   socopsSidebar:             'عمليات مركز الأمن',

@@ -1097,6 +1097,42 @@ export const bcmApi = {
   stats:        () => api.get<unknown>('/api/v1/bcm/stats'),
 };
 
+// ─── BCM dependency-cascade simulator (Sprint-9 Slice 9-A) ───────────────────
+// GET /api/v1/bcm/dependency-cascade/{failedProcessId} — given one critical
+// process failure, BFS the downstream consumers and bucket impact at the BCM
+// time-bands (1h / 4h / 8h / 24h), flag MTPD breaches, and decay confidence
+// with cascade depth. Pure compute over bcm.process_dependencies +
+// critical_processes + bia_records. Source-process list comes from
+// bcmApi.dependencyGraph().nodes.
+export interface CascadeBandSummary { impacted: number; breached: number; }
+export interface CascadeImpactRow {
+  processId: number;
+  processNameEn: string;
+  processNameAr?: string;
+  criticality?: string;
+  depth: number;                 // edges from the failed source
+  reachHour: number;             // band the cascade lands in (1/4/8/24)
+  mtpdHours?: number | null;
+  rtoHours?: number | null;
+  breached: boolean;             // reachHour >= MTPD (or RTO)
+  confidence: number;            // 0..1, drops with depth
+}
+export interface CascadeResult {
+  sourceProcessId: number;
+  sourceProcessNameEn: string;
+  sourceProcessNameAr?: string;
+  sourceCriticality?: string;
+  totalImpactedCount: number;
+  breachedCount: number;
+  byHourBand: Record<string, CascadeBandSummary>;   // keys "1" | "4" | "8" | "24"
+  impacts: CascadeImpactRow[];
+}
+export const CASCADE_BANDS = [1, 4, 8, 24];
+export const dependencyCascadeApi = {
+  simulate: (failedProcessId: number) =>
+    api.get<CascadeResult>(`/api/v1/bcm/dependency-cascade/${failedProcessId}`),
+};
+
 // ─── Cyber · Controls ───────────────────────────────────────────────────────
 export interface CyberControlDto {
   id: number; frameworkId?: number; frameworkName?: string; domain?: string;

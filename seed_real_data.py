@@ -397,6 +397,88 @@ for i, (pid, pname) in enumerate(processes[:5]):
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# BCM dependency-cascade topology — deepen the process graph so the
+# Sprint-9 cascade simulator (GET /api/v1/bcm/dependency-cascade/{id}) has a
+# real multi-tier blast radius to walk. Adds two downstream processes, three
+# edges (Core → Retail Payments → Cards; Core → Treasury) and their MTPDs so
+# an IT-Infrastructure failure cascades across the 1h / 4h / 8h bands with
+# clear MTPD breaches. Parameterised → Arabic + em-dash pass cleanly.
+# ──────────────────────────────────────────────────────────────────────
+section("bcm cascade topology — downstream processes + edges + MTPDs")
+
+CASCADE_PROCS = [
+    # (name_en, name_ar, criticality, business_unit, description_en)
+    ("Cards & ATM Switch — mada", "تبديل البطاقات والصرّاف الآلي — مدى", "CRITICAL",
+     "Payments & Channels",
+     "mada debit-card authorisation and ATM cash-dispense switch; depends on retail-payment rails."),
+    ("Treasury & Trade Finance — Murex", "الخزينة وتمويل التجارة — ميوركس", "HIGH",
+     "Wholesale Banking",
+     "Treasury, FX and trade-finance (LC/guarantees) on Murex MX.3; consumes core-banking balances."),
+]
+for name_en, name_ar, crit, bu, desc in CASCADE_PROCS:
+    run(
+        """
+        IF NOT EXISTS (SELECT 1 FROM bcm.critical_processes
+                       WHERE organisation_id=? AND process_name_en=?)
+        INSERT INTO bcm.critical_processes
+            (organisation_id, process_name_en, process_name_ar, criticality, business_unit, description_en)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        ORG_TSS, name_en,
+        ORG_TSS, name_en, name_ar, crit, bu, desc,
+        label=f"process: {name_en}",
+    )
+
+CASCADE_EDGES = [
+    # (consumer_like, provider_like, dependency_type, criticality_impact, notes)
+    ("Retail Payments%", "Core Banking%", "DATA_FEED", "CRITICAL",
+     "SARIE/SADAD/mada posting requires the core-banking ledger."),
+    ("Cards & ATM Switch%", "Retail Payments%", "INTERNAL_PROCESS", "CRITICAL",
+     "Card authorisation settles over the retail-payment rails."),
+    ("Treasury & Trade Finance%", "Core Banking%", "DATA_FEED", "HIGH",
+     "Treasury marks-to-market against core-banking positions."),
+]
+for consumer, provider, dtype, cimpact, notes in CASCADE_EDGES:
+    run(
+        """
+        DECLARE @c BIGINT = (SELECT TOP 1 id FROM bcm.critical_processes WHERE organisation_id=? AND is_deleted=0 AND process_name_en LIKE ?);
+        DECLARE @p BIGINT = (SELECT TOP 1 id FROM bcm.critical_processes WHERE organisation_id=? AND is_deleted=0 AND process_name_en LIKE ?);
+        IF @c IS NOT NULL AND @p IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM bcm.process_dependencies
+            WHERE organisation_id=? AND is_deleted=0 AND process_id=@c AND depends_on_process_id=@p)
+        INSERT INTO bcm.process_dependencies
+            (organisation_id, process_id, depends_on_process_id, dependency_type, criticality_impact, notes)
+        VALUES (?, @c, @p, ?, ?, ?)
+        """,
+        ORG_TSS, consumer, ORG_TSS, provider, ORG_TSS, ORG_TSS, dtype, cimpact, notes,
+        label=f"edge: {consumer} <- {provider}",
+    )
+
+CASCADE_BIAS = [
+    # (proc_like, mtpd, rto, rpo, criticality, impact, owner, bu, notes)
+    ("Retail Payments%", 2, 1, 0, "CRITICAL", "CRITICAL", "Head of Payments", "Payments & Channels",
+     "SARIE/SADAD/mada — sub-2h MTPD per SAMA payments availability."),
+    ("Cards & ATM Switch%", 4, 2, 1, "CRITICAL", "HIGH", "Head of Cards", "Payments & Channels",
+     "mada switch — 4h MTPD; card-present fallback limited."),
+    ("Treasury & Trade Finance%", 24, 12, 4, "HIGH", "MEDIUM", "Head of Treasury", "Wholesale Banking",
+     "Murex treasury — 24h MTPD; same-day settlement window."),
+]
+for proc, mtpd, rto, rpo, crit, impact, owner, bu, notes in CASCADE_BIAS:
+    run(
+        """
+        DECLARE @pid BIGINT = (SELECT TOP 1 id FROM bcm.critical_processes WHERE organisation_id=? AND is_deleted=0 AND process_name_en LIKE ?);
+        IF @pid IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM bcm.bia_records WHERE organisation_id=? AND is_deleted=0 AND process_id=@pid)
+        INSERT INTO bcm.bia_records
+            (process_id, mtpd_hours, rto_hours, rpo_hours, criticality, overall_impact, status,
+             owner_name, business_unit, organisation_id, notes)
+        VALUES (@pid, ?, ?, ?, ?, ?, 'APPROVED', ?, ?, ?, ?)
+        """,
+        ORG_TSS, proc, ORG_TSS, mtpd, rto, rpo, crit, impact, owner, bu, ORG_TSS, notes,
+        label=f"BIA: {proc} (MTPD={mtpd}h)",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # Vendor onboarding rows — link to scm.vendors
 # ──────────────────────────────────────────────────────────────────────
 section("scm.vendor_onboarding — supplier onboarding pipeline")

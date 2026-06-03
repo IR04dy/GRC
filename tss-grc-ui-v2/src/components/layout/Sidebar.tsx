@@ -265,6 +265,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'bcm',             to: '/bcm',                   Icon: ShieldCheck,    labelKey: 'bcmWorkspaceSidebar' },
       { id: 'bcm-dash',        to: '/bcm/dashboard',         Icon: LayoutDashboard, labelKey: 'bcmDashSidebar' },
       { id: 'bcm-readiness',   to: '/bcm/readiness',         Icon: Activity,       labelKey: 'bcmReadinessSidebar' },
+      { id: 'bcm-cascade',     to: '/bcm/dependency-cascade', Icon: Network,       labelKey: 'cascadeSidebar' },
       {
         id: 'bia-wizard', to: '/bcm/bia', Icon: ClipboardCheck, labelKey: 'biaWizardSidebar',
         children: [

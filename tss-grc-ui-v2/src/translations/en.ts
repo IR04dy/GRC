@@ -2415,6 +2415,7 @@ export const en = {
   ermDashSidebar:         'Risk dashboard',
   bcmDashSidebar:         'BCM dashboard',
   bcmReadinessSidebar:    'BCM readiness',
+  cascadeSidebar:         'Dependency cascade',
   scmDashSidebar:         'Supply chain dashboard',
   cyberDashSidebar:       'Cyber dashboard',
   socopsSidebar:             'SOC operations',
