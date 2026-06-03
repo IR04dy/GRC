@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, FileText, Table, ChevronDown } from 'lucide-react';
+import { Download, FileText, Table, FileType2, ChevronDown } from 'lucide-react';
 import { Button } from './Button';
 import { ApiError } from '../../lib/api';
 
@@ -13,20 +13,21 @@ interface Toast {
  * Tiny PDF/Excel export dropdown. Reusable across pages.
  *
  * Props:
- *   onPdf  / onXlsx — async callbacks that perform the download
+ *   onPdf / onXlsx / onDocx — async callbacks that perform the download
  *   demoMode — when true, the menu is disabled and shows a tooltip
  */
 export function ExportMenu({
-  demoMode, t, toast, onPdf, onXlsx,
+  demoMode, t, toast, onPdf, onXlsx, onDocx,
 }: {
   demoMode: boolean;
   t: (k: string) => string;
   toast: Toast;
   onPdf?: () => Promise<void>;
   onXlsx?: () => Promise<void>;
+  onDocx?: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null);
+  const [busy, setBusy] = useState<'pdf' | 'xlsx' | 'docx' | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export function ExportMenu({
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  async function run(kind: 'pdf' | 'xlsx', fn?: () => Promise<void>) {
+  async function run(kind: 'pdf' | 'xlsx' | 'docx', fn?: () => Promise<void>) {
     if (!fn) return;
     setBusy(kind); setOpen(false);
     try { await fn(); toast.success(t('exportStarted')); }
@@ -69,6 +70,12 @@ export function ExportMenu({
             <button role="menuitem" onClick={() => run('pdf', onPdf)} style={menuItem}>
               <FileText size={14} style={{ color: 'var(--ink-3)' }} />
               <span>{t('exportPdf')}</span>
+            </button>
+          )}
+          {onDocx && (
+            <button role="menuitem" onClick={() => run('docx', onDocx)} style={menuItem}>
+              <FileType2 size={14} style={{ color: 'var(--ink-3)' }} />
+              <span>{t('exportDocx')}</span>
             </button>
           )}
           {onXlsx && (

@@ -391,6 +391,7 @@ export function RiskRegisterPage() {
             <ExportMenu
               demoMode={demoMode} t={t} toast={toast}
               onPdf={() => reportingApi.riskRegisterPdf(lang)}
+              onDocx={() => reportingApi.riskRegisterDocx(lang)}
               onXlsx={() => reportingApi.riskRegisterXlsx()}
             />
             <Button variant="primary"   Icon={Plus} onClick={startCreate}>{t('riskNew')}</Button>

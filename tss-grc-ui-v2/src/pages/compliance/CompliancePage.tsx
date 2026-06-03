@@ -765,6 +765,7 @@ export function CompliancePage() {
             <ExportMenu
               demoMode={isDemo} t={t} toast={toast}
               onPdf={() => reportingApi.findingsPdf((typeof navigator !== 'undefined' && navigator.language?.startsWith('ar')) ? 'ar' : 'en')}
+              onDocx={() => reportingApi.findingsDocx((typeof navigator !== 'undefined' && navigator.language?.startsWith('ar')) ? 'ar' : 'en')}
               onXlsx={() => reportingApi.findingsXlsx()}
             />
             {showNewButton && <Button variant="primary" Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>}

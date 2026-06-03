@@ -405,6 +405,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'intake',     to: '/intake',            Icon: Send,     labelKey: 'intakeCatalogTitle' },
       { id: 'capa',       to: '/capa',              Icon: Wrench,   labelKey: 'modCapa' },
       { id: 'board-pack', to: '/board-pack',        Icon: FileText, labelKey: 'boardPackSidebar' },
+      { id: 'reports-centre', to: '/reports/centre', Icon: Files,   labelKey: 'reportsCentreSidebar' },
       { id: 'schedules',  to: '/reports/schedules', Icon: Calendar, labelKey: 'rsTitle' },
       { id: 'kb',         to: '/knowledge-base',    Icon: BookOpen, labelKey: 'kbSidebar' },
       { id: 'comms',      to: '/communications',    Icon: Send,     labelKey: 'modCommunications' },

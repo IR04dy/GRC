@@ -132,6 +132,7 @@ export function DashboardPage() {
           <ExportMenu
             demoMode={isDemo} t={t} toast={toast}
             onPdf={() => reportingApi.riskRegisterPdf(lang)}
+            onDocx={() => reportingApi.riskRegisterDocx(lang)}
             onXlsx={() => reportingApi.riskRegisterXlsx()}
           />
         </div>

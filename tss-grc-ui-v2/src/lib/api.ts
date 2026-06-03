@@ -653,10 +653,13 @@ export const reportScheduleApi = {
 export const reportingApi = {
   riskRegisterPdf:  (lang: string) => downloadFile(`/api/v1/reporting/risk-register.pdf?lang=${encodeURIComponent(lang)}`, 'risk-register.pdf'),
   riskRegisterXlsx: () => downloadFile('/api/v1/reporting/risk-register.xlsx', 'risk-register.xlsx'),
+  riskRegisterDocx: (lang: string) => downloadFile(`/api/v1/reporting/risk-register.docx?lang=${encodeURIComponent(lang)}`, 'risk-register.docx'),
   findingsPdf:      (lang: string) => downloadFile(`/api/v1/reporting/findings-aging.pdf?lang=${encodeURIComponent(lang)}`, 'findings.pdf'),
   findingsXlsx:     () => downloadFile('/api/v1/reporting/findings-aging.xlsx', 'findings.xlsx'),
+  findingsDocx:     (lang: string) => downloadFile(`/api/v1/reporting/findings-aging.docx?lang=${encodeURIComponent(lang)}`, 'findings.docx'),
   kriPdf:           (lang: string) => downloadFile(`/api/v1/reporting/kri-dashboard.pdf?lang=${encodeURIComponent(lang)}`, 'kri-dashboard.pdf'),
   kriXlsx:          () => downloadFile('/api/v1/reporting/kri-dashboard.xlsx', 'kri-dashboard.xlsx'),
+  kriDocx:          (lang: string) => downloadFile(`/api/v1/reporting/kri-dashboard.docx?lang=${encodeURIComponent(lang)}`, 'kri-dashboard.docx'),
   // S1 — board pack
   boardPackPdf:     (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pdf?lang=${encodeURIComponent(lang)}`, 'board-pack.pdf'),
   boardPackPptx:    (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pptx?lang=${encodeURIComponent(lang)}`, 'board-pack.pptx'),

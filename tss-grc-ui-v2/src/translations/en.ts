@@ -193,6 +193,7 @@ export const en = {
   riskClearFilters:  'Clear all',
   exportPdf:           'Export as PDF',
   exportXlsx:          'Export as Excel',
+  exportDocx:          'Export as Word',
   exportStarted:       'Export started — your download should begin shortly',
   exportFailed:        'Export failed',
   exportSignInRequired:'Sign in to export',
@@ -3090,6 +3091,18 @@ export const en = {
   riskMatchedAs:               'Matched as',
   riskFwBadge:                 'Risk FW',
   complianceFwBadge:           'Compliance FW',
+
+  // Reports Centre — on-demand document exports hub
+  reportsCentreSidebar: 'Reports centre',
+  reportsCentreEyebrow: 'Reporting · Document exports',
+  reportsCentreTitle:   'Reports centre',
+  reportsCentreSub:     'Generate every board-grade GRC document on demand — PDF, Word, Excel and PowerPoint, in Arabic or English.',
+  rcKpiReports:         'Standard reports',
+  rcKpiFormats:         'Document formats',
+  rcKpiLanguages:       'Languages',
+  rcLangLabel:          'Document language',
+  rcAvailableFormats:   'Available formats',
+  rcRegulatoryHook:     'Regulatory use',
 
   // R4 — Scheduled reports
   rsEyebrow:           'Reporting · Automation',

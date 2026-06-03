@@ -191,6 +191,7 @@ export const ar = {
   riskClearFilters:  'مسح الكل',
   exportPdf:           'تصدير PDF',
   exportXlsx:          'تصدير Excel',
+  exportDocx:          'تصدير Word',
   exportStarted:       'بدأ التصدير — التنزيل بعد لحظات',
   exportFailed:        'فشل التصدير',
   exportSignInRequired:'سجل الدخول للتصدير',
@@ -3074,6 +3075,18 @@ export const ar = {
   riskMatchedAs:               'مطابقة كـ',
   riskFwBadge:                 'إطار مخاطر',
   complianceFwBadge:           'إطار امتثال',
+
+  // مركز التقارير — مركز تصدير المستندات عند الطلب
+  reportsCentreSidebar: 'مركز التقارير',
+  reportsCentreEyebrow: 'التقارير · تصدير المستندات',
+  reportsCentreTitle:   'مركز التقارير',
+  reportsCentreSub:     'أنشئ كل مستند حوكمة ومخاطر وامتثال بمستوى المجلس عند الطلب — PDF وWord وExcel وPowerPoint، بالعربية أو الإنجليزية.',
+  rcKpiReports:         'التقارير المعيارية',
+  rcKpiFormats:         'صيغ المستندات',
+  rcKpiLanguages:       'اللغات',
+  rcLangLabel:          'لغة المستند',
+  rcAvailableFormats:   'الصيغ المتاحة',
+  rcRegulatoryHook:     'الاستخدام الرقابي',
 
   // R4 — التقارير المجدولة
   rsEyebrow:           'التقارير · الأتمتة',

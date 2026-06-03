@@ -246,6 +246,7 @@ const CatalogPage               = lazy(() => import('./pages/dataOfficer/OtherPa
 const QualityPage               = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.QualityPage })));
 const DoEthicsPage              = lazy(() => import('./pages/dataOfficer/OtherPages').then(m => ({ default: m.EthicsPage })));
 const ReportSchedulesPage    = lazy(() => import('./pages/reporting/ReportSchedulesPage').then(m => ({ default: m.ReportSchedulesPage })));
+const ReportsCentrePage      = lazy(() => import('./pages/reporting/ReportsCentrePage').then(m => ({ default: m.ReportsCentrePage })));
 const RiskDetailPage         = lazy(() => import('./pages/risk/RiskDetailPage').then(m => ({ default: m.RiskDetailPage })));
 const FindingDetailPage      = lazy(() => import('./pages/detail/FindingDetailPage').then(m => ({ default: m.FindingDetailPage })));
 const ControlDetailPage      = lazy(() => import('./pages/detail/ControlDetailPage').then(m => ({ default: m.ControlDetailPage })));
@@ -683,6 +684,7 @@ export function App() {
               <Route path="/data-officer/quality"                 element={<QualityPage />} />
               <Route path="/data-officer/ethics"                  element={<DoEthicsPage />} />
 
+              <Route path="/reports/centre" element={<ReportsCentrePage />} />
               <Route path="/reports/schedules" element={<ReportSchedulesPage />} />
 
               {/* Sprint 11 P1 GRC — bow-tie routes registered BEFORE
