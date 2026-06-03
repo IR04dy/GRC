@@ -131,6 +131,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'reg-horizon',  to: '/regulatory/horizon',     Icon: Compass,        labelKey: 'regHorizonSidebar' },
       { id: 'ctrl-library', to: '/controls/library',       Icon: ShieldCheck,    labelKey: 'ctrlLibrarySidebar' },
       { id: 'crosswalk',    to: '/control-crosswalk',      Icon: GitBranch,      labelKey: 'cwSidebar' },
+      { id: 'ctrl-ai-map',  to: '/controls/ai-mapper',     Icon: Bot,            labelKey: 'aiCtrlMapSidebar' },
       { id: 'ccm-dash',     to: '/ccm/dashboard',          Icon: Activity,       labelKey: 'ccmDashSidebar' },
       { id: 'posture-hub',  to: '/compliance/posture',     Icon: BarChart3,      labelKey: 'postureHubSidebar' },
       { id: 'fw-packs',     to: '/framework-packs',        Icon: Layers,         labelKey: 'fpSidebar' },

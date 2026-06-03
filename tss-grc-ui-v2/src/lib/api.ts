@@ -1171,6 +1171,38 @@ export const drTestTrendApi = {
     api.get<DrTrendReport>(`/api/v1/bcm/dr-test-trend${quarters ? `?quarters=${quarters}` : ''}`),
 };
 
+// ─── AI-assisted control mapping (Sprint-8 Slice 8-E) ────────────────────────
+// POST /api/v1/controls/ai/suggest — given a free-text description of a risk,
+// finding, requirement or gap, returns the top-N matching controls from the
+// unified library (platform.controls). Deterministic scoring: blended Jaccard
+// token overlap + Saudi-native regulatory-keyword boost (SAMA/NCA/SDAIA/PDPL…)
+// + explicit control-code mention. No LLM — auditable + reproducible for a
+// SAMA/NCA examiner. confidence/jaccard are 0..1.
+export interface ControlSuggestion {
+  controlId: number;
+  controlCode: string;
+  domain: string;
+  titleEn: string;
+  titleAr?: string | null;
+  jaccard: number;       // 0..1 — raw token-overlap
+  confidence: number;    // 0..1 — blended jaccard + Saudi boost + code mention
+  rationale: string;     // human-readable explanation of the match
+}
+export interface ControlSuggestRequest {
+  description: string;
+  domain?: string;       // optional domain filter (CYBER | BCM | PRIVACY | …)
+  topN?: number;
+}
+export interface ControlSuggestResponse {
+  query: string;
+  suggestions: ControlSuggestion[];
+  totalScored: number;   // how many controls scored > 0 before the top-N cut
+}
+export const aiControlMapApi = {
+  suggest: (body: ControlSuggestRequest) =>
+    api.post<ControlSuggestResponse>('/api/v1/controls/ai/suggest', body),
+};
+
 // ─── PDPL data-flow graph (Sprint-8 Slice 8-C) ───────────────────────────────
 // GET /api/v1/privacy/data-flow-graph — a node-link graph over the RoPA
 // (privacy.processing_activities): CATEGORY → ACTIVITY → COUNTRY + MECHANISM,

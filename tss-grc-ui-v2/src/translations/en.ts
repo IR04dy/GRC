@@ -1295,6 +1295,7 @@ export const en = {
 
   // Control inheritance / crosswalks — Sprint 6 follow-on (B5).
   cwSidebar:               'Control crosswalks',
+  aiCtrlMapSidebar:        'AI control mapper',
   cwTitle:                 'Control Inheritance · Frameworks Crosswalk',
   cwSub:                   'One control · multiple frameworks satisfied.',
   cwEyebrow:               'Frameworks',

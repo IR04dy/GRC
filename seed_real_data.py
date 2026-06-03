@@ -572,6 +572,137 @@ for (code, ten, tar, system, site_type, site_loc, site_prov, owner,
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# platform.controls — Saudi-native unified control library. Gives the
+# AI-assisted control mapper (POST /api/v1/controls/ai/suggest) a real
+# corpus to score against. The bootstrap ships only a handful of stub
+# controls, so the deterministic Jaccard + Saudi-keyword scorer had
+# almost nothing to match. This adds ~24 richly-described controls across
+# CYBER (NCA ECC / CSCC / OTCC), BCM (SAMA BCM / NCEMA / ISO 22301),
+# PRIVACY (PDPL / SDAIA), TPRM (SAMA outsourcing), RISK and COMPLIANCE,
+# each with keyword-dense EN+AR descriptions so a free-text query returns
+# strong, explainable suggestions. control_type / automation_level /
+# status respect the table CHECK constraints. Parameterised pyodbc
+# (Arabic-safe), idempotent, SET NOCOUNT ON for clean @@ROWCOUNT.
+# ──────────────────────────────────────────────────────────────────────
+section("platform.controls — Saudi-native control library (AI-mapper corpus)")
+
+CONTROL_LIB = [
+    # (code, domain, title_en, title_ar, ctype, auto, freq, desc_en, desc_ar)
+    ("C-ECC-1-2", "CYBER", "Cybersecurity governance, strategy & steering committee",
+     "حوكمة الأمن السيبراني والاستراتيجية ولجنة الإشراف", "PREVENTIVE", "MANUAL", "ANNUAL",
+     "Establish a cybersecurity governance framework, approved strategy and a steering committee with board oversight and defined roles and responsibilities, aligned to NCA ECC 1-1/1-2 and the SAMA CSF governance domain.",
+     "إرساء إطار حوكمة الأمن السيبراني واستراتيجية معتمدة ولجنة إشراف بإشراف من المجلس وأدوار ومسؤوليات محددة، بما يتوافق مع الضوابط الأساسية للهيئة الوطنية للأمن السيبراني وإطار ساما."),
+    ("C-ECC-2-1", "CYBER", "Asset management & classification inventory",
+     "إدارة الأصول وتصنيف المخزون", "PREVENTIVE", "MANUAL", "ANNUAL",
+     "Maintain a complete inventory of information and technology assets with assigned ownership and data classification per NCA ECC 2-1, covering hardware, software, data, and cloud assets.",
+     "الاحتفاظ بمخزون كامل لأصول المعلومات والتقنية مع تحديد الملكية وتصنيف البيانات وفق ضوابط الهيئة، شاملاً الأجهزة والبرمجيات والبيانات والأصول السحابية."),
+    ("C-ECC-2-2", "CYBER", "Identity & access management — least privilege & MFA",
+     "إدارة الهوية والدخول — أقل صلاحية والتحقق متعدد العوامل", "PREVENTIVE", "SEMI", "CONTINUOUS",
+     "Enforce identity and access management with least-privilege and role-based access, multi-factor authentication, privileged-access controls and periodic access recertification per NCA ECC 2-2 and the SAMA CSF.",
+     "تطبيق إدارة الهوية والدخول بمبدأ أقل صلاحية والوصول حسب الدور والتحقق متعدد العوامل وضبط الصلاحيات المميزة وإعادة اعتماد الصلاحيات دوريًا وفق ضوابط الهيئة وإطار ساما."),
+    ("C-ECC-2-3", "CYBER", "Network security — segmentation & firewalls",
+     "أمن الشبكات — التجزئة والجدران النارية", "PREVENTIVE", "SEMI", "CONTINUOUS",
+     "Protect networks through segmentation, firewalls, intrusion prevention and secure remote access per NCA ECC 2-3, isolating the cardholder and core-banking zones from the corporate network.",
+     "حماية الشبكات عبر التجزئة والجدران النارية ومنع التسلل والوصول الآمن عن بُعد وفق ضوابط الهيئة، مع عزل نطاقات حاملي البطاقات والنظام البنكي الأساسي عن الشبكة المؤسسية."),
+    ("C-ECC-2-5", "CYBER", "Vulnerability management & penetration testing",
+     "إدارة الثغرات واختبار الاختراق", "DETECTIVE", "SEMI", "MONTHLY",
+     "Run continuous vulnerability scanning, risk-based patching and at least annual penetration testing of internet-facing and critical systems per NCA ECC 2-5 and the SAMA CSF.",
+     "إجراء فحص مستمر للثغرات والترقيع المبني على المخاطر واختبار اختراق سنوي للأنظمة الحرجة والمتصلة بالإنترنت وفق ضوابط الهيئة وإطار ساما."),
+    ("C-ECC-2-8", "CYBER", "Cryptography & key management",
+     "التشفير وإدارة المفاتيح", "PREVENTIVE", "AUTOMATED", "CONTINUOUS",
+     "Apply approved cryptography for personal and sensitive data at rest and in transit, using hardware security modules and a full key-management lifecycle per NCA ECC 2-8.",
+     "تطبيق التشفير المعتمد للبيانات الشخصية والحساسة أثناء التخزين والنقل باستخدام وحدات أمان مادية ودورة حياة كاملة لإدارة المفاتيح وفق ضوابط الهيئة."),
+    ("C-ECC-2-12", "CYBER", "Security event monitoring — SOC, SIEM & logging",
+     "مراقبة الأحداث الأمنية — مركز العمليات وسيم وإدارة السجلات", "DETECTIVE", "AUTOMATED", "CONTINUOUS",
+     "Operate a security operations centre with SIEM correlation, 24x7 monitoring and protected log retention to detect and respond to cyber incidents per NCA ECC 2-12 and the SAMA CSF.",
+     "تشغيل مركز عمليات أمنية مع ربط أحداث سيم ومراقبة على مدار الساعة وحفظ محمي للسجلات لاكتشاف الحوادث السيبرانية والاستجابة لها وفق ضوابط الهيئة وإطار ساما."),
+    ("C-ECC-2-13", "CYBER", "Backup & recovery management",
+     "إدارة النسخ الاحتياطي والاستعادة", "RECOVERY", "SEMI", "DAILY",
+     "Perform regular backups with secure offsite or immutable copies and periodic restoration testing to recover data after ransomware or failure per NCA ECC 2-13.",
+     "إجراء نسخ احتياطي منتظم مع نسخ خارجية أو غير قابلة للتعديل واختبار استعادة دوري لاستعادة البيانات بعد برامج الفدية أو الأعطال وفق ضوابط الهيئة."),
+    ("C-CSCC-4-1", "CYBER", "Third-party & cloud cybersecurity",
+     "الأمن السيبراني للأطراف الثالثة والسحابة", "PREVENTIVE", "MANUAL", "ANNUAL",
+     "Assess and contractually enforce cybersecurity requirements for third parties and cloud service providers per NCA CSCC and ECC 4-1, including data residency inside the Kingdom.",
+     "تقييم متطلبات الأمن السيبراني للأطراف الثالثة ومزوّدي الخدمات السحابية وفرضها تعاقديًا وفق ضوابط الأمن السيبراني للحوسبة السحابية، بما يشمل استضافة البيانات داخل المملكة."),
+    ("C-OTCC-1-1", "CYBER", "Operational technology & ICS security",
+     "أمن التقنيات التشغيلية وأنظمة التحكم الصناعي", "PREVENTIVE", "MANUAL", "ANNUAL",
+     "Protect operational-technology and industrial control systems through zoning, monitoring and hardening per NCA OTCC, isolating SCADA/DCS environments from corporate IT.",
+     "حماية التقنيات التشغيلية وأنظمة التحكم الصناعي عبر التقسيم والمراقبة والتحصين وفق ضوابط الأمن السيبراني للأنظمة التشغيلية، مع عزل بيئات سكادا عن تقنية المعلومات المؤسسية."),
+    ("C-BCM-BIA-1", "BCM", "Business impact analysis — MTPD, RTO & RPO",
+     "تحليل أثر الأعمال — أقصى مدة تعطّل ووقت ونقطة الاستعادة", "PREVENTIVE", "MANUAL", "ANNUAL",
+     "Conduct a business impact analysis for critical business processes establishing MTPD, RTO and RPO and the resource and vendor dependencies per the SAMA BCM framework and ISO 22301.",
+     "إجراء تحليل أثر الأعمال للعمليات الحرجة وتحديد أقصى مدة تعطّل مقبولة ووقت ونقطة الاستعادة والاعتماديات على الموارد والموردين وفق إطار استمرارية الأعمال لساما والمعيار الدولي 22301."),
+    ("C-BCM-DRP-1", "BCM", "Disaster recovery plan & alternate DR site",
+     "خطة التعافي من الكوارث والموقع البديل", "RECOVERY", "SEMI", "ANNUAL",
+     "Maintain disaster recovery plans and an alternate DR site for critical systems that meet the defined RTO and RPO per the SAMA BCM framework, with documented failover and failback steps.",
+     "الاحتفاظ بخطط التعافي من الكوارث وموقع تعافٍ بديل للأنظمة الحرجة يحقق وقت ونقطة الاستعادة المحددين وفق إطار ساما، مع توثيق خطوات التحويل والإرجاع."),
+    ("C-BCM-EX-1", "BCM", "Annual BCP & DR exercise with documented results",
+     "تمرين سنوي لاستمرارية الأعمال والتعافي مع توثيق النتائج", "DETECTIVE", "MANUAL", "ANNUAL",
+     "Exercise and test business continuity and disaster recovery plans at least annually, documenting results, gaps and remediation actions per the SAMA BCM framework and NCEMA.",
+     "اختبار خطط استمرارية الأعمال والتعافي من الكوارث سنويًا على الأقل وتوثيق النتائج والفجوات وإجراءات المعالجة وفق إطار ساما والمركز الوطني لإدارة الكوارث."),
+    ("C-BCM-CRISIS-1", "BCM", "Crisis management & emergency communications",
+     "إدارة الأزمات والاتصالات الطارئة", "CORRECTIVE", "MANUAL", "ON_EVENT",
+     "Establish a crisis-management team with escalation and emergency-communication procedures to coordinate the response to major disruptions per NCEMA and the SAMA BCM framework.",
+     "تشكيل فريق لإدارة الأزمات مع إجراءات التصعيد والاتصالات الطارئة لتنسيق الاستجابة للتعطّلات الكبرى وفق المركز الوطني لإدارة الكوارث وإطار ساما."),
+    ("C-PDPL-CNS-1", "PRIVACY", "Lawful basis & consent management",
+     "الأساس النظامي وإدارة الموافقة", "PREVENTIVE", "SEMI", "CONTINUOUS",
+     "Capture and manage data-subject consent and a documented lawful basis for processing personal data per PDPL Articles 5 and 6 as enforced by SDAIA.",
+     "توثيق وإدارة موافقة صاحب البيانات والأساس النظامي لمعالجة البيانات الشخصية وفق المادتين الخامسة والسادسة من نظام حماية البيانات الشخصية الذي تشرف عليه سدايا."),
+    ("C-PDPL-DSR-1", "PRIVACY", "Data-subject rights handling",
+     "معالجة حقوق أصحاب البيانات", "CORRECTIVE", "MANUAL", "ON_EVENT",
+     "Receive and fulfil data-subject access, rectification, erasure and objection requests within the statutory period per PDPL and SDAIA guidance.",
+     "استقبال وتلبية طلبات أصحاب البيانات في الوصول والتصحيح والمحو والاعتراض خلال المدة النظامية وفق نظام حماية البيانات وإرشادات سدايا."),
+    ("C-PDPL-XB-1", "PRIVACY", "Cross-border personal-data transfer adequacy",
+     "كفاية النقل الحدودي للبيانات الشخصية", "PREVENTIVE", "MANUAL", "ANNUAL",
+     "Assess adequacy, safeguards and approvals for any cross-border transfer of personal data outside the Kingdom per PDPL Article 29 and the SDAIA transfer regulations.",
+     "تقييم الكفاية والضمانات والموافقات لأي نقل حدودي للبيانات الشخصية خارج المملكة وفق المادة التاسعة والعشرين من النظام ولوائح النقل الصادرة عن سدايا."),
+    ("C-PDPL-BR-1", "PRIVACY", "Personal-data breach detection & notification",
+     "اكتشاف خرق البيانات الشخصية والإبلاغ عنه", "CORRECTIVE", "MANUAL", "ON_EVENT",
+     "Detect, assess and notify personal-data breaches to SDAIA and to affected data subjects within the required timeframe per PDPL.",
+     "اكتشاف وتقييم خروقات البيانات الشخصية والإبلاغ عنها إلى سدايا وإلى أصحاب البيانات المتأثرين خلال المدة المطلوبة وفق نظام حماية البيانات."),
+    ("C-PDPL-DPIA-1", "PRIVACY", "Data-protection impact assessment",
+     "تقييم أثر حماية البيانات", "DETECTIVE", "MANUAL", "ON_EVENT",
+     "Perform a data-protection impact assessment for high-risk processing of personal data before go-live per PDPL and SDAIA guidance.",
+     "إجراء تقييم أثر حماية البيانات للمعالجة عالية الخطورة للبيانات الشخصية قبل الإطلاق وفق نظام حماية البيانات وإرشادات سدايا."),
+    ("C-TPRM-DD-1", "TPRM", "Third-party due diligence & risk rating",
+     "العناية الواجبة للأطراف الثالثة وتقييم المخاطر", "PREVENTIVE", "MANUAL", "ANNUAL",
+     "Perform risk-based due diligence and inherent and residual risk rating before onboarding third parties and vendors per the SAMA outsourcing framework and TPRM policy.",
+     "إجراء العناية الواجبة المبنية على المخاطر وتقييم المخاطر الكامنة والمتبقية قبل ضم الأطراف الثالثة والموردين وفق إطار الإسناد لساما وسياسة إدارة مخاطر الأطراف الثالثة."),
+    ("C-TPRM-MAT-1", "TPRM", "Material outsourcing notification & approval",
+     "إشعار واعتماد الإسناد الجوهري", "PREVENTIVE", "MANUAL", "ON_EVENT",
+     "Identify material outsourcing arrangements and obtain the SAMA no-objection or notification before signing per the SAMA outsourcing framework.",
+     "تحديد ترتيبات الإسناد الجوهري والحصول على عدم ممانعة ساما أو إشعارها قبل التوقيع وفق إطار الإسناد الصادر عن ساما."),
+    ("C-TPRM-BCP-1", "TPRM", "Vendor BCP attestation & exit strategy",
+     "إقرار استمرارية المورّد واستراتيجية الخروج", "DETECTIVE", "MANUAL", "ANNUAL",
+     "Obtain vendor business-continuity attestations and maintain an exit and step-in strategy for critical and material service providers per the SAMA outsourcing framework.",
+     "الحصول على إقرارات استمرارية الأعمال من الموردين والاحتفاظ باستراتيجية خروج وتدخّل لمزوّدي الخدمات الحرجين والجوهريين وفق إطار الإسناد لساما."),
+    ("C-RISK-RCSA-1", "RISK", "Risk & control self-assessment with KRIs",
+     "التقييم الذاتي للمخاطر والضوابط مع مؤشرات المخاطر", "DETECTIVE", "MANUAL", "QUARTERLY",
+     "Perform periodic risk and control self-assessment, define key risk indicators and monitor them against the board-approved risk appetite per SAMA operational-risk requirements and the ERM policy.",
+     "إجراء تقييم ذاتي دوري للمخاطر والضوابط وتحديد مؤشرات المخاطر الرئيسة ومراقبتها مقابل سقف تقبّل المخاطر المعتمد من المجلس وفق متطلبات المخاطر التشغيلية لساما وسياسة إدارة المخاطر المؤسسية."),
+    ("C-AML-SCR-1", "COMPLIANCE", "Sanctions & PEP screening",
+     "فحص العقوبات والأشخاص المعرّضين سياسيًا", "DETECTIVE", "AUTOMATED", "CONTINUOUS",
+     "Screen customers and transactions against sanctions and politically-exposed-person lists and report suspicious activity per the SAMA AML/CFT rules and the Saudi sanctions regime.",
+     "فحص العملاء والمعاملات مقابل قوائم العقوبات والأشخاص المعرّضين سياسيًا والإبلاغ عن الأنشطة المشبوهة وفق قواعد مكافحة غسل الأموال لساما ونظام العقوبات السعودي."),
+]
+for code, domain, ten, tar, ctype, auto, freq, den, dar in CONTROL_LIB:
+    run(
+        """
+        SET NOCOUNT ON;
+        IF NOT EXISTS (SELECT 1 FROM platform.controls
+                       WHERE organisation_id=? AND control_code=?)
+        INSERT INTO platform.controls
+            (organisation_id, control_code, domain, title_en, title_ar,
+             description_en, description_ar, control_type, automation_level,
+             frequency, status, version, is_deleted, created_at, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', '1.0', 0, SYSUTCDATETIME(), 'seed')
+        """,
+        ORG_TSS, code,
+        ORG_TSS, code, domain, ten, tar, den, dar, ctype, auto, freq,
+        label=f"control: {code} ({domain})",
+    )
+
+# ──────────────────────────────────────────────────────────────────────
 # Vendor onboarding rows — link to scm.vendors
 # ──────────────────────────────────────────────────────────────────────
 section("scm.vendor_onboarding — supplier onboarding pipeline")
