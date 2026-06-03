@@ -1997,6 +1997,25 @@ export const fairApi = {
   calculate: (body: FairInputs) => api.post<FairResult>('/api/v1/risk/fair/calculate', body),
 };
 
+// ─── Active sessions (refresh-token store) — self-service security ────────────
+// GET/DELETE /api/v1/auth/sessions — list my active refresh-token sessions and
+// revoke them individually or all at once ("sign out everywhere").
+export interface AuthSessionDto {
+  id: number;
+  issuedAt: string;
+  expiresAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  revokedAt?: string;
+  revokeReason?: string;
+  active: boolean;
+}
+export const sessionsApi = {
+  listMine:  () => api.get<AuthSessionDto[]>('/api/v1/auth/sessions'),
+  revoke:    (id: number) => api.delete<{ id: number; status: string }>(`/api/v1/auth/sessions/${id}`),
+  revokeAll: () => api.post<{ userId: number; revoked: number; status: string }>('/api/v1/auth/sessions/revoke-all'),
+};
+
 // ─── Departments (platform) — used to route an evidence request to an owner ──
 export interface DepartmentDto {
   id: number; code?: string; nameEn: string; nameAr?: string;

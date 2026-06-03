@@ -275,6 +275,7 @@ const IssuesPage             = lazy(() => import('./pages/platform/IssuesPage').
 const RegulatoryHorizonPage  = lazy(() => import('./pages/compliance/RegulatoryHorizonPage').then(m => ({ default: m.RegulatoryHorizonPage })));
 const CyberCloudServicesPage = lazy(() => import('./pages/cyber/CyberCloudServicesPage').then(m => ({ default: m.CyberCloudServicesPage })));
 const FairCalculatorPage     = lazy(() => import('./pages/risk/FairCalculatorPage').then(m => ({ default: m.FairCalculatorPage })));
+const SessionsPage           = lazy(() => import('./pages/account/SessionsPage').then(m => ({ default: m.SessionsPage })));
 const ApprovalInboxPage      = lazy(() => import('./pages/approvals/ApprovalInboxPage').then(m => ({ default: m.ApprovalInboxPage })));
 const SignaturesPage         = lazy(() => import('./pages/signatures/SignaturesPage').then(m => ({ default: m.SignaturesPage })));
 const AssetRegisterPage      = lazy(() => import('./pages/assets/AssetRegisterPage').then(m => ({ default: m.AssetRegisterPage })));
@@ -810,6 +811,7 @@ export function App() {
               <Route path="/regulatory/horizon" element={<RegulatoryHorizonPage />} />
               <Route path="/cyber/cloud-services" element={<CyberCloudServicesPage />} />
               <Route path="/risk/fair"          element={<FairCalculatorPage />} />
+              <Route path="/account/sessions"   element={<SessionsPage />} />
               <Route path="/attestations"       element={<AttestationCampaignsPage />} />
 
               {/* Cross-module approval inbox (Sprint 5) */}
