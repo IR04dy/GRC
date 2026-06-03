@@ -13,7 +13,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Scale,
          ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
          Cloud, ChevronRight, ScrollText, Archive, GraduationCap,
-         Calculator,
+         Calculator, Radar,
          type LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -189,6 +189,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'fw-ctrls', to: '/framework-controls', Icon: BookOpen,    labelKey: 'fwcSidebar' },
       { id: 'assets',   to: '/assets',             Icon: Server,      labelKey: 'assetsSidebar' },
       { id: 'cloud-svc', to: '/cyber/cloud-services', Icon: Cloud,    labelKey: 'cloudServicesSidebar' },
+      { id: 'ti-correlate', to: '/cyber/threat-intel', Icon: Radar,   labelKey: 'threatIntelSidebar' },
     ],
   },
 

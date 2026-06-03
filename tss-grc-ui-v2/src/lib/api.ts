@@ -1972,6 +1972,55 @@ export const cyberCloudServicesApi = {
   stats:  () => api.get<Record<string, number>>('/api/v1/cyber/cloud-services/stats'),
 };
 
+// ─── Threat-intel IOC correlation (Sprint-8 Slice 8-D) ───────────────────────
+// POST /api/v1/cyber/threat-intel/correlate — match an IOC bundle (CVE / IP /
+// HOSTNAME) against the tenant's cyber_assets + vulnerabilities. Pure read
+// aggregator; no persistence. regulatorEscalation=true → SAMA Cyber Framework
+// §3.5 4-hour notification clock should start. Distinct from the SOC-ops
+// threat-intel module (/api/v1/socops/...).
+export type IocType = 'CVE' | 'IP' | 'HOSTNAME';
+export type IocSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+export const IOC_TYPES: IocType[] = ['CVE', 'IP', 'HOSTNAME'];
+export const IOC_SEVERITIES: IocSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
+export interface IndicatorOfCompromise {
+  type: IocType | string;
+  value: string;
+  severity?: IocSeverity | string;
+  sourceFeed?: string;
+  context?: string;
+}
+export interface ThreatIntelRequest {
+  feedName: string;
+  feedTimestamp?: string;
+  indicators: IndicatorOfCompromise[];
+}
+export interface CorrelationHit {
+  iocType: string;
+  iocValue: string;
+  iocSeverity?: string;
+  matchedEntityType: string;   // VULNERABILITY | ASSET
+  matchedEntityId: number;
+  matchedTitleEn?: string;
+  matchedTitleAr?: string;
+  matchedSeverity?: string;
+  blendedSeverity: string;
+  assetName?: string;
+  sourceFeed?: string;
+}
+export interface CorrelationReport {
+  feedName?: string;
+  evaluatedAt: string;
+  hits: CorrelationHit[];
+  matchCount: number;
+  distinctIocsMatched: number;
+  distinctEntitiesMatched: number;
+  regulatorEscalation: boolean;
+}
+export const threatIntelApi = {
+  correlate: (body: ThreatIntelRequest) =>
+    api.post<CorrelationReport>('/api/v1/cyber/threat-intel/correlate', body),
+};
+
 // ─── FAIR quantitative-risk calculator (Sprint-8 Slice 8-A) ──────────────────
 // POST /api/v1/risk/fair/calculate — stateless Monte-Carlo over four triangular
 // factors → annualised loss exposure (ALE) distribution. No DB, no persistence.

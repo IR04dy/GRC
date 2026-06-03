@@ -276,6 +276,7 @@ const RegulatoryHorizonPage  = lazy(() => import('./pages/compliance/RegulatoryH
 const CyberCloudServicesPage = lazy(() => import('./pages/cyber/CyberCloudServicesPage').then(m => ({ default: m.CyberCloudServicesPage })));
 const FairCalculatorPage     = lazy(() => import('./pages/risk/FairCalculatorPage').then(m => ({ default: m.FairCalculatorPage })));
 const SessionsPage           = lazy(() => import('./pages/account/SessionsPage').then(m => ({ default: m.SessionsPage })));
+const ThreatIntelCorrelationPage = lazy(() => import('./pages/cyber/ThreatIntelCorrelationPage').then(m => ({ default: m.ThreatIntelCorrelationPage })));
 const ApprovalInboxPage      = lazy(() => import('./pages/approvals/ApprovalInboxPage').then(m => ({ default: m.ApprovalInboxPage })));
 const SignaturesPage         = lazy(() => import('./pages/signatures/SignaturesPage').then(m => ({ default: m.SignaturesPage })));
 const AssetRegisterPage      = lazy(() => import('./pages/assets/AssetRegisterPage').then(m => ({ default: m.AssetRegisterPage })));
@@ -812,6 +813,7 @@ export function App() {
               <Route path="/cyber/cloud-services" element={<CyberCloudServicesPage />} />
               <Route path="/risk/fair"          element={<FairCalculatorPage />} />
               <Route path="/account/sessions"   element={<SessionsPage />} />
+              <Route path="/cyber/threat-intel" element={<ThreatIntelCorrelationPage />} />
               <Route path="/attestations"       element={<AttestationCampaignsPage />} />
 
               {/* Cross-module approval inbox (Sprint 5) */}
