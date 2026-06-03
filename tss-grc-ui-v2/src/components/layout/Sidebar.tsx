@@ -419,6 +419,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'sso',           to: '/sso',                    Icon: LockKeyhole,  labelKey: 'ssoSidebar' },
       { id: 'wf-versions',   to: '/workflow-versions',      Icon: Layers,       labelKey: 'wvSidebar' },
       { id: 'connectors',    to: '/connectors',             Icon: Plug,         labelKey: 'connectorsTitle' },
+      { id: 'audit-log',     to: '/audit-log',              Icon: ScrollText,   labelKey: 'auditLogTitle' },
       {
         id: 'notif-dispatch', to: '/notifications/dispatch', Icon: Send, labelKey: 'ndSidebar',
         children: [

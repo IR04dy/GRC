@@ -2391,13 +2391,44 @@ export interface AuditLogEntryDto {
   severity: string;
   message?: string | null;
   createdAt: string;
+  sourceEndpoint?: string | null;
+  ipAddress?: string | null;
   workflowStatusBefore?: string | null;
   workflowStatusAfter?: string | null;
+}
+export interface AuditLogPageDto {
+  content: AuditLogEntryDto[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+export interface AuditLogFilters {
+  actionType?: string;
+  sourceModule?: string;
+  severity?: string;
+  page?: number;
+  size?: number;
 }
 export const auditLogApi = {
   historyFor: (entityType: string, entityId: number) =>
     api.get<AuditLogEntryDto[]>(
       `/api/v1/audit-log/history?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
+  /** Platform-wide audit log — filterable + paginated (F7). */
+  list: (f: AuditLogFilters = {}) => {
+    const q = new URLSearchParams();
+    if (f.actionType)   q.set('actionType', f.actionType);
+    if (f.sourceModule) q.set('sourceModule', f.sourceModule);
+    if (f.severity)     q.set('severity', f.severity);
+    q.set('page', String(f.page ?? 0));
+    q.set('size', String(f.size ?? 100));
+    return api.get<AuditLogPageDto>(`/api/v1/audit-log?${q.toString()}`);
+  },
+  /** Rolling 24-hour counts: { events, warns, errors }. */
+  stats: () => api.get<Record<string, number>>(`/api/v1/audit-log/stats`),
+  /** Follow one business action across modules via its correlation id. */
+  trace: (correlationId: string) =>
+    api.get<AuditLogEntryDto[]>(`/api/v1/audit-log/trace/${encodeURIComponent(correlationId)}`),
 };
 
 // ── Automation rule runs — F8 ─────────────────────────────────────────
