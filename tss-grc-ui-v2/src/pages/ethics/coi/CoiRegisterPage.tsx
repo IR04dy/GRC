@@ -17,6 +17,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { Input, Textarea } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { useI18n } from '../../../lib/i18n';
+import { useToast } from '../../../lib/toast';
 import { ApiError } from '../../../lib/api';
 import { isAuthenticated } from '../../../lib/auth';
 import {
@@ -446,6 +447,7 @@ function DeclarationForm({
 
 function RecusalLogPanel() {
   const { lang, t } = useI18n();
+  const toast = useToast();
   const demoMode = !isAuthenticated();
 
   const [userId, setUserId] = useState('');
@@ -456,6 +458,52 @@ function RecusalLogPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<RecusalResponse | null>(null);
+
+  // Record a recusal applied at a meeting (SAMA CG Art.18 / CMA CG Art.41–43).
+  // listRecusalsByUser already backed this panel; this closes the write path.
+  const [showRecord, setShowRecord] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [rUser, setRUser] = useState('');
+  const [rCommittee, setRCommittee] = useState('');
+  const [rMeeting, setRMeeting] = useState('');
+  const [rDate, setRDate] = useState('');
+  const [rDecl, setRDecl] = useState('');
+  const [rReasonEn, setRReasonEn] = useState('');
+  const [rReasonAr, setRReasonAr] = useState('');
+  const [rAgenda, setRAgenda] = useState('');
+
+  function openRecord() {
+    setRUser(userId || ''); setRCommittee(committee || '');
+    setRMeeting(''); setRDate(''); setRDecl(''); setRReasonEn(''); setRReasonAr(''); setRAgenda('');
+    setShowRecord(true);
+  }
+
+  async function submitRecord() {
+    const uid = parseInt(rUser, 10);
+    if (!Number.isFinite(uid) || !rCommittee.trim() || !rMeeting.trim() || !rDate
+        || !rReasonEn.trim() || !rReasonAr.trim()) return;
+    setSaving(true);
+    try {
+      await coiApi.recordRecusal({
+        userId: uid,
+        declarationId: rDecl ? parseInt(rDecl, 10) : undefined,
+        committeeCode: rCommittee.trim(),
+        meetingReference: rMeeting.trim(),
+        recusalDate: `${rDate}T00:00:00`,
+        recusalReasonEn: rReasonEn.trim(),
+        recusalReasonAr: rReasonAr.trim(),
+        agendaItems: rAgenda.trim() || undefined,
+      });
+      toast.success(lang === 'ar' ? 'سُجِّل التنحّي' : 'Recusal recorded');
+      setShowRecord(false);
+      setUserId(String(uid)); // pivot the filter to the recorded user
+      const r = await coiApi.listRecusalsByUser(uid).catch(() => [] as RecusalResponse[]);
+      setRows(r);
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message
+        : (lang === 'ar' ? 'تعذّر تسجيل التنحّي' : 'Failed to record recusal'));
+    } finally { setSaving(false); }
+  }
 
   async function loadByUser() {
     if (demoMode || !userId) { setRows([]); return; }
@@ -531,6 +579,9 @@ function RecusalLogPanel() {
           <Button size="md" variant="primary" onClick={loadByUser}>
             {lang === 'ar' ? 'بحث' : 'Search'}
           </Button>
+          <Button size="md" variant="secondary" Icon={UserMinus} onClick={openRecord}>
+            {lang === 'ar' ? 'تسجيل تنحٍّ' : 'Record recusal'}
+          </Button>
         </div>
       </Card>
 
@@ -553,6 +604,33 @@ function RecusalLogPanel() {
           )}
         </Card>
       </div>
+
+      <Modal
+        open={showRecord}
+        title={lang === 'ar' ? 'تسجيل تنحٍّ' : 'Record a recusal'}
+        onClose={() => setShowRecord(false)}
+        size="md"
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <Input label={`${t('coi.employee')} ID *`} type="number" value={rUser} onChange={e => setRUser(e.target.value)} />
+          <Input label={lang === 'ar' ? 'رمز اللجنة *' : 'Committee code *'} value={rCommittee} onChange={e => setRCommittee(e.target.value)} placeholder="BOARD-RISK" />
+          <Input label={lang === 'ar' ? 'مرجع الاجتماع *' : 'Meeting reference *'} value={rMeeting} onChange={e => setRMeeting(e.target.value)} placeholder="BRC-2026-04" />
+          <Input label={lang === 'ar' ? 'تاريخ التنحّي *' : 'Recusal date *'} type="date" value={rDate} onChange={e => setRDate(e.target.value)} />
+          <Input label={lang === 'ar' ? 'مُعرّف الإقرار (اختياري)' : 'Declaration ID (optional)'} type="number" value={rDecl} onChange={e => setRDecl(e.target.value)} />
+          <Input label={lang === 'ar' ? 'بنود جدول الأعمال (اختياري)' : 'Agenda items (optional)'} value={rAgenda} onChange={e => setRAgenda(e.target.value)} placeholder={lang === 'ar' ? 'البند 4: اعتماد تمويل' : 'Item 4: facility approval'} />
+        </div>
+        <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+          <Textarea label={lang === 'ar' ? 'سبب التنحّي (إنجليزي) *' : 'Recusal reason (English) *'} rows={2} value={rReasonEn} onChange={e => setRReasonEn(e.target.value)} />
+          <Textarea label={lang === 'ar' ? 'سبب التنحّي (عربي) *' : 'Recusal reason (Arabic) *'} rows={2} value={rReasonAr} onChange={e => setRReasonAr(e.target.value)} dir="rtl" />
+        </div>
+        <div style={{ marginTop: 14, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={() => setShowRecord(false)}>{lang === 'ar' ? 'إلغاء' : 'Cancel'}</Button>
+          <Button variant="primary" onClick={submitRecord}
+            disabled={saving || !rUser || !rCommittee.trim() || !rMeeting.trim() || !rDate || !rReasonEn.trim() || !rReasonAr.trim()}>
+            {saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : (lang === 'ar' ? 'تسجيل التنحّي' : 'Record recusal')}
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         open={selected !== null}
