@@ -197,6 +197,28 @@ export interface MilestoneRecordRequest {
 
 const BASE = '/api/v1/ia';
 
+/** One auditable entity for the universe bulk-import (subset of UniverseCreateRequest). */
+export interface UniverseEntryCreate {
+  entryCode: string;
+  titleEn: string;
+  titleAr: string;
+  processNameEn?: string;
+  businessUnitEn?: string;
+  inherentRiskScore?: number;
+  controlEnvironmentScore?: number;
+  plannedAuditYear?: number;
+  plannedQuarter?: string;
+}
+export interface UniverseBulkImportRequest {
+  planId?: number;
+  entries: UniverseEntryCreate[];
+}
+export interface UniverseBulkImportResponse {
+  totalSubmitted: number;
+  created: number;
+  skippedExisting: number;
+}
+
 export const iaApi = {
   // Plans
   listPlans:    () => api.get<IaPlan[]>(`${BASE}/plan`),
@@ -210,6 +232,11 @@ export const iaApi = {
   listAllUniverse:    () => api.get<IaUniverseEntry[]>(`${BASE}/universe`),
   listMasterUniverse: () => api.get<IaUniverseEntry[]>(`${BASE}/universe/master`),
   listUniverseForPlan: (planId: number) => api.get<IaUniverseEntry[]>(`${BASE}/universe/by-plan/${planId}`),
+  /** Re-run inherent × (1 − control-environment strength) → residual for one entry. */
+  recomputeUniverseResidual: (id: number) => api.post<IaUniverseEntry>(`${BASE}/universe/${id}/recompute-residual`),
+  /** Load a batch of auditable entities into the universe (IF-NOT-EXISTS on entryCode). */
+  bulkImportUniverse: (req: UniverseBulkImportRequest) =>
+    api.post<UniverseBulkImportResponse>(`${BASE}/universe/bulk-import`, req),
 
   // Engagements
   listAllEngagements: () => api.get<IaEngagement[]>(`${BASE}/engagements`),

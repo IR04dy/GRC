@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, RefreshCw, Search } from 'lucide-react';
+import { Flame, RefreshCw, Search, Calculator, Upload } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
-import { iaApi, residualBand, type IaUniverseEntry } from '../../lib/iaPlan';
+import { useToast } from '../../lib/toast';
+import { ApiError } from '../../lib/api';
+import {
+  iaApi, residualBand,
+  type IaUniverseEntry, type UniverseEntryCreate,
+} from '../../lib/iaPlan';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -44,11 +50,14 @@ const BAND_LABEL_AR: Record<ReturnType<typeof residualBand>, string> = {
 export function IaUniversePage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
+  const toast = useToast();
 
   const [state, setState] = useState<LoadState>('idle');
   const [entries, setEntries] = useState<IaUniverseEntry[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   async function load() {
     setState('loading'); setErr(null);
@@ -62,6 +71,56 @@ export function IaUniversePage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  // Re-run inherent × (1 − control-environment strength) → residual for one entry.
+  async function onRecompute(entry: IaUniverseEntry) {
+    setBusyId(entry.id);
+    try {
+      const updated = await iaApi.recomputeUniverseResidual(entry.id);
+      setEntries(prev => prev.map(x => (x.id === updated.id ? updated : x)));
+      toast.success(isAr
+        ? `أُعيد احتساب الخطر المتبقي: ${updated.residualRiskScore?.toFixed(2) ?? '—'}`
+        : `Residual recomputed: ${updated.residualRiskScore?.toFixed(2) ?? '—'}`);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إعادة الاحتساب' : 'Recompute failed'));
+    } finally { setBusyId(null); }
+  }
+
+  async function submitImport(v: { planId: string; rows: string }): Promise<void> {
+    const lines = v.rows.split('\n').map(s => s.trim()).filter(Boolean);
+    if (lines.length === 0) { toast.danger(isAr ? 'لا صفوف للاستيراد' : 'No rows to import'); return; }
+    const parsed: UniverseEntryCreate[] = lines.map(line => {
+      const [code, titleEn, titleAr, bu, inh, ctrl] = line.split('|').map(s => s.trim());
+      return {
+        entryCode: code,
+        titleEn: titleEn || code,
+        titleAr: titleAr || titleEn || code,
+        businessUnitEn: bu || undefined,
+        inherentRiskScore: inh ? Number(inh) : undefined,
+        controlEnvironmentScore: ctrl ? Number(ctrl) : undefined,
+      };
+    }).filter(e => e.entryCode);
+    if (parsed.length === 0) { toast.danger(isAr ? 'تعذّر تحليل أي صف' : 'Could not parse any rows'); return; }
+    try {
+      const planId = v.planId.trim() ? Number(v.planId) : undefined;
+      const res = await iaApi.bulkImportUniverse({ planId, entries: parsed });
+      toast.success(isAr
+        ? `استيراد: ${res.created} جديد · ${res.skippedExisting} موجود مسبقاً (من ${res.totalSubmitted})`
+        : `Imported ${res.created} new · ${res.skippedExisting} existing (of ${res.totalSubmitted})`);
+      setImportOpen(false);
+      await load();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل الاستيراد' : 'Import failed'));
+    }
+  }
+
+  const importFields: FieldDef[] = [
+    { kind: 'text', key: 'planId', label: isAr ? 'معرّف الخطة (اختياري)' : 'Plan id (optional)', span: 12 },
+    { kind: 'textarea', key: 'rows', rows: 8, span: 12,
+      label: isAr
+        ? 'صف لكل سطر — الرمز | العنوان EN | العنوان AR | الوحدة | متأصل | بيئة الضبط'
+        : 'One row per line — Code | Title EN | Title AR | Business unit | Inherent | Control-env' },
+  ];
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return entries;
@@ -111,6 +170,9 @@ export function IaUniversePage() {
             <Link to="/audit/ia/plans">
               <Button variant="ghost" size="sm">{isAr ? 'الخطط' : 'Annual plans'}</Button>
             </Link>
+            <Button variant="primary" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload size={14} /> {isAr ? 'استيراد دفعة' : 'Bulk import'}
+            </Button>
           </>
         }
       />
@@ -164,7 +226,7 @@ export function IaUniversePage() {
                 {rows.map(e => (
                   <div key={e.id} style={{
                     padding: 10, borderBottom: '1px solid var(--border)',
-                    display: 'grid', gridTemplateColumns: '140px 1fr auto auto auto',
+                    display: 'grid', gridTemplateColumns: '140px 1fr auto auto auto auto',
                     gap: 12, alignItems: 'center',
                   }}>
                     <div style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700 }}>{e.entryCode}</div>
@@ -187,6 +249,12 @@ export function IaUniversePage() {
                         <Badge tone="info">{e.plannedQuarter} {e.plannedAuditYear}</Badge>
                       )}
                     </div>
+                    <Button variant="ghost" size="sm" disabled={busyId === e.id}
+                      title={isAr ? 'إعادة احتساب الخطر المتبقي' : 'Recompute residual risk'}
+                      onClick={() => void onRecompute(e)}>
+                      <Calculator size={13} />
+                      <span style={{ marginInlineStart: 4 }}>{isAr ? 'احتساب' : 'Recompute'}</span>
+                    </Button>
                   </div>
                 ))}
               </Card>
@@ -194,6 +262,16 @@ export function IaUniversePage() {
           })}
         </div>
       )}
+
+      <FormModal<{ planId: string; rows: string }>
+        open={importOpen}
+        title={isAr ? 'استيراد دفعة عمليات للجَردة' : 'Bulk-import universe entries'}
+        fields={importFields}
+        initial={{ planId: '', rows: '' }}
+        onClose={() => setImportOpen(false)}
+        onSubmit={submitImport}
+        submitLabel={isAr ? 'استيراد' : 'Import'}
+      />
     </Shell>
   );
 }
