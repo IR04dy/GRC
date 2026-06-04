@@ -7,10 +7,13 @@ import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { Kpi } from '../../components/ui/Kpi';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
-import { ApiError } from '../../lib/api';
+import { ApiError, tprmApi, type TprmVendorDto } from '../../lib/api';
 import {
   asmApi,
   ASM_ASSET_TYPE_LABEL,
@@ -46,6 +49,7 @@ type Tab = 'assets' | 'findings' | 'shadowIt';
  */
 export function AttackSurfacePage() {
   const { lang } = useI18n();
+  const toast = useToast();
   const demoMode = !isAuthenticated();
 
   const [tab, setTab] = useState<Tab>('assets');
@@ -54,6 +58,14 @@ export function AttackSurfacePage() {
   const [shadowIt, setShadowIt] = useState<ShadowItResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Shadow-IT governance action (sanction / block) modal state.
+  const [actionTarget, setActionTarget] = useState<ShadowItResponse | null>(null);
+  const [actionMode, setActionMode] = useState<'sanction' | 'block'>('sanction');
+  const [vendors, setVendors] = useState<TprmVendorDto[]>([]);
+  const [selVendorId, setSelVendorId] = useState<number | ''>('');
+  const [actionNote, setActionNote] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
 
   // Filters per tab
   const [filterAssetType, setFilterAssetType] = useState<'ALL' | AsmAssetType>('ALL');
@@ -82,6 +94,46 @@ export function AttackSurfacePage() {
     }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  // ─── Shadow-IT governance actions ───────────────────────────────
+
+  const SHADOW_IT_ACTIONABLE = (s: ShadowItResponse) =>
+    s.status === 'PENDING_REVIEW' || s.status === 'IN_PROGRESS';
+
+  function openSanction(s: ShadowItResponse) {
+    setActionTarget(s); setActionMode('sanction'); setSelVendorId(''); setActionNote('');
+    if (vendors.length === 0) {
+      tprmApi.vendors(0, 200).then(p => setVendors(p.content ?? [])).catch(() => { /* picker stays empty */ });
+    }
+  }
+  function openBlock(s: ShadowItResponse) {
+    setActionTarget(s); setActionMode('block'); setActionNote('');
+  }
+  function closeAction() { setActionTarget(null); setActionNote(''); setSelVendorId(''); }
+
+  async function submitAction() {
+    if (!actionTarget) return;
+    if (actionMode === 'sanction' && !selVendorId) {
+      toast.danger(lang === 'ar' ? 'اختر مورّداً معتمداً' : 'Select a sanctioned vendor');
+      return;
+    }
+    setActionBusy(true);
+    try {
+      if (actionMode === 'sanction') {
+        await asmApi.sanctionShadowIt(actionTarget.externalId, selVendorId as number, actionNote.trim() || undefined);
+        toast.success(lang === 'ar' ? `${actionTarget.serviceName}: تم الاعتماد` : `${actionTarget.serviceName} sanctioned`);
+      } else {
+        await asmApi.blockShadowIt(actionTarget.externalId, actionNote.trim() || undefined);
+        toast.success(lang === 'ar' ? `${actionTarget.serviceName}: تم الحجب` : `${actionTarget.serviceName} blocked`);
+      }
+      closeAction();
+      await load();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Action failed');
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
   // ─── KPI computations ───────────────────────────────────────────
 
@@ -250,6 +302,19 @@ export function AttackSurfacePage() {
           {SHADOW_IT_STATUS_LABEL[r.status][lang === 'ar' ? 'ar' : 'en']}
         </Badge>
       ),
+    },
+    {
+      header: lang === 'ar' ? 'الإجراء' : 'Action', width: '190px', align: 'center',
+      cell: r => SHADOW_IT_ACTIONABLE(r) ? (
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+          <Button size="sm" variant="secondary" onClick={() => openSanction(r)}>
+            {lang === 'ar' ? 'اعتماد' : 'Sanction'}
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => openBlock(r)}>
+            {lang === 'ar' ? 'حجب' : 'Block'}
+          </Button>
+        </div>
+      ) : <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>,
     },
   ];
 
@@ -427,6 +492,61 @@ export function AttackSurfacePage() {
           />
         )}
       </Card>
+
+      {actionTarget && (
+        <Modal open onClose={closeAction} size="md"
+          title={actionMode === 'sanction'
+            ? (lang === 'ar' ? 'اعتماد خدمة تقنية الظل' : 'Sanction shadow IT')
+            : (lang === 'ar' ? 'حجب خدمة تقنية الظل' : 'Block shadow IT')}
+          footer={<>
+            <Button variant="ghost" onClick={closeAction}>{lang === 'ar' ? 'إلغاء' : 'Cancel'}</Button>
+            <Button variant={actionMode === 'block' ? 'danger' : 'primary'} disabled={actionBusy} onClick={submitAction}>
+              {actionMode === 'sanction'
+                ? (lang === 'ar' ? 'اعتماد ونقل إلى TPRM' : 'Sanction & link to TPRM')
+                : (lang === 'ar' ? 'تأكيد الحجب' : 'Confirm block')}
+            </Button>
+          </>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <strong>{lang === 'ar' && actionTarget.serviceNameAr ? actionTarget.serviceNameAr : actionTarget.serviceName}</strong>
+              <Badge tone={SHADOW_IT_STATUS_TONE[actionTarget.status]} dot>
+                {SHADOW_IT_STATUS_LABEL[actionTarget.status][lang === 'ar' ? 'ar' : 'en']}
+              </Badge>
+              {actionTarget.pdplDataProcessed && (
+                <Badge tone="danger" dot>{lang === 'ar' ? 'بيانات شخصية' : 'PDPL data'}</Badge>
+              )}
+            </div>
+
+            {actionMode === 'sanction' ? (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                {lang === 'ar' ? 'المورّد المعتمد (TPRM) *' : 'Sanctioned vendor (TPRM) *'}
+                <select value={selVendorId}
+                  onChange={e => setSelVendorId(e.target.value ? Number(e.target.value) : '')}
+                  style={{ padding: 8, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', fontSize: 13 }}>
+                  <option value="">{lang === 'ar' ? '— اختر مورّداً —' : '— Select a vendor —'}</option>
+                  {vendors.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {lang === 'ar' && v.vendorNameAr ? v.vendorNameAr : v.vendorName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--danger)' }}>
+                {lang === 'ar'
+                  ? 'الحجب إجراء نهائي لا يمكن التراجع عنه — تُمنع الخدمة من سطح الهجوم.'
+                  : 'Block is terminal and cannot be undone — the service is denied from the attack surface.'}
+              </div>
+            )}
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              {lang === 'ar' ? 'ملاحظة (اختياري)' : 'Note (optional)'}
+              <textarea value={actionNote} onChange={e => setActionNote(e.target.value)} rows={3}
+                style={{ padding: 8, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', fontSize: 13 }} />
+            </label>
+          </div>
+        </Modal>
+      )}
     </Shell>
   );
 }
