@@ -13,6 +13,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { MeetingPapersPanel } from '../../components/committees/MeetingPapersPanel';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -488,6 +489,7 @@ export function CommitteesPage() {
                                       </ol>
                                     </div>
                                   )}
+                                  <MeetingPapersPanel meetingId={m.id} isAr={lang === 'ar'} />
                                   {m.cancelReason && (
                                     <p style={{ marginTop: 8, color: 'var(--danger)' }}>
                                       <strong>{t('comCancelReason')}:</strong> {m.cancelReason}
