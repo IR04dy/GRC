@@ -120,6 +120,30 @@ export function SubprocessorDetailPage() {
     }
   }
 
+  // Material change (PDPL Art.30) — a sub-processor change of scope / location /
+  // ownership forces a fresh DPO review. Captures the bilingual change note that
+  // the backend stamps onto the event timeline.
+  const [showMaterialChange, setShowMaterialChange] = useState(false);
+  const [mcEn, setMcEn] = useState('');
+  const [mcAr, setMcAr] = useState('');
+  async function submitMaterialChange() {
+    if (!row || !mcEn.trim()) return;
+    setBusy(true);
+    try {
+      const updated = await subprocessorsApi.materialChange(row.externalId, mcEn.trim(), mcAr.trim() || undefined);
+      setRow(updated);
+      toast.warning(lang === 'ar'
+        ? 'سُجِّل تغيير جوهري — أُعيد المعالج للمراجعة'
+        : 'Material change recorded — sub-processor back in DPO review');
+      setShowMaterialChange(false); setMcEn(''); setMcAr('');
+      await load();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Material change failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading || !row) {
     return (
       <Shell title="" sub="">
@@ -220,12 +244,52 @@ export function SubprocessorDetailPage() {
           </button>
         )}
         {row.lifecycleStage !== 'RETIRED' && (
+          <button onClick={() => setShowMaterialChange(s => !s)}
+                  disabled={busy} style={btnSecondaryStyle}>
+            {lang === 'ar' ? 'تسجيل تغيير جوهري' : 'Record material change'}
+          </button>
+        )}
+        {row.lifecycleStage !== 'RETIRED' && (
           <button onClick={() => transition('RETIRED', lang === 'ar' ? 'تم التقاعد' : 'Retired')}
                   disabled={busy} style={btnDangerStyle}>
             {lang === 'ar' ? 'تقاعد' : 'Retire'}
           </button>
         )}
       </div>
+
+      {showMaterialChange && (
+        <Card padded>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>
+            {lang === 'ar' ? 'تسجيل تغيير جوهري (المادة 30)' : 'Record a material change (PDPL Art. 30)'}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>
+            {lang === 'ar'
+              ? 'تغيّر النطاق أو الموقع أو الملكية يُعيد المعالج الفرعي إلى مراجعة مسؤول حماية البيانات.'
+              : 'A change of scope, location, or ownership returns the sub-processor to DPO review.'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{lang === 'ar' ? 'الوصف (إنجليزي)' : 'Description (English)'}</span>
+              <textarea value={mcEn} rows={2} onChange={e => setMcEn(e.target.value)} maxLength={2000}
+                placeholder={lang === 'ar' ? 'مثال: نقل الاستضافة إلى منطقة جديدة' : 'e.g. hosting region moved to a new location'}
+                style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{lang === 'ar' ? 'الوصف (عربي)' : 'Description (Arabic)'}</span>
+              <textarea value={mcAr} rows={2} dir="rtl" onChange={e => setMcAr(e.target.value)} maxLength={2000}
+                style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, fontFamily: 'inherit' }} />
+            </label>
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <button onClick={submitMaterialChange} disabled={busy || !mcEn.trim()} style={btnPrimaryStyle}>
+              {busy ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : (lang === 'ar' ? 'تسجيل' : 'Record change')}
+            </button>
+            <button onClick={() => { setShowMaterialChange(false); setMcEn(''); setMcAr(''); }} style={btnSecondaryStyle}>
+              {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+            </button>
+          </div>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Card padded>
