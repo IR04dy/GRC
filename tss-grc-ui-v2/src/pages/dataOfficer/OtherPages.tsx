@@ -330,8 +330,8 @@ const DISPOSAL_METHODS = ['CRYPTO_SHRED','PHYSICAL_DESTRUCTION','OVERWRITE','ANO
 export function RetentionPage() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const { rows: rules, error: e1, reload: reloadR } = useList<RetentionRuleResponse>(() => dataOfficerApi.listRules());
-  const { rows: jobs } = useList<DisposalJobResponse>(() => dataOfficerApi.listDisposals());
+  const { rows: rules, error: e1, reload: reloadR, setError: setE1 } = useList<RetentionRuleResponse>(() => dataOfficerApi.listRules());
+  const { rows: jobs, reload: reloadJobs } = useList<DisposalJobResponse>(() => dataOfficerApi.listDisposals());
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ref, setRef] = useState(''); const [cat, setCat] = useState('CUSTOMER_KYC');
@@ -339,6 +339,10 @@ export function RetentionPage() {
   const [legalEn, setLegalEn] = useState(''); const [legalAr, setLegalAr] = useState('');
   const [disposal, setDisposal] = useState('CRYPTO_SHRED');
   const [reviewMonths, setReviewMonths] = useState('12');
+
+  // Schedule a disposal job against a retention rule (PDPL Art.18 — disposal evidence).
+  const [dispRule, setDispRule] = useState<RetentionRuleResponse | null>(null);
+  const [dispRef, setDispRef] = useState(''); const [dispDate, setDispDate] = useState('');
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true);
@@ -351,11 +355,32 @@ export function RetentionPage() {
     } finally { setBusy(false); }
   }
 
+  async function submitDisposal(e: React.FormEvent) {
+    e.preventDefault();
+    if (!dispRule) return;
+    setBusy(true);
+    try {
+      await dataOfficerApi.scheduleDisposal({ reference: dispRef, retentionRuleId: dispRule.id, scheduledFor: dispDate });
+      setDispRule(null); setDispRef(''); setDispDate('');
+      await reloadJobs();
+    } catch (err) {
+      setE1(err instanceof ApiError ? err.message : 'Schedule disposal failed');
+    } finally { setBusy(false); }
+  }
+
   const [docsTarget, setDocsTarget] = useState<RetentionRuleResponse | null>(null);
   const cols: Column<RetentionRuleResponse>[] = [
-    { header: '', width: '50px',
-      cell: row => <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
-        onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} /> },
+    { header: '', width: '170px',
+      cell: row => (
+        <span style={{ display: 'inline-flex', gap: 4 }}>
+          <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+            onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} />
+          <Button variant="ghost" size="sm" Icon={Archive} title={ar ? 'جدولة تخلّص' : 'Schedule disposal'}
+            onClick={(e) => { e.stopPropagation(); setDispRule(row); setDispRef(''); setDispDate(''); }}>
+            {ar ? 'تخلّص' : 'Dispose'}
+          </Button>
+        </span>
+      ) },
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '120px', cell: r => <span style={{ fontSize: 12 }}>{r.reference}</span> },
     { header: ar ? 'الفئة' : 'Category', cell: r => <span style={{ fontSize: 13 }}>{r.dataCategory}</span> },
     { header: ar ? 'المدة' : 'Retention', width: '100px',
@@ -391,6 +416,20 @@ export function RetentionPage() {
             <Button type="button" variant="ghost" onClick={() => setShowNew(false)}>{ar ? 'إغلاق' : 'Cancel'}</Button>
             <Button type="submit" disabled={busy}>{ar ? 'تسجيل' : 'Register'}</Button>
           </div></form></Card>
+      )}
+      {dispRule && (
+        <Card><form onSubmit={submitDisposal} style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div style={{ gridColumn: 'span 2', fontWeight: 700 }}>
+            {ar ? `جدولة تخلّص للقاعدة ${dispRule.reference} (${dispRule.disposalMethod ?? '—'})`
+                : `Schedule disposal for ${dispRule.reference} (${dispRule.disposalMethod ?? '—'})`}
+          </div>
+          <label>{ar ? 'مرجع التخلّص' : 'Disposal reference'}<input className="input" required value={dispRef} onChange={e => setDispRef(e.target.value)} placeholder="DSP-2026-NNN" /></label>
+          <label>{ar ? 'تاريخ التنفيذ' : 'Scheduled for'}<input className="input" type="date" required value={dispDate} onChange={e => setDispDate(e.target.value)} /></label>
+          <div style={{ gridColumn: 'span 2', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => { setDispRule(null); setDispRef(''); setDispDate(''); }}>{ar ? 'إغلاق' : 'Cancel'}</Button>
+            <Button type="submit" disabled={busy}>{ar ? 'جدولة' : 'Schedule'}</Button>
+          </div>
+        </form></Card>
       )}
       <Card>{rules.length === 0
         ? <EmptyState Icon={Archive} title={ar ? 'لا توجد قواعد احتفاظ' : 'No retention rules'} sub={ar ? 'أنشئ أول قاعدة' : 'Create the first rule'} />
@@ -628,8 +667,8 @@ type Dim = typeof DIMENSIONS[number];
 export function QualityPage() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const { rows: rules, error: e1, reload: reloadR } = useList<QualityRuleResponse>(() => dataOfficerApi.listQualityRules());
-  const { rows: runs } = useList(() => dataOfficerApi.listQualityRuns(undefined));
+  const { rows: rules, error: e1, reload: reloadR, setError: setE1 } = useList<QualityRuleResponse>(() => dataOfficerApi.listQualityRules());
+  const { rows: runs, reload: reloadRuns } = useList(() => dataOfficerApi.listQualityRuns(undefined));
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ref, setRef] = useState(''); const [catalogId, setCatalogId] = useState('');
@@ -637,6 +676,16 @@ export function QualityPage() {
   const [dim, setDim] = useState<Dim>('COMPLETENESS');
   const [thr, setThr] = useState('95');
   const [sev, setSev] = useState('MEDIUM');
+
+  // Record a quality-run result against a rule (NDMO DQM scorecard).
+  const [runRule, setRunRule] = useState<QualityRuleResponse | null>(null);
+  const [runChecked, setRunChecked] = useState(''); const [runFailed, setRunFailed] = useState('');
+  const [runNotesEn, setRunNotesEn] = useState(''); const [runNotesAr, setRunNotesAr] = useState('');
+  // Derived scorecard preview — pass% from checked/failed, RAG band vs the rule threshold.
+  const checkedN = Number(runChecked) || 0, failedN = Number(runFailed) || 0;
+  const runPassPct = checkedN > 0 ? Math.round(((checkedN - failedN) / checkedN) * 1000) / 10 : 0;
+  const runThr = runRule?.thresholdPct ?? 95;
+  const runBand = runPassPct >= runThr ? 'GREEN' : runPassPct >= runThr - 5 ? 'AMBER' : 'RED';
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true);
@@ -649,11 +698,36 @@ export function QualityPage() {
     } finally { setBusy(false); }
   }
 
+  async function submitRun(e: React.FormEvent) {
+    e.preventDefault();
+    if (!runRule || checkedN <= 0) return;
+    setBusy(true);
+    try {
+      await dataOfficerApi.recordQualityRun({
+        qualityRuleId: runRule.id, recordsChecked: checkedN, recordsFailed: failedN,
+        passPct: runPassPct, band: runBand,
+        notesEn: runNotesEn || undefined, notesAr: runNotesAr || undefined,
+      });
+      setRunRule(null); setRunChecked(''); setRunFailed(''); setRunNotesEn(''); setRunNotesAr('');
+      await reloadRuns();
+    } catch (err) {
+      setE1(err instanceof ApiError ? err.message : 'Record run failed');
+    } finally { setBusy(false); }
+  }
+
   const [docsTarget, setDocsTarget] = useState<QualityRuleResponse | null>(null);
   const cols: Column<QualityRuleResponse>[] = [
-    { header: '', width: '50px',
-      cell: row => <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
-        onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} /> },
+    { header: '', width: '160px',
+      cell: row => (
+        <span style={{ display: 'inline-flex', gap: 4 }}>
+          <Button variant="ghost" size="sm" Icon={FolderOpen} title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+            onClick={(e) => { e.stopPropagation(); setDocsTarget(row); }} />
+          <Button variant="ghost" size="sm" Icon={Sigma} title={ar ? 'تسجيل تشغيل' : 'Record run'}
+            onClick={(e) => { e.stopPropagation(); setRunRule(row); setRunChecked(''); setRunFailed(''); setRunNotesEn(''); setRunNotesAr(''); }}>
+            {ar ? 'تشغيل' : 'Run'}
+          </Button>
+        </span>
+      ) },
     { header: ar ? 'المرجع' : 'Reference', mono: true, width: '120px', cell: r => <span style={{ fontSize: 12 }}>{r.reference}</span> },
     { header: ar ? 'القاعدة' : 'Rule',
       cell: r => <div><div style={{ fontWeight: 600, fontSize: 13 }}>{ar ? (r.ruleNameAr ?? r.ruleNameEn) : r.ruleNameEn}</div>
@@ -687,6 +761,26 @@ export function QualityPage() {
             <Button type="button" variant="ghost" onClick={() => setShowNew(false)}>{ar ? 'إغلاق' : 'Cancel'}</Button>
             <Button type="submit" disabled={busy}>{ar ? 'تسجيل' : 'Register'}</Button>
           </div></form></Card>
+      )}
+      {runRule && (
+        <Card><form onSubmit={submitRun} style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div style={{ gridColumn: 'span 2', fontWeight: 700 }}>
+            {ar ? `تسجيل تشغيل للقاعدة ${runRule.reference} — حد ${runThr}%` : `Record run for ${runRule.reference} — threshold ${runThr}%`}
+          </div>
+          <label>{ar ? 'سجلات مفحوصة' : 'Records checked'}<input className="input" type="number" min="1" required value={runChecked} onChange={e => setRunChecked(e.target.value)} /></label>
+          <label>{ar ? 'سجلات فاشلة' : 'Records failed'}<input className="input" type="number" min="0" value={runFailed} onChange={e => setRunFailed(e.target.value)} /></label>
+          <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+            <span>{ar ? 'النجاح' : 'Pass'}: <strong>{runPassPct}%</strong></span>
+            <Badge tone={runBand === 'RED' ? 'danger' : runBand === 'AMBER' ? 'warning' : 'success'}>{runBand}</Badge>
+            {runBand === 'RED' && <span style={{ color: 'var(--danger,#a00)', fontSize: 12 }}>{ar ? 'سيُطلق تنبيه أحمر' : 'will raise a RED-band alert'}</span>}
+          </div>
+          <label style={{ gridColumn: 'span 2' }}>{ar ? 'ملاحظات (EN)' : 'Notes (EN)'}<textarea className="input" rows={2} value={runNotesEn} onChange={e => setRunNotesEn(e.target.value)} /></label>
+          <label style={{ gridColumn: 'span 2' }}>{ar ? 'ملاحظات (AR)' : 'Notes (AR)'}<textarea className="input" rows={2} value={runNotesAr} onChange={e => setRunNotesAr(e.target.value)} dir="rtl" /></label>
+          <div style={{ gridColumn: 'span 2', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => { setRunRule(null); setRunChecked(''); setRunFailed(''); setRunNotesEn(''); setRunNotesAr(''); }}>{ar ? 'إغلاق' : 'Cancel'}</Button>
+            <Button type="submit" disabled={busy || checkedN <= 0}>{ar ? 'تسجيل' : 'Record'}</Button>
+          </div>
+        </form></Card>
       )}
       <Card>{rules.length === 0
         ? <EmptyState Icon={Sigma} title={ar ? 'لا توجد قواعد' : 'No rules'} sub={ar ? 'سجّل أول قاعدة جودة' : 'Register the first quality rule'} />
