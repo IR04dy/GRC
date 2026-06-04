@@ -34,6 +34,7 @@ import {
   ML_OVERSIGHT_LABEL, ML_RESIDENCY_LABEL, ML_TRANSFER_BASIS_LABEL,
   type MlModelResponse, type MlLifecycleStage,
   type MlModelAuditResponse, type MlAuditType, type MlAuditStatus,
+  type MlDriftType, type MlDriftSeverity,
   type DriftObservationResponse,
 } from '../../lib/aiGovernance';
 import '../../styles/pages/ai-model-detail.css';
@@ -63,6 +64,7 @@ export function AiModelDetailPage() {
   const [tab, setTab] = useState<Tab>('overview');
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showDecomModal, setShowDecomModal] = useState(false);
+  const [showDriftModal, setShowDriftModal] = useState(false);
 
   async function load() {
     if (demoMode || !externalId) return;
@@ -244,7 +246,7 @@ export function AiModelDetailPage() {
             onAdd={() => setShowAuditModal(true)} />
         )}
         {tab === 'drift' && (
-          <DriftTab drift={drift} lang={lang} onAck={ackDrift} />
+          <DriftTab drift={drift} lang={lang} onAck={ackDrift} onAdd={() => setShowDriftModal(true)} />
         )}
         {tab === 'activity' && (
           <div className="aimd-activity-empty">
@@ -267,6 +269,13 @@ export function AiModelDetailPage() {
           modelExternalId={model.externalId}
           onClose={() => setShowDecomModal(false)}
           onSaved={m => { setModel(m); setShowDecomModal(false); }}
+        />
+      )}
+      {showDriftModal && (
+        <RecordDriftModal
+          modelExternalId={model.externalId}
+          onClose={() => setShowDriftModal(false)}
+          onSaved={d => { setDrift([d, ...drift]); setShowDriftModal(false); load(); }}
         />
       )}
     </Shell>
@@ -498,16 +507,12 @@ function AuditsTab({ audits, lang, onAdd }: {
 
 // ─── Drift tab ─────────────────────────────────────────────────────
 
-function DriftTab({ drift, lang, onAck }: {
+function DriftTab({ drift, lang, onAck, onAdd }: {
   drift: DriftObservationResponse[];
   lang: 'en' | 'ar';
   onAck: (d: DriftObservationResponse) => void;
+  onAdd: () => void;
 }) {
-  if (drift.length === 0) {
-    return <EmptyState Icon={Activity}
-      title={lang === 'ar' ? 'لا توجد ملاحظات انحراف' : 'No drift observations'}
-      sub={lang === 'ar' ? 'تظهر ملاحظات الانحراف هنا تلقائياً عند رصدها.' : 'Drift observations appear here automatically when detected.'} />;
-  }
   // Dominant metric → the drift-over-time chart (the watsonx-class hero).
   const byMetric = new Map<string, DriftObservationResponse[]>();
   for (const d of drift) {
@@ -516,8 +521,29 @@ function DriftTab({ drift, lang, onAck }: {
     arr.push(d); byMetric.set(k, arr);
   }
   const dominant = [...byMetric.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+  const head = (
+    <div className="aimd-audits-head">
+      <h3 className="aimd-audits-head-title">
+        {lang === 'ar' ? 'ملاحظات الانحراف' : 'Drift observations'}
+      </h3>
+      <Button variant="primary" onClick={onAdd}>
+        {lang === 'ar' ? 'تسجيل انحراف' : 'Record drift'}
+      </Button>
+    </div>
+  );
+  if (drift.length === 0) {
+    return (
+      <div>
+        {head}
+        <EmptyState Icon={Activity}
+          title={lang === 'ar' ? 'لا توجد ملاحظات انحراف' : 'No drift observations'}
+          sub={lang === 'ar' ? 'سجّل ملاحظة انحراف يدوياً، أو تظهر تلقائياً عند رصدها.' : 'Record a drift observation manually, or they appear automatically when detected.'} />
+      </div>
+    );
+  }
   return (
-    <>
+    <div>
+      {head}
       {dominant && dominant[1].length >= 2 && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ font: '700 12px var(--font-sans)', color: 'var(--ink-2)', marginBottom: 6 }}>
@@ -579,7 +605,7 @@ function DriftTab({ drift, lang, onAck }: {
         ))}
       </tbody>
     </table>
-    </>
+    </div>
   );
 }
 
@@ -689,6 +715,150 @@ function RecordAuditModal({ modelExternalId, onClose, onSaved }: {
               {lang === 'ar' ? 'مفاتيح شائعة:' : 'Common keys:'} {helpers.map(h => <code key={h} className="aimd-metrics-key">{h}</code>)}
             </div>
           </div>
+        </Row>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Record-drift modal ────────────────────────────────────────────
+
+// Common metric names per drift family — clickable hints that prefill the
+// metric-name field (mirrors AUDIT_METRIC_HELPERS for the audit modal).
+const DRIFT_METRIC_HELPERS: Record<MlDriftType, string[]> = {
+  DATA_DRIFT:              ['psi', 'kl_divergence', 'feature_drift_score'],
+  CONCEPT_DRIFT:           ['prediction_drift', 'concept_shift_score'],
+  PERFORMANCE_DEGRADATION: ['accuracy', 'auc', 'f1_score', 'precision'],
+  FAIRNESS_REGRESSION:     ['demographic_parity_diff', 'equal_opportunity_diff'],
+};
+
+function RecordDriftModal({ modelExternalId, onClose, onSaved }: {
+  modelExternalId: string;
+  onClose: () => void;
+  onSaved: (d: DriftObservationResponse) => void;
+}) {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const [observationType, setObservationType] = useState<MlDriftType>('DATA_DRIFT');
+  const [severity, setSeverity] = useState<MlDriftSeverity>('MODERATE');
+  const [observedAt, setObservedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [metricName, setMetricName] = useState('');
+  const [metricValue, setMetricValue] = useState('');
+  const [baselineValue, setBaselineValue] = useState('');
+  const [driftThreshold, setDriftThreshold] = useState('');
+  const [notesEn, setNotesEn] = useState('');
+  const [notesAr, setNotesAr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!metricName.trim()) {
+      toast.danger(lang === 'ar' ? 'اسم المقياس مطلوب' : 'Metric name is required');
+      return;
+    }
+    const mv = Number(metricValue);
+    if (metricValue.trim() === '' || Number.isNaN(mv)) {
+      toast.danger(lang === 'ar' ? 'القيمة المرصودة مطلوبة ويجب أن تكون رقماً' : 'Observed value is required and must be numeric');
+      return;
+    }
+    try {
+      setBusy(true);
+      // Stamp the observed date at noon to dodge any midnight TZ rollover.
+      const out = await mlModelApi.recordDrift(modelExternalId, {
+        observedAt: `${observedAt}T12:00:00`,
+        observationType,
+        severity,
+        metricName: metricName.trim(),
+        metricValue: mv,
+        baselineValue: baselineValue.trim() === '' ? undefined : Number(baselineValue),
+        driftThreshold: driftThreshold.trim() === '' ? undefined : Number(driftThreshold),
+        notesEn: notesEn.trim() || undefined,
+        notesAr: notesAr.trim() || undefined,
+      });
+      toast.success(lang === 'ar' ? 'تم تسجيل ملاحظة الانحراف' : 'Drift observation recorded');
+      onSaved(out);
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Could not record drift');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const helpers = DRIFT_METRIC_HELPERS[observationType];
+
+  return (
+    <Modal open onClose={onClose}
+      title={lang === 'ar' ? 'تسجيل ملاحظة انحراف' : 'Record drift observation'} size="lg"
+      footer={<>
+        <Button variant="ghost" onClick={onClose}>{lang === 'ar' ? 'إلغاء' : 'Cancel'}</Button>
+        <Button variant="primary" disabled={busy} onClick={save}>
+          {lang === 'ar' ? 'حفظ' : 'Save'}
+        </Button>
+      </>}>
+      <div className="aimd-form">
+        <Row>
+          <Label>{lang === 'ar' ? 'نوع الانحراف' : 'Drift type'}</Label>
+          <Select value={observationType} onChange={v => setObservationType(v as MlDriftType)}
+            options={(Object.keys(ML_DRIFT_TYPE_LABEL) as MlDriftType[]).map(k => ({
+              value: k, label: ML_DRIFT_TYPE_LABEL[k][lang === 'ar' ? 'ar' : 'en'],
+            }))} />
+        </Row>
+        <Row>
+          <Label>{lang === 'ar' ? 'الشدة' : 'Severity'}</Label>
+          <Select value={severity} onChange={v => setSeverity(v as MlDriftSeverity)}
+            options={(Object.keys(ML_DRIFT_SEVERITY_LABEL) as MlDriftSeverity[]).map(k => ({
+              value: k, label: ML_DRIFT_SEVERITY_LABEL[k][lang === 'ar' ? 'ar' : 'en'],
+            }))} />
+        </Row>
+        {severity === 'CRITICAL' && (
+          <div className="aimd-gate-warn">
+            <AlertTriangle size={13} className="me-xs" />
+            {lang === 'ar'
+              ? 'الشدة الحرجة تفتح بلاغاً تلقائياً وتُعيد النموذج إلى مرحلة المراجعة (REVISION).'
+              : 'Critical severity auto-opens an Issue and returns the model to REVISION.'}
+          </div>
+        )}
+        <Row>
+          <Label>{lang === 'ar' ? 'تاريخ الرصد' : 'Observed date'}</Label>
+          <input type="date" value={observedAt} onChange={e => setObservedAt(e.target.value)} className="aimd-input" />
+        </Row>
+        <Row>
+          <Label>{lang === 'ar' ? 'اسم المقياس' : 'Metric name'} *</Label>
+          <div className="aimd-metrics-wrap">
+            <input value={metricName} onChange={e => setMetricName(e.target.value)}
+              placeholder={helpers[0]} className="aimd-input" />
+            <div className="aimd-metrics-hint">
+              {lang === 'ar' ? 'مقاييس شائعة:' : 'Common metrics:'}{' '}
+              {helpers.map(h => (
+                <code key={h} className="aimd-metrics-key" style={{ cursor: 'pointer' }}
+                  onClick={() => setMetricName(h)}>{h}</code>
+              ))}
+            </div>
+          </div>
+        </Row>
+        <Row>
+          <Label>{lang === 'ar' ? 'القيمة المرصودة' : 'Observed value'} *</Label>
+          <input type="number" step="any" value={metricValue} onChange={e => setMetricValue(e.target.value)}
+            className="aimd-input" />
+        </Row>
+        <Row>
+          <Label>{lang === 'ar' ? 'القيمة الأساس' : 'Baseline value'}</Label>
+          <input type="number" step="any" value={baselineValue} onChange={e => setBaselineValue(e.target.value)}
+            placeholder={lang === 'ar' ? '(اختياري)' : '(optional)'} className="aimd-input" />
+        </Row>
+        <Row>
+          <Label>{lang === 'ar' ? 'حدّ الانحراف' : 'Drift threshold'}</Label>
+          <input type="number" step="any" value={driftThreshold} onChange={e => setDriftThreshold(e.target.value)}
+            placeholder={lang === 'ar' ? '(اختياري)' : '(optional)'} className="aimd-input" />
+        </Row>
+        <Row>
+          <Label>{lang === 'ar' ? 'ملاحظات (EN)' : 'Notes (EN)'}</Label>
+          <textarea value={notesEn} onChange={e => setNotesEn(e.target.value)}
+            rows={2} className="aimd-input aimd-textarea" />
+        </Row>
+        <Row>
+          <Label>{lang === 'ar' ? 'ملاحظات (AR)' : 'Notes (AR)'}</Label>
+          <textarea value={notesAr} onChange={e => setNotesAr(e.target.value)}
+            rows={2} dir="rtl" className="aimd-input aimd-textarea" />
         </Row>
       </div>
     </Modal>
