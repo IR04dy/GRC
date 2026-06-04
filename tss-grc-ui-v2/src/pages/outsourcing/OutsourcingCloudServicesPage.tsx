@@ -58,6 +58,19 @@ export function OutsourcingCloudServicesPage() {
   const [blockReasonEn, setBlockReasonEn] = useState('');
   const [blockReasonAr, setBlockReasonAr] = useState('');
 
+  // classify form (SAMA data-classification + residency gate)
+  const [classifyTarget, setClassifyTarget] = useState<CloudServiceResponse | null>(null);
+  const [clsValue, setClsValue] = useState<DataClassification | ''>('');
+  const [resValue, setResValue] = useState<DataResidency | ''>('');
+  const [regValue, setRegValue] = useState('');
+
+  const openClassify = (s: CloudServiceResponse) => {
+    setClassifyTarget(s);
+    setClsValue(s.dataClassification ?? '');
+    setResValue(s.dataResidency ?? '');
+    setRegValue(s.cspRegionLabel ?? '');
+  };
+
   const reload = async () => {
     if (demoMode) return;
     setLoading(true); setError(null);
@@ -121,6 +134,33 @@ export function OutsourcingCloudServicesPage() {
     } finally { setActing(false); }
   };
 
+  const submitClassify = async () => {
+    if (!classifyTarget || !clsValue || !resValue) return;
+    setActing(true);
+    try {
+      await outsourcingCloudApi.classifyCloudService(classifyTarget.id, {
+        dataClassification: clsValue,
+        dataResidency: resValue,
+        cspRegionLabel: regValue.trim() || undefined,
+      });
+      setClassifyTarget(null);
+      setClsValue(''); setResValue(''); setRegValue('');
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message :
+        (lang === 'ar' ? 'تعذّر التصنيف' : 'Failed to classify'));
+    } finally { setActing(false); }
+  };
+
+  // SAMA Cloud §5 residency gate (mirrors the backend APPROVED promotion check):
+  // T1 anywhere · T2 IN_KINGDOM/GCC · T3/T4 IN_KINGDOM only.
+  const residencyOk = (cls: DataClassification | '', res: DataResidency | ''): boolean => {
+    if (!cls || !res) return false;
+    if (cls === 'T1') return true;
+    if (cls === 'T2') return res === 'IN_KINGDOM' || res === 'GCC';
+    return res === 'IN_KINGDOM'; // T3 / T4
+  };
+
   const cols: Column<CloudServiceResponse>[] = [
     { header: lang === 'ar' ? 'المرجع' : 'Reference', width: '120px', mono: true,
       cell: s => <span style={{ fontSize: 12 }}>{s.reference}</span> },
@@ -154,8 +194,18 @@ export function OutsourcingCloudServicesPage() {
     { header: lang === 'ar' ? 'الحالة' : 'Status', width: '140px',
       cell: s => <Badge tone={CLOUD_STATUS_TONE[s.status]}>
         {CLOUD_STATUS_LABEL[s.status][lang === 'ar' ? 'ar' : 'en']}</Badge> },
-    { header: '', width: '95px',
+    { header: '', width: '110px',
       cell: s => {
+        // ONBOARDING / BLOCKED reach CLASSIFIED through the proper classify gate
+        // (sets T1-T4 + residency), not a bare status move.
+        if (s.status === 'ONBOARDING' || s.status === 'BLOCKED') {
+          return (
+            <Button variant="ghost" size="sm"
+              onClick={(e) => { e.stopPropagation(); openClassify(s); }}>
+              {lang === 'ar' ? 'تصنيف' : 'Classify'}
+            </Button>
+          );
+        }
         const next = nextCloudStatuses(s.status);
         if (next.length === 0) return null;
         return (
@@ -280,6 +330,70 @@ export function OutsourcingCloudServicesPage() {
                          : (lang === 'ar' ? 'إنشاء' : 'Create')}
               </Button>
               <Button variant="secondary" onClick={() => setShowNew(false)}>
+                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {classifyTarget && (
+        <div style={{ marginBottom: 16 }}>
+          <Card padded
+            title={lang === 'ar'
+              ? `تصنيف ${classifyTarget.reference}`
+              : `Classify ${classifyTarget.reference}`}>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 12 }}>
+              {lang === 'ar'
+                ? 'بوّابة التصنيف وفق إطار ساما للحوسبة السحابية — تُحدّد الفئة (T1–T4) مقرّ المعالجة المسموح. تنتقل الخدمة إلى «مُصنَّفة».'
+                : 'SAMA Cloud Computing Framework classification gate — the tier (T1–T4) determines the permitted residency. Moves the service to “Classified”.'}
+            </div>
+            <div style={{ display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+              <Field label={lang === 'ar' ? 'تصنيف البيانات *' : 'Data classification *'}>
+                <select value={clsValue}
+                  onChange={e => setClsValue(e.target.value as DataClassification)}
+                  style={inputStyle}>
+                  <option value="">—</option>
+                  {CLASSIFICATIONS.map(c => (
+                    <option key={c} value={c}>
+                      {DATA_CLASSIFICATION_LABEL[c][lang === 'ar' ? 'ar' : 'en']}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={lang === 'ar' ? 'إقامة البيانات *' : 'Data residency *'}>
+                <select value={resValue}
+                  onChange={e => setResValue(e.target.value as DataResidency)}
+                  style={inputStyle}>
+                  <option value="">—</option>
+                  {RESIDENCIES.map(r => (
+                    <option key={r} value={r}>
+                      {DATA_RESIDENCY_LABEL[r][lang === 'ar' ? 'ar' : 'en']}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={lang === 'ar' ? 'منطقة مزوّد السحابة' : 'CSP region label'}>
+                <input value={regValue} onChange={e => setRegValue(e.target.value)}
+                  style={inputStyle} maxLength={64} placeholder="me-south-1 (Bahrain)" />
+              </Field>
+            </div>
+            {clsValue && resValue && !residencyOk(clsValue, resValue) && (
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--warning-fg, #92600a)' }}>
+                {lang === 'ar'
+                  ? `⚠ ${DATA_CLASSIFICATION_LABEL[clsValue].ar} مع ${DATA_RESIDENCY_LABEL[resValue].ar} يخالف بوّابة الإقامة — ستُصنَّف الآن لكنها ستُحظَر عند ترقيتها إلى «معتمدة».`
+                  : `⚠ ${DATA_CLASSIFICATION_LABEL[clsValue].en} with ${DATA_RESIDENCY_LABEL[resValue].en} violates the residency gate — it will classify now but be blocked at promotion to “Approved”.`}
+              </div>
+            )}
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <Button variant="primary" onClick={submitClassify}
+                disabled={acting || !clsValue || !resValue}>
+                {acting ? (lang === 'ar' ? 'جارٍ التصنيف…' : 'Classifying…')
+                         : (lang === 'ar' ? 'تصنيف' : 'Classify')}
+              </Button>
+              <Button variant="secondary"
+                onClick={() => { setClassifyTarget(null); setClsValue(''); setResValue(''); setRegValue(''); }}>
                 {lang === 'ar' ? 'إلغاء' : 'Cancel'}
               </Button>
             </div>
