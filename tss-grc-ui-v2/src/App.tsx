@@ -105,6 +105,7 @@ const SanctionsDashboardPage         = lazy(() => import('./pages/aml-sanctions/
 const SanctionsListsPage             = lazy(() => import('./pages/aml-sanctions/SanctionsListsPage').then(m => ({ default: m.SanctionsListsPage })));
 const SanctionsChecksPage            = lazy(() => import('./pages/aml-sanctions/SanctionsChecksPage').then(m => ({ default: m.SanctionsChecksPage })));
 const SanctionsCheckDetailPage       = lazy(() => import('./pages/aml-sanctions/SanctionsCheckDetailPage').then(m => ({ default: m.SanctionsCheckDetailPage })));
+const SanctionsListDetailPage        = lazy(() => import('./pages/aml-sanctions/SanctionsListDetailPage').then(m => ({ default: m.SanctionsListDetailPage })));
 const SanctionsScreenPage            = lazy(() => import('./pages/aml-sanctions/SanctionsScreenPage').then(m => ({ default: m.SanctionsScreenPage })));
 // ─── Wizards — lazy-loaded so they don't bloat the initial bundle.
 //    Each wizard is its own chunk; the first time a user navigates to
@@ -550,6 +551,7 @@ export function App() {
                   the param route so they match first. */}
               <Route path="/aml/sanctions/dashboard"                 element={<SanctionsDashboardPage />} />
               <Route path="/aml/sanctions/lists"                     element={<SanctionsListsPage />} />
+              <Route path="/aml/sanctions/lists/:id"                 element={<SanctionsListDetailPage />} />
               <Route path="/aml/sanctions/checks"                    element={<SanctionsChecksPage />} />
               <Route path="/aml/sanctions/screen"                    element={<SanctionsScreenPage />} />
               <Route path="/aml/sanctions/checks/:id"                element={<SanctionsCheckDetailPage />} />

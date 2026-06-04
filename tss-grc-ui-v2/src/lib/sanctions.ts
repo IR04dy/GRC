@@ -73,6 +73,23 @@ export interface SanctionsListEntry {
   createdAt: string;
 }
 
+/** One row for the bulk-import endpoint. */
+export interface SanctionsEntryCreate {
+  entryExternalId: string;
+  entityType: EntityType;
+  primaryNameEn: string;
+  primaryNameAr?: string;
+  country?: string;
+  listingReasonEn?: string;
+  severity?: 'STRONG_MATCH_REQUIRED' | 'REVIEW_REQUIRED';
+}
+
+export interface BulkImportResponse {
+  totalSubmitted: number;
+  created: number;
+  skippedExisting: number;
+}
+
 export interface ScreeningHit {
   id: number;
   externalId: string;
@@ -162,6 +179,8 @@ export const sanctionsApi = {
   getList:      (id: number) => api.get<SanctionsList>(`${BASE}/lists/${id}`),
   refreshList:  (id: number) => api.post<SanctionsList>(`${BASE}/lists/${id}/refresh`),
   listEntries:  (id: number) => api.get<SanctionsListEntry[]>(`${BASE}/lists/${id}/entries`),
+  bulkImport:   (listId: number, entries: SanctionsEntryCreate[]) =>
+    api.post<BulkImportResponse>(`${BASE}/lists/${listId}/entries/bulk-import`, { listId, entries }),
 
   // Checks
   screen:       (req: ScreenRequest) => api.post<ScreeningCheck>(`${BASE}/checks`, req),

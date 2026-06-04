@@ -169,9 +169,14 @@ export function SanctionsListsPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <Link to={`/aml/sanctions/lists/${l.id}`} style={{ textDecoration: 'none' }}>
+                    <Button variant="primary" size="sm">
+                      <Database size={12} />{isAr ? 'الإدخالات' : 'Entries'}
+                    </Button>
+                  </Link>
                   <Button
-                    variant="primary"
+                    variant="secondary"
                     size="sm"
                     onClick={() => void refresh(l.id)}
                     disabled={refreshing === l.id || !l.isActive}
