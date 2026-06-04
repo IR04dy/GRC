@@ -69,6 +69,128 @@ export function serviceNowTestPush(body: ServiceNowTestPushRequest) {
   return api.post<Record<string, unknown>>(`${BASE}/servicenow/test-push`, body);
 }
 
+// ─── Config + audit (recorded-calls) — all four adapters ─────────────
+//
+// Each adapter exposes GET /config (masked secrets) and a STUB-only
+// GET /stub/recorded-calls. The recorded-calls feed is the integration
+// audit trail — every poll / health-check / outbound action the stub
+// client saw, frozen at call time.
+
+/** Masked configuration as a (possibly nested) key/value map. */
+export type IntegrationConfig = Record<string, unknown>;
+
+export function getIntegrationConfig(key: IntegrationKey) {
+  return api.get<IntegrationConfig>(`${BASE}/${key}/config`);
+}
+
+/** A single call the stub client recorded. Mirrors the backend StubInvocation. */
+export interface StubInvocation {
+  at: string;
+  /** POLL / RECAST / ACCEPT_RISK / REMOVE_RECAST / CONTAIN / LIFT / PUSH / HEALTH … */
+  method: string;
+  targetId?: string | null;
+  payload?: Record<string, unknown> | null;
+}
+
+export function getRecordedCalls(key: IntegrationKey) {
+  return api.get<StubInvocation[]>(`${BASE}/${key}/stub/recorded-calls`);
+}
+
+// ─── Tenable VM disposition actions (outbound) ───────────────────────
+//
+// recast / accept-risk / remove-recast against a Tenable plugin id. The
+// justification is the load-bearing audit field (NCA ECC-2 / SAMA CSF) —
+// the backend rejects anything under 30 characters.
+
+export interface TenableActionResponse {
+  actionType: string;            // RECAST_SEVERITY / ACCEPT_RISK / REMOVE_RECAST
+  targetPluginId: string;
+  targetAssetUuid?: string | null;
+  accepted: boolean;
+  httpStatus: number;
+  attemptCount: number;
+  tenableRuleId?: string | null; // "DISABLED" when the adapter is off
+}
+
+export interface TenableRecastRequest {
+  newSeverity: 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  justification: string;         // min 30 chars (server-enforced)
+  assetUuid?: string;            // null/absent = global recast
+}
+export interface TenableAcceptRiskRequest {
+  justification: string;         // min 30 chars (server-enforced)
+  expiresAt?: string;            // ISO LocalDateTime; absent = open-ended
+  assetUuid?: string;
+}
+
+export function tenableRecast(pluginId: string, body: TenableRecastRequest) {
+  return api.post<TenableActionResponse>(`${BASE}/tenable/recast/${encodeURIComponent(pluginId)}`, body);
+}
+export function tenableAcceptRisk(pluginId: string, body: TenableAcceptRiskRequest) {
+  return api.post<TenableActionResponse>(`${BASE}/tenable/accept-risk/${encodeURIComponent(pluginId)}`, body);
+}
+export function tenableRemoveRecast(pluginId: string, assetUuid?: string) {
+  return api.post<TenableActionResponse>(
+    `${BASE}/tenable/remove-recast/${encodeURIComponent(pluginId)}`,
+    assetUuid ? { assetUuid } : {});
+}
+
+// ─── CrowdStrike Falcon containment (outbound) ───────────────────────
+//
+// contain / lift a Falcon host. Containment isolates the host from the
+// network; lifting restores it. reason is the audit field.
+
+export interface ContainmentResponse {
+  actionType: string;            // CONTAIN_HOST / LIFT_CONTAINMENT
+  targetHostId: string;
+  accepted: boolean;
+  httpStatus: number;
+  attemptCount: number;
+  falconResourceId?: string | null; // "DISABLED" when the adapter is off
+}
+
+export function crowdstrikeContain(hostId: string, reason: string) {
+  return api.post<ContainmentResponse>(`${BASE}/crowdstrike/contain/${encodeURIComponent(hostId)}`, { reason });
+}
+export function crowdstrikeLift(hostId: string) {
+  return api.post<ContainmentResponse>(`${BASE}/crowdstrike/lift/${encodeURIComponent(hostId)}`);
+}
+
+// ─── Capability catalog — which adapters expose which surfaces ───────
+//
+// All four expose /config + /stub/recorded-calls. Outbound actions differ:
+// Tenable = VM disposition, CrowdStrike = host containment, Splunk/
+// ServiceNow = outbound test-push (lives on the Connectors page).
+
+export type AdapterAction = 'tenable-disposition' | 'crowdstrike-containment' | 'outbound-push';
+
+export const INTEGRATION_ACTION: Record<IntegrationKey, AdapterAction> = {
+  tenable: 'tenable-disposition',
+  crowdstrike: 'crowdstrike-containment',
+  splunk: 'outbound-push',
+  servicenow: 'outbound-push',
+};
+
+export function getAdapterMeta(key: string): IntegrationAdapterMeta | undefined {
+  return INTEGRATION_ADAPTERS.find(a => a.key === key);
+}
+
+/** Pretty tone for a recorded-call method badge. */
+export function stubMethodTone(method: string): IntegrationTone {
+  switch (method.toUpperCase()) {
+    case 'RECAST': case 'ACCEPT_RISK': case 'CONTAIN':
+      return 'warning';
+    case 'REMOVE_RECAST': case 'LIFT':
+      return 'info';
+    case 'POLL': case 'PUSH': case 'CREATE_INCIDENT':
+      return 'success';
+    case 'HEALTH':
+      return 'neutral';
+    default:
+      return 'neutral';
+  }
+}
+
 // ─── Display catalog ─────────────────────────────────────────────────
 
 export interface IntegrationAdapterMeta {

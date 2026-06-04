@@ -273,6 +273,7 @@ const IntakeInboxPage        = lazy(() => import('./pages/intake/IntakeInboxPage
 const IntakeCatalogPage      = lazy(() => import('./pages/intake/IntakeCatalogPage').then(m => ({ default: m.IntakeCatalogPage })));
 const IntakeFormPage         = lazy(() => import('./pages/intake/IntakeFormPage').then(m => ({ default: m.IntakeFormPage })));
 const ConnectorsPage         = lazy(() => import('./pages/intake/ConnectorsPage').then(m => ({ default: m.ConnectorsPage })));
+const IntegrationConsolePage = lazy(() => import('./pages/intake/IntegrationConsolePage').then(m => ({ default: m.IntegrationConsolePage })));
 const AuditLogPage           = lazy(() => import('./pages/platform/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const IssuesPage             = lazy(() => import('./pages/platform/IssuesPage').then(m => ({ default: m.IssuesPage })));
 const RegulatoryHorizonPage  = lazy(() => import('./pages/compliance/RegulatoryHorizonPage').then(m => ({ default: m.RegulatoryHorizonPage })));
@@ -821,6 +822,7 @@ export function App() {
               <Route path="/intake"             element={<IntakeCatalogPage />} />
               <Route path="/intake/:kind"       element={<IntakeFormPage />} />
               <Route path="/connectors"         element={<ConnectorsPage />} />
+              <Route path="/connectors/:key"    element={<IntegrationConsolePage />} />
               <Route path="/audit-log"          element={<AuditLogPage />} />
               <Route path="/issues"             element={<IssuesPage />} />
               <Route path="/regulatory/horizon" element={<RegulatoryHorizonPage />} />

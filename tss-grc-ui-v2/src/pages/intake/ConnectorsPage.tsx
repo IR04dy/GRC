@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play, PlayCircle, RefreshCw, ServerCog, Cable, HeartPulse, Send,
+  Plug, Activity, Clock, BookOpen, Database, Zap, Pause, Play, PlayCircle, RefreshCw, ServerCog, Cable, HeartPulse, Send, SlidersHorizontal,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -286,14 +287,21 @@ function LiveIntegrationAdapters() {
                   {s?.baseUrl ?? s?.platform ?? '—'}
                 </td>
                 <td style={{ textAlign: 'end' }}>
-                  {a.canPoll
-                    ? <Button size="sm" variant="primary" Icon={Play} disabled={busy || !reachable} onClick={() => void poll(a.key)}>
-                        {isAr ? 'استقصاء' : 'Poll now'}
+                  <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                    {a.canPoll
+                      ? <Button size="sm" variant="primary" Icon={Play} disabled={busy || !reachable} onClick={() => void poll(a.key)}>
+                          {isAr ? 'استقصاء' : 'Poll now'}
+                        </Button>
+                      : <Button size="sm" variant="ghost" Icon={Send} disabled={!reachable}
+                          onClick={() => setPushOpen(a.key === 'servicenow' ? 'servicenow' : 'splunk')}>
+                          {isAr ? 'إرسال اختبار' : 'Test push'}
+                        </Button>}
+                    <Link to={`/connectors/${a.key}`} style={{ textDecoration: 'none' }}>
+                      <Button size="sm" variant="ghost" Icon={SlidersHorizontal}>
+                        {isAr ? 'وحدة التحكّم' : 'Console'}
                       </Button>
-                    : <Button size="sm" variant="ghost" Icon={Send} disabled={!reachable}
-                        onClick={() => setPushOpen(a.key === 'servicenow' ? 'servicenow' : 'splunk')}>
-                        {isAr ? 'إرسال اختبار' : 'Test push'}
-                      </Button>}
+                    </Link>
+                  </div>
                 </td>
               </tr>
             );
