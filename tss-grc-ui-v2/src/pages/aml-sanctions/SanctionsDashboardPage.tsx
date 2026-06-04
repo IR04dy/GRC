@@ -9,8 +9,12 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { DataTable, type Column } from '../../components/ui/DataTable';
 import { useI18n } from '../../lib/i18n';
-import { sanctionsApi, type SanctionsDashboard } from '../../lib/sanctions';
+import {
+  sanctionsApi, hitStatusLabel, matchTypeLabel,
+  type SanctionsDashboard, type ScreeningHit,
+} from '../../lib/sanctions';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -32,11 +36,20 @@ export function SanctionsDashboardPage() {
   const [state, setState] = useState<LoadState>('idle');
   const [snap, setSnap] = useState<SanctionsDashboard | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Pending-review hit queue — surfaces listHits so the compliance officer can
+  // adjudicate (reviewHit) or escalate (escalateHit) straight from the dashboard.
+  const [hits, setHits] = useState<ScreeningHit[]>([]);
+  const [hitBusy, setHitBusy] = useState<number | null>(null);
 
   async function load() {
     setState('loading'); setErr(null);
     try {
-      setSnap(await sanctionsApi.dashboard());
+      const [s, h] = await Promise.all([
+        sanctionsApi.dashboard(),
+        sanctionsApi.listHits('PENDING_REVIEW').catch(() => [] as ScreeningHit[]),
+      ]);
+      setSnap(s);
+      setHits(Array.isArray(h) ? h : []);
       setState('ready');
     } catch (e) {
       setErr((e as Error)?.message ?? String(e));
@@ -45,6 +58,32 @@ export function SanctionsDashboardPage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  async function reviewHit(hit: ScreeningHit, newStatus: 'FALSE_POSITIVE' | 'TRUE_POSITIVE',
+                           dispositionEn: string, dispositionAr: string) {
+    if (hitBusy) return;
+    setHitBusy(hit.id);
+    try {
+      await sanctionsApi.reviewHit(hit.id, { newStatus, dispositionEn, dispositionAr });
+      await load();
+    } catch (e) {
+      setErr((e as Error)?.message ?? String(e));
+    } finally { setHitBusy(null); }
+  }
+
+  async function escalateHit(hit: ScreeningHit) {
+    if (hitBusy) return;
+    setHitBusy(hit.id);
+    try {
+      await sanctionsApi.escalateHit(hit.id, {
+        reasonEn: 'Escalated from the screening dashboard for senior AML review.',
+        reasonAr: 'صُعِّد من لوحة الفحص لمراجعة من جهة أعلى في مكافحة غسل الأموال.',
+      });
+      await load();
+    } catch (e) {
+      setErr((e as Error)?.message ?? String(e));
+    } finally { setHitBusy(null); }
+  }
 
   return (
     <Shell
@@ -146,6 +185,24 @@ export function SanctionsDashboardPage() {
             />
           </div>
 
+          {hits.length > 0 && (
+            <Card>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={16} style={{ color: 'var(--warning)' }} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>
+                  {isAr ? `تطابقات في انتظار المراجعة (${hits.length})` : `Hits pending review (${hits.length})`}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--ink-3)', marginInlineStart: 'auto' }}>
+                  {isAr ? 'فرز خلال ٢٤ ساعة' : 'Adjudicate within 24 h'}
+                </span>
+              </div>
+              <DataTable<ScreeningHit>
+                columns={hitCols(isAr, hitBusy, reviewHit, escalateHit)}
+                rows={hits}
+              />
+            </Card>
+          )}
+
           <Card>
             <div style={{ padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
@@ -166,6 +223,62 @@ export function SanctionsDashboardPage() {
       )}
     </Shell>
   );
+}
+
+function hitCols(
+  isAr: boolean,
+  hitBusy: number | null,
+  reviewHit: (h: ScreeningHit, s: 'FALSE_POSITIVE' | 'TRUE_POSITIVE', en: string, ar: string) => void,
+  escalateHit: (h: ScreeningHit) => void,
+): Column<ScreeningHit>[] {
+  return [
+    {
+      header: isAr ? 'الاسم المُطابَق' : 'Matched name',
+      cell: h => (
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13 }}>
+            {isAr ? (h.matchedNameAr || h.matchedNameEn || '—') : (h.matchedNameEn || h.matchedNameAr || '—')}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.listCode ?? '—'}</div>
+        </div>
+      ),
+    },
+    {
+      header: isAr ? 'الدرجة' : 'Score', width: '90px', align: 'center',
+      cell: h => <Badge tone={h.matchScore >= 95 ? 'danger' : h.matchScore >= 85 ? 'warning' : 'neutral'}>{h.matchScore}</Badge>,
+    },
+    {
+      header: isAr ? 'نوع التطابق' : 'Match type', width: '150px',
+      cell: h => <span style={{ fontSize: 12 }}>{matchTypeLabel(h.matchType, isAr)}</span>,
+    },
+    {
+      header: isAr ? 'الحالة' : 'Status', width: '140px', align: 'center',
+      cell: h => <Badge tone="warning">{hitStatusLabel(h.status, isAr)}</Badge>,
+    },
+    {
+      header: '', width: '280px', align: 'end',
+      cell: h => (
+        <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <Button size="sm" variant="secondary" disabled={hitBusy === h.id}
+            onClick={() => reviewHit(h, 'FALSE_POSITIVE',
+              'Reviewed from dashboard queue — false positive (no true match).',
+              'روجعت من لوحة الفحص — إيجابية خاطئة (لا يوجد تطابق فعلي).')}>
+            {isAr ? 'إيجابية خاطئة' : 'False positive'}
+          </Button>
+          <Button size="sm" variant="danger" disabled={hitBusy === h.id}
+            onClick={() => reviewHit(h, 'TRUE_POSITIVE',
+              'Reviewed from dashboard queue — confirmed true positive.',
+              'روجعت من لوحة الفحص — تطابق مُؤكّد.')}>
+            {isAr ? 'تطابق مُؤكّد' : 'True positive'}
+          </Button>
+          <Button size="sm" variant="ghost" disabled={hitBusy === h.id}
+            onClick={() => escalateHit(h)}>
+            {isAr ? 'تصعيد' : 'Escalate'}
+          </Button>
+        </span>
+      ),
+    },
+  ];
 }
 
 function KpiTile({ icon: Icon, value, label, tone }:
