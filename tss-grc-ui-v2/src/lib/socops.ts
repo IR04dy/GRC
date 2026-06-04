@@ -450,21 +450,35 @@ export interface BrandMonitoring {
   notes: string | null;
 }
 
-// Forensics artefact (chain-of-custody)
+// Forensics artefact (chain-of-custody).
+// Field names mirror the backend entity (`ForensicsArtefact`) verbatim — the
+// previous shape (acquiredAt / custodian / location / md5 / sha256 / sha512 /
+// disposalDueAt) was aspirational and never matched what Jackson serialised,
+// so the register rendered blank Custodian / Acquired / Location / SHA-256 /
+// Disposal columns. Page binds to these names.
 export interface ForensicsArtefact {
   id: number;
   artefactCode: string;
   caseCode: string;
-  artefactType: string | null;  // DISK_IMAGE | MEMORY | LOG | MOBILE | …
-  acquiredAt: string;
-  custodian: string;
-  location: string | null;
-  md5: string | null;
-  sha256: string | null;
-  sha512: string | null;
-  integrityStatus: string;       // VERIFIED | UNKNOWN | COMPROMISED
+  artefactType: string | null;       // DISK_IMAGE | MEMORY_DUMP | PCAP | LOG | MOBILE | …
+  titleEn: string | null;
+  titleAr: string | null;
+  capturedAt: string;                 // acquisition timestamp
+  capturedByHandler: string | null;
+  captureTool: string | null;
+  captureMethod: string | null;
+  sourceHost: string | null;
+  sizeBytes: number | null;
+  currentCustodian: string | null;
+  currentLocation: string | null;
+  md5Hash: string | null;
+  sha256Hash: string | null;
+  sha512Hash: string | null;
+  integrityStatus: string;            // VERIFIED | UNKNOWN | COMPROMISED | CORRUPTED
+  integrityVerifiedAt: string | null;
   legalHold: boolean;
-  disposalDueAt: string | null;
+  retentionUntil: string | null;      // disposal becomes due once retention expires
+  privileged: boolean;
   notes: string | null;
 }
 
