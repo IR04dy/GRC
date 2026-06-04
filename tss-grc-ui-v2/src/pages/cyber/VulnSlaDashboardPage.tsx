@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Clock, AlertOctagon, TimerReset, ShieldCheck, ShieldAlert, Activity } from 'lucide-react';
+import { Clock, AlertOctagon, TimerReset, ShieldCheck, ShieldAlert, Activity, CheckCircle2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Kpi } from '../../components/ui/Kpi';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
 import { ApiError } from '../../lib/api';
 import {
@@ -36,12 +38,31 @@ import {
  */
 export function VulnSlaDashboardPage() {
   const { lang } = useI18n();
+  const ar = lang === 'ar';
+  const toast = useToast();
   const demoMode = !isAuthenticated();
 
   const [snap, setSnap] = useState<VulnSlaDashboardSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'recompute' | 'escalation' | null>(null);
+  const [remediatingId, setRemediatingId] = useState<string | null>(null);
+
+  // Close out a finding from the SOC dashboard — POST .../findings/{id}/remediated
+  // stamps remediated_at + remediated_by and flips it out of the breach/warning queue.
+  async function markRemediated(f: VulnSlaFindingResponse) {
+    if (demoMode || remediatingId) return;
+    setRemediatingId(f.externalId);
+    try {
+      await vulnSlaApi.markRemediated(f.externalId);
+      toast.success(ar ? `عُولجت الثغرة #${f.vulnerabilityId}` : `Finding #${f.vulnerabilityId} marked remediated`);
+      await load();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : (ar ? 'تعذّرت المعالجة' : 'Remediation failed'));
+    } finally {
+      setRemediatingId(null);
+    }
+  }
 
   async function load() {
     if (demoMode) { setSnap(null); return; }
@@ -144,6 +165,16 @@ export function VulnSlaDashboardPage() {
           {VULN_SLA_STATUS_LABEL[r.status][lang === 'ar' ? 'ar' : 'en']}
         </Badge>
       ),
+    },
+    {
+      header: '', width: '150px', align: 'end',
+      cell: r => (['REMEDIATED', 'ACCEPTED_RISK', 'FALSE_POSITIVE'].includes(r.status) ? null : (
+        <Button size="sm" variant="secondary" Icon={CheckCircle2}
+          disabled={demoMode || remediatingId === r.externalId}
+          onClick={() => markRemediated(r)}>
+          {remediatingId === r.externalId ? (ar ? 'جارٍ…' : '…') : (ar ? 'تمت المعالجة' : 'Remediated')}
+        </Button>
+      )),
     },
   ];
 
