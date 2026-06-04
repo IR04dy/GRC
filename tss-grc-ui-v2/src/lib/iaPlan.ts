@@ -357,6 +357,28 @@ export function milestoneTypeLabel(m: MilestoneType, isAr: boolean): string {
 }
 
 /**
+ * Allowed engagement phase transitions — mirrors the backend
+ * IaEngagementService.ALLOWED_PHASE_TRANSITIONS state machine so the UI
+ * only ever offers a move the server will accept. CLOSED / CANCELLED are
+ * terminal (no outbound transitions).
+ */
+export const ENGAGEMENT_PHASE_NEXT: Record<EngagementPhase, EngagementPhase[]> = {
+  PLANNED:       ['PLANNING', 'CANCELLED'],
+  PLANNING:      ['FIELDWORK', 'CANCELLED'],
+  FIELDWORK:     ['REPORTING', 'CANCELLED'],
+  REPORTING:     ['REPORT_ISSUED', 'CANCELLED'],
+  REPORT_ISSUED: ['FOLLOW_UP', 'CANCELLED'],
+  FOLLOW_UP:     ['CLOSED', 'CANCELLED'],
+  CLOSED:        [],
+  CANCELLED:     [],
+};
+
+/** The phases an engagement may legally move to from its current phase. */
+export function nextEngagementPhases(p: EngagementPhase): EngagementPhase[] {
+  return ENGAGEMENT_PHASE_NEXT[p] ?? [];
+}
+
+/**
  * Residual-risk heat band on the 0-25 IA scale.
  * Low ≤ 8, Medium 8-15, High 15-20, Critical > 20.
  */
