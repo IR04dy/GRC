@@ -402,6 +402,22 @@ export const NDR_STATUS_LABEL: Record<NdrStatus, { en: string; ar: string }> = {
   REJECTED:            { en: 'Rejected',            ar: 'مرفوض' },
   REVISION_REQUESTED:  { en: 'Revision requested',  ar: 'مطلوب تعديل' },
 };
+export const NDR_STATUS_TONE: Record<NdrStatus, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+  DRAFT: 'neutral', INTERNAL_REVIEW: 'info', READY: 'info', SUBMITTED: 'warning',
+  ACCEPTED: 'success', REJECTED: 'danger', REVISION_REQUESTED: 'warning',
+};
+/** SDAIA NDR annual-submission lifecycle — mirrors backend NDR_ALLOWED. */
+export function nextNdrStatuses(s: NdrStatus): NdrStatus[] {
+  switch (s) {
+    case 'DRAFT':               return ['INTERNAL_REVIEW'];
+    case 'INTERNAL_REVIEW':     return ['READY', 'DRAFT'];
+    case 'READY':               return ['SUBMITTED'];
+    case 'SUBMITTED':           return ['ACCEPTED', 'REJECTED', 'REVISION_REQUESTED'];
+    case 'REVISION_REQUESTED':  return ['DRAFT'];
+    case 'REJECTED':            return ['DRAFT'];
+    default:                    return []; // ACCEPTED is terminal
+  }
+}
 export interface NdrResponse {
   id: number; reference: string; cycleYear: number;
   titleEn?: string; titleAr?: string; status: NdrStatus;
@@ -473,6 +489,21 @@ export const ETHICS_STATUS_LABEL: Record<EthicsStatus, { en: string; ar: string 
   REJECTED:                 { en: 'Rejected',                 ar: 'مرفوض' },
   ESCALATED:                { en: 'Escalated',                ar: 'مُصعَّد' },
 };
+export const ETHICS_STATUS_TONE: Record<EthicsStatus, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+  REQUESTED: 'neutral', COMMITTEE_REVIEW: 'info', OPINION_DRAFTED: 'info',
+  APPROVED: 'success', APPROVED_WITH_CONDITIONS: 'success', REJECTED: 'danger', ESCALATED: 'warning',
+};
+/** SDAIA AI-ethics / NDMO data-ethics committee lifecycle — mirrors backend ETHICS_ALLOWED. */
+export function nextEthicsStatuses(s: EthicsStatus): EthicsStatus[] {
+  switch (s) {
+    case 'REQUESTED':                return ['COMMITTEE_REVIEW', 'REJECTED'];
+    case 'COMMITTEE_REVIEW':         return ['OPINION_DRAFTED', 'REJECTED', 'ESCALATED'];
+    case 'OPINION_DRAFTED':          return ['APPROVED', 'APPROVED_WITH_CONDITIONS', 'REJECTED'];
+    case 'APPROVED_WITH_CONDITIONS': return ['APPROVED'];
+    case 'ESCALATED':                return ['COMMITTEE_REVIEW'];
+    default:                         return []; // APPROVED / REJECTED are terminal
+  }
+}
 export interface EthicsResponse {
   id: number; reference: string; subjectType?: string; subjectRef?: string;
   titleEn: string; titleAr: string; summaryEn?: string; summaryAr?: string;

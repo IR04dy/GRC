@@ -15,12 +15,12 @@ import {
   dataOfficerApi,
   CONSENT_STATUS_LABEL, CONSENT_STATUS_TONE,
   DPIA_STATUS_LABEL, DPIA_STATUS_TONE,
-  NOTICE_STATUS_LABEL, NOTICE_STATUS_TONE,
-  NDR_STATUS_LABEL,
-  ETHICS_STATUS_LABEL,
-  type ConsentResponse, type DpiaResponse, type NoticeResponse,
-  type RetentionRuleResponse, type DisposalJobResponse, type NdrResponse,
-  type CatalogEntryResponse, type QualityRuleResponse, type EthicsResponse,
+  NOTICE_STATUS_LABEL, NOTICE_STATUS_TONE, nextNoticeStatuses,
+  NDR_STATUS_LABEL, NDR_STATUS_TONE, nextNdrStatuses,
+  ETHICS_STATUS_LABEL, ETHICS_STATUS_TONE, nextEthicsStatuses,
+  type ConsentResponse, type DpiaResponse, type NoticeResponse, type NoticeStatus,
+  type RetentionRuleResponse, type DisposalJobResponse, type NdrResponse, type NdrStatus,
+  type CatalogEntryResponse, type QualityRuleResponse, type EthicsResponse, type EthicsStatus,
 } from '../../lib/dataOfficer';
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
@@ -203,7 +203,7 @@ const NOTICE_CHANNELS = ['WEB','MOBILE','BRANCH','IVR','ATM','SMS','EMAIL'];
 export function NoticePage() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const { rows, error, reload } = useList<NoticeResponse>(() => dataOfficerApi.listNotices());
+  const { rows, error, reload, setError } = useList<NoticeResponse>(() => dataOfficerApi.listNotices());
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ref, setRef] = useState(''); const [ver, setVer] = useState('');
@@ -212,6 +212,11 @@ export function NoticePage() {
   const [bodyEn, setBodyEn] = useState(''); const [bodyAr, setBodyAr] = useState('');
   const [reConsent, setReConsent] = useState(false);
 
+  // Lifecycle transition (PDPL Art.12 — DRAFT→IN_REVIEW→PUBLISHED→SUPERSEDED/RETIRED)
+  const [moveTarget, setMoveTarget] = useState<NoticeResponse | null>(null);
+  const [toStatus, setToStatus] = useState<NoticeStatus | null>(null);
+  const [supersededBy, setSupersededBy] = useState('');
+
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true);
     try {
@@ -219,6 +224,22 @@ export function NoticePage() {
         titleEn, titleAr, bodyEn, bodyAr, requiresReConsent: reConsent });
       setShowNew(false); setRef(''); setVer(''); setTitleEn(''); setTitleAr(''); setBodyEn(''); setBodyAr('');
       await reload();
+    } finally { setBusy(false); }
+  }
+
+  async function submitMove(e: React.FormEvent) {
+    e.preventDefault();
+    if (!moveTarget || !toStatus) return;
+    setBusy(true);
+    try {
+      await dataOfficerApi.transitionNotice(moveTarget.id, {
+        toStatus,
+        supersededById: toStatus === 'SUPERSEDED' && supersededBy ? Number(supersededBy) : undefined,
+      });
+      setMoveTarget(null); setToStatus(null); setSupersededBy('');
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Transition failed');
     } finally { setBusy(false); }
   }
 
@@ -232,10 +253,23 @@ export function NoticePage() {
       cell: n => <Badge tone={NOTICE_STATUS_TONE[n.status]}>{NOTICE_STATUS_LABEL[n.status][ar ? 'ar' : 'en']}</Badge> },
     { header: ar ? 'يتطلّب موافقة جديدة' : 'Re-consent', width: '110px',
       cell: n => n.requiresReConsent ? <Badge tone="warning">{ar ? 'نعم' : 'Yes'}</Badge> : null },
-    { header: '', width: '60px', align: 'end',
-      cell: n => <Button variant="ghost" size="sm" Icon={FolderOpen}
-        title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
-        onClick={(e) => { e.stopPropagation(); setDocsTarget(n); }} /> },
+    { header: '', width: '150px', align: 'end',
+      cell: n => {
+        const next = nextNoticeStatuses(n.status);
+        return (
+          <span style={{ display: 'inline-flex', gap: 4, justifyContent: 'flex-end' }}>
+            <Button variant="ghost" size="sm" Icon={FolderOpen}
+              title={ar ? 'المستندات والضوابط' : 'Docs & controls'}
+              onClick={(e) => { e.stopPropagation(); setDocsTarget(n); }} />
+            {next.length > 0 && (
+              <Button variant="ghost" size="sm"
+                onClick={(e) => { e.stopPropagation(); setMoveTarget(n); setToStatus(next[0]); }}>
+                {ar ? 'تحريك' : 'Advance'}
+              </Button>
+            )}
+          </span>
+        );
+      } },
   ];
   return (
     <Shell>
@@ -262,6 +296,24 @@ export function NoticePage() {
             <Button type="button" variant="ghost" onClick={() => setShowNew(false)}>{ar ? 'إغلاق' : 'Cancel'}</Button>
             <Button type="submit" disabled={busy}>{ar ? 'إعداد مسوّدة' : 'Draft'}</Button>
           </div></form></Card>
+      )}
+      {moveTarget && toStatus && (
+        <Card><form onSubmit={submitMove} style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div style={{ gridColumn: 'span 2', fontWeight: 700 }}>
+            {ar ? `تحريك ${moveTarget.reference} → ` : `Advance ${moveTarget.reference} → `}
+            <select value={toStatus} onChange={e => setToStatus(e.target.value as NoticeStatus)} className="input" style={{ marginInlineStart: 8, width: 'auto', display: 'inline-block' }}>
+              {nextNoticeStatuses(moveTarget.status).map(s => <option key={s} value={s}>{NOTICE_STATUS_LABEL[s][ar ? 'ar' : 'en']}</option>)}
+            </select>
+          </div>
+          {toStatus === 'SUPERSEDED' && (
+            <label style={{ gridColumn: 'span 2' }}>{ar ? 'استُبدِل بالإشعار رقم (اختياري)' : 'Superseded by notice # (optional)'}
+              <input className="input" type="number" value={supersededBy} onChange={e => setSupersededBy(e.target.value)} placeholder={ar ? 'معرّف النسخة الأحدث' : 'newer version id'} /></label>
+          )}
+          <div style={{ gridColumn: 'span 2', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => { setMoveTarget(null); setToStatus(null); setSupersededBy(''); }}>{ar ? 'إغلاق' : 'Cancel'}</Button>
+            <Button type="submit" disabled={busy}>{ar ? 'تنفيذ' : 'Apply'}</Button>
+          </div>
+        </form></Card>
       )}
       <Card>{rows.length === 0
         ? <EmptyState Icon={BookOpen} title={ar ? 'لا توجد إشعارات' : 'No notices'} sub={ar ? 'سجّل أول إشعار' : 'Draft the first notice'} />
@@ -366,11 +418,18 @@ export function RetentionPage() {
 export function NdrPage() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const { rows, error, reload } = useList<NdrResponse>(() => dataOfficerApi.listNdr());
+  const { rows, error, reload, setError } = useList<NdrResponse>(() => dataOfficerApi.listNdr());
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ref, setRef] = useState(''); const [year, setYear] = useState(String(new Date().getFullYear()));
   const [titleEn, setTitleEn] = useState(''); const [titleAr, setTitleAr] = useState('');
+
+  // Annual-cycle transition (SDAIA NDR — DRAFT→INTERNAL_REVIEW→READY→SUBMITTED→ACCEPTED/REJECTED/REVISION)
+  const [moveTarget, setMoveTarget] = useState<NdrResponse | null>(null);
+  const [toStatus, setToStatus] = useState<NdrStatus | null>(null);
+  const [submissionRef, setSubmissionRef] = useState('');
+  const [datasetCount, setDatasetCount] = useState('');
+  const [respEn, setRespEn] = useState(''); const [respAr, setRespAr] = useState('');
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true);
@@ -378,6 +437,27 @@ export function NdrPage() {
       await dataOfficerApi.createNdr({ reference: ref, cycleYear: Number(year), titleEn, titleAr });
       setShowNew(false); setRef(''); setTitleEn(''); setTitleAr('');
       await reload();
+    } finally { setBusy(false); }
+  }
+
+  const NDR_RESP = ['ACCEPTED', 'REJECTED', 'REVISION_REQUESTED'];
+  async function submitMove(e: React.FormEvent) {
+    e.preventDefault();
+    if (!moveTarget || !toStatus) return;
+    setBusy(true);
+    try {
+      const resp = NDR_RESP.includes(toStatus);
+      await dataOfficerApi.transitionNdr(moveTarget.id, {
+        toStatus,
+        submissionRef: toStatus === 'SUBMITTED' ? (submissionRef || undefined) : undefined,
+        datasetCount: toStatus === 'SUBMITTED' && datasetCount ? Number(datasetCount) : undefined,
+        responseSummaryEn: resp ? (respEn || undefined) : undefined,
+        responseSummaryAr: resp ? (respAr || undefined) : undefined,
+      });
+      setMoveTarget(null); setToStatus(null); setSubmissionRef(''); setDatasetCount(''); setRespEn(''); setRespAr('');
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Transition failed');
     } finally { setBusy(false); }
   }
   const [docsTarget, setDocsTarget] = useState<NdrResponse | null>(null);
@@ -390,8 +470,18 @@ export function NdrPage() {
     { header: ar ? 'العنوان' : 'Title', cell: n => <span style={{ fontSize: 13 }}>{ar ? (n.titleAr ?? n.titleEn) : (n.titleEn ?? n.titleAr) ?? '—'}</span> },
     { header: ar ? 'عدد البيانات' : 'Datasets', width: '110px', cell: n => <span style={{ fontSize: 12 }}>{n.datasetCount}</span> },
     { header: ar ? 'الحالة' : 'Status', width: '160px',
-      cell: n => <Badge tone={n.status === 'ACCEPTED' ? 'success' : n.status === 'REJECTED' ? 'danger' : 'info'}>{NDR_STATUS_LABEL[n.status][ar ? 'ar' : 'en']}</Badge> },
-    { header: ar ? 'مرجع سدايا' : 'SDAIA ref', width: '160px', cell: n => <span style={{ fontSize: 12 }}>{n.submissionRef ?? '—'}</span> },
+      cell: n => <Badge tone={NDR_STATUS_TONE[n.status]}>{NDR_STATUS_LABEL[n.status][ar ? 'ar' : 'en']}</Badge> },
+    { header: ar ? 'مرجع سدايا' : 'SDAIA ref', width: '140px', cell: n => <span style={{ fontSize: 12 }}>{n.submissionRef ?? '—'}</span> },
+    { header: '', width: '120px', align: 'end',
+      cell: n => {
+        const next = nextNdrStatuses(n.status);
+        return next.length > 0 ? (
+          <Button variant="ghost" size="sm"
+            onClick={(e) => { e.stopPropagation(); setMoveTarget(n); setToStatus(next[0]); }}>
+            {ar ? 'تحريك' : 'Advance'}
+          </Button>
+        ) : null;
+      } },
   ];
   return (
     <Shell>
@@ -411,6 +501,32 @@ export function NdrPage() {
             <Button type="button" variant="ghost" onClick={() => setShowNew(false)}>{ar ? 'إغلاق' : 'Cancel'}</Button>
             <Button type="submit" disabled={busy}>{ar ? 'إنشاء' : 'Create'}</Button>
           </div></form></Card>
+      )}
+      {moveTarget && toStatus && (
+        <Card><form onSubmit={submitMove} style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div style={{ gridColumn: 'span 2', fontWeight: 700 }}>
+            {ar ? `تحريك ${moveTarget.reference} → ` : `Advance ${moveTarget.reference} → `}
+            <select value={toStatus} onChange={e => setToStatus(e.target.value as NdrStatus)} className="input" style={{ marginInlineStart: 8, width: 'auto', display: 'inline-block' }}>
+              {nextNdrStatuses(moveTarget.status).map(s => <option key={s} value={s}>{NDR_STATUS_LABEL[s][ar ? 'ar' : 'en']}</option>)}
+            </select>
+          </div>
+          {toStatus === 'SUBMITTED' && (
+            <>
+              <label>{ar ? 'مرجع التقديم لدى سدايا' : 'SDAIA submission reference'}<input className="input" value={submissionRef} onChange={e => setSubmissionRef(e.target.value)} placeholder="SDAIA-NDR-2026-..." /></label>
+              <label>{ar ? 'عدد مجموعات البيانات' : 'Dataset count'}<input className="input" type="number" min="0" value={datasetCount} onChange={e => setDatasetCount(e.target.value)} /></label>
+            </>
+          )}
+          {NDR_RESP.includes(toStatus) && (
+            <>
+              <label style={{ gridColumn: 'span 2' }}>{ar ? 'ملخّص رد سدايا (EN)' : 'SDAIA response summary (EN)'}<textarea className="input" rows={2} value={respEn} onChange={e => setRespEn(e.target.value)} /></label>
+              <label style={{ gridColumn: 'span 2' }}>{ar ? 'ملخّص رد سدايا (AR)' : 'SDAIA response summary (AR)'}<textarea className="input" rows={2} value={respAr} onChange={e => setRespAr(e.target.value)} dir="rtl" /></label>
+            </>
+          )}
+          <div style={{ gridColumn: 'span 2', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => { setMoveTarget(null); setToStatus(null); setSubmissionRef(''); setDatasetCount(''); setRespEn(''); setRespAr(''); }}>{ar ? 'إغلاق' : 'Cancel'}</Button>
+            <Button type="submit" disabled={busy}>{ar ? 'تنفيذ' : 'Apply'}</Button>
+          </div>
+        </form></Card>
       )}
       <Card>{rows.length === 0
         ? <EmptyState Icon={ScrollText} title={ar ? 'لا توجد دورات تقديم' : 'No submission cycles'} sub={ar ? 'ابدأ دورة هذا العام' : 'Start this year\'s cycle'} />
@@ -600,12 +716,20 @@ const ETHICS_SUBJECT_TYPES = ['AI_MODEL','DATA_USE_CASE','NEW_PROCESSING','OPEN_
 export function EthicsPage() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const { rows, error, reload } = useList<EthicsResponse>(() => dataOfficerApi.listEthics());
+  const { rows, error, reload, setError } = useList<EthicsResponse>(() => dataOfficerApi.listEthics());
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ref, setRef] = useState(''); const [subType, setSubType] = useState('AI_MODEL'); const [subRef, setSubRef] = useState('');
   const [titleEn, setTitleEn] = useState(''); const [titleAr, setTitleAr] = useState('');
   const [summaryEn, setSummaryEn] = useState(''); const [summaryAr, setSummaryAr] = useState('');
+
+  // Committee lifecycle (SDAIA AI-ethics / NDMO data-ethics — REQUESTED→COMMITTEE_REVIEW→OPINION_DRAFTED→APPROVED…)
+  const [moveTarget, setMoveTarget] = useState<EthicsResponse | null>(null);
+  const [toStatus, setToStatus] = useState<EthicsStatus | null>(null);
+  const [committeeAt, setCommitteeAt] = useState('');
+  const [opinionEn, setOpinionEn] = useState(''); const [opinionAr, setOpinionAr] = useState('');
+  const [conditionsEn, setConditionsEn] = useState(''); const [conditionsAr, setConditionsAr] = useState('');
+  const [nextReview, setNextReview] = useState('');
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true);
@@ -614,6 +738,31 @@ export function EthicsPage() {
         titleEn, titleAr, summaryEn, summaryAr });
       setShowNew(false); setRef(''); setSubRef(''); setTitleEn(''); setTitleAr(''); setSummaryEn(''); setSummaryAr('');
       await reload();
+    } finally { setBusy(false); }
+  }
+
+  const ETH_DECISION = ['APPROVED', 'APPROVED_WITH_CONDITIONS', 'REJECTED'];
+  const ethShowOpinion = (s: EthicsStatus | null) => s === 'OPINION_DRAFTED' || (s != null && ETH_DECISION.includes(s));
+  const ethShowReview = (s: EthicsStatus | null) => s === 'APPROVED' || s === 'APPROVED_WITH_CONDITIONS';
+  async function submitMove(e: React.FormEvent) {
+    e.preventDefault();
+    if (!moveTarget || !toStatus) return;
+    setBusy(true);
+    try {
+      await dataOfficerApi.transitionEthics(moveTarget.id, {
+        toStatus,
+        committeeMeetingAt: toStatus === 'COMMITTEE_REVIEW' && committeeAt ? `${committeeAt}T00:00:00` : undefined,
+        opinionEn: ethShowOpinion(toStatus) ? (opinionEn || undefined) : undefined,
+        opinionAr: ethShowOpinion(toStatus) ? (opinionAr || undefined) : undefined,
+        conditionsEn: toStatus === 'APPROVED_WITH_CONDITIONS' ? (conditionsEn || undefined) : undefined,
+        conditionsAr: toStatus === 'APPROVED_WITH_CONDITIONS' ? (conditionsAr || undefined) : undefined,
+        nextReviewDue: ethShowReview(toStatus) ? (nextReview || undefined) : undefined,
+      });
+      setMoveTarget(null); setToStatus(null); setCommitteeAt(''); setOpinionEn(''); setOpinionAr('');
+      setConditionsEn(''); setConditionsAr(''); setNextReview('');
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Transition failed');
     } finally { setBusy(false); }
   }
 
@@ -627,9 +776,19 @@ export function EthicsPage() {
       cell: e => <div><div style={{ fontWeight: 600, fontSize: 13 }}>{ar ? e.titleAr : e.titleEn}</div>
         <div style={{ fontSize: 11, opacity: 0.7 }}>{e.subjectType}{e.subjectRef && ` · ${e.subjectRef}`}</div></div> },
     { header: ar ? 'الحالة' : 'Status', width: '180px',
-      cell: e => <Badge>{ETHICS_STATUS_LABEL[e.status][ar ? 'ar' : 'en']}</Badge> },
-    { header: ar ? 'اجتماع اللجنة' : 'Committee', width: '160px',
+      cell: e => <Badge tone={ETHICS_STATUS_TONE[e.status]}>{ETHICS_STATUS_LABEL[e.status][ar ? 'ar' : 'en']}</Badge> },
+    { header: ar ? 'اجتماع اللجنة' : 'Committee', width: '140px',
       cell: e => <span style={{ fontSize: 12 }}>{e.committeeMeetingAt ? new Date(e.committeeMeetingAt).toLocaleDateString() : '—'}</span> },
+    { header: '', width: '120px', align: 'end',
+      cell: e => {
+        const next = nextEthicsStatuses(e.status);
+        return next.length > 0 ? (
+          <Button variant="ghost" size="sm"
+            onClick={(ev) => { ev.stopPropagation(); setMoveTarget(e); setToStatus(next[0]); }}>
+            {ar ? 'تحريك' : 'Advance'}
+          </Button>
+        ) : null;
+      } },
   ];
   return (
     <Shell>
@@ -654,6 +813,39 @@ export function EthicsPage() {
             <Button type="button" variant="ghost" onClick={() => setShowNew(false)}>{ar ? 'إغلاق' : 'Cancel'}</Button>
             <Button type="submit" disabled={busy}>{ar ? 'تقديم للجنة' : 'Submit to committee'}</Button>
           </div></form></Card>
+      )}
+      {moveTarget && toStatus && (
+        <Card><form onSubmit={submitMove} style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div style={{ gridColumn: 'span 2', fontWeight: 700 }}>
+            {ar ? `تحريك ${moveTarget.reference} → ` : `Advance ${moveTarget.reference} → `}
+            <select value={toStatus} onChange={e => setToStatus(e.target.value as EthicsStatus)} className="input" style={{ marginInlineStart: 8, width: 'auto', display: 'inline-block' }}>
+              {nextEthicsStatuses(moveTarget.status).map(s => <option key={s} value={s}>{ETHICS_STATUS_LABEL[s][ar ? 'ar' : 'en']}</option>)}
+            </select>
+          </div>
+          {toStatus === 'COMMITTEE_REVIEW' && (
+            <label style={{ gridColumn: 'span 2' }}>{ar ? 'تاريخ اجتماع اللجنة' : 'Committee meeting date'}
+              <input className="input" type="date" value={committeeAt} onChange={e => setCommitteeAt(e.target.value)} /></label>
+          )}
+          {ethShowOpinion(toStatus) && (
+            <>
+              <label style={{ gridColumn: 'span 2' }}>{ar ? 'رأي اللجنة (EN)' : 'Committee opinion (EN)'}<textarea className="input" rows={2} value={opinionEn} onChange={e => setOpinionEn(e.target.value)} /></label>
+              <label style={{ gridColumn: 'span 2' }}>{ar ? 'رأي اللجنة (AR)' : 'Committee opinion (AR)'}<textarea className="input" rows={2} value={opinionAr} onChange={e => setOpinionAr(e.target.value)} dir="rtl" /></label>
+            </>
+          )}
+          {toStatus === 'APPROVED_WITH_CONDITIONS' && (
+            <>
+              <label style={{ gridColumn: 'span 2' }}>{ar ? 'الشروط (EN)' : 'Conditions (EN)'}<textarea className="input" rows={2} value={conditionsEn} onChange={e => setConditionsEn(e.target.value)} /></label>
+              <label style={{ gridColumn: 'span 2' }}>{ar ? 'الشروط (AR)' : 'Conditions (AR)'}<textarea className="input" rows={2} value={conditionsAr} onChange={e => setConditionsAr(e.target.value)} dir="rtl" /></label>
+            </>
+          )}
+          {ethShowReview(toStatus) && (
+            <label>{ar ? 'تاريخ المراجعة القادمة' : 'Next review due'}<input className="input" type="date" value={nextReview} onChange={e => setNextReview(e.target.value)} /></label>
+          )}
+          <div style={{ gridColumn: 'span 2', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => { setMoveTarget(null); setToStatus(null); setCommitteeAt(''); setOpinionEn(''); setOpinionAr(''); setConditionsEn(''); setConditionsAr(''); setNextReview(''); }}>{ar ? 'إغلاق' : 'Cancel'}</Button>
+            <Button type="submit" disabled={busy}>{ar ? 'تنفيذ' : 'Apply'}</Button>
+          </div>
+        </form></Card>
       )}
       <Card>{rows.length === 0
         ? <EmptyState Icon={Scale} title={ar ? 'لا توجد مراجعات' : 'No reviews'} sub={ar ? 'قدّم أول مراجعة' : 'Submit the first review'} />
