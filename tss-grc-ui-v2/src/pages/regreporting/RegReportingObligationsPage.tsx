@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Plus } from 'lucide-react';
+import { CalendarDays, Plus, FileText, FilePlus2, X } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -9,13 +9,14 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import {
   regreportingApi,
   REGULATOR_LABEL, FREQUENCY_LABEL,
   FILING_STATUS_LABEL, FILING_STATUS_TONE,
-  type ObligationResponse, type Regulator, type Frequency,
+  type ObligationResponse, type Regulator, type Frequency, type FilingResponse,
 } from '../../lib/regreporting';
 
 /**
@@ -37,11 +38,40 @@ const OWNER_ROLES = [
 
 export function RegReportingObligationsPage() {
   const { lang } = useI18n();
+  const ar = lang === 'ar';
+  const toast = useToast();
   const demoMode = !isAuthenticated();
 
   const [rows, setRows] = useState<ObligationResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Generate-next-filing + per-obligation filings drill-down (Sprint 16
+  // reg-reporting cycle). generateFiling derives the next period/due from
+  // the obligation's frequency; listFilingsForObligation backs the panel.
+  const [genBusy, setGenBusy] = useState<number | null>(null);
+  const [filingsFor, setFilingsFor] = useState<ObligationResponse | null>(null);
+  const [filings, setFilings] = useState<FilingResponse[] | null>(null);
+
+  async function loadFilings(o: ObligationResponse) {
+    setFilingsFor(o); setFilings(null);
+    try { setFilings(await regreportingApi.listFilingsForObligation(o.id)); }
+    catch { setFilings([]); }
+  }
+
+  async function generate(o: ObligationResponse) {
+    setGenBusy(o.id);
+    try {
+      const f = await regreportingApi.generateFiling(o.id, {});
+      toast.success(ar ? `أُنشئت دورة التقديم ${f.reference} (تستحق ${f.dueDate})`
+                       : `Filing cycle ${f.reference} generated · due ${f.dueDate}`);
+      await reload();
+      if (filingsFor?.id === o.id) await loadFilings(o);
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message
+        : (ar ? 'تعذّر إنشاء دورة التقديم' : 'Failed to generate filing'));
+    } finally { setGenBusy(null); }
+  }
 
   // New-obligation wizard.
   const [showNew, setShowNew] = useState(false);
@@ -150,10 +180,27 @@ export function RegReportingObligationsPage() {
       ) : <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>—</span>,
     },
     {
-      header: lang === 'ar' ? 'الاستحقاق' : 'Due offset', width: '120px',
+      header: lang === 'ar' ? 'الاستحقاق' : 'Due offset', width: '100px',
       cell: o => (
         <span style={{ fontSize: 12 }}>
           +{o.dueOffsetBusinessDays} {lang === 'ar' ? 'يوم عمل' : 'BD'}
+        </span>
+      ),
+    },
+    {
+      header: '', width: '210px',
+      cell: o => (
+        <span style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+          <Button size="sm" variant="ghost" Icon={FileText}
+            onClick={() => loadFilings(o)}>
+            {ar ? 'التقديمات' : 'Filings'}
+          </Button>
+          <Button size="sm" variant="secondary" Icon={FilePlus2}
+            disabled={!o.active || genBusy === o.id}
+            title={o.active ? '' : (ar ? 'التقرير غير مُفعّل' : 'Obligation is inactive')}
+            onClick={() => generate(o)}>
+            {genBusy === o.id ? (ar ? 'جارٍ…' : '…') : (ar ? 'دورة جديدة' : 'Generate')}
+          </Button>
         </span>
       ),
     },
@@ -327,6 +374,40 @@ export function RegReportingObligationsPage() {
           />
         )}
       </Card>
+
+      {filingsFor && (
+        <div style={{ marginTop: 16 }}>
+          <Card padded title={(ar ? 'دورات التقديم · ' : 'Filing cycles · ') + filingsFor.code}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -8, marginBottom: 8 }}>
+              <Button size="sm" variant="ghost" Icon={X}
+                onClick={() => { setFilingsFor(null); setFilings(null); }}>
+                {ar ? 'إغلاق' : 'Close'}
+              </Button>
+            </div>
+            {filings === null ? (
+              <InlineEmpty>{ar ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+            ) : filings.length === 0 ? (
+              <InlineEmpty>{ar ? 'لا توجد دورات تقديم بعد — اضغط «دورة جديدة».'
+                                : 'No filing cycles yet — use “Generate”.'}</InlineEmpty>
+            ) : (
+              <DataTable<FilingResponse>
+                columns={[
+                  { header: ar ? 'المرجع' : 'Reference', width: '200px', mono: true,
+                    cell: f => <span style={{ fontSize: 12 }}>{f.reference}</span> },
+                  { header: ar ? 'الفترة' : 'Period', width: '210px',
+                    cell: f => <span style={{ fontSize: 12 }}>{f.periodStart} → {f.periodEnd}</span> },
+                  { header: ar ? 'الاستحقاق' : 'Due', width: '130px',
+                    cell: f => <span style={{ fontSize: 12 }}>{f.dueDate}</span> },
+                  { header: ar ? 'الحالة' : 'Status', width: '170px',
+                    cell: f => <Badge tone={FILING_STATUS_TONE[f.status]}>
+                      {FILING_STATUS_LABEL[f.status][ar ? 'ar' : 'en']}</Badge> },
+                ]}
+                rows={[...filings].sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1))}
+              />
+            )}
+          </Card>
+        </div>
+      )}
     </Shell>
   );
 }
