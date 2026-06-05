@@ -74,7 +74,7 @@ import {
   type MaterialTopic, type MaterialMatrix, type MaterialCategory,
 } from '../../lib/sustainabilityMateriality';
 import {
-  listMetrics, metricsAggregate, recordMetricReading, archiveMetric,
+  listMetrics, metricsAggregate, recordMetricReading, archiveMetric, createMetric,
   computeMetricProgress, metricStatusTone, metricStatusLabel,
   metricCategoryLabel as esgMetricCategoryLabel,
   type EsgMetric as EsgM, type MetricAggregate, type MetricCategory,
@@ -2144,6 +2144,7 @@ function MetricsTab() {
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<MetricCategory | 'ALL'>('ALL');
   const [readingMetric, setReadingMetric]   = useState<EsgM | null>(null);
+  const [openNew, setOpenNew]               = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -2188,6 +2189,88 @@ function MetricsTab() {
       label: isAr ? 'تاريخ القياس' : 'As of' },
   ];
 
+  const createFields: FieldDef[] = [
+    { kind: 'text', key: 'metricNameEn', required: true, span: 6,
+      label: isAr ? 'اسم المؤشّر (إنجليزي)' : 'Metric name (English)' },
+    { kind: 'text', key: 'metricNameAr', span: 6,
+      label: isAr ? 'اسم المؤشّر (عربي)' : 'Metric name (Arabic)' },
+    { kind: 'select', key: 'category', required: true, span: 6,
+      label: isAr ? 'الفئة' : 'Category',
+      options: (['ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => ({
+        value: c, label: esgMetricCategoryLabel(c, isAr ? 'ar' : 'en'),
+      })) },
+    { kind: 'text', key: 'subcategory', span: 6,
+      label: isAr ? 'الفئة الفرعية' : 'Subcategory' },
+    { kind: 'text', key: 'unit', required: true, span: 4,
+      label: isAr ? 'الوحدة' : 'Unit', placeholder: 'MWh, %, tCO₂e…' },
+    { kind: 'number', key: 'reportingYear', required: true, span: 4, min: 2000, max: 2100,
+      label: isAr ? 'سنة التقرير' : 'Reporting year' },
+    { kind: 'text', key: 'metricCode', span: 4,
+      label: isAr ? 'الكود (اختياري)' : 'Code (optional)', placeholder: 'ENV-ENERGY-TOTAL' },
+    { kind: 'number', key: 'baselineValue', span: 3,
+      label: isAr ? 'قيمة الأساس' : 'Baseline value' },
+    { kind: 'number', key: 'baselineYear', span: 3, min: 2000, max: 2100,
+      label: isAr ? 'سنة الأساس' : 'Baseline year' },
+    { kind: 'number', key: 'targetValue', span: 3,
+      label: isAr ? 'القيمة المستهدفة' : 'Target value' },
+    { kind: 'number', key: 'targetYear', span: 3, min: 2000, max: 2100,
+      label: isAr ? 'سنة الهدف' : 'Target year' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المسؤول' : 'Owner' },
+    { kind: 'text', key: 'responsibleDepartment', span: 6,
+      label: isAr ? 'الإدارة المسؤولة' : 'Responsible department' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+  ];
+
+  async function submitCreate(values: Record<string, unknown>): Promise<void> {
+    const nameEn = String(values.metricNameEn ?? '').trim();
+    const unit = String(values.unit ?? '').trim();
+    const category = String(values.category ?? '').trim();
+    const year = Number(values.reportingYear);
+    if (!nameEn || !unit || !category || !Number.isFinite(year)) {
+      toast.danger(isAr
+        ? 'اسم المؤشّر والفئة والوحدة وسنة التقرير حقول مطلوبة'
+        : 'Metric name, category, unit and reporting year are required');
+      return;
+    }
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return v === '' || v == null || !Number.isFinite(n) ? undefined : n;
+    };
+    const str = (v: unknown) => {
+      const s = String(v ?? '').trim();
+      return s || undefined;
+    };
+    try {
+      const created = await createMetric({
+        metricNameEn: nameEn,
+        metricNameAr: str(values.metricNameAr),
+        category: category as MetricCategory,
+        subcategory: str(values.subcategory),
+        unit,
+        reportingYear: year,
+        metricCode: str(values.metricCode),
+        baselineValue: num(values.baselineValue),
+        baselineYear: num(values.baselineYear),
+        targetValue: num(values.targetValue),
+        targetYear: num(values.targetYear),
+        ownerName: str(values.ownerName),
+        responsibleDepartment: str(values.responsibleDepartment),
+        descriptionEn: str(values.descriptionEn),
+        status: 'ACTIVE',
+      });
+      toast.success(isAr
+        ? `تمت إضافة المؤشّر ${created.metricCode ?? created.metricNameEn}`
+        : `Metric ${created.metricCode ?? created.metricNameEn} added`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّرت إضافة المؤشّر' : 'Failed to add metric'));
+    }
+  }
+
   return (
     <div className="esg-stack">
       {/* Per-pillar mean-progress strip */}
@@ -2204,7 +2287,10 @@ function MetricsTab() {
           : 0} tone="danger" />
       </div>
 
-      <Card title={isAr ? 'سجلّ مؤشّرات الاستدامة (E/S/G)' : 'ESG Metrics Register (E/S/G)'} Icon={TrendingDown}>
+      <Card title={isAr ? 'سجلّ مؤشّرات الاستدامة (E/S/G)' : 'ESG Metrics Register (E/S/G)'} Icon={TrendingDown}
+        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
+          {isAr ? 'مؤشّر جديد' : 'New metric'}
+        </Button>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'سجلّ موحَّد لمؤشّرات البيئة والاجتماع والحوكمة. التقدّم يُحسب وفق الاتجاه — يدعم أهداف الارتفاع («حصة المتجدّدة») وأهداف الانخفاض («LTIFR»).'
@@ -2318,6 +2404,22 @@ function MetricsTab() {
         submitLabel={isAr ? 'حفظ' : 'Save'}
         onClose={() => setReadingMetric(null)}
         onSubmit={submitReading}
+      />
+
+      <FormModal
+        open={openNew}
+        title={isAr ? 'مؤشّر استدامة جديد' : 'New ESG metric'}
+        fields={createFields}
+        initial={{
+          metricNameEn: '', metricNameAr: '', category: 'ENVIRONMENTAL',
+          subcategory: '', unit: '', reportingYear: 2025, metricCode: '',
+          baselineValue: '', baselineYear: '', targetValue: '', targetYear: '',
+          ownerName: '', responsibleDepartment: '', descriptionEn: '',
+        }}
+        size="lg"
+        submitLabel={isAr ? 'إضافة المؤشّر' : 'Add metric'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={submitCreate}
       />
     </div>
   );
