@@ -735,6 +735,11 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
     try { await ermAdvancedApi.approveAppetite(s.id, who); toast.success('Approved'); void loadAll(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
+  async function retireAppetite(s: RiskAppetiteStatementDto) {
+    if (!window.confirm(`Retire appetite statement "${s.titleEn}"? It will be marked RETIRED.`)) return;
+    try { await ermAdvancedApi.retireAppetite(s.id); toast.success('Retired'); void loadAll(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
 
   return (
     <>
@@ -781,6 +786,8 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
                       <Button variant="secondary" Icon={ArrowRight} onClick={() => updateExposure(s)}>Update exposure</Button>
                       {s.status !== 'APPROVED' && s.status !== 'RETIRED' &&
                         <Button variant="secondary" Icon={CheckCheck} onClick={() => approveAppetite(s)}>Approve</Button>}
+                      {s.status !== 'RETIRED' &&
+                        <Button variant="ghost" Icon={Archive} onClick={() => retireAppetite(s)}>Retire</Button>}
                     </div>
                   </Card>
                 );
