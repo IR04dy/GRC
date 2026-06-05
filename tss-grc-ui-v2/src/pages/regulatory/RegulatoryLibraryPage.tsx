@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Landmark, AlertTriangle, Plus } from 'lucide-react';
+import { BookOpen, Landmark, AlertTriangle, Plus, Pencil } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -16,7 +16,7 @@ import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listAuthorityDocuments, listAuthorityDocumentCitations,
-  rollupAuthorityDocumentsByFamily, createAuthorityDocument, createCitation,
+  rollupAuthorityDocumentsByFamily, createAuthorityDocument, updateAuthorityDocument, createCitation,
   citationsToTree,
   authorityStatusTone, translationTone, translationLabel,
   type AuthorityDocument, type AuthorityDocumentCitation,
@@ -105,12 +105,27 @@ export function RegulatoryLibraryPage() {
   const [citationsLoading, setCitationsLoading] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CreateForm>(EMPTY_CREATE);
   const set = <K extends keyof CreateForm>(k: K, v: CreateForm[K]) =>
     setForm(f => ({ ...f, [k]: v }));
+  const isEditing = editingId !== null;
 
-  function openCreate() { setForm(EMPTY_CREATE); setShowCreate(true); }
+  function openCreate() { setEditingId(null); setForm(EMPTY_CREATE); setShowCreate(true); }
+
+  function openEdit(d: AuthorityDocument) {
+    setEditingId(d.id);
+    setForm({
+      code: d.code, titleEn: d.titleEn, titleAr: d.titleAr ?? '',
+      family: (d.family as AuthorityFamily), jurisdiction: d.jurisdiction,
+      issuer: d.issuer, version: d.version,
+      status: d.status, translationStatus: d.translationStatus,
+      summaryEn: d.summaryEn ?? '', summaryAr: d.summaryAr ?? '',
+      isPlaceholder: d.isPlaceholder,
+    });
+    setShowCreate(true);
+  }
 
   const [showCit, setShowCit] = useState(false);
   const [savingCit, setSavingCit] = useState(false);
@@ -175,28 +190,52 @@ export function RegulatoryLibraryPage() {
     }
     setSaving(true);
     try {
-      const created = await createAuthorityDocument({
-        code,
-        titleEn,
-        titleAr: form.titleAr.trim() || undefined,
-        family: form.family,
-        jurisdiction: form.jurisdiction,
-        issuer,
-        version: form.version.trim() || '1.0',
-        status: form.status,
-        translationStatus: form.translationStatus,
-        summaryEn: form.summaryEn.trim() || undefined,
-        summaryAr: form.summaryAr.trim() || undefined,
-        isPlaceholder: form.isPlaceholder,
-      });
-      toast.success(isAr
-        ? `تم تسجيل الوثيقة ${created.code} في المكتبة`
-        : `Document ${created.code} registered in the library`);
-      setShowCreate(false);
-      await reload();
+      if (isEditing) {
+        // code/version/status are immutable here (status is lifecycle-managed
+        // via the transition endpoint) — the service ignores them on update.
+        const updated = await updateAuthorityDocument(editingId!, {
+          titleEn,
+          titleAr: form.titleAr.trim() || undefined,
+          family: form.family,
+          jurisdiction: form.jurisdiction,
+          issuer,
+          translationStatus: form.translationStatus,
+          summaryEn: form.summaryEn.trim() || undefined,
+          summaryAr: form.summaryAr.trim() || undefined,
+          isPlaceholder: form.isPlaceholder,
+        });
+        toast.success(isAr
+          ? `تم تحديث الوثيقة ${updated.code}`
+          : `Document ${updated.code} updated`);
+        setShowCreate(false);
+        setSelected(prev => (prev && prev.id === updated.id ? updated : prev));
+        await reload();
+      } else {
+        const created = await createAuthorityDocument({
+          code,
+          titleEn,
+          titleAr: form.titleAr.trim() || undefined,
+          family: form.family,
+          jurisdiction: form.jurisdiction,
+          issuer,
+          version: form.version.trim() || '1.0',
+          status: form.status,
+          translationStatus: form.translationStatus,
+          summaryEn: form.summaryEn.trim() || undefined,
+          summaryAr: form.summaryAr.trim() || undefined,
+          isPlaceholder: form.isPlaceholder,
+        });
+        toast.success(isAr
+          ? `تم تسجيل الوثيقة ${created.code} في المكتبة`
+          : `Document ${created.code} registered in the library`);
+        setShowCreate(false);
+        await reload();
+      }
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّر تسجيل الوثيقة' : 'Failed to register document'));
+        : (isEditing
+            ? (isAr ? 'تعذّر تحديث الوثيقة' : 'Failed to update document')
+            : (isAr ? 'تعذّر تسجيل الوثيقة' : 'Failed to register document')));
     } finally {
       setSaving(false);
     }
@@ -349,6 +388,11 @@ export function RegulatoryLibraryPage() {
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <Badge tone="primary">{citations.length}</Badge>
                 {selected.isPlaceholder && <Badge tone="warning">{isAr ? 'مؤقت' : 'placeholder'}</Badge>}
+                {!demoMode && (
+                  <Button variant="ghost" size="sm" Icon={Pencil} onClick={() => openEdit(selected)}>
+                    {isAr ? 'تعديل' : 'Edit'}
+                  </Button>
+                )}
                 {!demoMode && (selected.status === 'DRAFT' || selected.status === 'ACTIVE') && (
                   <Button variant="secondary" size="sm" Icon={Plus} onClick={openAddCit}>
                     {isAr ? 'إضافة بند' : 'Add citation'}
@@ -396,31 +440,41 @@ export function RegulatoryLibraryPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         size="lg"
-        title={isAr ? 'تسجيل وثيقة مرجعية' : 'Register authority document'}
+        title={isEditing
+          ? (isAr ? `تعديل الوثيقة ${form.code}` : `Edit document ${form.code}`)
+          : (isAr ? 'تسجيل وثيقة مرجعية' : 'Register authority document')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowCreate(false)} disabled={saving}>
               {isAr ? 'إلغاء' : 'Cancel'}
             </Button>
-            <Button variant="primary" Icon={Plus} onClick={submitCreate} disabled={saving}>
-              {saving ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'تسجيل' : 'Register')}
+            <Button variant="primary" Icon={isEditing ? Pencil : Plus} onClick={submitCreate} disabled={saving}>
+              {saving
+                ? (isAr ? 'جارٍ الحفظ…' : 'Saving…')
+                : isEditing ? (isAr ? 'حفظ التغييرات' : 'Save changes') : (isAr ? 'تسجيل' : 'Register')}
             </Button>
           </>
         }>
         <div style={{ display: 'grid', gap: 12 }}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-            {isAr
-              ? 'الوثائق الجديدة تُسجَّل كعنصر مؤقت حتى استيراد النص الرسمي من الجهة المُصدرة.'
-              : 'New documents register as placeholders until the official text is imported from the issuer.'}
+            {isEditing
+              ? (isAr
+                  ? 'الكود والإصدار والحالة تُدار من خلال دورة حياة الوثيقة ولا يمكن تعديلها هنا. عند استيراد النص الرسمي، حدِّث حالة الترجمة وألغِ علامة «مؤقت».'
+                  : 'Code, version and status are managed through the document lifecycle and cannot be changed here. Once the official text is imported, update the translation status and clear the placeholder flag.')
+              : (isAr
+                  ? 'الوثائق الجديدة تُسجَّل كعنصر مؤقت حتى استيراد النص الرسمي من الجهة المُصدرة.'
+                  : 'New documents register as placeholders until the official text is imported from the issuer.')}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: 12 }}>
             <FormField label={isAr ? 'الكود' : 'Code'} required>
-              <input style={ctrl} value={form.code} placeholder="e.g. SAMA-CRMG-V1"
+              <input style={isEditing ? { ...ctrl, opacity: 0.6 } : ctrl} value={form.code}
+                placeholder="e.g. SAMA-CRMG-V1" disabled={isEditing}
                 onChange={e => set('code', e.target.value)} />
             </FormField>
             <FormField label={isAr ? 'الإصدار' : 'Version'}>
-              <input style={ctrl} value={form.version} placeholder="1.0"
+              <input style={isEditing ? { ...ctrl, opacity: 0.6 } : ctrl} value={form.version}
+                placeholder="1.0" disabled={isEditing}
                 onChange={e => set('version', e.target.value)} />
             </FormField>
           </div>
@@ -455,7 +509,8 @@ export function RegulatoryLibraryPage() {
                 onChange={e => set('issuer', e.target.value)} />
             </FormField>
             <FormField label={isAr ? 'الحالة' : 'Status'}>
-              <select style={ctrl} value={form.status}
+              <select style={isEditing ? { ...ctrl, opacity: 0.6 } : ctrl} value={form.status}
+                disabled={isEditing}
                 onChange={e => set('status', e.target.value as AuthorityStatus)}>
                 {STATUSES.map(s => <option key={s} value={s}>{statusLabel(s, lang)}</option>)}
               </select>
