@@ -285,7 +285,10 @@ export function BcmPage() {
     { header: '', align: 'end', width: '160px',
       cell: r => {
         const extras: Array<{ Icon: typeof CheckCheck; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
-        if (r.status === 'DRAFT' || r.status === 'UNDER_REVIEW') {
+        if (r.status === 'DRAFT') {
+          extras.push({ Icon: Send, onClick: () => submitPlanForReview(r), title: lang === 'ar' ? 'رفع الخطة للمراجعة' : 'Submit for review', tone: 'primary' });
+        }
+        if (r.status === 'UNDER_REVIEW') {
           extras.push({ Icon: CheckCheck, onClick: () => approvePlan(r), title: t('bcmActApprovePlan'), tone: 'success' });
         }
         if (r.status === 'APPROVED') {
@@ -371,6 +374,15 @@ export function BcmPage() {
   }
 
   // ── Plan workflow handlers (ISO 22301 lifecycle) ──
+  async function submitPlanForReview(p: BcmPlanDto) {
+    try {
+      await bcmApi.submitPlanForReview(p.id);
+      toast.success(lang === 'ar' ? 'تم رفع الخطة للمراجعة' : 'Plan submitted for review');
+      plans.reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر رفع الخطة للمراجعة' : 'Submit for review failed'));
+    }
+  }
   async function approvePlan(p: BcmPlanDto) {
     try { await bcmApi.approvePlan(p.id); toast.success('Plan approved'); plans.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Approve failed'); }
