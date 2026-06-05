@@ -842,6 +842,27 @@ const KYC_EMPTY: Partial<KycSubjectDto> = {
   status: 'PENDING', isPep: false, isSanctioned: false, eddRequired: false,
   fullName: '',
 };
+// Manual screening-hit capture options (recordHit).
+const HIT_LIST_SOURCES: { value: string; en: string; ar: string }[] = [
+  { value: 'OFAC_SDN',        en: 'OFAC SDN',          ar: 'قائمة OFAC' },
+  { value: 'UN_CONSOLIDATED', en: 'UN consolidated',   ar: 'قائمة الأمم المتحدة' },
+  { value: 'EU_CONSOLIDATED', en: 'EU consolidated',   ar: 'قائمة الاتحاد الأوروبي' },
+  { value: 'SAMA_LOCAL',      en: 'SAMA local list',   ar: 'القائمة المحلية (ساما)' },
+  { value: 'PEP_GLOBAL',      en: 'PEP (global)',      ar: 'الأشخاص المعرّضون سياسياً' },
+  { value: 'INTERPOL_RED',    en: 'Interpol red',      ar: 'النشرة الحمراء (الإنتربول)' },
+  { value: 'ADVERSE_MEDIA',   en: 'Adverse media',     ar: 'تغطية إعلامية سلبية' },
+  { value: 'INTERNAL',        en: 'Internal watchlist', ar: 'قائمة مراقبة داخلية' },
+];
+const HIT_DISPOSITIONS: { value: string; en: string; ar: string }[] = [
+  { value: 'NEEDS_REVIEW',    en: 'Needs review',      ar: 'بحاجة لمراجعة' },
+  { value: 'POTENTIAL_MATCH', en: 'Potential match',   ar: 'مطابقة محتملة' },
+  { value: 'TRUE_MATCH',      en: 'True match',        ar: 'مطابقة مؤكّدة' },
+  { value: 'FALSE_POSITIVE',  en: 'False positive',    ar: 'إيجابي كاذب' },
+];
+const hitCtrl: React.CSSProperties = {
+  padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 4,
+  background: 'var(--surface)', color: 'var(--ink-1)', fontSize: 13, width: '100%', boxSizing: 'border-box',
+};
 
 function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   t: (k: string) => string;
@@ -899,6 +920,46 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
       const list = await kycApi.hits(id);
       setHits(h => ({ ...h, [id]: list }));
     } catch { setHits(h => ({ ...h, [id]: [] })); }
+  }
+  async function refetchHits(id: number) {
+    try {
+      const list = await kycApi.hits(id);
+      setHits(h => ({ ...h, [id]: list }));
+    } catch { /* keep existing */ }
+  }
+
+  // ── Manual screening-hit capture (POST /ethics/kyc/{id}/hits) ──
+  // Auto-screening (runScreening) generates hits; this lets a compliance
+  // officer log a hit found through a manual / offline check.
+  const [hitFormFor, setHitFormFor] = useState<number | null>(null);
+  const [savingHit, setSavingHit] = useState(false);
+  const [hitDraft, setHitDraft] = useState<Partial<ScreeningHitDto>>({
+    listSource: 'OFAC_SDN', matchScore: 90, disposition: 'NEEDS_REVIEW',
+  });
+  function openHitForm(id: number) {
+    setHitDraft({ listSource: 'OFAC_SDN', matchScore: 90, disposition: 'NEEDS_REVIEW', matchSummary: '', listEntryRef: '' });
+    setHitFormFor(id);
+  }
+  async function submitHit(subjectId: number) {
+    if (!hitDraft.matchSummary?.trim()) {
+      toast.danger(lang === 'ar' ? 'أدخل ملخّص المطابقة' : 'Enter a match summary');
+      return;
+    }
+    setSavingHit(true);
+    try {
+      await kycApi.recordHit(subjectId, {
+        listSource:   hitDraft.listSource,
+        listEntryRef: hitDraft.listEntryRef?.trim() || undefined,
+        matchScore:   Number(hitDraft.matchScore) || 0,
+        matchSummary: hitDraft.matchSummary.trim(),
+        disposition:  hitDraft.disposition,
+      } as Partial<ScreeningHitDto>);
+      toast.success(lang === 'ar' ? 'تم تسجيل المطابقة' : 'Hit recorded');
+      setHitFormFor(null);
+      await refetchHits(subjectId);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر تسجيل المطابقة' : 'Failed to record hit'));
+    } finally { setSavingHit(false); }
   }
 
   const FIELDS: FieldDef[] = [
@@ -1004,9 +1065,58 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
                 <DataTable columns={cols} rows={items} empty={<EmptyState />} />
                 {expandedId != null && (
                   <div className="ethics-kyc-expand">
-                    <div className="ethics-kyc-expand__title">
-                      {t('kycHitsFor')} #{expandedId}
+                    <div className="ethics-kyc-expand__title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <span>{t('kycHitsFor')} #{expandedId}</span>
+                      {!demoMode && hitFormFor !== expandedId && (
+                        <Button variant="secondary" size="sm" Icon={Plus} onClick={() => openHitForm(expandedId)}>
+                          {lang === 'ar' ? 'تسجيل مطابقة' : 'Record hit'}
+                        </Button>
+                      )}
                     </div>
+                    {hitFormFor === expandedId && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10,
+                                    padding: 12, marginBottom: 12, border: '1px solid var(--border)',
+                                    borderRadius: 6, background: 'var(--surface-2)' }}>
+                        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                          <span style={{ color: 'var(--ink-3)' }}>{lang === 'ar' ? 'مصدر القائمة' : 'List source'}</span>
+                          <select value={hitDraft.listSource} onChange={e => setHitDraft(d => ({ ...d, listSource: e.target.value }))}
+                                  style={hitCtrl}>
+                            {HIT_LIST_SOURCES.map(s => <option key={s.value} value={s.value}>{lang === 'ar' ? s.ar : s.en}</option>)}
+                          </select>
+                        </label>
+                        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                          <span style={{ color: 'var(--ink-3)' }}>{lang === 'ar' ? 'درجة المطابقة %' : 'Match score %'}</span>
+                          <input type="number" min={0} max={100} value={hitDraft.matchScore ?? ''}
+                                 onChange={e => setHitDraft(d => ({ ...d, matchScore: e.target.value === '' ? undefined : Number(e.target.value) }))}
+                                 style={hitCtrl} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                          <span style={{ color: 'var(--ink-3)' }}>{lang === 'ar' ? 'القرار الأولي' : 'Disposition'}</span>
+                          <select value={hitDraft.disposition} onChange={e => setHitDraft(d => ({ ...d, disposition: e.target.value }))}
+                                  style={hitCtrl}>
+                            {HIT_DISPOSITIONS.map(s => <option key={s.value} value={s.value}>{lang === 'ar' ? s.ar : s.en}</option>)}
+                          </select>
+                        </label>
+                        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                          <span style={{ color: 'var(--ink-3)' }}>{lang === 'ar' ? 'مرجع القائمة' : 'List entry ref'}</span>
+                          <input value={hitDraft.listEntryRef ?? ''} onChange={e => setHitDraft(d => ({ ...d, listEntryRef: e.target.value }))}
+                                 placeholder={lang === 'ar' ? 'مثال: OFAC-12345' : 'e.g. OFAC-12345'} style={hitCtrl} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4, fontSize: 12, gridColumn: '1 / -1' }}>
+                          <span style={{ color: 'var(--ink-3)' }}>{lang === 'ar' ? 'ملخّص المطابقة' : 'Match summary'} *</span>
+                          <input value={hitDraft.matchSummary ?? ''} onChange={e => setHitDraft(d => ({ ...d, matchSummary: e.target.value }))}
+                                 placeholder={lang === 'ar' ? 'وصف موجز لسبب المطابقة' : 'Brief description of why this matched'} style={hitCtrl} />
+                        </label>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+                          <Button variant="primary" size="sm" disabled={savingHit} onClick={() => void submitHit(expandedId)}>
+                            {savingHit ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : (lang === 'ar' ? 'حفظ المطابقة' : 'Save hit')}
+                          </Button>
+                          <Button variant="ghost" size="sm" disabled={savingHit} onClick={() => setHitFormFor(null)}>
+                            {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {(hits[expandedId] ?? []).length === 0
                       ? <div className="ethics-kyc-expand__empty">{t('kycNoHits')}</div>
                       : (
