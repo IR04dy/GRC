@@ -1,24 +1,67 @@
-import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, Landmark, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { BookOpen, Landmark, AlertTriangle, Plus } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { PillTabs } from '../../components/ui/PillTabs';
 import { ApiError } from '../../lib/api';
+import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listAuthorityDocuments, listAuthorityDocumentCitations,
-  rollupAuthorityDocumentsByFamily,
+  rollupAuthorityDocumentsByFamily, createAuthorityDocument,
   citationsToTree,
   authorityStatusTone, translationTone, translationLabel,
   type AuthorityDocument, type AuthorityDocumentCitation,
+  type AuthorityFamily, type AuthorityStatus, type TranslationStatus,
   type CitationNode,
 } from '../../lib/regulatoryAuthority';
+
+const FAMILIES: AuthorityFamily[] = [
+  'NCA Cyber', 'SAMA', 'Privacy', 'BCM', 'Risk',
+  'Third-Party', 'Digital-Gov', 'Resilience', 'International', 'Cyber',
+];
+const JURISDICTIONS = ['KSA', 'GCC', 'International'];
+const STATUSES: AuthorityStatus[] = ['DRAFT', 'ACTIVE', 'DEPRECATED', 'SUPERSEDED'];
+const TRANSLATIONS: TranslationStatus[] = ['EN_ONLY', 'AR_AUTO', 'AR_HUMAN_REVIEWED', 'AR_OFFICIAL'];
+
+interface CreateForm {
+  code: string; titleEn: string; titleAr: string;
+  family: AuthorityFamily; jurisdiction: string; issuer: string; version: string;
+  status: AuthorityStatus; translationStatus: TranslationStatus;
+  summaryEn: string; summaryAr: string; isPlaceholder: boolean;
+}
+const EMPTY_CREATE: CreateForm = {
+  code: '', titleEn: '', titleAr: '',
+  family: 'NCA Cyber', jurisdiction: 'KSA', issuer: '', version: '1.0',
+  status: 'ACTIVE', translationStatus: 'EN_ONLY',
+  summaryEn: '', summaryAr: '', isPlaceholder: true,
+};
+
+const ctrl: CSSProperties = {
+  width: '100%', padding: '8px 10px', borderRadius: 'var(--r-sm)',
+  border: '1px solid var(--border)', background: 'var(--surface)',
+  color: 'var(--ink-1)', fontSize: 13,
+};
+
+function FormField({ label, required, children }:
+  { label: string; required?: boolean; children: ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+        {label}{required && <span style={{ color: 'var(--danger)' }}> *</span>}
+      </span>
+      {children}
+    </label>
+  );
+}
 
 /**
  * Regulatory Library — Framework Intersection plan slice F1.
@@ -37,6 +80,7 @@ export function RegulatoryLibraryPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const toast = useToast();
+  const demoMode = !isAuthenticated();
 
   const [documents, setDocuments] = useState<AuthorityDocument[]>([]);
   const [rollup, setRollup] = useState<Record<string, number>>({});
@@ -46,6 +90,53 @@ export function RegulatoryLibraryPage() {
   const [selected, setSelected] = useState<AuthorityDocument | null>(null);
   const [citations, setCitations] = useState<AuthorityDocumentCitation[]>([]);
   const [citationsLoading, setCitationsLoading] = useState(false);
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<CreateForm>(EMPTY_CREATE);
+  const set = <K extends keyof CreateForm>(k: K, v: CreateForm[K]) =>
+    setForm(f => ({ ...f, [k]: v }));
+
+  function openCreate() { setForm(EMPTY_CREATE); setShowCreate(true); }
+
+  async function submitCreate() {
+    const code = form.code.trim();
+    const titleEn = form.titleEn.trim();
+    const issuer = form.issuer.trim();
+    if (!code || !titleEn || !form.family || !form.jurisdiction || !issuer) {
+      toast.danger(isAr
+        ? 'الكود والعنوان (إنجليزي) والعائلة والاختصاص والجهة المُصدرة حقول مطلوبة'
+        : 'Code, English title, family, jurisdiction and issuer are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await createAuthorityDocument({
+        code,
+        titleEn,
+        titleAr: form.titleAr.trim() || undefined,
+        family: form.family,
+        jurisdiction: form.jurisdiction,
+        issuer,
+        version: form.version.trim() || '1.0',
+        status: form.status,
+        translationStatus: form.translationStatus,
+        summaryEn: form.summaryEn.trim() || undefined,
+        summaryAr: form.summaryAr.trim() || undefined,
+        isPlaceholder: form.isPlaceholder,
+      });
+      toast.success(isAr
+        ? `تم تسجيل الوثيقة ${created.code} في المكتبة`
+        : `Document ${created.code} registered in the library`);
+      setShowCreate(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تسجيل الوثيقة' : 'Failed to register document'));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function reload() {
     setLoading(true);
@@ -88,7 +179,12 @@ export function RegulatoryLibraryPage() {
       sub={isAr ? 'الجهات والأنظمة والمعايير التي تتبعها المنصة' : 'Authority documents and citations the platform tracks'}>
       <PageHeader
         eyebrow={isAr ? 'الإطار التنظيمي' : 'Regulatory framework'}
-        title={isAr ? 'مكتبة المرجعيات' : 'Authority documents catalog'} />
+        title={isAr ? 'مكتبة المرجعيات' : 'Authority documents catalog'}
+        actions={demoMode
+          ? <Badge tone="neutral">{isAr ? 'وضع العرض' : 'Demo mode'}</Badge>
+          : <Button variant="primary" Icon={Plus} onClick={openCreate}>
+              {isAr ? 'تسجيل وثيقة' : 'Register document'}
+            </Button>} />
 
       {/* Placeholder guardrail banner (NDI Rule-0 pattern) */}
       {placeholderCount > 0 && (
@@ -226,6 +322,103 @@ export function RegulatoryLibraryPage() {
           </Card>
         )}
       </div>
+
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        size="lg"
+        title={isAr ? 'تسجيل وثيقة مرجعية' : 'Register authority document'}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowCreate(false)} disabled={saving}>
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button variant="primary" Icon={Plus} onClick={submitCreate} disabled={saving}>
+              {saving ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'تسجيل' : 'Register')}
+            </Button>
+          </>
+        }>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+            {isAr
+              ? 'الوثائق الجديدة تُسجَّل كعنصر مؤقت حتى استيراد النص الرسمي من الجهة المُصدرة.'
+              : 'New documents register as placeholders until the official text is imported from the issuer.'}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: 12 }}>
+            <FormField label={isAr ? 'الكود' : 'Code'} required>
+              <input style={ctrl} value={form.code} placeholder="e.g. SAMA-CRMG-V1"
+                onChange={e => set('code', e.target.value)} />
+            </FormField>
+            <FormField label={isAr ? 'الإصدار' : 'Version'}>
+              <input style={ctrl} value={form.version} placeholder="1.0"
+                onChange={e => set('version', e.target.value)} />
+            </FormField>
+          </div>
+
+          <FormField label={isAr ? 'العنوان (إنجليزي)' : 'Title (English)'} required>
+            <input style={ctrl} value={form.titleEn}
+              onChange={e => set('titleEn', e.target.value)} />
+          </FormField>
+          <FormField label={isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}>
+            <input style={ctrl} value={form.titleAr} dir="rtl"
+              onChange={e => set('titleAr', e.target.value)} />
+          </FormField>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <FormField label={isAr ? 'العائلة' : 'Family'} required>
+              <select style={ctrl} value={form.family}
+                onChange={e => set('family', e.target.value as AuthorityFamily)}>
+                {FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </FormField>
+            <FormField label={isAr ? 'الاختصاص' : 'Jurisdiction'} required>
+              <select style={ctrl} value={form.jurisdiction}
+                onChange={e => set('jurisdiction', e.target.value)}>
+                {JURISDICTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+              </select>
+            </FormField>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <FormField label={isAr ? 'الجهة المُصدرة' : 'Issuer'} required>
+              <input style={ctrl} value={form.issuer} placeholder="e.g. SAMA, NCA, SDAIA, ISO"
+                onChange={e => set('issuer', e.target.value)} />
+            </FormField>
+            <FormField label={isAr ? 'الحالة' : 'Status'}>
+              <select style={ctrl} value={form.status}
+                onChange={e => set('status', e.target.value as AuthorityStatus)}>
+                {STATUSES.map(s => <option key={s} value={s}>{statusLabel(s, lang)}</option>)}
+              </select>
+            </FormField>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignItems: 'end' }}>
+            <FormField label={isAr ? 'حالة الترجمة' : 'Translation status'}>
+              <select style={ctrl} value={form.translationStatus}
+                onChange={e => set('translationStatus', e.target.value as TranslationStatus)}>
+                {TRANSLATIONS.map(t => (
+                  <option key={t} value={t}>{translationLabel(t, isAr ? 'ar' : 'en')}</option>
+                ))}
+              </select>
+            </FormField>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, padding: '8px 0' }}>
+              <input type="checkbox" checked={form.isPlaceholder}
+                onChange={e => set('isPlaceholder', e.target.checked)} />
+              {isAr ? 'عنصر مؤقت (النص الرسمي غير مستورد)' : 'Placeholder (official text not yet imported)'}
+            </label>
+          </div>
+
+          <FormField label={isAr ? 'ملخص (إنجليزي)' : 'Summary (English)'}>
+            <textarea style={{ ...ctrl, minHeight: 64, resize: 'vertical' }} value={form.summaryEn}
+              onChange={e => set('summaryEn', e.target.value)} />
+          </FormField>
+          <FormField label={isAr ? 'ملخص (عربي)' : 'Summary (Arabic)'}>
+            <textarea style={{ ...ctrl, minHeight: 64, resize: 'vertical' }} value={form.summaryAr} dir="rtl"
+              onChange={e => set('summaryAr', e.target.value)} />
+          </FormField>
+        </div>
+      </Modal>
     </Shell>
   );
 }
