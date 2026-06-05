@@ -58,13 +58,13 @@ import {
   type CmaDisclosure as CmaD, type CmaReadiness as CmaR, type CmaStatus,
 } from '../../lib/sustainabilityCma';
 import {
-  listTcfd, tcfdReadiness,
+  listTcfd, tcfdReadiness, createTcfd,
   tcfdMarkDisclosed, tcfdMarkPartial, tcfdMarkNotDisclosed,
   tcfdMarkNotApplicable, tcfdMarkUnderReview,
   tcfdAttachEvidence, tcfdRecordGap,
   tcfdStatusTone, tcfdStatusLabel, tcfdPillarLabel,
   hasTcfdGap, hasTcfdEvidence,
-  type TcfdItem as TcfdI, type TcfdReadiness as TcfdR, type TcfdPillar,
+  type TcfdItem as TcfdI, type TcfdReadiness as TcfdR, type TcfdPillar, type TcfdStatus,
 } from '../../lib/sustainabilityTcfd';
 import {
   listMateriality, generateMatrix, scoreMaterialTopic, approveMaterialTopic,
@@ -1737,6 +1737,7 @@ function TcfdTab() {
   const [loading, setLoading] = useState(true);
   const [evidencingId, setEvidencingId] = useState<number | null>(null);
   const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
+  const [openNew, setOpenNew]           = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -1820,6 +1821,64 @@ function TcfdTab() {
       label: isAr ? 'وصف الفجوة (عربي)' : 'Gap description (Arabic)' },
   ];
 
+  // Create starts in a gap-free state so it never trips Rule 5.
+  const TCFD_CREATE_STATUSES: TcfdStatus[] = ['UNDER_REVIEW', 'DISCLOSED', 'NOT_APPLICABLE'];
+  const TCFD_PILLARS: TcfdPillar[] = ['GOVERNANCE', 'STRATEGY', 'RISK_MGMT', 'METRICS_TARGETS'];
+  const createFields: FieldDef[] = [
+    { kind: 'select', key: 'pillar', required: true, span: 6,
+      label: isAr ? 'الركيزة' : 'Pillar',
+      options: TCFD_PILLARS.map(p => ({ value: p, label: tcfdPillarLabel(p, isAr ? 'ar' : 'en') })) },
+    { kind: 'text', key: 'recommendationCode', required: true, span: 3,
+      label: isAr ? 'رمز التوصية' : 'Rec. code', placeholder: 'a, b, c…' },
+    { kind: 'number', key: 'reportingYear', required: true, span: 3, min: 2000, max: 2100,
+      label: isAr ? 'سنة التقرير' : 'Reporting year' },
+    { kind: 'text', key: 'titleEn', required: true, span: 6,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', span: 6,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'select', key: 'disclosureStatus', span: 6,
+      label: isAr ? 'حالة الإفصاح' : 'Disclosure status',
+      options: TCFD_CREATE_STATUSES.map(s => ({ value: s, label: tcfdStatusLabel(s, isAr ? 'ar' : 'en') })) },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'textarea', key: 'recommendationEn', span: 12, rows: 2,
+      label: isAr ? 'نص التوصية (إنجليزي)' : 'Recommendation (English)' },
+  ];
+
+  async function submitCreate(values: Record<string, unknown>): Promise<void> {
+    const titleEn = String(values.titleEn ?? '').trim();
+    const pillar = String(values.pillar ?? '').trim();
+    const code = String(values.recommendationCode ?? '').trim();
+    const year = Number(values.reportingYear);
+    if (!titleEn || !pillar || !code || !Number.isFinite(year)) {
+      toast.danger(isAr
+        ? 'العنوان (إنجليزي) والركيزة ورمز التوصية وسنة التقرير حقول مطلوبة'
+        : 'English title, pillar, recommendation code and reporting year are required');
+      return;
+    }
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      const created = await createTcfd({
+        pillar: pillar as TcfdPillar,
+        recommendationCode: code,
+        reportingYear: year,
+        disclosureStatus: (String(values.disclosureStatus ?? 'UNDER_REVIEW') || 'UNDER_REVIEW') as TcfdStatus,
+        titleEn,
+        titleAr: str(values.titleAr),
+        recommendationEn: str(values.recommendationEn),
+        ownerName: str(values.ownerName),
+      });
+      toast.success(isAr
+        ? `تمت إضافة توصية ${created.recommendationCode}`
+        : `Recommendation ${created.recommendationCode} added`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّرت إضافة التوصية' : 'Failed to add recommendation'));
+    }
+  }
+
   return (
     <div className="esg-stack">
       {/* Rule 7 banner — Strategy resilience recommendation is missing/partial */}
@@ -1851,7 +1910,10 @@ function TcfdTab() {
         <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Under review'}      value={readiness?.byStatus.UNDER_REVIEW ?? 0}      tone="info" />
       </div>
 
-      <Card title={isAr ? 'مصفوفة المحاذاة مع TCFD' : 'TCFD alignment matrix'} Icon={FileText}>
+      <Card title={isAr ? 'مصفوفة المحاذاة مع TCFD' : 'TCFD alignment matrix'} Icon={FileText}
+        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
+          {isAr ? 'توصية جديدة' : 'New recommendation'}
+        </Button>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'إفصاحات TCFD الـ 11 الموزّعة على 4 ركائز (الحوكمة، الاستراتيجية، إدارة المخاطر، المقاييس والأهداف). نفس قواعد CMA (5 و 6) تنطبق هنا، بالإضافة إلى القاعدة 7 لتوصية صمود الاستراتيجية.'
@@ -1946,6 +2008,20 @@ function TcfdTab() {
         submitLabel={isAr ? 'حفظ' : 'Save'}
         onClose={() => setGappingId(null)}
         onSubmit={submitGap}
+      />
+      <FormModal
+        open={openNew}
+        title={isAr ? 'توصية TCFD جديدة' : 'New TCFD recommendation'}
+        fields={createFields}
+        initial={{
+          pillar: 'GOVERNANCE', recommendationCode: '', reportingYear: 2025,
+          titleEn: '', titleAr: '', disclosureStatus: 'UNDER_REVIEW',
+          ownerName: '', recommendationEn: '',
+        }}
+        size="lg"
+        submitLabel={isAr ? 'إضافة التوصية' : 'Add recommendation'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={submitCreate}
       />
     </div>
   );
