@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  ClipboardCheck, Play, ToggleLeft, ToggleRight, Fingerprint,
+  ClipboardCheck, Play, Pencil, ToggleLeft, ToggleRight, Fingerprint,
   Activity,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
@@ -23,8 +25,23 @@ import {
   CCM_SEVERITY_LABEL, CCM_SEVERITY_TONE,
   CCM_TEST_TYPE_LABEL, CCM_TARGET_SYSTEM_LABEL,
   prettyJson, shortHash,
-  type TestDefinitionResponse, type TestRunResponse, type CcmRunStatus,
+  type TestDefinitionResponse, type TestDefinitionRequest, type TestRunResponse,
+  type CcmRunStatus, type CcmTestType, type CcmTargetSystem, type CcmSeverity,
 } from '../../lib/ccmEngine';
+
+interface EditForm {
+  titleEn: string;
+  titleAr: string;
+  descEn: string;
+  descAr: string;
+  testType: CcmTestType;
+  targetSystemType: CcmTargetSystem;
+  severity: CcmSeverity;
+  frequencyCron: string;
+  timeoutSeconds: string;
+  targetConfigJson: string;
+  expectedConditionJson: string;
+}
 
 /**
  * CCM Test detail — Sprint 11.
@@ -46,6 +63,13 @@ export function CcmTestDetailPage() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Edit-definition modal
+  const [showEdit, setShowEdit] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<EditForm | null>(null);
+  const set = <K extends keyof EditForm>(k: K, v: EditForm[K]) =>
+    setForm(f => (f ? { ...f, [k]: v } : f));
 
   async function load() {
     if (!externalId || demoMode) return;
@@ -94,6 +118,65 @@ export function CcmTestDetailPage() {
       toast.danger(err instanceof ApiError ? err.message : 'Run failed');
     } finally {
       setBusy(false);
+    }
+  }
+
+  function openEdit() {
+    if (!test) return;
+    setForm({
+      titleEn: test.titleEn ?? '',
+      titleAr: test.titleAr ?? '',
+      descEn: test.descriptionEn ?? '',
+      descAr: test.descriptionAr ?? '',
+      testType: test.testType,
+      targetSystemType: test.targetSystemType,
+      severity: test.severity,
+      frequencyCron: test.frequencyCron ?? '0 2 * * *',
+      timeoutSeconds: String(test.timeoutSeconds ?? 30),
+      targetConfigJson: test.targetConfigJson ?? '',
+      expectedConditionJson: test.expectedConditionJson ?? '',
+    });
+    setShowEdit(true);
+  }
+
+  async function submitEdit() {
+    if (!test || !form) return;
+    if (!form.titleEn.trim()) {
+      toast.danger(lang === 'ar' ? 'العنوان (بالإنجليزية) مطلوب' : 'Title (EN) is required');
+      return;
+    }
+    for (const [val, label] of [
+      [form.targetConfigJson, lang === 'ar' ? 'إعدادات النظام المستهدف' : 'Target config'],
+      [form.expectedConditionJson, lang === 'ar' ? 'الشرط المتوقع' : 'Expected condition'],
+    ] as const) {
+      if (val.trim()) {
+        try { JSON.parse(val); }
+        catch { toast.danger((lang === 'ar' ? 'JSON غير صالح — ' : 'Invalid JSON — ') + label); return; }
+      }
+    }
+    setSaving(true);
+    try {
+      const body: TestDefinitionRequest = {
+        titleEn: form.titleEn.trim(),
+        titleAr: form.titleAr.trim() || undefined,
+        descriptionEn: form.descEn.trim() || undefined,
+        descriptionAr: form.descAr.trim() || undefined,
+        testType: form.testType,
+        targetSystemType: form.targetSystemType,
+        severity: form.severity,
+        frequencyCron: form.frequencyCron.trim() || '0 2 * * *',
+        timeoutSeconds: form.timeoutSeconds.trim() ? Number(form.timeoutSeconds) : undefined,
+        targetConfigJson: form.targetConfigJson.trim() || undefined,
+        expectedConditionJson: form.expectedConditionJson.trim() || undefined,
+      };
+      const updated = await ccmApi.updateTest(test.externalId, body);
+      setTest(updated);
+      toast.success(lang === 'ar' ? 'تم تحديث تعريف الاختبار' : 'Test definition updated');
+      setShowEdit(false);
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : (lang === 'ar' ? 'تعذّر تحديث الاختبار' : 'Failed to update test'));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -165,6 +248,17 @@ export function CcmTestDetailPage() {
               <Badge tone={CCM_STATUS_TONE[test.lastRunStatus]} dot>
                 {CCM_STATUS_LABEL[test.lastRunStatus][lang === 'ar' ? 'ar' : 'en']}
               </Badge>
+            )}
+            {!demoMode && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={openEdit}
+                style={{ padding: '6px 12px', border: '1px solid var(--border)',
+                         borderRadius: 6, background: 'var(--surface)', cursor: 'pointer', fontSize: 13 }}>
+                <Pencil size={13} style={{ verticalAlign: '-2px', marginInlineEnd: 4 }} />
+                {lang === 'ar' ? 'تعديل' : 'Edit'}
+              </button>
             )}
             <button
               type="button"
@@ -262,7 +356,106 @@ export function CcmTestDetailPage() {
           </div>
         </Card>
       </div>
+
+      {/* Edit-definition modal */}
+      <Modal
+        open={showEdit && form != null}
+        onClose={() => { if (!saving) setShowEdit(false); }}
+        size="lg"
+        title={lang === 'ar' ? `تعديل ${test.testCode}` : `Edit ${test.testCode}`}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowEdit(false)} disabled={saving}>
+              {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button variant="primary" Icon={Pencil} onClick={() => void submitEdit()} disabled={saving}>
+              {saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : (lang === 'ar' ? 'حفظ التغييرات' : 'Save changes')}
+            </Button>
+          </>
+        }
+      >
+        {form && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label={lang === 'ar' ? 'العنوان (إنجليزي) *' : 'Title (EN) *'}>
+                <input style={ctrl} value={form.titleEn} onChange={e => set('titleEn', e.target.value)} />
+              </Field>
+              <Field label={lang === 'ar' ? 'العنوان (عربي)' : 'Title (AR)'}>
+                <input style={ctrl} value={form.titleAr} onChange={e => set('titleAr', e.target.value)} dir="rtl" />
+              </Field>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label={lang === 'ar' ? 'نوع الاختبار *' : 'Test type *'}>
+                <select style={ctrl} value={form.testType} onChange={e => set('testType', e.target.value as CcmTestType)}>
+                  {(Object.keys(CCM_TEST_TYPE_LABEL) as CcmTestType[]).map(k => (
+                    <option key={k} value={k}>{CCM_TEST_TYPE_LABEL[k][lang === 'ar' ? 'ar' : 'en']}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={lang === 'ar' ? 'النظام المستهدف *' : 'Target system *'}>
+                <select style={ctrl} value={form.targetSystemType} onChange={e => set('targetSystemType', e.target.value as CcmTargetSystem)}>
+                  {(Object.keys(CCM_TARGET_SYSTEM_LABEL) as CcmTargetSystem[]).map(k => (
+                    <option key={k} value={k}>{CCM_TARGET_SYSTEM_LABEL[k][lang === 'ar' ? 'ar' : 'en']}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Field label={lang === 'ar' ? 'الخطورة' : 'Severity'}>
+                <select style={ctrl} value={form.severity} onChange={e => set('severity', e.target.value as CcmSeverity)}>
+                  {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as CcmSeverity[]).map(k => (
+                    <option key={k} value={k}>{CCM_SEVERITY_LABEL[k][lang === 'ar' ? 'ar' : 'en']}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={lang === 'ar' ? 'الجدول (cron)' : 'Schedule (cron)'}>
+                <input style={ctrl} value={form.frequencyCron} onChange={e => set('frequencyCron', e.target.value)} dir="ltr" />
+              </Field>
+              <Field label={lang === 'ar' ? 'المهلة (ثانية)' : 'Timeout (sec)'}>
+                <input style={ctrl} type="number" min={1} value={form.timeoutSeconds} onChange={e => set('timeoutSeconds', e.target.value)} />
+              </Field>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label={lang === 'ar' ? 'الوصف (إنجليزي)' : 'Description (EN)'}>
+                <input style={ctrl} value={form.descEn} onChange={e => set('descEn', e.target.value)} />
+              </Field>
+              <Field label={lang === 'ar' ? 'الوصف (عربي)' : 'Description (AR)'}>
+                <input style={ctrl} value={form.descAr} onChange={e => set('descAr', e.target.value)} dir="rtl" />
+              </Field>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label={lang === 'ar' ? 'إعدادات النظام (JSON)' : 'Target config (JSON)'}>
+                <textarea style={{ ...ctrl, minHeight: 70, resize: 'vertical', fontFamily: 'var(--font-mono, monospace)' }}
+                  value={form.targetConfigJson} onChange={e => set('targetConfigJson', e.target.value)} dir="ltr" />
+              </Field>
+              <Field label={lang === 'ar' ? 'الشرط المتوقع (JSON)' : 'Expected condition (JSON)'}>
+                <textarea style={{ ...ctrl, minHeight: 70, resize: 'vertical', fontFamily: 'var(--font-mono, monospace)' }}
+                  value={form.expectedConditionJson} onChange={e => set('expectedConditionJson', e.target.value)} dir="ltr" />
+              </Field>
+            </div>
+          </div>
+        )}
+      </Modal>
     </Shell>
+  );
+}
+
+const ctrl: CSSProperties = {
+  width: '100%', padding: '7px 9px', fontSize: 13,
+  border: '1px solid var(--border)', borderRadius: 6,
+  background: 'var(--surface)', color: 'var(--ink-1)', outline: 'none',
+};
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)' }}>{label}</span>
+      {children}
+    </label>
   );
 }
 
