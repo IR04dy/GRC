@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Files, Inbox, CalendarX, BadgeCheck, Filter, Download, Plus, BarChart3, FileText, Send, ClipboardCheck,
-  Layers, Plug, ChevronDown, ChevronRight, History, Power, Zap, Paperclip,
+  Layers, Plug, ChevronDown, ChevronRight, History, Power, Zap, Paperclip, Sparkles, CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -32,6 +32,7 @@ import {
   type ConnectorDefinitionDto, type EvidenceVersionDto,
 } from '../../lib/api';
 import { Modal } from '../../components/ui/Modal';
+import { ai, type AiSuggestion } from '../../lib/ai';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS, EVIDENCE_ANCHORS_BY_ID } from './mockEvidence';
@@ -203,6 +204,33 @@ export function EvidencePage() {
       items.reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Snapshot failed'); }
   }
+  // ── AI evidence-quality check (POST /api/v1/ai/evidence-quality) ──
+  // Rule-based scorer on age / signature / type / control linkage.
+  // Persists a DRAFT AiSuggestion to the AI Suggestions review queue.
+  const [aiCheck, setAiCheck] = useState<{ item: EvidenceItemDto; result: AiSuggestion | null; loading: boolean } | null>(null);
+  async function runAiCheck(item: EvidenceItemDto) {
+    setAiCheck({ item, result: null, loading: true });
+    const collected = item.collectedAt ?? item.collectedDate ?? item.createdAt;
+    const ageDays = collected
+      ? Math.max(0, Math.round((Date.now() - new Date(collected).getTime()) / 86_400_000))
+      : undefined;
+    try {
+      const result = await ai.evidenceQuality({
+        evidenceId:    item.id,
+        evidenceTitle: item.titleEn,
+        evidenceType:  item.evidenceType,
+        controlCode:   item.controlCode ?? item.subControlCode,
+        ageDays,
+        hasSignature:  item.fileName ? undefined : undefined,
+      });
+      setAiCheck({ item, result, loading: false });
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message
+        : (ar ? 'تعذّر تقييم جودة الدليل' : 'AI quality check failed'));
+      setAiCheck(null);
+    }
+  }
+
   async function runConnector(c: ConnectorDefinitionDto) {
     try {
       const updated = await evidenceApi.runConnector(c.id);
@@ -261,6 +289,7 @@ export function EvidencePage() {
       cell: r => (
         <RowActions
           extras={[
+            { Icon: Sparkles, onClick: () => runAiCheck(r), title: ar ? 'تقييم جودة الدليل (ذكاء اصطناعي)' : 'AI quality check', tone: 'primary' },
             { Icon: Paperclip, onClick: () => pickFileFor(r), title: t('evidenceAttachFile'), tone: 'primary' },
             { Icon: History, onClick: () => openVersions(r), title: t('evidenceVersionHistory'), tone: 'primary' },
           ]}
@@ -614,6 +643,69 @@ export function EvidencePage() {
       <FilterModal open={filterOpen} fields={evidenceFilterFields} value={advFilters}
         onApply={v => { setAdvFilters(v); toast.success(t('filterModalApplied')); }}
         onClose={() => setFilterOpen(false)} />
+
+      {/* ── AI evidence-quality check result ── */}
+      <Modal
+        open={!!aiCheck}
+        title={aiCheck ? `${ar ? 'تقييم جودة الدليل' : 'AI quality check'} · ${aiCheck.item.evidenceCode}` : ''}
+        size="lg"
+        onClose={() => setAiCheck(null)}
+      >
+        {aiCheck?.loading && (
+          <InlineEmpty>{ar ? 'جارٍ تحليل جودة الدليل…' : 'Scoring evidence quality…'}</InlineEmpty>
+        )}
+        {aiCheck && !aiCheck.loading && aiCheck.result && (() => {
+          let out: { qualityScore?: number; strengths?: string[]; issues?: string[]; verdict?: string } = {};
+          try { out = JSON.parse(aiCheck.result.outputJson); } catch { /* keep empty */ }
+          const score = out.qualityScore ?? Number(aiCheck.result.confidence ?? 0);
+          const verdict = out.verdict ?? '';
+          const vTone = verdict === 'ACCEPTABLE' ? 'success' : verdict === 'NEEDS_IMPROVEMENT' ? 'warning' : 'danger';
+          const vLabel = verdict === 'ACCEPTABLE'
+            ? (ar ? 'مقبول' : 'Acceptable')
+            : verdict === 'NEEDS_IMPROVEMENT'
+              ? (ar ? 'يحتاج تحسيناً' : 'Needs improvement')
+              : (ar ? 'غير كافٍ' : 'Insufficient');
+          const scoreTone = score >= 75 ? 'success' : score >= 50 ? 'warning' : 'danger';
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Badge tone={scoreTone}>{ar ? 'الدرجة' : 'Score'}: {score}/100</Badge>
+                <Badge tone={vTone} dot>{vLabel}</Badge>
+              </div>
+              {aiCheck.result.rationale && (
+                <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                  {aiCheck.result.rationale}
+                </div>
+              )}
+              {(out.strengths?.length ?? 0) > 0 && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <CheckCircle2 size={15} style={{ color: 'var(--success)' }} /> {ar ? 'نقاط القوة' : 'Strengths'}
+                  </div>
+                  <ul style={{ margin: 0, paddingInlineStart: 20, fontSize: 13, lineHeight: 1.8, color: 'var(--ink-1)' }}>
+                    {out.strengths!.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+              {(out.issues?.length ?? 0) > 0 && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertTriangle size={15} style={{ color: 'var(--warning)' }} /> {ar ? 'الملاحظات' : 'Issues to address'}
+                  </div>
+                  <ul style={{ margin: 0, paddingInlineStart: 20, fontSize: 13, lineHeight: 1.8, color: 'var(--ink-1)' }}>
+                    {out.issues!.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', borderTop: '1px solid var(--border)', paddingTop: 10, lineHeight: 1.6 }}>
+                {ar
+                  ? 'حُفظ هذا التقييم كمسودّة في قائمة «اقتراحات الذكاء الاصطناعي» لمراجعته بشرياً قبل أي إجراء. التقييم قائم على قواعد ولا يغيّر سجل الدليل من تلقاء نفسه.'
+                  : 'Saved as a draft in the AI Suggestions review queue for human sign-off. This is a rule-based score and never changes the evidence record on its own.'}
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Hidden picker for the binary file-upload row action (multipart). */}
       <input ref={fileInputRef} type="file" hidden onChange={onFileChosen}
