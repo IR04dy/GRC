@@ -30,7 +30,7 @@ import {
   type AsmAssetResponse, type AsmFindingResponse, type ShadowItResponse,
   type AsmAssetType, type AsmExposure, type AsmCriticality, type AsmLifecycleStage,
   type AsmFindingSeverity, type AsmFindingStatus,
-  type ShadowItStatus,
+  type ShadowItStatus, type ShadowItDiscoveredVia, type ShadowItDataClassification,
 } from '../../lib/asm';
 
 type Tab = 'assets' | 'findings' | 'shadowIt';
@@ -66,6 +66,18 @@ export function AttackSurfacePage() {
   const [selVendorId, setSelVendorId] = useState<number | ''>('');
   const [actionNote, setActionNote] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
+
+  // Record-shadow-IT-discovery modal state.
+  const [showRecord, setShowRecord] = useState(false);
+  const [recBusy, setRecBusy] = useState(false);
+  const [recName, setRecName] = useState('');
+  const [recNameAr, setRecNameAr] = useState('');
+  const [recDomain, setRecDomain] = useState('');
+  const [recVia, setRecVia] = useState<ShadowItDiscoveredVia>('USER_DECLARATION');
+  const [recUsers, setRecUsers] = useState('');
+  const [recClass, setRecClass] = useState<ShadowItDataClassification>('UNKNOWN');
+  const [recPdpl, setRecPdpl] = useState(false);
+  const [recNotes, setRecNotes] = useState('');
 
   // Filters per tab
   const [filterAssetType, setFilterAssetType] = useState<'ALL' | AsmAssetType>('ALL');
@@ -132,6 +144,39 @@ export function AttackSurfacePage() {
       toast.danger(err instanceof ApiError ? err.message : 'Action failed');
     } finally {
       setActionBusy(false);
+    }
+  }
+
+  function openRecord() {
+    setShowRecord(true);
+    setRecName(''); setRecNameAr(''); setRecDomain('');
+    setRecVia('USER_DECLARATION'); setRecUsers(''); setRecClass('UNKNOWN');
+    setRecPdpl(false); setRecNotes('');
+  }
+  async function submitRecord() {
+    if (!recName.trim()) {
+      toast.danger(lang === 'ar' ? 'اسم الخدمة مطلوب' : 'Service name is required');
+      return;
+    }
+    setRecBusy(true);
+    try {
+      await asmApi.recordShadowIt({
+        serviceName: recName.trim(),
+        serviceNameAr: recNameAr.trim() || undefined,
+        vendorDomain: recDomain.trim() || undefined,
+        discoveredVia: recVia,
+        observedUserCount: recUsers.trim() ? Number(recUsers) : undefined,
+        dataClassification: recClass,
+        pdplDataProcessed: recPdpl,
+        notesEn: recNotes.trim() || undefined,
+      });
+      toast.success(lang === 'ar' ? `سُجِّلت خدمة الظل: ${recName.trim()}` : `Shadow IT recorded: ${recName.trim()}`);
+      setShowRecord(false);
+      await load();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Record failed');
+    } finally {
+      setRecBusy(false);
     }
   }
 
@@ -447,6 +492,13 @@ export function AttackSurfacePage() {
                   value: k, label: SHADOW_IT_STATUS_LABEL[k][lang === 'ar' ? 'ar' : 'en'],
                 })),
               ]} />
+            {!demoMode && (
+              <div style={{ marginInlineStart: 'auto' }}>
+                <Button variant="primary" onClick={openRecord}>
+                  {lang === 'ar' ? 'تسجيل اكتشاف' : 'Record discovery'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -545,6 +597,65 @@ export function AttackSurfacePage() {
                 style={{ padding: 8, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', fontSize: 13 }} />
             </label>
           </div>
+        </Modal>
+      )}
+
+      {showRecord && (
+        <Modal open onClose={() => setShowRecord(false)} size="md"
+          title={lang === 'ar' ? 'تسجيل اكتشاف تقنية ظل' : 'Record a shadow-IT discovery'}
+          footer={<>
+            <Button variant="ghost" onClick={() => setShowRecord(false)}>{lang === 'ar' ? 'إلغاء' : 'Cancel'}</Button>
+            <Button variant="primary" disabled={recBusy} onClick={submitRecord}>{lang === 'ar' ? 'تسجيل' : 'Record'}</Button>
+          </>}>
+          {(() => {
+            const fld: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 };
+            const inp: React.CSSProperties = { padding: 8, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--surface)', fontSize: 13 };
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <label style={fld}>
+                  {lang === 'ar' ? 'اسم الخدمة *' : 'Service name *'}
+                  <input value={recName} onChange={e => setRecName(e.target.value)} placeholder="e.g. Figma" style={inp} />
+                </label>
+                <label style={fld}>
+                  {lang === 'ar' ? 'اسم الخدمة (عربي)' : 'Service name (AR)'}
+                  <input value={recNameAr} dir="rtl" onChange={e => setRecNameAr(e.target.value)} style={inp} />
+                </label>
+                <label style={fld}>
+                  {lang === 'ar' ? 'نطاق المزوّد' : 'Vendor domain'}
+                  <input value={recDomain} onChange={e => setRecDomain(e.target.value)} placeholder="e.g. figma.com" style={inp} />
+                </label>
+                <label style={fld}>
+                  {lang === 'ar' ? 'الاكتشاف عبر' : 'Discovered via'}
+                  <select value={recVia} onChange={e => setRecVia(e.target.value as ShadowItDiscoveredVia)} style={inp}>
+                    {(Object.keys(SHADOW_IT_DISCOVERED_VIA_LABEL) as ShadowItDiscoveredVia[]).map(k => (
+                      <option key={k} value={k}>{SHADOW_IT_DISCOVERED_VIA_LABEL[k][lang === 'ar' ? 'ar' : 'en']}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={fld}>
+                  {lang === 'ar' ? 'عدد المستخدمين المرصودين' : 'Observed user count'}
+                  <input type="number" value={recUsers} onChange={e => setRecUsers(e.target.value)}
+                    placeholder={lang === 'ar' ? '(اختياري)' : '(optional)'} style={inp} />
+                </label>
+                <label style={fld}>
+                  {lang === 'ar' ? 'تصنيف البيانات' : 'Data classification'}
+                  <select value={recClass} onChange={e => setRecClass(e.target.value as ShadowItDataClassification)} style={inp}>
+                    {(Object.keys(SHADOW_IT_DATA_CLASS_LABEL) as ShadowItDataClassification[]).map(k => (
+                      <option key={k} value={k}>{SHADOW_IT_DATA_CLASS_LABEL[k][lang === 'ar' ? 'ar' : 'en']}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <input type="checkbox" checked={recPdpl} onChange={e => setRecPdpl(e.target.checked)} />
+                  {lang === 'ar' ? 'تعالج بيانات شخصية (PDPL) — يُصعَّد للمسؤول عن البيانات' : 'Processes PDPL personal data — escalates to the DPO'}
+                </label>
+                <label style={fld}>
+                  {lang === 'ar' ? 'ملاحظات (اختياري)' : 'Notes (optional)'}
+                  <textarea value={recNotes} onChange={e => setRecNotes(e.target.value)} rows={2} style={inp} />
+                </label>
+              </div>
+            );
+          })()}
         </Modal>
       )}
     </Shell>
