@@ -251,6 +251,14 @@ export function RiskDetailPage() {
           {(risk.status === 'TREATMENT_IN_PROGRESS' || risk.status === 'ACCEPTED' || risk.status === 'TRANSFERRED') &&
             <Button variant="secondary" Icon={Archive} onClick={() => workflow(riskApi.closeRisk, 'Risk closed')}>{t('riskActClose')}</Button>}
           {risk.status === 'CLOSED' && <Button variant="secondary" Icon={RotateCcw} onClick={() => workflow(riskApi.reopenRisk, 'Risk reopened')}>{t('riskActReopen')}</Button>}
+          {risk.status !== 'CLOSED' &&
+            <Button variant="secondary" Icon={AlertTriangle}
+              title={lang === 'ar'
+                ? 'رفع احتمالية المخاطرة المتبقية +1 (بحدٍّ أقصى 5) عند تحقّق حادثة مرتبطة بهذه المخاطرة'
+                : 'Bump residual likelihood +1 (capped at 5) when an incident is realised for this risk'}
+              onClick={() => workflow(riskApi.incidentBump, lang === 'ar' ? 'تم رفع الاحتمالية المتبقية لتحقّق حادثة' : 'Residual likelihood bumped — incident realised')}>
+              {lang === 'ar' ? 'تحقّق حادثة' : 'Incident realised'}
+            </Button>}
         </>}
       />
 
