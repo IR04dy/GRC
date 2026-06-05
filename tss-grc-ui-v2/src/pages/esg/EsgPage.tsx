@@ -68,7 +68,7 @@ import {
 } from '../../lib/sustainabilityTcfd';
 import {
   listMateriality, generateMatrix, scoreMaterialTopic, approveMaterialTopic,
-  archiveMaterialTopic,
+  archiveMaterialTopic, createMaterialTopic,
   materialTierTone, materialTierLabel, materialCategoryLabel,
   materialStatusTone, materialStatusLabel,
   type MaterialTopic, type MaterialMatrix, type MaterialCategory,
@@ -1894,6 +1894,7 @@ function MaterialityTab() {
   const [categoryFilter, setCategoryFilter] = useState<MaterialCategory | 'ALL'>('ALL');
   const [scoringTopic, setScoringTopic]     = useState<MaterialTopic | null>(null);
   const [approvingId, setApprovingId]       = useState<number | null>(null);
+  const [openNew, setOpenNew]               = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -1960,6 +1961,69 @@ function MaterialityTab() {
       placeholder: isAr ? 'مثال: خالد العتيبي' : 'e.g. Khalid Al-Otaibi' },
   ];
 
+  const createFields: FieldDef[] = [
+    { kind: 'text', key: 'topicEn', required: true, span: 6,
+      label: isAr ? 'الموضوع (إنجليزي)' : 'Topic (English)' },
+    { kind: 'text', key: 'topicAr', span: 6,
+      label: isAr ? 'الموضوع (عربي)' : 'Topic (Arabic)' },
+    { kind: 'select', key: 'category', required: true, span: 6,
+      label: isAr ? 'الفئة' : 'Category',
+      options: (['ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => ({
+        value: c, label: materialCategoryLabel(c, isAr ? 'ar' : 'en'),
+      })) },
+    { kind: 'number', key: 'reportingYear', required: true, span: 6, min: 2000, max: 2100,
+      label: isAr ? 'سنة التقرير' : 'Reporting year' },
+    { kind: 'number', key: 'stakeholderImportance', min: 0, max: 5, span: 6,
+      label: isAr ? 'أهمية لأصحاب المصلحة (0–5)' : 'Stakeholder importance (0–5)' },
+    { kind: 'number', key: 'businessImpact', min: 0, max: 5, span: 6,
+      label: isAr ? 'الأثر على الأعمال (0–5)' : 'Business impact (0–5)' },
+    { kind: 'text', key: 'stakeholderGroups', span: 6,
+      label: isAr ? 'مجموعات أصحاب المصلحة' : 'Stakeholder groups' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المسؤول' : 'Owner' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+  ];
+
+  async function submitCreate(values: Record<string, unknown>): Promise<void> {
+    const topicEn = String(values.topicEn ?? '').trim();
+    const category = String(values.category ?? '').trim();
+    const year = Number(values.reportingYear);
+    if (!topicEn || !category || !Number.isFinite(year)) {
+      toast.danger(isAr
+        ? 'الموضوع والفئة وسنة التقرير حقول مطلوبة'
+        : 'Topic, category and reporting year are required');
+      return;
+    }
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return v === '' || v == null || !Number.isFinite(n) ? undefined : n;
+    };
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      const created = await createMaterialTopic({
+        topicEn,
+        topicAr: str(values.topicAr),
+        category: category as MaterialCategory,
+        reportingYear: year,
+        stakeholderImportance: num(values.stakeholderImportance) ?? 0,
+        businessImpact: num(values.businessImpact) ?? 0,
+        stakeholderGroups: str(values.stakeholderGroups),
+        ownerName: str(values.ownerName),
+        descriptionEn: str(values.descriptionEn),
+        status: 'DRAFT',
+      });
+      toast.success(isAr
+        ? `تمت إضافة الموضوع ${created.topicCode ?? created.topicEn}`
+        : `Topic ${created.topicCode ?? created.topicEn} added`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّرت إضافة الموضوع' : 'Failed to add topic'));
+    }
+  }
+
   return (
     <div className="esg-stack">
       {/* KPI strip — tier counts + category counts */}
@@ -1972,7 +2036,10 @@ function MaterialityTab() {
         <Kpi Icon={Building2}    label={isAr ? 'الحوكمة' : 'Governance'}                  value={matrix?.byCategory.GOVERNANCE ?? 0}    tone="primary" />
       </div>
 
-      <Card title={isAr ? 'مصفوفة تقييم الجوهرية المزدوجة' : 'Double-materiality assessment matrix'} Icon={Target}>
+      <Card title={isAr ? 'مصفوفة تقييم الجوهرية المزدوجة' : 'Double-materiality assessment matrix'} Icon={Target}
+        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
+          {isAr ? 'موضوع جديد' : 'New topic'}
+        </Button>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'كل موضوع يحصل على درجتين على مقياس 1-5: الأهمية لأصحاب المصلحة والأثر على الأعمال. درجة الجوهرية = المتوسط. يُحدَّد المستوى تلقائياً عند الحفظ.'
@@ -2121,6 +2188,20 @@ function MaterialityTab() {
         submitLabel={isAr ? 'اعتماد' : 'Approve'}
         onClose={() => setApprovingId(null)}
         onSubmit={submitApprove}
+      />
+      <FormModal
+        open={openNew}
+        title={isAr ? 'موضوع جوهرية جديد' : 'New materiality topic'}
+        fields={createFields}
+        initial={{
+          topicEn: '', topicAr: '', category: 'ENVIRONMENTAL', reportingYear: 2025,
+          stakeholderImportance: 3, businessImpact: 3,
+          stakeholderGroups: '', ownerName: '', descriptionEn: '',
+        }}
+        size="lg"
+        submitLabel={isAr ? 'إضافة الموضوع' : 'Add topic'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={submitCreate}
       />
     </div>
   );
