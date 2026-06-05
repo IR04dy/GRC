@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, ChevronLeft, ChevronRight, FileCheck2, Cog, AlertOctagon, Wrench } from 'lucide-react';
+import { ClipboardCheck, ChevronLeft, ChevronRight, FileCheck2, Cog, AlertOctagon, Wrench, Sparkles } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -12,6 +12,7 @@ import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
+import { ai } from '../../lib/ai';
 import {
   listBiaCatalog, listBiaAssessments, biaStats,
   getBiaAssessment, createBiaAssessment, patchBiaAssessment, transitionBiaAssessment,
@@ -442,10 +443,45 @@ function Step1Scope({ editing, onChange, isAr, locked }: {
   );
 }
 
+interface AiRtoRpo {
+  rtoMinutes: number; rpoMinutes: number; mtpdMinutes: number;
+  rtoHumanEn: string; rpoHumanEn: string; rtoHumanAr: string; rpoHumanAr: string;
+}
 function Step2Recovery({ editing, onChange, isAr, locked }: {
   editing: BcmBiaAssessment; onChange: (e: BcmBiaAssessment) => void; isAr: boolean; locked: boolean;
 }) {
+  const toast = useToast();
   const rtoTooHigh = editing.rtoHours != null && editing.mtpdHours != null && editing.rtoHours > editing.mtpdHours;
+
+  // AI RTO/RPO recommendation (POST /api/v1/ai/bia-rto-rpo) — rule-based,
+  // mapped from Saudi service tiers / NCEMA + SAMA OPRES expectations.
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiSug, setAiSug] = useState<{ out: AiRtoRpo; rationale: string } | null>(null);
+  async function suggestTargets() {
+    setAiBusy(true);
+    try {
+      const s = await ai.biaRtoRpo({
+        serviceId:    editing.serviceId,
+        serviceTitle: editing.description?.trim() || editing.biaCode || (isAr ? 'خدمة أعمال' : 'Business service'),
+        criticality:  editing.overallCriticality,
+      });
+      const out = JSON.parse(s.outputJson) as AiRtoRpo;
+      setAiSug({ out, rationale: s.rationale ?? '' });
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر اقتراح الأهداف' : 'Could not suggest targets'));
+    } finally { setAiBusy(false); }
+  }
+  function applyTargets() {
+    if (!aiSug) return;
+    onChange({
+      ...editing,
+      rtoHours:  Math.round(aiSug.out.rtoMinutes / 60),
+      rpoHours:  Math.round(aiSug.out.rpoMinutes / 60),
+      mtpdHours: Math.round(aiSug.out.mtpdMinutes / 60),
+    });
+    toast.success(isAr ? 'تم تطبيق الأهداف المقترحة' : 'Suggested targets applied');
+  }
+
   return (
     <Card title={isAr ? 'الخطوة 2 — أهداف التعافي' : 'Step 2 — Recovery targets'}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 }}>
@@ -472,6 +508,43 @@ function Step2Recovery({ editing, onChange, isAr, locked }: {
                 : `RTO (${editing.rtoHours}) cannot exceed MTPD (${editing.mtpdHours}). Approval will be rejected.`}
         </div>
       )}
+
+      {/* AI RTO/RPO recommendation */}
+      {!locked && (
+        <div style={{ marginTop: 12 }}>
+          <Button variant="secondary" disabled={aiBusy} onClick={() => void suggestTargets()}>
+            <Sparkles size={14} /> {aiBusy
+              ? (isAr ? 'جارٍ الاقتراح…' : 'Suggesting…')
+              : (isAr ? 'اقتراح أهداف التعافي (ذكاء اصطناعي)' : 'AI suggest recovery targets')}
+          </Button>
+          {aiSug && (
+            <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 6,
+                          border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                <Badge tone="info">RTO: {isAr ? aiSug.out.rtoHumanAr : aiSug.out.rtoHumanEn}</Badge>
+                <Badge tone="info">RPO: {isAr ? aiSug.out.rpoHumanAr : aiSug.out.rpoHumanEn}</Badge>
+                <Badge tone="neutral">MTPD ≈ {Math.round(aiSug.out.mtpdMinutes / 60)}h</Badge>
+              </div>
+              {aiSug.rationale && (
+                <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 10 }}>
+                  {aiSug.rationale}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button variant="primary" onClick={applyTargets}>
+                  {isAr ? 'تطبيق على الحقول' : 'Apply to fields'}
+                </Button>
+                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  {isAr
+                    ? 'الحقول بالساعات الكاملة؛ راجع القيم الدقيقة أعلاه. حُفظ الاقتراح في قائمة مراجعة الذكاء الاصطناعي.'
+                    : 'Fields are whole hours; see exact values above. Suggestion saved to the AI review queue.'}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <Field label={isAr ? 'وصف MBCO (الحد الأدنى لاستمرارية الأعمال)' : 'MBCO (Minimum Business Continuity Objective)'}>
         <textarea value={editing.mbcoDescription ?? ''} disabled={locked}
                   onChange={e => onChange({ ...editing, mbcoDescription: e.target.value })}
