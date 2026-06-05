@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Landmark, AlertTriangle, Plus, Pencil } from 'lucide-react';
+import { BookOpen, Landmark, AlertTriangle, Plus, Pencil, GitBranch } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -16,7 +16,8 @@ import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listAuthorityDocuments, listAuthorityDocumentCitations,
-  rollupAuthorityDocumentsByFamily, createAuthorityDocument, updateAuthorityDocument, createCitation,
+  rollupAuthorityDocumentsByFamily, createAuthorityDocument, updateAuthorityDocument,
+  transitionAuthorityDocument, createCitation,
   citationsToTree,
   authorityStatusTone, translationTone, translationLabel,
   type AuthorityDocument, type AuthorityDocumentCitation,
@@ -31,6 +32,14 @@ const FAMILIES: AuthorityFamily[] = [
 const JURISDICTIONS = ['KSA', 'GCC', 'International'];
 const STATUSES: AuthorityStatus[] = ['DRAFT', 'ACTIVE', 'DEPRECATED', 'SUPERSEDED'];
 const TRANSLATIONS: TranslationStatus[] = ['EN_ONLY', 'AR_AUTO', 'AR_HUMAN_REVIEWED', 'AR_OFFICIAL'];
+
+/** Allowed forward transitions — mirrors AuthorityDocumentService.transition(). */
+const NEXT_STATUSES: Record<AuthorityStatus, AuthorityStatus[]> = {
+  DRAFT:      ['ACTIVE'],
+  ACTIVE:     ['DEPRECATED', 'SUPERSEDED'],
+  DEPRECATED: ['SUPERSEDED'],
+  SUPERSEDED: [],
+};
 
 interface CreateForm {
   code: string; titleEn: string; titleAr: string;
@@ -125,6 +134,47 @@ export function RegulatoryLibraryPage() {
       isPlaceholder: d.isPlaceholder,
     });
     setShowCreate(true);
+  }
+
+  // ─── Lifecycle transition ───────────────────────────────────────
+  const [showTransition, setShowTransition] = useState(false);
+  const [savingTransition, setSavingTransition] = useState(false);
+  const [transitionTo, setTransitionTo] = useState<AuthorityStatus | ''>('');
+  const [successorId, setSuccessorId] = useState<string>('');
+
+  function openTransition() {
+    if (!selected) return;
+    const targets = NEXT_STATUSES[selected.status];
+    setTransitionTo(targets[0] ?? '');
+    setSuccessorId('');
+    setShowTransition(true);
+  }
+
+  async function submitTransition() {
+    if (!selected || !transitionTo) return;
+    if (transitionTo === 'SUPERSEDED' && !successorId) {
+      toast.danger(isAr
+        ? 'يجب اختيار الوثيقة البديلة عند الانتقال إلى «مُستبدَلة»'
+        : 'A successor document is required to mark this as superseded');
+      return;
+    }
+    setSavingTransition(true);
+    try {
+      const updated = await transitionAuthorityDocument(
+        selected.id, transitionTo,
+        transitionTo === 'SUPERSEDED' ? Number(successorId) : undefined);
+      toast.success(isAr
+        ? `تم نقل ${updated.code} إلى الحالة «${statusLabel(updated.status, lang)}»`
+        : `${updated.code} moved to ${statusLabel(updated.status, lang)}`);
+      setShowTransition(false);
+      setSelected(prev => (prev && prev.id === updated.id ? updated : prev));
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تغيير الحالة' : 'Failed to change status'));
+    } finally {
+      setSavingTransition(false);
+    }
   }
 
   const [showCit, setShowCit] = useState(false);
@@ -393,6 +443,11 @@ export function RegulatoryLibraryPage() {
                     {isAr ? 'تعديل' : 'Edit'}
                   </Button>
                 )}
+                {!demoMode && NEXT_STATUSES[selected.status].length > 0 && (
+                  <Button variant="ghost" size="sm" Icon={GitBranch} onClick={openTransition}>
+                    {isAr ? 'دورة الحياة' : 'Lifecycle'}
+                  </Button>
+                )}
                 {!demoMode && (selected.status === 'DRAFT' || selected.status === 'ACTIVE') && (
                   <Button variant="secondary" size="sm" Icon={Plus} onClick={openAddCit}>
                     {isAr ? 'إضافة بند' : 'Add citation'}
@@ -610,6 +665,67 @@ export function RegulatoryLibraryPage() {
             </label>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={showTransition}
+        onClose={() => setShowTransition(false)}
+        size="sm"
+        title={selected
+          ? `${isAr ? 'دورة حياة' : 'Lifecycle'} — ${selected.code}`
+          : (isAr ? 'دورة الحياة' : 'Lifecycle')}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowTransition(false)} disabled={savingTransition}>
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button variant="primary" Icon={GitBranch} onClick={submitTransition}
+              disabled={savingTransition || !transitionTo}>
+              {savingTransition ? (isAr ? 'جارٍ التطبيق…' : 'Applying…') : (isAr ? 'تطبيق' : 'Apply')}
+            </Button>
+          </>
+        }>
+        {selected && (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <span style={{ color: 'var(--ink-2)' }}>{isAr ? 'الحالة الحالية:' : 'Current status:'}</span>
+              <Badge tone={authorityStatusTone(selected.status)}>{statusLabel(selected.status, lang)}</Badge>
+            </div>
+
+            <FormField label={isAr ? 'الانتقال إلى' : 'Transition to'} required>
+              <select style={ctrl} value={transitionTo}
+                onChange={e => setTransitionTo(e.target.value as AuthorityStatus)}>
+                {NEXT_STATUSES[selected.status].map(s => (
+                  <option key={s} value={s}>{statusLabel(s, lang)}</option>
+                ))}
+              </select>
+            </FormField>
+
+            {transitionTo === 'SUPERSEDED' && (
+              <FormField label={isAr ? 'الوثيقة البديلة' : 'Successor document'} required>
+                <select style={ctrl} value={successorId}
+                  onChange={e => setSuccessorId(e.target.value)}>
+                  <option value="">{isAr ? '— اختر الوثيقة —' : '— Select document —'}</option>
+                  {documents.filter(d => d.id !== selected.id).map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.code} v{d.version} — {(isAr && d.titleAr ? d.titleAr : d.titleEn).slice(0, 40)}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            )}
+
+            <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+              {transitionTo === 'SUPERSEDED'
+                ? (isAr
+                    ? 'سيتم ربط هذه الوثيقة بالإصدار البديل للحفاظ على سلسلة التدقيق.'
+                    : 'This document will be linked to its successor to preserve the audit chain.')
+                : (isAr
+                    ? 'انتقالات دورة الحياة تسير للأمام فقط: مسودة ← فعّالة ← مهجورة ← مُستبدَلة.'
+                    : 'Lifecycle transitions only move forward: Draft → Active → Deprecated → Superseded.')}
+            </div>
+          </div>
+        )}
       </Modal>
     </Shell>
   );
