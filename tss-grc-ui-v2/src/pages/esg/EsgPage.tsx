@@ -46,10 +46,10 @@ import {
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
 } from '../../lib/sustainabilityCapa';
 import {
-  listSgi, sgiAggregate, achieveSgi, retireSgi,
+  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi,
   sgiStatusTone, sgiSectorLabel, sgiStatusLabel,
   computeProgressPct, canAchieve,
-  type SgiCommitment as SgiC, type SgiAggregate as SgiAgg,
+  type SgiCommitment as SgiC, type SgiAggregate as SgiAgg, type SgiSector,
 } from '../../lib/sustainabilitySgi';
 import {
   listCma, cmaReadiness, markDisclosed, markPartial, markNotDisclosed,
@@ -3218,6 +3218,7 @@ function SgiTab() {
   const [loading, setLoading] = useState(true);
   const [achievingId, setAchievingId] = useState<number | null>(null);
   const [retiringId, setRetiringId]   = useState<number | null>(null);
+  const [openNew, setOpenNew]         = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -3287,6 +3288,84 @@ function SgiTab() {
       label: isAr ? 'سبب التقاعد (للسجل المراجعي) *' : 'Reason (for audit trail) *' },
   ];
 
+  const SGI_SECTORS: SgiSector[] = ['ENERGY', 'INDUSTRY', 'TRANSPORT', 'WASTE', 'FORESTRY', 'WATER', 'LAND', 'OTHER'];
+  const createFields: FieldDef[] = [
+    { kind: 'text', key: 'commitmentCode', required: true, span: 6,
+      label: isAr ? 'كود الالتزام' : 'Commitment code', placeholder: 'SGI-RENEWABLE-50' },
+    { kind: 'select', key: 'sector', required: true, span: 6,
+      label: isAr ? 'القطاع' : 'Sector',
+      options: SGI_SECTORS.map(s => ({ value: s, label: sgiSectorLabel(s, isAr ? 'ar' : 'en') })) },
+    { kind: 'text', key: 'titleEn', required: true, span: 6,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', span: 6,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'text', key: 'unit', required: true, span: 4,
+      label: isAr ? 'الوحدة' : 'Unit', placeholder: 'tCO₂e/yr, %, MW…' },
+    { kind: 'number', key: 'targetValue', required: true, span: 4,
+      label: isAr ? 'القيمة المستهدفة' : 'Target value' },
+    { kind: 'number', key: 'targetYear', required: true, span: 4, min: 2020, max: 2100,
+      label: isAr ? 'سنة الهدف' : 'Target year' },
+    { kind: 'number', key: 'baselineValue', span: 4,
+      label: isAr ? 'قيمة الأساس' : 'Baseline value' },
+    { kind: 'number', key: 'baselineYear', span: 4, min: 2000, max: 2100,
+      label: isAr ? 'سنة الأساس' : 'Baseline year' },
+    { kind: 'number', key: 'currentValue', span: 4,
+      label: isAr ? 'القيمة الحالية' : 'Current value' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'text', key: 'nextMilestoneEn', span: 6,
+      label: isAr ? 'المرحلة التالية' : 'Next milestone' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+  ];
+
+  async function submitCreate(values: Record<string, unknown>): Promise<void> {
+    const code = String(values.commitmentCode ?? '').trim();
+    const titleEn = String(values.titleEn ?? '').trim();
+    const sector = String(values.sector ?? '').trim();
+    const unit = String(values.unit ?? '').trim();
+    const targetValue = Number(values.targetValue);
+    const targetYear = Number(values.targetYear);
+    if (!code || !titleEn || !sector || !unit
+        || !Number.isFinite(targetValue) || !Number.isFinite(targetYear)) {
+      toast.danger(isAr
+        ? 'الكود والعنوان والقطاع والوحدة والقيمة المستهدفة وسنة الهدف حقول مطلوبة'
+        : 'Code, title, sector, unit, target value and target year are required');
+      return;
+    }
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return v === '' || v == null || !Number.isFinite(n) ? undefined : n;
+    };
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      const created = await createSgi({
+        commitmentCode: code,
+        sector: sector as SgiSector,
+        titleEn,
+        titleAr: str(values.titleAr),
+        unit,
+        targetValue,
+        targetYear,
+        baselineValue: num(values.baselineValue),
+        baselineYear: num(values.baselineYear),
+        currentValue: num(values.currentValue),
+        ownerName: str(values.ownerName),
+        nextMilestoneEn: str(values.nextMilestoneEn),
+        descriptionEn: str(values.descriptionEn),
+        status: 'ACTIVE',
+      });
+      toast.success(isAr
+        ? `تمت إضافة الالتزام ${created.commitmentCode}`
+        : `Commitment ${created.commitmentCode} added`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّرت إضافة الالتزام' : 'Failed to add commitment'));
+    }
+  }
+
   return (
     <div className="esg-stack">
       {/* KPI strip — tier counts + lifecycle totals */}
@@ -3302,7 +3381,10 @@ function SgiTab() {
         <Kpi Icon={Trash2}       label={isAr ? 'مُتقاعَدة' : 'Retired'}                   value={agg?.retiredTotal ?? 0} />
       </div>
 
-      <Card title={isAr ? 'التزامات المبادرة السعودية الخضراء' : 'Saudi Green Initiative commitments'} Icon={Target}>
+      <Card title={isAr ? 'التزامات المبادرة السعودية الخضراء' : 'Saudi Green Initiative commitments'} Icon={Target}
+        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
+          {isAr ? 'التزام جديد' : 'New commitment'}
+        </Button>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'سجلّ الالتزامات المحفوظ مع تتبّع التقدّم، المالك، الموعد التالي، والسجل المراجعي. الإنجاز يتطلّب الوصول للهدف؛ التقاعد يتطلّب سبباً موثّقاً.'
@@ -3414,6 +3496,21 @@ function SgiTab() {
         submitLabel={isAr ? 'تقاعد' : 'Retire'}
         onClose={() => setRetiringId(null)}
         onSubmit={submitRetire}
+      />
+      <FormModal
+        open={openNew}
+        title={isAr ? 'التزام مبادرة خضراء جديد' : 'New Green-Initiative commitment'}
+        fields={createFields}
+        initial={{
+          commitmentCode: '', sector: 'ENERGY', titleEn: '', titleAr: '',
+          unit: '', targetValue: '', targetYear: 2030,
+          baselineValue: '', baselineYear: '', currentValue: '',
+          ownerName: '', nextMilestoneEn: '', descriptionEn: '',
+        }}
+        size="lg"
+        submitLabel={isAr ? 'إضافة الالتزام' : 'Add commitment'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={submitCreate}
       />
     </div>
   );
