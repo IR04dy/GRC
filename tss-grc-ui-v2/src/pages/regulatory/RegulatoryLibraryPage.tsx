@@ -16,7 +16,7 @@ import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listAuthorityDocuments, listAuthorityDocumentCitations,
-  rollupAuthorityDocumentsByFamily, createAuthorityDocument,
+  rollupAuthorityDocumentsByFamily, createAuthorityDocument, createCitation,
   citationsToTree,
   authorityStatusTone, translationTone, translationLabel,
   type AuthorityDocument, type AuthorityDocumentCitation,
@@ -43,6 +43,19 @@ const EMPTY_CREATE: CreateForm = {
   family: 'NCA Cyber', jurisdiction: 'KSA', issuer: '', version: '1.0',
   status: 'ACTIVE', translationStatus: 'EN_ONLY',
   summaryEn: '', summaryAr: '', isPlaceholder: true,
+};
+
+interface CitForm {
+  citationCode: string; parentCitationCode: string;
+  titleEn: string; titleAr: string;
+  requirementTextEn: string; requirementTextAr: string;
+  mandatory: boolean; weight: string;
+}
+const EMPTY_CIT: CitForm = {
+  citationCode: '', parentCitationCode: '',
+  titleEn: '', titleAr: '',
+  requirementTextEn: '', requirementTextAr: '',
+  mandatory: true, weight: '1',
 };
 
 const ctrl: CSSProperties = {
@@ -98,6 +111,57 @@ export function RegulatoryLibraryPage() {
     setForm(f => ({ ...f, [k]: v }));
 
   function openCreate() { setForm(EMPTY_CREATE); setShowCreate(true); }
+
+  const [showCit, setShowCit] = useState(false);
+  const [savingCit, setSavingCit] = useState(false);
+  const [citForm, setCitForm] = useState<CitForm>(EMPTY_CIT);
+  const setCit = <K extends keyof CitForm>(k: K, v: CitForm[K]) =>
+    setCitForm(f => ({ ...f, [k]: v }));
+
+  function openAddCit() { setCitForm(EMPTY_CIT); setShowCit(true); }
+
+  async function submitAddCit() {
+    if (!selected) return;
+    const citationCode = citForm.citationCode.trim();
+    const titleEn = citForm.titleEn.trim();
+    if (!citationCode || !titleEn) {
+      toast.danger(isAr
+        ? 'كود البند والعنوان (إنجليزي) حقول مطلوبة'
+        : 'Citation code and English title are required');
+      return;
+    }
+    // Derive depth from the chosen parent; top-level → 0.
+    const parent = citForm.parentCitationCode
+      ? citations.find(c => c.citationCode === citForm.parentCitationCode)
+      : undefined;
+    const depth = parent ? parent.depth + 1 : 0;
+    const weight = Number(citForm.weight);
+    setSavingCit(true);
+    try {
+      await createCitation(selected.id, {
+        citationCode,
+        parentCitationCode: citForm.parentCitationCode || undefined,
+        depth,
+        sequenceOrder: citations.length,
+        titleEn,
+        titleAr: citForm.titleAr.trim() || undefined,
+        requirementTextEn: citForm.requirementTextEn.trim() || undefined,
+        requirementTextAr: citForm.requirementTextAr.trim() || undefined,
+        mandatory: citForm.mandatory,
+        weight: Number.isFinite(weight) && weight > 0 ? weight : 1,
+      });
+      toast.success(isAr
+        ? `تمت إضافة البند ${citationCode}`
+        : `Citation ${citationCode} added`);
+      setShowCit(false);
+      await selectDoc(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّرت إضافة البند' : 'Failed to add citation'));
+    } finally {
+      setSavingCit(false);
+    }
+  }
 
   async function submitCreate() {
     const code = form.code.trim();
@@ -282,9 +346,14 @@ export function RegulatoryLibraryPage() {
         {selected ? (
           <Card title={`${selected.code} v${selected.version} — ${isAr ? 'العناصر' : 'Citations'}`}
             action={
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <Badge tone="primary">{citations.length}</Badge>
                 {selected.isPlaceholder && <Badge tone="warning">{isAr ? 'مؤقت' : 'placeholder'}</Badge>}
+                {!demoMode && (selected.status === 'DRAFT' || selected.status === 'ACTIVE') && (
+                  <Button variant="secondary" size="sm" Icon={Plus} onClick={openAddCit}>
+                    {isAr ? 'إضافة بند' : 'Add citation'}
+                  </Button>
+                )}
               </div>
             }>
             {selected.summaryEn && (
@@ -417,6 +486,74 @@ export function RegulatoryLibraryPage() {
             <textarea style={{ ...ctrl, minHeight: 64, resize: 'vertical' }} value={form.summaryAr} dir="rtl"
               onChange={e => set('summaryAr', e.target.value)} />
           </FormField>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showCit}
+        onClose={() => setShowCit(false)}
+        size="md"
+        title={selected
+          ? `${isAr ? 'إضافة بند إلى' : 'Add citation to'} ${selected.code}`
+          : (isAr ? 'إضافة بند' : 'Add citation')}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowCit(false)} disabled={savingCit}>
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button variant="primary" Icon={Plus} onClick={submitAddCit} disabled={savingCit}>
+              {savingCit ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'إضافة' : 'Add')}
+            </Button>
+          </>
+        }>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 12 }}>
+            <FormField label={isAr ? 'كود البند' : 'Citation code'} required>
+              <input style={ctrl} value={citForm.citationCode} placeholder="e.g. 2-1-1"
+                onChange={e => setCit('citationCode', e.target.value)} />
+            </FormField>
+            <FormField label={isAr ? 'البند الأب (اختياري)' : 'Parent citation (optional)'}>
+              <select style={ctrl} value={citForm.parentCitationCode}
+                onChange={e => setCit('parentCitationCode', e.target.value)}>
+                <option value="">{isAr ? '— مستوى أعلى —' : '— Top level —'}</option>
+                {citations.map(c => (
+                  <option key={c.id} value={c.citationCode}>
+                    {c.citationCode} — {(isAr && c.titleAr ? c.titleAr : c.titleEn).slice(0, 40)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+
+          <FormField label={isAr ? 'العنوان (إنجليزي)' : 'Title (English)'} required>
+            <input style={ctrl} value={citForm.titleEn}
+              onChange={e => setCit('titleEn', e.target.value)} />
+          </FormField>
+          <FormField label={isAr ? 'العنوان (عربي)' : 'Title (Arabic)'}>
+            <input style={ctrl} value={citForm.titleAr} dir="rtl"
+              onChange={e => setCit('titleAr', e.target.value)} />
+          </FormField>
+
+          <FormField label={isAr ? 'نص المتطلب (إنجليزي)' : 'Requirement text (English)'}>
+            <textarea style={{ ...ctrl, minHeight: 60, resize: 'vertical' }} value={citForm.requirementTextEn}
+              onChange={e => setCit('requirementTextEn', e.target.value)} />
+          </FormField>
+          <FormField label={isAr ? 'نص المتطلب (عربي)' : 'Requirement text (Arabic)'}>
+            <textarea style={{ ...ctrl, minHeight: 60, resize: 'vertical' }} value={citForm.requirementTextAr} dir="rtl"
+              onChange={e => setCit('requirementTextAr', e.target.value)} />
+          </FormField>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignItems: 'end' }}>
+            <FormField label={isAr ? 'الوزن' : 'Weight'}>
+              <input style={ctrl} type="number" min="0" step="0.5" value={citForm.weight}
+                onChange={e => setCit('weight', e.target.value)} />
+            </FormField>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, padding: '8px 0' }}>
+              <input type="checkbox" checked={citForm.mandatory}
+                onChange={e => setCit('mandatory', e.target.checked)} />
+              {isAr ? 'إلزامي' : 'Mandatory'}
+            </label>
+          </div>
         </div>
       </Modal>
     </Shell>
