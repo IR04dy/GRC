@@ -53,9 +53,9 @@ import {
 } from '../../lib/sustainabilitySgi';
 import {
   listCma, cmaReadiness, markDisclosed, markPartial, markNotDisclosed,
-  markNotApplicable, markUnderReview, attachCmaEvidence, recordCmaGap,
+  markNotApplicable, markUnderReview, attachCmaEvidence, recordCmaGap, createCma,
   cmaStatusTone, cmaStatusLabel, articleLabel, hasGap, hasEvidence,
-  type CmaDisclosure as CmaD, type CmaReadiness as CmaR,
+  type CmaDisclosure as CmaD, type CmaReadiness as CmaR, type CmaStatus,
 } from '../../lib/sustainabilityCma';
 import {
   listTcfd, tcfdReadiness,
@@ -1403,6 +1403,7 @@ function CmaTab() {
   const [loading, setLoading]   = useState(true);
   const [evidencingId, setEvidencingId] = useState<number | null>(null);
   const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
+  const [openNew, setOpenNew]           = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -1520,6 +1521,65 @@ function CmaTab() {
       label: isAr ? 'وصف الفجوة (عربي)' : 'Gap description (Arabic)' },
   ];
 
+  // Create starts in a gap-free state (UNDER_REVIEW / DISCLOSED / NOT_APPLICABLE)
+  // so it never trips Rule 5 (PARTIAL / NOT_DISCLOSED need a gap first).
+  const CREATE_STATUSES: CmaStatus[] = ['UNDER_REVIEW', 'DISCLOSED', 'NOT_APPLICABLE'];
+  const createFields: FieldDef[] = [
+    { kind: 'select', key: 'article', required: true, span: 4,
+      label: isAr ? 'المادة' : 'Article',
+      options: (['91', '92', '93', '94'] as const).map(a => ({
+        value: a, label: isAr ? `المادة ${a}` : `Article ${a}`,
+      })) },
+    { kind: 'number', key: 'reportingYear', required: true, span: 4, min: 2000, max: 2100,
+      label: isAr ? 'سنة التقرير' : 'Reporting year' },
+    { kind: 'select', key: 'disclosureStatus', span: 4,
+      label: isAr ? 'حالة الإفصاح' : 'Disclosure status',
+      options: CREATE_STATUSES.map(s => ({ value: s, label: cmaStatusLabel(s, isAr ? 'ar' : 'en') })) },
+    { kind: 'text', key: 'clause', span: 4,
+      label: isAr ? 'الفقرة' : 'Clause', placeholder: 'e.g. 91(a)' },
+    { kind: 'text', key: 'titleEn', required: true, span: 8,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', span: 6,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'text', key: 'responsibleDepartment', span: 6,
+      label: isAr ? 'الإدارة المسؤولة' : 'Responsible department' },
+    { kind: 'textarea', key: 'requirementEn', span: 12, rows: 2,
+      label: isAr ? 'نص المتطلب (إنجليزي)' : 'Requirement (English)' },
+  ];
+
+  async function submitCreate(values: Record<string, unknown>): Promise<void> {
+    const titleEn = String(values.titleEn ?? '').trim();
+    const article = String(values.article ?? '').trim();
+    const year = Number(values.reportingYear);
+    if (!titleEn || !article || !Number.isFinite(year)) {
+      toast.danger(isAr
+        ? 'العنوان (إنجليزي) والمادة وسنة التقرير حقول مطلوبة'
+        : 'English title, article and reporting year are required');
+      return;
+    }
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      const created = await createCma({
+        article: article as CmaD['article'],
+        reportingYear: year,
+        disclosureStatus: (String(values.disclosureStatus ?? 'UNDER_REVIEW') || 'UNDER_REVIEW') as CmaStatus,
+        clause: str(values.clause),
+        titleEn,
+        titleAr: str(values.titleAr),
+        requirementEn: str(values.requirementEn),
+        responsibleDepartment: str(values.responsibleDepartment),
+      });
+      toast.success(isAr
+        ? `تمت إضافة إفصاح المادة ${created.article}`
+        : `Article ${created.article} disclosure added`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّرت إضافة الإفصاح' : 'Failed to add disclosure'));
+    }
+  }
+
   return (
     <div className="esg-stack">
       {/* Readiness KPI strip */}
@@ -1533,7 +1593,10 @@ function CmaTab() {
         <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Under review'}      value={readiness?.byStatus.UNDER_REVIEW ?? 0}      tone="info" />
       </div>
 
-      <Card title={isAr ? 'سجلّ إفصاحات المواد 91–94' : 'CMA Articles 91–94 disclosure matrix'} Icon={FileText}>
+      <Card title={isAr ? 'سجلّ إفصاحات المواد 91–94' : 'CMA Articles 91–94 disclosure matrix'} Icon={FileText}
+        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
+          {isAr ? 'إفصاح جديد' : 'New disclosure'}
+        </Button>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'مصفوفة الإفصاحات الإلزامية لهيئة السوق المالية. الجزئي وغير المُفصَح يتطلّبان وصف فجوة (القاعدة 5). الإفصاحات المعتمدة بلا دليل تُعلَّم تلقائياً «يتطلّب دليلاً» (القاعدة 6).'
@@ -1638,6 +1701,19 @@ function CmaTab() {
         submitLabel={isAr ? 'حفظ' : 'Save'}
         onClose={() => setGappingId(null)}
         onSubmit={submitGap}
+      />
+      <FormModal
+        open={openNew}
+        title={isAr ? 'إفصاح هيئة السوق المالية جديد' : 'New CMA disclosure'}
+        fields={createFields}
+        initial={{
+          article: '91', reportingYear: 2025, disclosureStatus: 'UNDER_REVIEW',
+          clause: '', titleEn: '', titleAr: '', responsibleDepartment: '', requirementEn: '',
+        }}
+        size="lg"
+        submitLabel={isAr ? 'إضافة الإفصاح' : 'Add disclosure'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={submitCreate}
       />
     </div>
   );
