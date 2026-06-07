@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import {
   Server, CheckCircle2, XCircle, Archive, Play, FlaskConical, Network,
-  ChevronRight, ChevronDown, Clock,
+  ChevronRight, ChevronDown, Clock, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -11,26 +11,35 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
-  listDrPlans, approveDrPlan, rejectDrPlan, activateDrPlan, archiveDrPlan, recordDrTest,
+  listDrPlans, approveDrPlan, rejectDrPlan, activateDrPlan, archiveDrPlan, recordDrTest, createDrPlan,
   parseDrSteps, parseDrDependencies,
   DR_STATUS_TONE, DR_TEST_TONE, DR_SITE_TONE,
-  type DrPlan,
+  type DrPlan, type DrSiteType,
 } from '../../lib/drPlans';
+
+const DR_SITE_TYPES: DrSiteType[] = ['HOT', 'WARM', 'COLD', 'ACTIVE_ACTIVE', 'CLOUD_DR'];
+const DR_SITE_LABEL_AR: Record<DrSiteType, string> = {
+  HOT: 'موقع ساخن', WARM: 'موقع دافئ', COLD: 'موقع بارد',
+  ACTIVE_ACTIVE: 'نشط-نشط', CLOUD_DR: 'تعافٍ سحابي',
+};
 
 type TabId = 'all' | 'draft' | 'approved' | 'activated' | 'archived' | 'rejected';
 
 export function DrPlansPage() {
   const { t, lang } = useI18n();
+  const isAr = lang === 'ar';
   const toast = useToast();
   const [tab, setTab] = useState<TabId>('all');
   const [rows, setRows] = useState<DrPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [openCreate, setOpenCreate] = useState(false);
 
   useEffect(() => { void reload(); }, []);
 
@@ -120,6 +129,67 @@ export function DrPlansPage() {
     finally { setBusyId(null); }
   }
 
+  // ---- New DR plan ---------------------------------------------------------
+  const createFields: FieldDef[] = [
+    { key: 'titleEn', kind: 'text', label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)', required: true, span: 6, maxLength: 255 },
+    { key: 'titleAr', kind: 'text', label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)', span: 6, maxLength: 255 },
+    { key: 'criticalSystemName', kind: 'text', label: isAr ? 'النظام الحرج' : 'Critical system', span: 6,
+      placeholder: isAr ? 'مثال: نظام المدفوعات الفورية' : 'e.g. Instant Payments (IPS)' },
+    { key: 'drSiteType', kind: 'select', label: isAr ? 'نوع موقع التعافي' : 'DR site type', required: true, span: 6,
+      options: DR_SITE_TYPES.map(s => ({ value: s, label: isAr ? DR_SITE_LABEL_AR[s] : s.replace('_', ' ') })) },
+    { key: 'rtoHours', kind: 'number', label: isAr ? 'زمن التعافي المستهدف RTO (ساعات)' : 'RTO (hours)', required: true, span: 4, min: 0 },
+    { key: 'rpoHours', kind: 'number', label: isAr ? 'نقطة التعافي المستهدفة RPO (ساعات)' : 'RPO (hours)', required: true, span: 4, min: 0 },
+    { key: 'mtpdHours', kind: 'number', label: isAr ? 'أقصى مدة تعطل MTPD (ساعات)' : 'MTPD (hours)', span: 4, min: 0 },
+    { key: 'owner', kind: 'text', label: isAr ? 'المالك' : 'Owner', span: 6 },
+    { key: 'linkedBcpCode', kind: 'text', label: isAr ? 'رمز خطة الاستمرارية المرتبطة' : 'Linked BCP code', span: 6,
+      placeholder: isAr ? 'مثال: BCP-IPS-01' : 'e.g. BCP-IPS-01' },
+    { key: 'drSiteLocation', kind: 'text', label: isAr ? 'موقع التعافي' : 'DR site location', span: 6,
+      placeholder: isAr ? 'مثال: الرياض - مركز البيانات الثانوي' : 'e.g. Riyadh secondary DC' },
+    { key: 'drSiteProvider', kind: 'text', label: isAr ? 'مزود موقع التعافي' : 'DR site provider', span: 6,
+      placeholder: isAr ? 'مثال: STC Cloud' : 'e.g. STC Cloud' },
+    { key: 'descriptionEn', kind: 'textarea', label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)', span: 12, rows: 2 },
+    { key: 'descriptionAr', kind: 'textarea', label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)', span: 12, rows: 2 },
+    { key: 'recoveryStrategyEn', kind: 'textarea', label: isAr ? 'استراتيجية التعافي (إنجليزي)' : 'Recovery strategy (English)', span: 12, rows: 2 },
+    { key: 'dataBackupStrategyEn', kind: 'textarea', label: isAr ? 'استراتيجية النسخ الاحتياطي (إنجليزي)' : 'Data backup strategy (English)', span: 12, rows: 2 },
+  ];
+
+  // Memoised so its identity is stable across re-renders, keeping FormModal's reset effect from wiping the form.
+  const createInitial: Record<string, string> = useMemo(() => ({
+    titleEn: '', titleAr: '', criticalSystemName: '', drSiteType: 'WARM',
+    rtoHours: '4', rpoHours: '1', mtpdHours: '', owner: '', linkedBcpCode: '',
+    drSiteLocation: '', drSiteProvider: '',
+    descriptionEn: '', descriptionAr: '', recoveryStrategyEn: '', dataBackupStrategyEn: '',
+  }), []);
+
+  async function submitCreate(v: Record<string, string>) {
+    const titleEn = String(v.titleEn ?? '').trim();
+    const drSiteType = v.drSiteType as DrSiteType;
+    const rto = Number(v.rtoHours);
+    const rpo = Number(v.rpoHours);
+    if (!titleEn)                       { toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'Title (English) is required'); return; }
+    if (!drSiteType)                    { toast.danger(isAr ? 'نوع موقع التعافي مطلوب' : 'DR site type is required'); return; }
+    if (!Number.isFinite(rto) || rto < 0) { toast.danger(isAr ? 'قيمة RTO غير صالحة' : 'Valid RTO (hours) is required'); return; }
+    if (!Number.isFinite(rpo) || rpo < 0) { toast.danger(isAr ? 'قيمة RPO غير صالحة' : 'Valid RPO (hours) is required'); return; }
+    const optS = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    const optN = (s?: string) => { const x = String(s ?? '').trim(); return x ? Number(x) : undefined; };
+    try {
+      await createDrPlan({
+        titleEn, titleAr: optS(v.titleAr),
+        descriptionEn: optS(v.descriptionEn), descriptionAr: optS(v.descriptionAr),
+        linkedBcpCode: optS(v.linkedBcpCode), criticalSystemName: optS(v.criticalSystemName), owner: optS(v.owner),
+        rtoHours: rto, rpoHours: rpo, mtpdHours: optN(v.mtpdHours),
+        drSiteType,
+        drSiteLocation: optS(v.drSiteLocation), drSiteProvider: optS(v.drSiteProvider),
+        recoveryStrategyEn: optS(v.recoveryStrategyEn),
+        dataBackupStrategyEn: optS(v.dataBackupStrategyEn),
+      });
+      toast.success(isAr ? 'تم إنشاء خطة التعافي (مسودة)' : 'DR plan created (Draft)');
+      setOpenCreate(false);
+      setTab('draft');
+      await reload();
+    } catch { toast.danger(t('drpActionFailed')); }
+  }
+
   return (
     <Shell title={t('drpPageTitle')} sub={t('drpPageSub')}>
       <PageHeader eyebrow={t('navBcm')} title={t('drpPageTitle')} sub={t('drpPageSub')} />
@@ -133,7 +203,13 @@ export function DrPlansPage() {
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
-      <Card title={t('drpPageTitle')} Icon={Server}>
+      <Card title={t('drpPageTitle')} Icon={Server}
+        action={
+          <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenCreate(true)}>
+            {isAr ? 'خطة تعافٍ جديدة' : 'New DR plan'}
+          </Button>
+        }
+      >
         {loading
           ? <EmptyState Icon={Server} title={t('loading')} />
           : filtered.length === 0
@@ -338,6 +414,16 @@ export function DrPlansPage() {
             )
         }
       </Card>
+
+      <FormModal
+        open={openCreate}
+        title={isAr ? 'خطة تعافٍ من الكوارث جديدة' : 'New disaster-recovery plan'}
+        fields={createFields}
+        initial={createInitial}
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        onClose={() => setOpenCreate(false)}
+        onSubmit={submitCreate}
+      />
     </Shell>
   );
 }
