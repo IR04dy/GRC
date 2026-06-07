@@ -45,9 +45,9 @@ import {
   type NdiComplianceAssessment, type NdiComplianceAggregate, type NdiComplianceStatus,
 } from '../../lib/ndiCompliance';
 import {
-  listOpex, opexAggregate, updateOpexActual,
+  listOpex, opexAggregate, updateOpexActual, createOpex,
   kpiStatusTone, kpiStatusLabel, progressFraction,
-  type NdiOpexKpi, type NdiOpexAggregate,
+  type NdiOpexKpi, type NdiOpexAggregate, type NdiKpiFrequency,
 } from '../../lib/ndiOpex';
 import {
   listDomains, rollupForCycle, createDomain, updateDomain, deleteDomain,
@@ -1327,6 +1327,63 @@ function ComplianceTab() {
 //   - Primary user action is "record new actual" (slider + as-of date)
 //   - Visualisation = progress bar toward target, not status badge alone
 
+// All-string create-KPI form shape. Numeric fields are number-kind in the
+// FormModal (runtime values are numbers); the submit handler coerces them.
+// Status is intentionally absent — the server computes it (Rule 13) from
+// actual vs target, so a freshly-defined KPI starts DATA_MISSING/NOT_STARTED.
+interface OpexForm {
+  category:        string;
+  kpiCode:         string;
+  indicatorNameEn: string;
+  indicatorNameAr: string;
+  target:          string;
+  baseline:        string;
+  unit:            string;
+  frequency:       string;
+  dataSource:      string;
+  ownerName:       string;
+  ownerEmail:      string;
+  definitionEn:    string;
+  definitionAr:    string;
+  notes:           string;
+}
+
+const OPEX_FREQUENCIES: NdiKpiFrequency[] = ['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL'];
+const FREQ_LABEL_AR: Record<NdiKpiFrequency, string> = {
+  MONTHLY: 'شهري', QUARTERLY: 'ربع سنوي', SEMI_ANNUAL: 'نصف سنوي', ANNUAL: 'سنوي',
+};
+const FREQ_LABEL_EN: Record<NdiKpiFrequency, string> = {
+  MONTHLY: 'Monthly', QUARTERLY: 'Quarterly', SEMI_ANNUAL: 'Semi-annual', ANNUAL: 'Annual',
+};
+
+function opexFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'text', key: 'category', label: isAr ? 'الفئة' : 'Category', span: 6, required: true, maxLength: 60,
+      placeholder: isAr ? 'مثلاً: جاهزية الخدمة' : 'e.g. Service Availability' },
+    { kind: 'text', key: 'kpiCode', label: isAr ? 'كود المؤشّر (اختياري)' : 'KPI code (optional)', span: 6, maxLength: 40,
+      placeholder: 'e.g. OPEX-AVAIL-01' },
+
+    { kind: 'text', key: 'indicatorNameEn', label: isAr ? 'اسم المؤشّر (إنجليزي)' : 'Indicator name (EN)', span: 6, required: true, maxLength: 255 },
+    { kind: 'text', key: 'indicatorNameAr', label: isAr ? 'اسم المؤشّر (عربي)' : 'Indicator name (AR)', span: 6, maxLength: 255 },
+
+    { kind: 'number', key: 'target', label: isAr ? 'الهدف' : 'Target', span: 3, required: true },
+    { kind: 'number', key: 'baseline', label: isAr ? 'خط الأساس' : 'Baseline', span: 3 },
+    { kind: 'text', key: 'unit', label: isAr ? 'الوحدة' : 'Unit', span: 3, maxLength: 20, placeholder: '%, ms, hrs' },
+    { kind: 'select', key: 'frequency', label: isAr ? 'التكرار' : 'Frequency', span: 3,
+      options: OPEX_FREQUENCIES.map(f => ({ value: f, label: isAr ? FREQ_LABEL_AR[f] : FREQ_LABEL_EN[f] })) },
+
+    { kind: 'text', key: 'dataSource', label: isAr ? 'مصدر البيانات' : 'Data source', span: 12, maxLength: 255,
+      placeholder: isAr ? 'مثلاً: لوحة مراقبة الخدمة' : 'e.g. Service monitoring dashboard' },
+
+    { kind: 'text', key: 'ownerName', label: isAr ? 'اسم المالك' : 'Owner name', span: 6, maxLength: 255 },
+    { kind: 'text', key: 'ownerEmail', label: isAr ? 'بريد المالك' : 'Owner email', span: 6, maxLength: 255 },
+
+    { kind: 'textarea', key: 'definitionEn', label: isAr ? 'التعريف (إنجليزي)' : 'Definition (EN)', span: 12, rows: 2 },
+    { kind: 'textarea', key: 'definitionAr', label: isAr ? 'التعريف (عربي)' : 'Definition (AR)', span: 12, rows: 2 },
+    { kind: 'textarea', key: 'notes', label: isAr ? 'ملاحظات' : 'Notes', span: 12, rows: 2 },
+  ];
+}
+
 function OpexTab() {
   const { lang } = useI18n();
   const toast = useToast();
@@ -1338,6 +1395,12 @@ function OpexTab() {
   const [items, setItems] = useState<NdiOpexKpi[]>([]);
   const [agg, setAgg] = useState<NdiOpexAggregate | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
+  const newInitial = useMemo<OpexForm>(() => ({
+    category: '', kpiCode: '', indicatorNameEn: '', indicatorNameAr: '',
+    target: '', baseline: '', unit: '', frequency: 'QUARTERLY', dataSource: '',
+    ownerName: '', ownerEmail: '', definitionEn: '', definitionAr: '', notes: '',
+  }), []);
 
   async function loadCycles() {
     try {
@@ -1383,6 +1446,48 @@ function OpexTab() {
     }
   }
 
+  async function onCreate(v: OpexForm) {
+    if (!cycleId) { toast.danger(isAr ? 'اختر دورة أولاً' : 'Select a cycle first'); return; }
+    const category = String(v.category ?? '').trim();
+    const indicatorNameEn = String(v.indicatorNameEn ?? '').trim();
+    const targetStr = String(v.target ?? '').trim();
+    const target = Number(targetStr);
+    if (!category)        { toast.danger(isAr ? 'الفئة مطلوبة' : 'Category is required'); return; }
+    if (!indicatorNameEn) { toast.danger(isAr ? 'اسم المؤشّر (إنجليزي) مطلوب' : 'Indicator name (EN) is required'); return; }
+    if (targetStr === '' || !Number.isFinite(target)) {
+      toast.danger(isAr ? 'قيمة هدف صحيحة مطلوبة' : 'A valid target value is required'); return;
+    }
+    const baselineStr = String(v.baseline ?? '').trim();
+    const baseline = baselineStr === '' ? undefined : Number(baselineStr);
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    try {
+      await createOpex({
+        cycleId,
+        category,
+        kpiCode: opt(v.kpiCode),
+        indicatorNameEn,
+        indicatorNameAr: opt(v.indicatorNameAr),
+        target,
+        baseline: baseline != null && Number.isFinite(baseline) ? baseline : undefined,
+        unit: opt(v.unit),
+        frequency: (v.frequency as NdiKpiFrequency) || undefined,
+        dataSource: opt(v.dataSource),
+        ownerName: opt(v.ownerName),
+        ownerEmail: opt(v.ownerEmail),
+        definitionEn: opt(v.definitionEn),
+        definitionAr: opt(v.definitionAr),
+        notes: opt(v.notes),
+        // Server computes the real status (Rule 13); seed a valid placeholder.
+        status: 'NOT_STARTED',
+      });
+      toast.success(isAr ? `تمت إضافة المؤشّر «${indicatorNameEn}»` : `KPI "${indicatorNameEn}" added`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّرت إضافة المؤشّر' : 'Failed to add the KPI'));
+    }
+  }
+
   const groupedByCategory = useMemo(() => {
     const m = new Map<string, NdiOpexKpi[]>();
     for (const i of items) {
@@ -1400,16 +1505,21 @@ function OpexTab() {
     <div className="ndi-stack">
       <Card title={isAr ? 'مؤشّرات التميز التشغيلي' : 'Operational excellence KPIs'} Icon={Target}
         action={
-          <select
-            value={cycleId ?? ''}
-            onChange={e => setCycleId(Number(e.target.value))}
-            className="ndi-mini-select" style={{ minWidth: 240 }}>
-            {cycles.map(c => (
-              <option key={c.id} value={c.id}>
-                {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select
+              value={cycleId ?? ''}
+              onChange={e => setCycleId(Number(e.target.value))}
+              className="ndi-mini-select" style={{ minWidth: 240 }}>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} disabled={!cycleId} onClick={() => setOpenNew(true)}>
+              {isAr ? 'مؤشّر جديد' : 'New KPI'}
+            </Button>
+          </div>
         }>
         {agg && (
           <div className="kpi-grid">
@@ -1483,6 +1593,17 @@ function OpexTab() {
                 </table>
               </Card>
             ))}
+
+      <FormModal<OpexForm>
+        open={openNew}
+        title={isAr ? 'تعريف مؤشّر تميّز تشغيلي' : 'Define an operational excellence KPI'}
+        fields={opexFields(isAr)}
+        initial={newInitial}
+        submitLabel={isAr ? 'إضافة' : 'Add KPI'}
+        size="lg"
+        onClose={() => setOpenNew(false)}
+        onSubmit={onCreate}
+      />
     </div>
   );
 }
