@@ -15,12 +15,13 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
+  listObjectives, createObjective,
   createControlAssessment, linkRiskToControl, createMapping, updateMapping,
   transitionControlAssessment,
   controlStatusTone, controlTypeTone, coverageTone, effectivenessTone, domainLabel,
-  type Control, type ControlDomain, type ControlMapping,
+  type Control, type ControlDomain, type ControlMapping, type ControlObjective,
   type ControlAssessment, type RiskControlLink, type Effectiveness, type RiskLinkType,
-  type Coverage, type AssessmentWorkflow,
+  type Coverage, type AssessmentWorkflow, type ControlStatus,
 } from '../../lib/controlLibrary';
 import { statusLabel } from '../../lib/statusLabels';
 import {
@@ -48,6 +49,20 @@ interface CitOpt {
  */
 
 const DOMAINS: ControlDomain[] = ['RISK', 'CYBER', 'BCM', 'PRIVACY', 'TPRM', 'COMPLIANCE', 'GENERAL'];
+const STATUSES: ControlStatus[] = ['DRAFT', 'ACTIVE', 'RETIRED'];
+
+/** "Define objective" form — every field a string; the server stamps the
+ *  org, enforces a unique objectiveCode per tenant, and defaults status to
+ *  ACTIVE. domain must be one of the seven ControlDomain values. */
+interface ObjectiveForm {
+  objectiveCode: string;
+  domain: string;
+  titleEn: string;
+  titleAr: string;
+  status: string;
+  descriptionEn: string;
+  descriptionAr: string;
+}
 
 /** Assessment review state machine — mirrors the backend transition guard. */
 const NEXT_ASSESS: Record<AssessmentWorkflow, AssessmentWorkflow[]> = {
@@ -66,10 +81,12 @@ export function ControlLibraryPage() {
   const [openAssess, setOpenAssess] = useState(false);
   const [openLink, setOpenLink] = useState(false);
   const [openMap, setOpenMap] = useState(false);
+  const [openObjective, setOpenObjective] = useState(false);
   const [editingMap, setEditingMap] = useState<ControlMapping | null>(null);
   const [transitioningAssess, setTransitioningAssess] = useState<ControlAssessment | null>(null);
 
   const [controls, setControls] = useState<Control[]>([]);
+  const [objectives, setObjectives] = useState<ControlObjective[]>([]);
   const [docs, setDocs] = useState<AuthorityDocument[]>([]);
   const [risks, setRisks] = useState<RiskResponse[]>([]);
   const [citations, setCitations] = useState<CitOpt[]>([]);
@@ -87,14 +104,16 @@ export function ControlLibraryPage() {
     setLoading(true);
     // Per-call .catch() — controls and authority docs come from independent
     // tables; either failing shouldn't blank the whole library.
-    const [cs, ds, rs] = await Promise.all([
+    const [cs, ds, rs, os] = await Promise.all([
       listControls(domain || undefined).catch(() => [] as Control[]),
       listAuthorityDocuments().catch(() => [] as AuthorityDocument[]),
       riskApi.list(undefined, 0, 200).then(p => p.content).catch(() => [] as RiskResponse[]),
+      listObjectives(domain || undefined).catch(() => [] as ControlObjective[]),
     ]);
     setControls(cs);
     setDocs(ds);
     setRisks(rs);
+    setObjectives(os);
     setLoading(false);
   }
   useEffect(() => { void reload(); }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -153,6 +172,52 @@ export function ControlLibraryPage() {
     };
     return (isAr ? ar : en)[e];
   };
+
+  // ── Define objective (createObjective) ────────────────────────────
+  const objectiveFields: FieldDef[] = [
+    { key: 'objectiveCode', label: isAr ? 'كود الهدف' : 'Objective code', kind: 'text', required: true, span: 6,
+      maxLength: 60, placeholder: 'OBJ-PRIV-PAM' },
+    { key: 'domain', label: isAr ? 'المجال' : 'Domain', kind: 'select', required: true, span: 6,
+      options: DOMAINS.map(d => ({ value: d, label: domainLabel(d, isAr ? 'ar' : 'en') })) },
+    { key: 'titleEn', label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)', kind: 'text', required: true, span: 6, maxLength: 255 },
+    { key: 'titleAr', label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)', kind: 'text', span: 6, maxLength: 255 },
+    { key: 'status', label: isAr ? 'الحالة' : 'Status', kind: 'select', span: 6,
+      options: STATUSES.map(s => ({ value: s, label: statusLabel(s, isAr ? 'ar' : 'en') })) },
+    { key: 'descriptionEn', label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)', kind: 'textarea', span: 12, rows: 2 },
+    { key: 'descriptionAr', label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)', kind: 'textarea', span: 12, rows: 2 },
+  ];
+
+  const objectiveInitial = useMemo<ObjectiveForm>(() => ({
+    objectiveCode: '', domain: domain || 'GENERAL', titleEn: '', titleAr: '',
+    status: 'ACTIVE', descriptionEn: '', descriptionAr: '',
+  }), [domain]);
+
+  async function onCreateObjective(v: ObjectiveForm) {
+    const u = (s: string) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    const code = String(v.objectiveCode ?? '').trim();
+    const dom = String(v.domain ?? '').trim();
+    const titleEn = String(v.titleEn ?? '').trim();
+    if (!code)    { toast.danger(isAr ? 'كود الهدف مطلوب' : 'Objective code is required'); return; }
+    if (!dom)     { toast.danger(isAr ? 'المجال مطلوب' : 'Domain is required'); return; }
+    if (!titleEn) { toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'English title is required'); return; }
+    const body: Partial<ControlObjective> = {
+      objectiveCode: code,
+      domain: dom as ControlDomain,
+      titleEn,
+      titleAr: u(v.titleAr),
+      descriptionEn: u(v.descriptionEn),
+      descriptionAr: u(v.descriptionAr),
+      status: (v.status || 'ACTIVE') as ControlStatus,
+    };
+    try {
+      await createObjective(body);
+      toast.success(isAr ? 'أُضيف الهدف' : 'Objective added');
+      setOpenObjective(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّرت الإضافة' : 'Create failed'));
+    }
+  }
 
   const assessFields: FieldDef[] = [
     { key: 'effectiveness', label: isAr ? 'الفاعلية' : 'Effectiveness', kind: 'select', required: true, span: 6,
@@ -421,6 +486,49 @@ export function ControlLibraryPage() {
         />
       </div>
 
+      {/* Control objectives — the higher-level goals controls roll up to. */}
+      <div style={{ marginBottom: 14 }}>
+        <Card title={isAr ? 'أهداف الضبط' : 'Control objectives'}
+          action={
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Badge tone="primary">{objectives.length}</Badge>
+              {!demoMode && (
+                <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenObjective(true)}>
+                  {isAr ? 'تعريف هدف' : 'Define objective'}
+                </Button>
+              )}
+            </div>
+          }>
+          {loading
+            ? <div className="loading-block">{isAr ? 'جاري التحميل…' : 'Loading…'}</div>
+            : objectives.length === 0
+              ? <InlineEmpty>{isAr ? 'لا توجد أهداف — عرّف هدفاً للبدء' : 'No objectives — define one to start'}</InlineEmpty>
+              : <table className="grc-table">
+                  <thead><tr>
+                    <th>{isAr ? 'الكود' : 'Code'}</th>
+                    <th>{isAr ? 'العنوان' : 'Title'}</th>
+                    <th>{isAr ? 'المجال' : 'Domain'}</th>
+                    <th>{isAr ? 'الحالة' : 'Status'}</th>
+                  </tr></thead>
+                  <tbody>
+                    {objectives.map(o => (
+                      <tr key={o.id}>
+                        <td className="mono text-2xs">{o.objectiveCode}</td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{isAr && o.titleAr ? o.titleAr : o.titleEn}</div>
+                          {(o.descriptionEn || o.descriptionAr) && (
+                            <div className="text-2xs text-muted">{isAr && o.descriptionAr ? o.descriptionAr : o.descriptionEn}</div>
+                          )}
+                        </td>
+                        <td className="text-xs">{domainLabel(o.domain, isAr ? 'ar' : 'en')}</td>
+                        <td><Badge tone={controlStatusTone(o.status)}>{statusLabel(o.status, isAr ? 'ar' : 'en')}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>}
+        </Card>
+      </div>
+
       <div className="list-detail-grid">
         <Card title={isAr ? 'الضوابط' : 'Controls'}
           action={<Badge tone="primary">{controls.length}</Badge>}>
@@ -655,6 +763,17 @@ export function ControlLibraryPage() {
           </Card>
         )}
       </div>
+
+      <FormModal<ObjectiveForm>
+        open={openObjective}
+        title={isAr ? 'تعريف هدف ضبط' : 'Define control objective'}
+        fields={objectiveFields}
+        initial={objectiveInitial}
+        submitLabel={isAr ? 'إضافة الهدف' : 'Add objective'}
+        size="lg"
+        onClose={() => setOpenObjective(false)}
+        onSubmit={onCreateObjective}
+      />
 
       {selected && (
         <FormModal
