@@ -87,7 +87,7 @@ import {
   type NdiSubmissionPackage, type Preflight,
 } from '../../lib/ndiSubmission';
 import {
-  listReports, runReport, runAdHocReport, deleteReport, createReport,
+  listReports, runReport, runAdHocReport, deleteReport, createReport, updateReport,
   downloadReport, downloadAdHocReport,
   reportTypeLabel,
   type NdiReportDefinition, type NdiReportType, type ReportResult,
@@ -3764,6 +3764,7 @@ function ReportsTab() {
   const [result, setResult] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  const [editDef, setEditDef] = useState<NdiReportDefinition | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -3919,6 +3920,62 @@ function ReportsTab() {
     }
   }
 
+  // ── Edit report definition (updateReport) ─────────────────────────
+  // Pre-fill from the selected def; memoized on the def so FormModal's
+  // reset effect re-keys when a different row is opened.
+  const editInitial = useMemo<ReportForm>(() => ({
+    nameEn: editDef?.nameEn ?? '',
+    nameAr: editDef?.nameAr ?? '',
+    reportCode: editDef?.reportCode ?? '',
+    reportType: editDef?.reportType ?? 'NDI_EXECUTIVE_SUMMARY',
+    format: editDef?.format ?? 'PDF',
+    language: editDef?.language ?? 'BOTH',
+    status: editDef?.status ?? 'ACTIVE',
+    descriptionEn: editDef?.descriptionEn ?? '',
+    descriptionAr: editDef?.descriptionAr ?? '',
+    scheduleCron: editDef?.scheduleCron ?? '',
+    recipients: editDef?.recipients ?? '',
+    filtersJson: editDef?.filtersJson ?? '',
+  }), [editDef]);
+
+  async function onUpdate(v: ReportForm) {
+    if (!editDef?.id) return;
+    const u = (s: string) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    const nameEn = String(v.nameEn ?? '').trim();
+    const reportType = String(v.reportType ?? '').trim();
+    if (!nameEn)     { toast.danger(isAr ? 'الاسم (إنجليزي) مطلوب' : 'English name is required'); return; }
+    if (!reportType) { toast.danger(isAr ? 'نوع التقرير مطلوب' : 'Report type is required'); return; }
+
+    const filters = u(v.filtersJson);
+    if (filters) {
+      try { JSON.parse(filters); }
+      catch { toast.danger(isAr ? 'مرشّحات JSON غير صالحة' : 'Filters must be valid JSON'); return; }
+    }
+
+    const body: Partial<NdiReportDefinition> = {
+      nameEn,
+      nameAr: u(v.nameAr),
+      reportCode: u(v.reportCode),
+      reportType: reportType as NdiReportType,
+      format: (v.format || 'PDF') as NdiReportDefinition['format'],
+      language: (v.language || 'BOTH') as NdiReportDefinition['language'],
+      status: (v.status || 'ACTIVE') as NdiReportDefinition['status'],
+      descriptionEn: u(v.descriptionEn),
+      descriptionAr: u(v.descriptionAr),
+      scheduleCron: u(v.scheduleCron),
+      recipients: u(v.recipients),
+      filtersJson: filters,
+    };
+    try {
+      await updateReport(editDef.id, body);
+      toast.success(isAr ? 'حُدّث التقرير' : 'Report definition updated');
+      setEditDef(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
   return (
     <div className="ndi-stack">
       <Card title={isAr ? 'التقارير' : 'Reports'} Icon={FileText}
@@ -3971,6 +4028,8 @@ function ReportsTab() {
                       <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onRun(d)}>
                         {isAr ? 'تشغيل' : 'Run'}
                       </Button>
+                      <Button size="sm" variant="ghost" Icon={Pencil}
+                        onClick={() => setEditDef(d)} title={isAr ? 'تعديل' : 'Edit'} />
                       <Button size="sm" variant="ghost" Icon={FileText}
                         onClick={() => downloadReport(d.id!, 'XLSX', cycleId ?? undefined).catch(e => toast.danger(String(e)))}
                         title="XLSX">XLSX</Button>
@@ -4050,6 +4109,17 @@ function ReportsTab() {
         submitLabel={isAr ? 'حفظ التقرير' : 'Save report'}
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
+      />
+
+      <FormModal<ReportForm>
+        open={!!editDef}
+        title={isAr ? 'تعديل تعريف التقرير' : 'Edit report definition'}
+        fields={reportFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditDef(null)}
+        onSubmit={onUpdate}
       />
     </div>
   );
