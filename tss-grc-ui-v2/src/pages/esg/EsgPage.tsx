@@ -3,7 +3,7 @@ import {
   Leaf, TrendingDown, TrendingUp, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
   CloudLightning, Plus, ArrowRight, Link2, Wrench, Clock,
-  Paperclip, Coins, Hourglass, X as XIcon,
+  Paperclip, Coins, Hourglass, X as XIcon, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -68,7 +68,7 @@ import {
 } from '../../lib/sustainabilityTcfd';
 import {
   listMateriality, generateMatrix, scoreMaterialTopic, approveMaterialTopic,
-  archiveMaterialTopic, createMaterialTopic,
+  archiveMaterialTopic, createMaterialTopic, updateMaterialTopic,
   materialTierTone, materialTierLabel, materialCategoryLabel,
   materialStatusTone, materialStatusLabel,
   type MaterialTopic, type MaterialMatrix, type MaterialCategory,
@@ -2047,6 +2047,7 @@ function MaterialityTab() {
   const [scoringTopic, setScoringTopic]     = useState<MaterialTopic | null>(null);
   const [approvingId, setApprovingId]       = useState<number | null>(null);
   const [openNew, setOpenNew]               = useState(false);
+  const [editTopic, setEditTopic]           = useState<MaterialTopic | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -2136,6 +2137,80 @@ function MaterialityTab() {
     { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
       label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
   ];
+
+  // Edit-topic — descriptive + ownership fields only. Scoring has its own
+  // dedicated "Score" action, and the year is fixed once created.
+  const editFields: FieldDef[] = [
+    { kind: 'text', key: 'topicEn', required: true, span: 6,
+      label: isAr ? 'الموضوع (إنجليزي)' : 'Topic (English)' },
+    { kind: 'text', key: 'topicAr', span: 6,
+      label: isAr ? 'الموضوع (عربي)' : 'Topic (Arabic)' },
+    { kind: 'select', key: 'category', required: true, span: 6,
+      label: isAr ? 'الفئة' : 'Category',
+      options: (['ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => ({
+        value: c, label: materialCategoryLabel(c, isAr ? 'ar' : 'en'),
+      })) },
+    { kind: 'text', key: 'stakeholderGroups', span: 6,
+      label: isAr ? 'مجموعات أصحاب المصلحة' : 'Stakeholder groups' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المسؤول' : 'Owner' },
+    { kind: 'text', key: 'ownerEmail', span: 6,
+      label: isAr ? 'بريد المسؤول' : 'Owner email' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    topicEn:           editTopic?.topicEn ?? '',
+    topicAr:           editTopic?.topicAr ?? '',
+    category:          editTopic?.category ?? 'ENVIRONMENTAL',
+    stakeholderGroups: editTopic?.stakeholderGroups ?? '',
+    ownerName:         editTopic?.ownerName ?? '',
+    ownerEmail:        editTopic?.ownerEmail ?? '',
+    descriptionEn:     editTopic?.descriptionEn ?? '',
+    descriptionAr:     editTopic?.descriptionAr ?? '',
+    notes:             editTopic?.notes ?? '',
+  }), [editTopic]);
+
+  async function submitEdit(values: Record<string, unknown>): Promise<void> {
+    if (!editTopic?.id) return;
+    const topicEn = String(values.topicEn ?? '').trim();
+    const category = String(values.category ?? '').trim();
+    if (!topicEn || !category) {
+      toast.danger(isAr ? 'الموضوع والفئة حقلان مطلوبان' : 'Topic and category are required');
+      return;
+    }
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      await updateMaterialTopic(editTopic.id, {
+        topicEn,
+        topicAr: str(values.topicAr),
+        category: category as MaterialCategory,
+        descriptionEn: str(values.descriptionEn),
+        descriptionAr: str(values.descriptionAr),
+        stakeholderGroups: str(values.stakeholderGroups),
+        ownerName: str(values.ownerName),
+        ownerEmail: str(values.ownerEmail),
+        notes: str(values.notes),
+        // Preserve the score axes: the entity defaults both to 0 and the
+        // service recomputes materiality_score from them on every save, so
+        // an omitted value would zero out the score + tier. Scoring is owned
+        // by the dedicated "Score" action.
+        stakeholderImportance: editTopic.stakeholderImportance,
+        businessImpact: editTopic.businessImpact,
+      });
+      toast.success(isAr ? 'حُدّث الموضوع' : 'Topic updated');
+      setEditTopic(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث الموضوع' : 'Failed to update topic'));
+    }
+  }
 
   async function submitCreate(values: Record<string, unknown>): Promise<void> {
     const topicEn = String(values.topicEn ?? '').trim();
@@ -2250,6 +2325,11 @@ function MaterialityTab() {
                       <td className="esg-text-end">
                         <div className="esg-actions-row">
                           {t.status !== 'ARCHIVED' && (
+                            <Button size="sm" variant="ghost" Icon={Pencil}
+                              title={isAr ? 'تعديل' : 'Edit'}
+                              onClick={() => setEditTopic(t)} />
+                          )}
+                          {t.status !== 'ARCHIVED' && (
                             <Button size="sm" variant="secondary" onClick={() => setScoringTopic(t)}>
                               {isAr ? 'تقييم' : 'Score'}
                             </Button>
@@ -2354,6 +2434,18 @@ function MaterialityTab() {
         submitLabel={isAr ? 'إضافة الموضوع' : 'Add topic'}
         onClose={() => setOpenNew(false)}
         onSubmit={submitCreate}
+      />
+      <FormModal
+        open={editTopic !== null}
+        title={editTopic
+          ? (isAr ? `تعديل الموضوع · ${editTopic.topicCode ?? ''}` : `Edit topic · ${editTopic.topicCode ?? ''}`)
+          : ''}
+        fields={editFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditTopic(null)}
+        onSubmit={submitEdit}
       />
     </div>
   );
