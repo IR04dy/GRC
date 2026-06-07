@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw, Plus, ClipboardCheck } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -21,6 +21,8 @@ import {
   listDueDiligence,
   listEvents,
   getExitPlan,
+  createExitPlan,
+  recordExitTest,
   recordReview,
   recordEvent,
   recordDueDiligence,
@@ -31,6 +33,7 @@ import {
   type EventType,
   type Severity,
   type Recommendation,
+  type TestFrequency,
   LIFECYCLE_LABELS,
   SERVICE_TYPE_LABELS,
   CRITICAL_FUNCTION_LABELS,
@@ -76,6 +79,10 @@ const DD_SCORES: Array<{ key: string; en: string; ar: string }> = [
   { key: 'reputationScore',            en: 'Reputation',              ar: 'السمعة' },
 ];
 
+// Exit-plan test cadence (SAMA outsourcing exit-strategy testing). Ordered most
+// common first; NEVER is a board-accepted no-test posture, NEVER_TESTED a backlog.
+const TEST_FREQUENCIES: TestFrequency[] = ['ANNUAL', 'BIANNUAL', 'NEVER_TESTED', 'NEVER'];
+
 export function OutsourcingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -92,6 +99,8 @@ export function OutsourcingDetailPage() {
   const [loading, setLoading] = useState(false);
   const [openEvent, setOpenEvent] = useState(false);
   const [openDd, setOpenDd] = useState(false);
+  const [openExit, setOpenExit] = useState(false);
+  const [testingExit, setTestingExit] = useState(false);
 
   async function reload() {
     if (!Number.isFinite(arrangementId)) return;
@@ -248,6 +257,72 @@ export function OutsourcingDetailPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل تسجيل العناية الواجبة' : 'Failed to record due diligence'));
+    }
+  }
+
+  // ── Create the exit plan (SAMA stressed-exit strategy) ─────────────────
+  const exitInitial: Record<string, string> = useMemo(() => ({
+    triggerConditionsEn: '', triggerConditionsAr: '',
+    testFrequency: 'ANNUAL',
+    dataRepatriationPlanEn: '', dataRepatriationPlanAr: '',
+    lastTestedDate: '',
+  }), []);
+
+  const exitFields: FieldDef[] = useMemo(() => [
+    { key: 'triggerConditionsEn', kind: 'textarea', span: 12, rows: 3, maxLength: 2000,
+      label: isAr ? 'شروط التفعيل (إنجليزي)' : 'Trigger conditions (EN)' },
+    { key: 'triggerConditionsAr', kind: 'textarea', span: 12, rows: 3, maxLength: 2000,
+      label: isAr ? 'شروط التفعيل (عربي)' : 'Trigger conditions (AR)' },
+    { key: 'testFrequency', kind: 'select', required: true, span: 6,
+      label: isAr ? 'تواتر الاختبار' : 'Test frequency',
+      options: TEST_FREQUENCIES.map(f => ({ value: f, label: TEST_FREQUENCY_LABELS[f][isAr ? 'ar' : 'en'] })) },
+    { key: 'lastTestedDate', kind: 'date', span: 6, label: isAr ? 'تاريخ آخر اختبار (اختياري)' : 'Last tested date (optional)' },
+    { key: 'dataRepatriationPlanEn', kind: 'textarea', span: 12, rows: 3, maxLength: 2000,
+      label: isAr ? 'خطة استرداد البيانات (إنجليزي)' : 'Data repatriation plan (EN)' },
+    { key: 'dataRepatriationPlanAr', kind: 'textarea', span: 12, rows: 3, maxLength: 2000,
+      label: isAr ? 'خطة استرداد البيانات (عربي)' : 'Data repatriation plan (AR)' },
+  ], [isAr]);
+
+  async function submitExit(v: Record<string, string>) {
+    const triggerConditionsEn = String(v.triggerConditionsEn ?? '').trim();
+    const triggerConditionsAr = String(v.triggerConditionsAr ?? '').trim();
+    const testFrequency = (v.testFrequency ?? '') as TestFrequency;
+    const lastTestedDate = String(v.lastTestedDate ?? '').trim();
+    if (!triggerConditionsEn) { toast.danger(isAr ? 'شروط التفعيل بالإنجليزية مطلوبة' : 'Trigger conditions (EN) are required'); return; }
+    if (!triggerConditionsAr) { toast.danger(isAr ? 'شروط التفعيل بالعربية مطلوبة' : 'Trigger conditions (AR) are required'); return; }
+    if (!testFrequency) { toast.danger(isAr ? 'تواتر الاختبار مطلوب' : 'Test frequency is required'); return; }
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    try {
+      await createExitPlan({
+        arrangementId,
+        triggerConditionsEn,
+        triggerConditionsAr,
+        testFrequency,
+        dataRepatriationPlanEn: opt(v.dataRepatriationPlanEn),
+        dataRepatriationPlanAr: opt(v.dataRepatriationPlanAr),
+        lastTestedDate: lastTestedDate || undefined,
+      });
+      toast.success(isAr ? 'تمّ إنشاء خطة الخروج' : 'Exit plan created');
+      setOpenExit(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل إنشاء خطة الخروج' : 'Failed to create exit plan'));
+    }
+  }
+
+  async function onRecordExitTest() {
+    if (!exitPlan) return;
+    setTestingExit(true);
+    try {
+      const updated = await recordExitTest(exitPlan.id, today);
+      setExitPlan(updated);
+      toast.success(isAr ? 'تمّ تسجيل اختبار خطة الخروج' : 'Exit-plan test recorded');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل تسجيل اختبار الخروج' : 'Failed to record exit test'));
+    } finally {
+      setTestingExit(false);
     }
   }
 
@@ -448,7 +523,16 @@ export function OutsourcingDetailPage() {
       {tab === 'exit' && (
         <div style={{ marginTop: 16 }}>
           {!exitPlan
-            ? <Card><InlineEmpty text={isAr ? 'لا توجد خطة خروج لهذا الترتيب' : 'No exit plan for this arrangement'} /></Card>
+            ? (
+              <div style={stack}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button Icon={Plus} onClick={() => setOpenExit(true)}>
+                    {isAr ? 'إنشاء خطة خروج' : 'Create exit plan'}
+                  </Button>
+                </div>
+                <Card><InlineEmpty text={isAr ? 'لا توجد خطة خروج لهذا الترتيب' : 'No exit plan for this arrangement'} /></Card>
+              </div>
+            )
             : (
               <Card title={isAr ? 'خطة الخروج' : 'Exit plan'} Icon={LogOut} action={
                 <div style={row}>
@@ -460,6 +544,9 @@ export function OutsourcingDetailPage() {
                       {isAr ? 'آخر اختبار:' : 'Last test:'} {exitPlan.lastTestedDate}
                     </span>
                   )}
+                  <Button variant="secondary" Icon={ClipboardCheck} onClick={onRecordExitTest} disabled={testingExit}>
+                    {isAr ? 'تسجيل اختبار' : 'Record test'}
+                  </Button>
                 </div>
               }>
                 <DataPair
@@ -515,6 +602,16 @@ export function OutsourcingDetailPage() {
         onClose={() => setOpenDd(false)}
         onSubmit={submitDd}
         submitLabel={isAr ? 'تسجيل التقييم' : 'Record assessment'}
+      />
+
+      <FormModal
+        open={openExit}
+        title={isAr ? 'إنشاء خطة خروج' : 'Create exit plan'}
+        fields={exitFields}
+        initial={exitInitial}
+        onClose={() => setOpenExit(false)}
+        onSubmit={submitExit}
+        submitLabel={isAr ? 'إنشاء الخطة' : 'Create plan'}
       />
     </Shell>
   );
