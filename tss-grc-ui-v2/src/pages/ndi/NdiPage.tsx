@@ -87,7 +87,7 @@ import {
   type NdiSubmissionPackage, type Preflight,
 } from '../../lib/ndiSubmission';
 import {
-  listReports, runReport, runAdHocReport, deleteReport,
+  listReports, runReport, runAdHocReport, deleteReport, createReport,
   downloadReport, downloadAdHocReport,
   reportTypeLabel,
   type NdiReportDefinition, type NdiReportType, type ReportResult,
@@ -3630,6 +3630,31 @@ function tryFormat(s: string | undefined): string {
 
 // ─── Reports tab (slice 11) ──────────────────────────────────────────
 
+// All 12 NDI report types — used to populate the "Save report" picker.
+const ALL_REPORT_TYPES: NdiReportType[] = [
+  'NDI_EXECUTIVE_SUMMARY', 'MATURITY_HEATMAP', 'COMPLIANCE_STATUS',
+  'OPEX_KPI_DASHBOARD', 'GAP_REGISTER', 'CAPA_REGISTER',
+  'IMPROVEMENT_PLAN_ROADMAP', 'EVIDENCE_INVENTORY', 'DOMAIN_ROLLUP',
+  'CYCLE_HISTORY', 'AUDIT_TRAIL', 'SUBMISSION_PACKAGE_EXPORT',
+];
+
+// "Save report" definition form — every field a string. The server stamps
+// org and (via @PrePersist) defaults format=JSON, language=EN, status=ACTIVE.
+interface ReportForm {
+  nameEn: string;
+  nameAr: string;
+  reportCode: string;
+  reportType: string;
+  format: string;
+  language: string;
+  status: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  scheduleCron: string;
+  recipients: string;
+  filtersJson: string;
+}
+
 function ReportsTab() {
   const { lang } = useI18n();
   const toast = useToast();
@@ -3641,6 +3666,7 @@ function ReportsTab() {
   const [defs, setDefs] = useState<NdiReportDefinition[]>([]);
   const [result, setResult] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -3709,18 +3735,110 @@ function ReportsTab() {
     }
   }
 
+  // ── Save report definition (createReport) ─────────────────────────
+  const L = isAr ? 'ar' : 'en';
+  const reportTypeOpts = ALL_REPORT_TYPES.map(t => ({ value: t, label: reportTypeLabel(t, L) }));
+  const formatOpts = (['JSON', 'PDF', 'XLSX', 'CSV'] as const).map(f => ({ value: f, label: f }));
+  const languageOpts = [
+    { value: 'EN',   label: isAr ? 'الإنجليزية' : 'English' },
+    { value: 'AR',   label: isAr ? 'العربية'    : 'Arabic' },
+    { value: 'BOTH', label: isAr ? 'كلاهما'     : 'Both' },
+  ];
+  const statusOpts = [
+    { value: 'ACTIVE',   label: isAr ? 'نشط'    : 'Active' },
+    { value: 'DISABLED', label: isAr ? 'معطّل'  : 'Disabled' },
+    { value: 'ARCHIVED', label: isAr ? 'مؤرشف'  : 'Archived' },
+  ];
+
+  const reportFields: FieldDef[] = [
+    { kind: 'text', key: 'nameEn', span: 6, required: true, maxLength: 255,
+      label: isAr ? 'الاسم (إنجليزي)' : 'Name (English)' },
+    { kind: 'text', key: 'nameAr', span: 6, maxLength: 255,
+      label: isAr ? 'الاسم (عربي)' : 'Name (Arabic)' },
+    { kind: 'select', key: 'reportType', span: 6, required: true,
+      label: isAr ? 'نوع التقرير' : 'Report type', options: reportTypeOpts },
+    { kind: 'text', key: 'reportCode', span: 6, maxLength: 40,
+      label: isAr ? 'كود التقرير' : 'Report code', placeholder: 'RPT-EXEC-01' },
+    { kind: 'select', key: 'format', span: 4,
+      label: isAr ? 'الصيغة' : 'Format', options: formatOpts },
+    { kind: 'select', key: 'language', span: 4,
+      label: isAr ? 'اللغة' : 'Language', options: languageOpts },
+    { kind: 'select', key: 'status', span: 4,
+      label: isAr ? 'الحالة' : 'Status', options: statusOpts },
+    { kind: 'text', key: 'scheduleCron', span: 6, maxLength: 100,
+      label: isAr ? 'جدولة (cron)' : 'Schedule (cron)', placeholder: '0 0 1 * *' },
+    { kind: 'text', key: 'recipients', span: 6,
+      label: isAr ? 'المستلمون (بفواصل)' : 'Recipients (comma-separated)',
+      placeholder: 'cdo@bank.com.sa, grc@bank.com.sa' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+    { kind: 'textarea', key: 'filtersJson', span: 12, rows: 3,
+      label: isAr ? 'مرشّحات (JSON اختياري) — مثال: { "component": "MATURITY" }'
+                  : 'Filters (optional JSON) — e.g. { "component": "MATURITY" }' },
+  ];
+
+  const newInitial = useMemo<ReportForm>(() => ({
+    nameEn: '', nameAr: '', reportCode: '',
+    reportType: 'NDI_EXECUTIVE_SUMMARY', format: 'PDF', language: 'BOTH', status: 'ACTIVE',
+    descriptionEn: '', descriptionAr: '', scheduleCron: '', recipients: '', filtersJson: '',
+  }), []);
+
+  async function onCreate(v: ReportForm) {
+    const u = (s: string) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    const nameEn = String(v.nameEn ?? '').trim();
+    const reportType = String(v.reportType ?? '').trim();
+    if (!nameEn)     { toast.danger(isAr ? 'الاسم (إنجليزي) مطلوب' : 'English name is required'); return; }
+    if (!reportType) { toast.danger(isAr ? 'نوع التقرير مطلوب' : 'Report type is required'); return; }
+
+    const filters = u(v.filtersJson);
+    if (filters) {
+      try { JSON.parse(filters); }
+      catch { toast.danger(isAr ? 'مرشّحات JSON غير صالحة' : 'Filters must be valid JSON'); return; }
+    }
+
+    const body: Partial<NdiReportDefinition> = {
+      nameEn,
+      nameAr: u(v.nameAr),
+      reportCode: u(v.reportCode),
+      reportType: reportType as NdiReportType,
+      format: (v.format || 'PDF') as NdiReportDefinition['format'],
+      language: (v.language || 'BOTH') as NdiReportDefinition['language'],
+      status: (v.status || 'ACTIVE') as NdiReportDefinition['status'],
+      descriptionEn: u(v.descriptionEn),
+      descriptionAr: u(v.descriptionAr),
+      scheduleCron: u(v.scheduleCron),
+      recipients: u(v.recipients),
+      filtersJson: filters,
+    };
+    try {
+      await createReport(body);
+      toast.success(isAr ? 'حُفظ التقرير' : 'Report definition saved');
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Create failed');
+    }
+  }
+
   return (
     <div className="ndi-stack">
       <Card title={isAr ? 'التقارير' : 'Reports'} Icon={FileText}
         action={
-          <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
-            className="ndi-mini-select ndi-mini-select--w-220">
-            {cycles.map(c => (
-              <option key={c.id} value={c.id}>
-                {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select value={cycleId ?? ''} onChange={e => setCycleId(Number(e.target.value))}
+              className="ndi-mini-select ndi-mini-select--w-220">
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenNew(true)}>
+              {isAr ? 'حفظ تقرير' : 'Save report'}
+            </Button>
+          </div>
         }>
         {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
          : defs.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد تقارير محفوظة' : 'No saved reports'}</InlineEmpty>
@@ -3825,6 +3943,17 @@ function ReportsTab() {
           </details>
         </Card>
       )}
+
+      <FormModal<ReportForm>
+        open={openNew}
+        title={isAr ? 'حفظ تعريف تقرير نضيء' : 'Save NDI report definition'}
+        fields={reportFields}
+        initial={newInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التقرير' : 'Save report'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={onCreate}
+      />
     </div>
   );
 }
