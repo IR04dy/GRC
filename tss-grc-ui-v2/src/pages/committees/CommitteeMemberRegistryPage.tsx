@@ -1,20 +1,30 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Users, Award, ShieldCheck, ChevronLeft, AlertCircle, BadgeCheck,
+  Users, Award, ShieldCheck, ChevronLeft, AlertCircle, BadgeCheck, UserPlus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
+import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import {
-  listCommittees, listMemberTerms, listSkills, skillCoverage, getIndependenceStats,
+  listCommittees, listMemberTerms, listSkills, skillCoverage, getIndependenceStats, appointMember,
   type Committee, type CommitteeMemberTerm, type CommitteeMemberSkill,
   type IndependenceStats,
 } from '../../lib/committees';
+
+/** Term-of-office roles (CMA/SAMA committee composition). */
+const MEMBER_ROLES = ['Chair', 'Vice-Chair', 'Member', 'Secretary', 'Standing Invitee', 'External Advisor'] as const;
+const ROLE_LABEL_AR: Record<string, string> = {
+  'Chair': 'رئيس', 'Vice-Chair': 'نائب الرئيس', 'Member': 'عضو',
+  'Secretary': 'أمين السر', 'Standing Invitee': 'مدعو دائم', 'External Advisor': 'مستشار خارجي',
+};
 
 /**
  * Member registry page — shows the current panel + the historical
@@ -34,6 +44,7 @@ export function CommitteeMemberRegistryPage() {
   const cid = committeeId ? Number(committeeId) : NaN;
   const { lang } = useI18n();
   const isAr = lang === 'ar';
+  const toast = useToast();
 
   const [committee, setCommittee] = useState<Committee | null>(null);
   const [terms, setTerms] = useState<CommitteeMemberTerm[]>([]);
@@ -41,6 +52,8 @@ export function CommitteeMemberRegistryPage() {
   const [coverage, setCoverage] = useState<Record<string, number>>({});
   const [indep, setIndep] = useState<IndependenceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [openAppoint, setOpenAppoint] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(cid)) return;
@@ -61,7 +74,7 @@ export function CommitteeMemberRegistryPage() {
       setIndep(ind);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [cid]);
+  }, [cid, reloadKey]);
 
   // Build a member → {dimension → level} matrix from the flat skills array.
   const matrix = useMemo(() => {
@@ -89,6 +102,61 @@ export function CommitteeMemberRegistryPage() {
   const title = committee
     ? (isAr && committee.nameAr ? committee.nameAr : committee.nameEn)
     : (isAr ? 'تسجيل أعضاء اللجنة' : 'Committee member registry');
+
+  // ---- Appoint member ------------------------------------------------------
+  const appointFields: FieldDef[] = [
+    { key: 'memberName', kind: 'text', label: isAr ? 'اسم العضو' : 'Member name', required: true, span: 6, maxLength: 255 },
+    { key: 'role', kind: 'select', label: isAr ? 'الدور' : 'Role', required: true, span: 6,
+      options: MEMBER_ROLES.map(r => ({ value: r, label: isAr ? (ROLE_LABEL_AR[r] ?? r) : r })) },
+    { key: 'isIndependent', kind: 'select', label: isAr ? 'مستقل' : 'Independent', span: 6,
+      options: [{ value: '1', label: isAr ? 'نعم' : 'Yes' }, { value: '0', label: isAr ? 'لا' : 'No' }] },
+    { key: 'isVotingMember', kind: 'select', label: isAr ? 'عضو مصوّت' : 'Voting member', span: 6,
+      options: [{ value: '1', label: isAr ? 'نعم' : 'Yes' }, { value: '0', label: isAr ? 'لا' : 'No' }] },
+    { key: 'appointedAt', kind: 'date', label: isAr ? 'تاريخ التعيين' : 'Appointed on', span: 6 },
+    { key: 'appointedByReso', kind: 'text', label: isAr ? 'تعيّن بموجب قرار' : 'Appointed by resolution', span: 6,
+      placeholder: isAr ? 'مثال: RES-2026-COM-AUDIT-001' : 'e.g. RES-2026-COM-AUDIT-001' },
+    { key: 'termStartsAt', kind: 'date', label: isAr ? 'بدء الفترة' : 'Term starts', span: 6 },
+    { key: 'termEndsAt', kind: 'date', label: isAr ? 'انتهاء الفترة (اختياري)' : 'Term ends (optional)', span: 6 },
+    { key: 'termNumber', kind: 'number', label: isAr ? 'رقم الفترة' : 'Term number', span: 6, min: 1 },
+    { key: 'independenceBasisEn', kind: 'textarea', label: isAr ? 'أساس الاستقلالية' : 'Independence basis', span: 12, rows: 2 },
+  ];
+
+  const appointInitial: Record<string, string> = {
+    memberName: '', role: 'Member', isIndependent: '1', isVotingMember: '1',
+    appointedAt: '2026-06-01', appointedByReso: '', termStartsAt: '2026-06-01',
+    termEndsAt: '2029-05-31', termNumber: '1', independenceBasisEn: '',
+  };
+
+  async function submitAppoint(v: Record<string, string>) {
+    const memberName = (v.memberName ?? '').trim();
+    const role = v.role;
+    if (!memberName)      { toast.danger(isAr ? 'اسم العضو مطلوب' : 'Member name is required'); return; }
+    if (!role)            { toast.danger(isAr ? 'الدور مطلوب' : 'Role is required'); return; }
+    if (!v.appointedAt)   { toast.danger(isAr ? 'تاريخ التعيين مطلوب' : 'Appointment date is required'); return; }
+    if (!v.termStartsAt)  { toast.danger(isAr ? 'تاريخ بدء الفترة مطلوب' : 'Term start date is required'); return; }
+    if (v.termEndsAt && v.termEndsAt < v.termStartsAt) {
+      toast.danger(isAr ? 'تاريخ انتهاء الفترة يجب أن يكون بعد تاريخ البدء' : 'Term end must be after term start'); return;
+    }
+    const opt = (s?: string) => { const x = (s ?? '').trim(); return x ? x : undefined; };
+    try {
+      await appointMember({
+        committeeId: cid,
+        memberName,
+        role,
+        isIndependent: Number(v.isIndependent) === 1 ? 1 : 0,
+        isVotingMember: Number(v.isVotingMember) === 1 ? 1 : 0,
+        independenceBasisEn: opt(v.independenceBasisEn) ?? null,
+        appointedAt: v.appointedAt,
+        appointedByReso: opt(v.appointedByReso) ?? null,
+        termStartsAt: v.termStartsAt,
+        termEndsAt: opt(v.termEndsAt) ?? null,
+        termNumber: v.termNumber ? Number(v.termNumber) : 1,
+      });
+      toast.success(isAr ? `تم تعيين ${memberName}` : `${memberName} appointed`);
+      setOpenAppoint(false);
+      setReloadKey(k => k + 1);
+    } catch { toast.danger(isAr ? 'تعذّر تعيين العضو' : 'Failed to appoint member'); }
+  }
 
   if (!Number.isFinite(cid)) {
     return (
@@ -129,7 +197,12 @@ export function CommitteeMemberRegistryPage() {
       </div>
 
       {/* Active members panel */}
-      <Card title={isAr ? 'الأعضاء النشطون' : 'Active members'} Icon={Users}>
+      <Card title={isAr ? 'الأعضاء النشطون' : 'Active members'} Icon={Users}
+        action={
+          <Button size="sm" variant="primary" Icon={UserPlus} onClick={() => setOpenAppoint(true)}>
+            {isAr ? 'تعيين عضو' : 'Appoint member'}
+          </Button>
+        }>
         {loading
           ? <EmptyState Icon={Users} title={isAr ? 'جارٍ التحميل…' : 'Loading…'} />
           : activeTerms.length === 0
@@ -258,6 +331,16 @@ export function CommitteeMemberRegistryPage() {
           </table>
         </Card>
       )}
+
+      <FormModal
+        open={openAppoint}
+        title={isAr ? `تعيين عضو${committee ? ` — ${title}` : ''}` : `Appoint member${committee ? ` — ${title}` : ''}`}
+        fields={appointFields}
+        initial={appointInitial}
+        submitLabel={isAr ? 'تعيين' : 'Appoint'}
+        onClose={() => setOpenAppoint(false)}
+        onSubmit={submitAppoint}
+      />
     </Shell>
   );
 }
