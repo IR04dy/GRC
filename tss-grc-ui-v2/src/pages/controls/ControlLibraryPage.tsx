@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Shield, Wrench, Layers, GitBranch, Plus, Link2, BookText, Pencil } from 'lucide-react';
+import { Shield, Wrench, Layers, GitBranch, Plus, Link2, BookText, Pencil, ArrowRight } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -16,11 +16,13 @@ import { useToast } from '../../lib/toast';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
   createControlAssessment, linkRiskToControl, createMapping, updateMapping,
+  transitionControlAssessment,
   controlStatusTone, controlTypeTone, coverageTone, effectivenessTone, domainLabel,
   type Control, type ControlDomain, type ControlMapping,
   type ControlAssessment, type RiskControlLink, type Effectiveness, type RiskLinkType,
-  type Coverage,
+  type Coverage, type AssessmentWorkflow,
 } from '../../lib/controlLibrary';
+import { statusLabel } from '../../lib/statusLabels';
 import {
   listAuthorityDocuments, listAuthorityDocumentCitations,
   type AuthorityDocument, type AuthorityDocumentCitation,
@@ -47,6 +49,14 @@ interface CitOpt {
 
 const DOMAINS: ControlDomain[] = ['RISK', 'CYBER', 'BCM', 'PRIVACY', 'TPRM', 'COMPLIANCE', 'GENERAL'];
 
+/** Assessment review state machine — mirrors the backend transition guard. */
+const NEXT_ASSESS: Record<AssessmentWorkflow, AssessmentWorkflow[]> = {
+  DRAFT:        ['UNDER_REVIEW'],
+  UNDER_REVIEW: ['APPROVED', 'REJECTED'],
+  REJECTED:     ['DRAFT'],
+  APPROVED:     [],
+};
+
 export function ControlLibraryPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
@@ -57,6 +67,7 @@ export function ControlLibraryPage() {
   const [openLink, setOpenLink] = useState(false);
   const [openMap, setOpenMap] = useState(false);
   const [editingMap, setEditingMap] = useState<ControlMapping | null>(null);
+  const [transitioningAssess, setTransitioningAssess] = useState<ControlAssessment | null>(null);
 
   const [controls, setControls] = useState<Control[]>([]);
   const [docs, setDocs] = useState<AuthorityDocument[]>([]);
@@ -337,6 +348,35 @@ export function ControlLibraryPage() {
     }
   }
 
+  // ─── Advance an assessment through its review workflow ───────────
+  const assessTargets = transitioningAssess
+    ? NEXT_ASSESS[transitioningAssess.workflowStatus] ?? []
+    : [];
+  const transAssessFields: FieldDef[] = [
+    { key: 'to', label: isAr ? 'الحالة الجديدة' : 'New status', kind: 'select', required: true, span: 12,
+      options: assessTargets.map(s => ({ value: s, label: statusLabel(s, lang) })) },
+  ];
+  const transAssessInitial = { to: assessTargets[0] ?? '' };
+
+  async function submitTransitionAssess(v: Record<string, string>) {
+    if (!transitioningAssess?.id) return;
+    const to = v.to as AssessmentWorkflow;
+    if (!to) {
+      toast.danger(isAr ? 'يجب اختيار الحالة' : 'Pick a target status');
+      return;
+    }
+    try {
+      await transitionControlAssessment(transitioningAssess.id, to);
+      toast.success(isAr ? `تم نقل التقييم إلى ${statusLabel(to, lang)}`
+                        : `Assessment moved to ${statusLabel(to, lang)}`);
+      setTransitioningAssess(null);
+      if (selected) await selectControl(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر نقل التقييم' : 'Failed to transition assessment'));
+    }
+  }
+
   // Future F5 slice will resolve citationId → document via a dedicated
   // endpoint. For now mappings render the raw citationId — honest about
   // the gap. `docs` is loaded for the KPI strip + future hydration.
@@ -572,16 +612,30 @@ export function ControlLibraryPage() {
                             <th>{isAr ? 'الفاعلية' : 'Effectiveness'}</th>
                             <th>{isAr ? 'المُقيِّم' : 'Assessor'}</th>
                             <th>{isAr ? 'الحالة' : 'Workflow'}</th>
+                            {!demoMode && <th aria-label={isAr ? 'إجراءات' : 'Actions'} />}
                           </tr></thead>
                           <tbody>
-                            {assessments.map(a => (
-                              <tr key={a.id}>
-                                <td className="mono text-2xs">{a.assessmentDate}</td>
-                                <td><Badge size="sm" tone={effectivenessTone(a.effectiveness)}>{a.effectiveness}</Badge></td>
-                                <td className="text-xs">{a.assessorName ?? '—'}</td>
-                                <td><Badge size="sm" tone="neutral">{a.workflowStatus}</Badge></td>
-                              </tr>
-                            ))}
+                            {assessments.map(a => {
+                              const canAdvance = (NEXT_ASSESS[a.workflowStatus] ?? []).length > 0;
+                              return (
+                                <tr key={a.id}>
+                                  <td className="mono text-2xs">{a.assessmentDate}</td>
+                                  <td><Badge size="sm" tone={effectivenessTone(a.effectiveness)}>{a.effectiveness}</Badge></td>
+                                  <td className="text-xs">{a.assessorName ?? '—'}</td>
+                                  <td><Badge size="sm" tone="neutral">{statusLabel(a.workflowStatus, lang)}</Badge></td>
+                                  {!demoMode && (
+                                    <td style={{ textAlign: 'end' }}>
+                                      {canAdvance && (
+                                        <Button variant="ghost" size="sm" Icon={ArrowRight}
+                                          onClick={() => setTransitioningAssess(a)}>
+                                          {isAr ? 'نقل' : 'Advance'}
+                                        </Button>
+                                      )}
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>}
                   </Section>
@@ -651,6 +705,19 @@ export function ControlLibraryPage() {
           size="md"
           onClose={() => setEditingMap(null)}
           onSubmit={submitEditMapping}
+        />
+      )}
+
+      {transitioningAssess && (
+        <FormModal
+          open={!!transitioningAssess}
+          title={isAr ? 'نقل التقييم في سير العمل' : 'Advance assessment'}
+          fields={transAssessFields}
+          initial={transAssessInitial}
+          submitLabel={isAr ? 'نقل' : 'Advance'}
+          size="sm"
+          onClose={() => setTransitioningAssess(null)}
+          onSubmit={submitTransitionAssess}
         />
       )}
     </Shell>
