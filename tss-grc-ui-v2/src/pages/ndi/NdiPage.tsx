@@ -18,7 +18,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
-  listCycles, cyclesAggregate, createCycle, transitionCycle,
+  listCycles, cyclesAggregate, createCycle, updateCycle, transitionCycle,
   archiveCycle, cloneCycle, deleteCycle, nextStep,
   cycleStatusTone, cycleStatusLabel, readinessTone, readinessLabel,
   type NdiAssessmentCycle, type NdiCycleAggregate,
@@ -255,6 +255,7 @@ function CyclesTab() {
   const [agg, setAgg] = useState<NdiCycleAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  const [editCycle, setEditCycle] = useState<NdiAssessmentCycle | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -268,6 +269,41 @@ function CyclesTab() {
     setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
+
+  // Edit modal seed — mapped from the selected cycle, keyed on [editCycle] so
+  // FormModal's reset effect re-runs when a different row is opened. Reuses the
+  // same field keys as the create form (newFields).
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    cycleNameEn:           editCycle?.cycleNameEn ?? '',
+    cycleNameAr:           editCycle?.cycleNameAr ?? '',
+    reportingYear:         editCycle?.reportingYear ?? new Date().getFullYear(),
+    entityNameEn:          editCycle?.entityNameEn ?? '',
+    entityNameAr:          editCycle?.entityNameAr ?? '',
+    dataOfficeOwnerName:   editCycle?.dataOfficeOwnerName ?? '',
+    assessmentManagerName: editCycle?.assessmentManagerName ?? '',
+    scope:                 editCycle?.scope ?? '',
+  }), [editCycle]);
+
+  async function onUpdate(values: Record<string, unknown>) {
+    if (!editCycle?.id) return;
+    try {
+      await updateCycle(editCycle.id, {
+        cycleNameEn:           String(values.cycleNameEn ?? '').trim(),
+        cycleNameAr:           String(values.cycleNameAr ?? '').trim() || undefined,
+        reportingYear:         Number(values.reportingYear ?? editCycle.reportingYear),
+        scope:                 String(values.scope ?? '').trim() || undefined,
+        entityNameEn:          String(values.entityNameEn ?? '').trim() || undefined,
+        entityNameAr:          String(values.entityNameAr ?? '').trim() || undefined,
+        dataOfficeOwnerName:   String(values.dataOfficeOwnerName ?? '').trim() || undefined,
+        assessmentManagerName: String(values.assessmentManagerName ?? '').trim() || undefined,
+      });
+      toast.success(isAr ? 'حُدّثت الدورة' : 'Cycle updated');
+      setEditCycle(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
 
   async function onCreate(values: Record<string, unknown>) {
     try {
@@ -438,6 +474,11 @@ function CyclesTab() {
                                 {isAr ? 'تقدّم' : 'Advance'}
                               </Button>
                             )}
+                            {!isTerminal && (
+                              <Button size="sm" variant="ghost" Icon={Pencil}
+                                title={isAr ? 'تعديل' : 'Edit'}
+                                onClick={() => setEditCycle(c)} />
+                            )}
                             <Button size="sm" variant="ghost" Icon={Copy}
                               title={isAr ? 'استنساخ' : 'Clone'}
                               onClick={() => onClone(c)} />
@@ -468,6 +509,17 @@ function CyclesTab() {
         submitLabel={isAr ? 'إنشاء' : 'Create'}
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
+      />
+
+      <FormModal
+        open={!!editCycle}
+        title={isAr ? 'تعديل دورة التقييم' : 'Edit assessment cycle'}
+        fields={newFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditCycle(null)}
+        onSubmit={onUpdate}
       />
     </div>
   );
