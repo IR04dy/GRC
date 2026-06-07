@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Shield, Wrench, Layers, GitBranch, Plus, Link2, BookText } from 'lucide-react';
+import { Shield, Wrench, Layers, GitBranch, Plus, Link2, BookText, Pencil } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -15,7 +15,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
-  createControlAssessment, linkRiskToControl, createMapping,
+  createControlAssessment, linkRiskToControl, createMapping, updateMapping,
   controlStatusTone, controlTypeTone, coverageTone, effectivenessTone, domainLabel,
   type Control, type ControlDomain, type ControlMapping,
   type ControlAssessment, type RiskControlLink, type Effectiveness, type RiskLinkType,
@@ -56,6 +56,7 @@ export function ControlLibraryPage() {
   const [openAssess, setOpenAssess] = useState(false);
   const [openLink, setOpenLink] = useState(false);
   const [openMap, setOpenMap] = useState(false);
+  const [editingMap, setEditingMap] = useState<ControlMapping | null>(null);
 
   const [controls, setControls] = useState<Control[]>([]);
   const [docs, setDocs] = useState<AuthorityDocument[]>([]);
@@ -303,6 +304,39 @@ export function ControlLibraryPage() {
     }
   }
 
+  // ─── Edit an existing mapping (coverage + rationale; citation fixed) ──
+  const editMapFields: FieldDef[] = [
+    { key: 'coverage', label: isAr ? 'التغطية' : 'Coverage', kind: 'select', required: true, span: 6,
+      options: COVERAGES.map(c => ({ value: c, label: coverageLabel(c) })) },
+    { key: 'rationaleEn', label: isAr ? 'المبرر (إنجليزي) — مطلوب' : 'Rationale (English) — required', kind: 'textarea', rows: 2, span: 12 },
+    { key: 'rationaleAr', label: isAr ? 'المبرر (عربي)' : 'Rationale (Arabic)', kind: 'textarea', rows: 2, span: 12 },
+  ];
+  const editMapInitial = editingMap
+    ? { coverage: editingMap.coverage, rationaleEn: editingMap.rationaleEn ?? '', rationaleAr: editingMap.rationaleAr ?? '' }
+    : { coverage: 'FULL', rationaleEn: '', rationaleAr: '' };
+
+  async function submitEditMapping(v: Record<string, string>) {
+    if (!editingMap?.id) return;
+    const rationaleEn = (v.rationaleEn || '').trim();
+    if (!rationaleEn) {
+      toast.danger(isAr ? 'المبرر (الإنجليزي) مطلوب' : 'Rationale (English) is required');
+      return;
+    }
+    try {
+      await updateMapping(editingMap.id, {
+        coverage: (v.coverage || 'FULL') as Coverage,
+        rationaleEn,
+        rationaleAr: (v.rationaleAr || '').trim() || undefined,
+      });
+      toast.success(isAr ? 'تم تحديث الربط' : 'Mapping updated');
+      setEditingMap(null);
+      if (selected) await selectControl(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث الربط' : 'Failed to update mapping'));
+    }
+  }
+
   // Future F5 slice will resolve citationId → document via a dedicated
   // endpoint. For now mappings render the raw citationId — honest about
   // the gap. `docs` is loaded for the KPI strip + future hydration.
@@ -437,6 +471,7 @@ export function ControlLibraryPage() {
                             <th>{isAr ? 'التغطية' : 'Coverage'}</th>
                             <th>{isAr ? 'المبرر' : 'Rationale'}</th>
                             <th>{isAr ? 'آخر مراجعة' : 'Reviewed'}</th>
+                            {!demoMode && <th aria-label={isAr ? 'إجراءات' : 'Actions'} />}
                           </tr></thead>
                           <tbody>
                             {mappings.map(m => {
@@ -456,6 +491,22 @@ export function ControlLibraryPage() {
                                     {(isAr && m.rationaleAr ? m.rationaleAr : m.rationaleEn) ?? '—'}
                                   </td>
                                   <td className="mono text-2xs">{m.lastReviewedAt?.substring(0, 10) ?? '—'}</td>
+                                  {!demoMode && (
+                                    <td style={{ textAlign: 'end' }}>
+                                      <button
+                                        onClick={() => setEditingMap(m)}
+                                        aria-label={isAr ? 'تعديل الربط' : 'Edit mapping'}
+                                        title={isAr ? 'تعديل الربط' : 'Edit mapping'}
+                                        style={{
+                                          border: '1px solid var(--border)', borderRadius: 6,
+                                          background: 'var(--surface)', cursor: 'pointer',
+                                          color: 'var(--ink-2)', padding: '3px 6px',
+                                          display: 'inline-flex', alignItems: 'center',
+                                        }}>
+                                        <Pencil size={12} />
+                                      </button>
+                                    </td>
+                                  )}
                                 </tr>
                               );
                             })}
@@ -587,6 +638,19 @@ export function ControlLibraryPage() {
           size="md"
           onClose={() => setOpenMap(false)}
           onSubmit={submitMapping}
+        />
+      )}
+
+      {editingMap && (
+        <FormModal
+          open={!!editingMap}
+          title={isAr ? 'تعديل الربط التنظيمي' : 'Edit regulatory mapping'}
+          fields={editMapFields}
+          initial={editMapInitial}
+          submitLabel={isAr ? 'حفظ' : 'Save'}
+          size="md"
+          onClose={() => setEditingMap(null)}
+          onSubmit={submitEditMapping}
         />
       )}
     </Shell>
