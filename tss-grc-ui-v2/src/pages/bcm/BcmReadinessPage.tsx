@@ -19,7 +19,7 @@ import {
   listGovernance, createGovernance, transitionGovernance,
   listRisks, createRisk,
   listStrategies,
-  listContacts, recordCallTreeTest, contactTestStats,
+  listContacts, createContact, recordCallTreeTest, contactTestStats,
   cycleStatusTone, governanceStatusTone, bcmRiskStatusTone, residualToTone,
   type BcmAssessmentCycle, type BcmGovernanceRecord, type BcmRisk,
   type ContinuityStrategy, type BcmCommunicationContact, type CycleStatus, type GovernanceStatus,
@@ -83,6 +83,15 @@ const REVIEW_FREQUENCIES: Array<{ value: ReviewFrequency; en: string; ar: string
   { value: 'ON_CHANGE',   en: 'On change',    ar: 'عند التغيير' },
 ];
 
+// ── Call-tree contact availability (bilingual) ─────────────────────────
+type AvailabilityStatus = BcmCommunicationContact['availabilityStatus'];
+const AVAILABILITY_STATUSES: Array<{ value: AvailabilityStatus; en: string; ar: string }> = [
+  { value: 'AVAILABLE',   en: 'Available',   ar: 'متاح' },
+  { value: 'ON_LEAVE',    en: 'On leave',    ar: 'في إجازة' },
+  { value: 'UNAVAILABLE', en: 'Unavailable', ar: 'غير متاح' },
+  { value: 'BACKUP',      en: 'Backup',      ar: 'بديل' },
+];
+
 export function BcmReadinessPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
@@ -101,6 +110,7 @@ export function BcmReadinessPage() {
   const [loading, setLoading] = useState(false);
   const [openRisk, setOpenRisk] = useState(false);
   const [openGov, setOpenGov] = useState(false);
+  const [openContact, setOpenContact] = useState(false);
 
   // ── Loaders ────
   async function reload() {
@@ -286,6 +296,76 @@ export function BcmReadinessPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل إضافة السياسة' : 'Failed to add policy'));
+    }
+  }
+
+  // ── Add a call-tree contact (needs name + at least one of phone/email) ──
+  const contactInitial: Record<string, string> = useMemo(() => ({
+    name: '', roleTitle: '',
+    escalationLevel: '1',
+    primaryPhone: '', secondaryPhone: '', email: '',
+    availabilityStatus: 'AVAILABLE',
+  }), []);
+
+  const contactFields: FieldDef[] = useMemo(() => [
+    { key: 'name', kind: 'text', required: true, span: 6, maxLength: 200,
+      label: isAr ? 'الاسم' : 'Name' },
+    { key: 'roleTitle', kind: 'text', span: 6, maxLength: 200,
+      label: isAr ? 'الدور الوظيفي' : 'Role / title' },
+    { key: 'escalationLevel', kind: 'number', span: 4, min: 1, max: 5,
+      label: isAr ? 'مستوى التصعيد (١-٥)' : 'Escalation level (1-5)' },
+    { key: 'availabilityStatus', kind: 'select', span: 8,
+      label: isAr ? 'حالة التوفر' : 'Availability',
+      options: AVAILABILITY_STATUSES.map(a => ({ value: a.value, label: isAr ? a.ar : a.en })) },
+    { key: 'primaryPhone', kind: 'text', span: 6, maxLength: 40,
+      label: isAr ? 'الهاتف الأساسي' : 'Primary phone' },
+    { key: 'secondaryPhone', kind: 'text', span: 6, maxLength: 40,
+      label: isAr ? 'الهاتف البديل' : 'Secondary phone' },
+    { key: 'email', kind: 'text', span: 12, maxLength: 200,
+      label: isAr ? 'البريد الإلكتروني' : 'Email' },
+  ], [isAr]);
+
+  async function submitContact(v: Record<string, string>) {
+    const name = String(v.name ?? '').trim();
+    const roleTitle = String(v.roleTitle ?? '').trim();
+    const primaryPhone = String(v.primaryPhone ?? '').trim();
+    const secondaryPhone = String(v.secondaryPhone ?? '').trim();
+    const email = String(v.email ?? '').trim();
+    const availabilityStatus = (String(v.availabilityStatus ?? '').trim() || 'AVAILABLE') as AvailabilityStatus;
+    if (!name) { toast.danger(isAr ? 'الاسم مطلوب' : 'Name is required'); return; }
+    // Backend rejects a contact with neither phone nor email — mirror it here.
+    if (!primaryPhone && !email) {
+      toast.danger(isAr ? 'يلزم هاتف أساسي أو بريد إلكتروني على الأقل' : 'A primary phone or email is required');
+      return;
+    }
+    // escalationLevel is a number-kind field (runtime number); coerce + clamp 1..5.
+    const rawEsc = String(v.escalationLevel ?? '').trim();
+    let escalationLevel = 1;
+    if (rawEsc !== '') {
+      const n = Number(v.escalationLevel);
+      if (!Number.isFinite(n) || n < 1 || n > 5) {
+        toast.danger(isAr ? 'مستوى التصعيد: قيمة بين ١ و٥' : 'Escalation level must be 1-5');
+        return;
+      }
+      escalationLevel = Math.round(n);
+    }
+    try {
+      await createContact({
+        name,
+        roleTitle: roleTitle || undefined,
+        escalationLevel,
+        primaryPhone: primaryPhone || undefined,
+        secondaryPhone: secondaryPhone || undefined,
+        email: email || undefined,
+        availabilityStatus,
+        status: 'ACTIVE',
+      });
+      toast.success(isAr ? 'أُضيفت جهة الاتصال' : 'Contact added');
+      setOpenContact(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل إضافة جهة الاتصال' : 'Failed to add contact'));
     }
   }
 
@@ -516,7 +596,14 @@ export function BcmReadinessPage() {
             </div>
           )}
           <Card title={isAr ? 'جهات الاتصال' : 'Contacts'}
-            action={<Badge tone="primary">{contacts.length}</Badge>}>
+            action={
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Badge tone="primary">{contacts.length}</Badge>
+                <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenContact(true)}>
+                  {isAr ? 'إضافة جهة اتصال' : 'Add contact'}
+                </Button>
+              </div>
+            }>
             {contacts.length === 0
               ? <InlineEmpty>{isAr ? 'لا توجد جهات اتصال' : 'No contacts yet'}</InlineEmpty>
               : <table className="grc-table">
@@ -576,6 +663,16 @@ export function BcmReadinessPage() {
         onClose={() => setOpenGov(false)}
         onSubmit={submitGov}
         submitLabel={isAr ? 'إضافة السياسة' : 'Add policy'}
+      />
+
+      <FormModal
+        open={openContact}
+        title={isAr ? 'إضافة جهة اتصال للأزمات' : 'Add call-tree contact'}
+        fields={contactFields}
+        initial={contactInitial}
+        onClose={() => setOpenContact(false)}
+        onSubmit={submitContact}
+        submitLabel={isAr ? 'إضافة جهة الاتصال' : 'Add contact'}
       />
     </Shell>
   );
