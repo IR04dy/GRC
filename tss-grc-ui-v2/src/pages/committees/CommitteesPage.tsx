@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Landmark, CheckCircle2, XCircle, Calendar, Play, FileCheck2, Users,
   ChevronRight, ChevronDown, Gavel, ClipboardList, ListChecks, RefreshCw,
-  ExternalLink, AlertTriangle, ShieldAlert,
+  ExternalLink, AlertTriangle, ShieldAlert, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -13,17 +13,19 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { MeetingPapersPanel } from '../../components/committees/MeetingPapersPanel';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMeetings, startMeeting, completeMeeting, approveMinutes, cancelMeeting,
-  listResolutions, listActions, generateAnnualCalendar, populateAgenda,
+  listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution,
   startAction, completeAction, cancelAction, deferAction,
   parseAgenda, parseAttendees, parseDecisions, parseActions, parseMembers,
   COM_STATUS_TONE, MTG_STATUS_TONE, OUTCOME_TONE, ACTION_STATUS_TONE, ACTION_PRIORITY_TONE,
   type Committee, type CommitteeMeeting, type Resolution, type ActionItemRecord,
+  type ResolutionOutcome, type ConfidentialityLevel,
 } from '../../lib/committees';
 
 type TabId = 'committees' | 'scheduled' | 'in_progress' | 'completed' | 'approved' | 'cancelled'
@@ -62,6 +64,7 @@ export function CommitteesPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [openResolution, setOpenResolution] = useState(false);
 
   useEffect(() => { void reload(); }, []);
 
@@ -126,6 +129,108 @@ export function CommitteesPage() {
     if (!c) return `#${committeeId}`;
     return lang === 'ar' && c.nameAr ? c.nameAr : c.nameEn;
   };
+
+  // ─── Record a resolution against a meeting ───────────────────────
+  const isAr = lang === 'ar';
+  const OUTCOMES: ResolutionOutcome[] = ['APPROVED', 'REJECTED', 'DEFERRED', 'WITHDRAWN'];
+  const CONFIDENTIALITIES: ConfidentialityLevel[] = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'];
+  const OUTCOME_AR: Record<ResolutionOutcome, string> = {
+    APPROVED: 'معتمَد', REJECTED: 'مرفوض', DEFERRED: 'مؤجَّل', WITHDRAWN: 'مسحوب',
+  };
+  const CONF_AR: Record<ConfidentialityLevel, string> = {
+    PUBLIC: 'عام', INTERNAL: 'داخلي', CONFIDENTIAL: 'سرّي', RESTRICTED: 'مقيَّد',
+  };
+  const CONF_EN: Record<ConfidentialityLevel, string> = {
+    PUBLIC: 'Public', INTERNAL: 'Internal', CONFIDENTIAL: 'Confidential', RESTRICTED: 'Restricted',
+  };
+  const meetingLabel = (m: CommitteeMeeting): string => {
+    const title = (isAr ? m.titleAr : m.titleEn) || m.titleEn || committeeNameFor(m.committeeId);
+    return `${m.meetingCode} · ${title}`;
+  };
+  const resolutionFields: FieldDef[] = [
+    { key: 'meetingId', label: isAr ? 'الاجتماع' : 'Meeting', kind: 'select-searchable', required: true, span: 12,
+      placeholder: isAr ? 'اختر اجتماعًا…' : 'Select a meeting…',
+      options: meetings.map(m => ({ value: String(m.id), label: meetingLabel(m), sub: committeeNameFor(m.committeeId) })) },
+    { key: 'titleEn', label: isAr ? 'عنوان القرار (إنجليزي)' : 'Resolution title (English)', kind: 'text', required: true, maxLength: 500, span: 12 },
+    { key: 'titleAr', label: isAr ? 'عنوان القرار (عربي)' : 'Resolution title (Arabic)', kind: 'text', maxLength: 500, span: 12 },
+    { key: 'bodyEn', label: isAr ? 'نص القرار (إنجليزي)' : 'Resolution body (English)', kind: 'textarea', rows: 3, span: 12 },
+    { key: 'bodyAr', label: isAr ? 'نص القرار (عربي)' : 'Resolution body (Arabic)', kind: 'textarea', rows: 3, span: 12 },
+    { key: 'outcome', label: isAr ? 'النتيجة' : 'Outcome', kind: 'select', required: true, span: 4,
+      options: OUTCOMES.map(o => ({ value: o, label: isAr ? OUTCOME_AR[o] : o.charAt(0) + o.slice(1).toLowerCase() })) },
+    { key: 'confidentiality', label: isAr ? 'السرّية' : 'Confidentiality', kind: 'select', required: true, span: 4,
+      options: CONFIDENTIALITIES.map(c => ({ value: c, label: isAr ? CONF_AR[c] : CONF_EN[c] })) },
+    { key: 'regulatorNotify', label: isAr ? 'إشعار الجهة التنظيمية؟' : 'Notify regulator?', kind: 'select', required: true, span: 4,
+      options: [{ value: 'false', label: isAr ? 'لا' : 'No' }, { value: 'true', label: isAr ? 'نعم' : 'Yes' }] },
+    { key: 'voteFor', label: isAr ? 'مع' : 'For', kind: 'number', min: 0, span: 4 },
+    { key: 'voteAgainst', label: isAr ? 'ضد' : 'Against', kind: 'number', min: 0, span: 4 },
+    { key: 'voteAbstain', label: isAr ? 'امتناع' : 'Abstain', kind: 'number', min: 0, span: 4 },
+    { key: 'proposedBy', label: isAr ? 'مُقدِّم القرار' : 'Proposed by', kind: 'text', maxLength: 255, span: 6 },
+    { key: 'secondedBy', label: isAr ? 'مؤيِّد القرار' : 'Seconded by', kind: 'text', maxLength: 255, span: 6 },
+    { key: 'effectiveFrom', label: isAr ? 'سارٍ من' : 'Effective from', kind: 'date', span: 6 },
+    { key: 'reviewRequiredBy', label: isAr ? 'مراجعة مطلوبة قبل' : 'Review required by', kind: 'date', span: 6 },
+    { key: 'dissentNotesEn', label: isAr ? 'ملاحظات الاعتراض (إنجليزي)' : 'Dissent notes (English)', kind: 'textarea', rows: 2, span: 12 },
+    { key: 'dissentNotesAr', label: isAr ? 'ملاحظات الاعتراض (عربي)' : 'Dissent notes (Arabic)', kind: 'textarea', rows: 2, span: 12 },
+  ];
+  const resolutionInitial = {
+    meetingId: '', titleEn: '', titleAr: '', bodyEn: '', bodyAr: '',
+    outcome: 'APPROVED', confidentiality: 'INTERNAL', regulatorNotify: 'false',
+    voteFor: '0', voteAgainst: '0', voteAbstain: '0',
+    proposedBy: '', secondedBy: '', effectiveFrom: '', reviewRequiredBy: '',
+    dissentNotesEn: '', dissentNotesAr: '',
+  };
+
+  async function submitResolution(v: Record<string, string>) {
+    const meetingId = Number(v.meetingId);
+    const meeting = meetings.find(m => m.id === meetingId);
+    const titleEn = String(v.titleEn || '').trim();
+    const bodyEn = String(v.bodyEn || '').trim();
+    if (!meeting || !titleEn || !bodyEn || !v.outcome || !v.confidentiality) {
+      toast.danger(isAr ? 'يُرجى تعبئة الحقول المطلوبة' : 'Please fill the required fields');
+      return;
+    }
+    // seq is per-meeting; resolutionCode is unique per org. Derive both from
+    // the meeting + the resolutions already on record so the new row slots in
+    // sequentially and the generated code can't collide with an existing one.
+    const existing = resolutions.filter(r => r.meetingId === meetingId);
+    let seq = existing.reduce((mx, r) => Math.max(mx, r.seq || 0), 0) + 1;
+    const codes = new Set(resolutions.map(r => r.resolutionCode));
+    let resolutionCode = `RES-${meeting.meetingCode}-${String(seq).padStart(3, '0')}`;
+    while (codes.has(resolutionCode)) {
+      seq += 1;
+      resolutionCode = `RES-${meeting.meetingCode}-${String(seq).padStart(3, '0')}`;
+    }
+    const numOr0 = (x: string) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
+    try {
+      await createResolution({
+        meetingId,
+        committeeId: meeting.committeeId,
+        resolutionCode,
+        seq,
+        titleEn,
+        titleAr: String(v.titleAr || '').trim() || null,
+        bodyEn,
+        bodyAr: String(v.bodyAr || '').trim() || null,
+        proposedBy: String(v.proposedBy || '').trim() || null,
+        secondedBy: String(v.secondedBy || '').trim() || null,
+        voteFor: numOr0(v.voteFor),
+        voteAgainst: numOr0(v.voteAgainst),
+        voteAbstain: numOr0(v.voteAbstain),
+        outcome: v.outcome as ResolutionOutcome,
+        confidentiality: v.confidentiality as ConfidentialityLevel,
+        effectiveFrom: String(v.effectiveFrom || '').trim() || null,
+        reviewRequiredBy: String(v.reviewRequiredBy || '').trim() || null,
+        regulatorNotify: v.regulatorNotify === 'true' ? 1 : 0,
+        dissentNotesEn: String(v.dissentNotesEn || '').trim() || null,
+        dissentNotesAr: String(v.dissentNotesAr || '').trim() || null,
+      });
+      toast.success(isAr ? `تم تسجيل القرار ${resolutionCode}` : `Resolution ${resolutionCode} recorded`);
+      setOpenResolution(false);
+      setTab('resolutions');
+      await reload();
+    } catch (e) {
+      toast.danger(isAr ? 'تعذّر تسجيل القرار' : 'Failed to record the resolution');
+    }
+  }
 
   function toggle(key: string) {
     const n = new Set(expanded);
@@ -515,7 +620,13 @@ export function CommitteesPage() {
 
       {/* ── Resolutions register ─────────────────────────────────────── */}
       {tab === 'resolutions' && (
-        <Card title={t('comTabResolutions')} Icon={Gavel}>
+        <Card title={t('comTabResolutions')} Icon={Gavel}
+          action={
+            <Button variant="primary" Icon={Plus} disabled={meetings.length === 0}
+                    onClick={() => setOpenResolution(true)}>
+              {isAr ? 'تسجيل قرار' : 'Record resolution'}
+            </Button>
+          }>
           {loading
             ? <EmptyState Icon={Gavel} title={t('loading')} />
             : resolutions.length === 0
@@ -725,6 +836,17 @@ export function CommitteesPage() {
               )}
         </Card>
       )}
+
+      <FormModal
+        open={openResolution}
+        title={isAr ? 'تسجيل قرار لجنة' : 'Record a committee resolution'}
+        fields={resolutionFields}
+        initial={resolutionInitial}
+        submitLabel={isAr ? 'تسجيل' : 'Record'}
+        size="lg"
+        onClose={() => setOpenResolution(false)}
+        onSubmit={submitResolution}
+      />
     </Shell>
   );
 }
