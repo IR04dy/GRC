@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Shield, Wrench, Layers, GitBranch } from 'lucide-react';
+import { Shield, Wrench, Layers, GitBranch, Plus } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { PillTabs } from '../../components/ui/PillTabs';
+import { ApiError } from '../../lib/api';
+import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
+import { useToast } from '../../lib/toast';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
+  createControlAssessment,
   controlStatusTone, controlTypeTone, coverageTone, effectivenessTone, domainLabel,
   type Control, type ControlDomain, type ControlMapping,
-  type ControlAssessment, type RiskControlLink,
+  type ControlAssessment, type RiskControlLink, type Effectiveness,
 } from '../../lib/controlLibrary';
 import {
   listAuthorityDocuments,
@@ -34,6 +40,10 @@ const DOMAINS: ControlDomain[] = ['RISK', 'CYBER', 'BCM', 'PRIVACY', 'TPRM', 'CO
 export function ControlLibraryPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
+  const toast = useToast();
+  const demoMode = !isAuthenticated();
+
+  const [openAssess, setOpenAssess] = useState(false);
 
   const [controls, setControls] = useState<Control[]>([]);
   const [docs, setDocs] = useState<AuthorityDocument[]>([]);
@@ -72,6 +82,62 @@ export function ControlLibraryPage() {
     ]);
     setMappings(ms); setRiskLinks(rl); setAssessments(as);
     setDetailLoading(false);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const EFFECTIVENESS: Effectiveness[] = ['EFFECTIVE', 'NEEDS_IMPROVEMENT', 'INEFFECTIVE', 'NOT_TESTED'];
+  const effLabel = (e: Effectiveness) => {
+    const en: Record<Effectiveness, string> = {
+      EFFECTIVE: 'Effective', NEEDS_IMPROVEMENT: 'Needs improvement',
+      INEFFECTIVE: 'Ineffective', NOT_TESTED: 'Not tested',
+    };
+    const ar: Record<Effectiveness, string> = {
+      EFFECTIVE: 'فعّال', NEEDS_IMPROVEMENT: 'يحتاج تحسيناً',
+      INEFFECTIVE: 'غير فعّال', NOT_TESTED: 'لم يُختبر',
+    };
+    return (isAr ? ar : en)[e];
+  };
+
+  const assessFields: FieldDef[] = [
+    { key: 'effectiveness', label: isAr ? 'الفاعلية' : 'Effectiveness', kind: 'select', required: true, span: 6,
+      options: EFFECTIVENESS.map(e => ({ value: e, label: effLabel(e) })) },
+    { key: 'assessmentDate', label: isAr ? 'تاريخ التقييم' : 'Assessment date', kind: 'date', span: 6 },
+    { key: 'assessorName', label: isAr ? 'اسم المُقيِّم' : 'Assessor name', kind: 'text', span: 12,
+      placeholder: isAr ? 'مثال: فريق التدقيق الداخلي' : 'e.g. Internal Audit team' },
+    { key: 'notesEn', label: isAr ? 'ملاحظات (إنجليزي)' : 'Notes (English)', kind: 'textarea', rows: 3, span: 12 },
+    { key: 'notesAr', label: isAr ? 'ملاحظات (عربي)' : 'Notes (Arabic)', kind: 'textarea', rows: 3, span: 12 },
+  ];
+  const assessInitial = {
+    effectiveness: 'EFFECTIVE', assessmentDate: today,
+    assessorName: '', notesEn: '', notesAr: '',
+  };
+
+  async function submitAssessment(v: Record<string, string>) {
+    if (!selected) return;
+    const assessmentDate = (v.assessmentDate || '').trim();
+    if (!v.effectiveness || !assessmentDate) {
+      toast.danger(isAr ? 'الفاعلية وتاريخ التقييم حقول مطلوبة'
+                        : 'Effectiveness and assessment date are required');
+      return;
+    }
+    try {
+      await createControlAssessment({
+        controlId: selected.id,
+        effectiveness: v.effectiveness as Effectiveness,
+        assessmentDate,
+        assessorName: (v.assessorName || '').trim() || undefined,
+        notesEn: (v.notesEn || '').trim() || undefined,
+        notesAr: (v.notesAr || '').trim() || undefined,
+        workflowStatus: 'DRAFT',
+      });
+      toast.success(isAr ? `تم تسجيل تقييم للضابط ${selected.controlCode}`
+                        : `Assessment recorded for ${selected.controlCode}`);
+      setOpenAssess(false);
+      await selectControl(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تسجيل التقييم' : 'Failed to record assessment'));
+    }
   }
 
   // Future F5 slice will resolve citationId → document via a dedicated
@@ -246,7 +312,12 @@ export function ControlLibraryPage() {
                   </Section>
 
                   {/* Assessments */}
-                  <Section title={isAr ? 'التقييمات' : 'Assessments'} count={assessments.length}>
+                  <Section title={isAr ? 'التقييمات' : 'Assessments'} count={assessments.length}
+                    action={!demoMode && selected.status === 'ACTIVE'
+                      ? <Button variant="secondary" size="sm" Icon={Plus} onClick={() => setOpenAssess(true)}>
+                          {isAr ? 'تسجيل تقييم' : 'Record assessment'}
+                        </Button>
+                      : undefined}>
                     {assessments.length === 0
                       ? <InlineEmpty>
                           {isAr ? 'لا توجد تقييمات' : 'No assessments yet'}
@@ -286,16 +357,31 @@ export function ControlLibraryPage() {
           </Card>
         )}
       </div>
+
+      {selected && (
+        <FormModal
+          open={openAssess}
+          title={isAr ? `تسجيل تقييم — ${selected.controlCode}` : `Record assessment — ${selected.controlCode}`}
+          fields={assessFields}
+          initial={assessInitial}
+          submitLabel={isAr ? 'تسجيل' : 'Record'}
+          size="md"
+          onClose={() => setOpenAssess(false)}
+          onSubmit={submitAssessment}
+        />
+      )}
     </Shell>
   );
 }
 
-function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+function Section({ title, count, action, children }:
+  { title: string; count: number; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{title}</h4>
         <Badge tone="primary">{count}</Badge>
+        {action && <div style={{ marginInlineStart: 'auto' }}>{action}</div>}
       </div>
       {children}
     </div>
