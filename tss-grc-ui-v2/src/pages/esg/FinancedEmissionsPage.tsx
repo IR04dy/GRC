@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Factory, Target, BarChart3, CheckCircle2,
-  Send, Archive, TrendingDown,
+  Send, Archive, TrendingDown, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -9,20 +9,21 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
-  listEmissions, transitionEmission,
+  listEmissions, transitionEmission, createEmission,
   listTargets, getTargetProgress, getEmissionsTotal,
   ASSET_CLASS_LABELS, EMISSIONS_STAGE_LABELS, ALIGNMENT_LABELS,
   emissionsStageTone, dataQualityTone,
   fmtTco2e, fmtSarMillions, fmtPercent,
   type FinancedEmissionsRecord, type FinancedEmissionsTarget,
   type TargetProgress, type EmissionsLifecycleStage,
-  type FinancedEmissionsTotal,
+  type FinancedEmissionsTotal, type AssetClass, type ReportingPeriod,
 } from '../../lib/climate';
 
 type Tab = 'records' | 'targets' | 'trend';
@@ -49,6 +50,7 @@ export function FinancedEmissionsPage() {
   const toast = useToast();
 
   const [tab, setTab] = useState<Tab>('records');
+  const [openCreate, setOpenCreate] = useState(false);
   const [records, setRecords] = useState<FinancedEmissionsRecord[]>([]);
   const [targets, setTargets] = useState<FinancedEmissionsTarget[]>([]);
   const [progress, setProgress] = useState<TargetProgress[]>([]);
@@ -105,6 +107,88 @@ export function FinancedEmissionsPage() {
     }
   }
 
+  // ─── Add a financed-emissions record (starts DRAFT) ──────────────
+  const ASSET_CLASSES = Object.keys(ASSET_CLASS_LABELS) as AssetClass[];
+  const PERIODS: ReportingPeriod[] = ['ANNUAL', 'Q1', 'Q2', 'Q3', 'Q4'];
+  const createFields: FieldDef[] = [
+    { key: 'reportingYear', label: isAr ? 'سنة التقرير' : 'Reporting year', kind: 'number', min: 2000, max: 2100, required: true, span: 4 },
+    { key: 'reportingPeriod', label: isAr ? 'الفترة' : 'Period', kind: 'select', required: true, span: 4,
+      options: PERIODS.map(p => ({ value: p, label: p === 'ANNUAL' ? (isAr ? 'سنوي' : 'Annual') : p })) },
+    { key: 'dataQualityScore', label: isAr ? 'جودة بيانات PCAF' : 'PCAF data quality', kind: 'select', required: true, span: 4,
+      options: [1, 2, 3, 4, 5].map(n => ({ value: String(n), label: isAr ? `${n} (${n === 1 ? 'الأفضل' : n === 5 ? 'الأضعف' : 'متوسط'})` : `${n} (${n === 1 ? 'best' : n === 5 ? 'worst' : 'proxy'})` })) },
+    { key: 'assetClass', label: isAr ? 'فئة الأصل' : 'Asset class', kind: 'select', required: true, span: 12,
+      options: ASSET_CLASSES.map(a => ({ value: a, label: isAr ? ASSET_CLASS_LABELS[a].ar : ASSET_CLASS_LABELS[a].en })) },
+    { key: 'outstandingAmountSarMillions', label: isAr ? 'المبلغ القائم (مليون ر.س)' : 'Outstanding (M SAR)', kind: 'number', min: 0, required: true, span: 6 },
+    { key: 'attributionFactor', label: isAr ? 'عامل الإسناد (0–1)' : 'Attribution factor (0–1)', kind: 'number', min: 0, max: 1, required: true, span: 6 },
+    { key: 'emissionsScope1Tco2e', label: isAr ? 'النطاق 1 (طن CO₂e)' : 'Scope 1 (tCO₂e)', kind: 'number', min: 0, span: 4 },
+    { key: 'emissionsScope2Tco2e', label: isAr ? 'النطاق 2 (طن CO₂e)' : 'Scope 2 (tCO₂e)', kind: 'number', min: 0, span: 4 },
+    { key: 'emissionsScope3Tco2e', label: isAr ? 'النطاق 3 (طن CO₂e)' : 'Scope 3 (tCO₂e)', kind: 'number', min: 0, span: 4 },
+    { key: 'methodologyEn', label: isAr ? 'المنهجية (إنجليزي)' : 'Methodology (English)', kind: 'textarea', rows: 2, span: 12 },
+    { key: 'methodologyAr', label: isAr ? 'المنهجية (عربي)' : 'Methodology (Arabic)', kind: 'textarea', rows: 2, span: 12 },
+  ];
+  const createInitial = {
+    reportingYear: String(currentYear), reportingPeriod: 'ANNUAL', dataQualityScore: '3',
+    assetClass: 'BUSINESS_LOANS', outstandingAmountSarMillions: '', attributionFactor: '',
+    emissionsScope1Tco2e: '', emissionsScope2Tco2e: '', emissionsScope3Tco2e: '',
+    methodologyEn: '', methodologyAr: '',
+  };
+
+  async function submitCreate(v: Record<string, string>) {
+    const assetClass = String(v.assetClass) as AssetClass;
+    const labels = ASSET_CLASS_LABELS[assetClass];
+    const reportingYear = Number(v.reportingYear);
+    const outstanding = Number(v.outstandingAmountSarMillions);
+    const attribution = Number(v.attributionFactor);
+    const dq = Number(v.dataQualityScore);
+    if (!reportingYear || !v.reportingPeriod || !assetClass || !labels
+        || !Number.isFinite(outstanding) || !Number.isFinite(attribution) || !dq) {
+      toast.danger(isAr ? 'يُرجى تعبئة الحقول المطلوبة' : 'Please fill the required fields');
+      return;
+    }
+    // One row per (year × period × asset-class) — enforced by the DB unique
+    // index UQ_fe_year_class_period. Catch the clash here so the user gets an
+    // actionable message instead of a raw 500 from the duplicate-key insert.
+    const dup = records.find(r =>
+      r.reportingYear === reportingYear
+      && r.reportingPeriod === v.reportingPeriod
+      && r.assetClass === assetClass);
+    if (dup) {
+      const periodLabel = v.reportingPeriod === 'ANNUAL' ? (isAr ? 'سنوي' : 'Annual') : v.reportingPeriod;
+      toast.danger(isAr
+        ? `يوجد سجل بالفعل لعام ${reportingYear} · ${periodLabel} · ${labels.ar}. عدّل السجل القائم أو اختر فئة أصل أو سنة مختلفة.`
+        : `A record already exists for ${reportingYear} · ${periodLabel} · ${labels.en}. Edit the existing record or choose a different asset class or year.`);
+      return;
+    }
+    const num = (x: string) => {
+      const n = Number(x);
+      return x !== '' && Number.isFinite(n) ? n : undefined;
+    };
+    try {
+      await createEmission({
+        reportingYear,
+        reportingPeriod: v.reportingPeriod as ReportingPeriod,
+        assetClass,
+        assetClassLabelEn: labels.en,
+        assetClassLabelAr: labels.ar,
+        outstandingAmountSarMillions: outstanding,
+        attributionFactor: attribution,
+        dataQualityScore: dq,
+        emissionsScope1Tco2e: num(v.emissionsScope1Tco2e),
+        emissionsScope2Tco2e: num(v.emissionsScope2Tco2e),
+        emissionsScope3Tco2e: num(v.emissionsScope3Tco2e),
+        methodologyEn: String(v.methodologyEn || '').trim() || undefined,
+        methodologyAr: String(v.methodologyAr || '').trim() || undefined,
+      });
+      toast.success(isAr ? `تم تسجيل انبعاثات ${labels.ar} (مسوّدة)` : `Recorded emissions for ${labels.en} (DRAFT)`);
+      setOpenCreate(false);
+      setTab('records');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تسجيل السجل' : 'Failed to create record'));
+    }
+  }
+
   return (
     <Shell>
       <PageHeader
@@ -152,6 +236,12 @@ export function FinancedEmissionsPage() {
           <Button variant={tab === 'trend' ? 'primary' : 'secondary'} onClick={() => setTab('trend')}>
             {isAr ? 'الاتّجاه الزمني' : 'Trend'}
           </Button>
+          {tab === 'records' && (
+            <Button variant="primary" Icon={Plus} style={{ marginInlineStart: 'auto' }}
+                    onClick={() => setOpenCreate(true)}>
+              {isAr ? 'إضافة سجل' : 'Add record'}
+            </Button>
+          )}
         </div>
 
         {loading && <p>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>}
@@ -287,6 +377,17 @@ export function FinancedEmissionsPage() {
           )
         )}
       </Card>
+
+      <FormModal
+        open={openCreate}
+        title={isAr ? 'إضافة سجل انبعاثات مُموَّلة' : 'Add financed-emissions record'}
+        fields={createFields}
+        initial={createInitial}
+        submitLabel={isAr ? 'تسجيل' : 'Create'}
+        size="lg"
+        onClose={() => setOpenCreate(false)}
+        onSubmit={submitCreate}
+      />
     </Shell>
   );
 }
