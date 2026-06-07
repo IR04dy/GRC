@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { CalendarClock, Shield, AlertTriangle, Activity, Phone, FileWarning, Workflow } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarClock, Shield, AlertTriangle, Activity, Phone, FileWarning, Workflow, Plus } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
@@ -16,12 +17,13 @@ import { useDialog } from '../../lib/dialog';
 import {
   listCycles, transitionCycle,
   listGovernance, transitionGovernance,
-  listRisks,
+  listRisks, createRisk,
   listStrategies,
   listContacts, recordCallTreeTest, contactTestStats,
   cycleStatusTone, governanceStatusTone, bcmRiskStatusTone, residualToTone,
   type BcmAssessmentCycle, type BcmGovernanceRecord, type BcmRisk,
   type ContinuityStrategy, type BcmCommunicationContact, type CycleStatus, type GovernanceStatus,
+  type ThreatCategory,
 } from '../../lib/bcmCycle';
 import { downloadEvidencePackage } from '../../lib/bcmEvidencePackage';
 
@@ -41,6 +43,37 @@ import { downloadEvidencePackage } from '../../lib/bcmEvidencePackage';
  */
 type TabId = 'cycles' | 'governance' | 'risks' | 'strategies' | 'calltree';
 
+// ── BCM risk authoring vocab (bilingual) ───────────────────────────────
+// 18 ISO 22301 / NCA threat categories surfaced as a searchable select.
+const THREAT_CATEGORIES: Array<{ value: ThreatCategory; en: string; ar: string }> = [
+  { value: 'TECH_FAILURE',             en: 'Technology failure',            ar: 'عطل تقني' },
+  { value: 'CYBERATTACK',              en: 'Cyberattack',                   ar: 'هجوم سيبراني' },
+  { value: 'DATA_CENTER_OUTAGE',       en: 'Data-centre outage',            ar: 'انقطاع مركز البيانات' },
+  { value: 'CLOUD_OUTAGE',             en: 'Cloud outage',                  ar: 'انقطاع الحوسبة السحابية' },
+  { value: 'TELECOM_OUTAGE',           en: 'Telecom outage',                ar: 'انقطاع الاتصالات' },
+  { value: 'POWER_FAILURE',            en: 'Power failure',                 ar: 'انقطاع الطاقة' },
+  { value: 'FACILITY_UNAVAILABILITY',  en: 'Facility unavailability',       ar: 'عدم توفر المقر' },
+  { value: 'WORKFORCE_UNAVAILABILITY', en: 'Workforce unavailability',      ar: 'عدم توفر الكوادر' },
+  { value: 'SUPPLIER_FAILURE',         en: 'Supplier failure',              ar: 'إخفاق مورّد' },
+  { value: 'PANDEMIC',                 en: 'Pandemic',                      ar: 'جائحة' },
+  { value: 'NATURAL_HAZARD',           en: 'Natural hazard',                ar: 'خطر طبيعي' },
+  { value: 'FIRE',                     en: 'Fire',                          ar: 'حريق' },
+  { value: 'FLOOD',                    en: 'Flood',                         ar: 'فيضان' },
+  { value: 'REGIONAL_DISRUPTION',      en: 'Regional disruption',           ar: 'اضطراب إقليمي' },
+  { value: 'REGULATORY_DISRUPTION',    en: 'Regulatory disruption',         ar: 'اضطراب تنظيمي' },
+  { value: 'DATA_LOSS',                en: 'Data loss',                     ar: 'فقدان بيانات' },
+  { value: 'THIRD_PARTY_DEPENDENCY',   en: 'Third-party dependency',        ar: 'اعتماد على طرف ثالث' },
+  { value: 'CRITICAL_INFRASTRUCTURE',  en: 'Critical infrastructure',       ar: 'بنية تحتية حرجة' },
+];
+
+type ControlEffectiveness = NonNullable<BcmRisk['controlEffectiveness']>;
+const CONTROL_EFFECTIVENESS: Array<{ value: ControlEffectiveness; en: string; ar: string }> = [
+  { value: 'EFFECTIVE',         en: 'Effective (residual ÷4)',        ar: 'فعّالة (المتبقّي ÷٤)' },
+  { value: 'NEEDS_IMPROVEMENT', en: 'Needs improvement (÷2)',         ar: 'تحتاج تحسيناً (÷٢)' },
+  { value: 'INEFFECTIVE',       en: 'Ineffective (no reduction)',     ar: 'غير فعّالة (دون تخفيض)' },
+  { value: 'NOT_TESTED',        en: 'Not tested (no reduction)',      ar: 'لم تُختبر (دون تخفيض)' },
+];
+
 export function BcmReadinessPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
@@ -57,6 +90,7 @@ export function BcmReadinessPage() {
   const [contacts, setContacts] = useState<BcmCommunicationContact[]>([]);
   const [contactStats, setContactStats] = useState<{ passed: number; failed: number; notReached: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [openRisk, setOpenRisk] = useState(false);
 
   // ── Loaders ────
   async function reload() {
@@ -115,6 +149,77 @@ export function BcmReadinessPage() {
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Record failed');
+    }
+  }
+
+  // ── Add a BCM risk (inherent/residual scores computed server-side) ─────
+  const riskInitial: Record<string, string> = useMemo(() => ({
+    titleEn: '', titleAr: '',
+    threatCategory: 'CYBERATTACK',
+    likelihood: '3', impact: '3',
+    controlEffectiveness: 'NOT_TESTED',
+    existingControls: '',
+  }), []);
+
+  const riskFields: FieldDef[] = useMemo(() => [
+    { key: 'titleEn', kind: 'text', required: true, span: 6, maxLength: 200,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)' },
+    { key: 'titleAr', kind: 'text', span: 6, maxLength: 200,
+      label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { key: 'threatCategory', kind: 'select-searchable', required: true, span: 12,
+      label: isAr ? 'فئة التهديد' : 'Threat category',
+      options: THREAT_CATEGORIES.map(t => ({ value: t.value, label: isAr ? t.ar : t.en })) },
+    { key: 'likelihood', kind: 'number', span: 3, min: 1, max: 5,
+      label: isAr ? 'الاحتمالية (١-٥)' : 'Likelihood (1-5)' },
+    { key: 'impact', kind: 'number', span: 3, min: 1, max: 5,
+      label: isAr ? 'الأثر (١-٥)' : 'Impact (1-5)' },
+    { key: 'controlEffectiveness', kind: 'select', span: 6,
+      label: isAr ? 'فاعلية الضوابط' : 'Control effectiveness',
+      options: CONTROL_EFFECTIVENESS.map(c => ({ value: c.value, label: isAr ? c.ar : c.en })) },
+    { key: 'existingControls', kind: 'textarea', span: 12, rows: 3,
+      label: isAr ? 'الضوابط القائمة' : 'Existing controls' },
+  ], [isAr]);
+
+  async function submitRisk(v: Record<string, string>) {
+    const titleEn = String(v.titleEn ?? '').trim();
+    const titleAr = String(v.titleAr ?? '').trim();
+    const threatCategory = (v.threatCategory ?? '') as ThreatCategory;
+    const existingControls = String(v.existingControls ?? '').trim();
+    if (!titleEn) { toast.danger(isAr ? 'العنوان بالإنجليزية مطلوب' : 'Title (EN) is required'); return; }
+    if (!threatCategory) { toast.danger(isAr ? 'فئة التهديد مطلوبة' : 'Threat category is required'); return; }
+    // FormModal number-kind fields hold runtime numbers; coerce + bounds-check (1..5).
+    const scale = (raw: string, label: string): number | null | undefined => {
+      const s = String(raw ?? '').trim();
+      if (s === '') return undefined;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 1 || n > 5) {
+        toast.danger(isAr ? `${label}: قيمة بين ١ و٥` : `${label}: must be 1-5`);
+        return null;
+      }
+      return Math.round(n);
+    };
+    const likelihood = scale(v.likelihood, isAr ? 'الاحتمالية' : 'Likelihood');
+    if (likelihood === null) return;
+    const impact = scale(v.impact, isAr ? 'الأثر' : 'Impact');
+    if (impact === null) return;
+    const ce = String(v.controlEffectiveness ?? '').trim() as ControlEffectiveness | '';
+    try {
+      await createRisk({
+        titleEn,
+        titleAr: titleAr || undefined,
+        threatCategory,
+        likelihood: likelihood ?? undefined,
+        impact: impact ?? undefined,
+        controlEffectiveness: ce || undefined,
+        existingControls: existingControls || undefined,
+        status: 'DRAFT',
+      });
+      toast.success(isAr ? 'أُضيفت المخاطرة' : 'BCM risk added');
+      setOpenRisk(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل إضافة المخاطرة' : 'Failed to add risk'));
     }
   }
 
@@ -248,7 +353,14 @@ export function BcmReadinessPage() {
       {/* ── Risks ── */}
       {tab === 'risks' && (
         <Card title={isAr ? 'سجل مخاطر BCM' : 'BCM risk register'}
-          action={<Badge tone="primary">{risks.length}</Badge>}>
+          action={
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Badge tone="primary">{risks.length}</Badge>
+              <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenRisk(true)}>
+                {isAr ? 'إضافة مخاطرة' : 'Add risk'}
+              </Button>
+            </div>
+          }>
           {risks.length === 0
             ? <InlineEmpty>{isAr ? 'لا توجد مخاطر مسجّلة' : 'No BCM risks yet'}</InlineEmpty>
             : <table className="grc-table">
@@ -372,6 +484,16 @@ export function BcmReadinessPage() {
           </Card>
         </div>
       )}
+
+      <FormModal
+        open={openRisk}
+        title={isAr ? 'إضافة مخاطرة استمرارية' : 'Add BCM risk'}
+        fields={riskFields}
+        initial={riskInitial}
+        onClose={() => setOpenRisk(false)}
+        onSubmit={submitRisk}
+        submitLabel={isAr ? 'إضافة المخاطرة' : 'Add risk'}
+      />
     </Shell>
   );
 }
