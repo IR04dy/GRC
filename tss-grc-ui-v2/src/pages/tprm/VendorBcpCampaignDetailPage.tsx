@@ -13,6 +13,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -21,12 +22,31 @@ import { ApiError } from '../../lib/api';
 import {
   getCampaign, getCampaignStats, listAttestations,
   acceptAttestation, rejectAttestation, markAttestationOutOfScope,
-  attestationsToCsv,
+  submitAttestation, attestationsToCsv,
   type VendorBcpCampaign, type CampaignStats,
   type VendorBcpAttestation, type AttestationStatus,
+  type AttestationSubmitRequest,
   CAMPAIGN_STATUS_LABELS, ATTESTATION_STATUS_LABELS,
   campaignStatusTone, attestationStatusTone,
 } from '../../lib/vendorBcp';
+
+// Operator-side "record submission" form — the TPRM lead captures a
+// vendor's BCP figures on their behalf (phoned/emailed in). Numeric RTO/
+// MTPD come back as runtime numbers; everything else is a string.
+interface SubmitForm {
+  rtoHoursAttested: number;
+  mtpdHoursAttested: number;
+  hasTestedBcp: string;        // 'YES' | 'NO'
+  lastBcpTestDate: string;
+  lastDrTestDate: string;
+  submittedByContactName: string;
+  submittedByContactEmail: string;
+  evidenceFileName: string;
+  subprocessorDependencies: string;
+}
+
+// Backend guardSubmit allows these source states -> SUBMITTED.
+const SUBMITTABLE: AttestationStatus[] = ['INVITED', 'REMINDED', 'OVERDUE', 'REJECTED'];
 
 /**
  * Slice 10-D — Campaign detail with per-status drill-down.
@@ -52,6 +72,7 @@ export function VendorBcpCampaignDetailPage() {
   const [items, setItems] = useState<VendorBcpAttestation[]>([]);
   const [activeTab, setActiveTab] = useState<AttestationStatus | 'ALL'>('ALL');
   const [drawer, setDrawer] = useState<VendorBcpAttestation | null>(null);
+  const [submitFor, setSubmitFor] = useState<VendorBcpAttestation | null>(null);
 
   async function reload() {
     if (!Number.isFinite(numId)) return;
@@ -125,6 +146,76 @@ export function VendorBcpCampaignDetailPage() {
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed');
+    }
+  }
+
+  // ─── Record submission on the vendor's behalf (submitAttestation) ───
+  const submitFields: FieldDef[] = [
+    { kind: 'number', key: 'rtoHoursAttested', span: 6, required: true, min: 1,
+      label: isAr ? 'RTO المُعلن (ساعات)' : 'Attested RTO (hours)' },
+    { kind: 'number', key: 'mtpdHoursAttested', span: 6, required: true, min: 1,
+      label: isAr ? 'MTPD المُعلن (ساعات)' : 'Attested MTPD (hours)' },
+    { kind: 'select', key: 'hasTestedBcp', span: 6, required: true,
+      label: isAr ? 'هل خطة الاستمرارية مُختبَرة؟' : 'BCP tested?',
+      options: [
+        { value: 'YES', label: isAr ? 'نعم' : 'Yes' },
+        { value: 'NO',  label: isAr ? 'لا'  : 'No' },
+      ] },
+    { kind: 'date', key: 'lastBcpTestDate', span: 6,
+      label: isAr ? 'آخر اختبار للخطة' : 'Last BCP test date' },
+    { kind: 'date', key: 'lastDrTestDate', span: 6,
+      label: isAr ? 'آخر اختبار للتعافي' : 'Last DR test date' },
+    { kind: 'text', key: 'submittedByContactName', span: 6, maxLength: 255,
+      label: isAr ? 'اسم جهة الاتصال المُقدِّمة' : 'Submitted by (name)' },
+    { kind: 'text', key: 'submittedByContactEmail', span: 6, maxLength: 255,
+      label: isAr ? 'بريد جهة الاتصال' : 'Submitted by (email)' },
+    { kind: 'text', key: 'evidenceFileName', span: 6, maxLength: 255,
+      label: isAr ? 'اسم ملف الدليل' : 'Evidence file name' },
+    { kind: 'textarea', key: 'subprocessorDependencies', span: 12, rows: 3,
+      label: isAr ? 'تبعيات المعالجين الفرعيين' : 'Sub-processor dependencies' },
+  ];
+
+  const submitInitial = useMemo<SubmitForm>(() => ({
+    rtoHoursAttested: 0, mtpdHoursAttested: 0, hasTestedBcp: 'YES',
+    lastBcpTestDate: '', lastDrTestDate: '',
+    submittedByContactName: '', submittedByContactEmail: '',
+    evidenceFileName: '', subprocessorDependencies: '',
+  }), [submitFor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function recordSubmission(v: SubmitForm) {
+    if (!submitFor) return;
+    const u = (s: string) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    const rto = Number(v.rtoHoursAttested);
+    const mtpd = Number(v.mtpdHoursAttested);
+    if (!Number.isFinite(rto) || rto <= 0) {
+      toast.danger(isAr ? 'RTO يجب أن يكون رقماً موجباً' : 'Attested RTO must be a positive number'); return;
+    }
+    if (!Number.isFinite(mtpd) || mtpd <= 0) {
+      toast.danger(isAr ? 'MTPD يجب أن يكون رقماً موجباً' : 'Attested MTPD must be a positive number'); return;
+    }
+    const email = u(v.submittedByContactEmail);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.danger(isAr ? 'بريد إلكتروني غير صالح' : 'Invalid email address'); return;
+    }
+    const body: AttestationSubmitRequest = {
+      rtoHoursAttested: Math.round(rto),
+      mtpdHoursAttested: Math.round(mtpd),
+      hasTestedBcp: v.hasTestedBcp === 'YES',
+      lastBcpTestDate: u(v.lastBcpTestDate),
+      lastDrTestDate: u(v.lastDrTestDate),
+      subprocessorDependencies: u(v.subprocessorDependencies),
+      evidenceFileName: u(v.evidenceFileName),
+      submittedByContactName: u(v.submittedByContactName),
+      submittedByContactEmail: email,
+    };
+    try {
+      await submitAttestation(submitFor.id, body);
+      toast.success(isAr ? 'تم تسجيل الشهادة' : 'Submission recorded');
+      setSubmitFor(null);
+      setDrawer(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Submit failed');
     }
   }
 
@@ -287,8 +378,22 @@ export function VendorBcpCampaignDetailPage() {
           onAccept={() => review(drawer, 'accept')}
           onReject={() => review(drawer, 'reject')}
           onNa={() => review(drawer, 'na')}
+          onRecordSubmit={() => setSubmitFor(drawer)}
         />
       )}
+
+      <FormModal<SubmitForm>
+        open={submitFor !== null}
+        title={isAr
+          ? `تسجيل شهادة المورّد · ${(submitFor && (submitFor.vendorNameAr || submitFor.vendorName)) || (submitFor ? '#' + submitFor.vendorId : '')}`
+          : `Record submission · ${(submitFor && submitFor.vendorName) || (submitFor ? '#' + submitFor.vendorId : '')}`}
+        fields={submitFields}
+        initial={submitInitial}
+        size="lg"
+        submitLabel={isAr ? 'تسجيل الشهادة' : 'Record submission'}
+        onClose={() => setSubmitFor(null)}
+        onSubmit={recordSubmission}
+      />
     </Shell>
   );
 }
@@ -296,7 +401,7 @@ export function VendorBcpCampaignDetailPage() {
 // ─── Drawer ───────────────────────────────────────────────────────────
 
 function AttestationDrawer({
-  item, isAr, onClose, onAccept, onReject, onNa,
+  item, isAr, onClose, onAccept, onReject, onNa, onRecordSubmit,
 }: {
   item: VendorBcpAttestation;
   isAr: boolean;
@@ -304,9 +409,11 @@ function AttestationDrawer({
   onAccept: () => void;
   onReject: () => void;
   onNa: () => void;
+  onRecordSubmit: () => void;
 }) {
   const canReview = item.status === 'SUBMITTED';
   const canMarkNa = ['INVITED', 'REMINDED', 'OVERDUE'].includes(item.status);
+  const canSubmit = SUBMITTABLE.includes(item.status);
 
   return (
     <div className="drawer-overlay" onClick={onClose}
@@ -385,6 +492,11 @@ function AttestationDrawer({
         )}
 
         <div className="cluster" style={{ gap: 8, marginTop: 16 }}>
+          {canSubmit && (
+            <Button Icon={ClipboardCheck} onClick={onRecordSubmit}>
+              {isAr ? 'تسجيل الشهادة' : 'Record submission'}
+            </Button>
+          )}
           {canReview && (
             <>
               <Button Icon={CheckCircle2} onClick={onAccept}>
