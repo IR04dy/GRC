@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Shield, Wrench, Layers, GitBranch, Plus, Link2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Shield, Wrench, Layers, GitBranch, Plus, Link2, BookText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -15,15 +15,25 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
-  createControlAssessment, linkRiskToControl,
+  createControlAssessment, linkRiskToControl, createMapping,
   controlStatusTone, controlTypeTone, coverageTone, effectivenessTone, domainLabel,
   type Control, type ControlDomain, type ControlMapping,
   type ControlAssessment, type RiskControlLink, type Effectiveness, type RiskLinkType,
+  type Coverage,
 } from '../../lib/controlLibrary';
 import {
-  listAuthorityDocuments,
-  type AuthorityDocument,
+  listAuthorityDocuments, listAuthorityDocumentCitations,
+  type AuthorityDocument, type AuthorityDocumentCitation,
 } from '../../lib/regulatoryAuthority';
+
+/** A flattened citation option — carries its parent document's code for display. */
+interface CitOpt {
+  value: string;        // citation id as string
+  docCode: string;
+  citationCode: string;
+  titleEn: string;
+  titleAr?: string;
+}
 
 /**
  * Unified Control Library — Framework Intersection F2.
@@ -45,10 +55,13 @@ export function ControlLibraryPage() {
 
   const [openAssess, setOpenAssess] = useState(false);
   const [openLink, setOpenLink] = useState(false);
+  const [openMap, setOpenMap] = useState(false);
 
   const [controls, setControls] = useState<Control[]>([]);
   const [docs, setDocs] = useState<AuthorityDocument[]>([]);
   const [risks, setRisks] = useState<RiskResponse[]>([]);
+  const [citations, setCitations] = useState<CitOpt[]>([]);
+  const citationsLoadedRef = useRef(false);
   const [domain, setDomain] = useState<ControlDomain | ''>('');
   const [loading, setLoading] = useState(true);
 
@@ -73,6 +86,33 @@ export function ControlLibraryPage() {
     setLoading(false);
   }
   useEffect(() => { void reload(); }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Citations live one-per-document; the mapping picker needs a flat pool.
+  // Load it once (across all authority docs) the first time docs arrive —
+  // powers both the searchable citation picker and the coverage table's
+  // doc·code hydration. ~19 GETs once per mount; cached thereafter.
+  useEffect(() => {
+    if (citationsLoadedRef.current || docs.length === 0) return;
+    citationsLoadedRef.current = true;
+    void (async () => {
+      const lists = await Promise.all(docs.map(d =>
+        listAuthorityDocumentCitations(d.id)
+          .then(cs => ({ d, cs }))
+          .catch(() => ({ d, cs: [] as AuthorityDocumentCitation[] })),
+      ));
+      const opts: CitOpt[] = [];
+      for (const { d, cs } of lists) {
+        for (const c of cs) {
+          if (c.id == null) continue;
+          opts.push({
+            value: String(c.id), docCode: d.code, citationCode: c.citationCode,
+            titleEn: c.titleEn, titleAr: c.titleAr,
+          });
+        }
+      }
+      setCitations(opts);
+    })();
+  }, [docs]);
 
   async function selectControl(c: Control) {
     setSelected(c);
@@ -207,6 +247,62 @@ export function ControlLibraryPage() {
     }
   }
 
+  // ─── Map this control to a regulatory citation ──────────────────
+  const COVERAGES: Coverage[] = ['FULL', 'PARTIAL', 'COMPENSATING'];
+  const coverageLabel = (c: Coverage) => {
+    const en: Record<Coverage, string> = { FULL: 'Full', PARTIAL: 'Partial', COMPENSATING: 'Compensating' };
+    const ar: Record<Coverage, string> = { FULL: 'كاملة', PARTIAL: 'جزئية', COMPENSATING: 'تعويضية' };
+    return (isAr ? ar : en)[c];
+  };
+
+  const citationById = useMemo(() => {
+    const m = new Map<number, CitOpt>();
+    for (const c of citations) m.set(Number(c.value), c);
+    return m;
+  }, [citations]);
+
+  const mapFields: FieldDef[] = [
+    { key: 'citationId', label: isAr ? 'النص التنظيمي' : 'Citation', kind: 'select-searchable', required: true, span: 12,
+      placeholder: isAr ? 'ابحث عن نص بالكود أو العنوان…' : 'Search a citation by code or title…',
+      options: citations.map(c => ({ value: c.value, label: `${c.docCode} · ${c.citationCode} — ${isAr && c.titleAr ? c.titleAr : c.titleEn}` })) },
+    { key: 'coverage', label: isAr ? 'التغطية' : 'Coverage', kind: 'select', required: true, span: 6,
+      options: COVERAGES.map(c => ({ value: c, label: coverageLabel(c) })) },
+    { key: 'rationaleEn', label: isAr ? 'المبرر (إنجليزي) — مطلوب' : 'Rationale (English) — required', kind: 'textarea', rows: 2, span: 12 },
+    { key: 'rationaleAr', label: isAr ? 'المبرر (عربي)' : 'Rationale (Arabic)', kind: 'textarea', rows: 2, span: 12 },
+  ];
+  const mapInitial = { citationId: '', coverage: 'FULL', rationaleEn: '', rationaleAr: '' };
+
+  async function submitMapping(v: Record<string, string>) {
+    if (!selected) return;
+    const citationId = Number(v.citationId);
+    if (!citationId || Number.isNaN(citationId)) {
+      toast.danger(isAr ? 'يجب اختيار نص تنظيمي' : 'Pick a citation to map');
+      return;
+    }
+    const rationaleEn = (v.rationaleEn || '').trim();
+    if (!rationaleEn) {
+      toast.danger(isAr ? 'المبرر (الإنجليزي) مطلوب' : 'Rationale (English) is required');
+      return;
+    }
+    try {
+      await createMapping({
+        controlId: selected.id,
+        citationId,
+        coverage: (v.coverage || 'FULL') as Coverage,
+        rationaleEn,
+        rationaleAr: (v.rationaleAr || '').trim() || undefined,
+      });
+      const c = citationById.get(citationId);
+      toast.success(isAr ? `تم ربط ${selected.controlCode} بـ ${c ? c.citationCode : 'النص'}`
+                        : `Mapped ${selected.controlCode} to ${c ? c.citationCode : 'citation'}`);
+      setOpenMap(false);
+      await selectControl(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر إنشاء الربط' : 'Failed to create mapping'));
+    }
+  }
+
   // Future F5 slice will resolve citationId → document via a dedicated
   // endpoint. For now mappings render the raw citationId — honest about
   // the gap. `docs` is loaded for the KPI strip + future hydration.
@@ -324,7 +420,12 @@ export function ControlLibraryPage() {
                   )}
 
                   {/* Mappings */}
-                  <Section title={isAr ? 'تغطية النصوص التنظيمية' : 'Regulatory coverage'} count={mappings.length}>
+                  <Section title={isAr ? 'تغطية النصوص التنظيمية' : 'Regulatory coverage'} count={mappings.length}
+                    action={!demoMode && citations.length > 0
+                      ? <Button variant="secondary" size="sm" Icon={BookText} onClick={() => setOpenMap(true)}>
+                          {isAr ? 'ربط نص تنظيمي' : 'Map citation'}
+                        </Button>
+                      : undefined}>
                     {mappings.length === 0
                       ? <InlineEmpty>
                           {isAr ? 'لم يُربط هذا الضابط بأي نص تنظيمي بعد'
@@ -338,16 +439,26 @@ export function ControlLibraryPage() {
                             <th>{isAr ? 'آخر مراجعة' : 'Reviewed'}</th>
                           </tr></thead>
                           <tbody>
-                            {mappings.map(m => (
-                              <tr key={m.id}>
-                                <td className="mono text-2xs">#{m.citationId}</td>
-                                <td><Badge size="sm" tone={coverageTone(m.coverage)}>{m.coverage}</Badge></td>
-                                <td className="text-xs" style={{ maxWidth: 360 }}>
-                                  {(isAr && m.rationaleAr ? m.rationaleAr : m.rationaleEn) ?? '—'}
-                                </td>
-                                <td className="mono text-2xs">{m.lastReviewedAt?.substring(0, 10) ?? '—'}</td>
-                              </tr>
-                            ))}
+                            {mappings.map(m => {
+                              const c = citationById.get(m.citationId);
+                              return (
+                                <tr key={m.id}>
+                                  <td>
+                                    {c
+                                      ? <>
+                                          <div className="mono text-2xs">{c.docCode} · {c.citationCode}</div>
+                                          <div className="text-2xs text-muted">{isAr && c.titleAr ? c.titleAr : c.titleEn}</div>
+                                        </>
+                                      : <span className="mono text-2xs">#{m.citationId}</span>}
+                                  </td>
+                                  <td><Badge size="sm" tone={coverageTone(m.coverage)}>{coverageLabel(m.coverage)}</Badge></td>
+                                  <td className="text-xs" style={{ maxWidth: 360 }}>
+                                    {(isAr && m.rationaleAr ? m.rationaleAr : m.rationaleEn) ?? '—'}
+                                  </td>
+                                  <td className="mono text-2xs">{m.lastReviewedAt?.substring(0, 10) ?? '—'}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>}
                   </Section>
@@ -463,6 +574,19 @@ export function ControlLibraryPage() {
           size="md"
           onClose={() => setOpenLink(false)}
           onSubmit={submitLink}
+        />
+      )}
+
+      {selected && (
+        <FormModal
+          open={openMap}
+          title={isAr ? `ربط نص تنظيمي — ${selected.controlCode}` : `Map citation — ${selected.controlCode}`}
+          fields={mapFields}
+          initial={mapInitial}
+          submitLabel={isAr ? 'ربط' : 'Map'}
+          size="md"
+          onClose={() => setOpenMap(false)}
+          onSubmit={submitMapping}
         />
       )}
     </Shell>
