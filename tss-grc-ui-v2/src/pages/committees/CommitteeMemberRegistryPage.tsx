@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Users, Award, ShieldCheck, ChevronLeft, AlertCircle, BadgeCheck, UserPlus,
+  Users, Award, ShieldCheck, ChevronLeft, AlertCircle, BadgeCheck, UserPlus, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -15,6 +15,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMemberTerms, listSkills, skillCoverage, getIndependenceStats, appointMember,
+  addSkill,
   type Committee, type CommitteeMemberTerm, type CommitteeMemberSkill,
   type IndependenceStats,
 } from '../../lib/committees';
@@ -25,6 +26,25 @@ const ROLE_LABEL_AR: Record<string, string> = {
   'Chair': 'رئيس', 'Vice-Chair': 'نائب الرئيس', 'Member': 'عضو',
   'Secretary': 'أمين السر', 'Standing Invitee': 'مدعو دائم', 'External Advisor': 'مستشار خارجي',
 };
+
+/** GRC competency dimensions regulators test for (CMA Art 54, NCA ECC-2,
+ *  ISO 22301, AML Law Art 41). Matches the backend skill_dimension vocab. */
+const SKILL_DIMENSIONS: Array<{ value: string; en: string; ar: string }> = [
+  { value: 'FINANCIAL_EXPERT', en: 'Financial expert',  ar: 'خبير مالي' },
+  { value: 'CYBER_EXPERT',     en: 'Cyber expert',      ar: 'خبير أمن سيبراني' },
+  { value: 'BCM_EXPERT',       en: 'BCM expert',        ar: 'خبير استمرارية الأعمال' },
+  { value: 'AML_EXPERT',       en: 'AML expert',        ar: 'خبير مكافحة غسل الأموال' },
+  { value: 'LEGAL',            en: 'Legal',             ar: 'قانوني' },
+  { value: 'INDUSTRY',         en: 'Industry',          ar: 'خبرة قطاعية' },
+  { value: 'DIGITAL',          en: 'Digital',           ar: 'رقمي' },
+  { value: 'ESG',              en: 'ESG',               ar: 'الاستدامة' },
+  { value: 'RISK_MGMT',        en: 'Risk management',   ar: 'إدارة المخاطر' },
+];
+const SKILL_LEVELS: Array<{ value: string; en: string; ar: string }> = [
+  { value: 'BASIC',        en: 'Basic',        ar: 'أساسي' },
+  { value: 'INTERMEDIATE', en: 'Intermediate', ar: 'متوسط' },
+  { value: 'EXPERT',       en: 'Expert',       ar: 'خبير' },
+];
 
 /**
  * Member registry page — shows the current panel + the historical
@@ -54,6 +74,7 @@ export function CommitteeMemberRegistryPage() {
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [openAppoint, setOpenAppoint] = useState(false);
+  const [openSkill, setOpenSkill] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(cid)) return;
@@ -158,6 +179,54 @@ export function CommitteeMemberRegistryPage() {
     } catch { toast.danger(isAr ? 'تعذّر تعيين العضو' : 'Failed to appoint member'); }
   }
 
+  // ---- Add a skill to the matrix -------------------------------------------
+  const skillFields: FieldDef[] = [
+    { key: 'memberTermId', kind: 'select-searchable', label: isAr ? 'العضو' : 'Member', required: true, span: 12,
+      placeholder: isAr ? 'اختر عضواً…' : 'Select a member…',
+      options: activeTerms.map(tm => ({ value: String(tm.id), label: tm.memberName, sub: tm.role })) },
+    { key: 'skillDimension', kind: 'select', label: isAr ? 'بُعد المهارة' : 'Skill dimension', required: true, span: 6,
+      options: SKILL_DIMENSIONS.map(d => ({ value: d.value, label: isAr ? d.ar : d.en })) },
+    { key: 'skillLevel', kind: 'select', label: isAr ? 'المستوى' : 'Level', required: true, span: 6,
+      options: SKILL_LEVELS.map(l => ({ value: l.value, label: isAr ? l.ar : l.en })) },
+    { key: 'yearsExperience', kind: 'number', label: isAr ? 'سنوات الخبرة' : 'Years of experience', span: 6, min: 0, max: 70 },
+    { key: 'certification', kind: 'text', label: isAr ? 'الشهادات' : 'Certifications', span: 6, maxLength: 255,
+      placeholder: 'CPA, CFA, CISA, CISSP' },
+    { key: 'lastReviewedAt', kind: 'date', label: isAr ? 'آخر مراجعة' : 'Last reviewed', span: 6 },
+    { key: 'evidenceEn', kind: 'textarea', label: isAr ? 'مبرّر التأهيل (للجهة التنظيمية)' : 'Qualification evidence (for the regulator)', span: 12, rows: 2 },
+  ];
+  // Memoised so FormModal's reset effect can't wipe the form on a re-render.
+  const skillInitial: Record<string, string> = useMemo(() => ({
+    memberTermId: '', skillDimension: 'FINANCIAL_EXPERT', skillLevel: 'EXPERT',
+    yearsExperience: '', certification: '', lastReviewedAt: '', evidenceEn: '',
+  }), []);
+
+  async function submitSkill(v: Record<string, string>) {
+    const term = activeTerms.find(tm => tm.id === Number(v.memberTermId));
+    const skillDimension = String(v.skillDimension || '').trim();
+    const skillLevel = String(v.skillLevel || '').trim();
+    if (!term)           { toast.danger(isAr ? 'يُرجى اختيار عضو' : 'Please select a member'); return; }
+    if (!skillDimension) { toast.danger(isAr ? 'بُعد المهارة مطلوب' : 'Skill dimension is required'); return; }
+    if (!skillLevel)     { toast.danger(isAr ? 'المستوى مطلوب' : 'Level is required'); return; }
+    const yrsStr = String(v.yearsExperience ?? '').trim();
+    const yrs = yrsStr === '' ? null : Number(yrsStr);
+    try {
+      await addSkill({
+        committeeId: cid,
+        memberTermId: term.id,
+        memberName: term.memberName,
+        skillDimension,
+        skillLevel: skillLevel as 'BASIC' | 'INTERMEDIATE' | 'EXPERT',
+        yearsExperience: yrs != null && Number.isFinite(yrs) && yrs >= 0 ? yrs : null,
+        certification: String(v.certification || '').trim() || null,
+        evidenceEn: String(v.evidenceEn || '').trim() || null,
+        lastReviewedAt: String(v.lastReviewedAt || '').trim() || null,
+      });
+      toast.success(isAr ? `تمت إضافة مهارة لـ ${term.memberName}` : `Skill added for ${term.memberName}`);
+      setOpenSkill(false);
+      setReloadKey(k => k + 1);
+    } catch { toast.danger(isAr ? 'تعذّر إضافة المهارة' : 'Failed to add the skill'); }
+  }
+
   if (!Number.isFinite(cid)) {
     return (
       <Shell title={isAr ? 'تسجيل أعضاء اللجنة' : 'Committee member registry'}>
@@ -246,7 +315,13 @@ export function CommitteeMemberRegistryPage() {
       </Card>
 
       {/* Skills matrix */}
-      <Card title={isAr ? 'مصفوفة المهارات' : 'Skills matrix'} Icon={Award}>
+      <Card title={isAr ? 'مصفوفة المهارات' : 'Skills matrix'} Icon={Award}
+        action={
+          <Button size="sm" variant="primary" Icon={Plus} disabled={activeTerms.length === 0}
+            onClick={() => setOpenSkill(true)}>
+            {isAr ? 'إضافة مهارة' : 'Add skill'}
+          </Button>
+        }>
         {loading
           ? <EmptyState Icon={Award} title={isAr ? 'جارٍ التحميل…' : 'Loading…'} />
           : skills.length === 0
@@ -340,6 +415,16 @@ export function CommitteeMemberRegistryPage() {
         submitLabel={isAr ? 'تعيين' : 'Appoint'}
         onClose={() => setOpenAppoint(false)}
         onSubmit={submitAppoint}
+      />
+
+      <FormModal
+        open={openSkill}
+        title={isAr ? `إضافة مهارة${committee ? ` — ${title}` : ''}` : `Add skill${committee ? ` — ${title}` : ''}`}
+        fields={skillFields}
+        initial={skillInitial}
+        submitLabel={isAr ? 'إضافة' : 'Add skill'}
+        onClose={() => setOpenSkill(false)}
+        onSubmit={submitSkill}
       />
     </Shell>
   );
