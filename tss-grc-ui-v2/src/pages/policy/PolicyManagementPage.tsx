@@ -18,7 +18,7 @@ import {
   listPolicies, createPolicy, transitionPolicy, deletePolicy,
   newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate,
   listExceptions, transitionException,
-  listAttestations, attestPolicy, declineAttestation,
+  listAttestations, attestPolicy, declineAttestation, createAttestation,
   policyStatusTone, policyStatusLabel, nextPolicyStatuses,
   exceptionStatusTone, exceptionStatusLabel, nextExceptionStatuses,
   attestationStatusTone, attestationStatusLabel,
@@ -495,6 +495,8 @@ function AttestationsTab() {
   const [items, setItems] = useState<PolicyAttestation[]>([]);
   const [filter, setFilter] = useState<'PENDING' | 'ATTESTED' | 'DECLINED' | ''>('');
   const [loading, setLoading] = useState(true);
+  const [policies, setPolicies] = useState<PolicyDocument[]>([]);
+  const [openAssign, setOpenAssign] = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -503,6 +505,61 @@ function AttestationsTab() {
     finally { setLoading(false); }
   }
   useEffect(() => { void reload(); }, [filter]);
+
+  // Policy options for the assignment select (published first, then others).
+  useEffect(() => {
+    listPolicies({ latestOnly: true })
+      .then(ps => setPolicies(ps.slice().sort((a, b) =>
+        (a.status === 'PUBLISHED' ? 0 : 1) - (b.status === 'PUBLISHED' ? 0 : 1))))
+      .catch(() => setPolicies([]));
+  }, []);
+
+  const assignInitial: Record<string, string> = useMemo(() => ({
+    policyId: '', userUsername: '', userFullName: '', userRole: '', userDepartment: '', notes: '',
+  }), []);
+
+  const assignFields: FieldDef[] = useMemo(() => [
+    { key: 'policyId', kind: 'select', required: true, span: 12,
+      label: isAr ? 'السياسة' : 'Policy',
+      options: policies.map(p => ({
+        value: String(p.id),
+        label: `${p.policyCode} v${p.version} — ${isAr ? (p.titleAr ?? p.titleEn) : p.titleEn}`,
+      })) },
+    { key: 'userUsername', kind: 'text', required: true, span: 6, label: isAr ? 'اسم المستخدم' : 'Username' },
+    { key: 'userFullName', kind: 'text', span: 6, label: isAr ? 'الاسم الكامل' : 'Full name' },
+    { key: 'userRole', kind: 'text', span: 6, label: isAr ? 'الدور' : 'Role' },
+    { key: 'userDepartment', kind: 'text', span: 6, label: isAr ? 'الإدارة' : 'Department' },
+    { key: 'notes', kind: 'textarea', span: 12, rows: 2, label: isAr ? 'ملاحظات' : 'Notes' },
+  ], [isAr, policies]);
+
+  async function submitAssign(v: Record<string, string>) {
+    const policyId = Number(v.policyId);
+    const userUsername = String(v.userUsername ?? '').trim();
+    if (!Number.isFinite(policyId) || policyId <= 0) {
+      toast.danger(isAr ? 'السياسة مطلوبة' : 'Policy is required'); return;
+    }
+    if (!userUsername) { toast.danger(isAr ? 'اسم المستخدم مطلوب' : 'Username is required'); return; }
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    const pol = policies.find(p => p.id === policyId);
+    try {
+      await createAttestation({
+        policyId,
+        policyVersion: pol?.version,
+        userUsername,
+        userFullName: opt(v.userFullName),
+        userRole: opt(v.userRole),
+        userDepartment: opt(v.userDepartment),
+        notes: opt(v.notes),
+        status: 'PENDING',
+      });
+      toast.success(isAr ? 'تم إسناد الإقرار' : 'Attestation assigned');
+      setOpenAssign(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل إسناد الإقرار' : 'Failed to assign attestation'));
+    }
+  }
 
   async function onAttest(a: PolicyAttestation) {
     const ans = await dialog.prompt({
@@ -536,16 +593,22 @@ function AttestationsTab() {
   }
 
   return (
+    <>
     <Card title={isAr ? 'الإقرارات' : 'Policy attestations'} Icon={CheckCircle2}
       action={
-        <select value={filter} onChange={e => setFilter(e.target.value as 'PENDING' | 'ATTESTED' | 'DECLINED' | '')}
-          style={{ padding: '6px 10px', fontSize: 12, minWidth: 160, border: '1px solid var(--border)',
-                   borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
-          <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
-          <option value="PENDING">{attestationStatusLabel('PENDING', isAr ? 'ar' : 'en')}</option>
-          <option value="ATTESTED">{attestationStatusLabel('ATTESTED', isAr ? 'ar' : 'en')}</option>
-          <option value="DECLINED">{attestationStatusLabel('DECLINED', isAr ? 'ar' : 'en')}</option>
-        </select>
+        <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <select value={filter} onChange={e => setFilter(e.target.value as 'PENDING' | 'ATTESTED' | 'DECLINED' | '')}
+            style={{ padding: '6px 10px', fontSize: 12, minWidth: 160, border: '1px solid var(--border)',
+                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+            <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
+            <option value="PENDING">{attestationStatusLabel('PENDING', isAr ? 'ar' : 'en')}</option>
+            <option value="ATTESTED">{attestationStatusLabel('ATTESTED', isAr ? 'ar' : 'en')}</option>
+            <option value="DECLINED">{attestationStatusLabel('DECLINED', isAr ? 'ar' : 'en')}</option>
+          </select>
+          <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenAssign(true)}>
+            {isAr ? 'إسناد إقرار' : 'Assign attestation'}
+          </Button>
+        </div>
       }>
       {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
        : items.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد إقرارات' : 'No attestations'}</InlineEmpty>
@@ -595,6 +658,17 @@ function AttestationsTab() {
         </table>
       )}
     </Card>
+
+    <FormModal
+      open={openAssign}
+      title={isAr ? 'إسناد إقرار سياسة' : 'Assign policy attestation'}
+      fields={assignFields}
+      initial={assignInitial}
+      onClose={() => setOpenAssign(false)}
+      onSubmit={submitAssign}
+      submitLabel={isAr ? 'إسناد' : 'Assign'}
+    />
+    </>
   );
 }
 
