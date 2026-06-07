@@ -17,13 +17,14 @@ import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
   listEmissions, transitionEmission, createEmission,
-  listTargets, getTargetProgress, getEmissionsTotal,
+  listTargets, getTargetProgress, getEmissionsTotal, createTarget,
   ASSET_CLASS_LABELS, EMISSIONS_STAGE_LABELS, ALIGNMENT_LABELS,
   emissionsStageTone, dataQualityTone,
   fmtTco2e, fmtSarMillions, fmtPercent,
   type FinancedEmissionsRecord, type FinancedEmissionsTarget,
   type TargetProgress, type EmissionsLifecycleStage,
   type FinancedEmissionsTotal, type AssetClass, type ReportingPeriod,
+  type AlignmentFramework,
 } from '../../lib/climate';
 
 type Tab = 'records' | 'targets' | 'trend';
@@ -51,6 +52,7 @@ export function FinancedEmissionsPage() {
 
   const [tab, setTab] = useState<Tab>('records');
   const [openCreate, setOpenCreate] = useState(false);
+  const [openTarget, setOpenTarget] = useState(false);
   const [records, setRecords] = useState<FinancedEmissionsRecord[]>([]);
   const [targets, setTargets] = useState<FinancedEmissionsTarget[]>([]);
   const [progress, setProgress] = useState<TargetProgress[]>([]);
@@ -189,6 +191,71 @@ export function FinancedEmissionsPage() {
     }
   }
 
+  // ─── Register a reduction target ─────────────────────────────────
+  const ALIGNMENTS = Object.keys(ALIGNMENT_LABELS) as AlignmentFramework[];
+  const targetFields: FieldDef[] = [
+    { key: 'titleEn', label: isAr ? 'عنوان الهدف (إنجليزي)' : 'Target title (English)', kind: 'text', required: true, maxLength: 255, span: 12 },
+    { key: 'titleAr', label: isAr ? 'عنوان الهدف (عربي)' : 'Target title (Arabic)', kind: 'text', maxLength: 255, span: 12 },
+    { key: 'baselineYear', label: isAr ? 'سنة الأساس' : 'Baseline year', kind: 'number', min: 2000, max: 2100, required: true, span: 4 },
+    { key: 'targetYear', label: isAr ? 'سنة الهدف' : 'Target year', kind: 'number', min: 2000, max: 2100, required: true, span: 4 },
+    { key: 'alignmentFramework', label: isAr ? 'إطار المواءمة' : 'Alignment framework', kind: 'select', required: true, span: 4,
+      options: ALIGNMENTS.map(a => ({ value: a, label: isAr ? ALIGNMENT_LABELS[a].ar : ALIGNMENT_LABELS[a].en })) },
+    { key: 'baselineEmissionsTco2e', label: isAr ? 'انبعاثات الأساس (طن CO₂e)' : 'Baseline emissions (tCO₂e)', kind: 'number', min: 0, required: true, span: 6 },
+    { key: 'targetEmissionsTco2e', label: isAr ? 'انبعاثات الهدف (طن CO₂e)' : 'Target emissions (tCO₂e)', kind: 'number', min: 0, required: true, span: 6 },
+    { key: 'sbtiAligned', label: isAr ? 'مُعتمَد من SBTi؟' : 'SBTi-validated?', kind: 'select', required: true, span: 12,
+      options: [
+        { value: 'false', label: isAr ? 'لا' : 'No' },
+        { value: 'true', label: isAr ? 'نعم' : 'Yes' },
+      ] },
+  ];
+  const targetInitial = {
+    titleEn: '', titleAr: '', baselineYear: String(currentYear), targetYear: '2030',
+    alignmentFramework: 'SBTI_1_5C', baselineEmissionsTco2e: '', targetEmissionsTco2e: '', sbtiAligned: 'false',
+  };
+
+  async function submitTarget(v: Record<string, string>) {
+    const titleEn = String(v.titleEn || '').trim();
+    const alignmentFramework = String(v.alignmentFramework) as AlignmentFramework;
+    const targetYear = Number(v.targetYear);
+    const baselineYear = Number(v.baselineYear);
+    const baseline = Number(v.baselineEmissionsTco2e);
+    const target = Number(v.targetEmissionsTco2e);
+    if (!titleEn || !alignmentFramework || !targetYear || !baselineYear
+        || !Number.isFinite(baseline) || !Number.isFinite(target)) {
+      toast.danger(isAr ? 'يُرجى تعبئة الحقول المطلوبة' : 'Please fill the required fields');
+      return;
+    }
+    if (targetYear <= baselineYear) {
+      toast.danger(isAr ? 'سنة الهدف يجب أن تكون بعد سنة الأساس' : 'Target year must be after the baseline year');
+      return;
+    }
+    if (target >= baseline) {
+      toast.danger(isAr
+        ? 'انبعاثات الهدف يجب أن تكون أقل من انبعاثات الأساس لتمثّل خفضًا.'
+        : 'Target emissions must be lower than the baseline to represent a reduction.');
+      return;
+    }
+    try {
+      await createTarget({
+        titleEn,
+        titleAr: String(v.titleAr || '').trim() || undefined,
+        targetYear,
+        baselineYear,
+        baselineEmissionsTco2e: baseline,
+        targetEmissionsTco2e: target,
+        sbtiAligned: v.sbtiAligned === 'true',
+        alignmentFramework,
+      });
+      toast.success(isAr ? 'تم تسجيل الهدف' : 'Reduction target registered');
+      setOpenTarget(false);
+      setTab('targets');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تسجيل الهدف' : 'Failed to create target'));
+    }
+  }
+
   return (
     <Shell>
       <PageHeader
@@ -240,6 +307,12 @@ export function FinancedEmissionsPage() {
             <Button variant="primary" Icon={Plus} style={{ marginInlineStart: 'auto' }}
                     onClick={() => setOpenCreate(true)}>
               {isAr ? 'إضافة سجل' : 'Add record'}
+            </Button>
+          )}
+          {tab === 'targets' && (
+            <Button variant="primary" Icon={Plus} style={{ marginInlineStart: 'auto' }}
+                    onClick={() => setOpenTarget(true)}>
+              {isAr ? 'إضافة هدف' : 'Add target'}
             </Button>
           )}
         </div>
@@ -387,6 +460,17 @@ export function FinancedEmissionsPage() {
         size="lg"
         onClose={() => setOpenCreate(false)}
         onSubmit={submitCreate}
+      />
+
+      <FormModal
+        open={openTarget}
+        title={isAr ? 'إضافة هدف خفض' : 'Add reduction target'}
+        fields={targetFields}
+        initial={targetInitial}
+        submitLabel={isAr ? 'تسجيل' : 'Create'}
+        size="lg"
+        onClose={() => setOpenTarget(false)}
+        onSubmit={submitTarget}
       />
     </Shell>
   );
