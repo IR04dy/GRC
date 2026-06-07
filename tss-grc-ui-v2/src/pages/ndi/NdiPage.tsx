@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   Database, FileText, Target, Wrench, AlertCircle, CheckCircle2,
   Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check, Paperclip,
-  Calendar,
+  Calendar, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -25,7 +25,7 @@ import {
 } from '../../lib/ndiCycles';
 import {
   listFramework, frameworkAggregate, markOfficial, markPlaceholder,
-  importFrameworkJson, deleteFrameworkItem, createFrameworkItem,
+  importFrameworkJson, deleteFrameworkItem, createFrameworkItem, updateFrameworkItem,
   componentTone, componentLabel, priorityTone, priorityLabel,
   type NdiFrameworkItem, type NdiFrameworkAggregate, type NdiComponent,
   type NdiPriority,
@@ -595,6 +595,8 @@ function FrameworkTab() {
 
   // ── Define requirement (createFrameworkItem) ──────────────────────
   const [openNew, setOpenNew] = useState(false);
+  // ── Edit requirement (updateFrameworkItem) ────────────────────────
+  const [editItem, setEditItem] = useState<NdiFrameworkItem | null>(null);
   const L = isAr ? 'ar' : 'en';
 
   const componentOpts = (['COMPLIANCE', 'MATURITY', 'OPERATIONAL_EXCELLENCE'] as NdiComponent[])
@@ -738,6 +740,87 @@ function FrameworkTab() {
     }
   }
 
+  // Edit modal pre-fills from the selected row. Keyed on item id so the
+  // memoized identity changes whenever a different row is opened, which
+  // re-runs FormModal's reset effect against the new initial.
+  const editInitial = useMemo<FrameworkForm>(() => ({
+    requirementCode: editItem?.requirementCode ?? '',
+    component: editItem?.component ?? 'COMPLIANCE',
+    domain: editItem?.domain ?? '',
+    subdomain: editItem?.subdomain ?? '',
+    titleEn: editItem?.titleEn ?? '',
+    titleAr: editItem?.titleAr ?? '',
+    priority: editItem?.priority ?? 'MEDIUM',
+    mandatory: editItem?.mandatory ? 'YES' : 'NO',
+    reviewFrequency: editItem?.reviewFrequency ?? '',
+    status: editItem?.status ?? 'ACTIVE',
+    weight: editItem?.weight ?? 1,
+    scoringMethod: editItem?.scoringMethod ?? '',
+    ownerRole: editItem?.ownerRole ?? '',
+    descriptionEn: editItem?.descriptionEn ?? '',
+    descriptionAr: editItem?.descriptionAr ?? '',
+    questionEn: editItem?.questionEn ?? '',
+    questionAr: editItem?.questionAr ?? '',
+    evidenceGuidanceEn: editItem?.evidenceGuidanceEn ?? '',
+    evidenceGuidanceAr: editItem?.evidenceGuidanceAr ?? '',
+    relatedNdmoControl: editItem?.relatedNdmoControl ?? '',
+    relatedPdplRequirement: editItem?.relatedPdplRequirement ?? '',
+    relatedCyberControl: editItem?.relatedCyberControl ?? '',
+    relatedIsoMapping: editItem?.relatedIsoMapping ?? '',
+    effectiveDate: editItem?.effectiveDate ?? '',
+    notes: editItem?.notes ?? '',
+  }), [editItem]);
+
+  async function onUpdate(v: FrameworkForm) {
+    if (!editItem?.id) return;
+    const u = (s: string) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    const code = String(v.requirementCode ?? '').trim();
+    const titleEn = String(v.titleEn ?? '').trim();
+    const domain = String(v.domain ?? '').trim();
+    const component = String(v.component ?? '').trim();
+    if (!code)      { toast.danger(isAr ? 'كود المتطلب مطلوب' : 'Requirement code is required'); return; }
+    if (!component) { toast.danger(isAr ? 'المكوّن مطلوب' : 'Component is required'); return; }
+    if (!domain)    { toast.danger(isAr ? 'المجال مطلوب' : 'Domain is required'); return; }
+    if (!titleEn)   { toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'English title is required'); return; }
+    const weight = Number.isFinite(v.weight) && v.weight > 0 ? v.weight : 1;
+
+    const body: Partial<NdiFrameworkItem> = {
+      requirementCode: code,
+      component: component as NdiComponent,
+      domain,
+      subdomain: u(v.subdomain),
+      titleEn,
+      titleAr: u(v.titleAr),
+      priority: (v.priority || 'MEDIUM') as NdiPriority,
+      mandatory: v.mandatory === 'YES',
+      reviewFrequency: u(v.reviewFrequency) as NdiFrameworkItem['reviewFrequency'],
+      status: (v.status || 'ACTIVE') as NdiFrameworkItem['status'],
+      weight,
+      scoringMethod: u(v.scoringMethod) as NdiFrameworkItem['scoringMethod'],
+      ownerRole: u(v.ownerRole),
+      descriptionEn: u(v.descriptionEn),
+      descriptionAr: u(v.descriptionAr),
+      questionEn: u(v.questionEn),
+      questionAr: u(v.questionAr),
+      evidenceGuidanceEn: u(v.evidenceGuidanceEn),
+      evidenceGuidanceAr: u(v.evidenceGuidanceAr),
+      relatedNdmoControl: u(v.relatedNdmoControl),
+      relatedPdplRequirement: u(v.relatedPdplRequirement),
+      relatedCyberControl: u(v.relatedCyberControl),
+      relatedIsoMapping: u(v.relatedIsoMapping),
+      effectiveDate: u(v.effectiveDate),
+      notes: u(v.notes),
+    };
+    try {
+      await updateFrameworkItem(editItem.id, body);
+      toast.success(isAr ? 'حُدّث المتطلب' : 'Requirement updated');
+      setEditItem(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
   return (
     <div className="ndi-stack">
       <div className="kpi-grid">
@@ -824,6 +907,9 @@ function FrameworkTab() {
                       </td>
                       <td className="ndi-text-end">
                         <div className="ndi-actions-row">
+                          <Button size="sm" variant="ghost" Icon={Pencil}
+                            title={isAr ? 'تعديل' : 'Edit'}
+                            onClick={() => setEditItem(it)} />
                           {!it.isOfficialImport && (
                             <Button size="sm" variant="secondary" Icon={Check}
                               onClick={() => onMarkOfficial(it)}>
@@ -867,6 +953,17 @@ function FrameworkTab() {
         submitLabel={isAr ? 'إضافة المتطلب' : 'Add requirement'}
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
+      />
+
+      <FormModal<FrameworkForm>
+        open={!!editItem}
+        title={isAr ? 'تعديل متطلب الإطار' : 'Edit framework requirement'}
+        fields={reqFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditItem(null)}
+        onSubmit={onUpdate}
       />
     </div>
   );
