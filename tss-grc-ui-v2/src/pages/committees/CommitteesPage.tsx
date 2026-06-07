@@ -21,12 +21,13 @@ import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMeetings, startMeeting, completeMeeting, approveMinutes, cancelMeeting,
   listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution, createMeeting,
-  createCommittee,
+  createCommittee, createAction,
   startAction, completeAction, cancelAction, deferAction,
   parseAgenda, parseAttendees, parseDecisions, parseActions, parseMembers,
   COM_STATUS_TONE, MTG_STATUS_TONE, OUTCOME_TONE, ACTION_STATUS_TONE, ACTION_PRIORITY_TONE,
   type Committee, type CommitteeMeeting, type Resolution, type ActionItemRecord,
   type ResolutionOutcome, type ConfidentialityLevel, type CommitteeType, type MeetingCadence,
+  type ActionPriority,
 } from '../../lib/committees';
 
 /** Committee type -> registry-code stem, mirroring the seeded set (COM-RISK, COM-AUDIT, …). */
@@ -92,6 +93,7 @@ export function CommitteesPage() {
   const [openResolution, setOpenResolution] = useState(false);
   const [openMeeting, setOpenMeeting] = useState(false);
   const [openCommittee, setOpenCommittee] = useState(false);
+  const [openAction, setOpenAction] = useState(false);
 
   useEffect(() => { void reload(); }, []);
 
@@ -361,6 +363,87 @@ export function CommitteesPage() {
       await reload();
     } catch {
       toast.danger(isAr ? 'تعذّر إنشاء اللجنة' : 'Failed to charter the committee');
+    }
+  }
+
+  // ─── Log an action item against a meeting ────────────────────────
+  const PRIORITIES: ActionPriority[] = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'];
+  const PRIORITY_AR: Record<ActionPriority, string> = {
+    LOW: 'منخفضة', NORMAL: 'عادية', HIGH: 'عالية', CRITICAL: 'حرجة',
+  };
+  const PRIORITY_EN: Record<ActionPriority, string> = {
+    LOW: 'Low', NORMAL: 'Normal', HIGH: 'High', CRITICAL: 'Critical',
+  };
+  const actionFields: FieldDef[] = [
+    { key: 'meetingId', label: isAr ? 'الاجتماع' : 'Meeting', kind: 'select-searchable', required: true, span: 12,
+      placeholder: isAr ? 'اختر اجتماعًا…' : 'Select a meeting…',
+      options: meetings.map(m => ({ value: String(m.id), label: meetingLabel(m), sub: committeeNameFor(m.committeeId) })) },
+    { key: 'titleEn', label: isAr ? 'عنوان المهمة (إنجليزي)' : 'Action title (English)', kind: 'text', required: true, maxLength: 500, span: 12 },
+    { key: 'titleAr', label: isAr ? 'عنوان المهمة (عربي)' : 'Action title (Arabic)', kind: 'text', maxLength: 500, span: 12 },
+    { key: 'ownerName', label: isAr ? 'المسؤول' : 'Owner', kind: 'text', required: true, maxLength: 255, span: 6 },
+    { key: 'ownerRole', label: isAr ? 'صفة المسؤول' : 'Owner role', kind: 'text', maxLength: 120, span: 6 },
+    { key: 'dueDate', label: isAr ? 'تاريخ الاستحقاق' : 'Due date', kind: 'date', span: 4 },
+    { key: 'priority', label: isAr ? 'الأولوية' : 'Priority', kind: 'select', required: true, span: 4,
+      options: PRIORITIES.map(p => ({ value: p, label: isAr ? PRIORITY_AR[p] : PRIORITY_EN[p] })) },
+    { key: 'agendaItemSeq', label: isAr ? 'بند جدول الأعمال' : 'Agenda item #', kind: 'number', min: 1, span: 4 },
+    { key: 'descriptionEn', label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)', kind: 'textarea', rows: 2, span: 12 },
+    { key: 'descriptionAr', label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)', kind: 'textarea', rows: 2, span: 12 },
+  ];
+  // Memoised so the modal's reset effect (keyed on `initial`) can't wipe the
+  // form during the page's live-refresh re-renders.
+  const actionInitial: Record<string, string> = useMemo(() => ({
+    meetingId: '', titleEn: '', titleAr: '', ownerName: '', ownerRole: '',
+    dueDate: '', priority: 'NORMAL', agendaItemSeq: '', descriptionEn: '', descriptionAr: '',
+  }), []);
+
+  async function submitAction(v: Record<string, string>) {
+    const meetingId = Number(v.meetingId);
+    const meeting = meetings.find(m => m.id === meetingId);
+    const titleEn = String(v.titleEn || '').trim();
+    const ownerName = String(v.ownerName || '').trim();
+    const dueDate = String(v.dueDate || '').trim();
+    const priority = (v.priority as ActionPriority) || 'NORMAL';
+    if (!meeting)   { toast.danger(isAr ? 'يُرجى اختيار اجتماع' : 'Please select a meeting'); return; }
+    if (!titleEn)   { toast.danger(isAr ? 'عنوان المهمة (إنجليزي) مطلوب' : 'Action title (English) is required'); return; }
+    if (!ownerName) { toast.danger(isAr ? 'اسم المسؤول مطلوب' : 'Owner name is required'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      toast.danger(isAr ? 'تاريخ الاستحقاق مطلوب' : 'A due date is required'); return;
+    }
+    // seq is per-meeting; action_code is unique per org (UQ_action_item_code).
+    // Derive both collision-safe from the actions already on record so the new
+    // row slots in sequentially and the generated code can't clash.
+    const existing = actions.filter(a => a.meetingId === meetingId);
+    let seq = existing.reduce((mx, a) => Math.max(mx, a.seq || 0), 0) + 1;
+    const codes = new Set(actions.map(a => a.actionCode));
+    let actionCode = `ACT-${meeting.meetingCode}-${String(seq).padStart(3, '0')}`;
+    while (codes.has(actionCode)) {
+      seq += 1;
+      actionCode = `ACT-${meeting.meetingCode}-${String(seq).padStart(3, '0')}`;
+    }
+    const agendaStr = String(v.agendaItemSeq ?? '').trim();
+    const agendaNum = agendaStr === '' ? null : Number(agendaStr);
+    try {
+      await createAction({
+        meetingId,
+        committeeId: meeting.committeeId,
+        actionCode,
+        seq,
+        agendaItemSeq: agendaNum != null && Number.isFinite(agendaNum) ? agendaNum : null,
+        titleEn,
+        titleAr: String(v.titleAr || '').trim() || null,
+        descriptionEn: String(v.descriptionEn || '').trim() || null,
+        descriptionAr: String(v.descriptionAr || '').trim() || null,
+        ownerName,
+        ownerRole: String(v.ownerRole || '').trim() || null,
+        dueDate,
+        priority,
+      });
+      toast.success(isAr ? `تم تسجيل المهمة ${actionCode}` : `Action ${actionCode} logged`);
+      setOpenAction(false);
+      setTab('actions');
+      await reload();
+    } catch {
+      toast.danger(isAr ? 'تعذّر تسجيل المهمة' : 'Failed to log the action');
     }
   }
 
@@ -865,7 +948,13 @@ export function CommitteesPage() {
 
       {/* ── Action items register ────────────────────────────────────── */}
       {tab === 'actions' && (
-        <Card title={t('comTabActionRegister')} Icon={ClipboardList}>
+        <Card title={t('comTabActionRegister')} Icon={ClipboardList}
+          action={
+            <Button variant="primary" Icon={Plus} disabled={meetings.length === 0}
+                    onClick={() => setOpenAction(true)}>
+              {isAr ? 'تسجيل مهمة' : 'Log action'}
+            </Button>
+          }>
           {loading
             ? <EmptyState Icon={ClipboardList} title={t('loading')} />
             : actions.length === 0
@@ -1011,6 +1100,17 @@ export function CommitteesPage() {
         size="lg"
         onClose={() => setOpenCommittee(false)}
         onSubmit={submitCommittee}
+      />
+
+      <FormModal
+        open={openAction}
+        title={isAr ? 'تسجيل مهمة لجنة' : 'Log a committee action'}
+        fields={actionFields}
+        initial={actionInitial}
+        submitLabel={isAr ? 'تسجيل' : 'Log action'}
+        size="lg"
+        onClose={() => setOpenAction(false)}
+        onSubmit={submitAction}
       />
     </Shell>
   );
