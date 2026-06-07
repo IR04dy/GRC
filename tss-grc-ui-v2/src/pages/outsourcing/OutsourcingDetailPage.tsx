@@ -15,6 +15,7 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
+import { getUser } from '../../lib/auth';
 import {
   getArrangement,
   listDueDiligence,
@@ -22,12 +23,14 @@ import {
   getExitPlan,
   recordReview,
   recordEvent,
+  recordDueDiligence,
   type OutsourcingArrangement,
   type DueDiligence,
   type MonitoringEvent,
   type ExitPlan,
   type EventType,
   type Severity,
+  type Recommendation,
   LIFECYCLE_LABELS,
   SERVICE_TYPE_LABELS,
   CRITICAL_FUNCTION_LABELS,
@@ -57,6 +60,22 @@ const EVENT_TYPES: EventType[] = [
 ];
 const SEVERITIES: Severity[] = ['INFO', 'MINOR', 'MODERATE', 'MAJOR', 'CRITICAL'];
 
+const RECOMMENDATIONS: Recommendation[] = ['APPROVE', 'CONDITIONAL', 'REJECT'];
+const RECOMMENDATION_LABELS: Record<Recommendation, { en: string; ar: string }> = {
+  APPROVE:     { en: 'Approve',                ar: 'موافقة' },
+  CONDITIONAL: { en: 'Conditional approval',   ar: 'موافقة مشروطة' },
+  REJECT:      { en: 'Reject',                 ar: 'رفض' },
+};
+// Six due-diligence sub-score fields (each 0-100). Composite is server-computed.
+const DD_SCORES: Array<{ key: string; en: string; ar: string }> = [
+  { key: 'financialHealthScore',       en: 'Financial health',        ar: 'الوضع المالي' },
+  { key: 'operationalCapabilityScore', en: 'Operational capability',  ar: 'القدرة التشغيلية' },
+  { key: 'cybersecurityScore',         en: 'Cybersecurity',           ar: 'الأمن السيبراني' },
+  { key: 'bcmScore',                   en: 'BCM resilience',          ar: 'استمرارية الأعمال' },
+  { key: 'pdplComplianceScore',        en: 'PDPL compliance',         ar: 'الامتثال لنظام حماية البيانات' },
+  { key: 'reputationScore',            en: 'Reputation',              ar: 'السمعة' },
+];
+
 export function OutsourcingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -72,6 +91,7 @@ export function OutsourcingDetailPage() {
   const [tab, setTab] = useState<TabId>('overview');
   const [loading, setLoading] = useState(false);
   const [openEvent, setOpenEvent] = useState(false);
+  const [openDd, setOpenDd] = useState(false);
 
   async function reload() {
     if (!Number.isFinite(arrangementId)) return;
@@ -162,6 +182,72 @@ export function OutsourcingDetailPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل تسجيل الحدث' : 'Failed to record event'));
+    }
+  }
+
+  // ── Record a due-diligence assessment (six sub-scores -> composite) ────
+  const ddInitial: Record<string, string> = useMemo(() => ({
+    assessmentDate: today,
+    financialHealthScore: '80', operationalCapabilityScore: '80', cybersecurityScore: '80',
+    bcmScore: '80', pdplComplianceScore: '80', reputationScore: '80',
+    recommendation: 'APPROVE', rationaleEn: '', rationaleAr: '',
+  }), [today]);
+
+  const ddFields: FieldDef[] = useMemo(() => [
+    { key: 'assessmentDate', kind: 'date', span: 6, label: isAr ? 'تاريخ التقييم' : 'Assessment date' },
+    { key: 'recommendation', kind: 'select', required: true, span: 6,
+      label: isAr ? 'التوصية' : 'Recommendation',
+      options: RECOMMENDATIONS.map(r => ({ value: r, label: RECOMMENDATION_LABELS[r][isAr ? 'ar' : 'en'] })) },
+    ...DD_SCORES.map((s): FieldDef => ({
+      key: s.key, kind: 'number', required: true, span: 4, min: 0, max: 100,
+      label: isAr ? s.ar : s.en,
+    })),
+    { key: 'rationaleEn', kind: 'textarea', span: 12, rows: 3, label: isAr ? 'المبرّر (إنجليزي)' : 'Rationale (EN)' },
+    { key: 'rationaleAr', kind: 'textarea', span: 12, rows: 3, label: isAr ? 'المبرّر (عربي)' : 'Rationale (AR)' },
+  ], [isAr]);
+
+  async function submitDd(v: Record<string, string>) {
+    const assessmentDate = String(v.assessmentDate ?? '').trim();
+    const recommendation = (v.recommendation ?? '') as Recommendation;
+    const rationaleEn = String(v.rationaleEn ?? '').trim();
+    const rationaleAr = String(v.rationaleAr ?? '').trim();
+    const assessorUserId = getUser()?.userId;
+    if (!assessmentDate) { toast.danger(isAr ? 'تاريخ التقييم مطلوب' : 'Assessment date is required'); return; }
+    if (!recommendation) { toast.danger(isAr ? 'التوصية مطلوبة' : 'Recommendation is required'); return; }
+    if (!rationaleEn) { toast.danger(isAr ? 'المبرّر بالإنجليزية مطلوب' : 'Rationale (EN) is required'); return; }
+    if (!rationaleAr) { toast.danger(isAr ? 'المبرّر بالعربية مطلوب' : 'Rationale (AR) is required'); return; }
+    if (assessorUserId == null) { toast.danger(isAr ? 'تعذّر تحديد المُقيِّم' : 'Could not resolve the assessor'); return; }
+    // FormModal number-kind fields hold runtime numbers; coerce + bounds-check.
+    const scores: Record<string, number> = {};
+    for (const s of DD_SCORES) {
+      const n = Number(v[s.key]);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        toast.danger(isAr ? `قيمة غير صحيحة: ${s.ar} (0-100)` : `Invalid score: ${s.en} (0-100)`);
+        return;
+      }
+      scores[s.key] = Math.round(n);
+    }
+    try {
+      await recordDueDiligence({
+        arrangementId,
+        assessmentDate,
+        assessorUserId,
+        financialHealthScore: scores.financialHealthScore,
+        operationalCapabilityScore: scores.operationalCapabilityScore,
+        cybersecurityScore: scores.cybersecurityScore,
+        bcmScore: scores.bcmScore,
+        pdplComplianceScore: scores.pdplComplianceScore,
+        reputationScore: scores.reputationScore,
+        recommendation,
+        rationaleEn,
+        rationaleAr,
+      });
+      toast.success(isAr ? 'تمّ تسجيل تقييم العناية الواجبة' : 'Due diligence recorded');
+      setOpenDd(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل تسجيل العناية الواجبة' : 'Failed to record due diligence'));
     }
   }
 
@@ -287,6 +373,11 @@ export function OutsourcingDetailPage() {
 
       {tab === 'dd' && (
         <div style={stack}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button Icon={Plus} onClick={() => setOpenDd(true)}>
+              {isAr ? 'تسجيل تقييم' : 'Record assessment'}
+            </Button>
+          </div>
           {dd.length === 0 && <Card><InlineEmpty text={isAr ? 'لا توجد سجلات عناية واجبة' : 'No due diligence records'} /></Card>}
           {dd.map(d => (
             <Card key={d.id}>
@@ -414,6 +505,16 @@ export function OutsourcingDetailPage() {
         onClose={() => setOpenEvent(false)}
         onSubmit={submitEvent}
         submitLabel={isAr ? 'تسجيل الحدث' : 'Record event'}
+      />
+
+      <FormModal
+        open={openDd}
+        title={isAr ? 'تسجيل تقييم عناية واجبة' : 'Record due-diligence assessment'}
+        fields={ddFields}
+        initial={ddInitial}
+        onClose={() => setOpenDd(false)}
+        onSubmit={submitDd}
+        submitLabel={isAr ? 'تسجيل التقييم' : 'Record assessment'}
       />
     </Shell>
   );
