@@ -20,7 +20,7 @@ import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMeetings, startMeeting, completeMeeting, approveMinutes, cancelMeeting,
-  listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution,
+  listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution, createMeeting,
   startAction, completeAction, cancelAction, deferAction,
   parseAgenda, parseAttendees, parseDecisions, parseActions, parseMembers,
   COM_STATUS_TONE, MTG_STATUS_TONE, OUTCOME_TONE, ACTION_STATUS_TONE, ACTION_PRIORITY_TONE,
@@ -65,6 +65,7 @@ export function CommitteesPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [openResolution, setOpenResolution] = useState(false);
+  const [openMeeting, setOpenMeeting] = useState(false);
 
   useEffect(() => { void reload(); }, []);
 
@@ -232,6 +233,48 @@ export function CommitteesPage() {
     }
   }
 
+  // ─── Schedule a meeting ──────────────────────────────────────────
+  const MEETING_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+  const meetingFields: FieldDef[] = [
+    { key: 'committeeId', label: isAr ? 'اللجنة' : 'Committee', kind: 'select-searchable', required: true, span: 12,
+      placeholder: isAr ? 'اختر لجنة…' : 'Select a committee…',
+      options: committees.map(c => ({ value: String(c.id), label: `${c.code} · ${lang === 'ar' && c.nameAr ? c.nameAr : c.nameEn}` })) },
+    { key: 'titleEn', label: isAr ? 'عنوان الاجتماع (إنجليزي)' : 'Meeting title (English)', kind: 'text', maxLength: 255, span: 12 },
+    { key: 'titleAr', label: isAr ? 'عنوان الاجتماع (عربي)' : 'Meeting title (Arabic)', kind: 'text', maxLength: 255, span: 12 },
+    { key: 'meetingDate', label: isAr ? 'تاريخ الاجتماع' : 'Meeting date', kind: 'date', span: 6 },
+    { key: 'meetingTime', label: isAr ? 'الوقت' : 'Time', kind: 'select', required: true, span: 6,
+      options: MEETING_TIMES.map(tm => ({ value: tm, label: tm })) },
+    { key: 'locationOrLink', label: isAr ? 'المكان أو الرابط' : 'Location or link', kind: 'text', maxLength: 500, span: 12 },
+  ];
+  const meetingInitial = {
+    committeeId: '', titleEn: '', titleAr: '', meetingDate: '', meetingTime: '10:00', locationOrLink: '',
+  };
+
+  async function submitMeeting(v: Record<string, string>) {
+    const committeeId = Number(v.committeeId);
+    const committee = committees.find(c => c.id === committeeId);
+    if (!committee || !v.meetingDate || !v.meetingTime) {
+      toast.danger(isAr ? 'يُرجى اختيار اللجنة والتاريخ والوقت' : 'Please choose a committee, date and time');
+      return;
+    }
+    const scheduledAt = `${v.meetingDate}T${v.meetingTime}:00`;
+    try {
+      await createMeeting({
+        committeeId,
+        titleEn: String(v.titleEn || '').trim() || undefined,
+        titleAr: String(v.titleAr || '').trim() || undefined,
+        scheduledAt,
+        locationOrLink: String(v.locationOrLink || '').trim() || undefined,
+      });
+      toast.success(isAr ? 'تم جدولة الاجتماع' : 'Meeting scheduled');
+      setOpenMeeting(false);
+      setTab('scheduled');
+      await reload();
+    } catch (e) {
+      toast.danger(isAr ? 'تعذّر جدولة الاجتماع' : 'Failed to schedule the meeting');
+    }
+  }
+
   function toggle(key: string) {
     const n = new Set(expanded);
     if (n.has(key)) n.delete(key); else n.add(key);
@@ -342,7 +385,13 @@ export function CommitteesPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'committees' && (
-        <Card title={t('comTabCommittees')} Icon={Landmark}>
+        <Card title={t('comTabCommittees')} Icon={Landmark}
+          action={
+            <Button variant="primary" Icon={Plus} disabled={committees.length === 0}
+                    onClick={() => setOpenMeeting(true)}>
+              {isAr ? 'جدولة اجتماع' : 'Schedule meeting'}
+            </Button>
+          }>
           {loading
             ? <EmptyState Icon={Landmark} title={t('loading')} />
             : committees.length === 0
@@ -846,6 +895,17 @@ export function CommitteesPage() {
         size="lg"
         onClose={() => setOpenResolution(false)}
         onSubmit={submitResolution}
+      />
+
+      <FormModal
+        open={openMeeting}
+        title={isAr ? 'جدولة اجتماع لجنة' : 'Schedule a committee meeting'}
+        fields={meetingFields}
+        initial={meetingInitial}
+        submitLabel={isAr ? 'جدولة' : 'Schedule'}
+        size="lg"
+        onClose={() => setOpenMeeting(false)}
+        onSubmit={submitMeeting}
       />
     </Shell>
   );
