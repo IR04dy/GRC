@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Factory, Target, BarChart3, CheckCircle2,
-  Send, Archive, TrendingDown, Plus,
+  Send, Archive, TrendingDown, Plus, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -16,7 +16,7 @@ import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
-  listEmissions, transitionEmission, createEmission,
+  listEmissions, transitionEmission, createEmission, updateEmission,
   listTargets, getTargetProgress, getEmissionsTotal, createTarget,
   ASSET_CLASS_LABELS, EMISSIONS_STAGE_LABELS, ALIGNMENT_LABELS,
   emissionsStageTone, dataQualityTone,
@@ -53,6 +53,7 @@ export function FinancedEmissionsPage() {
   const [tab, setTab] = useState<Tab>('records');
   const [openCreate, setOpenCreate] = useState(false);
   const [openTarget, setOpenTarget] = useState(false);
+  const [editing, setEditing] = useState<FinancedEmissionsRecord | null>(null);
   const [records, setRecords] = useState<FinancedEmissionsRecord[]>([]);
   const [targets, setTargets] = useState<FinancedEmissionsTarget[]>([]);
   const [progress, setProgress] = useState<TargetProgress[]>([]);
@@ -256,6 +257,71 @@ export function FinancedEmissionsPage() {
     }
   }
 
+  // ─── Edit a non-published record ─────────────────────────────────
+  // The identity triple (year · period · asset class) is locked — it is
+  // part of the unique key and changing it is semantically a different
+  // record. Only the financial / emission components are editable.
+  const editFields: FieldDef[] = [
+    { key: 'dataQualityScore', label: isAr ? 'جودة بيانات PCAF' : 'PCAF data quality', kind: 'select', required: true, span: 4,
+      options: [1, 2, 3, 4, 5].map(n => ({ value: String(n), label: isAr ? `${n} (${n === 1 ? 'الأفضل' : n === 5 ? 'الأضعف' : 'متوسط'})` : `${n} (${n === 1 ? 'best' : n === 5 ? 'worst' : 'proxy'})` })) },
+    { key: 'outstandingAmountSarMillions', label: isAr ? 'المبلغ القائم (مليون ر.س)' : 'Outstanding (M SAR)', kind: 'number', min: 0, required: true, span: 4 },
+    { key: 'attributionFactor', label: isAr ? 'عامل الإسناد (0–1)' : 'Attribution factor (0–1)', kind: 'number', min: 0, max: 1, required: true, span: 4 },
+    { key: 'emissionsScope1Tco2e', label: isAr ? 'النطاق 1 (طن CO₂e)' : 'Scope 1 (tCO₂e)', kind: 'number', min: 0, span: 4 },
+    { key: 'emissionsScope2Tco2e', label: isAr ? 'النطاق 2 (طن CO₂e)' : 'Scope 2 (tCO₂e)', kind: 'number', min: 0, span: 4 },
+    { key: 'emissionsScope3Tco2e', label: isAr ? 'النطاق 3 (طن CO₂e)' : 'Scope 3 (tCO₂e)', kind: 'number', min: 0, span: 4 },
+    { key: 'methodologyEn', label: isAr ? 'المنهجية (إنجليزي)' : 'Methodology (English)', kind: 'textarea', rows: 2, span: 12 },
+    { key: 'methodologyAr', label: isAr ? 'المنهجية (عربي)' : 'Methodology (Arabic)', kind: 'textarea', rows: 2, span: 12 },
+  ];
+  const editInitial = useMemo(() => ({
+    dataQualityScore: editing ? String(editing.dataQualityScore) : '3',
+    outstandingAmountSarMillions: editing ? String(editing.outstandingAmountSarMillions ?? '') : '',
+    attributionFactor: editing ? String(editing.attributionFactor ?? '') : '',
+    emissionsScope1Tco2e: editing ? String(editing.emissionsScope1Tco2e ?? '') : '',
+    emissionsScope2Tco2e: editing ? String(editing.emissionsScope2Tco2e ?? '') : '',
+    emissionsScope3Tco2e: editing ? String(editing.emissionsScope3Tco2e ?? '') : '',
+    methodologyEn: editing?.methodologyEn ?? '',
+    methodologyAr: editing?.methodologyAr ?? '',
+  }), [editing]);
+
+  async function submitEdit(v: Record<string, string>) {
+    if (!editing) return;
+    const outstanding = Number(v.outstandingAmountSarMillions);
+    const attribution = Number(v.attributionFactor);
+    const dq = Number(v.dataQualityScore);
+    if (!Number.isFinite(outstanding) || !Number.isFinite(attribution) || !dq) {
+      toast.danger(isAr ? 'يُرجى تعبئة الحقول المطلوبة' : 'Please fill the required fields');
+      return;
+    }
+    const num = (x: string) => {
+      const n = Number(x);
+      return x !== '' && Number.isFinite(n) ? n : undefined;
+    };
+    const labels = ASSET_CLASS_LABELS[editing.assetClass];
+    try {
+      await updateEmission(editing.externalId, {
+        reportingYear: editing.reportingYear,
+        reportingPeriod: editing.reportingPeriod,
+        assetClass: editing.assetClass,
+        assetClassLabelEn: editing.assetClassLabelEn || labels.en,
+        assetClassLabelAr: editing.assetClassLabelAr ?? labels.ar,
+        outstandingAmountSarMillions: outstanding,
+        attributionFactor: attribution,
+        dataQualityScore: dq,
+        emissionsScope1Tco2e: num(v.emissionsScope1Tco2e),
+        emissionsScope2Tco2e: num(v.emissionsScope2Tco2e),
+        emissionsScope3Tco2e: num(v.emissionsScope3Tco2e),
+        methodologyEn: String(v.methodologyEn || '').trim() || undefined,
+        methodologyAr: String(v.methodologyAr || '').trim() || undefined,
+      });
+      toast.success(isAr ? 'تم تحديث السجل' : 'Record updated');
+      setEditing(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث السجل' : 'Failed to update record'));
+    }
+  }
+
   return (
     <Shell>
       <PageHeader
@@ -358,6 +424,12 @@ export function FinancedEmissionsPage() {
                         </Badge>
                       </td>
                       <td style={td}>
+                        {r.lifecycleStage !== 'PUBLISHED' && r.lifecycleStage !== 'ARCHIVED' && (
+                          <Button variant="ghost" Icon={Pencil}
+                                  aria-label={isAr ? 'تعديل السجل' : 'Edit record'}
+                                  style={{ marginInlineEnd: 8 }}
+                                  onClick={() => setEditing(r)} />
+                        )}
                         {r.lifecycleStage === 'DRAFT' && (
                           <Button variant="secondary" Icon={Send}
                                   onClick={() => changeStage(r, 'IN_REVIEW')}>
@@ -471,6 +543,21 @@ export function FinancedEmissionsPage() {
         size="lg"
         onClose={() => setOpenTarget(false)}
         onSubmit={submitTarget}
+      />
+
+      <FormModal
+        open={!!editing}
+        title={editing
+          ? (isAr
+              ? `تعديل: ${tlabel(ASSET_CLASS_LABELS, editing.assetClass, true)} · ${editing.reportingYear}/${editing.reportingPeriod}`
+              : `Edit: ${tlabel(ASSET_CLASS_LABELS, editing.assetClass, false)} · ${editing.reportingYear}/${editing.reportingPeriod}`)
+          : ''}
+        fields={editFields}
+        initial={editInitial}
+        submitLabel={isAr ? 'حفظ' : 'Save'}
+        size="lg"
+        onClose={() => setEditing(null)}
+        onSubmit={submitEdit}
       />
     </Shell>
   );
