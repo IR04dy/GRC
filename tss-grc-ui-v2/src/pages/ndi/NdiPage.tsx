@@ -50,7 +50,7 @@ import {
   type NdiOpexKpi, type NdiOpexAggregate,
 } from '../../lib/ndiOpex';
 import {
-  listDomains, rollupForCycle, updateDomain, deleteDomain,
+  listDomains, rollupForCycle, createDomain, updateDomain, deleteDomain,
   markDomainOfficial, markDomainPlaceholder,
   ndiScoreTone, ndiScoreLabel,
   type NdiGovernanceDomain, type CycleRollup, type DomainRollup,
@@ -1489,6 +1489,51 @@ function OpexTab() {
 
 // ─── Governance Domains tab (slice 6) ────────────────────────────────
 
+// All-string create-domain form shape. Numeric fields are number-kind in the
+// FormModal (runtime values are numbers); the submit handler coerces them.
+interface DomainForm {
+  code:             string;
+  nameEn:           string;
+  nameAr:           string;
+  weight:           string;
+  sortOrder:        string;
+  weightMaturity:   string;
+  weightCompliance: string;
+  weightOpex:       string;
+  domainAliases:    string;
+  ownerName:        string;
+  ownerEmail:       string;
+  descriptionEn:    string;
+  descriptionAr:    string;
+}
+
+function domainFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'text', key: 'code', label: isAr ? 'الكود' : 'Code', span: 4, required: true, maxLength: 40,
+      placeholder: isAr ? 'مثلاً: DATA_QUALITY' : 'e.g. DATA_QUALITY' },
+    { kind: 'number', key: 'weight', label: isAr ? 'الوزن (0-100)' : 'Weight (0-100)', span: 4, min: 0, max: 100, required: true },
+    { kind: 'number', key: 'sortOrder', label: isAr ? 'ترتيب الفرز' : 'Sort order', span: 4, min: 0, required: true },
+
+    { kind: 'text', key: 'nameEn', label: isAr ? 'الاسم (إنجليزي)' : 'Name (EN)', span: 6, required: true, maxLength: 255,
+      placeholder: isAr ? 'مثلاً: Data Quality' : 'e.g. Data Quality' },
+    { kind: 'text', key: 'nameAr', label: isAr ? 'الاسم (عربي)' : 'Name (AR)', span: 6, maxLength: 255,
+      placeholder: isAr ? 'مثلاً: جودة البيانات' : 'e.g. جودة البيانات' },
+
+    { kind: 'number', key: 'weightMaturity', label: isAr ? 'وزن النضج (0-1)' : 'Maturity weight (0-1)', span: 4, min: 0, max: 1 },
+    { kind: 'number', key: 'weightCompliance', label: isAr ? 'وزن الالتزام (0-1)' : 'Compliance weight (0-1)', span: 4, min: 0, max: 1 },
+    { kind: 'number', key: 'weightOpex', label: isAr ? 'وزن التميّز (0-1)' : 'OpEx weight (0-1)', span: 4, min: 0, max: 1 },
+
+    { kind: 'text', key: 'domainAliases', label: isAr ? 'أسماء بديلة (مفصولة بـ |)' : 'Aliases (pipe-separated)', span: 12,
+      placeholder: isAr ? 'مثلاً: Data Quality|جودة البيانات|DQ' : 'e.g. Data Quality|DQ|جودة البيانات' },
+
+    { kind: 'text', key: 'ownerName', label: isAr ? 'اسم المالك' : 'Owner name', span: 6, maxLength: 255 },
+    { kind: 'text', key: 'ownerEmail', label: isAr ? 'بريد المالك' : 'Owner email', span: 6, maxLength: 255 },
+
+    { kind: 'textarea', key: 'descriptionEn', label: isAr ? 'الوصف (إنجليزي)' : 'Description (EN)', span: 12, rows: 2 },
+    { kind: 'textarea', key: 'descriptionAr', label: isAr ? 'الوصف (عربي)' : 'Description (AR)', span: 12, rows: 2 },
+  ];
+}
+
 function DomainsTab() {
   const { lang } = useI18n();
   const toast = useToast();
@@ -1500,6 +1545,21 @@ function DomainsTab() {
   const [domains, setDomains] = useState<NdiGovernanceDomain[]>([]);
   const [rollup, setRollup] = useState<CycleRollup | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Create-domain modal (slice 6). The page could already edit/mark/delete
+  // domains but had no way to add one beyond the V71 seed catalogue, leaving
+  // the createDomain client orphaned. New domains are seeded as placeholders
+  // (isPlaceholder=true) so they inherit the page's "pending official SDAIA
+  // import" narrative until an admin flips them via "Mark official".
+  // Memoised initial keeps a stable identity for FormModal's open-reset effect.
+  const [openNew, setOpenNew] = useState(false);
+  const domainInitial = useMemo<DomainForm>(() => ({
+    code: '', nameEn: '', nameAr: '',
+    weight: '10', sortOrder: '100',
+    weightMaturity: '0.40', weightCompliance: '0.40', weightOpex: '0.20',
+    domainAliases: '', ownerName: '', ownerEmail: '',
+    descriptionEn: '', descriptionAr: '',
+  }), []);
 
   async function loadCycles() {
     try {
@@ -1547,6 +1607,63 @@ function DomainsTab() {
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  // Create a brand-new governance domain. Client validation mirrors the
+  // service contract: code + nameEn required; component weights (maturity /
+  // compliance / opex) must each be in [0,1] and sum to 1.00 (±0.005).
+  async function onCreate(v: DomainForm) {
+    const code   = String(v.code ?? '').trim();
+    const nameEn = String(v.nameEn ?? '').trim();
+    if (!code) { toast.danger(isAr ? 'الكود مطلوب' : 'Code is required'); return; }
+    if (!nameEn) { toast.danger(isAr ? 'الاسم الإنجليزي مطلوب' : 'English name is required'); return; }
+
+    const weight = Number(v.weight);
+    if (!Number.isFinite(weight) || weight < 0 || weight > 100) {
+      toast.danger(isAr ? 'الوزن يجب أن يكون بين 0 و 100' : 'Weight must be between 0 and 100');
+      return;
+    }
+    const sortOrder = Number(v.sortOrder);
+    if (!Number.isFinite(sortOrder) || sortOrder < 0) {
+      toast.danger(isAr ? 'ترتيب الفرز يجب أن يكون رقماً موجباً' : 'Sort order must be a non-negative number');
+      return;
+    }
+    const wM = Number(v.weightMaturity), wC = Number(v.weightCompliance), wO = Number(v.weightOpex);
+    for (const x of [wM, wC, wO]) {
+      if (!Number.isFinite(x) || x < 0 || x > 1) {
+        toast.danger(isAr ? 'أوزان المكوّنات يجب أن تكون بين 0 و 1' : 'Component weights must each be between 0 and 1');
+        return;
+      }
+    }
+    const sum = wM + wC + wO;
+    if (Math.abs(sum - 1) > 0.005) {
+      toast.danger(isAr
+        ? `أوزان المكوّنات يجب أن يكون مجموعها 1.00 (الحالي ${sum.toFixed(2)})`
+        : `Component weights must sum to 1.00 (currently ${sum.toFixed(2)})`);
+      return;
+    }
+    try {
+      await createDomain({
+        code, nameEn,
+        nameAr:        String(v.nameAr ?? '').trim() || undefined,
+        weight, sortOrder,
+        weightMaturity:   wM,
+        weightCompliance: wC,
+        weightOpex:       wO,
+        domainAliases: String(v.domainAliases ?? '').trim() || undefined,
+        ownerName:     String(v.ownerName ?? '').trim() || undefined,
+        ownerEmail:    String(v.ownerEmail ?? '').trim() || undefined,
+        descriptionEn: String(v.descriptionEn ?? '').trim() || undefined,
+        descriptionAr: String(v.descriptionAr ?? '').trim() || undefined,
+        isActive: true,
+        isPlaceholder: true,
+      });
+      toast.success(isAr ? `تمت إضافة المجال ${code}` : `Domain ${code} created`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إنشاء المجال' : 'Create failed'));
     }
   }
 
@@ -1619,16 +1736,21 @@ function DomainsTab() {
     <div className="ndi-stack">
       <Card title={isAr ? 'مجالات حوكمة البيانات' : 'Data governance domains'} Icon={Database}
         action={
-          <select
-            value={cycleId ?? ''}
-            onChange={e => setCycleId(Number(e.target.value))}
-            className="ndi-mini-select" style={{ minWidth: 240 }}>
-            {cycles.map(c => (
-              <option key={c.id} value={c.id}>
-                {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select
+              value={cycleId ?? ''}
+              onChange={e => setCycleId(Number(e.target.value))}
+              className="ndi-mini-select" style={{ minWidth: 240 }}>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {isAr && c.cycleNameAr ? c.cycleNameAr : c.cycleNameEn} ({c.reportingYear})
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenNew(true)}>
+              {isAr ? 'مجال جديد' : 'New domain'}
+            </Button>
+          </div>
         }>
         {rollup && (
           <div className="kpi-grid">
@@ -1779,6 +1901,17 @@ function DomainsTab() {
           </table>
         </Card>
       )}
+
+      <FormModal
+        open={openNew}
+        title={isAr ? 'مجال حوكمة جديد' : 'New governance domain'}
+        fields={domainFields(isAr)}
+        initial={domainInitial}
+        size="lg"
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={onCreate}
+      />
     </div>
   );
 }
