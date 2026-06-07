@@ -30,7 +30,7 @@ import {
   type GhgEmissionRecord, type GhgScope, type GhgAggregate, type GhgYoY,
 } from '../../lib/ghgInventory';
 import {
-  listReportingYears, listReportsForYear, generateAnnex, generateReport,
+  listReportingYears, createReportingYear, listReportsForYear, generateAnnex, generateReport,
   reportTypeLabel,
   submitReport, approveReport, publishReport, exportReport,
   ryStatusTone, reportStatusTone,
@@ -2898,6 +2898,16 @@ function AnnexTab() {
   // Slice-12 — selected report type for the Generate flow.
   const [selectedReportType, setSelectedReportType] = useState<ReportType>('ANNUAL_ANNEX');
 
+  // New-reporting-year modal. The tab could pick a year, generate annexes and
+  // run the report lifecycle, but had no way to open a fresh reporting year,
+  // leaving createReportingYear orphaned. Memoised initial keeps a stable
+  // identity for FormModal's open-reset effect.
+  const [openNewYear, setOpenNewYear] = useState(false);
+  const yearInitial = useMemo<RyForm>(() => ({
+    year: '', reportingEntityEn: '', reportingEntityAr: '',
+    periodStart: '', periodEnd: '', preparedBy: '', notes: '',
+  }), []);
+
   async function loadYears() {
     setLoading(true);
     try {
@@ -2925,6 +2935,40 @@ function AnnexTab() {
     setActive(y);
     setPreviewId(null);
     await loadReports(y.id!);
+  }
+
+  // Open a fresh reporting year. Client validation mirrors the entity: the
+  // year (a SQL SMALLINT) and the English reporting entity are required;
+  // the server defaults the status to ACTIVE. On success we reload the year
+  // list and focus the newly-created year.
+  async function onCreateYear(v: RyForm) {
+    const yearNum = Number(v.year);
+    if (!Number.isInteger(yearNum) || yearNum < 2000 || yearNum > 2100) {
+      toast.danger(isAr ? 'أدخل سنة صحيحة (2000–2100)' : 'Enter a valid year (2000–2100)');
+      return;
+    }
+    const reportingEntityEn = String(v.reportingEntityEn ?? '').trim();
+    if (!reportingEntityEn) {
+      toast.danger(isAr ? 'اسم جهة الإبلاغ (إنجليزي) مطلوب' : 'Reporting entity (EN) is required');
+      return;
+    }
+    try {
+      const created = await createReportingYear({
+        year: yearNum,
+        reportingEntityEn,
+        reportingEntityAr: String(v.reportingEntityAr ?? '').trim() || undefined,
+        periodStart: String(v.periodStart ?? '').trim() || undefined,
+        periodEnd: String(v.periodEnd ?? '').trim() || undefined,
+        preparedBy: String(v.preparedBy ?? '').trim() || undefined,
+        notes: String(v.notes ?? '').trim() || undefined,
+      });
+      toast.success(isAr ? `تم إنشاء سنة الإبلاغ ${created.year}` : `Reporting year ${created.year} created`);
+      setOpenNewYear(false);
+      await loadYears();
+      if (created.id) { setActive(created); await loadReports(created.id); }
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إنشاء سنة الإبلاغ' : 'Create failed'));
+    }
   }
 
   async function onGenerate() {
@@ -2968,7 +3012,6 @@ function AnnexTab() {
   );
 
   if (loading) return <InlineEmpty>{t('annexLoading')}</InlineEmpty>;
-  if (years.length === 0) return <InlineEmpty>{t('annexNoYears')}</InlineEmpty>;
 
   return (
     <div className="esg-stack">
@@ -2986,7 +3029,12 @@ function AnnexTab() {
             {y.year}
           </button>
         ))}
+        <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenNewYear(true)}>
+          {isAr ? 'سنة إبلاغ جديدة' : 'New reporting year'}
+        </Button>
       </div>
+
+      {years.length === 0 && <InlineEmpty>{t('annexNoYears')}</InlineEmpty>}
 
       {/* Selected-year summary card */}
       {activeRy && (
@@ -3043,6 +3091,7 @@ function AnnexTab() {
       )}
 
       {/* Reports list */}
+      {activeRy && (
       <Card title={t('annexReportsTitle')} Icon={FileText}>
         {reports.length === 0
           ? <InlineEmpty>{t('annexNoReports')}</InlineEmpty>
@@ -3083,6 +3132,7 @@ function AnnexTab() {
             </table>
           )}
       </Card>
+      )}
 
       {/* Live preview pane */}
       {previewReport && previewReport.contentMarkdown && (
@@ -3098,8 +3148,47 @@ function AnnexTab() {
           }}>{previewReport.contentMarkdown}</pre>
         </Card>
       )}
+
+      <FormModal
+        open={openNewYear}
+        title={isAr ? 'سنة إبلاغ جديدة' : 'New reporting year'}
+        size="md"
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        fields={ryFields(isAr)}
+        initial={yearInitial}
+        onClose={() => setOpenNewYear(false)}
+        onSubmit={onCreateYear}
+      />
     </div>
   );
+}
+
+// All-string create-reporting-year form. `year` is a number-kind field whose
+// runtime value the submit handler coerces; the rest are plain strings.
+interface RyForm {
+  year:              string;
+  reportingEntityEn: string;
+  reportingEntityAr: string;
+  periodStart:       string;
+  periodEnd:         string;
+  preparedBy:        string;
+  notes:             string;
+}
+
+function ryFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'number', key: 'year', label: isAr ? 'السنة' : 'Year', span: 4, min: 2000, max: 2100, required: true },
+    { kind: 'date', key: 'periodStart', label: isAr ? 'بداية الفترة' : 'Period start', span: 4 },
+    { kind: 'date', key: 'periodEnd', label: isAr ? 'نهاية الفترة' : 'Period end', span: 4 },
+
+    { kind: 'text', key: 'reportingEntityEn', label: isAr ? 'جهة الإبلاغ (إنجليزي)' : 'Reporting entity (EN)',
+      span: 6, required: true, maxLength: 255, placeholder: isAr ? 'مثلاً: TSS GRC Platform' : 'e.g. TSS GRC Platform' },
+    { kind: 'text', key: 'reportingEntityAr', label: isAr ? 'جهة الإبلاغ (عربي)' : 'Reporting entity (AR)',
+      span: 6, maxLength: 255, placeholder: isAr ? 'مثلاً: منصة تي إس إس للحوكمة' : 'e.g. منصة تي إس إس للحوكمة' },
+
+    { kind: 'text', key: 'preparedBy', label: isAr ? 'أُعدّ بواسطة' : 'Prepared by', span: 12, maxLength: 255 },
+    { kind: 'textarea', key: 'notes', label: isAr ? 'ملاحظات' : 'Notes', span: 12, rows: 2 },
+  ];
 }
 
 // ─── GHG Inventory tab (V56) ─────────────────────────────────────────────────
