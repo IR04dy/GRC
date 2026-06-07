@@ -21,12 +21,37 @@ import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMeetings, startMeeting, completeMeeting, approveMinutes, cancelMeeting,
   listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution, createMeeting,
+  createCommittee,
   startAction, completeAction, cancelAction, deferAction,
   parseAgenda, parseAttendees, parseDecisions, parseActions, parseMembers,
   COM_STATUS_TONE, MTG_STATUS_TONE, OUTCOME_TONE, ACTION_STATUS_TONE, ACTION_PRIORITY_TONE,
   type Committee, type CommitteeMeeting, type Resolution, type ActionItemRecord,
-  type ResolutionOutcome, type ConfidentialityLevel,
+  type ResolutionOutcome, type ConfidentialityLevel, type CommitteeType, type MeetingCadence,
 } from '../../lib/committees';
+
+/** Committee type -> registry-code stem, mirroring the seeded set (COM-RISK, COM-AUDIT, …). */
+const TYPE_CODE_STEM: Record<CommitteeType, string> = {
+  BOARD: 'BOARD', EXEC_COMMITTEE: 'EXEC', RISK_COMMITTEE: 'RISK', AUDIT_COMMITTEE: 'AUDIT',
+  BCM_COMMITTEE: 'BCM', COMPLIANCE_COMMITTEE: 'COMPLIANCE', TECH_COMMITTEE: 'TECH', OTHER: 'COMMITTEE',
+};
+const COMMITTEE_TYPES = Object.keys(TYPE_CODE_STEM) as CommitteeType[];
+const TYPE_LABEL_EN: Record<CommitteeType, string> = {
+  BOARD: 'Board of Directors', EXEC_COMMITTEE: 'Executive Committee', RISK_COMMITTEE: 'Risk Committee',
+  AUDIT_COMMITTEE: 'Audit Committee', BCM_COMMITTEE: 'BCM Committee', COMPLIANCE_COMMITTEE: 'Compliance Committee',
+  TECH_COMMITTEE: 'Technology Committee', OTHER: 'Other',
+};
+const TYPE_LABEL_AR: Record<CommitteeType, string> = {
+  BOARD: 'مجلس الإدارة', EXEC_COMMITTEE: 'اللجنة التنفيذية', RISK_COMMITTEE: 'لجنة المخاطر',
+  AUDIT_COMMITTEE: 'لجنة المراجعة', BCM_COMMITTEE: 'لجنة استمرارية الأعمال', COMPLIANCE_COMMITTEE: 'لجنة الالتزام',
+  TECH_COMMITTEE: 'لجنة التقنية', OTHER: 'أخرى',
+};
+const CADENCES: MeetingCadence[] = ['WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'AD_HOC'];
+const CADENCE_LABEL_EN: Record<MeetingCadence, string> = {
+  WEEKLY: 'Weekly', BIWEEKLY: 'Bi-weekly', MONTHLY: 'Monthly', QUARTERLY: 'Quarterly', AD_HOC: 'Ad hoc',
+};
+const CADENCE_LABEL_AR: Record<MeetingCadence, string> = {
+  WEEKLY: 'أسبوعي', BIWEEKLY: 'نصف شهري', MONTHLY: 'شهري', QUARTERLY: 'ربع سنوي', AD_HOC: 'حسب الحاجة',
+};
 
 type TabId = 'committees' | 'scheduled' | 'in_progress' | 'completed' | 'approved' | 'cancelled'
            | 'resolutions' | 'actions';
@@ -66,6 +91,7 @@ export function CommitteesPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [openResolution, setOpenResolution] = useState(false);
   const [openMeeting, setOpenMeeting] = useState(false);
+  const [openCommittee, setOpenCommittee] = useState(false);
 
   useEffect(() => { void reload(); }, []);
 
@@ -275,6 +301,69 @@ export function CommitteesPage() {
     }
   }
 
+  // ─── Charter a committee ─────────────────────────────────────────
+  /** Next free registry code for a type: COM-<STEM>, collision-safe against loaded committees. */
+  function nextCommitteeCode(type: CommitteeType): string {
+    const base = `COM-${TYPE_CODE_STEM[type]}`;
+    const used = new Set(committees.map(c => c.code));
+    if (!used.has(base)) return base;
+    let n = 2;
+    let code = `${base}-${n}`;
+    while (used.has(code)) { n += 1; code = `${base}-${n}`; }
+    return code;
+  }
+
+  const committeeFields: FieldDef[] = [
+    { key: 'nameEn', label: isAr ? 'اسم اللجنة (إنجليزي)' : 'Committee name (English)', kind: 'text', required: true, span: 6, maxLength: 255 },
+    { key: 'nameAr', label: isAr ? 'اسم اللجنة (عربي)' : 'Committee name (Arabic)', kind: 'text', span: 6, maxLength: 255 },
+    { key: 'committeeType', label: isAr ? 'نوع اللجنة' : 'Committee type', kind: 'select', required: true, span: 6,
+      options: COMMITTEE_TYPES.map(ct => ({ value: ct, label: isAr ? TYPE_LABEL_AR[ct] : TYPE_LABEL_EN[ct] })) },
+    { key: 'meetingCadence', label: isAr ? 'وتيرة الاجتماعات' : 'Meeting cadence', kind: 'select', span: 6,
+      options: CADENCES.map(cd => ({ value: cd, label: isAr ? CADENCE_LABEL_AR[cd] : CADENCE_LABEL_EN[cd] })) },
+    { key: 'chairpersonName', label: isAr ? 'رئيس اللجنة' : 'Chairperson', kind: 'text', span: 6, maxLength: 255 },
+    { key: 'secretaryName', label: isAr ? 'أمين السر' : 'Secretary', kind: 'text', span: 6, maxLength: 255 },
+    { key: 'quorumPct', label: isAr ? 'نسبة النصاب (%)' : 'Quorum (%)', kind: 'number', span: 6, min: 0, max: 100 },
+    { key: 'descriptionEn', label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)', kind: 'textarea', span: 12, rows: 2 },
+    { key: 'descriptionAr', label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)', kind: 'textarea', span: 12, rows: 2 },
+    { key: 'charterEn', label: isAr ? 'الميثاق (إنجليزي)' : 'Charter (English)', kind: 'textarea', span: 12, rows: 2 },
+    { key: 'charterAr', label: isAr ? 'الميثاق (عربي)' : 'Charter (Arabic)', kind: 'textarea', span: 12, rows: 2 },
+  ];
+  // Memoised so its identity is stable across the page's live-refresh re-renders;
+  // otherwise FormModal's reset effect (keyed on `initial`) would wipe the form mid-entry.
+  const committeeInitial: Record<string, string> = useMemo(() => ({
+    nameEn: '', nameAr: '', committeeType: 'EXEC_COMMITTEE', meetingCadence: 'MONTHLY',
+    chairpersonName: '', secretaryName: '', quorumPct: '50',
+    descriptionEn: '', descriptionAr: '', charterEn: '', charterAr: '',
+  }), []);
+
+  async function submitCommittee(v: Record<string, string>) {
+    const nameEn = (v.nameEn ?? '').trim();
+    const committeeType = v.committeeType as CommitteeType;
+    if (!nameEn)        { toast.danger(isAr ? 'اسم اللجنة (إنجليزي) مطلوب' : 'Committee name (English) is required'); return; }
+    if (!committeeType) { toast.danger(isAr ? 'نوع اللجنة مطلوب' : 'Committee type is required'); return; }
+    const code = nextCommitteeCode(committeeType);
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    // quorumPct comes back as a number from FormModal's number field (typed string), so stringify before trimming.
+    const quorum = String(v.quorumPct ?? '').trim();
+    try {
+      await createCommittee({
+        code, nameEn, nameAr: opt(v.nameAr),
+        committeeType,
+        descriptionEn: opt(v.descriptionEn), descriptionAr: opt(v.descriptionAr),
+        chairpersonName: opt(v.chairpersonName), secretaryName: opt(v.secretaryName),
+        charterEn: opt(v.charterEn), charterAr: opt(v.charterAr),
+        meetingCadence: (v.meetingCadence as MeetingCadence) || undefined,
+        quorumPct: quorum === '' ? undefined : Number(quorum),
+      });
+      toast.success(isAr ? `تم إنشاء اللجنة ${code}` : `Committee ${code} chartered`);
+      setOpenCommittee(false);
+      setTab('committees');
+      await reload();
+    } catch {
+      toast.danger(isAr ? 'تعذّر إنشاء اللجنة' : 'Failed to charter the committee');
+    }
+  }
+
   function toggle(key: string) {
     const n = new Set(expanded);
     if (n.has(key)) n.delete(key); else n.add(key);
@@ -387,10 +476,15 @@ export function CommitteesPage() {
       {tab === 'committees' && (
         <Card title={t('comTabCommittees')} Icon={Landmark}
           action={
-            <Button variant="primary" Icon={Plus} disabled={committees.length === 0}
-                    onClick={() => setOpenMeeting(true)}>
-              {isAr ? 'جدولة اجتماع' : 'Schedule meeting'}
-            </Button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button variant="primary" Icon={Landmark} onClick={() => setOpenCommittee(true)}>
+                {isAr ? 'إنشاء لجنة' : 'Charter committee'}
+              </Button>
+              <Button variant="secondary" Icon={Plus} disabled={committees.length === 0}
+                      onClick={() => setOpenMeeting(true)}>
+                {isAr ? 'جدولة اجتماع' : 'Schedule meeting'}
+              </Button>
+            </div>
           }>
           {loading
             ? <EmptyState Icon={Landmark} title={t('loading')} />
@@ -906,6 +1000,17 @@ export function CommitteesPage() {
         size="lg"
         onClose={() => setOpenMeeting(false)}
         onSubmit={submitMeeting}
+      />
+
+      <FormModal
+        open={openCommittee}
+        title={isAr ? 'إنشاء لجنة جديدة' : 'Charter a new committee'}
+        fields={committeeFields}
+        initial={committeeInitial}
+        submitLabel={isAr ? 'إنشاء' : 'Charter'}
+        size="lg"
+        onClose={() => setOpenCommittee(false)}
+        onSubmit={submitCommittee}
       />
     </Shell>
   );
