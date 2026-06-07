@@ -17,7 +17,7 @@ import { useToast } from '../../lib/toast';
 import {
   listAuthorityDocuments, listAuthorityDocumentCitations,
   rollupAuthorityDocumentsByFamily, createAuthorityDocument, updateAuthorityDocument,
-  transitionAuthorityDocument, createCitation,
+  transitionAuthorityDocument, createCitation, updateCitation,
   citationsToTree,
   authorityStatusTone, translationTone, translationLabel,
   type AuthorityDocument, type AuthorityDocumentCitation,
@@ -179,11 +179,25 @@ export function RegulatoryLibraryPage() {
 
   const [showCit, setShowCit] = useState(false);
   const [savingCit, setSavingCit] = useState(false);
+  const [editingCitId, setEditingCitId] = useState<number | null>(null);
   const [citForm, setCitForm] = useState<CitForm>(EMPTY_CIT);
   const setCit = <K extends keyof CitForm>(k: K, v: CitForm[K]) =>
     setCitForm(f => ({ ...f, [k]: v }));
+  const isEditingCit = editingCitId !== null;
 
-  function openAddCit() { setCitForm(EMPTY_CIT); setShowCit(true); }
+  function openAddCit() { setEditingCitId(null); setCitForm(EMPTY_CIT); setShowCit(true); }
+
+  function openEditCit(c: AuthorityDocumentCitation) {
+    setEditingCitId(c.id ?? null);
+    setCitForm({
+      citationCode: c.citationCode,
+      parentCitationCode: c.parentCitationCode ?? '',
+      titleEn: c.titleEn, titleAr: c.titleAr ?? '',
+      requirementTextEn: c.requirementTextEn ?? '', requirementTextAr: c.requirementTextAr ?? '',
+      mandatory: c.mandatory, weight: String(c.weight ?? 1),
+    });
+    setShowCit(true);
+  }
 
   async function submitAddCit() {
     if (!selected) return;
@@ -195,34 +209,53 @@ export function RegulatoryLibraryPage() {
         : 'Citation code and English title are required');
       return;
     }
-    // Derive depth from the chosen parent; top-level → 0.
-    const parent = citForm.parentCitationCode
-      ? citations.find(c => c.citationCode === citForm.parentCitationCode)
-      : undefined;
-    const depth = parent ? parent.depth + 1 : 0;
     const weight = Number(citForm.weight);
+    const safeWeight = Number.isFinite(weight) && weight > 0 ? weight : 1;
     setSavingCit(true);
     try {
-      await createCitation(selected.id, {
-        citationCode,
-        parentCitationCode: citForm.parentCitationCode || undefined,
-        depth,
-        sequenceOrder: citations.length,
-        titleEn,
-        titleAr: citForm.titleAr.trim() || undefined,
-        requirementTextEn: citForm.requirementTextEn.trim() || undefined,
-        requirementTextAr: citForm.requirementTextAr.trim() || undefined,
-        mandatory: citForm.mandatory,
-        weight: Number.isFinite(weight) && weight > 0 ? weight : 1,
-      });
-      toast.success(isAr
-        ? `تمت إضافة البند ${citationCode}`
-        : `Citation ${citationCode} added`);
+      if (isEditingCit) {
+        // citationCode / parent / depth are structural and immutable here;
+        // the backend updateCitation only mutates the content fields below.
+        await updateCitation(editingCitId!, {
+          titleEn,
+          titleAr: citForm.titleAr.trim() || undefined,
+          requirementTextEn: citForm.requirementTextEn.trim() || undefined,
+          requirementTextAr: citForm.requirementTextAr.trim() || undefined,
+          mandatory: citForm.mandatory,
+          weight: safeWeight,
+        });
+        toast.success(isAr
+          ? `تم تحديث البند ${citationCode}`
+          : `Citation ${citationCode} updated`);
+      } else {
+        // Derive depth from the chosen parent; top-level → 0.
+        const parent = citForm.parentCitationCode
+          ? citations.find(c => c.citationCode === citForm.parentCitationCode)
+          : undefined;
+        const depth = parent ? parent.depth + 1 : 0;
+        await createCitation(selected.id, {
+          citationCode,
+          parentCitationCode: citForm.parentCitationCode || undefined,
+          depth,
+          sequenceOrder: citations.length,
+          titleEn,
+          titleAr: citForm.titleAr.trim() || undefined,
+          requirementTextEn: citForm.requirementTextEn.trim() || undefined,
+          requirementTextAr: citForm.requirementTextAr.trim() || undefined,
+          mandatory: citForm.mandatory,
+          weight: safeWeight,
+        });
+        toast.success(isAr
+          ? `تمت إضافة البند ${citationCode}`
+          : `Citation ${citationCode} added`);
+      }
       setShowCit(false);
       await selectDoc(selected);
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
-        : (isAr ? 'تعذّرت إضافة البند' : 'Failed to add citation'));
+        : (isEditingCit
+            ? (isAr ? 'تعذّر تحديث البند' : 'Failed to update citation')
+            : (isAr ? 'تعذّرت إضافة البند' : 'Failed to add citation')));
     } finally {
       setSavingCit(false);
     }
@@ -474,7 +507,8 @@ export function RegulatoryLibraryPage() {
                     </div>
                   </InlineEmpty>
                 : <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {citationTree.map(n => <CitationRow key={n.citation.id} node={n} isAr={isAr} depth={0} />)}
+                    {citationTree.map(n => <CitationRow key={n.citation.id} node={n} isAr={isAr} depth={0}
+                      onEdit={demoMode ? undefined : openEditCit} />)}
                   </div>}
           </Card>
         ) : (
@@ -603,27 +637,33 @@ export function RegulatoryLibraryPage() {
         open={showCit}
         onClose={() => setShowCit(false)}
         size="md"
-        title={selected
-          ? `${isAr ? 'إضافة بند إلى' : 'Add citation to'} ${selected.code}`
-          : (isAr ? 'إضافة بند' : 'Add citation')}
+        title={isEditingCit
+          ? `${isAr ? 'تعديل البند' : 'Edit citation'} ${citForm.citationCode}`
+          : selected
+            ? `${isAr ? 'إضافة بند إلى' : 'Add citation to'} ${selected.code}`
+            : (isAr ? 'إضافة بند' : 'Add citation')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowCit(false)} disabled={savingCit}>
               {isAr ? 'إلغاء' : 'Cancel'}
             </Button>
-            <Button variant="primary" Icon={Plus} onClick={submitAddCit} disabled={savingCit}>
-              {savingCit ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'إضافة' : 'Add')}
+            <Button variant="primary" Icon={isEditingCit ? Pencil : Plus} onClick={submitAddCit} disabled={savingCit}>
+              {savingCit
+                ? (isAr ? 'جارٍ الحفظ…' : 'Saving…')
+                : isEditingCit ? (isAr ? 'حفظ التغييرات' : 'Save changes') : (isAr ? 'إضافة' : 'Add')}
             </Button>
           </>
         }>
         <div style={{ display: 'grid', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 12 }}>
             <FormField label={isAr ? 'كود البند' : 'Citation code'} required>
-              <input style={ctrl} value={citForm.citationCode} placeholder="e.g. 2-1-1"
+              <input style={isEditingCit ? { ...ctrl, opacity: 0.6 } : ctrl} value={citForm.citationCode}
+                placeholder="e.g. 2-1-1" disabled={isEditingCit}
                 onChange={e => setCit('citationCode', e.target.value)} />
             </FormField>
             <FormField label={isAr ? 'البند الأب (اختياري)' : 'Parent citation (optional)'}>
-              <select style={ctrl} value={citForm.parentCitationCode}
+              <select style={isEditingCit ? { ...ctrl, opacity: 0.6 } : ctrl} value={citForm.parentCitationCode}
+                disabled={isEditingCit}
                 onChange={e => setCit('parentCitationCode', e.target.value)}>
                 <option value="">{isAr ? '— مستوى أعلى —' : '— Top level —'}</option>
                 {citations.map(c => (
@@ -731,7 +771,9 @@ export function RegulatoryLibraryPage() {
   );
 }
 
-function CitationRow({ node, depth, isAr }: { node: CitationNode; depth: number; isAr: boolean }) {
+function CitationRow({ node, depth, isAr, onEdit }:
+  { node: CitationNode; depth: number; isAr: boolean;
+    onEdit?: (c: AuthorityDocumentCitation) => void }) {
   const c = node.citation;
   const title = isAr && c.titleAr ? c.titleAr : c.titleEn;
   const isLeaf = node.children.length === 0;
@@ -750,13 +792,25 @@ function CitationRow({ node, depth, isAr }: { node: CitationNode; depth: number;
       }}>
         <span className="mono text-2xs" style={{ minWidth: 56, color: 'var(--ink-3)' }}>{c.citationCode}</span>
         <span style={{ fontSize: 12, fontWeight: depth === 0 ? 600 : 400 }}>{title}</span>
-        <span style={{ display: 'inline-flex', gap: 4 }}>
+        <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
           {c.mandatory && <Badge tone="info">{isAr ? 'إلزامي' : 'mandatory'}</Badge>}
           {c.isPlaceholder && isLeaf && <Badge tone="warning">{isAr ? 'مؤقت' : 'placeholder'}</Badge>}
+          {onEdit && (
+            <button type="button" onClick={() => onEdit(c)}
+              title={isAr ? 'تعديل البند' : 'Edit citation'}
+              aria-label={isAr ? 'تعديل البند' : 'Edit citation'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                border: 'none', background: 'transparent', cursor: 'pointer',
+                color: 'var(--ink-3)', padding: 2, borderRadius: 'var(--r-sm)',
+              }}>
+              <Pencil size={13} />
+            </button>
+          )}
         </span>
       </div>
       {node.children.map(child =>
-        <CitationRow key={child.citation.id} node={child} depth={depth + 1} isAr={isAr} />)}
+        <CitationRow key={child.citation.id} node={child} depth={depth + 1} isAr={isAr} onEdit={onEdit} />)}
     </>
   );
 }
