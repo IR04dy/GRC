@@ -39,7 +39,7 @@ import {
 } from '../../lib/ndiMaturity';
 import {
   listCompliance, complianceAggregate, startComplianceForCycle,
-  setComplianceStatus, attachComplianceEvidence,
+  setComplianceStatus, attachComplianceEvidence, updateCompliance,
   submitCompliance, markUnderReviewCompliance, returnCompliance,
   approveCompliance, reopenCompliance,
   complianceStatusLabel, lifecycleTone, lifecycleLabel,
@@ -1363,6 +1363,7 @@ function ComplianceTab() {
   const [agg, setAgg] = useState<NdiComplianceAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [evidencing, setEvidencing] = useState<NdiComplianceAssessment | null>(null);
+  const [editItem, setEditItem] = useState<NdiComplianceAssessment | null>(null);
 
   async function loadCycles() {
     try {
@@ -1471,6 +1472,36 @@ function ComplianceTab() {
     }
   }
 
+  // Edit-response — the bilingual narrative + ownership fields that the
+  // set-status / attach-evidence quick actions don't reach. Trim-or-undefined
+  // so cleared fields are sent as null-means-keep (no accidental blanking).
+  //
+  // complianceStatus is echoed back deliberately: the entity defaults the
+  // column to "UNDER_REVIEW", so an omitted value would deserialize to that
+  // default and the service's update() would overwrite the reviewer's real
+  // classification. Sending the current status preserves it; the service
+  // re-applies Rules 3/4/5 against it on save.
+  async function onSaveResponse(values: Record<string, unknown>) {
+    if (!editItem?.id) return;
+    const u = (s: unknown) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    try {
+      await updateCompliance(editItem.id, {
+        complianceStatus:  editItem.complianceStatus,
+        responseTextEn:    u(values.responseTextEn),
+        responseTextAr:    u(values.responseTextAr),
+        controlOwnerName:  u(values.controlOwnerName),
+        controlOwnerEmail: u(values.controlOwnerEmail),
+        evidenceOwnerName: u(values.evidenceOwnerName),
+        notes:             u(values.notes),
+      });
+      toast.success(isAr ? 'حُدّثت الاستجابة' : 'Response updated');
+      setEditItem(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }
+
   const evidenceFields: FieldDef[] = [
     { kind: 'text', key: 'evidenceRef',   required: true, span: 12,
       label: isAr ? 'مرجع الدليل' : 'Evidence reference',
@@ -1478,6 +1509,30 @@ function ComplianceTab() {
     { kind: 'text', key: 'evidenceOwner', span: 12,
       label: isAr ? 'مالك الدليل' : 'Evidence owner' },
   ];
+
+  const responseFields: FieldDef[] = [
+    { kind: 'textarea', key: 'responseTextEn', span: 12, rows: 3,
+      label: isAr ? 'نص الاستجابة (إنجليزي)' : 'Response narrative (EN)' },
+    { kind: 'textarea', key: 'responseTextAr', span: 12, rows: 3,
+      label: isAr ? 'نص الاستجابة (عربي)' : 'Response narrative (AR)' },
+    { kind: 'text', key: 'controlOwnerName', span: 6, maxLength: 255,
+      label: isAr ? 'مالك الضابط' : 'Control owner' },
+    { kind: 'text', key: 'controlOwnerEmail', span: 6, maxLength: 255,
+      label: isAr ? 'بريد مالك الضابط' : 'Control owner email' },
+    { kind: 'text', key: 'evidenceOwnerName', span: 6, maxLength: 255,
+      label: isAr ? 'مالك الدليل' : 'Evidence owner' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    responseTextEn:    editItem?.responseTextEn ?? '',
+    responseTextAr:    editItem?.responseTextAr ?? '',
+    controlOwnerName:  editItem?.controlOwnerName ?? '',
+    controlOwnerEmail: editItem?.controlOwnerEmail ?? '',
+    evidenceOwnerName: editItem?.evidenceOwnerName ?? '',
+    notes:             editItem?.notes ?? '',
+  }), [editItem]);
 
   const groupedByDomain = useMemo(() => {
     const m = new Map<string, NdiComplianceAssessment[]>();
@@ -1604,6 +1659,11 @@ function ComplianceTab() {
                             <td className="ndi-text-end">
                               <div className="ndi-actions-row">
                                 {!isApproved && (
+                                  <Button size="sm" variant="ghost" Icon={Pencil}
+                                    title={isAr ? 'تعديل الاستجابة' : 'Edit response'}
+                                    onClick={() => setEditItem(it)} />
+                                )}
+                                {!isApproved && (
                                   <Button size="sm" variant="ghost" Icon={Paperclip}
                                     onClick={() => setEvidencing(it)}>
                                     {isAr ? 'إرفاق' : 'Attach'}
@@ -1657,6 +1717,19 @@ function ComplianceTab() {
         submitLabel={isAr ? 'إرفاق' : 'Attach'}
         onClose={() => setEvidencing(null)}
         onSubmit={onSaveEvidence}
+      />
+
+      <FormModal
+        open={editItem !== null}
+        title={editItem
+          ? (isAr ? `تعديل استجابة ${editItem.requirementCode}` : `Edit response — ${editItem.requirementCode}`)
+          : ''}
+        fields={responseFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ' : 'Save'}
+        onClose={() => setEditItem(null)}
+        onSubmit={onSaveResponse}
       />
     </div>
   );
