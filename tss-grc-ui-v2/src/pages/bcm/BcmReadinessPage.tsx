@@ -16,7 +16,7 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
   listCycles, transitionCycle,
-  listGovernance, transitionGovernance,
+  listGovernance, createGovernance, transitionGovernance,
   listRisks, createRisk,
   listStrategies,
   listContacts, recordCallTreeTest, contactTestStats,
@@ -74,6 +74,15 @@ const CONTROL_EFFECTIVENESS: Array<{ value: ControlEffectiveness; en: string; ar
   { value: 'NOT_TESTED',        en: 'Not tested (no reduction)',      ar: 'لم تُختبر (دون تخفيض)' },
 ];
 
+// ── BCM governance-policy review cadence (bilingual) ───────────────────
+type ReviewFrequency = NonNullable<BcmGovernanceRecord['reviewFrequency']>;
+const REVIEW_FREQUENCIES: Array<{ value: ReviewFrequency; en: string; ar: string }> = [
+  { value: 'ANNUAL',      en: 'Annual',       ar: 'سنوي' },
+  { value: 'SEMI_ANNUAL', en: 'Semi-annual',  ar: 'نصف سنوي' },
+  { value: 'QUARTERLY',   en: 'Quarterly',    ar: 'ربع سنوي' },
+  { value: 'ON_CHANGE',   en: 'On change',    ar: 'عند التغيير' },
+];
+
 export function BcmReadinessPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
@@ -91,6 +100,7 @@ export function BcmReadinessPage() {
   const [contactStats, setContactStats] = useState<{ passed: number; failed: number; notReached: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [openRisk, setOpenRisk] = useState(false);
+  const [openGov, setOpenGov] = useState(false);
 
   // ── Loaders ────
   async function reload() {
@@ -223,6 +233,62 @@ export function BcmReadinessPage() {
     }
   }
 
+  // ── Add a governance policy (starts DRAFT; version defaults 1.0) ───────
+  const govInitial: Record<string, string> = useMemo(() => ({
+    policyTitleEn: '', policyTitleAr: '',
+    policyVersion: '1.0',
+    reviewFrequency: 'ANNUAL',
+    nextReviewDate: '',
+    scope: '', objective: '',
+  }), []);
+
+  const govFields: FieldDef[] = useMemo(() => [
+    { key: 'policyTitleEn', kind: 'text', required: true, span: 6, maxLength: 200,
+      label: isAr ? 'عنوان السياسة (إنجليزي)' : 'Policy title (EN)' },
+    { key: 'policyTitleAr', kind: 'text', span: 6, maxLength: 200,
+      label: isAr ? 'عنوان السياسة (عربي)' : 'Policy title (AR)' },
+    { key: 'policyVersion', kind: 'text', span: 4, maxLength: 20,
+      label: isAr ? 'الإصدار' : 'Version' },
+    { key: 'reviewFrequency', kind: 'select', span: 4,
+      label: isAr ? 'تكرار المراجعة' : 'Review frequency',
+      options: REVIEW_FREQUENCIES.map(f => ({ value: f.value, label: isAr ? f.ar : f.en })) },
+    { key: 'nextReviewDate', kind: 'date', span: 4,
+      label: isAr ? 'تاريخ المراجعة القادمة' : 'Next review date' },
+    { key: 'scope', kind: 'textarea', span: 12, rows: 2,
+      label: isAr ? 'النطاق' : 'Scope' },
+    { key: 'objective', kind: 'textarea', span: 12, rows: 3,
+      label: isAr ? 'الهدف' : 'Objective' },
+  ], [isAr]);
+
+  async function submitGov(v: Record<string, string>) {
+    const policyTitleEn = String(v.policyTitleEn ?? '').trim();
+    const policyTitleAr = String(v.policyTitleAr ?? '').trim();
+    const policyVersion = String(v.policyVersion ?? '').trim();
+    const reviewFrequency = String(v.reviewFrequency ?? '').trim() as ReviewFrequency | '';
+    const nextReviewDate = String(v.nextReviewDate ?? '').trim();
+    const scope = String(v.scope ?? '').trim();
+    const objective = String(v.objective ?? '').trim();
+    if (!policyTitleEn) { toast.danger(isAr ? 'عنوان السياسة بالإنجليزية مطلوب' : 'Policy title (EN) is required'); return; }
+    try {
+      await createGovernance({
+        policyTitleEn,
+        policyTitleAr: policyTitleAr || undefined,
+        policyVersion: policyVersion || '1.0',
+        reviewFrequency: reviewFrequency || undefined,
+        nextReviewDate: nextReviewDate || undefined,
+        scope: scope || undefined,
+        objective: objective || undefined,
+        approvalStatus: 'DRAFT',
+      });
+      toast.success(isAr ? 'أُضيفت السياسة' : 'Policy added');
+      setOpenGov(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل إضافة السياسة' : 'Failed to add policy'));
+    }
+  }
+
   const tabs: TabItem<TabId>[] = [
     { id: 'cycles',     label: isAr ? 'دورات التقييم'    : 'Cycles' },
     { id: 'governance', label: isAr ? 'الحوكمة'           : 'Governance' },
@@ -317,7 +383,14 @@ export function BcmReadinessPage() {
       {/* ── Governance ── */}
       {tab === 'governance' && (
         <Card title={isAr ? 'سجل الحوكمة' : 'Governance records'}
-          action={<Badge tone="primary">{governance.length}</Badge>}>
+          action={
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Badge tone="primary">{governance.length}</Badge>
+              <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenGov(true)}>
+                {isAr ? 'إضافة سياسة' : 'Add policy'}
+              </Button>
+            </div>
+          }>
           {governance.length === 0
             ? <InlineEmpty>{isAr ? 'لا توجد سياسات' : 'No governance records yet'}</InlineEmpty>
             : <table className="grc-table">
@@ -493,6 +566,16 @@ export function BcmReadinessPage() {
         onClose={() => setOpenRisk(false)}
         onSubmit={submitRisk}
         submitLabel={isAr ? 'إضافة المخاطرة' : 'Add risk'}
+      />
+
+      <FormModal
+        open={openGov}
+        title={isAr ? 'إضافة سياسة حوكمة' : 'Add governance policy'}
+        fields={govFields}
+        initial={govInitial}
+        onClose={() => setOpenGov(false)}
+        onSubmit={submitGov}
+        submitLabel={isAr ? 'إضافة السياسة' : 'Add policy'}
       />
     </Shell>
   );
