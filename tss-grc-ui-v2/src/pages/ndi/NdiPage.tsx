@@ -97,9 +97,9 @@ import {
   type DashboardSnapshot, type UpcomingItem,
 } from '../../lib/ndiDashboard';
 import {
-  listSettingsGrouped, setSettingValue, resetSetting,
+  listSettingsGrouped, setSettingValue, resetSetting, createSetting,
   settingCategoryLabel,
-  type NdiSetting,
+  type NdiSetting, type NdiSettingType,
 } from '../../lib/ndiSettings';
 import {
   searchAudit, auditAggregate, severityTone as auditSeverityTone,
@@ -4135,6 +4135,23 @@ function DashboardTab() {
 
 // ─── Settings tab (slice 13) ─────────────────────────────────────────
 
+// "Define setting" form — every field a string. The server stamps org,
+// enforces a unique settingKey per tenant, and type-validates valueText
+// (INTEGER/DECIMAL/BOOLEAN must parse). isLocked is a 'YES'|'NO' string
+// the handler coerces to boolean; valueType is one of NdiSettingType.
+interface SettingForm {
+  settingKey: string;
+  category: string;
+  valueType: string;        // NdiSettingType
+  valueText: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  defaultValue: string;
+  isLocked: string;         // 'YES' | 'NO'
+}
+
 function SettingsTab() {
   const { lang } = useI18n();
   const toast = useToast();
@@ -4143,6 +4160,7 @@ function SettingsTab() {
 
   const [grouped, setGrouped] = useState<Record<string, NdiSetting[]>>({});
   const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -4185,11 +4203,124 @@ function SettingsTab() {
     }
   }
 
+  // ── Define setting (createSetting) ────────────────────────────────
+  const L = isAr ? 'ar' : 'en';
+
+  const categoryOpts = (['GENERAL', 'THRESHOLDS', 'WORKFLOW', 'ATTESTATION', 'GUARDRAIL'])
+    .map(c => ({ value: c, label: settingCategoryLabel(c, L) }));
+  const typeOpts = (['STRING', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'JSON'] as NdiSettingType[])
+    .map(t => ({ value: t, label: t }));
+  const lockedOpts = [
+    { value: 'NO',  label: isAr ? 'لا'  : 'No' },
+    { value: 'YES', label: isAr ? 'نعم' : 'Yes' },
+  ];
+
+  const settingFields: FieldDef[] = [
+    { kind: 'text', key: 'settingKey', span: 6, required: true, maxLength: 80,
+      label: isAr ? 'مفتاح الإعداد' : 'Setting key', placeholder: 'ndi.attestation.escalation_days' },
+    { kind: 'select', key: 'category', span: 6, required: true,
+      label: isAr ? 'الفئة' : 'Category', options: categoryOpts },
+    { kind: 'text', key: 'nameEn', span: 6, required: true, maxLength: 255,
+      label: isAr ? 'الاسم (إنجليزي)' : 'Name (English)' },
+    { kind: 'text', key: 'nameAr', span: 6, maxLength: 255,
+      label: isAr ? 'الاسم (عربي)' : 'Name (Arabic)' },
+    { kind: 'select', key: 'valueType', span: 4, required: true,
+      label: isAr ? 'نوع القيمة' : 'Value type', options: typeOpts },
+    { kind: 'text', key: 'valueText', span: 4,
+      label: isAr ? 'القيمة الحالية' : 'Current value' },
+    { kind: 'text', key: 'defaultValue', span: 4,
+      label: isAr ? 'القيمة الافتراضية' : 'Default value' },
+    { kind: 'select', key: 'isLocked', span: 6,
+      label: isAr ? 'مقفل' : 'Locked', options: lockedOpts },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+  ];
+
+  const newInitial = useMemo<SettingForm>(() => ({
+    settingKey: '', category: 'GENERAL', valueType: 'STRING', valueText: '',
+    nameEn: '', nameAr: '', descriptionEn: '', descriptionAr: '',
+    defaultValue: '', isLocked: 'NO',
+  }), []);
+
+  async function onCreate(v: SettingForm) {
+    const u = (s: string) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    const key = String(v.settingKey ?? '').trim();
+    const nameEn = String(v.nameEn ?? '').trim();
+    const type = (String(v.valueType ?? 'STRING').trim() || 'STRING') as NdiSettingType;
+    if (!key)    { toast.danger(isAr ? 'مفتاح الإعداد مطلوب' : 'Setting key is required'); return; }
+    if (!nameEn) { toast.danger(isAr ? 'الاسم (إنجليزي) مطلوب' : 'English name is required'); return; }
+
+    // Mirror the server's type validation so the user sees the problem inline,
+    // before the round-trip — INTEGER/DECIMAL/BOOLEAN must parse; JSON must parse.
+    const typed = (raw: string, labelEn: string, labelAr: string): boolean => {
+      const s = String(raw ?? '').trim();
+      if (s === '') return true;
+      if (type === 'INTEGER' && !/^-?\d+$/.test(s)) {
+        toast.danger(isAr ? `${labelAr} يجب أن تكون عددًا صحيحًا` : `${labelEn} must be a whole number`); return false;
+      }
+      if (type === 'DECIMAL' && !Number.isFinite(Number(s))) {
+        toast.danger(isAr ? `${labelAr} يجب أن تكون رقمًا` : `${labelEn} must be a number`); return false;
+      }
+      if (type === 'BOOLEAN' && !/^(true|false)$/i.test(s)) {
+        toast.danger(isAr ? `${labelAr} يجب أن تكون true أو false` : `${labelEn} must be true or false`); return false;
+      }
+      if (type === 'JSON') {
+        try { JSON.parse(s); }
+        catch { toast.danger(isAr ? `${labelAr} يجب أن تكون JSON صالحًا` : `${labelEn} must be valid JSON`); return false; }
+      }
+      return true;
+    };
+    if (!typed(v.valueText, 'Current value', 'القيمة الحالية')) return;
+    if (!typed(v.defaultValue, 'Default value', 'القيمة الافتراضية')) return;
+
+    const body: Partial<NdiSetting> = {
+      settingKey: key,
+      category: String(v.category ?? 'GENERAL').trim() || 'GENERAL',
+      valueType: type,
+      valueText: u(v.valueText),
+      nameEn,
+      nameAr: u(v.nameAr),
+      descriptionEn: u(v.descriptionEn),
+      descriptionAr: u(v.descriptionAr),
+      defaultValue: u(v.defaultValue),
+      isLocked: v.isLocked === 'YES',
+    };
+    try {
+      await createSetting(body);
+      toast.success(isAr ? 'أُضيف الإعداد' : 'Setting added');
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّرت الإضافة' : 'Create failed'));
+    }
+  }
+
   if (loading) return <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>;
+
+  const categories = Object.entries(grouped);
 
   return (
     <div className="ndi-stack">
-      {Object.entries(grouped).map(([category, items]) => (
+      <Card title={isAr ? 'إعدادات نضيء' : 'NDI settings'} Icon={Wrench}
+        action={
+          <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenNew(true)}>
+            {isAr ? 'تعريف إعداد' : 'Define setting'}
+          </Button>
+        }>
+        <div className="text-2xs text-muted">
+          {isAr
+            ? 'إعدادات تهيئة وحدة نضيء على مستوى المؤسسة — العتبات وسير العمل والإقرار والحماية. القيم المقفلة لا تُعدَّل ولا تُعاد لقيمتها الافتراضية.'
+            : 'Organisation-wide NDI module configuration — thresholds, workflow, attestation and guardrails. Locked values cannot be edited or reset.'}
+        </div>
+      </Card>
+
+      {categories.length === 0 && (
+        <InlineEmpty>{isAr ? 'لا توجد إعدادات بعد — ابدأ بتعريف إعداد' : 'No settings yet — define one to start'}</InlineEmpty>
+      )}
+
+      {categories.map(([category, items]) => (
         <Card key={category} title={settingCategoryLabel(category, isAr ? 'ar' : 'en')} Icon={Wrench}>
           <table className="grc-table">
             <thead>
@@ -4231,6 +4362,17 @@ function SettingsTab() {
           </table>
         </Card>
       ))}
+
+      <FormModal<SettingForm>
+        open={openNew}
+        title={isAr ? 'تعريف إعداد نضيء' : 'Define NDI setting'}
+        fields={settingFields}
+        initial={newInitial}
+        size="lg"
+        submitLabel={isAr ? 'إضافة الإعداد' : 'Add setting'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={onCreate}
+      />
     </div>
   );
 }
