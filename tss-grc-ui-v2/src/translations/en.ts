@@ -5426,6 +5426,16 @@ export const en = {
   cclEmpty:                    'No clauses in this category yet',
   cclEmptyHint:                'Run V45 to seed the standard library or use New clause to add your own.',
 
+  cclNewClause:                'New clause',
+  cclCreateTitle:              'New contractual clause',
+  cclFTitleEn:                 'Title (English)',
+  cclFTitleAr:                 'Title (Arabic)',
+  cclFBodyEn:                  'Clause body (English)',
+  cclFBodyAr:                  'Clause body (Arabic)',
+  cclFGuidanceEn:              'Drafting guidance (English)',
+  cclFGuidanceAr:              'Drafting guidance (Arabic)',
+  cclFTags:                    'Tags (comma-separated)',
+
   // ─── Cyber → PDPL bridge log (gap-analysis item A) ─────────────────
   cpbSidebar:                  'Cyber → PDPL bridge',
   cpbPageTitle:                'Cyber → PDPL breach bridge log',

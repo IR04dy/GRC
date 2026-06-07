@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import {
-  Stamp, CheckCircle2, Archive, ChevronRight, ChevronDown, BookOpen, AlertTriangle, Files,
+  Stamp, CheckCircle2, Archive, ChevronRight, ChevronDown, BookOpen, AlertTriangle, Files, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,14 +10,24 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
-  listClauses, approveClause, deprecateClause,
+  listClauses, approveClause, deprecateClause, createClause,
   CLAUSE_STATUS_TONE, CLAUSE_RISK_TONE, CLAUSE_NEGOTIABILITY_TONE, CLAUSE_CATEGORY_LABEL,
-  type ContractClause, type ClauseCategory,
+  type ContractClause, type ClauseCategory, type ClauseRisk, type ClauseNegotiability,
 } from '../../lib/contractClauses';
+
+/** Category -> clause-code prefix, mirroring the seeded library (CLS-DP-01, CLS-SLA-02, ...). */
+const CATEGORY_PREFIX: Record<ClauseCategory, string> = {
+  DATA_PROTECTION: 'DP', SLA: 'SLA', AUDIT_RIGHTS: 'AUD', EXIT_RIGHTS: 'EXT',
+  SECURITY: 'SEC', COMPLIANCE: 'COM', LIABILITY: 'LIA', SUBPROCESSORS: 'SUB',
+  FORCE_MAJEURE: 'FM', OTHER: 'OTH',
+};
+const RISK_LEVELS:      ClauseRisk[]         = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+const NEGOTIABILITIES:  ClauseNegotiability[] = ['FIXED', 'NEGOTIABLE', 'DEFAULT'];
 
 type TabId = 'all' | 'DATA_PROTECTION' | 'SLA' | 'AUDIT_RIGHTS' | 'EXIT_RIGHTS'
            | 'SECURITY' | 'COMPLIANCE' | 'LIABILITY' | 'SUBPROCESSORS' | 'FORCE_MAJEURE'
@@ -31,8 +41,26 @@ export function ContractClausesPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [openCreate, setOpenCreate] = useState(false);
+  const isAr = lang === 'ar';
 
   useEffect(() => { void reload(); }, []);
+
+  /** Next free clause code for a category: CLS-<PREFIX>-NN, padded, collision-safe against loaded rows. */
+  function nextClauseCode(category: ClauseCategory): string {
+    const prefix = CATEGORY_PREFIX[category];
+    const used = new Set(rows.map(r => r.clauseCode));
+    const re = new RegExp(`^CLS-${prefix}-(\\d+)$`);
+    let max = 0;
+    for (const code of used) {
+      const m = re.exec(code);
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+    let seq = max + 1;
+    let code = `CLS-${prefix}-${String(seq).padStart(2, '0')}`;
+    while (used.has(code)) { seq += 1; code = `CLS-${prefix}-${String(seq).padStart(2, '0')}`; }
+    return code;
+  }
 
   async function reload() {
     setLoading(true);
@@ -98,6 +126,64 @@ export function ContractClausesPage() {
     finally { setBusyId(null); }
   }
 
+  // ---- Create clause -------------------------------------------------------
+  const createFields: FieldDef[] = [
+    { key: 'category', kind: 'select', label: t('cclColCategory'), required: true, span: 6,
+      options: (Object.keys(CLAUSE_CATEGORY_LABEL) as ClauseCategory[]).map(c => ({ value: c, label: t(CLAUSE_CATEGORY_LABEL[c]) })) },
+    { key: 'version', kind: 'text', label: t('cclColVersion'), span: 3, maxLength: 20, placeholder: '1.0' },
+    { key: 'riskLevel', kind: 'select', label: t('cclColRisk'), span: 6,
+      options: RISK_LEVELS.map(r => ({ value: r, label: r })) },
+    { key: 'negotiability', kind: 'select', label: t('cclColNegotiability'), span: 6,
+      options: NEGOTIABILITIES.map(n => ({ value: n, label: n })) },
+    { key: 'titleEn', kind: 'text', label: t('cclFTitleEn'), required: true, span: 6, maxLength: 255 },
+    { key: 'titleAr', kind: 'text', label: t('cclFTitleAr'), span: 6, maxLength: 255 },
+    { key: 'applicableTo', kind: 'text', label: t('cclApplicableTo'), span: 12,
+      placeholder: isAr ? 'مثال: جميع موردي السحابة، المعالجون الفرعيون' : 'e.g. All cloud vendors, subprocessors' },
+    { key: 'bodyEn', kind: 'textarea', label: t('cclFBodyEn'), span: 12, rows: 4 },
+    { key: 'bodyAr', kind: 'textarea', label: t('cclFBodyAr'), span: 12, rows: 4 },
+    { key: 'guidanceEn', kind: 'textarea', label: t('cclFGuidanceEn'), span: 6, rows: 2 },
+    { key: 'guidanceAr', kind: 'textarea', label: t('cclFGuidanceAr'), span: 6, rows: 2 },
+    { key: 'regulatoryRefs', kind: 'text', label: t('cclRegRefs'), span: 6,
+      placeholder: isAr ? 'مثال: PDPL م.20، ECC-2-1-3' : 'e.g. PDPL Art.20, ECC-2-1-3' },
+    { key: 'owner', kind: 'text', label: t('cclOwner'), span: 6 },
+    { key: 'tags', kind: 'text', label: t('cclFTags'), span: 12,
+      placeholder: isAr ? 'مثال: سحابة، حرج، SAMA' : 'e.g. cloud, critical, SAMA' },
+  ];
+
+  const createInitial: Record<string, string> = {
+    category: '', version: '1.0', riskLevel: 'MEDIUM', negotiability: 'NEGOTIABLE',
+    titleEn: '', titleAr: '', applicableTo: '', bodyEn: '', bodyAr: '',
+    guidanceEn: '', guidanceAr: '', regulatoryRefs: '', owner: '', tags: '',
+  };
+
+  async function submitCreate(v: Record<string, string>) {
+    const category = v.category as ClauseCategory;
+    const titleEn = (v.titleEn ?? '').trim();
+    const bodyEn = (v.bodyEn ?? '').trim();
+    if (!category)  { toast.danger(isAr ? 'الفئة مطلوبة' : 'Category is required'); return; }
+    if (!titleEn)   { toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'Title (English) is required'); return; }
+    if (!bodyEn)    { toast.danger(isAr ? 'نص البند (إنجليزي) مطلوب' : 'Clause body (English) is required'); return; }
+
+    const clauseCode = nextClauseCode(category);
+    const opt = (s?: string) => { const x = (s ?? '').trim(); return x ? x : undefined; };
+    try {
+      await createClause({
+        clauseCode, titleEn, titleAr: opt(v.titleAr),
+        category, applicableTo: opt(v.applicableTo),
+        bodyEn, bodyAr: opt(v.bodyAr),
+        guidanceEn: opt(v.guidanceEn), guidanceAr: opt(v.guidanceAr),
+        regulatoryRefs: opt(v.regulatoryRefs),
+        riskLevel: (v.riskLevel as ClauseRisk) || undefined,
+        negotiability: (v.negotiability as ClauseNegotiability) || undefined,
+        version: opt(v.version),
+        owner: opt(v.owner), tags: opt(v.tags),
+      });
+      toast.success(isAr ? `تم إنشاء البند ${clauseCode} (مسودة)` : `Clause ${clauseCode} created (Draft)`);
+      setOpenCreate(false);
+      await reload();
+    } catch { toast.danger(t('cclActionFailed')); }
+  }
+
   return (
     <Shell title={t('cclPageTitle')} sub={t('cclPageSub')}>
       <PageHeader eyebrow={t('navThirdParty')} title={t('cclPageTitle')} sub={t('cclPageSub')} />
@@ -111,7 +197,13 @@ export function ContractClausesPage() {
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
-      <Card title={t('cclPageTitle')} Icon={BookOpen}>
+      <Card title={t('cclPageTitle')} Icon={BookOpen}
+        action={
+          <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenCreate(true)}>
+            {t('cclNewClause')}
+          </Button>
+        }
+      >
         {loading
           ? <EmptyState Icon={BookOpen} title={t('loading')} />
           : filtered.length === 0
@@ -221,6 +313,16 @@ export function ContractClausesPage() {
             )
         }
       </Card>
+
+      <FormModal
+        open={openCreate}
+        title={t('cclCreateTitle')}
+        fields={createFields}
+        initial={createInitial}
+        submitLabel={t('cclNewClause')}
+        onClose={() => setOpenCreate(false)}
+        onSubmit={submitCreate}
+      />
     </Shell>
   );
 }

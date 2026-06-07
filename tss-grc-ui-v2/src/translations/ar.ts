@@ -5406,6 +5406,16 @@ export const ar = {
   cclEmpty:                    'لا توجد بنود في هذه الفئة بعد',
   cclEmptyHint:                'شغّل V45 لتعبئة المكتبة القياسية أو أضف بنوداً يدوياً.',
 
+  cclNewClause:                'بند جديد',
+  cclCreateTitle:              'بند تعاقدي جديد',
+  cclFTitleEn:                 'العنوان (إنجليزي)',
+  cclFTitleAr:                 'العنوان (عربي)',
+  cclFBodyEn:                  'نص البند (إنجليزي)',
+  cclFBodyAr:                  'نص البند (عربي)',
+  cclFGuidanceEn:              'إرشادات الصياغة (إنجليزي)',
+  cclFGuidanceAr:              'إرشادات الصياغة (عربي)',
+  cclFTags:                    'الوسوم (مفصولة بفواصل)',
+
   // ─── Cyber → PDPL bridge log ───────────────────────────────────────
   cpbSidebar:                  'جسر السيبراني → PDPL',
   cpbPageTitle:                'سجل جسر السيبراني إلى اختراق البيانات الشخصية',
