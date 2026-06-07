@@ -16,7 +16,7 @@ import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
   listPlans, planStats, getPlan, createPlan, transitionPlan, reopenPlan,
-  listSections, editSection,
+  listSections, editSection, addSection,
   listVersions, diffVersions,
   planStatusTone, downloadPlanPdf,
   type BcpPlan, type BcpPlanType, type BcpPlanStatus, type BcpSection, type BcpVersion,
@@ -111,6 +111,15 @@ export function BcpBuilderPage() {
   const [bindersLoaded, setBindersLoaded] = useState(false);
   const [binderOpen, setBinderOpen] = useState(false);
   const [binderBusy, setBinderBusy] = useState(false);
+
+  // Ad-hoc section authoring — lets a plan owner add a bespoke ISO 22301
+  // §8.4.2 section beyond the canonical catalogue (e.g. a vendor-specific
+  // dependency or a regulator-requested annex) without leaving the builder.
+  // Backend blocks this on locked plans, so the trigger is gated on !isLocked.
+  // Memoised initial keeps a stable identity so FormModal's open-reset effect
+  // (deps [open, initial]) doesn't wipe typed input on a parent re-render.
+  const [openSection, setOpenSection] = useState(false);
+  const sectionInitial = useMemo(() => emptySection(), []);
 
   // ── Register loaders ──
   async function reload() {
@@ -226,6 +235,59 @@ export function BcpBuilderPage() {
       setSections(sections.map(s => s.id === saved.id ? saved : s));
       setActiveSection(saved);
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+
+  // Add an ad-hoc section. Mirrors the backend's validation (key + EN title
+  // required; key unique per plan; order auto-computed when blank) so the
+  // user gets an inline message before the round-trip. On success we re-fetch
+  // the section list and focus the newly-added section in the editor.
+  async function submitSection(v: SectionForm) {
+    if (!plan) return;
+    const sectionKey     = (v.sectionKey ?? '').trim();
+    const sectionTitleEn = (v.sectionTitleEn ?? '').trim();
+    if (!sectionKey) {
+      toast.warning(isAr ? 'مفتاح القسم مطلوب' : 'Section key is required');
+      return;
+    }
+    if (!/^[a-z0-9_]+$/.test(sectionKey)) {
+      toast.warning(isAr
+        ? 'المفتاح: أحرف إنجليزية صغيرة وأرقام وشرطة سفلية فقط'
+        : 'Key: lowercase letters, digits and underscores only');
+      return;
+    }
+    if (!sectionTitleEn) {
+      toast.warning(isAr ? 'العنوان الإنجليزي مطلوب' : 'English title is required');
+      return;
+    }
+    // sectionOrder is a number-kind field (runtime value is a number or '').
+    // Leave undefined when blank so the backend appends after the last section.
+    let sectionOrder: number | undefined;
+    const rawOrder = String(v.sectionOrder ?? '').trim();
+    if (rawOrder !== '') {
+      const n = Number(v.sectionOrder);
+      if (!Number.isFinite(n) || n < 1) {
+        toast.warning(isAr ? 'الترتيب يجب أن يكون رقماً موجباً' : 'Order must be a positive number');
+        return;
+      }
+      sectionOrder = Math.round(n);
+    }
+    try {
+      const created = await addSection(plan.id, {
+        sectionKey,
+        sectionTitleEn,
+        sectionTitleAr: v.sectionTitleAr?.trim() || undefined,
+        sectionOrder,
+        bodyEn: v.bodyEn?.trim() || undefined,
+        bodyAr: v.bodyAr?.trim() || undefined,
+      });
+      const secs = await listSections(plan.id);
+      setSections(secs);
+      setActiveSection(secs.find(s => s.id === created.id) ?? created);
+      setOpenSection(false);
+      toast.success(isAr ? `تم إضافة القسم ${created.sectionKey}` : `Section ${created.sectionKey} added`);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إضافة القسم' : 'Add section failed'));
+    }
   }
 
   // ── Diff ──
@@ -540,7 +602,12 @@ export function BcpBuilderPage() {
       <div className="bcp-builder-content">
         {builderTab === 'sections' && (
           <div className="bcp-builder-sections-grid">
-            <Card title={isAr ? 'الأقسام' : 'Sections'}>
+            <Card title={isAr ? 'الأقسام' : 'Sections'}
+                  action={!isLocked
+                    ? <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenSection(true)}>
+                        {isAr ? 'إضافة قسم' : 'Add section'}
+                      </Button>
+                    : undefined}>
               {sections.length === 0
                 ? <InlineEmpty text={isAr ? 'لا أقسام' : 'No sections'} />
                 : <ul className="bcp-builder-section-list">
@@ -732,6 +799,17 @@ export function BcpBuilderPage() {
         </Card>
       )}
 
+      <FormModal<SectionForm>
+        open={openSection}
+        title={isAr ? 'إضافة قسم' : 'Add section'}
+        size="md"
+        submitLabel={isAr ? 'إضافة' : 'Add'}
+        fields={sectionFields(isAr)}
+        initial={sectionInitial}
+        onClose={() => setOpenSection(false)}
+        onSubmit={submitSection}
+      />
+
       <FormModal<DistributeForm>
         open={distOpen}
         title={isAr ? 'توزيع الخطة' : 'Distribute plan'}
@@ -818,6 +896,47 @@ function emptyNewPlan(): NewPlanForm {
   return { planType: 'BCP', titleEn: '', titleAr: '',
            rtoHours: '', rpoHours: '', mtpdHours: '',
            responseTeamRole: '' };
+}
+
+// ─── Add-section form definition ─────────────────────────────────
+//
+// All-string shape (sectionOrder is a number-kind field whose runtime
+// value FormModal stores as a number; the submit handler coerces it).
+// Mirrors the backend contract: section_key ≤ 50 chars unique per plan,
+// section_title_en required, the rest optional.
+
+interface SectionForm {
+  sectionKey:      string;
+  sectionTitleEn:  string;
+  sectionTitleAr:  string;
+  sectionOrder:    string;
+  bodyEn:          string;
+  bodyAr:          string;
+}
+
+function emptySection(): SectionForm {
+  return { sectionKey: '', sectionTitleEn: '', sectionTitleAr: '',
+           sectionOrder: '', bodyEn: '', bodyAr: '' };
+}
+
+function sectionFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'text', key: 'sectionKey', label: isAr ? 'مفتاح القسم' : 'Section key',
+      span: 6, required: true, maxLength: 50,
+      placeholder: isAr ? 'مثلاً: vendor_dependencies' : 'e.g. vendor_dependencies' },
+    { kind: 'number', key: 'sectionOrder', label: isAr ? 'الترتيب (اختياري)' : 'Order (optional)',
+      span: 6, min: 1 },
+
+    { kind: 'text', key: 'sectionTitleEn', label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)',
+      span: 6, required: true, maxLength: 255,
+      placeholder: isAr ? 'مثلاً: Vendor dependencies' : 'e.g. Vendor dependencies' },
+    { kind: 'text', key: 'sectionTitleAr', label: isAr ? 'العنوان (عربي)' : 'Title (AR)',
+      span: 6, maxLength: 255,
+      placeholder: isAr ? 'مثلاً: اعتماديات الموردين' : 'e.g. اعتماديات الموردين' },
+
+    { kind: 'textarea', key: 'bodyEn', label: isAr ? 'النص (إنجليزي)' : 'Body (EN)', span: 12, rows: 3 },
+    { kind: 'textarea', key: 'bodyAr', label: isAr ? 'النص (عربي)' : 'Body (AR)', span: 12, rows: 3 },
+  ];
 }
 
 // ─── Distribute form (Tier-2 #11) ────────────────────────────────
