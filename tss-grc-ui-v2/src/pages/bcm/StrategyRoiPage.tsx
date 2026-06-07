@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   TrendingUp, ChevronLeft, AlertTriangle, CheckCircle2, Clock,
-  XCircle, FileText, Banknote, Sigma,
+  XCircle, FileText, Banknote, Sigma, Plus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -17,10 +18,13 @@ import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
 import {
   listStrategyRoi,
+  createStrategyRoi,
   recommendStrategyRoi,
   archiveStrategyRoi,
   type StrategyRoiAnalysis,
   type Recommendation,
+  type StrategyType,
+  STRATEGY_TYPES,
   STRATEGY_TYPE_LABELS,
   RECOMMENDATION_LABELS,
   recommendationTone,
@@ -29,6 +33,7 @@ import {
   fmtPercent,
   fmtPaybackMonths,
 } from '../../lib/strategyRoi';
+import { listQuantitativeBias, type BiaQuantitative } from '../../lib/biaQuantitative';
 
 /**
  * Slice 9-D — Continuity Strategy ROI register.
@@ -64,6 +69,32 @@ export function StrategyRoiPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [biaFilter, setBiaFilter] = useState<number | null>(null);
+
+  // ─── New-analysis modal ──────────────────────────────────────────────
+  // The register could list / recommend / archive ROI analyses but had no
+  // way to author one, leaving the createStrategyRoi client orphaned. An
+  // analysis must reference a Quantitative BIA, so we load the tenant's BIAs
+  // for the picker. The server computes the ROI / NPV / payback from these
+  // inputs + the BIA loss curve and assigns the analysis code.
+  const [openNew, setOpenNew] = useState(false);
+  const [bias, setBias] = useState<BiaQuantitative[]>([]);
+  useEffect(() => {
+    void listQuantitativeBias()
+      .then(list => setBias(Array.isArray(list) ? list : []))
+      .catch(() => setBias([]));
+  }, []);
+  // Memoised so FormModal's open-reset effect (deps [open, initial]) keeps a
+  // stable identity. Default the BIA to the first one once loaded.
+  const newInitial = useMemo<RoiForm>(() => ({
+    biaQuantitativeId: bias.length > 0 ? String(bias[0].id) : '',
+    strategyType: 'WARM_DR',
+    strategyNameEn: '', strategyNameAr: '',
+    planningHorizonYears: '5',
+    expectedRtoHours: '4',
+    capexSar: '', opexAnnualSar: '',
+    expectedIncidentsPerYear: '0.5',
+    discountRatePercent: '8',
+  }), [bias]);
 
   // ─── Load ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -176,6 +207,81 @@ export function StrategyRoiPage() {
     window.history.replaceState({}, '', url.toString());
   }
 
+  // Create a new ROI analysis. Client validation mirrors the service
+  // contract: a BIA + strategy type + bilingual names are required;
+  // planning horizon and RTO must be >= 1; capex/opex must be >= 0;
+  // the optional incidents/yr and discount rate must be >= 0 when given.
+  async function submitNew(v: RoiForm) {
+    const biaQuantitativeId = Number(v.biaQuantitativeId);
+    if (!Number.isFinite(biaQuantitativeId) || biaQuantitativeId <= 0) {
+      toast.danger(isAr ? 'اختر تحليل الأثر الكمي' : 'Select a Quantitative BIA');
+      return;
+    }
+    const strategyType = String(v.strategyType ?? '').trim();
+    if (!STRATEGY_TYPES.includes(strategyType as StrategyType)) {
+      toast.danger(isAr ? 'اختر نوع الاستراتيجية' : 'Select a strategy type');
+      return;
+    }
+    const strategyNameEn = String(v.strategyNameEn ?? '').trim();
+    const strategyNameAr = String(v.strategyNameAr ?? '').trim();
+    if (!strategyNameEn) { toast.danger(isAr ? 'اسم الاستراتيجية (إنجليزي) مطلوب' : 'English strategy name is required'); return; }
+    if (!strategyNameAr) { toast.danger(isAr ? 'اسم الاستراتيجية (عربي) مطلوب' : 'Arabic strategy name is required'); return; }
+
+    const planningHorizonYears = Number(v.planningHorizonYears);
+    if (!Number.isFinite(planningHorizonYears) || planningHorizonYears < 1) {
+      toast.danger(isAr ? 'أفق التخطيط يجب أن يكون سنة واحدة على الأقل' : 'Planning horizon must be at least 1 year');
+      return;
+    }
+    const expectedRtoHours = Number(v.expectedRtoHours);
+    if (!Number.isFinite(expectedRtoHours) || expectedRtoHours < 1) {
+      toast.danger(isAr ? 'زمن التعافي المستهدف يجب أن يكون ساعة واحدة على الأقل' : 'Expected RTO must be at least 1 hour');
+      return;
+    }
+    const capexSar = Number(v.capexSar);
+    if (!Number.isFinite(capexSar) || capexSar < 0) {
+      toast.danger(isAr ? 'النفقات الرأسمالية يجب ألا تكون سالبة' : 'Capex must be non-negative');
+      return;
+    }
+    const opexAnnualSar = Number(v.opexAnnualSar);
+    if (!Number.isFinite(opexAnnualSar) || opexAnnualSar < 0) {
+      toast.danger(isAr ? 'النفقات التشغيلية السنوية يجب ألا تكون سالبة' : 'Annual opex must be non-negative');
+      return;
+    }
+
+    const incRaw = String(v.expectedIncidentsPerYear ?? '').trim();
+    let expectedIncidentsPerYear: number | undefined;
+    if (incRaw !== '') {
+      const n = Number(v.expectedIncidentsPerYear);
+      if (!Number.isFinite(n) || n < 0) { toast.danger(isAr ? 'عدد الحوادث المتوقعة سنوياً يجب ألا يكون سالباً' : 'Expected incidents/yr must be non-negative'); return; }
+      expectedIncidentsPerYear = n;
+    }
+    const discRaw = String(v.discountRatePercent ?? '').trim();
+    let discountRatePercent: number | undefined;
+    if (discRaw !== '') {
+      const n = Number(v.discountRatePercent);
+      if (!Number.isFinite(n) || n < 0) { toast.danger(isAr ? 'معدل الخصم يجب ألا يكون سالباً' : 'Discount rate must be non-negative'); return; }
+      discountRatePercent = n;
+    }
+
+    try {
+      const created = await createStrategyRoi({
+        biaQuantitativeId,
+        strategyType: strategyType as StrategyType,
+        strategyNameEn, strategyNameAr,
+        planningHorizonYears,
+        capexSar, opexAnnualSar,
+        expectedRtoHours,
+        expectedIncidentsPerYear,
+        discountRatePercent,
+      });
+      toast.success(isAr ? `تم إنشاء التحليل ${created.analysisCode}` : `Analysis ${created.analysisCode} created`);
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إنشاء التحليل' : 'Create failed'));
+    }
+  }
+
   // ─── Render ───────────────────────────────────────────────────────
   return (
     <Shell>
@@ -186,6 +292,16 @@ export function StrategyRoiPage() {
         sub={isAr
           ? 'المبرّر المالي الذي يطلبه المجلس لكل استراتيجية استمرارية — العائد، صافي القيمة الحالية، فترة الاسترداد. مرتبط بتحليل الأثر الكمي (BIA).'
           : 'The board-grade financial justification for every continuity strategy — ROI, NPV, payback. Layered on top of the Quantitative BIA.'}
+        actions={
+          <Button variant="primary" Icon={Plus}
+                  disabled={bias.length === 0}
+                  title={bias.length === 0
+                    ? (isAr ? 'أنشئ تحليل أثر كمي أولاً' : 'Create a Quantitative BIA first')
+                    : undefined}
+                  onClick={() => setOpenNew(true)}>
+            {isAr ? 'تحليل جديد' : 'New analysis'}
+          </Button>
+        }
       />
 
       {biaFilter != null && (
@@ -456,6 +572,59 @@ export function StrategyRoiPage() {
           </div>
         )}
       </Card>
+
+      <FormModal<RoiForm>
+        open={openNew}
+        title={isAr ? 'تحليل عائد جديد' : 'New ROI analysis'}
+        size="lg"
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        fields={roiFields(isAr, bias)}
+        initial={newInitial}
+        onClose={() => setOpenNew(false)}
+        onSubmit={submitNew}
+      />
     </Shell>
   );
+}
+
+// ─── New-analysis form ───────────────────────────────────────────────
+//
+// All-string shape (numeric fields are number-kind in the FormModal; the
+// submit handler coerces them). The BIA picker is populated from the
+// tenant's Quantitative BIAs; the server computes ROI / NPV / payback.
+interface RoiForm {
+  biaQuantitativeId:        string;
+  strategyType:             string;
+  strategyNameEn:           string;
+  strategyNameAr:           string;
+  planningHorizonYears:     string;
+  expectedRtoHours:         string;
+  capexSar:                 string;
+  opexAnnualSar:            string;
+  expectedIncidentsPerYear: string;
+  discountRatePercent:      string;
+}
+
+function roiFields(isAr: boolean, bias: BiaQuantitative[]): FieldDef[] {
+  return [
+    { kind: 'select', key: 'biaQuantitativeId', label: isAr ? 'تحليل الأثر الكمي' : 'Quantitative BIA',
+      span: 6, required: true,
+      options: bias.map(b => ({ value: String(b.id), label: b.assessmentCode })) },
+    { kind: 'select', key: 'strategyType', label: isAr ? 'نوع الاستراتيجية' : 'Strategy type',
+      span: 6, required: true,
+      options: STRATEGY_TYPES.map(t => ({ value: t, label: tlabel(STRATEGY_TYPE_LABELS, t, isAr) })) },
+
+    { kind: 'text', key: 'strategyNameEn', label: isAr ? 'اسم الاستراتيجية (إنجليزي)' : 'Strategy name (EN)',
+      span: 6, required: true, maxLength: 255, placeholder: isAr ? 'مثلاً: Active-active DR for Core Banking' : 'e.g. Active-active DR for Core Banking' },
+    { kind: 'text', key: 'strategyNameAr', label: isAr ? 'اسم الاستراتيجية (عربي)' : 'Strategy name (AR)',
+      span: 6, required: true, maxLength: 255, placeholder: isAr ? 'مثلاً: تعافٍ نشط-نشط للنظام المصرفي الأساسي' : 'e.g. تعافٍ نشط-نشط' },
+
+    { kind: 'number', key: 'planningHorizonYears', label: isAr ? 'أفق التخطيط (سنوات)' : 'Planning horizon (yrs)', span: 4, min: 1, required: true },
+    { kind: 'number', key: 'expectedRtoHours', label: isAr ? 'زمن التعافي المستهدف (ساعات)' : 'Expected RTO (h)', span: 4, min: 1, required: true },
+    { kind: 'number', key: 'discountRatePercent', label: isAr ? 'معدل الخصم (%)' : 'Discount rate (%)', span: 4, min: 0 },
+
+    { kind: 'number', key: 'capexSar', label: isAr ? 'النفقات الرأسمالية (ريال)' : 'Capex (SAR)', span: 4, min: 0, required: true },
+    { kind: 'number', key: 'opexAnnualSar', label: isAr ? 'النفقات التشغيلية السنوية (ريال)' : 'Annual opex (SAR)', span: 4, min: 0, required: true },
+    { kind: 'number', key: 'expectedIncidentsPerYear', label: isAr ? 'الحوادث المتوقعة سنوياً' : 'Expected incidents/yr', span: 4, min: 0 },
+  ];
 }
