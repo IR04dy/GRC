@@ -25,9 +25,10 @@ import {
 } from '../../lib/ndiCycles';
 import {
   listFramework, frameworkAggregate, markOfficial, markPlaceholder,
-  importFrameworkJson, deleteFrameworkItem,
+  importFrameworkJson, deleteFrameworkItem, createFrameworkItem,
   componentTone, componentLabel, priorityTone, priorityLabel,
   type NdiFrameworkItem, type NdiFrameworkAggregate, type NdiComponent,
+  type NdiPriority,
 } from '../../lib/ndiFramework';
 import {
   listMaturity, maturityAggregate, startMaturityForCycle, updateMaturity,
@@ -474,6 +475,38 @@ function CyclesTab() {
 
 // ─── Framework Library tab (slice 2 — V67) ─────────────────────────
 
+// "Define requirement" form — every field a string except the numeric
+// weight (kind:'number' yields a runtime number). The server stamps org,
+// keeps is_placeholder=true (manual entries stay placeholders until an
+// official SDAIA/NDI library import flips them), and defaults the rest.
+interface FrameworkForm {
+  requirementCode: string;
+  component: string;
+  domain: string;
+  subdomain: string;
+  titleEn: string;
+  titleAr: string;
+  priority: string;
+  mandatory: string;        // 'YES' | 'NO'
+  reviewFrequency: string;
+  status: string;
+  weight: number;
+  scoringMethod: string;
+  ownerRole: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  questionEn: string;
+  questionAr: string;
+  evidenceGuidanceEn: string;
+  evidenceGuidanceAr: string;
+  relatedNdmoControl: string;
+  relatedPdplRequirement: string;
+  relatedCyberControl: string;
+  relatedIsoMapping: string;
+  effectiveDate: string;
+  notes: string;
+}
+
 function FrameworkTab() {
   const { lang } = useI18n();
   const toast = useToast();
@@ -560,6 +593,151 @@ function FrameworkTab() {
       label: isAr ? 'JSON للاستيراد' : 'JSON to import' },
   ];
 
+  // ── Define requirement (createFrameworkItem) ──────────────────────
+  const [openNew, setOpenNew] = useState(false);
+  const L = isAr ? 'ar' : 'en';
+
+  const componentOpts = (['COMPLIANCE', 'MATURITY', 'OPERATIONAL_EXCELLENCE'] as NdiComponent[])
+    .map(c => ({ value: c, label: componentLabel(c, L) }));
+  const priorityOpts = (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as NdiPriority[])
+    .map(p => ({ value: p, label: priorityLabel(p, L) }));
+  const mandatoryOpts = [
+    { value: 'NO',  label: isAr ? 'اختياري' : 'Optional' },
+    { value: 'YES', label: isAr ? 'إلزامي'  : 'Mandatory' },
+  ];
+  const freqOpts = [
+    { value: '',            label: '—' },
+    { value: 'ANNUAL',      label: isAr ? 'سنوي'      : 'Annual' },
+    { value: 'SEMI_ANNUAL', label: isAr ? 'نصف سنوي'  : 'Semi-annual' },
+    { value: 'QUARTERLY',   label: isAr ? 'ربع سنوي'  : 'Quarterly' },
+    { value: 'MONTHLY',     label: isAr ? 'شهري'      : 'Monthly' },
+  ];
+  const scoringOpts = [
+    { value: '',          label: '—' },
+    { value: 'LEVEL_0_5', label: isAr ? 'مستوى 0–5'   : 'Level 0–5' },
+    { value: 'BINARY',    label: isAr ? 'ثنائي'        : 'Binary' },
+    { value: 'PERCENT',   label: isAr ? 'نسبة مئوية'   : 'Percentage' },
+    { value: 'RUBRIC',    label: isAr ? 'مرجع تقييم'   : 'Rubric' },
+  ];
+  const statusOpts = [
+    { value: 'DRAFT',   label: isAr ? 'مسودة'   : 'Draft' },
+    { value: 'ACTIVE',  label: isAr ? 'نشط'     : 'Active' },
+    { value: 'RETIRED', label: isAr ? 'متقاعد'  : 'Retired' },
+  ];
+
+  const reqFields: FieldDef[] = [
+    { kind: 'text', key: 'requirementCode', span: 6, required: true, maxLength: 40,
+      label: isAr ? 'كود المتطلب' : 'Requirement code', placeholder: 'NDI-COMP-001' },
+    { kind: 'select', key: 'component', span: 6, required: true,
+      label: isAr ? 'المكوّن' : 'Component', options: componentOpts },
+    { kind: 'text', key: 'domain', span: 6, required: true, maxLength: 80,
+      label: isAr ? 'المجال' : 'Domain', placeholder: isAr ? 'حوكمة البيانات' : 'Data Governance' },
+    { kind: 'text', key: 'subdomain', span: 6, maxLength: 80,
+      label: isAr ? 'المجال الفرعي' : 'Subdomain' },
+    { kind: 'text', key: 'titleEn', span: 6, required: true, maxLength: 255,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', span: 6, maxLength: 255,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'select', key: 'priority', span: 3,
+      label: isAr ? 'الأولوية' : 'Priority', options: priorityOpts },
+    { kind: 'select', key: 'mandatory', span: 3,
+      label: isAr ? 'الإلزام' : 'Mandatory', options: mandatoryOpts },
+    { kind: 'select', key: 'reviewFrequency', span: 3,
+      label: isAr ? 'دورية المراجعة' : 'Review frequency', options: freqOpts },
+    { kind: 'select', key: 'status', span: 3,
+      label: isAr ? 'الحالة' : 'Status', options: statusOpts },
+    { kind: 'number', key: 'weight', span: 4, min: 0, max: 999.99,
+      label: isAr ? 'الوزن' : 'Weight' },
+    { kind: 'select', key: 'scoringMethod', span: 4,
+      label: isAr ? 'طريقة التقييم' : 'Scoring method', options: scoringOpts },
+    { kind: 'text', key: 'ownerRole', span: 4, maxLength: 80,
+      label: isAr ? 'الدور المالك' : 'Owner role' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+    { kind: 'textarea', key: 'questionEn', span: 12, rows: 2,
+      label: isAr ? 'سؤال التقييم (إنجليزي)' : 'Assessment question (English)' },
+    { kind: 'textarea', key: 'questionAr', span: 12, rows: 2,
+      label: isAr ? 'سؤال التقييم (عربي)' : 'Assessment question (Arabic)' },
+    { kind: 'textarea', key: 'evidenceGuidanceEn', span: 12, rows: 2,
+      label: isAr ? 'إرشاد الأدلة (إنجليزي)' : 'Evidence guidance (English)' },
+    { kind: 'textarea', key: 'evidenceGuidanceAr', span: 12, rows: 2,
+      label: isAr ? 'إرشاد الأدلة (عربي)' : 'Evidence guidance (Arabic)' },
+    { kind: 'text', key: 'relatedNdmoControl', span: 6, maxLength: 120,
+      label: isAr ? 'ضابط ندمو ذو صلة' : 'Related NDMO control' },
+    { kind: 'text', key: 'relatedPdplRequirement', span: 6, maxLength: 120,
+      label: isAr ? 'متطلب حماية البيانات' : 'Related PDPL requirement' },
+    { kind: 'text', key: 'relatedCyberControl', span: 6, maxLength: 120,
+      label: isAr ? 'ضابط سيبراني ذو صلة' : 'Related cyber control' },
+    { kind: 'text', key: 'relatedIsoMapping', span: 6, maxLength: 120,
+      label: isAr ? 'مطابقة ISO' : 'Related ISO mapping' },
+    { kind: 'date', key: 'effectiveDate', span: 6,
+      label: isAr ? 'تاريخ السريان' : 'Effective date' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const newInitial = useMemo<FrameworkForm>(() => ({
+    requirementCode: '', component: 'COMPLIANCE', domain: '', subdomain: '',
+    titleEn: '', titleAr: '',
+    priority: 'MEDIUM', mandatory: 'NO', reviewFrequency: '', status: 'ACTIVE',
+    weight: 1, scoringMethod: '', ownerRole: '',
+    descriptionEn: '', descriptionAr: '', questionEn: '', questionAr: '',
+    evidenceGuidanceEn: '', evidenceGuidanceAr: '',
+    relatedNdmoControl: '', relatedPdplRequirement: '', relatedCyberControl: '', relatedIsoMapping: '',
+    effectiveDate: '', notes: '',
+  }), []);
+
+  async function onCreate(v: FrameworkForm) {
+    const u = (s: string) => { const t = String(s ?? '').trim(); return t === '' ? undefined : t; };
+    const code = String(v.requirementCode ?? '').trim();
+    const titleEn = String(v.titleEn ?? '').trim();
+    const domain = String(v.domain ?? '').trim();
+    const component = String(v.component ?? '').trim();
+    if (!code)      { toast.danger(isAr ? 'كود المتطلب مطلوب' : 'Requirement code is required'); return; }
+    if (!component) { toast.danger(isAr ? 'المكوّن مطلوب' : 'Component is required'); return; }
+    if (!domain)    { toast.danger(isAr ? 'المجال مطلوب' : 'Domain is required'); return; }
+    if (!titleEn)   { toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'English title is required'); return; }
+    const weight = Number.isFinite(v.weight) && v.weight > 0 ? v.weight : 1;
+
+    const body: Partial<NdiFrameworkItem> = {
+      requirementCode: code,
+      component: component as NdiComponent,
+      domain,
+      subdomain: u(v.subdomain),
+      titleEn,
+      titleAr: u(v.titleAr),
+      priority: (v.priority || 'MEDIUM') as NdiPriority,
+      mandatory: v.mandatory === 'YES',
+      reviewFrequency: u(v.reviewFrequency) as NdiFrameworkItem['reviewFrequency'],
+      status: (v.status || 'ACTIVE') as NdiFrameworkItem['status'],
+      weight,
+      scoringMethod: u(v.scoringMethod) as NdiFrameworkItem['scoringMethod'],
+      ownerRole: u(v.ownerRole),
+      descriptionEn: u(v.descriptionEn),
+      descriptionAr: u(v.descriptionAr),
+      questionEn: u(v.questionEn),
+      questionAr: u(v.questionAr),
+      evidenceGuidanceEn: u(v.evidenceGuidanceEn),
+      evidenceGuidanceAr: u(v.evidenceGuidanceAr),
+      relatedNdmoControl: u(v.relatedNdmoControl),
+      relatedPdplRequirement: u(v.relatedPdplRequirement),
+      relatedCyberControl: u(v.relatedCyberControl),
+      relatedIsoMapping: u(v.relatedIsoMapping),
+      effectiveDate: u(v.effectiveDate),
+      notes: u(v.notes),
+    };
+    try {
+      await createFrameworkItem(body);
+      toast.success(isAr ? 'أُضيف المتطلب' : 'Requirement added');
+      setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Create failed');
+    }
+  }
+
   return (
     <div className="ndi-stack">
       <div className="kpi-grid">
@@ -586,9 +764,14 @@ function FrameworkTab() {
 
       <Card title={isAr ? 'مكتبة إطار نضيء' : 'NDI framework library'} Icon={FileText}
         action={
-          <Button size="sm" variant="primary" Icon={Upload} onClick={() => setImportOpen(true)}>
-            {isAr ? 'استيراد JSON' : 'Import JSON'}
-          </Button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Button size="sm" variant="primary" Icon={Plus} onClick={() => setOpenNew(true)}>
+              {isAr ? 'تعريف متطلب' : 'Define requirement'}
+            </Button>
+            <Button size="sm" variant="secondary" Icon={Upload} onClick={() => setImportOpen(true)}>
+              {isAr ? 'استيراد JSON' : 'Import JSON'}
+            </Button>
+          </div>
         }>
         <div className="ndi-filter-row">
           {(['ALL', 'COMPLIANCE', 'MATURITY', 'OPERATIONAL_EXCELLENCE'] as const).map(c => (
@@ -673,6 +856,17 @@ function FrameworkTab() {
         submitLabel={isAr ? 'استيراد' : 'Import'}
         onClose={() => setImportOpen(false)}
         onSubmit={onImport}
+      />
+
+      <FormModal<FrameworkForm>
+        open={openNew}
+        title={isAr ? 'تعريف متطلب إطار نضيء' : 'Define NDI framework requirement'}
+        fields={reqFields}
+        initial={newInitial}
+        size="lg"
+        submitLabel={isAr ? 'إضافة المتطلب' : 'Add requirement'}
+        onClose={() => setOpenNew(false)}
+        onSubmit={onCreate}
       />
     </div>
   );
