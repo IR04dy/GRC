@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Shield, Wrench, Layers, GitBranch, Plus } from 'lucide-react';
+import { Shield, Wrench, Layers, GitBranch, Plus, Link2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -9,16 +9,16 @@ import { Button } from '../../components/ui/Button';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { PillTabs } from '../../components/ui/PillTabs';
-import { ApiError } from '../../lib/api';
+import { ApiError, riskApi, type RiskResponse } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listControls, listControlMappings, listControlAssessments, listControlRiskLinks,
-  createControlAssessment,
+  createControlAssessment, linkRiskToControl,
   controlStatusTone, controlTypeTone, coverageTone, effectivenessTone, domainLabel,
   type Control, type ControlDomain, type ControlMapping,
-  type ControlAssessment, type RiskControlLink, type Effectiveness,
+  type ControlAssessment, type RiskControlLink, type Effectiveness, type RiskLinkType,
 } from '../../lib/controlLibrary';
 import {
   listAuthorityDocuments,
@@ -44,9 +44,11 @@ export function ControlLibraryPage() {
   const demoMode = !isAuthenticated();
 
   const [openAssess, setOpenAssess] = useState(false);
+  const [openLink, setOpenLink] = useState(false);
 
   const [controls, setControls] = useState<Control[]>([]);
   const [docs, setDocs] = useState<AuthorityDocument[]>([]);
+  const [risks, setRisks] = useState<RiskResponse[]>([]);
   const [domain, setDomain] = useState<ControlDomain | ''>('');
   const [loading, setLoading] = useState(true);
 
@@ -60,12 +62,14 @@ export function ControlLibraryPage() {
     setLoading(true);
     // Per-call .catch() — controls and authority docs come from independent
     // tables; either failing shouldn't blank the whole library.
-    const [cs, ds] = await Promise.all([
+    const [cs, ds, rs] = await Promise.all([
       listControls(domain || undefined).catch(() => [] as Control[]),
       listAuthorityDocuments().catch(() => [] as AuthorityDocument[]),
+      riskApi.list(undefined, 0, 200).then(p => p.content).catch(() => [] as RiskResponse[]),
     ]);
     setControls(cs);
     setDocs(ds);
+    setRisks(rs);
     setLoading(false);
   }
   useEffect(() => { void reload(); }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -137,6 +141,69 @@ export function ControlLibraryPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'تعذّر تسجيل التقييم' : 'Failed to record assessment'));
+    }
+  }
+
+  // ─── Link a risk to this control ────────────────────────────────
+  const LINK_TYPES: RiskLinkType[] = ['MITIGATES', 'DETECTS', 'TRANSFERS', 'AVOIDS', 'COMPENSATES'];
+  const linkTypeLabel = (l: RiskLinkType) => {
+    const en: Record<RiskLinkType, string> = {
+      MITIGATES: 'Mitigates', DETECTS: 'Detects', TRANSFERS: 'Transfers',
+      AVOIDS: 'Avoids', COMPENSATES: 'Compensates',
+    };
+    const ar: Record<RiskLinkType, string> = {
+      MITIGATES: 'يخفّف', DETECTS: 'يكشف', TRANSFERS: 'يحوّل',
+      AVOIDS: 'يتجنّب', COMPENSATES: 'يعوّض',
+    };
+    return (isAr ? ar : en)[l];
+  };
+
+  const riskById = useMemo(() => {
+    const m = new Map<number, RiskResponse>();
+    for (const r of risks) m.set(r.id, r);
+    return m;
+  }, [risks]);
+
+  const linkFields: FieldDef[] = [
+    { key: 'riskId', label: isAr ? 'الخطر' : 'Risk', kind: 'select-searchable', required: true, span: 12,
+      placeholder: isAr ? 'ابحث عن خطر بالكود أو العنوان…' : 'Search a risk by code or title…',
+      options: risks.map(r => ({ value: String(r.id), label: `${r.riskCode} — ${isAr && r.titleAr ? r.titleAr : r.titleEn}` })) },
+    { key: 'linkType', label: isAr ? 'نوع الارتباط' : 'Link type', kind: 'select', required: true, span: 6,
+      options: LINK_TYPES.map(l => ({ value: l, label: linkTypeLabel(l) })) },
+    { key: 'effectiveness', label: isAr ? 'الفاعلية' : 'Effectiveness', kind: 'select', span: 6,
+      options: [{ value: '', label: isAr ? '— (اختياري)' : '— (optional)' },
+                ...EFFECTIVENESS.map(e => ({ value: e, label: effLabel(e) }))] },
+    { key: 'rationaleEn', label: isAr ? 'المبرر (إنجليزي)' : 'Rationale (English)', kind: 'textarea', rows: 2, span: 12 },
+    { key: 'rationaleAr', label: isAr ? 'المبرر (عربي)' : 'Rationale (Arabic)', kind: 'textarea', rows: 2, span: 12 },
+  ];
+  const linkInitial = {
+    riskId: '', linkType: 'MITIGATES', effectiveness: '', rationaleEn: '', rationaleAr: '',
+  };
+
+  async function submitLink(v: Record<string, string>) {
+    if (!selected) return;
+    const riskId = Number(v.riskId);
+    if (!riskId || Number.isNaN(riskId)) {
+      toast.danger(isAr ? 'يجب اختيار خطر لربطه' : 'Pick a risk to link');
+      return;
+    }
+    try {
+      await linkRiskToControl({
+        riskId,
+        controlId: selected.id,
+        linkType: (v.linkType || 'MITIGATES') as RiskLinkType,
+        effectiveness: v.effectiveness ? (v.effectiveness as Effectiveness) : undefined,
+        rationaleEn: (v.rationaleEn || '').trim() || undefined,
+        rationaleAr: (v.rationaleAr || '').trim() || undefined,
+      });
+      const r = riskById.get(riskId);
+      toast.success(isAr ? `تم ربط ${r ? r.riskCode : 'الخطر'} بالضابط ${selected.controlCode}`
+                        : `Linked ${r ? r.riskCode : 'risk'} to ${selected.controlCode}`);
+      setOpenLink(false);
+      await selectControl(selected);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر ربط الخطر' : 'Failed to link risk'));
     }
   }
 
@@ -286,7 +353,12 @@ export function ControlLibraryPage() {
                   </Section>
 
                   {/* Risk-control matrix */}
-                  <Section title={isAr ? 'المخاطر المرتبطة' : 'Risk-control matrix'} count={riskLinks.length}>
+                  <Section title={isAr ? 'المخاطر المرتبطة' : 'Risk-control matrix'} count={riskLinks.length}
+                    action={!demoMode && risks.length > 0
+                      ? <Button variant="secondary" size="sm" Icon={Link2} onClick={() => setOpenLink(true)}>
+                          {isAr ? 'ربط خطر' : 'Link risk'}
+                        </Button>
+                      : undefined}>
                     {riskLinks.length === 0
                       ? <InlineEmpty>
                           {isAr ? 'لم يُربط هذا الضابط بأي خطر' : 'No risks linked to this control yet'}
@@ -299,14 +371,24 @@ export function ControlLibraryPage() {
                             <th>{isAr ? 'آخر مراجعة' : 'Reviewed'}</th>
                           </tr></thead>
                           <tbody>
-                            {riskLinks.map(l => (
-                              <tr key={l.id}>
-                                <td className="mono text-2xs">#{l.riskId}</td>
-                                <td><Badge size="sm" tone="info">{l.linkType}</Badge></td>
-                                <td><Badge size="sm" tone={effectivenessTone(l.effectiveness)}>{l.effectiveness ?? '—'}</Badge></td>
-                                <td className="mono text-2xs">{l.lastReviewedAt?.substring(0, 10) ?? '—'}</td>
-                              </tr>
-                            ))}
+                            {riskLinks.map(l => {
+                              const r = riskById.get(l.riskId);
+                              return (
+                                <tr key={l.id}>
+                                  <td>
+                                    {r
+                                      ? <>
+                                          <div className="mono text-2xs">{r.riskCode}</div>
+                                          <div className="text-2xs text-muted">{isAr && r.titleAr ? r.titleAr : r.titleEn}</div>
+                                        </>
+                                      : <span className="mono text-2xs">#{l.riskId}</span>}
+                                  </td>
+                                  <td><Badge size="sm" tone="info">{linkTypeLabel(l.linkType)}</Badge></td>
+                                  <td><Badge size="sm" tone={effectivenessTone(l.effectiveness)}>{l.effectiveness ?? '—'}</Badge></td>
+                                  <td className="mono text-2xs">{l.lastReviewedAt?.substring(0, 10) ?? '—'}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>}
                   </Section>
@@ -368,6 +450,19 @@ export function ControlLibraryPage() {
           size="md"
           onClose={() => setOpenAssess(false)}
           onSubmit={submitAssessment}
+        />
+      )}
+
+      {selected && (
+        <FormModal
+          open={openLink}
+          title={isAr ? `ربط خطر — ${selected.controlCode}` : `Link risk — ${selected.controlCode}`}
+          fields={linkFields}
+          initial={linkInitial}
+          submitLabel={isAr ? 'ربط' : 'Link'}
+          size="md"
+          onClose={() => setOpenLink(false)}
+          onSubmit={submitLink}
         />
       )}
     </Shell>
