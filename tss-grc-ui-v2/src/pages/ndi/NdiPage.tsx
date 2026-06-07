@@ -46,7 +46,7 @@ import {
   type NdiComplianceAssessment, type NdiComplianceAggregate, type NdiComplianceStatus,
 } from '../../lib/ndiCompliance';
 import {
-  listOpex, opexAggregate, updateOpexActual, createOpex,
+  listOpex, opexAggregate, updateOpexActual, createOpex, updateOpex,
   kpiStatusTone, kpiStatusLabel, progressFraction,
   type NdiOpexKpi, type NdiOpexAggregate, type NdiKpiFrequency,
 } from '../../lib/ndiOpex';
@@ -1687,11 +1687,32 @@ function OpexTab() {
   const [agg, setAgg] = useState<NdiOpexAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  const [editItem, setEditItem] = useState<NdiOpexKpi | null>(null);
   const newInitial = useMemo<OpexForm>(() => ({
     category: '', kpiCode: '', indicatorNameEn: '', indicatorNameAr: '',
     target: '', baseline: '', unit: '', frequency: 'QUARTERLY', dataSource: '',
     ownerName: '', ownerEmail: '', definitionEn: '', definitionAr: '', notes: '',
   }), []);
+  // Edit modal seed — mapped from the selected KPI. Keyed on [editItem] so
+  // FormModal's reset effect re-runs when a different row is opened. Numeric
+  // columns are stringified for the number-kind fields; status is omitted
+  // (the server recomputes it from actual vs target on every save).
+  const editInitial = useMemo<OpexForm>(() => ({
+    category:        editItem?.category ?? '',
+    kpiCode:         editItem?.kpiCode ?? '',
+    indicatorNameEn: editItem?.indicatorNameEn ?? '',
+    indicatorNameAr: editItem?.indicatorNameAr ?? '',
+    target:          editItem?.target != null ? String(editItem.target) : '',
+    baseline:        editItem?.baseline != null ? String(editItem.baseline) : '',
+    unit:            editItem?.unit ?? '',
+    frequency:       editItem?.frequency ?? '',
+    dataSource:      editItem?.dataSource ?? '',
+    ownerName:       editItem?.ownerName ?? '',
+    ownerEmail:      editItem?.ownerEmail ?? '',
+    definitionEn:    editItem?.definitionEn ?? '',
+    definitionAr:    editItem?.definitionAr ?? '',
+    notes:           editItem?.notes ?? '',
+  }), [editItem]);
 
   async function loadCycles() {
     try {
@@ -1776,6 +1797,48 @@ function OpexTab() {
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّرت إضافة المؤشّر' : 'Failed to add the KPI'));
+    }
+  }
+
+  async function onUpdate(v: OpexForm) {
+    if (!editItem?.id) return;
+    const category = String(v.category ?? '').trim();
+    const indicatorNameEn = String(v.indicatorNameEn ?? '').trim();
+    const targetStr = String(v.target ?? '').trim();
+    const target = Number(targetStr);
+    if (!category)        { toast.danger(isAr ? 'الفئة مطلوبة' : 'Category is required'); return; }
+    if (!indicatorNameEn) { toast.danger(isAr ? 'اسم المؤشّر (إنجليزي) مطلوب' : 'Indicator name (EN) is required'); return; }
+    if (targetStr === '' || !Number.isFinite(target)) {
+      toast.danger(isAr ? 'قيمة هدف صحيحة مطلوبة' : 'A valid target value is required'); return;
+    }
+    const baselineStr = String(v.baseline ?? '').trim();
+    const baseline = baselineStr === '' ? undefined : Number(baselineStr);
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    // Partial body — only fields the edit form owns. Status is intentionally
+    // omitted; the service recomputes it (Rule 13) from actual vs target.
+    const body: Partial<NdiOpexKpi> = {
+      category,
+      kpiCode: opt(v.kpiCode),
+      indicatorNameEn,
+      indicatorNameAr: opt(v.indicatorNameAr),
+      target,
+      baseline: baseline != null && Number.isFinite(baseline) ? baseline : undefined,
+      unit: opt(v.unit),
+      frequency: (v.frequency as NdiKpiFrequency) || undefined,
+      dataSource: opt(v.dataSource),
+      ownerName: opt(v.ownerName),
+      ownerEmail: opt(v.ownerEmail),
+      definitionEn: opt(v.definitionEn),
+      definitionAr: opt(v.definitionAr),
+      notes: opt(v.notes),
+    };
+    try {
+      await updateOpex(editItem.id, body);
+      toast.success(isAr ? 'حُدّث المؤشّر' : 'KPI updated');
+      setEditItem(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحديث المؤشّر' : 'Failed to update the KPI'));
     }
   }
 
@@ -1873,9 +1936,13 @@ function OpexTab() {
                           <td><Badge tone={kpiStatusTone(k.status)}>{kpiStatusLabel(k.status, isAr ? 'ar' : 'en')}</Badge></td>
                           <td className="text-xs">{k.lastActualAt ?? <span className="text-muted">—</span>}</td>
                           <td className="ndi-text-end">
-                            <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onUpdateActual(k)}>
-                              {isAr ? 'تسجيل قراءة' : 'Record actual'}
-                            </Button>
+                            <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                              <Button size="sm" variant="ghost" Icon={Pencil}
+                                title={isAr ? 'تعديل' : 'Edit'} onClick={() => setEditItem(k)} />
+                              <Button size="sm" variant="primary" Icon={ArrowRight} onClick={() => onUpdateActual(k)}>
+                                {isAr ? 'تسجيل قراءة' : 'Record actual'}
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1894,6 +1961,17 @@ function OpexTab() {
         size="lg"
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
+      />
+
+      <FormModal<OpexForm>
+        open={!!editItem}
+        title={isAr ? 'تعديل مؤشّر التميّز التشغيلي' : 'Edit operational excellence KPI'}
+        fields={opexFields(isAr)}
+        initial={editInitial}
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        size="lg"
+        onClose={() => setEditItem(null)}
+        onSubmit={onUpdate}
       />
     </div>
   );
