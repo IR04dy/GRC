@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw } from 'lucide-react';
+import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw, Plus } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
@@ -20,10 +21,13 @@ import {
   listEvents,
   getExitPlan,
   recordReview,
+  recordEvent,
   type OutsourcingArrangement,
   type DueDiligence,
   type MonitoringEvent,
   type ExitPlan,
+  type EventType,
+  type Severity,
   LIFECYCLE_LABELS,
   SERVICE_TYPE_LABELS,
   CRITICAL_FUNCTION_LABELS,
@@ -47,6 +51,12 @@ const overviewGrid: CSSProperties = { display: 'grid', gap: 16, marginTop: 16, g
 const fullSpan: CSSProperties = { gridColumn: '1 / -1' };
 const muted: CSSProperties = { color: 'var(--ink-3)' };
 
+const EVENT_TYPES: EventType[] = [
+  'KPI_REVIEW', 'SLA_BREACH', 'INCIDENT', 'AUDIT_REPORT', 'CONTRACT_AMENDMENT',
+  'FINANCIAL_HEALTH_FLAG', 'REGULATORY_QUERY', 'CHANGE_OF_CONTROL', 'RFP_RECOMPETE', 'EXIT_TRIGGER',
+];
+const SEVERITIES: Severity[] = ['INFO', 'MINOR', 'MODERATE', 'MAJOR', 'CRITICAL'];
+
 export function OutsourcingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -61,6 +71,7 @@ export function OutsourcingDetailPage() {
   const [exitPlan, setExitPlan] = useState<ExitPlan | null>(null);
   const [tab, setTab] = useState<TabId>('overview');
   const [loading, setLoading] = useState(false);
+  const [openEvent, setOpenEvent] = useState(false);
 
   async function reload() {
     if (!Number.isFinite(arrangementId)) return;
@@ -95,6 +106,62 @@ export function OutsourcingDetailPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل تسجيل المراجعة' : 'Failed to record review'));
+    }
+  }
+
+  // ── Record a monitoring event (continuous-oversight log) ──────────────
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const eventInitial: Record<string, string> = useMemo(() => ({
+    eventType: 'KPI_REVIEW', eventDate: today, severity: 'INFO',
+    descriptionEn: '', descriptionAr: '', actionTakenEn: '', actionTakenAr: '',
+  }), [today]);
+
+  const eventFields: FieldDef[] = useMemo(() => [
+    { key: 'eventType', kind: 'select', required: true, span: 6,
+      label: isAr ? 'نوع الحدث' : 'Event type',
+      options: EVENT_TYPES.map(t => ({ value: t, label: EVENT_TYPE_LABELS[t][isAr ? 'ar' : 'en'] })) },
+    { key: 'eventDate', kind: 'date', span: 3, label: isAr ? 'تاريخ الحدث' : 'Event date' },
+    { key: 'severity', kind: 'select', span: 3,
+      label: isAr ? 'الخطورة' : 'Severity',
+      options: SEVERITIES.map(s => ({ value: s, label: SEVERITY_LABELS[s][isAr ? 'ar' : 'en'] })) },
+    { key: 'descriptionEn', kind: 'textarea', span: 12, rows: 3,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (EN)' },
+    { key: 'descriptionAr', kind: 'textarea', span: 12, rows: 3,
+      label: isAr ? 'الوصف (عربي)' : 'Description (AR)' },
+    { key: 'actionTakenEn', kind: 'textarea', span: 12, rows: 2,
+      label: isAr ? 'الإجراء المُتَّخذ (إنجليزي)' : 'Action taken (EN)' },
+    { key: 'actionTakenAr', kind: 'textarea', span: 12, rows: 2,
+      label: isAr ? 'الإجراء المُتَّخذ (عربي)' : 'Action taken (AR)' },
+  ], [isAr]);
+
+  async function submitEvent(v: Record<string, string>) {
+    const eventType = (v.eventType ?? '') as EventType;
+    const eventDate = String(v.eventDate ?? '').trim();
+    const descriptionEn = String(v.descriptionEn ?? '').trim();
+    const descriptionAr = String(v.descriptionAr ?? '').trim();
+    if (!eventType) { toast.danger(isAr ? 'نوع الحدث مطلوب' : 'Event type is required'); return; }
+    if (!eventDate) { toast.danger(isAr ? 'تاريخ الحدث مطلوب' : 'Event date is required'); return; }
+    if (!descriptionEn) { toast.danger(isAr ? 'الوصف بالإنجليزية مطلوب' : 'Description (EN) is required'); return; }
+    if (!descriptionAr) { toast.danger(isAr ? 'الوصف بالعربية مطلوب' : 'Description (AR) is required'); return; }
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    try {
+      await recordEvent({
+        arrangementId,
+        eventType,
+        eventDate,
+        severity: ((v.severity as Severity) || 'INFO'),
+        descriptionEn,
+        descriptionAr,
+        actionTakenEn: opt(v.actionTakenEn),
+        actionTakenAr: opt(v.actionTakenAr),
+        resolved: false,
+      });
+      toast.success(isAr ? 'تمّ تسجيل حدث المراقبة' : 'Monitoring event recorded');
+      setOpenEvent(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل تسجيل الحدث' : 'Failed to record event'));
     }
   }
 
@@ -255,6 +322,11 @@ export function OutsourcingDetailPage() {
 
       {tab === 'events' && (
         <div style={stack}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button Icon={Plus} onClick={() => setOpenEvent(true)}>
+              {isAr ? 'تسجيل حدث' : 'Record event'}
+            </Button>
+          </div>
           {events.length === 0 && <Card><InlineEmpty text={isAr ? 'لا توجد أحداث مراقبة' : 'No monitoring events'} /></Card>}
           {events.map(e => (
             <Card key={e.id}>
@@ -333,6 +405,16 @@ export function OutsourcingDetailPage() {
           </Card>
         </div>
       )}
+
+      <FormModal
+        open={openEvent}
+        title={isAr ? 'تسجيل حدث مراقبة' : 'Record monitoring event'}
+        fields={eventFields}
+        initial={eventInitial}
+        onClose={() => setOpenEvent(false)}
+        onSubmit={submitEvent}
+        submitLabel={isAr ? 'تسجيل الحدث' : 'Record event'}
+      />
     </Shell>
   );
 }
