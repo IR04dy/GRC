@@ -62,7 +62,7 @@ import {
   listTcfd, tcfdReadiness, createTcfd, updateTcfd,
   tcfdMarkDisclosed, tcfdMarkPartial, tcfdMarkNotDisclosed,
   tcfdMarkNotApplicable, tcfdMarkUnderReview,
-  tcfdAttachEvidence, tcfdRecordGap,
+  tcfdAttachEvidence, tcfdRecordGap, tcfdLinkClimateRisk,
   tcfdStatusTone, tcfdStatusLabel, tcfdPillarLabel,
   hasTcfdGap, hasTcfdEvidence,
   type TcfdItem as TcfdI, type TcfdReadiness as TcfdR, type TcfdPillar, type TcfdStatus,
@@ -1964,19 +1964,58 @@ function TcfdTab() {
   const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
   const [openNew, setOpenNew]           = useState(false);
   const [editTcfd, setEditTcfd]         = useState<TcfdI | null>(null);
+  // Rule-7 traceability — link a TCFD recommendation to a climate risk in the
+  // R&O register. The picker is populated from the kind=RISK items.
+  const [linkingTcfd, setLinkingTcfd]   = useState<TcfdI | null>(null);
+  const [climateRisks, setClimateRisks] = useState<ClimateRiskOpportunity[]>([]);
 
   async function reload() {
     setLoading(true);
-    // Per-call .catch() — matrix and readiness load independently.
-    const [pg, r] = await Promise.all([
+    // Per-call .catch() — matrix, readiness and the climate-risk picker load
+    // independently.
+    const [pg, r, croPg] = await Promise.all([
       listTcfd({ year: 2025, size: 100 }).catch(() => ({ content: [] as TcfdI[], totalElements: 0 })),
       tcfdReadiness(2025).catch(() => null as TcfdR | null),
+      listClimateItems({ kind: 'RISK', size: 100 }).catch(() => ({ content: [] as ClimateRiskOpportunity[], totalElements: 0 })),
     ]);
     setItems(pg.content);
     setReadi(r);
+    setClimateRisks(croPg.content);
     setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
+
+  const climateRiskLabel = (id?: number) => {
+    if (id == null) return null;
+    const cro = climateRisks.find(c => c.id === id);
+    if (!cro) return `#${id}`;
+    return `${cro.itemCode ? cro.itemCode + ' · ' : ''}${isAr && cro.titleAr ? cro.titleAr : cro.titleEn}`;
+  };
+
+  const linkFields: FieldDef[] = useMemo(() => [
+    { kind: 'select', key: 'climateRiskId', required: true, span: 12,
+      label: isAr ? 'مخاطرة مناخية' : 'Climate risk',
+      options: climateRisks.map(c => ({
+        value: String(c.id),
+        label: `${c.itemCode ? c.itemCode + ' · ' : ''}${isAr && c.titleAr ? c.titleAr : c.titleEn}`,
+      })) },
+  ], [climateRisks, isAr]);
+
+  async function submitLink(values: Record<string, unknown>) {
+    if (linkingTcfd?.id == null) return;
+    const climateRiskId = Number(values.climateRiskId);
+    if (!Number.isInteger(climateRiskId) || climateRiskId <= 0) {
+      toast.danger(isAr ? 'اختر مخاطرة مناخية' : 'Select a climate risk'); return;
+    }
+    try {
+      await tcfdLinkClimateRisk(linkingTcfd.id, climateRiskId);
+      toast.success(isAr ? 'تم ربط المخاطرة المناخية' : 'Climate risk linked');
+      setLinkingTcfd(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
 
   const byPillar = useMemo(() => {
     const map = new Map<TcfdPillar, TcfdI[]>();
@@ -2268,7 +2307,16 @@ function TcfdTab() {
                               title={isAr ? 'تعديل' : 'Edit'} onClick={() => setEditTcfd(t)} />
                             <Button size="sm" variant="secondary" Icon={Paperclip}   onClick={() => setEvidencingId(t.id!)}>{isAr ? 'إرفاق' : 'Attach'}</Button>
                             <Button size="sm" variant="secondary" Icon={AlertCircle} onClick={() => setGappingId({ id: t.id! })}>{isAr ? 'فجوة' : 'Gap'}</Button>
+                            <Button size="sm" variant="secondary" Icon={Link2} onClick={() => setLinkingTcfd(t)}>
+                              {t.relatedClimateRiskId ? (isAr ? 'تغيير المخاطرة' : 'Relink risk') : (isAr ? 'ربط مخاطرة' : 'Link risk')}
+                            </Button>
                           </div>
+                          {t.relatedClimateRiskId != null && (
+                            <div className="text-2xs text-muted" style={{ marginTop: 2 }}>
+                              <Link2 size={10} className="esg-icon-inline" />
+                              {isAr ? 'مخاطرة مرتبطة: ' : 'Linked risk: '}{climateRiskLabel(t.relatedClimateRiskId)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -2330,6 +2378,19 @@ function TcfdTab() {
         submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
         onClose={() => setEditTcfd(null)}
         onSubmit={submitEdit}
+      />
+
+      <FormModal
+        open={linkingTcfd !== null}
+        title={linkingTcfd
+          ? (isAr ? `ربط مخاطرة مناخية · ${linkingTcfd.recommendationCode}` : `Link climate risk · ${linkingTcfd.recommendationCode}`)
+          : ''}
+        fields={linkFields}
+        initial={{ climateRiskId: linkingTcfd?.relatedClimateRiskId != null ? String(linkingTcfd.relatedClimateRiskId) : '' }}
+        size="md"
+        submitLabel={isAr ? 'ربط' : 'Link'}
+        onClose={() => setLinkingTcfd(null)}
+        onSubmit={submitLink}
       />
     </div>
   );
