@@ -74,7 +74,7 @@ import {
   type MaterialTopic, type MaterialMatrix, type MaterialCategory,
 } from '../../lib/sustainabilityMateriality';
 import {
-  listMetrics, metricsAggregate, recordMetricReading, archiveMetric, createMetric,
+  listMetrics, metricsAggregate, recordMetricReading, archiveMetric, createMetric, updateMetric,
   computeMetricProgress, metricStatusTone, metricStatusLabel,
   metricCategoryLabel as esgMetricCategoryLabel,
   type EsgMetric as EsgM, type MetricAggregate, type MetricCategory,
@@ -2470,6 +2470,7 @@ function MetricsTab() {
   const [categoryFilter, setCategoryFilter] = useState<MetricCategory | 'ALL'>('ALL');
   const [readingMetric, setReadingMetric]   = useState<EsgM | null>(null);
   const [openNew, setOpenNew]               = useState(false);
+  const [editMetric, setEditMetric]         = useState<EsgM | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -2547,6 +2548,107 @@ function MetricsTab() {
     { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
       label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
   ];
+
+  // Edit-metric — descriptive fields + baseline/target correction. The
+  // current value keeps its dedicated "Record" action, and the reporting
+  // year / code are fixed once created. Numeric columns have no entity
+  // default (null), so omitting current_value leaves it untouched.
+  const editFields: FieldDef[] = [
+    { kind: 'text', key: 'metricNameEn', required: true, span: 6,
+      label: isAr ? 'اسم المؤشّر (إنجليزي)' : 'Metric name (English)' },
+    { kind: 'text', key: 'metricNameAr', span: 6,
+      label: isAr ? 'اسم المؤشّر (عربي)' : 'Metric name (Arabic)' },
+    { kind: 'select', key: 'category', required: true, span: 6,
+      label: isAr ? 'الفئة' : 'Category',
+      options: (['ENVIRONMENTAL', 'SOCIAL', 'GOVERNANCE'] as const).map(c => ({
+        value: c, label: esgMetricCategoryLabel(c, isAr ? 'ar' : 'en'),
+      })) },
+    { kind: 'text', key: 'subcategory', span: 3,
+      label: isAr ? 'الفئة الفرعية' : 'Subcategory' },
+    { kind: 'text', key: 'unit', required: true, span: 3,
+      label: isAr ? 'الوحدة' : 'Unit', placeholder: 'MWh, %, tCO₂e…' },
+    { kind: 'number', key: 'baselineValue', span: 3,
+      label: isAr ? 'قيمة الأساس' : 'Baseline value' },
+    { kind: 'number', key: 'baselineYear', span: 3, min: 2000, max: 2100,
+      label: isAr ? 'سنة الأساس' : 'Baseline year' },
+    { kind: 'number', key: 'targetValue', span: 3,
+      label: isAr ? 'القيمة المستهدفة' : 'Target value' },
+    { kind: 'number', key: 'targetYear', span: 3, min: 2000, max: 2100,
+      label: isAr ? 'سنة الهدف' : 'Target year' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المسؤول' : 'Owner' },
+    { kind: 'text', key: 'ownerEmail', span: 6,
+      label: isAr ? 'بريد المسؤول' : 'Owner email' },
+    { kind: 'text', key: 'responsibleDepartment', span: 12,
+      label: isAr ? 'الإدارة المسؤولة' : 'Responsible department' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    metricNameEn:          editMetric?.metricNameEn ?? '',
+    metricNameAr:          editMetric?.metricNameAr ?? '',
+    category:              editMetric?.category ?? 'ENVIRONMENTAL',
+    subcategory:           editMetric?.subcategory ?? '',
+    unit:                  editMetric?.unit ?? '',
+    baselineValue:         editMetric?.baselineValue != null ? String(editMetric.baselineValue) : '',
+    baselineYear:          editMetric?.baselineYear != null ? String(editMetric.baselineYear) : '',
+    targetValue:           editMetric?.targetValue != null ? String(editMetric.targetValue) : '',
+    targetYear:            editMetric?.targetYear != null ? String(editMetric.targetYear) : '',
+    ownerName:             editMetric?.ownerName ?? '',
+    ownerEmail:            editMetric?.ownerEmail ?? '',
+    responsibleDepartment: editMetric?.responsibleDepartment ?? '',
+    descriptionEn:         editMetric?.descriptionEn ?? '',
+    descriptionAr:         editMetric?.descriptionAr ?? '',
+    notes:                 editMetric?.notes ?? '',
+  }), [editMetric]);
+
+  async function submitEdit(values: Record<string, unknown>): Promise<void> {
+    if (!editMetric?.id) return;
+    const nameEn = String(values.metricNameEn ?? '').trim();
+    const unit = String(values.unit ?? '').trim();
+    const category = String(values.category ?? '').trim();
+    if (!nameEn || !unit || !category) {
+      toast.danger(isAr
+        ? 'اسم المؤشّر والفئة والوحدة حقول مطلوبة'
+        : 'Metric name, category and unit are required');
+      return;
+    }
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return v === '' || v == null || !Number.isFinite(n) ? undefined : n;
+    };
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      await updateMetric(editMetric.id, {
+        metricNameEn: nameEn,
+        metricNameAr: str(values.metricNameAr),
+        category: category as MetricCategory,
+        subcategory: str(values.subcategory),
+        unit,
+        baselineValue: num(values.baselineValue),
+        baselineYear: num(values.baselineYear),
+        targetValue: num(values.targetValue),
+        targetYear: num(values.targetYear),
+        ownerName: str(values.ownerName),
+        ownerEmail: str(values.ownerEmail),
+        responsibleDepartment: str(values.responsibleDepartment),
+        descriptionEn: str(values.descriptionEn),
+        descriptionAr: str(values.descriptionAr),
+        notes: str(values.notes),
+      });
+      toast.success(isAr ? 'حُدّث المؤشّر' : 'Metric updated');
+      setEditMetric(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث المؤشّر' : 'Failed to update metric'));
+    }
+  }
 
   async function submitCreate(values: Record<string, unknown>): Promise<void> {
     const nameEn = String(values.metricNameEn ?? '').trim();
@@ -2698,6 +2800,11 @@ function MetricsTab() {
                         <td className="esg-text-end">
                           <div className="esg-actions-row">
                             {m.status !== 'ARCHIVED' && (
+                              <Button size="sm" variant="ghost" Icon={Pencil}
+                                title={isAr ? 'تعديل' : 'Edit'}
+                                onClick={() => setEditMetric(m)} />
+                            )}
+                            {m.status !== 'ARCHIVED' && (
                               <Button size="sm" variant="secondary" onClick={() => setReadingMetric(m)}>
                                 {isAr ? 'تسجيل' : 'Record'}
                               </Button>
@@ -2745,6 +2852,19 @@ function MetricsTab() {
         submitLabel={isAr ? 'إضافة المؤشّر' : 'Add metric'}
         onClose={() => setOpenNew(false)}
         onSubmit={submitCreate}
+      />
+
+      <FormModal
+        open={editMetric !== null}
+        title={editMetric
+          ? (isAr ? `تعديل المؤشّر · ${editMetric.metricCode ?? ''}` : `Edit metric · ${editMetric.metricCode ?? ''}`)
+          : ''}
+        fields={editFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditMetric(null)}
+        onSubmit={submitEdit}
       />
     </div>
   );
