@@ -28,7 +28,7 @@ import {
   RISK_KRIS_BY_ID, RISK_HISTORY_BY_ID, RISK_LINKS_BY_ID,
 } from './mockRisks';
 import {
-  listAssessments, recordAssessment,
+  listAssessments, recordAssessment, correctAssessment,
   listTreatments, createTreatment, updateTreatment, transitionTreatment, deleteTreatment,
   treatmentTypeTone, treatmentStatusTone, nextTreatmentStatuses,
   type RiskAssessment, type RiskTreatment, type RiskTreatmentType, type RiskTreatmentStatus,
@@ -131,6 +131,48 @@ export function RiskDetailPage() {
       try { setRisk(await riskApi.get(risk.id)); } catch { /* ignore */ }
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed to record assessment');
+    }
+  }
+
+  // Correct an existing assessment in place (typo / mis-keyed score). The
+  // endpoint takes likelihood / impact / English notes (null-means-keep) and
+  // re-mirrors the parent risk's residual score when this is still the latest
+  // assessment. Prompts are prefilled with the row's current values; the
+  // Arabic note isn't carried by this endpoint so only the English note shows.
+  async function onCorrectAssessment(a: RiskAssessment) {
+    if (!risk) return;
+    const ar = lang === 'ar';
+    const lAns = await dialog.prompt({
+      title: ar ? 'تصحيح التقييم' : 'Correct assessment',
+      label: ar ? 'الاحتمالية (1..5)' : 'Likelihood (1..5)', type: 'number',
+      required: true, min: 1, max: 5, initial: String(a.likelihood),
+      submitLabel: ar ? 'حفظ' : 'Save',
+    });
+    if (lAns === null) return;
+    const iAns = await dialog.prompt({
+      title: ar ? 'تصحيح التقييم' : 'Correct assessment',
+      label: ar ? 'الأثر (1..5)' : 'Impact (1..5)', type: 'number',
+      required: true, min: 1, max: 5, initial: String(a.impact),
+      submitLabel: ar ? 'حفظ' : 'Save',
+    });
+    if (iAns === null) return;
+    const notes = await dialog.prompt({
+      title: ar ? 'تصحيح التقييم' : 'Correct assessment',
+      label: ar ? 'ملاحظات (اختياري)' : 'Notes (optional)', type: 'textarea',
+      initial: a.assessmentNotesEn ?? '',
+      submitLabel: ar ? 'حفظ' : 'Save',
+    });
+    if (notes === null) return;
+    try {
+      await correctAssessment(a.id, {
+        likelihood: Number(lAns), impact: Number(iAns),
+        assessmentNotesEn: notes.trim() || undefined,
+      });
+      toast.success(ar ? 'تم تصحيح التقييم' : 'Assessment corrected');
+      setLiveAssessments(await listAssessments(risk.id));
+      try { setRisk(await riskApi.get(risk.id)); } catch { /* ignore */ }
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (ar ? 'تعذّر تصحيح التقييم' : 'Failed to correct assessment'));
     }
   }
 
@@ -391,6 +433,11 @@ export function RiskDetailPage() {
                           #{a.id}
                         </span>
                         <span className={`risk-detail-score-pill ${scoreToneClass(a.score ?? a.likelihood * a.impact)}`}>{a.score ?? a.likelihood * a.impact}</span>
+                        <Button size="sm" variant="ghost" Icon={Edit}
+                          title={lang === 'ar' ? 'تصحيح التقييم' : 'Correct assessment'}
+                          onClick={() => onCorrectAssessment(a)}>
+                          {lang === 'ar' ? 'تصحيح' : 'Correct'}
+                        </Button>
                       </div>
                     ))}
                   </div>
