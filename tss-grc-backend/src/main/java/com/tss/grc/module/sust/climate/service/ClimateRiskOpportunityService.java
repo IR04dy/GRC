@@ -145,7 +145,13 @@ public class ClimateRiskOpportunityService {
         if (req.getTitleAr() != null)               cur.setTitleAr(req.getTitleAr());
         if (req.getDescriptionEn() != null)         cur.setDescriptionEn(req.getDescriptionEn());
         if (req.getDescriptionAr() != null)         cur.setDescriptionAr(req.getDescriptionAr());
-        if (req.getKind() != null)                  cur.setKind(req.getKind());
+        // kind is immutable post-create — a climate item is created as either a
+        // RISK or an OPPORTUNITY and its category taxonomy is bound to that
+        // choice, so update() deliberately never copies req.getKind(). Besides
+        // being the correct domain rule, this permanently closes the partial-
+        // update clobber for kind: an omitted, echoed, or even mismatched kind
+        // in the PUT body can no longer flip the row and trip validateAxes.
+        // (The "RISK" insert default lives in @PrePersist on the entity.)
         if (req.getCategory() != null)              cur.setCategory(req.getCategory());
         if (req.getTimeHorizon() != null)           cur.setTimeHorizon(req.getTimeHorizon());
         if (req.getLikelihood() != null)            cur.setLikelihood(req.getLikelihood());

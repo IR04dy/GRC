@@ -33,20 +33,20 @@ public class OrganisationSettings {
 
     @Column(name = "organisation_id", nullable = false) private Long organisationId;
 
-    @Column(name = "esg_readiness_warning_threshold", nullable = false)  private Integer esgReadinessWarningThreshold  = 60;
-    @Column(name = "esg_readiness_critical_threshold", nullable = false) private Integer esgReadinessCriticalThreshold = 40;
+    @Column(name = "esg_readiness_warning_threshold", nullable = false)  private Integer esgReadinessWarningThreshold;
+    @Column(name = "esg_readiness_critical_threshold", nullable = false) private Integer esgReadinessCriticalThreshold;
 
-    @Column(name = "evidence_expiry_warning_days", nullable = false) private Integer evidenceExpiryWarningDays = 30;
-    @Column(name = "evidence_sweep_cron", nullable = false, length = 50) private String evidenceSweepCron = "0 0 6 * * *";
+    @Column(name = "evidence_expiry_warning_days", nullable = false) private Integer evidenceExpiryWarningDays;
+    @Column(name = "evidence_sweep_cron", nullable = false, length = 50) private String evidenceSweepCron;
 
     @Column(name = "scope3_partial_coverage_threshold", nullable = false, precision = 5, scale = 2)
-    private BigDecimal scope3PartialCoverageThreshold = new BigDecimal("70.00");
+    private BigDecimal scope3PartialCoverageThreshold;
 
-    @Column(name = "capa_overdue_warning_days",      nullable = false) private Integer capaOverdueWarningDays      = 7;
-    @Column(name = "capa_executive_escalation_days", nullable = false) private Integer capaExecutiveEscalationDays = 30;
+    @Column(name = "capa_overdue_warning_days",      nullable = false) private Integer capaOverdueWarningDays;
+    @Column(name = "capa_executive_escalation_days", nullable = false) private Integer capaExecutiveEscalationDays;
 
     @Column(name = "sgi_at_risk_progress_factor", nullable = false, precision = 3, scale = 2)
-    private BigDecimal sgiAtRiskProgressFactor = new BigDecimal("0.70");
+    private BigDecimal sgiAtRiskProgressFactor;
 
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
 
@@ -57,7 +57,22 @@ public class OrganisationSettings {
     @Column(name = "updated_by", length = 100) private String updatedBy;
 
     @PrePersist
-    void onCreate() { if (createdAt == null) createdAt = LocalDateTime.now(); }
+    void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        // Defaults live here (not in field initializers) so a partial PUT that
+        // OMITS a threshold leaves it null and update()'s null-guard preserves
+        // the stored value instead of silently snapping it back to default.
+        // getOrCreate() persists a bare new row, so @PrePersist still seeds a
+        // brand-new tenant's settings with the V65 schema defaults on INSERT.
+        if (esgReadinessWarningThreshold   == null) esgReadinessWarningThreshold   = 60;
+        if (esgReadinessCriticalThreshold  == null) esgReadinessCriticalThreshold  = 40;
+        if (evidenceExpiryWarningDays      == null) evidenceExpiryWarningDays      = 30;
+        if (evidenceSweepCron              == null) evidenceSweepCron              = "0 0 6 * * *";
+        if (scope3PartialCoverageThreshold == null) scope3PartialCoverageThreshold = new BigDecimal("70.00");
+        if (capaOverdueWarningDays         == null) capaOverdueWarningDays         = 7;
+        if (capaExecutiveEscalationDays    == null) capaExecutiveEscalationDays    = 30;
+        if (sgiAtRiskProgressFactor        == null) sgiAtRiskProgressFactor        = new BigDecimal("0.70");
+    }
 
     @PreUpdate
     void onUpdate() { updatedAt = LocalDateTime.now(); }
