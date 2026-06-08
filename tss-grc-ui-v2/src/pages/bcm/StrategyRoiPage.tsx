@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   TrendingUp, ChevronLeft, AlertTriangle, CheckCircle2, Clock,
-  XCircle, FileText, Banknote, Sigma, Plus,
+  XCircle, FileText, Banknote, Sigma, Plus, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -19,9 +19,11 @@ import { ApiError } from '../../lib/api';
 import {
   listStrategyRoi,
   createStrategyRoi,
+  updateStrategyRoi,
   recommendStrategyRoi,
   archiveStrategyRoi,
   type StrategyRoiAnalysis,
+  type StrategyRoiRequest,
   type Recommendation,
   type StrategyType,
   STRATEGY_TYPES,
@@ -77,6 +79,7 @@ export function StrategyRoiPage() {
   // for the picker. The server computes the ROI / NPV / payback from these
   // inputs + the BIA loss curve and assigns the analysis code.
   const [openNew, setOpenNew] = useState(false);
+  const [editItem, setEditItem] = useState<StrategyRoiAnalysis | null>(null);
   const [bias, setBias] = useState<BiaQuantitative[]>([]);
   useEffect(() => {
     void listQuantitativeBias()
@@ -95,6 +98,22 @@ export function StrategyRoiPage() {
     expectedIncidentsPerYear: '0.5',
     discountRatePercent: '8',
   }), [bias]);
+  // Edit seed — mapped from the selected analysis, keyed on [editItem] so
+  // FormModal's open-reset effect re-runs when a different row is opened.
+  // Numeric columns are stringified for the number-kind fields; the server
+  // recomputes ROI / NPV / payback from these inputs + the linked BIA.
+  const editInitial = useMemo<RoiForm>(() => ({
+    biaQuantitativeId:        editItem != null ? String(editItem.biaQuantitativeId) : '',
+    strategyType:             editItem?.strategyType ?? 'WARM_DR',
+    strategyNameEn:           editItem?.strategyNameEn ?? '',
+    strategyNameAr:           editItem?.strategyNameAr ?? '',
+    planningHorizonYears:     editItem != null ? String(editItem.planningHorizonYears) : '',
+    expectedRtoHours:         editItem != null ? String(editItem.expectedRtoHours) : '',
+    capexSar:                 editItem != null ? String(editItem.capexSar) : '',
+    opexAnnualSar:            editItem != null ? String(editItem.opexAnnualSar) : '',
+    expectedIncidentsPerYear: editItem?.expectedIncidentsPerYear != null ? String(editItem.expectedIncidentsPerYear) : '',
+    discountRatePercent:      editItem?.discountRatePercent != null ? String(editItem.discountRatePercent) : '',
+  }), [editItem]);
 
   // ─── Load ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -211,74 +230,103 @@ export function StrategyRoiPage() {
   // contract: a BIA + strategy type + bilingual names are required;
   // planning horizon and RTO must be >= 1; capex/opex must be >= 0;
   // the optional incidents/yr and discount rate must be >= 0 when given.
-  async function submitNew(v: RoiForm) {
+  // Validate + coerce a RoiForm into a StrategyRoiRequest, or null (after
+  // toasting) if invalid. Shared by create and edit so both honour the same
+  // contract: a BIA + strategy type + bilingual names are required; planning
+  // horizon and RTO must be >= 1; capex/opex must be >= 0; the optional
+  // incidents/yr and discount rate must be >= 0 when given.
+  function buildRoiRequest(v: RoiForm): StrategyRoiRequest | null {
     const biaQuantitativeId = Number(v.biaQuantitativeId);
     if (!Number.isFinite(biaQuantitativeId) || biaQuantitativeId <= 0) {
       toast.danger(isAr ? 'اختر تحليل الأثر الكمي' : 'Select a Quantitative BIA');
-      return;
+      return null;
     }
     const strategyType = String(v.strategyType ?? '').trim();
     if (!STRATEGY_TYPES.includes(strategyType as StrategyType)) {
       toast.danger(isAr ? 'اختر نوع الاستراتيجية' : 'Select a strategy type');
-      return;
+      return null;
     }
     const strategyNameEn = String(v.strategyNameEn ?? '').trim();
     const strategyNameAr = String(v.strategyNameAr ?? '').trim();
-    if (!strategyNameEn) { toast.danger(isAr ? 'اسم الاستراتيجية (إنجليزي) مطلوب' : 'English strategy name is required'); return; }
-    if (!strategyNameAr) { toast.danger(isAr ? 'اسم الاستراتيجية (عربي) مطلوب' : 'Arabic strategy name is required'); return; }
+    if (!strategyNameEn) { toast.danger(isAr ? 'اسم الاستراتيجية (إنجليزي) مطلوب' : 'English strategy name is required'); return null; }
+    if (!strategyNameAr) { toast.danger(isAr ? 'اسم الاستراتيجية (عربي) مطلوب' : 'Arabic strategy name is required'); return null; }
 
     const planningHorizonYears = Number(v.planningHorizonYears);
     if (!Number.isFinite(planningHorizonYears) || planningHorizonYears < 1) {
       toast.danger(isAr ? 'أفق التخطيط يجب أن يكون سنة واحدة على الأقل' : 'Planning horizon must be at least 1 year');
-      return;
+      return null;
     }
     const expectedRtoHours = Number(v.expectedRtoHours);
     if (!Number.isFinite(expectedRtoHours) || expectedRtoHours < 1) {
       toast.danger(isAr ? 'زمن التعافي المستهدف يجب أن يكون ساعة واحدة على الأقل' : 'Expected RTO must be at least 1 hour');
-      return;
+      return null;
     }
     const capexSar = Number(v.capexSar);
     if (!Number.isFinite(capexSar) || capexSar < 0) {
       toast.danger(isAr ? 'النفقات الرأسمالية يجب ألا تكون سالبة' : 'Capex must be non-negative');
-      return;
+      return null;
     }
     const opexAnnualSar = Number(v.opexAnnualSar);
     if (!Number.isFinite(opexAnnualSar) || opexAnnualSar < 0) {
       toast.danger(isAr ? 'النفقات التشغيلية السنوية يجب ألا تكون سالبة' : 'Annual opex must be non-negative');
-      return;
+      return null;
     }
 
     const incRaw = String(v.expectedIncidentsPerYear ?? '').trim();
     let expectedIncidentsPerYear: number | undefined;
     if (incRaw !== '') {
       const n = Number(v.expectedIncidentsPerYear);
-      if (!Number.isFinite(n) || n < 0) { toast.danger(isAr ? 'عدد الحوادث المتوقعة سنوياً يجب ألا يكون سالباً' : 'Expected incidents/yr must be non-negative'); return; }
+      if (!Number.isFinite(n) || n < 0) { toast.danger(isAr ? 'عدد الحوادث المتوقعة سنوياً يجب ألا يكون سالباً' : 'Expected incidents/yr must be non-negative'); return null; }
       expectedIncidentsPerYear = n;
     }
     const discRaw = String(v.discountRatePercent ?? '').trim();
     let discountRatePercent: number | undefined;
     if (discRaw !== '') {
       const n = Number(v.discountRatePercent);
-      if (!Number.isFinite(n) || n < 0) { toast.danger(isAr ? 'معدل الخصم يجب ألا يكون سالباً' : 'Discount rate must be non-negative'); return; }
+      if (!Number.isFinite(n) || n < 0) { toast.danger(isAr ? 'معدل الخصم يجب ألا يكون سالباً' : 'Discount rate must be non-negative'); return null; }
       discountRatePercent = n;
     }
 
+    return {
+      biaQuantitativeId,
+      strategyType: strategyType as StrategyType,
+      strategyNameEn, strategyNameAr,
+      planningHorizonYears,
+      capexSar, opexAnnualSar,
+      expectedRtoHours,
+      expectedIncidentsPerYear,
+      discountRatePercent,
+    };
+  }
+
+  async function submitNew(v: RoiForm) {
+    const body = buildRoiRequest(v);
+    if (!body) return;
     try {
-      const created = await createStrategyRoi({
-        biaQuantitativeId,
-        strategyType: strategyType as StrategyType,
-        strategyNameEn, strategyNameAr,
-        planningHorizonYears,
-        capexSar, opexAnnualSar,
-        expectedRtoHours,
-        expectedIncidentsPerYear,
-        discountRatePercent,
-      });
+      const created = await createStrategyRoi(body);
       toast.success(isAr ? `تم إنشاء التحليل ${created.analysisCode}` : `Analysis ${created.analysisCode} created`);
       setOpenNew(false);
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إنشاء التحليل' : 'Create failed'));
+    }
+  }
+
+  // Edit an existing analysis. Same validation as create; the server
+  // recomputes ROI / NPV / payback from the new inputs + linked BIA. The
+  // recommendation state is preserved (an APPROVED analysis is read-only —
+  // the Edit affordance is hidden for it, matching the service guard).
+  async function submitEdit(v: RoiForm) {
+    if (!editItem) return;
+    const body = buildRoiRequest(v);
+    if (!body) return;
+    try {
+      const updated = await updateStrategyRoi(editItem.externalId, body);
+      toast.success(isAr ? `تم تحديث التحليل ${updated.analysisCode}` : `Analysis ${updated.analysisCode} updated`);
+      setEditItem(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحديث التحليل' : 'Update failed'));
     }
   }
 
@@ -537,6 +585,13 @@ export function StrategyRoiPage() {
                     </td>
                     <td>
                       <div className="cluster" style={{ gap: 4 }}>
+                        {it.recommendation !== 'APPROVED' && (
+                          <Button size="sm" variant="ghost" Icon={Pencil}
+                                  title={isAr ? 'تعديل المدخلات' : 'Edit inputs'}
+                                  onClick={() => setEditItem(it)}>
+                            {isAr ? 'تعديل' : 'Edit'}
+                          </Button>
+                        )}
                         {it.recommendation === 'PENDING_REVIEW' || it.recommendation === 'DEFERRED' ? (
                           <>
                             <Button size="sm" variant="primary" Icon={CheckCircle2}
@@ -582,6 +637,19 @@ export function StrategyRoiPage() {
         initial={newInitial}
         onClose={() => setOpenNew(false)}
         onSubmit={submitNew}
+      />
+
+      <FormModal<RoiForm>
+        open={editItem !== null}
+        title={editItem
+          ? (isAr ? `تعديل التحليل · ${editItem.analysisCode}` : `Edit analysis · ${editItem.analysisCode}`)
+          : ''}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        fields={roiFields(isAr, bias)}
+        initial={editInitial}
+        onClose={() => setEditItem(null)}
+        onSubmit={submitEdit}
       />
     </Shell>
   );
