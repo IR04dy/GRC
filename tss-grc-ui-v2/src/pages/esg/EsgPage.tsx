@@ -30,12 +30,12 @@ import {
   type GhgEmissionRecord, type GhgScope, type GhgAggregate, type GhgYoY,
 } from '../../lib/ghgInventory';
 import {
-  listReportingYears, createReportingYear, listReportsForYear, generateAnnex, generateReport,
+  listReportingYears, createReportingYear, advanceReportingYear, listReportsForYear, generateAnnex, generateReport,
   reportTypeLabel,
   submitReport, approveReport, publishReport, exportReport,
   ryStatusTone, reportStatusTone,
   type ReportingYear as Ry, type SustainabilityReport as SR,
-  type ReportType,
+  type ReportType, type RyStatus,
 } from '../../lib/sustainabilityAnnex';
 import {
   listCapas, capaAggregate,
@@ -3404,6 +3404,21 @@ function EvidenceTab() {
 // live data → DRAFT report row appears. Submit → Approve → Publish moves
 // it through the lifecycle. Export downloads any of the three formats.
 
+// Reporting-year lifecycle: a single linear forward step plus ARCHIVED from any
+// non-archived state (mirrors SustainabilityReportService.transitionYear).
+const RY_FORWARD: Record<RyStatus, RyStatus | null> = {
+  ACTIVE: 'DATA_COLLECTION', DATA_COLLECTION: 'REVIEW', REVIEW: 'APPROVED',
+  APPROVED: 'PUBLISHED', PUBLISHED: null, ARCHIVED: null,
+};
+const RY_STATUS_LABEL: Record<RyStatus, { en: string; ar: string }> = {
+  ACTIVE:          { en: 'Active',          ar: 'نشطة' },
+  DATA_COLLECTION: { en: 'Data collection', ar: 'جمع البيانات' },
+  REVIEW:          { en: 'Review',          ar: 'مراجعة' },
+  APPROVED:        { en: 'Approved',        ar: 'معتمدة' },
+  PUBLISHED:       { en: 'Published',       ar: 'منشورة' },
+  ARCHIVED:        { en: 'Archived',        ar: 'مؤرشفة' },
+};
+
 function AnnexTab() {
   const { t, lang } = useI18n();
   const toast = useToast();
@@ -3491,6 +3506,22 @@ function AnnexTab() {
     }
   }
 
+  // Advance the active reporting year through its lifecycle. The server allows
+  // a single linear forward step (ACTIVE -> DATA_COLLECTION -> REVIEW ->
+  // APPROVED -> PUBLISHED) plus ARCHIVED from any state; the UI offers exactly
+  // those so an illegal transition is never attempted.
+  async function onAdvance(to: RyStatus) {
+    if (!activeRy?.id) return;
+    try {
+      const updated = await advanceReportingYear(activeRy.id, to);
+      setActive(updated);
+      setYears(prev => prev.map(y => (y.id === updated.id ? updated : y)));
+      toast.success(isAr ? `حالة سنة الإبلاغ → ${RY_STATUS_LABEL[to][isAr ? 'ar' : 'en']}` : `Reporting year → ${to}`);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تغيير الحالة' : 'Failed to advance'));
+    }
+  }
+
   async function onGenerate() {
     if (!activeRy?.id) return;
     setGen(true);
@@ -3559,7 +3590,23 @@ function AnnexTab() {
       {/* Selected-year summary card */}
       {activeRy && (
         <Card title={t('annexYearTitle').replace('{y}', String(activeRy.year))} Icon={Building2}
-          action={<Badge tone={ryStatusTone(activeRy.status)}>{activeRy.status}</Badge>}>
+          action={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Badge tone={ryStatusTone(activeRy.status)}>{activeRy.status}</Badge>
+              {activeRy.status && RY_FORWARD[activeRy.status] && (
+                <Button size="sm" variant="primary" onClick={() => void onAdvance(RY_FORWARD[activeRy.status!]!)}>
+                  {isAr
+                    ? `الانتقال إلى ${RY_STATUS_LABEL[RY_FORWARD[activeRy.status]!].ar}`
+                    : `Advance to ${RY_STATUS_LABEL[RY_FORWARD[activeRy.status]!].en}`}
+                </Button>
+              )}
+              {activeRy.status && activeRy.status !== 'ARCHIVED' && (
+                <Button size="sm" variant="ghost" onClick={() => void onAdvance('ARCHIVED')}>
+                  {isAr ? 'أرشفة' : 'Archive'}
+                </Button>
+              )}
+            </div>
+          }>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div className="stat-tile">
               <div className="stat-tile-label">{t('annexEntity')}</div>
