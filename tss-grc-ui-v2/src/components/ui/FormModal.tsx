@@ -27,7 +27,7 @@ export type FieldDef =
   | (FieldCommon & { kind: 'text';     required?: boolean; maxLength?: number; placeholder?: string })
   | (FieldCommon & { kind: 'textarea'; rows?: number; required?: boolean })
   | (FieldCommon & { kind: 'number';   min?: number; max?: number; required?: boolean })
-  | (FieldCommon & { kind: 'date' })
+  | (FieldCommon & { kind: 'date'; required?: boolean })
   | (FieldCommon & { kind: 'select';   options: Array<{ value: string; label: string }>; required?: boolean })
   /**
    * Searchable select with optional "create new" affordance. Use when:
@@ -211,6 +211,7 @@ export function FormModal<T>({
             case 'date':
               return wrap(
                 <Input id={f.key} label={f.label} type="date" error={fieldErr}
+                  required={f.required}
                   value={(v as string) ?? ''}
                   onChange={e => setV(e.currentTarget.value)} />
               );

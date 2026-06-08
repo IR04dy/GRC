@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Users, Award, ShieldCheck, ChevronLeft, AlertCircle, BadgeCheck, UserPlus, Plus,
+  RefreshCw, UserMinus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -15,6 +16,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMemberTerms, listSkills, skillCoverage, getIndependenceStats, appointMember,
+  renewMemberTerm, endMemberTerm,
   addSkill,
   type Committee, type CommitteeMemberTerm, type CommitteeMemberSkill,
   type IndependenceStats,
@@ -75,6 +77,8 @@ export function CommitteeMemberRegistryPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [openAppoint, setOpenAppoint] = useState(false);
   const [openSkill, setOpenSkill] = useState(false);
+  const [renewTarget, setRenewTarget] = useState<CommitteeMemberTerm | null>(null);
+  const [endTarget, setEndTarget] = useState<CommitteeMemberTerm | null>(null);
 
   useEffect(() => {
     if (!Number.isFinite(cid)) return;
@@ -227,6 +231,64 @@ export function CommitteeMemberRegistryPage() {
     } catch { toast.danger(isAr ? 'تعذّر إضافة المهارة' : 'Failed to add the skill'); }
   }
 
+  // ---- Renew a term (closes the current ACTIVE term as RENEWED, opens a new
+  // ACTIVE term #n+1 with fresh dates under the renewing resolution) ----------
+  const renewFields: FieldDef[] = [
+    { key: 'newStart', kind: 'date', label: isAr ? 'بدء الفترة الجديدة' : 'New term starts', required: true, span: 6 },
+    { key: 'newEnd', kind: 'date', label: isAr ? 'انتهاء الفترة الجديدة' : 'New term ends', required: true, span: 6 },
+    { key: 'resolutionCode', kind: 'text', label: isAr ? 'قرار التجديد' : 'Renewing resolution', required: true, span: 12,
+      maxLength: 64, placeholder: isAr ? 'مثال: RES-2029-COM-AUDIT-014' : 'e.g. RES-2029-COM-AUDIT-014' },
+  ];
+  // Memoised on the target so FormModal's reset effect reflects the new term
+  // without churning. Defaults the new start to the day the current term ends.
+  const renewInitial: Record<string, string> = useMemo(() => ({
+    newStart: renewTarget?.termEndsAt ?? '', newEnd: '', resolutionCode: '',
+  }), [renewTarget]);
+
+  async function submitRenew(v: Record<string, string>) {
+    if (!renewTarget) return;
+    const newStart = String(v.newStart ?? '').trim();
+    const newEnd = String(v.newEnd ?? '').trim();
+    const resolutionCode = String(v.resolutionCode ?? '').trim();
+    if (!newStart)        { toast.danger(isAr ? 'تاريخ بدء الفترة الجديدة مطلوب' : 'New term start is required'); return; }
+    if (!newEnd)          { toast.danger(isAr ? 'تاريخ انتهاء الفترة الجديدة مطلوب' : 'New term end is required'); return; }
+    if (newEnd < newStart){ toast.danger(isAr ? 'تاريخ الانتهاء يجب أن يكون بعد البدء' : 'End must be after start'); return; }
+    if (!resolutionCode)  { toast.danger(isAr ? 'قرار التجديد مطلوب' : 'Renewing resolution is required'); return; }
+    try {
+      await renewMemberTerm(renewTarget.id, newStart, newEnd, resolutionCode);
+      toast.success(isAr ? `تم تجديد فترة ${renewTarget.memberName}` : `${renewTarget.memberName}'s term renewed`);
+      setRenewTarget(null);
+      setReloadKey(k => k + 1);
+    } catch { toast.danger(isAr ? 'تعذّر تجديد الفترة' : 'Failed to renew the term'); }
+  }
+
+  // ---- End a term (ACTIVE -> RESIGNED / REMOVED / EXPIRED) ------------------
+  const endFields: FieldDef[] = [
+    { key: 'renewalStatus', kind: 'select', label: isAr ? 'سبب الإنهاء' : 'End status', required: true, span: 12,
+      options: [
+        { value: 'RESIGNED', label: isAr ? 'استقالة' : 'Resigned' },
+        { value: 'REMOVED',  label: isAr ? 'إقالة' : 'Removed' },
+        { value: 'EXPIRED',  label: isAr ? 'انتهاء الفترة' : 'Term expired' },
+      ] },
+    { key: 'reason', kind: 'textarea', label: isAr ? 'البيان / السبب' : 'Reason / note', span: 12, rows: 3 },
+  ];
+  const endInitial: Record<string, string> = useMemo(() => ({
+    renewalStatus: 'RESIGNED', reason: '',
+  }), [endTarget]);
+
+  async function submitEnd(v: Record<string, string>) {
+    if (!endTarget) return;
+    const renewalStatus = String(v.renewalStatus ?? '').trim();
+    const reason = String(v.reason ?? '').trim();
+    if (!renewalStatus) { toast.danger(isAr ? 'سبب الإنهاء مطلوب' : 'End status is required'); return; }
+    try {
+      await endMemberTerm(endTarget.id, renewalStatus, reason);
+      toast.success(isAr ? `تم إنهاء فترة ${endTarget.memberName}` : `${endTarget.memberName}'s term ended`);
+      setEndTarget(null);
+      setReloadKey(k => k + 1);
+    } catch { toast.danger(isAr ? 'تعذّر إنهاء الفترة' : 'Failed to end the term'); }
+  }
+
   if (!Number.isFinite(cid)) {
     return (
       <Shell title={isAr ? 'تسجيل أعضاء اللجنة' : 'Committee member registry'}>
@@ -291,6 +353,7 @@ export function CommitteeMemberRegistryPage() {
                     <th>{isAr ? 'بدء الفترة' : 'Term starts'}</th>
                     <th>{isAr ? 'انتهاء الفترة' : 'Term ends'}</th>
                     <th>{isAr ? 'تعيّن بموجب' : 'Appointed by'}</th>
+                    <th style={{ textAlign: isAr ? 'left' : 'right' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -307,6 +370,16 @@ export function CommitteeMemberRegistryPage() {
                       <td className="mono">{t.termStartsAt}</td>
                       <td className="mono">{t.termEndsAt ?? (isAr ? 'غير محدد' : 'Open-ended')}</td>
                       <td className="mono">{t.appointedByReso ?? '—'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: isAr ? 'flex-start' : 'flex-end' }}>
+                          <Button size="sm" variant="secondary" Icon={RefreshCw} onClick={() => setRenewTarget(t)}>
+                            {isAr ? 'تجديد' : 'Renew'}
+                          </Button>
+                          <Button size="sm" variant="ghost" Icon={UserMinus} onClick={() => setEndTarget(t)}>
+                            {isAr ? 'إنهاء' : 'End'}
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -425,6 +498,30 @@ export function CommitteeMemberRegistryPage() {
         submitLabel={isAr ? 'إضافة' : 'Add skill'}
         onClose={() => setOpenSkill(false)}
         onSubmit={submitSkill}
+      />
+
+      <FormModal
+        open={renewTarget != null}
+        title={isAr
+          ? `تجديد فترة${renewTarget ? ` — ${renewTarget.memberName}` : ''}`
+          : `Renew term${renewTarget ? ` — ${renewTarget.memberName}` : ''}`}
+        fields={renewFields}
+        initial={renewInitial}
+        submitLabel={isAr ? 'تجديد الفترة' : 'Renew term'}
+        onClose={() => setRenewTarget(null)}
+        onSubmit={submitRenew}
+      />
+
+      <FormModal
+        open={endTarget != null}
+        title={isAr
+          ? `إنهاء فترة${endTarget ? ` — ${endTarget.memberName}` : ''}`
+          : `End term${endTarget ? ` — ${endTarget.memberName}` : ''}`}
+        fields={endFields}
+        initial={endInitial}
+        submitLabel={isAr ? 'إنهاء الفترة' : 'End term'}
+        onClose={() => setEndTarget(null)}
+        onSubmit={submitEnd}
       />
     </Shell>
   );
