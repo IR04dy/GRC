@@ -29,7 +29,7 @@ import {
 } from './mockRisks';
 import {
   listAssessments, recordAssessment,
-  listTreatments, createTreatment, transitionTreatment, deleteTreatment,
+  listTreatments, createTreatment, updateTreatment, transitionTreatment, deleteTreatment,
   treatmentTypeTone, treatmentStatusTone, nextTreatmentStatuses,
   type RiskAssessment, type RiskTreatment, type RiskTreatmentType, type RiskTreatmentStatus,
 } from '../../lib/riskAdvanced';
@@ -196,6 +196,40 @@ export function RiskDetailPage() {
       if (risk) setLiveTreatments(await listTreatments(risk.id));
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Delete failed');
+    }
+  }
+
+  // Edit a planned/in-progress treatment. The update endpoint only touches
+  // description / owner / due date (treatment TYPE is immutable once recorded
+  // and STATUS moves via transitions), so the edit surfaces description + due
+  // date, prefilled. Both prompts cancel-out (null) cleanly; an empty due date
+  // is omitted so it keeps the existing value (server is null-means-keep).
+  async function onEditTreatment(tr: RiskTreatment) {
+    if (!risk) return;
+    const ar = lang === 'ar';
+    const description = await dialog.prompt({
+      title: ar ? 'تعديل المعالجة' : 'Edit treatment',
+      label: ar ? 'الوصف' : 'Description', type: 'textarea', required: true,
+      initial: tr.descriptionEn,
+      submitLabel: ar ? 'حفظ' : 'Save',
+    });
+    if (description === null) return;
+    const due = await dialog.prompt({
+      title: ar ? 'تعديل المعالجة' : 'Edit treatment',
+      label: ar ? 'تاريخ الاستحقاق (YYYY-MM-DD، اختياري)' : 'Due date (YYYY-MM-DD, optional)',
+      type: 'text', initial: tr.dueDate ? tr.dueDate.slice(0, 10) : '',
+      submitLabel: ar ? 'حفظ' : 'Save',
+    });
+    if (due === null) return;
+    try {
+      await updateTreatment(tr.id, {
+        descriptionEn: description,
+        dueDate: due.trim() || undefined,
+      });
+      toast.success(ar ? 'تم تحديث المعالجة' : 'Treatment updated');
+      setLiveTreatments(await listTreatments(risk.id));
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (ar ? 'تعذّر تحديث المعالجة' : 'Failed to update treatment'));
     }
   }
 
@@ -420,6 +454,11 @@ export function RiskDetailPage() {
                               → {next}
                             </Button>
                           ))}
+                          {(tr.status === 'PLANNED' || tr.status === 'IN_PROGRESS') && (
+                            <Button size="sm" variant="ghost" Icon={Edit} onClick={() => onEditTreatment(tr)}>
+                              {lang === 'ar' ? 'تعديل' : 'Edit'}
+                            </Button>
+                          )}
                           {(tr.status === 'PLANNED' || tr.status === 'IN_PROGRESS') && (
                             <Button size="sm" variant="ghost" onClick={() => onDeleteTreatment(tr)}>
                               Delete
