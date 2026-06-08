@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, Fragment } from 'react';
 import {
-  Workflow, AlertOctagon, CheckCircle2, ArrowRight, ChevronRight, ChevronDown, RefreshCw,
+  Workflow, AlertOctagon, CheckCircle2, ArrowRight, ChevronRight, ChevronDown, RefreshCw, Zap,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,10 +10,12 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { ApiError } from '../../lib/api';
 import {
-  listBridgeLog,
+  listBridgeLog, triggerBridge,
   BRIDGE_OUTCOME_TONE, BRIDGE_EVENT_TONE,
   type BridgeLogEntry, type BridgeOutcome,
 } from '../../lib/cyberPdplBridge';
@@ -21,12 +23,14 @@ import {
 type TabId = 'all' | 'CREATED' | 'LINKED' | 'SKIPPED' | 'ERROR';
 
 export function CyberPdplBridgePage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isAr = lang === 'ar';
   const toast = useToast();
   const [tab, setTab] = useState<TabId>('all');
   const [rows, setRows] = useState<BridgeLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [openTrigger, setOpenTrigger] = useState(false);
 
   useEffect(() => { void reload(); }, []);
 
@@ -37,6 +41,41 @@ export function CyberPdplBridgePage() {
       setRows(page.content);
     } catch { toast.danger(t('cpbLoadFailed')); }
     finally { setLoading(false); }
+  }
+
+  // ─── Manual bridge trigger ───────────────────────────────────────
+  const triggerFields: FieldDef[] = [
+    { key: 'cyberIncidentId', kind: 'number', required: true, min: 1, span: 6,
+      label: isAr ? 'معرّف الحادثة السيبرانية' : 'Cyber incident ID' },
+    { key: 'dataSubjectsAffectedEst', kind: 'number', min: 0, span: 6,
+      label: isAr ? 'أصحاب البيانات المتأثرون (تقديري)' : 'Data subjects affected (est.)' },
+    { key: 'dataCategoriesAffected', kind: 'text', span: 12,
+      label: isAr ? 'فئات البيانات المتأثرة' : 'Data categories affected',
+      placeholder: 'NATIONAL_ID, FINANCIAL, CONTACT' },
+    { key: 'piiAssessment', kind: 'textarea', rows: 3, span: 12,
+      label: isAr ? 'تقييم البيانات الشخصية' : 'PII assessment' },
+  ];
+  const triggerInitial: Record<string, string> = useMemo(() => ({
+    cyberIncidentId: '', dataSubjectsAffectedEst: '', dataCategoriesAffected: '', piiAssessment: '',
+  }), []);
+
+  async function submitTrigger(v: Record<string, string>) {
+    const incId = Number(v.cyberIncidentId);
+    if (!incId || incId < 1) { toast.danger(isAr ? 'معرّف الحادثة مطلوب' : 'Cyber incident ID is required'); return; }
+    const est = String(v.dataSubjectsAffectedEst ?? '').trim();
+    try {
+      const entry = await triggerBridge({
+        cyberIncidentId: incId,
+        dataSubjectsAffectedEst: est === '' ? undefined : Number(est),
+        dataCategoriesAffected: String(v.dataCategoriesAffected ?? '').trim() || undefined,
+        piiAssessment: String(v.piiAssessment ?? '').trim() || undefined,
+      });
+      toast.success(isAr ? `تم تشغيل الجسر — النتيجة: ${entry.outcome}` : `Bridge run — outcome: ${entry.outcome}`);
+      setOpenTrigger(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تشغيل الجسر' : 'Bridge trigger failed'));
+    }
   }
 
   const stats = useMemo(() => ({
@@ -72,7 +111,14 @@ export function CyberPdplBridgePage() {
         eyebrow={t('navPrivacy')}
         title={t('cpbPageTitle')}
         sub={t('cpbPageSub')}
-        actions={<Button variant="ghost" Icon={RefreshCw} onClick={() => void reload()}>{t('cpbRefresh')}</Button>}
+        actions={
+          <div style={{ display: 'inline-flex', gap: 8 }}>
+            <Button variant="primary" Icon={Zap} onClick={() => setOpenTrigger(true)}>
+              {isAr ? 'تشغيل الجسر' : 'Trigger bridge'}
+            </Button>
+            <Button variant="ghost" Icon={RefreshCw} onClick={() => void reload()}>{t('cpbRefresh')}</Button>
+          </div>
+        }
       />
 
       <div className="kpi-grid">
@@ -169,6 +215,16 @@ export function CyberPdplBridgePage() {
             )
         }
       </Card>
+
+      <FormModal
+        open={openTrigger}
+        title={isAr ? 'تشغيل جسر الأمن السيبراني ← الخصوصية' : 'Trigger cyber → PDPL bridge'}
+        fields={triggerFields}
+        initial={triggerInitial}
+        submitLabel={isAr ? 'تشغيل الجسر' : 'Run bridge'}
+        onClose={() => setOpenTrigger(false)}
+        onSubmit={submitTrigger}
+      />
     </Shell>
   );
 }
