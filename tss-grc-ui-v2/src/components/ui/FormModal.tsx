@@ -25,7 +25,7 @@ type FieldCommon = {
 };
 export type FieldDef =
   | (FieldCommon & { kind: 'text';     required?: boolean; maxLength?: number; placeholder?: string })
-  | (FieldCommon & { kind: 'textarea'; rows?: number })
+  | (FieldCommon & { kind: 'textarea'; rows?: number; required?: boolean })
   | (FieldCommon & { kind: 'number';   min?: number; max?: number; required?: boolean })
   | (FieldCommon & { kind: 'date' })
   | (FieldCommon & { kind: 'select';   options: Array<{ value: string; label: string }>; required?: boolean })
@@ -197,6 +197,7 @@ export function FormModal<T>({
             case 'textarea':
               return wrap(
                 <Textarea id={f.key} label={f.label} error={fieldErr} rows={f.rows ?? 3}
+                  required={f.required}
                   value={(v as string) ?? ''}
                   onChange={e => setV(e.currentTarget.value)} />
               );

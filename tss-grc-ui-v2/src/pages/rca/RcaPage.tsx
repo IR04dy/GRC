@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Microscope, Plus, Send, CheckCircle2, XCircle, FileText,
-  ChevronRight, ChevronDown, Clock, Wrench,
+  ChevronRight, ChevronDown, Clock, Wrench, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -16,7 +16,7 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
-  listRcas, createRca, submitRca, approveRca, rejectRca, generateCapasFromRca,
+  listRcas, createRca, updateRca, submitRca, approveRca, rejectRca, generateCapasFromRca,
   parseFiveWhys, RCA_STATUS_TONE,
   type RootCauseAnalysis, type RcaStatus, type RcaMethodology,
 } from '../../lib/rootCauseAnalysis';
@@ -43,6 +43,7 @@ export function RcaPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editRow, setEditRow] = useState<RootCauseAnalysis | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   useEffect(() => { void reload(); }, []);
@@ -91,6 +92,35 @@ export function RcaPage() {
     { kind: 'text', key: 'capaRefs', label: t('rcaFldCapaRefs'), placeholder: 'CAPA-1024,CAPA-1031', span: 12 },
   ];
 
+  // Edit reuses the editable subset of the create fields. The related-entity
+  // identity (type/id/label) is fixed at create — the update endpoint never
+  // reads it — so it is excluded. Edit is DRAFT-only (the service rejects
+  // edits in any later state); the row affordance is gated to match.
+  // Asterisks come from the `required` prop (FieldLabel renders it) — the label
+  // strings carry no baked-in "*", so required fields show exactly one.
+  const EDIT_FIELDS: FieldDef[] = [
+    { kind: 'select', key: 'methodology', label: t('rcaFldMethodology'), required: true,
+      options: [
+        { value: 'FIVE_WHYS', label: '5 Whys' },
+        { value: 'FISHBONE',  label: 'Fishbone (Ishikawa)' },
+        { value: 'PARETO',    label: 'Pareto (80/20)' },
+        { value: 'OTHER',     label: 'Other (free-form narrative)' },
+      ], span: 6 },
+    { kind: 'text', key: 'facilitator', label: t('rcaFldFacilitator'), span: 6 },
+    { kind: 'textarea', key: 'problemStatementEn', label: t('rcaFldProblem'), required: true, rows: 2, span: 12 },
+    { kind: 'textarea', key: 'rootCauseEn', label: t('rcaFldRootCause'), rows: 2, span: 12 },
+    { kind: 'textarea', key: 'recommendationsEn', label: t('rcaFldRecommendations'), rows: 2, span: 12 },
+    { kind: 'text', key: 'capaRefs', label: t('rcaFldCapaRefs'), placeholder: 'CAPA-1024,CAPA-1031', span: 12 },
+  ];
+  const editInitial = useMemo(() => editRow ? {
+    methodology: editRow.methodology,
+    facilitator: editRow.facilitator ?? '',
+    problemStatementEn: editRow.problemStatementEn,
+    rootCauseEn: editRow.rootCauseEn ?? '',
+    recommendationsEn: editRow.recommendationsEn ?? '',
+    capaRefs: editRow.capaRefs ?? '',
+  } : {}, [editRow]);
+
   async function onCreate(values: Record<string, any>) {
     try {
       await createRca({
@@ -108,6 +138,23 @@ export function RcaPage() {
       setCreateOpen(false);
       await reload();
     } catch { toast.danger(t('rcaCreateFailedToast')); }
+  }
+
+  async function onUpdate(values: Record<string, any>) {
+    if (!editRow) return;
+    try {
+      await updateRca(editRow.id, {
+        methodology: (values.methodology || 'FIVE_WHYS') as RcaMethodology,
+        facilitator: values.facilitator || undefined,
+        problemStatementEn: values.problemStatementEn,
+        rootCauseEn: values.rootCauseEn || undefined,
+        recommendationsEn: values.recommendationsEn || undefined,
+        capaRefs: values.capaRefs || undefined,
+      });
+      toast.success(t('rcaUpdatedToast'));
+      setEditRow(null);
+      await reload();
+    } catch { toast.danger(t('rcaActionFailedToast')); }
   }
 
   async function onSubmit(row: RootCauseAnalysis) {
@@ -187,6 +234,7 @@ export function RcaPage() {
                   <RcaRow key={row.id} row={row} lang={lang} t={t} busyId={busyId}
                           isExpanded={expanded.has(row.id)}
                           onToggle={() => toggleExpanded(row.id)}
+                          onEdit={setEditRow}
                           onSubmit={onSubmit} onApprove={onApprove} onReject={onReject}
                           onGenerateCapas={onGenerateCapas} />
                 ))}
@@ -201,17 +249,28 @@ export function RcaPage() {
         onClose={() => setCreateOpen(false)}
         onSubmit={onCreate}
       />
+
+      <FormModal<Record<string, any>>
+        open={!!editRow}
+        title={editRow ? `${t('rcaEditTitle')} — ${editRow.relatedEntityLabel ?? editRow.relatedEntityType + '#' + editRow.relatedEntityId}` : ''}
+        fields={EDIT_FIELDS}
+        initial={editInitial}
+        submitLabel={t('rcaEditSaveBtn')}
+        onClose={() => setEditRow(null)}
+        onSubmit={onUpdate}
+      />
     </Shell>
   );
 }
 
-function RcaRow({ row, lang, t, busyId, isExpanded, onToggle, onSubmit, onApprove, onReject, onGenerateCapas }: {
+function RcaRow({ row, lang, t, busyId, isExpanded, onToggle, onEdit, onSubmit, onApprove, onReject, onGenerateCapas }: {
   row: RootCauseAnalysis;
   lang: 'en' | 'ar';
   t: (k: string) => string;
   busyId: number | null;
   isExpanded: boolean;
   onToggle: () => void;
+  onEdit: (r: RootCauseAnalysis) => void;
   onSubmit: (r: RootCauseAnalysis) => Promise<void>;
   onApprove: (r: RootCauseAnalysis) => Promise<void>;
   onReject: (r: RootCauseAnalysis) => Promise<void>;
@@ -250,8 +309,12 @@ function RcaRow({ row, lang, t, busyId, isExpanded, onToggle, onSubmit, onApprov
         </button>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {row.status === 'DRAFT' && (
-            <Button size="sm" variant="primary" Icon={Send} disabled={busyId === row.id}
-                    onClick={() => onSubmit(row)}>{t('rcaActSubmit')}</Button>
+            <>
+              <Button size="sm" variant="ghost" Icon={Pencil} disabled={busyId === row.id}
+                      title={t('rcaActEdit')} onClick={() => onEdit(row)}>{t('rcaActEdit')}</Button>
+              <Button size="sm" variant="primary" Icon={Send} disabled={busyId === row.id}
+                      onClick={() => onSubmit(row)}>{t('rcaActSubmit')}</Button>
+            </>
           )}
           {row.status === 'IN_REVIEW' && (
             <>
