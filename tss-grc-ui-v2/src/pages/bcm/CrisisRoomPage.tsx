@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Siren, AlertTriangle, MessageSquare, Gavel, ShieldAlert, Plus, ChevronRight, Download } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Siren, AlertTriangle, MessageSquare, Gavel, ShieldAlert, Plus, ChevronRight, Download, Pencil } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -13,7 +13,7 @@ import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
   listCrisisEvents, listActiveCrisisEvents, crisisEventStats,
-  getCrisisEvent, createCrisisEvent, transitionCrisisEvent,
+  getCrisisEvent, createCrisisEvent, patchCrisisEvent, transitionCrisisEvent,
   activateBcp, activateDrp,
   listSitReps, addSitRep,
   listDecisions, addDecision,
@@ -21,8 +21,9 @@ import {
   downloadCrisisEventPdf,
   SEVERITY_LABELS, severityTone, statusTone,
   type CrisisEvent, type CrisisStatus, type CrisisSituationReport, type CrisisDecision,
-  type CrisisRegulatoryNotification, type Regulator,
+  type CrisisRegulatoryNotification, type Regulator, type TriggerSource,
 } from '../../lib/crisisEvents';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 
 /**
  * Crisis Room — independent audit Tier-1 fix.
@@ -90,6 +91,7 @@ export function CrisisRoomPage() {
   const [regNotifs, setRegNotifs] = useState<CrisisRegulatoryNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   // Form state for the "new event" modal
   const [newEvt, setNewEvt] = useState<Partial<CrisisEvent>>(emptyEvent());
@@ -127,6 +129,51 @@ export function CrisisRoomPage() {
     setSitreps(sr);
     setDecisions(dec);
     setRegNotifs(rn);
+  }
+
+  // ── Edit the crisis-event record (PATCH — partial null-means-keep) ─────
+  // Status is owned by transition(); the PATCH body must echo the current
+  // status because the endpoint binds a JPA entity whose status field
+  // defaults to "DETECTED" — an omitted status would otherwise trip the
+  // server's "Use transition() to change status" guard. The server also
+  // refuses edits on CLOSED / CANCELLED events, so the affordance is gated.
+  const editFields: FieldDef[] = [
+    { key: 'titleEn', kind: 'text', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)' },
+    { key: 'titleAr', kind: 'text', span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { key: 'description', kind: 'textarea', span: 12, rows: 2, label: isAr ? 'الوصف' : 'Description' },
+    { key: 'severity', kind: 'select', required: true, span: 6, label: isAr ? 'الشدة' : 'Severity',
+      options: [1, 2, 3, 4, 5].map(n => ({ value: String(n), label: `${n} — ${isAr ? SEVERITY_LABELS[n].ar : SEVERITY_LABELS[n].en}` })) },
+    { key: 'triggerSource', kind: 'select', span: 6, label: isAr ? 'المصدر' : 'Trigger',
+      options: TRIGGERS.map(t => ({ value: t.value, label: isAr ? t.ar : t.en })) },
+    { key: 'rootCause', kind: 'textarea', span: 12, rows: 2, label: isAr ? 'السبب الجذري' : 'Root cause' },
+  ];
+  const editInitial = useMemo(() => selected ? {
+    titleEn: selected.titleEn,
+    titleAr: selected.titleAr ?? '',
+    description: selected.description ?? '',
+    severity: String(selected.severity),
+    triggerSource: selected.triggerSource ?? '',
+    rootCause: selected.rootCause ?? '',
+  } : {}, [selected]);
+  async function onPatchEvent(values: Record<string, unknown>) {
+    if (!selected) return;
+    try {
+      const updated = await patchCrisisEvent(selected.id, {
+        titleEn: String(values.titleEn ?? '').trim(),
+        titleAr: String(values.titleAr ?? '').trim() || undefined,
+        description: String(values.description ?? '').trim() || undefined,
+        severity: Number(values.severity) as 1 | 2 | 3 | 4 | 5,
+        triggerSource: (String(values.triggerSource ?? '').trim() || undefined) as TriggerSource | undefined,
+        rootCause: String(values.rootCause ?? '').trim() || undefined,
+        status: selected.status, // echo — see comment above
+      });
+      setSelected(updated);
+      setEditOpen(false);
+      toast.success(isAr ? 'تم تحديث الحدث' : 'Event updated');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحديث الحدث' : 'Failed to update event'));
+    }
   }
 
   async function handleCreate(e: FormEvent) {
@@ -339,9 +386,16 @@ export function CrisisRoomPage() {
               {/* Header card */}
               <Card title={`${selected.eventCode} — ${selected.titleEn}`}
                     action={
-                      <Button variant="ghost" onClick={() => void downloadCrisisEventPdf(selected.id, selected.eventCode)}>
-                        <Download size={14} /> {isAr ? 'تقرير PDF' : 'After-action PDF'}
-                      </Button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {selected.status !== 'CLOSED' && selected.status !== 'CANCELLED' && (
+                          <Button variant="ghost" onClick={() => setEditOpen(true)}>
+                            <Pencil size={14} /> {isAr ? 'تعديل' : 'Edit'}
+                          </Button>
+                        )}
+                        <Button variant="ghost" onClick={() => void downloadCrisisEventPdf(selected.id, selected.eventCode)}>
+                          <Download size={14} /> {isAr ? 'تقرير PDF' : 'After-action PDF'}
+                        </Button>
+                      </div>
                     }>
                 <div className="kpi-grid-xs text-sm">
                   <div><span className="text-muted">{isAr ? 'الشدة' : 'Severity'}: </span>
@@ -547,6 +601,18 @@ export function CrisisRoomPage() {
             </div>
           </form>
         </div>
+      )}
+
+      {selected && (
+        <FormModal
+          open={editOpen}
+          title={`${isAr ? 'تعديل الحدث' : 'Edit event'} — ${selected.eventCode}`}
+          fields={editFields}
+          initial={editInitial}
+          onClose={() => setEditOpen(false)}
+          onSubmit={onPatchEvent}
+          submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        />
       )}
     </Shell>
   );
