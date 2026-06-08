@@ -70,6 +70,7 @@ const STATUS_LABELS: Record<string, { en: string; ar: string }> = {
   WITHDRAWN:                { en: 'Withdrawn',        ar: 'مسحوبة' },
   SUPERSEDED:               { en: 'Superseded',       ar: 'مستبدلة' },
   DEPRECATED:               { en: 'Deprecated',       ar: 'مهجورة' },
+  DISSOLVED:                { en: 'Dissolved',        ar: 'مُنحَلّة' },
   // ── Regulatory change ───────────────────────────────────────────
   ASSESSED:                 { en: 'Assessed',         ar: 'مُقيَّمة' },
   IMPACT_ANALYSED:          { en: 'Impact analysed',  ar: 'الأثر محلَّل' },

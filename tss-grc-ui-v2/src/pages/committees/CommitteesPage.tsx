@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Landmark, CheckCircle2, XCircle, Calendar, Play, FileCheck2, Users,
   ChevronRight, ChevronDown, Gavel, ClipboardList, ListChecks, RefreshCw,
-  ExternalLink, AlertTriangle, ShieldAlert, Plus,
+  ExternalLink, AlertTriangle, ShieldAlert, Plus, Ban,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -21,7 +21,7 @@ import { useToast } from '../../lib/toast';
 import {
   listCommittees, listMeetings, startMeeting, completeMeeting, approveMinutes, cancelMeeting,
   listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution, createMeeting,
-  createCommittee, createAction,
+  createCommittee, createAction, dissolveCommittee,
   startAction, completeAction, cancelAction, deferAction,
   parseAgenda, parseAttendees, parseDecisions, parseActions, parseMembers,
   COM_STATUS_TONE, MTG_STATUS_TONE, OUTCOME_TONE, ACTION_STATUS_TONE, ACTION_PRIORITY_TONE,
@@ -94,6 +94,7 @@ export function CommitteesPage() {
   const [openMeeting, setOpenMeeting] = useState(false);
   const [openCommittee, setOpenCommittee] = useState(false);
   const [openAction, setOpenAction] = useState(false);
+  const [dissolveTarget, setDissolveTarget] = useState<Committee | null>(null);
 
   useEffect(() => { void reload(); }, []);
 
@@ -366,6 +367,27 @@ export function CommitteesPage() {
     }
   }
 
+  // ─── Dissolve a committee ────────────────────────────────────────
+  const dissolveFields: FieldDef[] = [
+    { key: 'reason', label: isAr ? 'سبب الحل' : 'Dissolution reason', kind: 'textarea',
+      required: true, span: 12, rows: 3 },
+  ];
+  const dissolveInitial: Record<string, string> = useMemo(() => ({ reason: '' }), []);
+
+  async function submitDissolve(v: Record<string, string>) {
+    if (!dissolveTarget) return;
+    const reason = (v.reason ?? '').trim();
+    if (!reason) { toast.danger(isAr ? 'سبب الحل مطلوب' : 'Dissolution reason is required'); return; }
+    try {
+      await dissolveCommittee(dissolveTarget.id, reason);
+      toast.success(isAr ? `تم حلّ اللجنة ${dissolveTarget.code}` : `Committee ${dissolveTarget.code} dissolved`);
+      setDissolveTarget(null);
+      await reload();
+    } catch {
+      toast.danger(isAr ? 'تعذّر حلّ اللجنة' : 'Failed to dissolve the committee');
+    }
+  }
+
   // ─── Log an action item against a meeting ────────────────────────
   const PRIORITIES: ActionPriority[] = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'];
   const PRIORITY_AR: Record<ActionPriority, string> = {
@@ -620,6 +642,14 @@ export function CommitteesPage() {
                                 onClick={() => onGenerateCalendar(c.id)}>
                                 {t('comCalendarGenerate')}
                               </Button>
+                              {c.status !== 'DISSOLVED' && (
+                                <Button size="sm" variant="ghost" Icon={Ban}
+                                  style={{ marginInlineStart: 8, color: 'var(--danger)' }}
+                                  disabled={busyId === c.id}
+                                  onClick={() => setDissolveTarget(c)}>
+                                  {isAr ? 'حلّ اللجنة' : 'Dissolve'}
+                                </Button>
+                              )}
                             </td>
                           </tr>
                           {open && (
@@ -1111,6 +1141,18 @@ export function CommitteesPage() {
         size="lg"
         onClose={() => setOpenAction(false)}
         onSubmit={submitAction}
+      />
+
+      <FormModal
+        open={dissolveTarget !== null}
+        title={dissolveTarget
+          ? (isAr ? `حلّ اللجنة ${dissolveTarget.code}` : `Dissolve committee ${dissolveTarget.code}`)
+          : ''}
+        fields={dissolveFields}
+        initial={dissolveInitial}
+        submitLabel={isAr ? 'حلّ اللجنة' : 'Dissolve'}
+        onClose={() => setDissolveTarget(null)}
+        onSubmit={submitDissolve}
       />
     </Shell>
   );
