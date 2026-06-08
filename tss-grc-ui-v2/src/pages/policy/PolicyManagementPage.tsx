@@ -17,7 +17,7 @@ import { useDialog } from '../../lib/dialog';
 import {
   listPolicies, createPolicy, transitionPolicy, deletePolicy,
   newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate,
-  listExceptions, transitionException,
+  listExceptions, transitionException, runExceptionExpirySweep,
   listAttestations, attestPolicy, declineAttestation, createAttestation,
   policyStatusTone, policyStatusLabel, nextPolicyStatuses,
   exceptionStatusTone, exceptionStatusLabel, nextExceptionStatuses,
@@ -403,6 +403,16 @@ function ExceptionsTab() {
   }
   useEffect(() => { void reload(); }, [statusFilter]);
 
+  async function onSweep() {
+    try {
+      const r = await runExceptionExpirySweep();
+      toast.success(isAr ? `تم — انتهت ${r.flippedCount} استثناءات` : `Done — ${r.flippedCount} exceptions flipped to EXPIRED`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Sweep failed');
+    }
+  }
+
   async function onTransition(e: PolicyException, to: ExceptionStatus) {
     let reason: string | undefined;
     if (to === 'REJECTED') {
@@ -426,16 +436,21 @@ function ExceptionsTab() {
   return (
     <Card title={isAr ? 'الاستثناءات' : 'Policy exceptions'} Icon={AlertCircle}
       action={
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as ExceptionStatus | '')}
-          style={{ padding: '6px 10px', fontSize: 12, minWidth: 160, border: '1px solid var(--border)',
-                   borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
-          <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
-          <option value="REQUESTED">{exceptionStatusLabel('REQUESTED', isAr ? 'ar' : 'en')}</option>
-          <option value="UNDER_REVIEW">{exceptionStatusLabel('UNDER_REVIEW', isAr ? 'ar' : 'en')}</option>
-          <option value="APPROVED">{exceptionStatusLabel('APPROVED', isAr ? 'ar' : 'en')}</option>
-          <option value="REJECTED">{exceptionStatusLabel('REJECTED', isAr ? 'ar' : 'en')}</option>
-          <option value="EXPIRED">{exceptionStatusLabel('EXPIRED', isAr ? 'ar' : 'en')}</option>
-        </select>
+        <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <Button size="sm" variant="ghost" Icon={Wrench} onClick={onSweep}>
+            {isAr ? 'تحقق من انتهاء الاستثناءات' : 'Run exception expiry sweep'}
+          </Button>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as ExceptionStatus | '')}
+            style={{ padding: '6px 10px', fontSize: 12, minWidth: 160, border: '1px solid var(--border)',
+                     borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+            <option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>
+            <option value="REQUESTED">{exceptionStatusLabel('REQUESTED', isAr ? 'ar' : 'en')}</option>
+            <option value="UNDER_REVIEW">{exceptionStatusLabel('UNDER_REVIEW', isAr ? 'ar' : 'en')}</option>
+            <option value="APPROVED">{exceptionStatusLabel('APPROVED', isAr ? 'ar' : 'en')}</option>
+            <option value="REJECTED">{exceptionStatusLabel('REJECTED', isAr ? 'ar' : 'en')}</option>
+            <option value="EXPIRED">{exceptionStatusLabel('EXPIRED', isAr ? 'ar' : 'en')}</option>
+          </select>
+        </div>
       }>
       {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
        : items.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد استثناءات' : 'No exceptions'}</InlineEmpty>
