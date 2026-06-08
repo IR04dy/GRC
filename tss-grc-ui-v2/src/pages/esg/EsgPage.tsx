@@ -25,7 +25,7 @@ import {
 } from '../../lib/climateRisk';
 import {
   listGhgRecords, ghgAggregate, ghgYoy,
-  createGhgRecord, updateGhgRecord, submitGhgRecord, verifyGhgRecord, approveGhgRecord,
+  createGhgRecord, updateGhgRecord, submitGhgRecord, verifyGhgRecord, approveGhgRecord, archiveGhgRecord,
   ghgStatusTone, canVerify,
   type GhgEmissionRecord, type GhgScope, type GhgAggregate, type GhgYoY,
 } from '../../lib/ghgInventory';
@@ -3921,6 +3921,14 @@ function GhgInventoryTab() {
     try { await approveGhgRecord(id); toast.success(t('ghgApproved')); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed')); }
   }
+  async function onArchive(id: number) {
+    // ARCHIVED is terminal (no transition back out), so confirm first.
+    if (!window.confirm(isAr
+      ? 'أرشفة هذا السجل؟ لا يمكن التراجع عن الأرشفة.'
+      : 'Archive this record? Archiving cannot be undone.')) return;
+    try { await archiveGhgRecord(id); toast.success(isAr ? 'تمت أرشفة السجل' : 'Record archived'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed')); }
+  }
 
   const FIELDS: FieldDef[] = [
     { kind: 'number',   key: 'reportingYear',      label: t('ghgFldYear') + ' *',  required: true, min: 2020, max: 2050, span: 3 },
@@ -4087,6 +4095,11 @@ function GhgInventoryTab() {
                             </Button>
                           )}
                           {r.status === 'VERIFIED'  && <Button variant="primary"   size="sm" Icon={CheckCircle2} onClick={() => onApprove(r.id!)}>{t('ghgActApprove')}</Button>}
+                          {r.status !== 'ARCHIVED'  && (
+                            <Button variant="ghost" size="sm" Icon={Trash2}
+                              title={isAr ? 'أرشفة' : 'Archive'}
+                              onClick={() => onArchive(r.id!)} />
+                          )}
                         </div>
                       </td>
                     </tr>
