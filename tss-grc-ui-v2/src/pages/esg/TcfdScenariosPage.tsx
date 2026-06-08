@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   CloudLightning, Plus, ChevronRight, ChevronLeft, CheckCircle2,
-  Archive, FileSearch, Globe2, AlertTriangle,
+  Archive, FileSearch, Globe2, AlertTriangle, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +10,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -18,6 +19,7 @@ import { ApiError } from '../../lib/api';
 import {
   listScenarios,
   createScenario,
+  updateScenario,
   transitionScenario,
   addSectorImpact,
   getProbabilityWeightedExpectedLoss,
@@ -97,6 +99,64 @@ export function TcfdScenariosPage() {
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed');
+    }
+  }
+
+  // ── Edit a scenario (full-replace PUT; DRAFT / IN_REVIEW only) ─────────
+  // Once BOARD_APPROVED or ARCHIVED the server locks the figures (the board
+  // approved specific numbers), so the affordance is gated to match.
+  const [editScenario, setEditScenario] = useState<TcfdScenario | null>(null);
+  const editFields: FieldDef[] = useMemo(() => [
+    { key: 'titleEn', kind: 'text', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)' },
+    { key: 'titleAr', kind: 'text', span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { key: 'descriptionEn', kind: 'textarea', span: 12, rows: 2, label: isAr ? 'الوصف (إنجليزي)' : 'Description (EN)' },
+    { key: 'descriptionAr', kind: 'textarea', span: 12, rows: 2, label: isAr ? 'الوصف (عربي)' : 'Description (AR)' },
+    { key: 'scenarioType', kind: 'select', required: true, span: 6, label: isAr ? 'نوع السيناريو' : 'Scenario type',
+      options: (Object.keys(SCENARIO_TYPE_LABELS) as ScenarioType[]).map(v => ({ value: v, label: tlabel(SCENARIO_TYPE_LABELS, v, isAr) })) },
+    { key: 'referenceFramework', kind: 'select', required: true, span: 6, label: isAr ? 'الإطار المرجعي' : 'Reference framework',
+      options: (Object.keys(FRAMEWORK_LABELS) as ReferenceFramework[]).map(v => ({ value: v, label: tlabel(FRAMEWORK_LABELS, v, isAr) })) },
+    { key: 'timeHorizonYears', kind: 'number', required: true, min: 1, max: 100, span: 4, label: isAr ? 'الأفق الزمني (سنوات)' : 'Time horizon (yrs)' },
+    { key: 'globalWarmingCelsius', kind: 'number', required: true, min: 0, max: 10, span: 4, label: isAr ? 'الاحترار (°م)' : 'Warming (°C)' },
+    { key: 'probabilityWeight', kind: 'number', min: 0, max: 1, span: 4, label: isAr ? 'وزن الاحتمال (0-1)' : 'Probability weight (0-1)' },
+    { key: 'portfolioAtRiskSarBillions', kind: 'number', min: 0, span: 6, label: isAr ? 'المحفظة المعرّضة (مليار ر.س)' : 'Portfolio at risk (SAR bn)' },
+    { key: 'expectedLossSarMillions', kind: 'number', min: 0, span: 6, label: isAr ? 'الخسارة المتوقّعة (مليون ر.س)' : 'Expected loss (SAR mn)' },
+  ], [isAr]);
+  const editInitial = useMemo(() => editScenario ? {
+    titleEn: editScenario.titleEn,
+    titleAr: editScenario.titleAr ?? '',
+    descriptionEn: editScenario.descriptionEn ?? '',
+    descriptionAr: editScenario.descriptionAr ?? '',
+    scenarioType: editScenario.scenarioType,
+    referenceFramework: editScenario.referenceFramework,
+    timeHorizonYears: editScenario.timeHorizonYears,
+    globalWarmingCelsius: Number(editScenario.globalWarmingCelsius),
+    probabilityWeight: Number(editScenario.probabilityWeight),
+    portfolioAtRiskSarBillions: editScenario.portfolioAtRiskSarBillions != null ? Number(editScenario.portfolioAtRiskSarBillions) : '',
+    expectedLossSarMillions: editScenario.expectedLossSarMillions != null ? Number(editScenario.expectedLossSarMillions) : '',
+  } : {}, [editScenario]);
+  async function onUpdateScenario(values: Record<string, unknown>) {
+    if (!editScenario) return;
+    const num = (v: unknown) => (typeof v === 'number' && !Number.isNaN(v) ? v : undefined);
+    try {
+      await updateScenario(editScenario.externalId, {
+        scenarioCode: editScenario.scenarioCode,
+        titleEn: String(values.titleEn ?? '').trim(),
+        titleAr: String(values.titleAr ?? '').trim() || undefined,
+        descriptionEn: String(values.descriptionEn ?? '').trim() || undefined,
+        descriptionAr: String(values.descriptionAr ?? '').trim() || undefined,
+        scenarioType: values.scenarioType as ScenarioType,
+        referenceFramework: values.referenceFramework as ReferenceFramework,
+        timeHorizonYears: Number(values.timeHorizonYears),
+        globalWarmingCelsius: Number(values.globalWarmingCelsius),
+        probabilityWeight: num(values.probabilityWeight),
+        portfolioAtRiskSarBillions: num(values.portfolioAtRiskSarBillions),
+        expectedLossSarMillions: num(values.expectedLossSarMillions),
+      });
+      toast.success(isAr ? 'تم تحديث السيناريو' : 'Scenario updated');
+      setEditScenario(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحديث السيناريو' : 'Failed to update scenario'));
     }
   }
 
@@ -256,6 +316,10 @@ export function TcfdScenariosPage() {
                       </Badge>
                     </td>
                     <td style={td}>
+                      {(s.lifecycleStage === 'DRAFT' || s.lifecycleStage === 'IN_REVIEW') && (
+                        <Button variant="ghost" Icon={Pencil} title={isAr ? 'تعديل' : 'Edit'}
+                                onClick={() => setEditScenario(s)} />
+                      )}
                       {s.lifecycleStage === 'DRAFT' && (
                         <Button variant="secondary" onClick={() => transition(s, 'IN_REVIEW')}>
                           {isAr ? 'إرسال للمراجعة' : 'Submit for review'}
@@ -388,6 +452,18 @@ export function TcfdScenariosPage() {
             </div>
           </div>
         </Card>
+      )}
+
+      {editScenario && (
+        <FormModal
+          open={!!editScenario}
+          title={`${isAr ? 'تعديل السيناريو' : 'Edit scenario'} — ${editScenario.scenarioCode}`}
+          fields={editFields}
+          initial={editInitial}
+          onClose={() => setEditScenario(null)}
+          onSubmit={onUpdateScenario}
+          submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        />
       )}
     </Shell>
   );
