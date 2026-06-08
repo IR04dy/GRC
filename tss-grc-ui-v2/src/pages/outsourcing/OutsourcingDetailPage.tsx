@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw, Plus, ClipboardCheck, Pencil } from 'lucide-react';
+import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw, Plus, ClipboardCheck, Pencil, CheckCircle2 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -27,6 +27,7 @@ import {
   recordExitTest,
   recordReview,
   recordEvent,
+  resolveEvent,
   recordDueDiligence,
   type OutsourcingArrangement,
   type DueDiligence,
@@ -102,6 +103,7 @@ export function OutsourcingDetailPage() {
   const [tab, setTab] = useState<TabId>('overview');
   const [loading, setLoading] = useState(false);
   const [openEvent, setOpenEvent] = useState(false);
+  const [resolveTarget, setResolveTarget] = useState<MonitoringEvent | null>(null);
   const [openDd, setOpenDd] = useState(false);
   const [openExit, setOpenExit] = useState(false);
   const [editExitOpen, setEditExitOpen] = useState(false);
@@ -247,6 +249,40 @@ export function OutsourcingDetailPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل تسجيل الحدث' : 'Failed to record event'));
+    }
+  }
+
+  // ── Resolve an open monitoring event (close-out with action taken) ─────
+  // Pre-fills any action already logged so the closer edits rather than
+  // re-types; backend keeps an existing value when the field is left blank.
+  const resolveInitial: Record<string, string> = useMemo(() => ({
+    actionTakenEn: resolveTarget?.actionTakenEn ?? '',
+    actionTakenAr: resolveTarget?.actionTakenAr ?? '',
+  }), [resolveTarget]);
+
+  const resolveFields: FieldDef[] = useMemo(() => [
+    { key: 'actionTakenEn', kind: 'textarea', span: 12, rows: 3, required: true,
+      label: isAr ? 'الإجراء المُتَّخذ (إنجليزي)' : 'Action taken (EN)' },
+    { key: 'actionTakenAr', kind: 'textarea', span: 12, rows: 3,
+      label: isAr ? 'الإجراء المُتَّخذ (عربي)' : 'Action taken (AR)' },
+  ], [isAr]);
+
+  async function submitResolve(v: Record<string, string>) {
+    if (!resolveTarget) return;
+    const actionTakenEn = String(v.actionTakenEn ?? '').trim();
+    if (!actionTakenEn) { toast.danger(isAr ? 'الإجراء المُتَّخذ مطلوب' : 'Action taken is required'); return; }
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    try {
+      await resolveEvent(resolveTarget.id, {
+        actionTakenEn,
+        actionTakenAr: opt(v.actionTakenAr),
+      });
+      toast.success(isAr ? 'تمّ إغلاق حدث المراقبة' : 'Monitoring event resolved');
+      setResolveTarget(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل إغلاق الحدث' : 'Failed to resolve event'));
     }
   }
 
@@ -616,6 +652,11 @@ export function OutsourcingDetailPage() {
                   </div>
                   <div style={{ marginTop: 4, fontSize: 11, ...muted }}>{e.eventDate}</div>
                 </div>
+                {!e.resolved && (
+                  <Button variant="secondary" Icon={CheckCircle2} onClick={() => setResolveTarget(e)}>
+                    {isAr ? 'إغلاق الحدث' : 'Resolve'}
+                  </Button>
+                )}
               </div>
               <p style={{ marginTop: 8, fontSize: 13 }}>{isAr ? e.descriptionAr : e.descriptionEn}</p>
               {(e.actionTakenEn || e.actionTakenAr) && (
@@ -714,6 +755,16 @@ export function OutsourcingDetailPage() {
         onClose={() => setOpenEvent(false)}
         onSubmit={submitEvent}
         submitLabel={isAr ? 'تسجيل الحدث' : 'Record event'}
+      />
+
+      <FormModal
+        open={resolveTarget != null}
+        title={isAr ? 'إغلاق حدث المراقبة' : 'Resolve monitoring event'}
+        fields={resolveFields}
+        initial={resolveInitial}
+        onClose={() => setResolveTarget(null)}
+        onSubmit={submitResolve}
+        submitLabel={isAr ? 'إغلاق الحدث' : 'Resolve event'}
       />
 
       <FormModal
