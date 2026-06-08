@@ -46,7 +46,7 @@ import {
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
 } from '../../lib/sustainabilityCapa';
 import {
-  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi,
+  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi,
   sgiStatusTone, sgiSectorLabel, sgiStatusLabel,
   computeProgressPct, canAchieve,
   type SgiCommitment as SgiC, type SgiAggregate as SgiAgg, type SgiSector,
@@ -3672,6 +3672,7 @@ function SgiTab() {
   const [achievingId, setAchievingId] = useState<number | null>(null);
   const [retiringId, setRetiringId]   = useState<number | null>(null);
   const [openNew, setOpenNew]         = useState(false);
+  const [editSgi, setEditSgi]         = useState<SgiC | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -3771,6 +3772,120 @@ function SgiTab() {
     { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
       label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
   ];
+
+  // Edit-commitment — the full editable definition. commitmentCode is the
+  // immutable identifier and status is owned by the achieve/retire actions,
+  // so neither is in the form. Numeric columns have no entity default (null),
+  // so any omitted value is left untouched on save.
+  const editFields: FieldDef[] = [
+    { kind: 'select', key: 'sector', required: true, span: 6,
+      label: isAr ? 'القطاع' : 'Sector',
+      options: SGI_SECTORS.map(s => ({ value: s, label: sgiSectorLabel(s, isAr ? 'ar' : 'en') })) },
+    { kind: 'text', key: 'titleEn', required: true, span: 6,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', span: 12,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'text', key: 'unit', required: true, span: 4,
+      label: isAr ? 'الوحدة' : 'Unit', placeholder: 'tCO₂e/yr, %, MW…' },
+    { kind: 'number', key: 'targetValue', required: true, span: 4,
+      label: isAr ? 'القيمة المستهدفة' : 'Target value' },
+    { kind: 'number', key: 'targetYear', required: true, span: 4, min: 2020, max: 2100,
+      label: isAr ? 'سنة الهدف' : 'Target year' },
+    { kind: 'number', key: 'baselineValue', span: 4,
+      label: isAr ? 'قيمة الأساس' : 'Baseline value' },
+    { kind: 'number', key: 'baselineYear', span: 4, min: 2000, max: 2100,
+      label: isAr ? 'سنة الأساس' : 'Baseline year' },
+    { kind: 'number', key: 'currentValue', span: 4,
+      label: isAr ? 'القيمة الحالية' : 'Current value' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'text', key: 'ownerEmail', span: 6,
+      label: isAr ? 'بريد المالك' : 'Owner email' },
+    { kind: 'date', key: 'nextMilestoneDate', span: 4,
+      label: isAr ? 'تاريخ المرحلة التالية' : 'Next milestone date' },
+    { kind: 'text', key: 'nextMilestoneEn', span: 8,
+      label: isAr ? 'المرحلة التالية (إنجليزي)' : 'Next milestone (English)' },
+    { kind: 'text', key: 'nextMilestoneAr', span: 12,
+      label: isAr ? 'المرحلة التالية (عربي)' : 'Next milestone (Arabic)' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+    { kind: 'textarea', key: 'notesEn', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات (إنجليزي)' : 'Notes (English)' },
+    { kind: 'textarea', key: 'notesAr', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات (عربي)' : 'Notes (Arabic)' },
+  ];
+
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    sector:            editSgi?.sector ?? 'ENERGY',
+    titleEn:           editSgi?.titleEn ?? '',
+    titleAr:           editSgi?.titleAr ?? '',
+    unit:              editSgi?.unit ?? '',
+    targetValue:       editSgi?.targetValue != null ? String(editSgi.targetValue) : '',
+    targetYear:        editSgi?.targetYear != null ? String(editSgi.targetYear) : '',
+    baselineValue:     editSgi?.baselineValue != null ? String(editSgi.baselineValue) : '',
+    baselineYear:      editSgi?.baselineYear != null ? String(editSgi.baselineYear) : '',
+    currentValue:      editSgi?.currentValue != null ? String(editSgi.currentValue) : '',
+    ownerName:         editSgi?.ownerName ?? '',
+    ownerEmail:        editSgi?.ownerEmail ?? '',
+    nextMilestoneDate: editSgi?.nextMilestoneDate ?? '',
+    nextMilestoneEn:   editSgi?.nextMilestoneEn ?? '',
+    nextMilestoneAr:   editSgi?.nextMilestoneAr ?? '',
+    descriptionEn:     editSgi?.descriptionEn ?? '',
+    descriptionAr:     editSgi?.descriptionAr ?? '',
+    notesEn:           editSgi?.notesEn ?? '',
+    notesAr:           editSgi?.notesAr ?? '',
+  }), [editSgi]);
+
+  async function submitEdit(values: Record<string, unknown>): Promise<void> {
+    if (!editSgi?.id) return;
+    const titleEn = String(values.titleEn ?? '').trim();
+    const sector = String(values.sector ?? '').trim();
+    const unit = String(values.unit ?? '').trim();
+    const targetValue = Number(values.targetValue);
+    const targetYear = Number(values.targetYear);
+    if (!titleEn || !sector || !unit
+        || !Number.isFinite(targetValue) || !Number.isFinite(targetYear)) {
+      toast.danger(isAr
+        ? 'العنوان والقطاع والوحدة والقيمة المستهدفة وسنة الهدف حقول مطلوبة'
+        : 'Title, sector, unit, target value and target year are required');
+      return;
+    }
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return v === '' || v == null || !Number.isFinite(n) ? undefined : n;
+    };
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      await updateSgi(editSgi.id, {
+        sector: sector as SgiSector,
+        titleEn,
+        titleAr: str(values.titleAr),
+        unit,
+        targetValue,
+        targetYear,
+        baselineValue: num(values.baselineValue),
+        baselineYear: num(values.baselineYear),
+        currentValue: num(values.currentValue),
+        ownerName: str(values.ownerName),
+        ownerEmail: str(values.ownerEmail),
+        nextMilestoneDate: str(values.nextMilestoneDate),
+        nextMilestoneEn: str(values.nextMilestoneEn),
+        nextMilestoneAr: str(values.nextMilestoneAr),
+        descriptionEn: str(values.descriptionEn),
+        descriptionAr: str(values.descriptionAr),
+        notesEn: str(values.notesEn),
+        notesAr: str(values.notesAr),
+      });
+      toast.success(isAr ? 'حُدّث الالتزام' : 'Commitment updated');
+      setEditSgi(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث الالتزام' : 'Failed to update commitment'));
+    }
+  }
 
   async function submitCreate(values: Record<string, unknown>): Promise<void> {
     const code = String(values.commitmentCode ?? '').trim();
@@ -3875,6 +3990,9 @@ function SgiTab() {
                           <Badge tone={sgiStatusTone(c.status)}>{sgiStatusLabel(c.status, isAr ? 'ar' : 'en')}</Badge>
                           {isActive && (
                             <>
+                              <Button size="sm" variant="ghost" Icon={Pencil}
+                                title={isAr ? 'تعديل' : 'Edit'}
+                                onClick={() => setEditSgi(c)} />
                               <Button size="sm" variant="secondary" Icon={CheckCircle2}
                                 disabled={!canAchieve(c)}
                                 title={!canAchieve(c) ? (isAr ? 'لم يصل القياس الحالي إلى الهدف بعد' : 'Current value has not met target yet') : undefined}
@@ -3964,6 +4082,19 @@ function SgiTab() {
         submitLabel={isAr ? 'إضافة الالتزام' : 'Add commitment'}
         onClose={() => setOpenNew(false)}
         onSubmit={submitCreate}
+      />
+
+      <FormModal
+        open={editSgi !== null}
+        title={editSgi
+          ? (isAr ? `تعديل الالتزام · ${editSgi.commitmentCode}` : `Edit commitment · ${editSgi.commitmentCode}`)
+          : ''}
+        fields={editFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditSgi(null)}
+        onSubmit={submitEdit}
       />
     </div>
   );
