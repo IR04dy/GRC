@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw, Plus, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, FileText, ShieldCheck, AlertTriangle, LogOut, History, RefreshCw, Plus, ClipboardCheck, Pencil } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -18,6 +18,7 @@ import { ApiError } from '../../lib/api';
 import { getUser } from '../../lib/auth';
 import {
   getArrangement,
+  updateArrangement,
   listDueDiligence,
   listEvents,
   getExitPlan,
@@ -34,6 +35,8 @@ import {
   type Severity,
   type Recommendation,
   type TestFrequency,
+  type ServiceType,
+  type CriticalFunction,
   LIFECYCLE_LABELS,
   SERVICE_TYPE_LABELS,
   CRITICAL_FUNCTION_LABELS,
@@ -101,6 +104,7 @@ export function OutsourcingDetailPage() {
   const [openDd, setOpenDd] = useState(false);
   const [openExit, setOpenExit] = useState(false);
   const [testingExit, setTestingExit] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   async function reload() {
     if (!Number.isFinite(arrangementId)) return;
@@ -135,6 +139,56 @@ export function OutsourcingDetailPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل تسجيل المراجعة' : 'Failed to record review'));
+    }
+  }
+
+  // ── Edit the arrangement record (PATCH — partial null-means-keep) ──────
+  // Focused on the routinely-corrected descriptive + contract fields. The
+  // lifecycle stage moves via transitions, and materiality/SAMA flags have
+  // their own downstream-triggering flows, so they're left out of this quick
+  // edit. Server takes a partial DTO, so omitted fields keep their values.
+  const serviceTypeOptions = useMemo(
+    () => Object.entries(SERVICE_TYPE_LABELS).map(([value, l]) => ({ value, label: isAr ? l.ar : l.en })), [isAr]);
+  const criticalFnOptions = useMemo(
+    () => Object.entries(CRITICAL_FUNCTION_LABELS).map(([value, l]) => ({ value, label: isAr ? l.ar : l.en })), [isAr]);
+  const editFields: FieldDef[] = useMemo(() => [
+    { key: 'titleEn', kind: 'text', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)' },
+    { key: 'titleAr', kind: 'text', required: true, span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { key: 'descriptionEn', kind: 'textarea', span: 12, rows: 2, label: isAr ? 'الوصف (إنجليزي)' : 'Description (EN)' },
+    { key: 'serviceType', kind: 'select', required: true, span: 6, options: serviceTypeOptions, label: isAr ? 'نوع الخدمة' : 'Service type' },
+    { key: 'criticalFunction', kind: 'select', required: true, span: 6, options: criticalFnOptions, label: isAr ? 'الوظيفة الحرجة' : 'Critical function' },
+    { key: 'contractValueSarAnnual', kind: 'number', span: 4, min: 0, label: isAr ? 'القيمة السنوية (ريال)' : 'Annual value (SAR)' },
+    { key: 'contractEndDate', kind: 'date', span: 4, label: isAr ? 'نهاية العقد' : 'Contract end' },
+    { key: 'nextReviewDueDate', kind: 'date', span: 4, label: isAr ? 'المراجعة القادمة' : 'Next review due' },
+  ], [isAr, serviceTypeOptions, criticalFnOptions]);
+  const editInitial = useMemo(() => arrangement ? {
+    titleEn: arrangement.titleEn,
+    titleAr: arrangement.titleAr,
+    descriptionEn: arrangement.descriptionEn ?? '',
+    serviceType: arrangement.serviceType,
+    criticalFunction: arrangement.criticalFunction,
+    contractValueSarAnnual: arrangement.contractValueSarAnnual ?? '',
+    contractEndDate: arrangement.contractEndDate ? arrangement.contractEndDate.slice(0, 10) : '',
+    nextReviewDueDate: arrangement.nextReviewDueDate ? arrangement.nextReviewDueDate.slice(0, 10) : '',
+  } : {}, [arrangement]);
+  async function onUpdate(values: Record<string, unknown>) {
+    try {
+      const updated = await updateArrangement(arrangementId, {
+        titleEn: String(values.titleEn ?? '').trim(),
+        titleAr: String(values.titleAr ?? '').trim(),
+        descriptionEn: String(values.descriptionEn ?? '').trim() || undefined,
+        serviceType: values.serviceType as ServiceType,
+        criticalFunction: values.criticalFunction as CriticalFunction,
+        contractValueSarAnnual: typeof values.contractValueSarAnnual === 'number' && !Number.isNaN(values.contractValueSarAnnual)
+          ? values.contractValueSarAnnual : undefined,
+        contractEndDate: String(values.contractEndDate ?? '').trim() || undefined,
+        nextReviewDueDate: String(values.nextReviewDueDate ?? '').trim() || undefined,
+      });
+      setArrangement(updated);
+      setEditOpen(false);
+      toast.success(isAr ? 'تم تحديث الترتيب' : 'Arrangement updated');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحديث الترتيب' : 'Failed to update arrangement'));
     }
   }
 
@@ -373,9 +427,14 @@ export function OutsourcingDetailPage() {
           </>
         }
         actions={
-          <Button variant="secondary" Icon={RefreshCw} onClick={onRecordReview}>
-            {isAr ? 'تسجيل مراجعة' : 'Record review'}
-          </Button>
+          <div style={row}>
+            <Button variant="secondary" Icon={Pencil} onClick={() => setEditOpen(true)}>
+              {isAr ? 'تعديل' : 'Edit'}
+            </Button>
+            <Button variant="secondary" Icon={RefreshCw} onClick={onRecordReview}>
+              {isAr ? 'تسجيل مراجعة' : 'Record review'}
+            </Button>
+          </div>
         }
       />
 
@@ -583,6 +642,16 @@ export function OutsourcingDetailPage() {
           </Card>
         </div>
       )}
+
+      <FormModal
+        open={editOpen}
+        title={isAr ? 'تعديل الترتيب' : 'Edit arrangement'}
+        fields={editFields}
+        initial={editInitial}
+        onClose={() => setEditOpen(false)}
+        onSubmit={onUpdate}
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+      />
 
       <FormModal
         open={openEvent}
