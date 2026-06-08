@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Database, FileText, Target, Wrench, AlertCircle, CheckCircle2,
-  Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check, Paperclip,
+  Plus, ArrowRight, Trash2, Copy, Archive as ArchiveIcon, Upload, Check, Paperclip, Replace,
   Calendar, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -58,7 +58,7 @@ import {
 } from '../../lib/ndiDomains';
 import {
   listEvidence, evidenceAggregate, createEvidence, approveEvidence,
-  rejectEvidence, runExpiryCheck, deleteEvidence,
+  rejectEvidence, runExpiryCheck, deleteEvidence, supersedeEvidence,
   evidenceStatusTone, evidenceStatusLabel, evidenceTypeLabel,
   classificationTone, classificationLabel, daysUntil,
   type NdiEvidenceItem, type NdiEvidenceAggregate, type NdiEvidenceType,
@@ -2546,6 +2546,7 @@ function EvidenceTab() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [supersedeTarget, setSupersedeTarget] = useState<NdiEvidenceItem | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -2628,6 +2629,39 @@ function EvidenceTab() {
       await reload();
     } catch (err) {
       toast.danger(err instanceof ApiError ? err.message : 'Delete failed');
+    }
+  }
+
+  // Supersede an evidence item by a newer one already in the register: the old
+  // flips to SUPERSEDED and the replacement records supersedesId. The picker
+  // lists every other non-superseded item so a fresh upload can retire a stale
+  // policy/report without deleting the audit trail.
+  const supersedeCandidates = useMemo(
+    () => items.filter(c => c.id !== supersedeTarget?.id && c.status !== 'SUPERSEDED'),
+    [items, supersedeTarget],
+  );
+  const supersedeFields: FieldDef[] = useMemo(() => [
+    { kind: 'select', key: 'newId', required: true, span: 12,
+      label: isAr ? 'الدليل البديل (الأحدث)' : 'Replacement evidence (the newer item)',
+      options: supersedeCandidates.map(c => ({
+        value: String(c.id),
+        label: `${c.evidenceCode ?? '#' + c.id} · ${isAr && c.titleAr ? c.titleAr : c.titleEn}`,
+      })) },
+  ], [supersedeCandidates, isAr]);
+
+  async function onSupersede(values: Record<string, unknown>) {
+    if (supersedeTarget?.id == null) return;
+    const newId = Number(values.newId);
+    if (!Number.isInteger(newId) || newId <= 0) {
+      toast.danger(isAr ? 'اختر الدليل البديل' : 'Select a replacement'); return;
+    }
+    try {
+      await supersedeEvidence(supersedeTarget.id, newId);
+      toast.success(isAr ? 'تم الاستبدال' : 'Evidence superseded');
+      setSupersedeTarget(null);
+      await reload();
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Supersede failed');
     }
   }
 
@@ -2796,6 +2830,10 @@ function EvidenceTab() {
                             title={isAr ? 'رفض' : 'Reject'} />
                         </>
                       )}
+                      {(e.status === 'ACTIVE' || e.status === 'EXPIRED') && (
+                        <Button size="sm" variant="ghost" Icon={Replace} onClick={() => setSupersedeTarget(e)}
+                          title={isAr ? 'استبدال بإصدار أحدث' : 'Supersede with a newer item'} />
+                      )}
                       <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(e)}
                         title={isAr ? 'حذف' : 'Delete'} />
                     </div>
@@ -2816,6 +2854,21 @@ function EvidenceTab() {
         submitLabel={isAr ? 'إضافة' : 'Create'}
         onClose={() => setShowCreate(false)}
         onSubmit={async (vals: Record<string, unknown>) => { await onCreate(vals as unknown as Partial<NdiEvidenceItem>); }}
+      />
+
+      <FormModal
+        open={supersedeTarget !== null}
+        title={supersedeTarget
+          ? (isAr
+              ? `استبدال الدليل · ${supersedeTarget.evidenceCode ?? '#' + supersedeTarget.id}`
+              : `Supersede evidence · ${supersedeTarget.evidenceCode ?? '#' + supersedeTarget.id}`)
+          : ''}
+        fields={supersedeFields}
+        initial={{ newId: '' }}
+        size="md"
+        submitLabel={isAr ? 'استبدال' : 'Supersede'}
+        onClose={() => setSupersedeTarget(null)}
+        onSubmit={onSupersede}
       />
     </div>
   );
