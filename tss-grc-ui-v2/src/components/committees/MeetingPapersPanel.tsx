@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Clock, Eye, CheckCircle2 } from 'lucide-react';
+import { FileText, Clock, Eye, CheckCircle2, Plus } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { FormModal, type FieldDef } from '../ui/FormModal';
@@ -7,7 +7,7 @@ import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import { getUser } from '../../lib/auth';
 import {
-  listMeetingPapers, meetingPaperStats, markPaperRead, markPaperLate,
+  listMeetingPapers, meetingPaperStats, markPaperRead, markPaperLate, circulatePaper,
   type MeetingPaper, type MeetingPaperStats, type ConfidentialityLevel,
 } from '../../lib/committees';
 
@@ -43,6 +43,7 @@ export function MeetingPapersPanel({ meetingId, isAr }: { meetingId: number; isA
   const [stats, setStats] = useState<MeetingPaperStats | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [lateTarget, setLateTarget] = useState<MeetingPaper | null>(null);
+  const [circulateOpen, setCirculateOpen] = useState(false);
 
   async function load() {
     const [p, s] = await Promise.all([
@@ -85,13 +86,82 @@ export function MeetingPapersPanel({ meetingId, isAr }: { meetingId: number; isA
       placeholder: isAr ? 'مثال: عُمّمت بعد الموعد بـ٢٤ ساعة' : 'e.g. circulated 24h after the deadline' },
   ], [isAr]);
 
+  // Circulate a board paper into the pre-read pack. The backend stamps the
+  // circulation time and auto-flags it late when issued <24h before the
+  // meeting, so the form only collects the descriptive fields.
+  const circulateFields: FieldDef[] = useMemo(() => [
+    { key: 'paperCode', label: isAr ? 'رمز الورقة' : 'Paper code', kind: 'text', required: true, span: 6, maxLength: 64,
+      placeholder: 'e.g. PAP-2026-AUD-014' },
+    { key: 'agendaItemSeq', label: isAr ? 'بند جدول الأعمال' : 'Agenda item #', kind: 'number', span: 6, min: 1 },
+    { key: 'titleEn', label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)', kind: 'text', required: true, span: 12, maxLength: 255 },
+    { key: 'titleAr', label: isAr ? 'العنوان (عربي)' : 'Title (AR)', kind: 'text', span: 12, maxLength: 255 },
+    { key: 'authorName', label: isAr ? 'المُعِدّ' : 'Author', kind: 'text', span: 6, maxLength: 128 },
+    { key: 'authorRole', label: isAr ? 'صفة المُعِدّ' : 'Author role', kind: 'text', span: 6, maxLength: 128 },
+    { key: 'confidentiality', label: isAr ? 'السرية' : 'Confidentiality', kind: 'select', required: true, span: 12,
+      options: (['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as ConfidentialityLevel[])
+        .map(c => ({ value: c, label: isAr ? CONF_LABEL[c].ar : CONF_LABEL[c].en })) },
+  ], [isAr]);
+  const circulateInitial = useMemo(() => ({
+    paperCode: '', agendaItemSeq: '', titleEn: '', titleAr: '',
+    authorName: '', authorRole: '', confidentiality: 'INTERNAL',
+  }), []);
+
+  async function onCirculate(v: Record<string, string>) {
+    const paperCode = String(v.paperCode ?? '').trim();
+    const titleEn = String(v.titleEn ?? '').trim();
+    if (!paperCode) { toast.danger(isAr ? 'رمز الورقة مطلوب' : 'Paper code is required'); return; }
+    if (!titleEn)   { toast.danger(isAr ? 'العنوان الإنجليزي مطلوب' : 'English title is required'); return; }
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    const seqRaw = String(v.agendaItemSeq ?? '').trim();
+    try {
+      await circulatePaper({
+        meetingId,
+        paperCode,
+        titleEn,
+        titleAr: opt(v.titleAr) ?? null,
+        authorName: opt(v.authorName) ?? null,
+        authorRole: opt(v.authorRole) ?? null,
+        agendaItemSeq: seqRaw ? Number(seqRaw) : null,
+        confidentiality: (v.confidentiality as ConfidentialityLevel) || 'INTERNAL',
+      });
+      toast.success(isAr ? `عُمّمت الورقة ${paperCode}` : `Paper ${paperCode} circulated`);
+      setCirculateOpen(false);
+      await load();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تعميم الورقة' : 'Failed to circulate the paper'));
+    }
+  }
+
+  const circulateBtn = (
+    <Button size="sm" variant="primary" Icon={Plus} onClick={() => setCirculateOpen(true)}>
+      {isAr ? 'تعميم ورقة' : 'Circulate paper'}
+    </Button>
+  );
+
+  const circulateModal = (
+    <FormModal
+      open={circulateOpen}
+      size="md"
+      title={isAr ? 'تعميم ورقة اجتماع' : 'Circulate meeting paper'}
+      fields={circulateFields}
+      initial={circulateInitial}
+      submitLabel={isAr ? 'تعميم' : 'Circulate'}
+      onClose={() => setCirculateOpen(false)}
+      onSubmit={onCirculate}
+    />
+  );
+
   if (papers && papers.length === 0) {
     return (
       <div style={{ marginTop: 10 }}>
-        <strong style={{ fontSize: 13 }}>{isAr ? 'أوراق الاجتماع (القراءة المسبقة)' : 'Meeting papers (pre-read)'}</strong>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: 13 }}>{isAr ? 'أوراق الاجتماع (القراءة المسبقة)' : 'Meeting papers (pre-read)'}</strong>
+          {circulateBtn}
+        </div>
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
           {isAr ? 'لا توجد أوراق معمّمة لهذا الاجتماع.' : 'No papers circulated for this meeting.'}
         </div>
+        {circulateModal}
       </div>
     );
   }
@@ -108,6 +178,7 @@ export function MeetingPapersPanel({ meetingId, isAr }: { meetingId: number; isA
             <Badge tone={stats.latePapers > 0 ? 'warning' : 'neutral'}>{isAr ? `متأخرة ${stats.latePapers}` : `${stats.latePapers} late`}</Badge>
           </span>
         )}
+        <span style={{ marginInlineStart: 'auto' }}>{circulateBtn}</span>
       </div>
 
       {!papers
@@ -178,6 +249,8 @@ export function MeetingPapersPanel({ meetingId, isAr }: { meetingId: number; isA
         onClose={() => setLateTarget(null)}
         onSubmit={async (v) => { await onMarkLate(v.reason.trim()); return {}; }}
       />
+
+      {circulateModal}
     </div>
   );
 }
