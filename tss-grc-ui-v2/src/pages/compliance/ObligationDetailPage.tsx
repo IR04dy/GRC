@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   FileCheck2, ArrowLeft, ShieldCheck, AlertTriangle,
-  Stamp, Edit3, ClipboardCheck, CheckCircle2, XCircle, RotateCcw,
+  Stamp, Edit3, ClipboardCheck, CheckCircle2, XCircle, RotateCcw, Pencil,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -21,9 +22,19 @@ import {
   recordAttestation,
   reviewAttestation,
   transitionObligation,
+  updateObligation,
   type Obligation,
   type ObligationAttestation,
   type ReviewerDecision,
+  type ObligationUpdateRequest,
+  type Regulator,
+  type ObligationType,
+  type Frequency,
+  type Severity,
+  REGULATORS,
+  TYPES,
+  FREQUENCIES,
+  SEVERITIES,
   REGULATOR_LABELS,
   TYPE_LABELS,
   FREQUENCY_LABELS,
@@ -54,6 +65,7 @@ export function ObligationDetailPage() {
   const [obligation, setObligation] = useState<Obligation | null>(null);
   const [attestations, setAttestations] = useState<ObligationAttestation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   async function reload() {
     if (!id) return;
@@ -162,6 +174,94 @@ export function ObligationDetailPage() {
     }
   }
 
+  // Edit the obligation's descriptive / classification / scheduling fields.
+  // Owner + backup-owner pickers and the related control/risk links are left
+  // out of this form; PATCH is null-means-keep, so omitting them preserves
+  // the current values. Lifecycle stage is owned by the transition actions.
+  const editFields: FieldDef[] = [
+    { kind: 'text', key: 'titleEn', required: true, span: 6, maxLength: 255,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', required: true, span: 6, maxLength: 255,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'select', key: 'regulator', required: true, span: 4,
+      label: isAr ? 'الجهة الرقابية' : 'Regulator',
+      options: REGULATORS.map(r => ({ value: r, label: tlabel(REGULATOR_LABELS, r, isAr) })) },
+    { kind: 'select', key: 'obligationType', required: true, span: 4,
+      label: isAr ? 'النوع' : 'Type',
+      options: TYPES.map(t => ({ value: t, label: tlabel(TYPE_LABELS, t, isAr) })) },
+    { kind: 'select', key: 'frequency', required: true, span: 4,
+      label: isAr ? 'التكرار' : 'Frequency',
+      options: FREQUENCIES.map(f => ({ value: f, label: tlabel(FREQUENCY_LABELS, f, isAr) })) },
+    { kind: 'select', key: 'severityIfMissed', required: true, span: 4,
+      label: isAr ? 'الخطورة عند التخلف' : 'Severity if missed',
+      options: SEVERITIES.map(s => ({ value: s, label: tlabel(SEVERITY_LABELS, s, isAr) })) },
+    { kind: 'date', key: 'nextDueDate', span: 4,
+      label: isAr ? 'تاريخ الاستحقاق التالي' : 'Next due date' },
+    { kind: 'number', key: 'leadTimeDays', span: 4, min: 0,
+      label: isAr ? 'مدّة التذكير المسبق (أيام)' : 'Lead-time (days)' },
+    { kind: 'text', key: 'regulationReference', span: 12, maxLength: 255,
+      label: isAr ? 'المرجع التنظيمي' : 'Regulation reference' },
+    { kind: 'text', key: 'businessUnitEn', span: 6, maxLength: 255,
+      label: isAr ? 'وحدة العمل (إنجليزي)' : 'Business unit (English)' },
+    { kind: 'text', key: 'businessUnitAr', span: 6, maxLength: 255,
+      label: isAr ? 'وحدة العمل (عربي)' : 'Business unit (Arabic)' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+  ];
+
+  const editInitial: Record<string, unknown> = obligation ? {
+    titleEn:             obligation.titleEn,
+    titleAr:             obligation.titleAr,
+    regulator:           obligation.regulator,
+    obligationType:      obligation.obligationType,
+    frequency:           obligation.frequency,
+    severityIfMissed:    obligation.severityIfMissed,
+    nextDueDate:         obligation.nextDueDate ? obligation.nextDueDate.slice(0, 10) : '',
+    leadTimeDays:        obligation.leadTimeDays,
+    regulationReference: obligation.regulationReference ?? '',
+    businessUnitEn:      obligation.businessUnitEn ?? '',
+    businessUnitAr:      obligation.businessUnitAr ?? '',
+    descriptionEn:       obligation.descriptionEn ?? '',
+    descriptionAr:       obligation.descriptionAr ?? '',
+  } : {};
+
+  async function submitEdit(values: Record<string, unknown>) {
+    if (!obligation) return;
+    const titleEn = String(values.titleEn ?? '').trim();
+    const titleAr = String(values.titleAr ?? '').trim();
+    if (!titleEn || !titleAr) {
+      toast.danger(isAr ? 'العنوان بالإنجليزية والعربية مطلوب' : 'English and Arabic titles are required');
+      return;
+    }
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    const num = (v: unknown) => { const n = Number(v); return v === '' || v == null || !Number.isFinite(n) ? undefined : n; };
+    const body: ObligationUpdateRequest = {
+      titleEn,
+      titleAr,
+      descriptionEn: str(values.descriptionEn),
+      descriptionAr: str(values.descriptionAr),
+      regulator: String(values.regulator ?? '').trim() as Regulator,
+      regulationReference: str(values.regulationReference),
+      obligationType: String(values.obligationType ?? '').trim() as ObligationType,
+      frequency: String(values.frequency ?? '').trim() as Frequency,
+      severityIfMissed: String(values.severityIfMissed ?? '').trim() as Severity,
+      nextDueDate: str(values.nextDueDate),
+      leadTimeDays: num(values.leadTimeDays),
+      businessUnitEn: str(values.businessUnitEn),
+      businessUnitAr: str(values.businessUnitAr),
+    };
+    try {
+      await updateObligation(obligation.id, body);
+      toast.success(isAr ? 'تم تحديث الالتزام' : 'Obligation updated');
+      setEditOpen(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التحديث' : 'Update failed'));
+    }
+  }
+
   async function onTransition(to: 'ACTIVE' | 'SUSPENDED' | 'RETIRED') {
     if (!obligation) return;
     const ok = await dialog.confirm({
@@ -207,6 +307,9 @@ export function ObligationDetailPage() {
             <Button variant="secondary" Icon={ArrowLeft}
               onClick={() => navigate('/compliance/obligations')}>
               {isAr ? 'رجوع' : 'Back'}
+            </Button>
+            <Button variant="secondary" Icon={Pencil} onClick={() => setEditOpen(true)}>
+              {isAr ? 'تعديل' : 'Edit'}
             </Button>
             <Button Icon={Stamp} onClick={onRecord}>
               {isAr ? 'تسجيل إقرار' : 'Record attestation'}
@@ -345,6 +448,17 @@ export function ObligationDetailPage() {
           </div>
         )}
       </Card>
+
+      <FormModal
+        open={editOpen}
+        title={isAr ? `تعديل الالتزام · ${obligation.obligationCode}` : `Edit obligation · ${obligation.obligationCode}`}
+        fields={editFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditOpen(false)}
+        onSubmit={submitEdit}
+      />
     </Shell>
   );
 }
