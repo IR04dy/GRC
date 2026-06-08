@@ -7,32 +7,39 @@ interpreted as CP1252 (or a mix of CP1252 + Latin-1) during the migration
 parse, and the resulting Unicode codepoints landed in NVARCHAR storage.
 
 This script scans every NVARCHAR column of every user table (skipping the
-flyway history), and runs ftfy.fix_text() on any cell that smells like
+flyway history), and runs ftfy.fix_encoding() on any cell that smells like
 mojibake. ftfy handles the mixed-encoding case correctly.
+
+NOTE: this uses ftfy.fix_encoding(), NOT ftfy.fix_text(). fix_encoding ONLY
+reverses the UTF-8<->CP1252/Latin-1 double-encoding. fix_text is a kitchen
+sink that also unescapes HTML entities and applies NFC normalisation — on this
+DB that would corrupt legitimate cells (e.g. JSON columns, markdown containing
+"5x5") that are NOT mojibaked. Keep this on fix_encoding.
 """
 from __future__ import annotations
 import sys, pyodbc, ftfy
+
+# Windows consoles default to cp1252 and cannot print ≤ / Arabic, etc.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 CONN = (
     "DRIVER={ODBC Driver 17 for SQL Server};"
     "SERVER=localhost;DATABASE=TSS_GRC;UID=sa;PWD=tss.123;TrustServerCertificate=yes"
 )
 
-# Markers we use to flag candidate cells. Any one of these implies likely
-# mojibake. The Ø/Ù pair catches UTF-8 Arabic decoded as CP1252; â€ catches
-# UTF-8 em-dash / quote chars decoded as CP1252; the others catch the
-# CP1252-specific replacements that show up alongside.
-MARKERS = ("Ø", "Ù", "â€", "Ã", "‚", "ˆ", "—", "Ŝ", "Ÿ", "Â")
-
-
-def looks_mojibaked(s: str) -> bool:
-    return any(ch in s for ch in MARKERS)
-
 
 def repair(s: str) -> str | None:
-    if not s or not looks_mojibaked(s):
+    """Reverse encoding-mojibake only. Returns the fixed string, or None when
+    the cell is already clean (fix_encoding is a no-op on non-mojibaked text)."""
+    if not s:
         return None
-    fixed = ftfy.fix_text(s)
+    try:
+        fixed = ftfy.fix_encoding(s)
+    except Exception:
+        return None
     return fixed if fixed != s else None
 
 
@@ -107,19 +114,26 @@ def main() -> int:
                 continue
             params.append(row_id)
             try:
+                # Force each text param to bind as SQL_WVARCHAR (-> nvarchar(max)).
+                # By default pyodbc streams long strings as SQL_WLONGVARCHAR, which
+                # maps to legacy ntext — and ntext CANNOT carry this DB's _SC_UTF8
+                # collation (error 4189), so long cells would silently fail to
+                # update. SQL_WVARCHAR(max) holds the full Unicode value.
+                cur.setinputsizes([(pyodbc.SQL_WVARCHAR, 0, 0)] * len(sets)
+                                  + [(pyodbc.SQL_INTEGER, 0, 0)])
                 cur.execute(
                     f"UPDATE [{schema}].[{table}] SET {', '.join(sets)} WHERE id = ?",
                     *params,
                 )
                 fixed_in_table += 1
             except pyodbc.Error as e:
-                # Skip rows whose update fails (e.g. legacy ntext columns that
-                # can't bind under SC_UTF8). Other rows in the same table can
-                # still succeed under autocommit=True.
+                # Other rows in the same table can still succeed under autocommit=True.
                 msg = str(e)
                 if skipped_rows < 5:
                     print(f"    skip {schema}.{table} id={row_id}: {msg[:120]}")
                 skipped_rows += 1
+            finally:
+                cur.setinputsizes(None)
         if fixed_in_table:
             print(f"  {schema}.{table}: repaired {fixed_in_table} row(s)")
             total_fixed += fixed_in_table

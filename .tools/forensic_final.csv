@@ -1,0 +1,914 @@
+schema,table,column,id,confidence,method,roundtrip_validated,after_correct
+ccm,control_test_definition,title_en,1,exact,count==live & batch & org1,True,Domain Admins membership ≤ 5
+ccm,control_test_definition,title_en,2,exact,count==live & batch & org1,True,Admin users MFA enrolment ≥ 95%
+ccm,control_test_definition,title_en,3,exact,count==live & batch & org1,True,Splunk audit-log retention ≥ 365 days
+ccm,control_test_definition,title_en,5,exact,count==live & batch & org1,True,AD password policy ≥ 14 chars + complexity
+ccm,control_test_definition,title_en,8,exact,count==live & batch & org1,True,Endpoints at current patch level ≥ 95%
+cyber,root_cause_analyses,recommendations_en,3,exact,count==live,True,1) Enable IP-rate-limit (5 attempts / 60s / IP) on the VPN concentrator. 2) Lower IDS auto-block threshold from 24h → 4h. 3) Move the VPN endpoint behind the WAF instead of public IPv4. 4) Document weekend on-call rotation for SOC L2.
+platform,controls,description_en,4,exact,count==live,True,CMDB completeness ≥ 95% for production systems; weekly automated reconciliation.
+risk,bowtie_preventive_control,description_en,1,exact,count==live,True,Symantec DLP rules: any message containing ≥50 CR numbers or IBANs is blocked from external send. USB write of PII fingerprinted files is blocked at endpoint.
+scm,supplier_resilience_tests,success_criteria_en,2,exact,count==live,True,(1) Workload reachable on standby ≤ 30 min; (2) data freshness ≤ 15 min; (3) fail back clean.
+scm,supplier_resilience_tests,success_criteria_en,4,exact,count==live,True,(1) Restore initiated by Workday within 4h of ticket; (2) restored data RPO ≤ 1h; (3) record-count delta ≤ 0.01%.
+scm,supplier_resilience_tests,success_criteria_en,6,exact,count==live,True,(1) Cutover to Azure endpoint ≤ 30 min; (2) copilot UX unchanged for users.
+scm,supplier_resilience_tests,success_criteria_en,8,exact,count==live,True,(1) Detection-to-MSSP-confirmation ≤ 15 min; (2) CSIRT bridge convened ≤ 30 min.
+sust,sustainability_report,content_markdown,2,exact,count==live,True,"G / SUSTAINABILITY ANNEX — ANNUAL REPORT
+ملحق الاستدامة والحوكمة البيئية — التقرير السنوي
+
+Reporting entity: TSS GRC Platform
+الجهة المُعِدّة  : منصة الحوكمة والمخاطر والامتثال
+Reporting year: 2025
+Generated     : 2026-05-15T00:00:00Z
+
+1. GHG EMISSIONS · انبعاثات الغازات الدفيئة
+   Scope 1: 14220 tCO2e (verified: YES)
+   Scope 2: 38910 tCO2e (verified: YES)
+   Scope 3: 142480 tCO2e (coverage 69%, verified: no)
+   Total  : 195610 tCO2e
+   YoY    : Scope 1 0%, Scope 2 0%, Scope 3 0%
+
+2. SAUDI GREEN INITIATIVE COMMITMENTS · التزامات مبادرة السعودية الخضراء
+   [ENERGY   ] Net-zero greenhouse gases by 2060
+               الحياد الكربوني بحلول 2060
+               Progress: 8.4% — ON TRACK (target 2060)
+   [ENERGY   ] Cut Scope 1+2 emissions 30% by 2030
+               خفض انبعاثات النطاقين 1 و 2 بنسبة 30٪ بحلول 2030
+               Progress: 39.6% — BEHIND PLAN (target 2030)
+   [ENERGY   ] 50% renewable energy mix by 2030
+               50٪ مزيج طاقة متجدّدة بحلول 2030
+               Progress: 33.3% — ON TRACK (target 2030)
+   [FORESTRY ] Contribute to 10B trees national target
+               المساهمة في هدف 10 مليارات شجرة
+               Progress: 24.8% — ON TRACK (target 2030)
+   [TRANSPORT] Convert 30% of light-vehicle fleet to EV by 2030
+               تحويل 30٪ من أسطول المركبات الخفيفة إلى كهربائي بحلول 2030
+               Progress: 40% — ON TRACK (target 2030)
+   [WASTE    ] 60% non-hazardous waste diverted from landfill by 2030
+               تحويل 60٪ من النفايات غير الخطرة بعيداً عن المكبّ بحلول 2030
+               Progress: 47.6% — ON TRACK (target 2030)
+   [WATER    ] Reduce water intensity 25% by 2030
+               خفض كثافة استهلاك المياه 25٪ بحلول 2030
+               Progress: 47.6% — ON TRACK (target 2030)
+
+3. CMA ARTICLES 91-94 DISCLOSURE · إفصاح المواد 91-94 من لائحة الحوكمة
+   Art. 91(a) [DISCLOSED     ] Board oversight of sustainability + ESG / إشراف المجلس على الاستدامة والحوكمة البيئية والاجتماعية
+     evidence: Annual Report 2025 §3.4
+   Art. 91(b) [DISCLOSED     ] Sustainability committee composition / تشكيل لجنة الاستدامة
+     evidence: Committee Charter v3.0
+   Art. 92(a) [DISCLOSED     ] Material ESG topics — assessment / تقييم الموضوعات الجوهرية للحوكمة البيئية والاجتماعية
+     evidence: Materiality matrix 2025
+   Art. 92(b) [PARTIAL       ] Climate-related risks + opportunities / المخاطر والفرص المتعلّقة بالمناخ
+     evidence: Risk register — climate band
+   Art. 93(a) [DISCLOSED     ] GHG emissions — Scope 1 + 2 / انبعاثات الغازات الدفيئة — النطاقان 1 و 2
+     evidence: GHG inventory 2025
+   Art. 93(b) [PARTIAL       ] GHG emissions — Scope 3 / انبعاثات النطاق 3
+     evidence: Scope 3 — 67% coverage
+   Art. 93(c) [DISCLOSED     ] Energy intensity + renewable share / كثافة الطاقة وحصة المتجدّدة
+     evidence: Energy mix 2025
+   Art. 93(d) [DISCLOSED     ] Water + waste metrics / مؤشرات المياه والنفايات
+     evidence: Operations report 2025
+   Art. 94(a) [DISCLOSED     ] Saudization (Nitaqat) compliance / الالتزام بالسعودة (نطاقات)
+     evidence: HRSD 2025 Q4
+   Art. 94(b) [DISCLOSED     ] Female workforce participation / مشاركة المرأة في القوى العاملة
+     evidence: HR diversity report 2025
+   Art. 94(c) [PARTIAL       ] Health, safety + LTIFR / الصحة والسلامة وLTIFR
+     evidence: HSSE report 2025
+
+4. TCFD ALIGNMENT · المحاذاة مع TCFD
+   [GOVERNANCE     ] (a) [DISCLOSED     ] Board oversight of climate risks
+   [GOVERNANCE     ] (b) [DISCLOSED     ] Management role in assessing climate risks
+   [STRATEGY       ] (a) [DISCLOSED     ] Climate-related risks + opportunities (short / medium / long term)
+   [STRATEGY       ] (b) [PARTIAL       ] Impact on business, strategy, financial planning
+   [STRATEGY       ] (c) [PARTIAL       ] Resilience under different climate scenarios (incl. 2°C)
+   [RISK_MGMT      ] (a) [DISCLOSED     ] Process for identifying climate risks
+   [RISK_MGMT      ] (b) [DISCLOSED     ] Process for managing climate risks
+   [RISK_MGMT      ] (c) [DISCLOSED     ] Integration into overall risk management
+   [METRICS_TARGETS] (a) [DISCLOSED     ] Metrics for climate risks + opportunities
+   [METRICS_TARGETS] (b) [PARTIAL       ] Scope 1, 2, 3 emissions disclosure
+   [METRICS_TARGETS] (c) [DISCLOSED     ] Targets to manage climate risks + performance
+
+5. CLIMATE RISKS & OPPORTUNITIES · المخاطر والفرص المناخية
+   [ENERGY_SOURCE] OPPORTUNITY score=16  Riyadh-2 facility — 8MW on-site solar + Sudair PPA
+                                    مرفق الرياض-2 — طاقة شمسية في الموقع 8 ميجاواط + اتفاقية شراء طاقة من سدير
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Khalid Al-Otaibi
+   [TRANSITION  ] RISK   score=16  Saudi carbon pricing scheme — financial exposure on Scope 1+2
+                                    تسعير الكربون السعودي — التعرّض المالي للنطاق 1 + 2
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Lina Al-Harbi
+   [PHYSICAL    ] RISK   score=15  Jeddah DC flood exposure under Red Sea storm intensification
+                                    تعرّض مركز بيانات جدة لفيضانات الساحل الغربي
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Khalid Al-Otaibi
+   [SUPPLY_CHAIN] RISK   score=12  High-emissions supplier consolidation risk on net-zero pathway
+                                    مخاطر تركّز موردين ذوي انبعاثات عالية على مسار الحياد الكربوني
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Mohammed Al-Sulaiman
+   [REGULATORY  ] RISK   score=12  SDAIA + CMA climate-disclosure tightening — gap on Scope 3 + scenario analysis
+                                    تشديد إفصاحات المناخ من سدايا وهيئة السوق المالية — فجوة في النطاق 3 وتحليل السيناريوهات
+                                    Status: IDENTIFIED · Horizon: SHORT · Owner: Sara Al-Zahrani
+
+Methodology: GHG Protocol Corporate Standard (Scope 1/2) + Scope 3 Standard.
+CMA Article references: Corporate Governance Regulations issued by Capital Market Authority.
+TCFD recommendations: Final Report — Recommendations of the TCFD (June 2017).
+"
+sust,sustainability_report,content_html,2,exact,count==live,True,"<!doctype html>
+<html lang=""en"" dir=""ltr""><head>
+<meta charset=""utf-8"">
+<title>Sustainability Annex 2025 — TSS GRC Platform</title>
+<style>body{font:13px/1.55 -apple-system,Segoe UI,Tahoma,Arial,sans-serif;margin:24px;color:#15201D;background:#FAF8F4} pre{font:12px/1.55 ui-monospace,Consolas,monospace;white-space:pre-wrap;color:#15201D;background:#fff;border:1px solid #E5DFD2;padding:24px;border-radius:8px}</style>
+</head><body><pre>G / SUSTAINABILITY ANNEX — ANNUAL REPORT
+ملحق الاستدامة والحوكمة البيئية — التقرير السنوي
+
+Reporting entity: TSS GRC Platform
+الجهة المُعِدّة  : منصة الحوكمة والمخاطر والامتثال
+Reporting year: 2025
+Generated     : 2026-05-15T00:00:00Z
+
+1. GHG EMISSIONS · انبعاثات الغازات الدفيئة
+   Scope 1: 14220 tCO2e (verified: YES)
+   Scope 2: 38910 tCO2e (verified: YES)
+   Scope 3: 142480 tCO2e (coverage 69%, verified: no)
+   Total  : 195610 tCO2e
+   YoY    : Scope 1 0%, Scope 2 0%, Scope 3 0%
+
+2. SAUDI GREEN INITIATIVE COMMITMENTS · التزامات مبادرة السعودية الخضراء
+   [ENERGY   ] Net-zero greenhouse gases by 2060
+               الحياد الكربوني بحلول 2060
+               Progress: 8.4% — ON TRACK (target 2060)
+   [ENERGY   ] Cut Scope 1+2 emissions 30% by 2030
+               خفض انبعاثات النطاقين 1 و 2 بنسبة 30٪ بحلول 2030
+               Progress: 39.6% — BEHIND PLAN (target 2030)
+   [ENERGY   ] 50% renewable energy mix by 2030
+               50٪ مزيج طاقة متجدّدة بحلول 2030
+               Progress: 33.3% — ON TRACK (target 2030)
+   [FORESTRY ] Contribute to 10B trees national target
+               المساهمة في هدف 10 مليارات شجرة
+               Progress: 24.8% — ON TRACK (target 2030)
+   [TRANSPORT] Convert 30% of light-vehicle fleet to EV by 2030
+               تحويل 30٪ من أسطول المركبات الخفيفة إلى كهربائي بحلول 2030
+               Progress: 40% — ON TRACK (target 2030)
+   [WASTE    ] 60% non-hazardous waste diverted from landfill by 2030
+               تحويل 60٪ من النفايات غير الخطرة بعيداً عن المكبّ بحلول 2030
+               Progress: 47.6% — ON TRACK (target 2030)
+   [WATER    ] Reduce water intensity 25% by 2030
+               خفض كثافة استهلاك المياه 25٪ بحلول 2030
+               Progress: 47.6% — ON TRACK (target 2030)
+
+3. CMA ARTICLES 91-94 DISCLOSURE · إفصاح المواد 91-94 من لائحة الحوكمة
+   Art. 91(a) [DISCLOSED     ] Board oversight of sustainability + ESG / إشراف المجلس على الاستدامة والحوكمة البيئية والاجتماعية
+     evidence: Annual Report 2025 §3.4
+   Art. 91(b) [DISCLOSED     ] Sustainability committee composition / تشكيل لجنة الاستدامة
+     evidence: Committee Charter v3.0
+   Art. 92(a) [DISCLOSED     ] Material ESG topics — assessment / تقييم الموضوعات الجوهرية للحوكمة البيئية والاجتماعية
+     evidence: Materiality matrix 2025
+   Art. 92(b) [PARTIAL       ] Climate-related risks + opportunities / المخاطر والفرص المتعلّقة بالمناخ
+     evidence: Risk register — climate band
+   Art. 93(a) [DISCLOSED     ] GHG emissions — Scope 1 + 2 / انبعاثات الغازات الدفيئة — النطاقان 1 و 2
+     evidence: GHG inventory 2025
+   Art. 93(b) [PARTIAL       ] GHG emissions — Scope 3 / انبعاثات النطاق 3
+     evidence: Scope 3 — 67% coverage
+   Art. 93(c) [DISCLOSED     ] Energy intensity + renewable share / كثافة الطاقة وحصة المتجدّدة
+     evidence: Energy mix 2025
+   Art. 93(d) [DISCLOSED     ] Water + waste metrics / مؤشرات المياه والنفايات
+     evidence: Operations report 2025
+   Art. 94(a) [DISCLOSED     ] Saudization (Nitaqat) compliance / الالتزام بالسعودة (نطاقات)
+     evidence: HRSD 2025 Q4
+   Art. 94(b) [DISCLOSED     ] Female workforce participation / مشاركة المرأة في القوى العاملة
+     evidence: HR diversity report 2025
+   Art. 94(c) [PARTIAL       ] Health, safety + LTIFR / الصحة والسلامة وLTIFR
+     evidence: HSSE report 2025
+
+4. TCFD ALIGNMENT · المحاذاة مع TCFD
+   [GOVERNANCE     ] (a) [DISCLOSED     ] Board oversight of climate risks
+   [GOVERNANCE     ] (b) [DISCLOSED     ] Management role in assessing climate risks
+   [STRATEGY       ] (a) [DISCLOSED     ] Climate-related risks + opportunities (short / medium / long term)
+   [STRATEGY       ] (b) [PARTIAL       ] Impact on business, strategy, financial planning
+   [STRATEGY       ] (c) [PARTIAL       ] Resilience under different climate scenarios (incl. 2°C)
+   [RISK_MGMT      ] (a) [DISCLOSED     ] Process for identifying climate risks
+   [RISK_MGMT      ] (b) [DISCLOSED     ] Process for managing climate risks
+   [RISK_MGMT      ] (c) [DISCLOSED     ] Integration into overall risk management
+   [METRICS_TARGETS] (a) [DISCLOSED     ] Metrics for climate risks + opportunities
+   [METRICS_TARGETS] (b) [PARTIAL       ] Scope 1, 2, 3 emissions disclosure
+   [METRICS_TARGETS] (c) [DISCLOSED     ] Targets to manage climate risks + performance
+
+5. CLIMATE RISKS &amp; OPPORTUNITIES · المخاطر والفرص المناخية
+   [ENERGY_SOURCE] OPPORTUNITY score=16  Riyadh-2 facility — 8MW on-site solar + Sudair PPA
+                                    مرفق الرياض-2 — طاقة شمسية في الموقع 8 ميجاواط + اتفاقية شراء طاقة من سدير
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Khalid Al-Otaibi
+   [TRANSITION  ] RISK   score=16  Saudi carbon pricing scheme — financial exposure on Scope 1+2
+                                    تسعير الكربون السعودي — التعرّض المالي للنطاق 1 + 2
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Lina Al-Harbi
+   [PHYSICAL    ] RISK   score=15  Jeddah DC flood exposure under Red Sea storm intensification
+                                    تعرّض مركز بيانات جدة لفيضانات الساحل الغربي
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Khalid Al-Otaibi
+   [SUPPLY_CHAIN] RISK   score=12  High-emissions supplier consolidation risk on net-zero pathway
+                                    مخاطر تركّز موردين ذوي انبعاثات عالية على مسار الحياد الكربوني
+                                    Status: ASSESSED · Horizon: MEDIUM · Owner: Mohammed Al-Sulaiman
+   [REGULATORY  ] RISK   score=12  SDAIA + CMA climate-disclosure tightening — gap on Scope 3 + scenario analysis
+                                    تشديد إفصاحات المناخ من سدايا وهيئة السوق المالية — فجوة في النطاق 3 وتحليل السيناريوهات
+                                    Status: IDENTIFIED · Horizon: SHORT · Owner: Sara Al-Zahrani
+
+Methodology: GHG Protocol Corporate Standard (Scope 1/2) + Scope 3 Standard.
+CMA Article references: Corporate Governance Regulations issued by Capital Market Authority.
+TCFD recommendations: Final Report — Recommendations of the TCFD (June 2017).
+</pre></body></html>
+"
+tprm,outsourcing_exit_plan,exit_steps_json,2,exact,count==live,True,"[{""step"":""Cut mobile-app traffic to Azure region failover"",""owner"":""CIO"",""target_date_relative_days"":0},{""step"":""Snapshot Aurora cluster to S3 then cross-cloud copy"",""owner"":""DBA Lead"",""target_date_relative_days"":3},{""step"":""Restore on Azure Postgres Flexible Server"",""owner"":""DBA Lead"",""target_date_relative_days"":10},{""step"":""Cutover CloudFront → Azure Front Door"",""owner"":""Network Lead"",""target_date_relative_days"":21},{""step"":""Repatriate S3 objects (encrypted) to Azure Blob"",""owner"":""Storage Lead"",""target_date_relative_days"":30},{""step"":""Confirm AWS data deletion + receive signed attestation"",""owner"":""CISO"",""target_date_relative_days"":60}]"
+admin,committee_form_templates,content_md_en,1,ground_truth,pre-repair diagnostic output,True,"# Committee Charter — [Committee Name]
+
+**Charter version:** [1.0]   **Approved on:** [YYYY-MM-DD]   **Approving body:** [Board Resolution #]
+**Next review due:** [YYYY-MM-DD]   **Custodian:** [Company Secretary]
+
+## 1. Establishment & Authority
+This Committee is established by resolution of [the Board of Directors / Executive Committee] on [date]. Its authority derives from [Article X of CMA Corporate Governance Regulations / SAMA RGov 2017 / NCA ECC-2 control 1-2-1 / specific Board resolution]. The Committee operates under delegated authority from [parent body] and reports to [reporting body].
+
+## 2. Mandate
+The Committee is responsible for:
+- [Primary mandate item 1]
+- [Primary mandate item 2]
+- [Primary mandate item 3]
+
+## 3. Authority & Decision Rights
+The Committee is authorised to:
+- Approve [decision type] up to [threshold].
+- Recommend to [parent body] all matters above the above threshold.
+- Engage external advisors (legal, technical, financial) as needed, with budget ceiling SAR [amount] per engagement.
+- Request information, documents, and personnel time from any function in the company.
+- Convene executive (in-camera) sessions without management present.
+
+## 4. Composition
+- **Chair:** [Title / role expectation — independence / financial-expert / sector qualification].
+- **Members:** [N] members in total. [Description of expected mix: independent non-executives, executives, standing invitees].
+- **Secretary:** [Role — typically Company Secretary, Head of Risk, or function-aligned officer].
+- **Term of office:** [3 years for governance committees / aligned with directorship term / indefinite for management committees].
+- **Independence:** [Specify which seats must be held by independent directors per regulator requirements].
+- **Standing invitees:** [Roles invited to all meetings without voting rights].
+
+## 5. Quorum & Voting
+- **Quorum:** [X]% of voting members present (minimum [N] members).
+- **Voting:** One vote per voting member. Chair has a casting vote in the event of a tie.
+- **Conflicts of interest:** Members must declare any conflict at the start of each meeting and recuse themselves from the relevant item; the recusal is recorded in the minutes.
+- **Confidentiality:** All Committee deliberations are confidential. Members are bound by the company's confidentiality undertakings.
+
+## 6. Meetings
+- **Cadence:** [Frequency, e.g. Monthly / Quarterly / Semi-annual / Annual].
+- **Annual calendar:** Published by the Secretary by [date] each year, reviewed by the Chair, and approved by the parent body.
+- **Notice:** [10] business days advance notice for regular meetings; [24] hours for emergency meetings.
+- **Pre-read papers:** Circulated at least [7] business days before the meeting. Late papers require Chair approval.
+- **Minutes:** Drafted by the Secretary within [3] business days, circulated for member comments within [7] business days, finalised and approved at the next meeting (or by electronic vote for time-sensitive items).
+
+## 7. Reporting & Escalation
+- The Committee reports to [parent body] [quarterly / per material event].
+- Material matters escalated upwards include: [list per committee type].
+- Annual report on the Committee's work is included in the [Corporate Governance Report / Annual Report].
+
+## 8. Regulator Anchor
+This Committee's mandate aligns with the following regulator requirements:
+- [Regulator name + specific article / control reference]
+- [Regulator name + specific article / control reference]
+
+## 9. Annual Review
+- The Committee shall review this Charter annually.
+- Material changes require approval by [parent body].
+- Performance of the Committee against this Charter shall be assessed annually as part of the [Board / Committee] evaluation process.
+
+---
+
+**Approved:**
+[Chair Name]   [Date]
+[Parent Body Chair Name]   [Date]
+"
+admin,committee_form_templates,content_md_en,4,ground_truth,pre-repair diagnostic output,True,"# Attendance & Quorum Register
+
+**Committee:** [Name]   **Meeting:** [Code]   **Date:** [YYYY-MM-DD]
+**Scheduled start:** [HH:mm]   **Actual start:** [HH:mm]   **End:** [HH:mm]
+**Quorum required:** [X]% of voting members ([N] of [M])
+
+## Attendance
+
+| # | Member | Role | Voting? | Present? | Joined | Left | Mode | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 1 | [Name] | Chair | Yes | ☐ | [HH:mm] | [HH:mm] | In-person / Teams | |
+| 2 | [Name] | Vice-Chair | Yes | ☐ | | | | |
+| 3 | [Name] | Member | Yes | ☐ | | | | |
+| 4 | [Name] | Member | Yes | ☐ | | | | Apologies received [date] |
+| 5 | [Name] | Secretary | No | ☐ | | | | |
+| 6 | [Name] | Standing invitee | No | ☐ | | | | |
+
+**Total voting members present:** [N]   **Quorum met:** [Yes / No]
+
+## Quorum at each agenda item
+For items where a member recuses themselves on COI grounds:
+
+| Item # | Recused member | Reason (COI) | Quorum after recusal | Quorum still met? |
+|---|---|---|---|---|
+| | | | | |
+
+## Late arrivals / early departures
+| Member | Joined at | Items missed | Left at | Items missed |
+|---|---|---|---|---|
+| | | | | |
+
+## Apologies received
+| Member | Reason | Received on | Acknowledged by |
+|---|---|---|---|
+| | | | |
+
+---
+
+**Confirmed by Secretary:** [Name]   **Signature:** ___   **Date:** [YYYY-MM-DD]
+**Confirmed by Chair:** [Name]   **Signature:** ___   **Date:** [YYYY-MM-DD]
+"
+admin,committee_form_templates,content_md_en,6,ground_truth,pre-repair diagnostic output,True,"# Minutes — [Committee Name]
+
+**Meeting code:** [MTG-YYYY-Qx-CMTE-NNN]   **Type:** [Regular / Special]
+**Date:** [YYYY-MM-DD]   **Time:** [HH:mm — HH:mm]
+**Location:** [Boardroom + Teams hybrid / Microsoft Teams / Specific venue]
+**Chair:** [Name]   **Secretary:** [Name]
+**Quorum met:** [Yes — N of M voting members present]
+
+## 1. Welcome, apologies, quorum check
+The Chair opened the meeting at [HH:mm]. Apologies were received from [members]. Quorum was confirmed by the Secretary ([N] of [M] voting members present, [X]%).
+
+## 2. Approval of previous minutes
+The minutes of the previous meeting on [date] were [approved as circulated / approved subject to the following amendments: ___].
+
+## 3. Matters arising / open actions
+The Secretary tabled the open-actions register. [N] actions were reported complete, [N] in progress, [N] overdue. The Chair noted [specific action] for follow-up.
+
+## 4. [Standing item — e.g. CEO report]
+The [presenter] tabled [paper code]. Key points discussed:
+- [Discussion point 1]
+- [Discussion point 2]
+- [Discussion point 3]
+
+**Resolution [RES-YYYY-Qx-CMTE-NNN]:** ""[Full text of resolution]""
+**Vote:** [For] / [Against] / [Abstain] — **Outcome:** [APPROVED]
+
+## 5. [Standing item — repeat structure for each agenda item]
+
+## 6. AOB (Any Other Business)
+[Members raised the following items: ___ / No items raised.]
+
+## 7. Executive session (in-camera) — if held
+The meeting moved into executive session at [HH:mm] for [N min]. [Confidential — content summarised separately in the executive-session minutes filed with the Chair only.]
+
+## 8. Date of next meeting
+The next [regular / special] meeting is scheduled for [YYYY-MM-DD] at [HH:mm].
+
+## 9. Closure
+The Chair closed the meeting at [HH:mm].
+
+---
+
+## Resolutions adopted at this meeting
+| Resolution code | Title | Outcome |
+|---|---|---|
+| RES-YYYY-Qx-CMTE-NNN | [Title] | APPROVED |
+
+## Action items arising
+| Action code | Action | Owner | Due | Priority |
+|---|---|---|---|---|
+| ACT-YYYY-Qx-CMTE-NNN | [Action] | [Owner] | [YYYY-MM-DD] | [Priority] |
+
+## Attendance
+[Reference to the attendance-register form, attached as Appendix A]
+
+## Conflicts of interest declared
+[List of COI declarations made at the start of the meeting and any recusals during specific items.]
+
+---
+
+**Drafted by Secretary:** [Name]   **Date:** [YYYY-MM-DD]
+**Circulated to members:** [Date]
+**Approved at meeting on:** [Date]
+**Signed by Chair:** [Name + signature]
+"
+admin,committee_form_templates,content_md_en,8,ground_truth,pre-repair diagnostic output,True,"# Conflict-of-Interest Declaration
+
+**Member:** [Name + role]   **Committee:** [Name]
+**Type:** [On joining / Annual / Specific meeting / Specific item]
+**Date:** [YYYY-MM-DD]   **Period covered:** [if Annual: YYYY]
+
+## Section A — Material relationships
+Have you, or any related party (spouse, child, parent, sibling, business partner, or controlled entity), held any of the following in the past 12 months? Tick ✔ Yes / ✘ No for each.
+
+| # | Relationship type | Yes / No | If Yes: details |
+|---|---|---|---|
+| 1 | Directorship / executive role in another company in the same sector | ☐ | |
+| 2 | Material shareholding (>5%) in a company that contracts with the organisation | ☐ | |
+| 3 | Consultancy / advisory engagement with the organisation or a competitor | ☐ | |
+| 4 | Family member employed by the organisation in a senior position | ☐ | |
+| 5 | Personal financial transaction with the organisation above SAR [threshold] | ☐ | |
+| 6 | Gift / hospitality received from a counterparty above SAR [threshold] | ☐ | |
+| 7 | Political-office or government-board appointment | ☐ | |
+| 8 | Any other relationship that could be perceived as a conflict | ☐ | |
+
+## Section B — Specific-meeting declaration
+**This declaration applies to agenda item(s):** [#N — Item title]
+
+I declare that I have a [direct / indirect] interest in the matter under consideration arising from [describe]. I [will / will not] participate in the discussion and [will / will not] vote on this item.
+
+If recusing: I will leave the meeting room (or the Teams call) at the start of the item and rejoin only after the Chair confirms the matter has been concluded.
+
+## Section C — Mitigation / management
+| Mitigation | Applied? |
+|---|---|
+| Recusal from the specific agenda item | ☐ |
+| Recusal from the entire meeting | ☐ |
+| Resignation from the committee | ☐ |
+| Acceptance with disclosure (low materiality) | ☐ |
+
+## Section D — Acknowledgements
+- I acknowledge that I have read and understood the company's Code of Conduct + Conflict-of-Interest Policy.
+- I acknowledge that failure to declare a material conflict may be a breach of CMA Corporate Governance regulations and may result in [sanctions per company policy].
+- I undertake to update this declaration immediately upon any material change in my circumstances.
+
+---
+
+**Member signature:** ___   **Date:** [YYYY-MM-DD]
+**Acknowledged by Secretary:** ___   **Date:** [YYYY-MM-DD]
+**Reviewed by Chair (if needed):** ___   **Date:** [YYYY-MM-DD]
+"
+admin,committee_form_templates,content_md_en,9,ground_truth,pre-repair diagnostic output,True,"# Skills Matrix — [Committee Name]
+
+**Period:** [YYYY]   **Last reviewed:** [YYYY-MM-DD]   **By:** Nomination & Remuneration Committee
+
+## Skill dimensions
+
+Level: **0** = none, **1** = basic, **2** = intermediate, **3** = expert.
+
+| Skill | Required min total | [Member 1] | [Member 2] | [Member 3] | [Member 4] | Total | Gap |
+|---|---|---|---|---|---|---|---|
+| Financial / accounting expertise (CMA ""financial expert"" criterion) | 3+ | 3 | 2 | 1 | 0 | 6 | ✓ |
+| Sector / industry expertise (banking, insurance, healthcare, etc.) | 6+ | 3 | 3 | 2 | 1 | 9 | ✓ |
+| Risk management | 4+ | 1 | 3 | 2 | 1 | 7 | ✓ |
+| Cyber-security / IT governance | 3+ | 0 | 1 | 3 | 1 | 5 | ✓ |
+| Legal / regulatory | 3+ | 1 | 2 | 1 | 3 | 7 | ✓ |
+| ESG / sustainability | 2+ | 0 | 1 | 2 | 1 | 4 | ✓ |
+| Strategy / M&A | 3+ | 3 | 1 | 1 | 2 | 7 | ✓ |
+| Digital transformation | 3+ | 1 | 0 | 3 | 2 | 6 | ✓ |
+| Saudi market / Vision 2030 | 5+ | 3 | 3 | 2 | 3 | 11 | ✓ |
+| HR / leadership development | 2+ | 1 | 2 | 1 | 1 | 5 | ✓ |
+| Diversity (gender, age, nationality) | varied | F/45/SA | M/58/SA | M/61/EG | M/52/SA | | review |
+
+## Member detail (basis for self-attestation)
+
+### [Member 1 name]
+- **Independent:** Yes
+- **Term:** 1 of 3 (appointed [date])
+- **Financial expert:** Yes — [credential: e.g. CPA, 20 years audit at Big 4]
+- **Other roles:** [list any concurrent directorships]
+- **Conflicts:** None declared / [list]
+
+### [Member 2 name]
+- [Repeat structure]
+
+## Gap analysis
+Based on the matrix:
+- **Strong areas:** [list]
+- **Weak areas:** [list] — addressed via training / external advisor / next nomination
+- **Independence:** [N] of [M] members are independent ([%]) — meets / exceeds / falls short of CMA one-third minimum
+
+## Recommendations to next nomination cycle
+1. [Add a director with strong [skill area]]
+2. [Renew term of [member] subject to independence reassessment]
+3. [Decline renewal of [member] — gap addressed elsewhere]
+
+---
+
+**Reviewed by NomCom Chair:** ___   **Date:** [YYYY-MM-DD]
+**Endorsed by Board:** ___   **Date:** [YYYY-MM-DD]
+"
+admin,committee_form_templates,content_md_en,10,ground_truth,pre-repair diagnostic output,True,"# Annual Self-Evaluation — [Committee Name]
+
+**Period under evaluation:** [YYYY]   **Submitting member:** [Name]
+**Submission date:** [YYYY-MM-DD]
+**Anonymity:** [Anonymous to other members / Identified — Secretary aggregates]
+
+For each statement, rate **1 = strongly disagree** to **5 = strongly agree**.
+
+## A. Composition & independence
+| # | Statement | Rating | Comment |
+|---|---|---|---|
+| A1 | The committee has the right mix of skills and experience to discharge its mandate. | _ | |
+| A2 | The independence of independent members is genuine — they question management robustly. | _ | |
+| A3 | The diversity (gender, nationality, age, professional background) of the committee is adequate. | _ | |
+| A4 | The committee meets the regulator-mandated minimum independence threshold. | _ | |
+
+## B. Mandate, agenda & meetings
+| # | Statement | Rating | Comment |
+|---|---|---|---|
+| B1 | The committee charter clearly defines the mandate and authority. | _ | |
+| B2 | The annual agenda covers all charter responsibilities (no gaps). | _ | |
+| B3 | Pre-read papers are received on time, are of high quality, and are appropriately concise. | _ | |
+| B4 | Meeting time is well allocated — important items get sufficient discussion. | _ | |
+| B5 | Decisions are explicit, recorded clearly, with clear ownership for follow-up. | _ | |
+
+## C. Information & decision-making
+| # | Statement | Rating | Comment |
+|---|---|---|---|
+| C1 | The committee receives the information it needs from management in a timely way. | _ | |
+| C2 | Risks are properly identified, debated, and acted upon. | _ | |
+| C3 | Dissenting opinions are heard and recorded where members request it. | _ | |
+| C4 | The committee challenges management constructively rather than rubber-stamping. | _ | |
+
+## D. Effectiveness of chair & secretary
+| # | Statement | Rating | Comment |
+|---|---|---|---|
+| D1 | The chair runs effective meetings — agenda is followed, all members contribute. | _ | |
+| D2 | The chair ensures executive sessions are held without management when appropriate. | _ | |
+| D3 | The secretary produces accurate minutes promptly; the action register is well-maintained. | _ | |
+
+## E. Performance against responsibilities
+For each major responsibility in the charter, rate effectiveness:
+
+| # | Responsibility | Rating | Comment |
+|---|---|---|---|
+| E1 | [Mandate item 1] | _ | |
+| E2 | [Mandate item 2] | _ | |
+| E3 | [Mandate item 3] | _ | |
+
+## F. Open questions
+1. What is the **one** thing this committee does best?
+2. What is the **one** thing it should change in the year ahead?
+3. Are there any topics the committee should be discussing but is not?
+4. Any other comments?
+
+---
+
+**Submitting member signature:** ___   **Date:** [YYYY-MM-DD]
+**(For Secretary use)** Aggregation completed on: [Date]   By: [Name]
+"
+admin,committee_form_templates,content_md_ar,1,ground_truth,pre-repair diagnostic output,True,"# ميثاق اللجنة — [اسم اللجنة]
+
+**نسخة الميثاق:** [1.0]   **اعتُمد في:** [YYYY-MM-DD]   **الجهة المعتمدة:** [قرار المجلس رقم]
+**المراجعة القادمة:** [YYYY-MM-DD]   **الحارس:** [أمين سر الشركة]
+
+## 1. التأسيس والصلاحية
+أُنشئت هذه اللجنة بقرار من [مجلس الإدارة / اللجنة التنفيذية] بتاريخ [التاريخ]. تستمد صلاحيتها من [المادة X من لائحة حوكمة الشركات الصادرة عن هيئة السوق المالية / إطار حوكمة ساما 2017 / الضابط 1-2-1 من ECC-2 الصادر عن الهيئة الوطنية للأمن السيبراني / قرار محدد من المجلس]. تعمل اللجنة بصلاحية مفوّضة من [الجهة الأم] وترفع تقاريرها إلى [جهة الرفع].
+
+## 2. الولاية
+اللجنة مسؤولة عن:
+- [بند الولاية الأول]
+- [بند الولاية الثاني]
+- [بند الولاية الثالث]
+
+## 3. الصلاحيات وحقوق اتخاذ القرار
+اللجنة مخوّلة بـ:
+- اعتماد [نوع القرار] حتى [الحد].
+- التوصية إلى [الجهة الأم] في جميع الأمور التي تتجاوز الحد المذكور.
+- الاستعانة بمستشارين خارجيين (قانونيين، فنيين، ماليين) عند الحاجة، بسقف ميزانية [مبلغ] ريال لكل تكليف.
+- طلب المعلومات والمستندات ووقت الموظفين من أي وظيفة في الشركة.
+- عقد جلسات تنفيذية (مغلقة) دون حضور الإدارة.
+
+## 4. التشكيل
+- **الرئيس:** [اللقب / متطلبات الدور — الاستقلالية / الخبير المالي / المؤهل القطاعي].
+- **الأعضاء:** [العدد] أعضاء إجمالاً. [وصف المزيج المتوقع: غير تنفيذيين مستقلون، تنفيذيون، مدعوون دائمون].
+- **الأمين:** [الدور — عادة أمين سر الشركة أو رئيس المخاطر أو مسؤول وظيفي].
+- **مدة العضوية:** [3 سنوات للجان الحوكمة / متوافقة مع مدة العضوية / غير محددة للجان الإدارية].
+- **الاستقلالية:** [حدد المقاعد التي يجب أن يشغلها أعضاء مستقلون وفق متطلبات الجهة التنظيمية].
+- **مدعوون دائمون:** [الأدوار المدعوة لجميع الاجتماعات دون حق التصويت].
+
+## 5. النصاب والتصويت
+- **النصاب:** [X]% من الأعضاء المصوّتين حاضرون (الحد الأدنى [N] أعضاء).
+- **التصويت:** صوت واحد لكل عضو مصوّت. للرئيس صوت مرجح في حال التعادل.
+- **تعارض المصالح:** يجب على الأعضاء الإفصاح عن أي تعارض في بداية كل اجتماع والانسحاب من البند ذي الصلة؛ يُسجل الانسحاب في المحضر.
+- **السرية:** جميع مداولات اللجنة سرية. يلتزم الأعضاء بتعهدات السرية الخاصة بالشركة.
+
+## 6. الاجتماعات
+- **التواتر:** [التكرار، مثل شهري / ربع سنوي / نصف سنوي / سنوي].
+- **التقويم السنوي:** يصدره الأمين بحلول [التاريخ] من كل عام، يراجعه الرئيس، وتعتمده الجهة الأم.
+- **الإشعار:** إشعار مسبق بـ [10] أيام عمل للاجتماعات العادية؛ [24] ساعة للاجتماعات الطارئة.
+- **أوراق ما قبل القراءة:** تُعمَّم قبل الاجتماع بـ [7] أيام عمل على الأقل. الأوراق المتأخرة تتطلب موافقة الرئيس.
+- **المحضر:** يُحرره الأمين خلال [3] أيام عمل، يُعمَّم لتعليقات الأعضاء خلال [7] أيام عمل، يُنهى ويُعتمد في الاجتماع التالي (أو بالتصويت الإلكتروني للبنود الحساسة زمنياً).
+
+## 7. الرفع والتصعيد
+- ترفع اللجنة تقاريرها إلى [الجهة الأم] [ربع سنوياً / لكل حدث جوهري].
+- الأمور الجوهرية المصعَّدة إلى الأعلى تشمل: [قائمة حسب نوع اللجنة].
+- يُدرج التقرير السنوي عن عمل اللجنة في [تقرير حوكمة الشركات / التقرير السنوي].
+
+## 8. المرجع التنظيمي
+تتوافق ولاية هذه اللجنة مع متطلبات الجهات التنظيمية التالية:
+- [اسم الجهة التنظيمية + مرجع المادة / الضابط]
+- [اسم الجهة التنظيمية + مرجع المادة / الضابط]
+
+## 9. المراجعة السنوية
+- تراجع اللجنة هذا الميثاق سنوياً.
+- التعديلات الجوهرية تتطلب موافقة [الجهة الأم].
+- يُقيَّم أداء اللجنة مقابل هذا الميثاق سنوياً كجزء من عملية تقييم [المجلس / اللجنة].
+
+---
+
+**معتمد:**
+[اسم الرئيس]   [التاريخ]
+[اسم رئيس الجهة الأم]   [التاريخ]
+"
+admin,committee_form_templates,content_md_ar,6,ground_truth,pre-repair diagnostic output,True,"# محضر — [اسم اللجنة]
+
+**رمز الاجتماع:** [MTG-YYYY-Qx-CMTE-NNN]   **النوع:** [عادي / استثنائي]
+**التاريخ:** [YYYY-MM-DD]   **الوقت:** [HH:mm — HH:mm]
+**المكان:** [قاعة المجلس + Teams مختلط / Microsoft Teams / مكان محدد]
+**الرئيس:** [الاسم]   **الأمين:** [الاسم]
+**النصاب متوافر:** [نعم — N من M أعضاء مصوّتين حاضرين]
+
+## 1. الترحيب، الاعتذارات، فحص النصاب
+افتتح الرئيس الاجتماع في [HH:mm]. وردت اعتذارات من [الأعضاء]. أكد الأمين توافر النصاب ([N] من [M] أعضاء مصوّتين حاضرين، [X]%).
+
+## 2. اعتماد المحضر السابق
+[اعتُمد محضر الاجتماع السابق بتاريخ [التاريخ] كما تم تعميمه / اعتُمد رهناً بالتعديلات التالية: ___].
+
+## 3. الأمور المنبثقة / الإجراءات المفتوحة
+عرض الأمين سجل الإجراءات المفتوحة. أُبلغ عن اكتمال [N] إجراءات، [N] قيد التنفيذ، [N] متأخرة. أشار الرئيس إلى [إجراء محدد] للمتابعة.
+
+## 4. [البند الدائم — مثل تقرير الرئيس التنفيذي]
+عرض [المقدّم] [رمز الورقة]. النقاط الرئيسية التي نوقشت:
+- [نقطة المناقشة 1]
+- [نقطة المناقشة 2]
+- [نقطة المناقشة 3]
+
+**قرار [RES-YYYY-Qx-CMTE-NNN]:** ""[النص الكامل للقرار]""
+**التصويت:** [مع] / [ضد] / [امتناع] — **النتيجة:** [اعتُمد]
+
+## 5. [البند الدائم — كرر الهيكل لكل بند من جدول الأعمال]
+
+## 6. أمور أخرى
+[طرح الأعضاء البنود التالية: ___ / لم تُطرح أي بنود.]
+
+## 7. الجلسة التنفيذية (المغلقة) — إن عُقدت
+انتقل الاجتماع إلى جلسة تنفيذية في [HH:mm] لمدة [N دقيقة]. [سري — يُلخّص المحتوى منفصلاً في محضر الجلسة التنفيذية المحفوظ مع الرئيس فقط.]
+
+## 8. تاريخ الاجتماع القادم
+الاجتماع [العادي / الاستثنائي] القادم مجدول في [YYYY-MM-DD] في [HH:mm].
+
+## 9. الاختتام
+أغلق الرئيس الاجتماع في [HH:mm].
+
+---
+
+## القرارات المعتمدة في هذا الاجتماع
+| رمز القرار | العنوان | النتيجة |
+|---|---|---|
+| RES-YYYY-Qx-CMTE-NNN | [العنوان] | اعتُمد |
+
+## الإجراءات المنبثقة
+| رمز الإجراء | الإجراء | المالك | الاستحقاق | الأولوية |
+|---|---|---|---|---|
+| ACT-YYYY-Qx-CMTE-NNN | [الإجراء] | [المالك] | [YYYY-MM-DD] | [الأولوية] |
+
+## الحضور
+[الإشارة إلى نموذج سجل الحضور، مرفق كملحق أ]
+
+## تعارضات المصالح المُعلَنة
+[قائمة بإعلانات تعارض المصالح في بداية الاجتماع وأي انسحابات خلال بنود معينة.]
+
+---
+
+**حرره الأمين:** [الاسم]   **التاريخ:** [YYYY-MM-DD]
+**عُمم للأعضاء:** [التاريخ]
+**اعتُمد في اجتماع:** [التاريخ]
+**وقّع الرئيس:** [الاسم + التوقيع]
+"
+admin,committee_form_templates,content_md_ar,8,ground_truth,pre-repair diagnostic output,True,"# إعلان تعارض المصالح
+
+**العضو:** [الاسم + الدور]   **اللجنة:** [الاسم]
+**النوع:** [عند الانضمام / سنوي / اجتماع محدد / بند محدد]
+**التاريخ:** [YYYY-MM-DD]   **الفترة المغطاة:** [إذا كان سنوياً: YYYY]
+
+## القسم أ — العلاقات الجوهرية
+هل كنت أنت، أو أي طرف ذي علاقة (الزوج/الزوجة، الأبناء، الوالدان، الأشقاء، الشركاء التجاريون، أو الكيانات المسيطر عليها)، تشغل أياً مما يلي خلال الـ 12 شهراً الماضية؟ ضع ✔ نعم / ✘ لا لكل بند.
+
+| # | نوع العلاقة | نعم / لا | إذا نعم: التفاصيل |
+|---|---|---|---|
+| 1 | عضوية مجلس إدارة / دور تنفيذي في شركة أخرى في القطاع نفسه | ☐ | |
+| 2 | حصة جوهرية (>5%) في شركة تتعاقد مع المنظمة | ☐ | |
+| 3 | تكليف استشاري مع المنظمة أو منافس | ☐ | |
+| 4 | فرد من العائلة يعمل في المنظمة في منصب رفيع | ☐ | |
+| 5 | معاملة مالية شخصية مع المنظمة فوق [الحد] ريال | ☐ | |
+| 6 | هدية / ضيافة مستلمة من نظير فوق [الحد] ريال | ☐ | |
+| 7 | منصب سياسي أو تعيين في مجلس حكومي | ☐ | |
+| 8 | أي علاقة أخرى يمكن أن يُنظر إليها كتعارض | ☐ | |
+
+## القسم ب — إعلان اجتماع محدد
+**ينطبق هذا الإعلان على بند(بنود) جدول الأعمال:** [#N — عنوان البند]
+
+أُقرّ بأن لدي مصلحة [مباشرة / غير مباشرة] في الموضوع قيد النظر ناشئة عن [الوصف]. [سأشارك / لن أشارك] في النقاش و[سأصوّت / لن أصوّت] على هذا البند.
+
+في حال الانسحاب: سأغادر قاعة الاجتماع (أو مكالمة Teams) في بداية البند وأعود فقط بعد تأكيد الرئيس انتهاء الموضوع.
+
+## القسم ج — التخفيف / الإدارة
+| التخفيف | تم تطبيقه؟ |
+|---|---|
+| الانسحاب من البند المحدد | ☐ |
+| الانسحاب من الاجتماع بأكمله | ☐ |
+| الاستقالة من اللجنة | ☐ |
+| القبول مع الإفصاح (جوهرية منخفضة) | ☐ |
+
+## القسم د — التأكيدات
+- أُقرّ بأنني قرأت وفهمت ميثاق سلوك الشركة + سياسة تعارض المصالح.
+- أُقرّ بأن عدم الإفصاح عن تعارض جوهري قد يكون مخالفة للائحة حوكمة الشركات الصادرة عن هيئة السوق المالية وقد يؤدي إلى [العقوبات وفق سياسة الشركة].
+- أتعهد بتحديث هذا الإعلان فور حدوث أي تغيير جوهري في ظروفي.
+
+---
+
+**توقيع العضو:** ___   **التاريخ:** [YYYY-MM-DD]
+**تأكيد الأمين:** ___   **التاريخ:** [YYYY-MM-DD]
+**مراجعة الرئيس (عند الحاجة):** ___   **التاريخ:** [YYYY-MM-DD]
+"
+admin,committee_form_templates,content_md_ar,9,ground_truth,pre-repair diagnostic output,True,"# مصفوفة المهارات — [اسم اللجنة]
+
+**الفترة:** [YYYY]   **آخر مراجعة:** [YYYY-MM-DD]   **بواسطة:** لجنة الترشيحات والمكافآت
+
+## أبعاد المهارات
+
+المستوى: **0** = لا يوجد، **1** = أساسي، **2** = متوسط، **3** = خبير.
+
+| المهارة | الحد الأدنى المطلوب من الإجمالي | [العضو 1] | [العضو 2] | [العضو 3] | [العضو 4] | الإجمالي | فجوة |
+|---|---|---|---|---|---|---|---|
+| الخبرة المالية / المحاسبية (معيار ""الخبير المالي"" لهيئة السوق المالية) | 3+ | 3 | 2 | 1 | 0 | 6 | ✓ |
+| الخبرة القطاعية / الصناعية (مصرفي، تأمين، رعاية صحية، إلخ) | 6+ | 3 | 3 | 2 | 1 | 9 | ✓ |
+| إدارة المخاطر | 4+ | 1 | 3 | 2 | 1 | 7 | ✓ |
+| الأمن السيبراني / حوكمة تقنية المعلومات | 3+ | 0 | 1 | 3 | 1 | 5 | ✓ |
+| القانوني / التنظيمي | 3+ | 1 | 2 | 1 | 3 | 7 | ✓ |
+| الاستدامة / ESG | 2+ | 0 | 1 | 2 | 1 | 4 | ✓ |
+| الاستراتيجية / الاندماج والاستحواذ | 3+ | 3 | 1 | 1 | 2 | 7 | ✓ |
+| التحول الرقمي | 3+ | 1 | 0 | 3 | 2 | 6 | ✓ |
+| السوق السعودي / رؤية 2030 | 5+ | 3 | 3 | 2 | 3 | 11 | ✓ |
+| الموارد البشرية / تطوير القيادات | 2+ | 1 | 2 | 1 | 1 | 5 | ✓ |
+| التنوع (الجنس، العمر، الجنسية) | متنوع | أ/45/سعودية | ذ/58/سعودي | ذ/61/مصري | ذ/52/سعودي | | مراجعة |
+
+## تفاصيل العضو (أساس الإقرار الذاتي)
+
+### [اسم العضو 1]
+- **مستقل:** نعم
+- **المدة:** 1 من 3 (عُيّن في [التاريخ])
+- **خبير مالي:** نعم — [الاعتماد: مثل CPA، 20 سنة مراجعة في Big 4]
+- **أدوار أخرى:** [قائمة أي عضوية مجلس متزامنة]
+- **التعارضات:** لا توجد / [قائمة]
+
+### [اسم العضو 2]
+- [كرر الهيكل]
+
+## تحليل الفجوة
+بناءً على المصفوفة:
+- **المجالات القوية:** [قائمة]
+- **المجالات الضعيفة:** [قائمة] — تعالج عبر التدريب / مستشار خارجي / الترشيح القادم
+- **الاستقلالية:** [N] من [M] أعضاء مستقلون ([%]) — يستوفي / يفوق / يقصر عن الحد الأدنى لهيئة السوق المالية (الثلث)
+
+## التوصيات لدورة الترشيح القادمة
+1. [إضافة عضو ذي مهارات قوية في [مجال المهارة]]
+2. [تجديد مدة [العضو] رهناً بإعادة تقييم الاستقلالية]
+3. [عدم تجديد [العضو] — الفجوة معالجة في موقع آخر]
+
+---
+
+**روجعت من رئيس لجنة الترشيحات:** ___   **التاريخ:** [YYYY-MM-DD]
+**اعتمدها المجلس:** ___   **التاريخ:** [YYYY-MM-DD]
+"
+admin,committee_form_templates,content_md_ar,10,ground_truth,pre-repair diagnostic output,True,"# التقييم الذاتي السنوي — [اسم اللجنة]
+
+**الفترة قيد التقييم:** [YYYY]   **العضو المقدّم:** [الاسم]
+**تاريخ التقديم:** [YYYY-MM-DD]
+**السرية:** [مجهول الهوية للأعضاء الآخرين / مُعرَّف — يجمّعه الأمين]
+
+لكل عبارة، صنّف **1 = لا أوافق بشدة** إلى **5 = أوافق بشدة**.
+
+## أ. التشكيل والاستقلالية
+| # | العبارة | التصنيف | التعليق |
+|---|---|---|---|
+| أ1 | لدى اللجنة المزيج الصحيح من المهارات والخبرة لأداء ولايتها. | _ | |
+| أ2 | استقلالية الأعضاء المستقلين حقيقية — يستجوبون الإدارة بقوة. | _ | |
+| أ3 | تنوع اللجنة (الجنس، الجنسية، العمر، الخلفية المهنية) كافٍ. | _ | |
+| أ4 | تستوفي اللجنة الحد الأدنى للاستقلالية المفروض من الجهات التنظيمية. | _ | |
+
+## ب. الولاية وجدول الأعمال والاجتماعات
+| # | العبارة | التصنيف | التعليق |
+|---|---|---|---|
+| ب1 | يحدد ميثاق اللجنة الولاية والصلاحيات بوضوح. | _ | |
+| ب2 | يغطي جدول الأعمال السنوي جميع مسؤوليات الميثاق (لا توجد فجوات). | _ | |
+| ب3 | تُستلم أوراق ما قبل القراءة في الوقت المحدد، وتكون عالية الجودة، وموجزة بشكل مناسب. | _ | |
+| ب4 | يُخصص وقت الاجتماع بشكل جيد — تحظى البنود المهمة بنقاش كافٍ. | _ | |
+| ب5 | القرارات صريحة، مسجلة بوضوح، مع ملكية واضحة للمتابعة. | _ | |
+
+## ج. المعلومات واتخاذ القرار
+| # | العبارة | التصنيف | التعليق |
+|---|---|---|---|
+| ج1 | تستلم اللجنة المعلومات التي تحتاجها من الإدارة في وقت مناسب. | _ | |
+| ج2 | تُحدد المخاطر بشكل صحيح، وتُناقش، وتُتخذ إجراءات بشأنها. | _ | |
+| ج3 | تُسمع الآراء المعترضة وتُسجل عندما يطلبها الأعضاء. | _ | |
+| ج4 | تتحدى اللجنة الإدارة بشكل بناء بدلاً من الموافقة الشكلية. | _ | |
+
+## د. فعالية الرئيس والأمين
+| # | العبارة | التصنيف | التعليق |
+|---|---|---|---|
+| د1 | يدير الرئيس اجتماعات فعالة — يُتَّبع جدول الأعمال، يساهم جميع الأعضاء. | _ | |
+| د2 | يضمن الرئيس عقد جلسات تنفيذية دون الإدارة عند الاقتضاء. | _ | |
+| د3 | ينتج الأمين محاضر دقيقة على الفور؛ سجل الإجراءات مُحافظ عليه جيداً. | _ | |
+
+## هـ. الأداء مقابل المسؤوليات
+لكل مسؤولية رئيسية في الميثاق، صنّف الفعالية:
+
+| # | المسؤولية | التصنيف | التعليق |
+|---|---|---|---|
+| هـ1 | [بند الولاية 1] | _ | |
+| هـ2 | [بند الولاية 2] | _ | |
+| هـ3 | [بند الولاية 3] | _ | |
+
+## و. أسئلة مفتوحة
+1. ما **الشيء الوحيد** الذي تتقنه هذه اللجنة؟
+2. ما **الشيء الوحيد** الذي يجب أن تغيره في العام القادم؟
+3. هل توجد موضوعات يجب أن تناقشها اللجنة لكنها لا تفعل؟
+4. أي تعليقات أخرى؟
+
+---
+
+**توقيع العضو المقدّم:** ___   **التاريخ:** [YYYY-MM-DD]
+**(لاستخدام الأمين)** اكتمل التجميع في: [التاريخ]   بواسطة: [الاسم]
+"
+admin,committee_form_templates,completion_guide_ar,1,ground_truth,pre-repair diagnostic output,True,استبدل جميع العناصر النائبة [بين الأقواس] بقيم محددة للجنة. يجب أن يعكس النطاق والصلاحيات والتشكيل والنصاب المرجع التنظيمي (المادة X من هيئة السوق المالية، إطار ساما 2017، الضابط 1-2-1 من ECC-2). راجع المستشار العام قبل اعتماد المجلس. يُفعّل تاريخ المراجعة السنوية تذكيراً F8 قبل الانتهاء بـ 30 يوماً.
+admin,committee_form_templates,completion_guide_ar,6,ground_truth,pre-repair diagnostic output,True,المحضر ليس نسخة حرفية. لخّص النقاش، اذكر القرارات حرفياً، والتقط كل بند إجراء. يتوقع فاحصو ساما رؤية: تأكيد نصاب واضح، كل قرار مع تفاصيل تصويته، كل إجراء مع المالك والتاريخ، وأي انسحاب تعارض مصالح مسجل صراحة. يُستثنى محتوى الجلسة التنفيذية من المحضر الرئيسي ويُحفظ منفصلاً بوصول الرئيس فقط.
+admin,committee_form_templates,completion_guide_ar,8,ground_truth,pre-repair diagnostic output,True,يجب أن تكون إعلانات تعارض المصالح في الملف قبل الاجتماع الأول. التحديثات السنوية إلزامية — تصدر المنصة تذكيرات تلقائية قبل تاريخ الاستحقاق السنوي بـ 30 يوماً. تُعمل إعلانات البنود المحددة في بداية الاجتماع وتُسجل في الحضور / المحضر. يطلب فاحصو هيئة السوق المالية سجل تعارض المصالح في كل مراجعة لحوكمة الشركات.
+admin,committee_form_templates,completion_guide_ar,9,ground_truth,pre-repair diagnostic output,True,"يُقرّ الأعضاء ذاتياً بمستوياتهم مع الأدلة (الاعتمادات، سنوات الخبرة، التكليفات المسماة). يتحقق رئيس لجنة الترشيحات. عمود ""الحد الأدنى المطلوب من الإجمالي"" تحدده سياسة المجلس ويتفاوت حسب القطاع — تحتاج البنوك عادة 4+ خبراء ماليين؛ الشركات غير المالية 2-3."
+admin,committee_form_templates,completion_guide_ar,10,ground_truth,pre-repair diagnostic output,True,يكمل كل عضو بشكل مجهول؛ يجمّع الأمين ويعرض الخريطة الحرارية في الاجتماع التالي في جلسة مغلقة (دون حضور الإدارة). تُغذي الملاحظات الجوهرية خطة اللجنة للعام التالي + تحليل فجوة المهارات للجنة الترشيحات. يطلب فاحصو هيئة السوق المالية رؤية نتائج التقييم — ليس الردود الفردية، بل الموضوعات المجمّعة وخطة العمل الناتجة.
+admin,committee_form_templates,completion_guide_en,2,ground_truth,pre-repair diagnostic output,True,"The annual-calendar generator pre-fills items 4-5+ from committee_standing_items. The Chair reviews and adds ad-hoc items. The Secretary distributes the final agenda + paper pack ≥7 days before the meeting via the platform (with read-receipt tracking). For special-purpose or emergency meetings, the chair can compress the timeline but should document the deviation."
+admin,committee_form_templates,completion_guide_en,8,ground_truth,pre-repair diagnostic output,True,COI declarations must be on file before the first meeting. Annual refreshes are mandatory — the platform issues automatic reminders 30 days before the annual due date. Specific-item declarations are made at the start of the meeting and recorded in the attendance / minutes. CMA examiners ask for the COI register at every Corporate Governance audit.
+admin,committee_form_templates,completion_guide_en,9,ground_truth,pre-repair diagnostic output,True,"Members self-attest their levels with evidence (certifications, years of experience, named engagements). The Nomination Committee Chair validates. The ""required minimum total"" column is set by Board policy and varies by sector — banks typically need 4+ financial experts; non-financial firms 2-3."
+admin,committee_form_templates,completion_guide_en,10,ground_truth,pre-repair diagnostic output,True,"Each member completes anonymously; the Secretary aggregates and presents the heat-map at the next meeting in a closed session (no management present). Material findings feed into the next year's committee plan + into the Nomination Committee's skills-gap analysis. CMA examiners ask to see the evaluation outcome — not the individual responses, but the aggregated themes and the action plan that resulted."
+admin,committee_form_templates,purpose_en,10,ground_truth,pre-repair diagnostic output,True,"CMA Corporate Governance Article 26 requires the Board and its committees to conduct an annual evaluation of their effectiveness. This form is the standard self-evaluation questionnaire — completed individually, then aggregated and discussed in a closed session."
+ai_governance,ml_model_drift_observation,notes_ar,3,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,4,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,5,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,6,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,7,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,8,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,9,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,10,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,11,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+ai_governance,ml_model_drift_observation,notes_ar,12,batch_validated,"created_at batch (06-02); validated vs known {3,4,5,6}",True,مؤشّر استقرار التوزيع مقابل الأساس.
+bcm,exercises,exercise_name_ar,4,batch_validated,created_at batch (06-01 = 10 rows),True,تمرين نظري لاستمرارية الأعمال خلال جائحة
+bcm,exercises,exercise_name_ar,5,batch_validated,created_at batch (06-01 = 10 rows),True,تجربة التحول إلى موقع التعافي للنظام المصرفي الأساسي
+bcm,exercises,exercise_name_ar,6,batch_validated,created_at batch (06-01 = 10 rows),True,اختبار شجرة الاتصال وإشعار الموظفين في الأزمات
+bcm,exercises,exercise_name_ar,7,batch_validated,created_at batch (06-01 = 10 rows),True,تمرين نظري للاستجابة لبرامج الفدية وفق إطار ساما
+bcm,exercises,exercise_name_ar,8,batch_validated,created_at batch (06-01 = 10 rows),True,تجربة تحويل مفتاح مدفوعات سداد
+bcm,exercises,exercise_name_ar,9,batch_validated,created_at batch (06-01 = 10 rows),True,فقدان التغذية الكهربائية وتشغيل المولدات في مركز البيانات
+bcm,exercises,exercise_name_ar,10,batch_validated,created_at batch (06-01 = 10 rows),True,تمرين نظري لانقطاع مزود الحوسبة السحابية
+bcm,exercises,exercise_name_ar,11,batch_validated,created_at batch (06-01 = 10 rows),True,اختبار عزل واستعادة شبكة الصرافات ونقاط البيع
+bcm,exercises,exercise_name_ar,12,batch_validated,created_at batch (06-01 = 10 rows),True,تمرين تفعيل فريق إدارة الأزمات التنفيذي
+bcm,exercises,exercise_name_ar,13,batch_validated,created_at batch (06-01 = 10 rows),True,تمرين شامل للانتقال إلى الموقع البديل
+ccm,control_test_definition,description_en,5,inferred_symbol,unique ≥-coverage; row 5 also title-corrupted,True,AD default-domain-policy enforces password length ≥ 14 and complexity enabled. SAMA CSF section 3.3.4 (Password Management) is explicit on these floors for privileged systems.
+bcm,exercises,exercise_name_en,5,inferred_symbol,unique —-coverage; in corrupted 06-01 batch,True,Core banking DR failover — T24 to Riyadh DR site
+platform,automation_rules,description_en,22,inferred_symbol,unique ≥-coverage; both in 1-52 prefix,True,"When a BCM risk moves into TREATMENT_PLANNED with residual score ≥ 12 (high/critical band), require an ERM risk linkage or formal acceptance."
+platform,automation_rules,description_en,30,inferred_symbol,unique ≥-coverage; both in 1-52 prefix,True,"When an approved BIA classifies as SOVEREIGN criticality (national_sovereign dimension ≥ 4), escalate to the board secretary so the next board pack carries the matter."
+risk,kri_definition,description_en,15,inferred_symbol,unique ≥-coverage,True,Stock of high-quality liquid assets divided by 30-day net cash outflows under stress. SAMA Basel III implementation requires LCR ≥100%; the bank's internal floor is 130% with a 110% screaming-red anchor.
+platform,automation_rules,name_en,1,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,New system with personal data → create PDPL ROPA + PIA
+platform,automation_rules,name_en,2,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Critical system → create BIA + DRP + NCA critical system assessment
+platform,automation_rules,name_en,3,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Vendor processes personal data → trigger processor due diligence
+platform,automation_rules,name_en,4,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Cyber incident affecting personal data → 72-hour PDPL breach timer
+platform,automation_rules,name_en,5,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Cloud service backs critical service → CCC + DRP + supplier resilience review
+platform,automation_rules,name_en,6,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Risk exceeds appetite → escalate to risk committee
+platform,automation_rules,name_en,7,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,BIA RTO < current recovery capability → gap + treatment plan
+platform,automation_rules,name_en,8,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Supplier missing valid BCP evidence → supplier CAPA
+platform,automation_rules,name_en,9,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,NCA evidence expired → notify evidence owner + control owner
+platform,automation_rules,name_en,10,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Data subject request SLA breach → escalate to privacy manager
+platform,automation_rules,name_en,11,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Risk acceptance expired → reopen risk review
+platform,automation_rules,name_en,12,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,CAPA overdue → escalate to owner + manager
+platform,automation_rules,name_en,13,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Vulnerability SLA breach → escalate to cybersecurity manager
+platform,automation_rules,name_en,14,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Repeated supplier SLA breaches → update supplier risk score
+platform,automation_rules,name_en,15,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Policy updated → trigger employee attestation campaign
+platform,automation_rules,name_en,16,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Board approval required → create digital signature transaction
+platform,automation_rules,name_en,17,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Evidence rejected → reopen the related control gap
+platform,automation_rules,name_en,18,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Critical incident → activate crisis workflow
+platform,automation_rules,name_en,19,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Cross-border transfer requested → trigger PDPL transfer assessment
+platform,automation_rules,name_en,20,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Cloud provider region change → data residency + privacy re-assessment
+platform,automation_rules,name_en,21,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Call-tree test failed → corrective action
+platform,automation_rules,name_en,22,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,BCM risk treatment planned → link to ERM if high/critical
+platform,automation_rules,name_en,23,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,BCM exercise failed → gap + corrective action
+platform,automation_rules,name_en,24,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,BCM corrective action overdue → escalate
+platform,automation_rules,name_en,25,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,DR test failed → corrective action
+platform,automation_rules,name_en,26,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Crisis severity ≥ 4 → escalate to executive sponsor
+platform,automation_rules,name_en,27,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Crisis with personal-data → PDPL breach placeholder
+platform,automation_rules,name_en,28,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Crisis cyber-linked → flag for cyber module
+platform,automation_rules,name_en,29,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Crisis supplier-involved → flag for SCM module
+platform,automation_rules,name_en,30,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,BIA SOVEREIGN criticality → require board sign-off
+platform,automation_rules,name_en,31,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,BIA approved → notify BCM manager
+platform,automation_rules,name_en,32,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,BCM plan review overdue → escalate to plan owner
+platform,automation_rules,name_en,33,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Audit-day reminder → notify audit team + auditee owner
+platform,automation_rules,name_en,34,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Report-deadline reminder → notify compliance officer + filer
+platform,automation_rules,name_en,35,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,CAPA-due reminder → escalate to action owner + program lead
+platform,automation_rules,name_en,36,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,DR-test reminder → notify BCM coordinator + tech lead
+platform,automation_rules,name_en,37,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Generic reminder → notify event owner
+platform,automation_rules,name_en,38,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,CRITICAL incident raised → escalate to CISO + crisis coord
+platform,automation_rules,name_en,39,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Phase advance to CONTAINMENT → notify incident commander
+platform,automation_rules,name_en,40,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,PDPL personal-data breach → notify DPO + start 72h clock
+platform,automation_rules,name_en,41,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Incident CLOSED → audit milestone + CAPA lookback
+platform,automation_rules,name_en,42,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Regulator notified → audit log + general counsel
+platform,automation_rules,name_en,43,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Resolution approved with regulator notify → alert Compliance + GC
+platform,automation_rules,name_en,44,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Board resolution APPROVED → board secretariat notification
+platform,automation_rules,name_en,45,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Committee action OVERDUE → escalate to owner + line manager
+platform,automation_rules,name_en,46,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,CRITICAL action created → owner SMS within 1 hour
+platform,automation_rules,name_en,47,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Risk-linked action COMPLETED → update risk register entry
+platform,automation_rules,name_en,48,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Audit-linked action COMPLETED → advance CAPA stage
+platform,automation_rules,name_en,49,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Resolution DEFERRED → re-table at next meeting
+platform,automation_rules,name_en,50,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Action CANCELLED → notify Chair for review
+platform,automation_rules,name_en,51,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Resolution review due in 30 days → reminder to Chair
+platform,automation_rules,name_en,52,inferred_batch,"created_at prefix <=2026-05-23 13:04:30 == 52; rows 22,30 (desc) inside; 53+ clean",True,Committee charter review due in 30 days → reminder
+scm,exit_plans,data_migration_plan_en,2,best_guess,→(id2) vs —(id4); math symbol favoured,True,Terraform-managed; daily S3 → GCS sync established 2025-Q4. Tier-1 RPO 1h; Tier-2/3 RPO 24h.
+signature,digital_signature_transactions,purpose,15,best_guess,→(id15) vs —(id17); math symbol favoured,True,"Cross-border transfer approval CBT-2026-001 (employee analytics → AWS us-east-1, SCC-based)"
+workflow,approval_chain_step,title_en,8,best_guess,≥(id8) vs —(id6); ≥ matches CCM-style corruption,True,"Board approval (≥10k records, adequacy basis)"
+privacy,data_breaches,description_en,7,best_guess,"→&—(id7) most symbol-rich of the → candidates {6,7}",True,Cyber → PDPL bridge rule v1 created this breach automatically when cyber incident INC-00004 was classified as affecting personal data. 380 data subjects estimated. Lower severity — no national-ID category affected.
