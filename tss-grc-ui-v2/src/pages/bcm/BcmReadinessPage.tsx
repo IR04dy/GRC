@@ -16,7 +16,7 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
   listCycles, transitionCycle,
-  listGovernance, createGovernance, transitionGovernance,
+  listGovernance, createGovernance, updateGovernance, transitionGovernance,
   listRisks, createRisk, updateRisk, transitionRisk,
   listStrategies,
   listContacts, createContact, recordCallTreeTest, contactTestStats,
@@ -123,6 +123,7 @@ export function BcmReadinessPage() {
   const [openRisk, setOpenRisk] = useState(false);
   const [editRisk, setEditRisk] = useState<BcmRisk | null>(null);
   const [openGov, setOpenGov] = useState(false);
+  const [editGov, setEditGov] = useState<BcmGovernanceRecord | null>(null);
   const [openContact, setOpenContact] = useState(false);
 
   // ── Loaders ────
@@ -380,6 +381,44 @@ export function BcmReadinessPage() {
     }
   }
 
+  // Edit a governance policy in place. Reuses the create field set; the PUT is
+  // null-means-keep and never touches approvalStatus (that's transition's job).
+  // The server blocks edits to APPROVED / ACTIVE records, so the Edit affordance
+  // is gated to the others.
+  const editGovInitial: Record<string, string> = useMemo(() => ({
+    policyTitleEn: editGov?.policyTitleEn ?? '',
+    policyTitleAr: editGov?.policyTitleAr ?? '',
+    policyVersion: editGov?.policyVersion ?? '',
+    reviewFrequency: editGov?.reviewFrequency ?? '',
+    nextReviewDate: editGov?.nextReviewDate ?? '',
+    scope: editGov?.scope ?? '',
+    objective: editGov?.objective ?? '',
+  }), [editGov]);
+
+  async function submitEditGov(v: Record<string, string>) {
+    if (!editGov) return;
+    const policyTitleEn = String(v.policyTitleEn ?? '').trim();
+    if (!policyTitleEn) { toast.danger(isAr ? 'عنوان السياسة بالإنجليزية مطلوب' : 'Policy title (EN) is required'); return; }
+    const reviewFrequency = String(v.reviewFrequency ?? '').trim() as ReviewFrequency | '';
+    try {
+      await updateGovernance(editGov.id, {
+        policyTitleEn,
+        policyTitleAr: String(v.policyTitleAr ?? '').trim() || undefined,
+        policyVersion: String(v.policyVersion ?? '').trim() || undefined,
+        reviewFrequency: reviewFrequency || undefined,
+        nextReviewDate: String(v.nextReviewDate ?? '').trim() || undefined,
+        scope: String(v.scope ?? '').trim() || undefined,
+        objective: String(v.objective ?? '').trim() || undefined,
+      });
+      toast.success(isAr ? 'حُدِّثت السياسة' : 'Policy updated');
+      setEditGov(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل تحديث السياسة' : 'Failed to update policy'));
+    }
+  }
+
   // ── Add a call-tree contact (needs name + at least one of phone/email) ──
   const contactInitial: Record<string, string> = useMemo(() => ({
     name: '', roleTitle: '',
@@ -575,6 +614,10 @@ export function BcmReadinessPage() {
                       <td className="text-xs">{g.reviewFrequency ?? '—'}</td>
                       <td className="mono text-2xs">{g.nextReviewDate ?? '—'}</td>
                       <td style={{ textAlign: 'end' }}>
+                        {g.approvalStatus !== 'APPROVED' && g.approvalStatus !== 'ACTIVE' && (
+                          <Button size="sm" variant="ghost" Icon={Pencil}
+                            title={isAr ? 'تعديل' : 'Edit'} onClick={() => setEditGov(g)} />
+                        )}
                         <GovernanceActions g={g} onMove={moveGovernance} isAr={isAr} />
                       </td>
                     </tr>
@@ -774,6 +817,16 @@ export function BcmReadinessPage() {
         onClose={() => setOpenGov(false)}
         onSubmit={submitGov}
         submitLabel={isAr ? 'إضافة السياسة' : 'Add policy'}
+      />
+
+      <FormModal
+        open={editGov !== null}
+        title={isAr ? 'تعديل سياسة الحوكمة' : 'Edit governance policy'}
+        fields={govFields}
+        initial={editGovInitial}
+        onClose={() => setEditGov(null)}
+        onSubmit={submitEditGov}
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
       />
 
       <FormModal
