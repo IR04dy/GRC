@@ -23,6 +23,7 @@ import {
   listEvents,
   getExitPlan,
   createExitPlan,
+  updateExitPlan,
   recordExitTest,
   recordReview,
   recordEvent,
@@ -103,6 +104,7 @@ export function OutsourcingDetailPage() {
   const [openEvent, setOpenEvent] = useState(false);
   const [openDd, setOpenDd] = useState(false);
   const [openExit, setOpenExit] = useState(false);
+  const [editExitOpen, setEditExitOpen] = useState(false);
   const [testingExit, setTestingExit] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -365,6 +367,54 @@ export function OutsourcingDetailPage() {
     }
   }
 
+  // ── Edit the existing exit plan (PATCH — partial null-means-keep) ──────
+  // Server takes a DTO, so omitted fields keep their values. lastTestedDate
+  // is owned by the "record test" action, so it's excluded from the edit.
+  const editExitFields: FieldDef[] = useMemo(() => [
+    { key: 'triggerConditionsEn', kind: 'textarea', span: 12, rows: 3, required: true, maxLength: 2000,
+      label: isAr ? 'شروط التفعيل (إنجليزي)' : 'Trigger conditions (EN)' },
+    { key: 'triggerConditionsAr', kind: 'textarea', span: 12, rows: 3, required: true, maxLength: 2000,
+      label: isAr ? 'شروط التفعيل (عربي)' : 'Trigger conditions (AR)' },
+    { key: 'testFrequency', kind: 'select', required: true, span: 6,
+      label: isAr ? 'تواتر الاختبار' : 'Test frequency',
+      options: TEST_FREQUENCIES.map(f => ({ value: f, label: TEST_FREQUENCY_LABELS[f][isAr ? 'ar' : 'en'] })) },
+    { key: 'dataRepatriationPlanEn', kind: 'textarea', span: 12, rows: 3, maxLength: 2000,
+      label: isAr ? 'خطة استرداد البيانات (إنجليزي)' : 'Data repatriation plan (EN)' },
+    { key: 'dataRepatriationPlanAr', kind: 'textarea', span: 12, rows: 3, maxLength: 2000,
+      label: isAr ? 'خطة استرداد البيانات (عربي)' : 'Data repatriation plan (AR)' },
+  ], [isAr]);
+  const editExitInitial: Record<string, string> = useMemo(() => ({
+    triggerConditionsEn: exitPlan?.triggerConditionsEn ?? '',
+    triggerConditionsAr: exitPlan?.triggerConditionsAr ?? '',
+    testFrequency: exitPlan?.testFrequency ?? 'ANNUAL',
+    dataRepatriationPlanEn: exitPlan?.dataRepatriationPlanEn ?? '',
+    dataRepatriationPlanAr: exitPlan?.dataRepatriationPlanAr ?? '',
+  }), [exitPlan]);
+  async function onUpdateExit(v: Record<string, string>) {
+    if (!exitPlan) return;
+    const triggerConditionsEn = String(v.triggerConditionsEn ?? '').trim();
+    const triggerConditionsAr = String(v.triggerConditionsAr ?? '').trim();
+    if (!triggerConditionsEn || !triggerConditionsAr) {
+      toast.danger(isAr ? 'شروط التفعيل (إنجليزي/عربي) مطلوبة' : 'Trigger conditions (EN/AR) are required');
+      return;
+    }
+    const opt = (s?: string) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    try {
+      const updated = await updateExitPlan(exitPlan.id, {
+        triggerConditionsEn,
+        triggerConditionsAr,
+        testFrequency: (v.testFrequency ?? exitPlan.testFrequency) as TestFrequency,
+        dataRepatriationPlanEn: opt(v.dataRepatriationPlanEn),
+        dataRepatriationPlanAr: opt(v.dataRepatriationPlanAr),
+      });
+      setExitPlan(updated);
+      setEditExitOpen(false);
+      toast.success(isAr ? 'تم تحديث خطة الخروج' : 'Exit plan updated');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحديث خطة الخروج' : 'Failed to update exit plan'));
+    }
+  }
+
   async function onRecordExitTest() {
     if (!exitPlan) return;
     setTestingExit(true);
@@ -603,6 +653,9 @@ export function OutsourcingDetailPage() {
                       {isAr ? 'آخر اختبار:' : 'Last test:'} {exitPlan.lastTestedDate}
                     </span>
                   )}
+                  <Button variant="secondary" Icon={Pencil} onClick={() => setEditExitOpen(true)}>
+                    {isAr ? 'تعديل' : 'Edit'}
+                  </Button>
                   <Button variant="secondary" Icon={ClipboardCheck} onClick={onRecordExitTest} disabled={testingExit}>
                     {isAr ? 'تسجيل اختبار' : 'Record test'}
                   </Button>
@@ -682,6 +735,18 @@ export function OutsourcingDetailPage() {
         onSubmit={submitExit}
         submitLabel={isAr ? 'إنشاء الخطة' : 'Create plan'}
       />
+
+      {exitPlan && (
+        <FormModal
+          open={editExitOpen}
+          title={isAr ? 'تعديل خطة الخروج' : 'Edit exit plan'}
+          fields={editExitFields}
+          initial={editExitInitial}
+          onClose={() => setEditExitOpen(false)}
+          onSubmit={onUpdateExit}
+          submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        />
+      )}
     </Shell>
   );
 }
