@@ -18,7 +18,7 @@ import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
-  listClimateItems, createClimateItem, assessClimateItem, treatClimateItem,
+  listClimateItems, createClimateItem, updateClimateItem, assessClimateItem, treatClimateItem,
   closeClimateItem, retireClimateItem, linkClimateItemToErm,
   riskScoreTone, riskScoreBand, shouldOfferErmLink,
   type ClimateRiskOpportunity, type CroKind,
@@ -241,6 +241,7 @@ function ClimateTab() {
   const [items, setItems] = useState<ClimateRiskOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  const [editItem, setEditItem] = useState<ClimateRiskOpportunity | null>(null);
   // ERM-link prompt modal (replaces window.prompt). Holds the climate-item
   // id so the modal knows which row to link when the user submits.
   const [linkingErmFor, setLinkingErmFor] = useState<number | null>(null);
@@ -277,6 +278,36 @@ function ClimateTab() {
       });
       toast.success(t('cliCreated'));
       setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed'));
+    }
+  }
+  // Edit (PUT) — partial null-means-keep on the server. kind stays fixed
+  // (the category whitelist is kind-specific) and is NOT shown in the form,
+  // but it MUST be echoed in the payload: the update endpoint binds a JPA
+  // @RequestBody entity whose kind defaults to "RISK", so an omitted kind
+  // arrives non-null and would clobber an OPPORTUNITY to RISK — failing the
+  // category validation. Echoing editItem.kind makes the overwrite a no-op.
+  // reportingYear is immutable via update. The server recomputes
+  // riskScore = likelihood × impact; status is owned by the transition
+  // endpoints and never touched here.
+  async function onUpdate(values: Record<string, unknown>) {
+    if (!editItem) return;
+    try {
+      await updateClimateItem(editItem.id!, {
+        kind:          editItem.kind,
+        category:      String(values.category ?? editItem.category),
+        timeHorizon:   (values.timeHorizon as 'SHORT' | 'MEDIUM' | 'LONG') ?? editItem.timeHorizon,
+        titleEn:       String(values.titleEn ?? '').trim(),
+        titleAr:       String(values.titleAr ?? '').trim() || undefined,
+        descriptionEn: String(values.descriptionEn ?? '').trim() || undefined,
+        likelihood:    Number(values.likelihood ?? editItem.likelihood),
+        impact:        Number(values.impact ?? editItem.impact),
+        ownerName:     String(values.ownerName ?? '').trim() || undefined,
+      });
+      toast.success(t('cliUpdated'));
+      setEditItem(null);
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : t('cliActionFailed'));
@@ -343,6 +374,52 @@ function ClimateTab() {
     { kind: 'text',     key: 'ownerName',     label: t('cliFldOwner'),             span: 3 },
   ];
 
+  // Category whitelist is kind-specific on the server; scope the edit
+  // options to the item's kind so an edit can never produce an invalid
+  // kind/category pair. Kind itself is omitted from the edit surface.
+  const RISK_CAT_OPTS = [
+    { value: 'PHYSICAL',     label: isAr ? 'مادي'          : 'Physical' },
+    { value: 'TRANSITION',   label: isAr ? 'انتقالي'        : 'Transition' },
+    { value: 'REGULATORY',   label: isAr ? 'تنظيمي'         : 'Regulatory' },
+    { value: 'MARKET',       label: isAr ? 'سوق'           : 'Market' },
+    { value: 'TECHNOLOGY',   label: isAr ? 'تقني'          : 'Technology' },
+    { value: 'REPUTATION',   label: isAr ? 'سُمعة'          : 'Reputation' },
+    { value: 'SUPPLY_CHAIN', label: isAr ? 'سلسلة الإمداد' : 'Supply chain' },
+  ];
+  const OPP_CAT_OPTS = [
+    { value: 'RESOURCE_EFFICIENCY', label: isAr ? 'كفاءة الموارد' : 'Resource efficiency' },
+    { value: 'ENERGY_SOURCE',       label: isAr ? 'مصدر طاقة'      : 'Energy source' },
+    { value: 'PRODUCT_SERVICE',     label: isAr ? 'منتج/خدمة'     : 'Product/service' },
+    { value: 'MARKETS',             label: isAr ? 'أسواق'         : 'Markets' },
+    { value: 'RESILIENCE',          label: isAr ? 'صمود'          : 'Resilience' },
+  ];
+  const editCatOpts = editItem?.kind === 'OPPORTUNITY' ? OPP_CAT_OPTS : RISK_CAT_OPTS;
+  const EDIT_FIELDS: FieldDef[] = [
+    { kind: 'select',   key: 'category',      label: t('cliFldCategory') + ' *', required: true, span: 6, options: editCatOpts },
+    { kind: 'select',   key: 'timeHorizon',   label: t('cliFldHorizon') + ' *',  required: true, span: 6,
+      options: [
+        { value: 'SHORT',  label: isAr ? 'قصير المدى (≤ سنة)'  : 'Short (≤1y)' },
+        { value: 'MEDIUM', label: isAr ? 'متوسط المدى (1-5 س)' : 'Medium (1-5y)' },
+        { value: 'LONG',   label: isAr ? 'طويل المدى (> 5 س)'  : 'Long (>5y)' },
+      ] },
+    { kind: 'text',     key: 'titleEn',       label: t('cliFldTitleEn') + ' *', required: true, span: 12 },
+    { kind: 'text',     key: 'titleAr',       label: t('cliFldTitleAr'),         span: 12 },
+    { kind: 'textarea', key: 'descriptionEn', label: t('cliFldDescription'),     rows: 3, span: 12 },
+    { kind: 'number',   key: 'likelihood',    label: t('cliFldLikelihood') + ' *', required: true, min: 1, max: 5, span: 3 },
+    { kind: 'number',   key: 'impact',        label: t('cliFldImpact') + ' *',     required: true, min: 1, max: 5, span: 3 },
+    { kind: 'text',     key: 'ownerName',     label: t('cliFldOwner'),             span: 6 },
+  ];
+  const editInitial = useMemo(() => editItem ? {
+    category:      editItem.category,
+    timeHorizon:   editItem.timeHorizon,
+    titleEn:       editItem.titleEn,
+    titleAr:       editItem.titleAr ?? '',
+    descriptionEn: editItem.descriptionEn ?? '',
+    likelihood:    editItem.likelihood,
+    impact:        editItem.impact,
+    ownerName:     editItem.ownerName ?? '',
+  } : {}, [editItem]);
+
   return (
     <div className="esg-stack">
       {/* KPI strip — risks vs opportunities + Rule-8 alert chip */}
@@ -400,6 +477,10 @@ function ClimateTab() {
                               <Button variant="primary" size="sm" Icon={Link2}
                                 onClick={() => setLinkingErmFor(it.id!)}>{t('cliActLinkErm')}</Button>
                             )}
+                            {it.status !== 'RETIRED' && (
+                              <Button variant="ghost" size="sm" Icon={Pencil}
+                                title={t('cliActEdit')} onClick={() => setEditItem(it)} />
+                            )}
                             {it.status === 'IDENTIFIED' && (
                               <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onAssess(it.id!)}>{t('cliActAssess')}</Button>
                             )}
@@ -431,6 +512,16 @@ function ClimateTab() {
         initial={{ kind: 'RISK', category: 'PHYSICAL', timeHorizon: 'MEDIUM', likelihood: 3, impact: 3, reportingYear: new Date().getFullYear() }}
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
+      />
+
+      <FormModal
+        open={!!editItem}
+        title={editItem ? `${t('cliEditTitle')} — ${editItem.itemCode ?? `#${editItem.id}`}` : ''}
+        fields={EDIT_FIELDS}
+        initial={editInitial}
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditItem(null)}
+        onSubmit={onUpdate}
       />
 
       {/* ERM-link prompt — replaces window.prompt. Stays in-window so the
