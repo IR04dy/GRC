@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Shield, AlertTriangle, Activity, Phone, FileWarning, Workflow, Plus } from 'lucide-react';
+import { CalendarClock, Shield, AlertTriangle, Activity, Phone, FileWarning, Workflow, Plus, Pencil } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -17,7 +17,7 @@ import { useDialog } from '../../lib/dialog';
 import {
   listCycles, transitionCycle,
   listGovernance, createGovernance, transitionGovernance,
-  listRisks, createRisk, transitionRisk,
+  listRisks, createRisk, updateRisk, transitionRisk,
   listStrategies,
   listContacts, createContact, recordCallTreeTest, contactTestStats,
   cycleStatusTone, governanceStatusTone, bcmRiskStatusTone, residualToTone,
@@ -121,6 +121,7 @@ export function BcmReadinessPage() {
   const [contactStats, setContactStats] = useState<{ passed: number; failed: number; notReached: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [openRisk, setOpenRisk] = useState(false);
+  const [editRisk, setEditRisk] = useState<BcmRisk | null>(null);
   const [openGov, setOpenGov] = useState(false);
   const [openContact, setOpenContact] = useState(false);
 
@@ -252,6 +253,59 @@ export function BcmReadinessPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل إضافة المخاطرة' : 'Failed to add risk'));
+    }
+  }
+
+  // Edit a BCM risk in place. Reuses the create field set; the PUT is
+  // null-means-keep on the server and never touches status (that's transition's
+  // job), so only the descriptive + assessment fields move. Memoised on the
+  // selected risk so FormModal's open-reset effect reflects the right row.
+  const editRiskInitial: Record<string, string> = useMemo(() => ({
+    titleEn: editRisk?.titleEn ?? '',
+    titleAr: editRisk?.titleAr ?? '',
+    threatCategory: editRisk?.threatCategory ?? '',
+    likelihood: editRisk?.likelihood != null ? String(editRisk.likelihood) : '',
+    impact: editRisk?.impact != null ? String(editRisk.impact) : '',
+    controlEffectiveness: editRisk?.controlEffectiveness ?? '',
+    existingControls: editRisk?.existingControls ?? '',
+  }), [editRisk]);
+
+  async function submitEditRisk(v: Record<string, string>) {
+    if (!editRisk) return;
+    const titleEn = String(v.titleEn ?? '').trim();
+    const threatCategory = (v.threatCategory ?? '') as ThreatCategory;
+    if (!titleEn) { toast.danger(isAr ? 'العنوان بالإنجليزية مطلوب' : 'Title (EN) is required'); return; }
+    if (!threatCategory) { toast.danger(isAr ? 'فئة التهديد مطلوبة' : 'Threat category is required'); return; }
+    const scale = (raw: string, label: string): number | null | undefined => {
+      const s = String(raw ?? '').trim();
+      if (s === '') return undefined;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 1 || n > 5) {
+        toast.danger(isAr ? `${label}: قيمة بين ١ و٥` : `${label}: must be 1-5`); return null;
+      }
+      return Math.round(n);
+    };
+    const likelihood = scale(v.likelihood, isAr ? 'الاحتمالية' : 'Likelihood');
+    if (likelihood === null) return;
+    const impact = scale(v.impact, isAr ? 'الأثر' : 'Impact');
+    if (impact === null) return;
+    const ce = String(v.controlEffectiveness ?? '').trim() as ControlEffectiveness | '';
+    try {
+      await updateRisk(editRisk.id, {
+        titleEn,
+        titleAr: String(v.titleAr ?? '').trim() || undefined,
+        threatCategory,
+        likelihood: likelihood ?? undefined,
+        impact: impact ?? undefined,
+        controlEffectiveness: ce || undefined,
+        existingControls: String(v.existingControls ?? '').trim() || undefined,
+      });
+      toast.success(isAr ? 'حُدِّثت المخاطرة' : 'BCM risk updated');
+      setEditRisk(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل تحديث المخاطرة' : 'Failed to update risk'));
     }
   }
 
@@ -577,8 +631,12 @@ export function BcmReadinessPage() {
                       </td>
                       <td><Badge tone={bcmRiskStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
                       <td style={{ textAlign: isAr ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                        {r.status !== 'CLOSED' && (
+                          <Button size="sm" variant="ghost" Icon={Pencil}
+                            title={isAr ? 'تعديل' : 'Edit'} onClick={() => setEditRisk(r)} />
+                        )}
                         {nexts.length === 0
-                          ? <span className="text-muted">—</span>
+                          ? (r.status === 'CLOSED' ? <span className="text-muted">—</span> : null)
                           : nexts.map(to => (
                               <Button key={to} size="sm" variant={to === 'CLOSED' ? 'ghost' : 'secondary'}
                                 onClick={() => void onTransitionRisk(r, to)}>
@@ -696,6 +754,16 @@ export function BcmReadinessPage() {
         onClose={() => setOpenRisk(false)}
         onSubmit={submitRisk}
         submitLabel={isAr ? 'إضافة المخاطرة' : 'Add risk'}
+      />
+
+      <FormModal
+        open={editRisk !== null}
+        title={isAr ? 'تعديل مخاطرة الاستمرارية' : 'Edit BCM risk'}
+        fields={riskFields}
+        initial={editRiskInitial}
+        onClose={() => setEditRisk(null)}
+        onSubmit={submitEditRisk}
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
       />
 
       <FormModal
