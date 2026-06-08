@@ -58,7 +58,7 @@ import {
   type CmaDisclosure as CmaD, type CmaReadiness as CmaR, type CmaStatus,
 } from '../../lib/sustainabilityCma';
 import {
-  listTcfd, tcfdReadiness, createTcfd,
+  listTcfd, tcfdReadiness, createTcfd, updateTcfd,
   tcfdMarkDisclosed, tcfdMarkPartial, tcfdMarkNotDisclosed,
   tcfdMarkNotApplicable, tcfdMarkUnderReview,
   tcfdAttachEvidence, tcfdRecordGap,
@@ -1824,6 +1824,7 @@ function TcfdTab() {
   const [evidencingId, setEvidencingId] = useState<number | null>(null);
   const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
   const [openNew, setOpenNew]           = useState(false);
+  const [editTcfd, setEditTcfd]         = useState<TcfdI | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -1930,6 +1931,71 @@ function TcfdTab() {
     { kind: 'textarea', key: 'recommendationEn', span: 12, rows: 2,
       label: isAr ? 'نص التوصية (إنجليزي)' : 'Recommendation (English)' },
   ];
+
+  // Edit-recommendation — descriptive fields only. Disclosure status is owned
+  // by the mark-* actions, evidence by Attach, gaps by Gap, so none are in
+  // this form. disclosureStatus is echoed back deliberately: the entity
+  // defaults the column to "UNDER_REVIEW", so an omitted value would
+  // deserialize to that default and update() would overwrite the reviewer's
+  // real classification. The service re-applies Rules 5/6 against it on save.
+  const editFields: FieldDef[] = [
+    { kind: 'text', key: 'titleEn', required: true, span: 6,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', span: 6,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'text', key: 'ownerEmail', span: 6,
+      label: isAr ? 'بريد المالك' : 'Owner email' },
+    { kind: 'text', key: 'reviewerName', span: 12,
+      label: isAr ? 'اسم المراجع' : 'Reviewer name' },
+    { kind: 'textarea', key: 'recommendationEn', span: 12, rows: 2,
+      label: isAr ? 'نص التوصية (إنجليزي)' : 'Recommendation (English)' },
+    { kind: 'textarea', key: 'recommendationAr', span: 12, rows: 2,
+      label: isAr ? 'نص التوصية (عربي)' : 'Recommendation (Arabic)' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    titleEn:           editTcfd?.titleEn ?? '',
+    titleAr:           editTcfd?.titleAr ?? '',
+    ownerName:         editTcfd?.ownerName ?? '',
+    ownerEmail:        editTcfd?.ownerEmail ?? '',
+    reviewerName:      editTcfd?.reviewerName ?? '',
+    recommendationEn:  editTcfd?.recommendationEn ?? '',
+    recommendationAr:  editTcfd?.recommendationAr ?? '',
+    notes:             editTcfd?.notes ?? '',
+  }), [editTcfd]);
+
+  async function submitEdit(values: Record<string, unknown>): Promise<void> {
+    if (!editTcfd?.id) return;
+    const titleEn = String(values.titleEn ?? '').trim();
+    if (!titleEn) {
+      toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'English title is required');
+      return;
+    }
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      await updateTcfd(editTcfd.id, {
+        disclosureStatus: editTcfd.disclosureStatus,
+        titleEn,
+        titleAr: str(values.titleAr),
+        recommendationEn: str(values.recommendationEn),
+        recommendationAr: str(values.recommendationAr),
+        ownerName: str(values.ownerName),
+        ownerEmail: str(values.ownerEmail),
+        reviewerName: str(values.reviewerName),
+        notes: str(values.notes),
+      });
+      toast.success(isAr ? 'حُدّثت التوصية' : 'Recommendation updated');
+      setEditTcfd(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث التوصية' : 'Failed to update recommendation'));
+    }
+  }
 
   async function submitCreate(values: Record<string, unknown>): Promise<void> {
     const titleEn = String(values.titleEn ?? '').trim();
@@ -2059,6 +2125,8 @@ function TcfdTab() {
                             {t.disclosureStatus !== 'NOT_APPLICABLE'&& <Button size="sm" variant="ghost" onClick={() => onMarkNotApplicable(t)}>{isAr ? 'لا ينطبق' : 'N/A'}</Button>}
                           </div>
                           <div className="esg-disclosure-row__btn-row">
+                            <Button size="sm" variant="ghost" Icon={Pencil}
+                              title={isAr ? 'تعديل' : 'Edit'} onClick={() => setEditTcfd(t)} />
                             <Button size="sm" variant="secondary" Icon={Paperclip}   onClick={() => setEvidencingId(t.id!)}>{isAr ? 'إرفاق' : 'Attach'}</Button>
                             <Button size="sm" variant="secondary" Icon={AlertCircle} onClick={() => setGappingId({ id: t.id! })}>{isAr ? 'فجوة' : 'Gap'}</Button>
                           </div>
@@ -2108,6 +2176,21 @@ function TcfdTab() {
         submitLabel={isAr ? 'إضافة التوصية' : 'Add recommendation'}
         onClose={() => setOpenNew(false)}
         onSubmit={submitCreate}
+      />
+
+      <FormModal
+        open={editTcfd !== null}
+        title={editTcfd
+          ? (isAr
+              ? `تعديل التوصية · ${tcfdPillarLabel(editTcfd.pillar, 'ar')} (${editTcfd.recommendationCode})`
+              : `Edit recommendation · ${tcfdPillarLabel(editTcfd.pillar, 'en')} (${editTcfd.recommendationCode})`)
+          : ''}
+        fields={editFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditTcfd(null)}
+        onSubmit={submitEdit}
       />
     </div>
   );
