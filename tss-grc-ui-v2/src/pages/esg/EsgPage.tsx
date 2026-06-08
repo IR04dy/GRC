@@ -53,10 +53,11 @@ import {
 } from '../../lib/sustainabilitySgi';
 import {
   listCma, cmaReadiness, markDisclosed, markPartial, markNotDisclosed,
-  markNotApplicable, markUnderReview, attachCmaEvidence, recordCmaGap, createCma, updateCma,
+  markNotApplicable, markUnderReview, attachCmaEvidence, recordCmaGap, createCma, updateCma, approveCma,
   cmaStatusTone, cmaStatusLabel, articleLabel, hasGap, hasEvidence,
   type CmaDisclosure as CmaD, type CmaReadiness as CmaR, type CmaStatus,
 } from '../../lib/sustainabilityCma';
+import { getUser } from '../../lib/auth';
 import {
   listTcfd, tcfdReadiness, createTcfd, updateTcfd,
   tcfdMarkDisclosed, tcfdMarkPartial, tcfdMarkNotDisclosed,
@@ -1496,6 +1497,7 @@ function CmaTab() {
   const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
   const [openNew, setOpenNew]           = useState(false);
   const [editCma, setEditCma]           = useState<CmaD | null>(null);
+  const [approvingCma, setApprovingCma] = useState<CmaD | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -1588,6 +1590,30 @@ function CmaTab() {
       if (gappingId.toStatus === 'NOT_DISCLOSED') await markNotDisclosed(gappingId.id);
       toast.success(isAr ? 'تم تسجيل الفجوة' : 'Gap recorded');
       setGappingId(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    }
+  }
+
+  // Sign-off (CMA Art. 91-94 board attestation). Only DISCLOSED / PARTIAL /
+  // NOT_APPLICABLE rows can be approved (the service rejects others); the
+  // approver name is captured for the audit trail and defaults to the user.
+  const approveInitial: Record<string, string> = useMemo(
+    () => ({ approvedBy: getUser()?.username ?? '' }), [approvingCma]);
+  const approveFields: FieldDef[] = [
+    { kind: 'text', key: 'approvedBy', required: true, span: 12, maxLength: 128,
+      label: isAr ? 'المُعتمِد' : 'Approved by',
+      placeholder: isAr ? 'اسم المسؤول عن الاعتماد' : 'Name of the approving officer' },
+  ];
+  async function submitApprove(values: Record<string, unknown>) {
+    if (approvingCma?.id == null) return;
+    const approvedBy = String(values.approvedBy ?? '').trim();
+    if (!approvedBy) { toast.danger(isAr ? 'اسم المُعتمِد مطلوب' : 'Approver name is required'); return; }
+    try {
+      await approveCma(approvingCma.id, approvedBy);
+      toast.success(isAr ? 'تم اعتماد الإفصاح' : 'Disclosure approved');
+      setApprovingCma(null);
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Action failed');
@@ -1832,6 +1858,16 @@ function CmaTab() {
                           <Button size="sm" variant="secondary" Icon={AlertCircle} onClick={() => setGappingId({ id: d.id! })}>
                             {isAr ? 'تسجيل فجوة' : 'Gap'}
                           </Button>
+                          {d.approvalStatus === 'APPROVED'
+                            ? <Badge tone="success" title={d.approvedBy ? `${isAr ? 'اعتمده' : 'by'} ${d.approvedBy}` : undefined}>
+                                <CheckCircle2 size={11} className="esg-icon-inline" />
+                                {isAr ? 'مُعتمَد' : 'Approved'}{d.approvedBy ? ` · ${d.approvedBy}` : ''}
+                              </Badge>
+                            : (d.disclosureStatus === 'DISCLOSED' || d.disclosureStatus === 'PARTIAL' || d.disclosureStatus === 'NOT_APPLICABLE') && (
+                                <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => setApprovingCma(d)}>
+                                  {isAr ? 'اعتماد' : 'Approve'}
+                                </Button>
+                              )}
                         </div>
                       </div>
                     </div>
@@ -1865,6 +1901,18 @@ function CmaTab() {
         submitLabel={isAr ? 'حفظ' : 'Save'}
         onClose={() => setGappingId(null)}
         onSubmit={submitGap}
+      />
+      <FormModal
+        open={approvingCma !== null}
+        title={isAr
+          ? `اعتماد الإفصاح${approvingCma ? ` — ${articleLabel(approvingCma, 'ar')}` : ''}`
+          : `Approve disclosure${approvingCma ? ` — ${articleLabel(approvingCma, 'en')}` : ''}`}
+        fields={approveFields}
+        initial={approveInitial}
+        size="sm"
+        submitLabel={isAr ? 'اعتماد' : 'Approve'}
+        onClose={() => setApprovingCma(null)}
+        onSubmit={submitApprove}
       />
       <FormModal
         open={openNew}
