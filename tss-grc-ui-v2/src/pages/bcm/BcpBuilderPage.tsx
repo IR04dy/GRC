@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Wrench, FileText, ChevronLeft, History, GitCompare, Plus, ListOrdered, Send, Download, BookOpen, Trash2 } from 'lucide-react';
+import { Wrench, FileText, ChevronLeft, History, GitCompare, Plus, ListOrdered, Send, Download, BookOpen, Trash2, Pencil } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -15,7 +15,7 @@ import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
-  listPlans, planStats, getPlan, createPlan, transitionPlan, reopenPlan,
+  listPlans, planStats, getPlan, createPlan, patchPlan, transitionPlan, reopenPlan,
   listSections, editSection, addSection,
   listVersions, diffVersions,
   planStatusTone, downloadPlanPdf,
@@ -121,6 +121,21 @@ export function BcpBuilderPage() {
   const [openSection, setOpenSection] = useState(false);
   const sectionInitial = useMemo(() => emptySection(), []);
 
+  // Edit plan metadata (title / RTO·RPO·MTPD / response role / next review).
+  // Backend blocks the PATCH on locked plans, so the trigger is gated on
+  // !isLocked. Initial is memoised on the loaded plan so FormModal's open-reset
+  // effect (deps [open, initial]) reflects the current plan without churning.
+  const [editOpen, setEditOpen] = useState(false);
+  const editInitial: EditPlanForm = useMemo(() => ({
+    titleEn:          plan?.titleEn ?? '',
+    titleAr:          plan?.titleAr ?? '',
+    rtoHours:         plan?.rtoHours != null ? String(plan.rtoHours) : '',
+    rpoHours:         plan?.rpoHours != null ? String(plan.rpoHours) : '',
+    mtpdHours:        plan?.mtpdHours != null ? String(plan.mtpdHours) : '',
+    responseTeamRole: plan?.responseTeamRole ?? '',
+    nextReviewDate:   plan?.nextReviewDate ?? '',
+  }), [plan]);
+
   // ── Register loaders ──
   async function reload() {
     setLoading(true);
@@ -225,6 +240,43 @@ export function BcpBuilderPage() {
       setPlan(out);
       toast.success(isAr ? 'تم إعادة الفتح للتحرير' : 'Reopened for editing');
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+
+  // Edit the plan's metadata (title / recovery objectives / response role /
+  // next review). Sends only the editable fields — status is intentionally
+  // omitted so the PATCH never trips the "use transition() to change status"
+  // guard; the backend keeps any field left null (null-means-keep). Numbers
+  // are coerced; a blank number leaves the existing value untouched.
+  async function submitEditPlan(v: EditPlanForm) {
+    if (!plan) return;
+    const titleEn = (v.titleEn ?? '').trim();
+    if (!titleEn) {
+      toast.warning(isAr ? 'العنوان الإنجليزي مطلوب' : 'English title is required');
+      return;
+    }
+    const numOpt = (s?: string): number | undefined => {
+      const raw = String(s ?? '').trim();
+      if (raw === '') return undefined;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n) : undefined;
+    };
+    try {
+      const out = await patchPlan(plan.id, {
+        titleEn,
+        titleAr:          v.titleAr?.trim() || undefined,
+        rtoHours:         numOpt(v.rtoHours),
+        rpoHours:         numOpt(v.rpoHours),
+        mtpdHours:        numOpt(v.mtpdHours),
+        responseTeamRole: v.responseTeamRole?.trim() || undefined,
+        nextReviewDate:   v.nextReviewDate?.trim() || undefined,
+      });
+      setPlan(out);
+      setItems(items.map(p => p.id === out.id ? out : p));
+      setEditOpen(false);
+      toast.success(isAr ? 'تم تحديث الخطة' : 'Plan updated');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل تحديث الخطة' : 'Plan update failed'));
+    }
   }
 
   // ── Section editing ──
@@ -575,6 +627,11 @@ export function BcpBuilderPage() {
           <Button variant="ghost" onClick={() => setBinderOpen(true)}>
             <BookOpen size={14} /> {isAr ? 'تصدير الكتيّب' : 'Export binder'}
           </Button>
+          {!isLocked && (
+            <Button variant="ghost" onClick={() => setEditOpen(true)}>
+              <Pencil size={14} /> {isAr ? 'تعديل الخطة' : 'Edit plan'}
+            </Button>
+          )}
           {(plan.status === 'APPROVED' || plan.status === 'UNDER_REVIEW') && (
             <Button variant="ghost" onClick={() => void handleReopen()}>
               {isAr ? 'إعادة فتح للتحرير' : 'Reopen for editing'}
@@ -810,6 +867,17 @@ export function BcpBuilderPage() {
         onSubmit={submitSection}
       />
 
+      <FormModal<EditPlanForm>
+        open={editOpen}
+        title={isAr ? 'تعديل الخطة' : 'Edit plan'}
+        size="md"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        fields={editPlanFields(isAr)}
+        initial={editInitial}
+        onClose={() => setEditOpen(false)}
+        onSubmit={submitEditPlan}
+      />
+
       <FormModal<DistributeForm>
         open={distOpen}
         title={isAr ? 'توزيع الخطة' : 'Distribute plan'}
@@ -1013,6 +1081,39 @@ function binderFields(isAr: boolean): FieldDef[] {
         { value: 'EN',        label: isAr ? 'إنجليزي'                  : 'English only' },
         { value: 'AR',        label: isAr ? 'عربي'                     : 'Arabic only' },
       ] },
+  ];
+}
+
+// ─── Edit-plan form definition ───────────────────────────────────
+//
+// Mirrors the backend PATCH contract (BcpPlanService.update): only the
+// owner-editable metadata, never the status/version/lifecycle. All-string
+// shape; the submit handler coerces the numeric fields. titleEn required.
+
+interface EditPlanForm {
+  titleEn:          string;
+  titleAr:          string;
+  rtoHours:         string;
+  rpoHours:         string;
+  mtpdHours:        string;
+  responseTeamRole: string;
+  nextReviewDate:   string;
+}
+
+function editPlanFields(isAr: boolean): FieldDef[] {
+  return [
+    { kind: 'text', key: 'titleEn', label: isAr ? 'العنوان (إنجليزي)' : 'Title (EN)', span: 12, required: true,
+      placeholder: isAr ? 'مثلاً: Core Banking BCP' : 'e.g. Core Banking BCP' },
+    { kind: 'text', key: 'titleAr', label: isAr ? 'العنوان (عربي)' : 'Title (AR)', span: 12,
+      placeholder: isAr ? 'مثلاً: خطة استمرارية الخدمات المصرفية الأساسية' : 'e.g. خطة استمرارية الخدمات المصرفية الأساسية' },
+
+    { kind: 'number', key: 'rtoHours',  label: 'RTO (h)',  span: 4, min: 0 },
+    { kind: 'number', key: 'rpoHours',  label: 'RPO (h)',  span: 4, min: 0 },
+    { kind: 'number', key: 'mtpdHours', label: 'MTPD (h)', span: 4, min: 0 },
+
+    { kind: 'text', key: 'responseTeamRole', label: isAr ? 'دور فريق الاستجابة' : 'Response team role',
+      span: 6, placeholder: isAr ? 'مثلاً: مدير عمليات الخدمات المصرفية' : 'e.g. Core Banking Lead' },
+    { kind: 'date', key: 'nextReviewDate', label: isAr ? 'تاريخ المراجعة القادمة' : 'Next review date', span: 6 },
   ];
 }
 
