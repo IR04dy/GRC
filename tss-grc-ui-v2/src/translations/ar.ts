@@ -1669,6 +1669,7 @@ export const ar = {
   ghgLoading:      'جارٍ التحميل…',
   ghgLoadFailed:   'تعذّر تحميل سجلّ الانبعاثات',
   ghgCreated:      'تمّ إنشاء السجلّ (مسوّدة)',
+  ghgUpdated:      'تمّ تحديث السجلّ',
   ghgSubmitted:    'تمّ تقديم السجلّ للتحقّق',
   ghgVerified:     'تمّ التحقّق من السجلّ',
   ghgApproved:     'تمّ اعتماد السجلّ',

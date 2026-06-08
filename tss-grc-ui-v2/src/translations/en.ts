@@ -1672,6 +1672,7 @@ export const en = {
   ghgLoading:      'Loading inventory…',
   ghgLoadFailed:   'Failed to load GHG inventory',
   ghgCreated:      'Record created (DRAFT)',
+  ghgUpdated:      'Record updated',
   ghgSubmitted:    'Record submitted for verification',
   ghgVerified:     'Record verified',
   ghgApproved:     'Record approved',

@@ -25,7 +25,7 @@ import {
 } from '../../lib/climateRisk';
 import {
   listGhgRecords, ghgAggregate, ghgYoy,
-  createGhgRecord, submitGhgRecord, verifyGhgRecord, approveGhgRecord,
+  createGhgRecord, updateGhgRecord, submitGhgRecord, verifyGhgRecord, approveGhgRecord,
   ghgStatusTone, canVerify,
   type GhgEmissionRecord, type GhgScope, type GhgAggregate, type GhgYoY,
 } from '../../lib/ghgInventory';
@@ -3594,6 +3594,7 @@ function GhgInventoryTab() {
   const [yoy, setYoy]     = useState<GhgYoY | null>(null);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
+  const [editRec, setEditRec] = useState<GhgEmissionRecord | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -3628,6 +3629,31 @@ function GhgInventoryTab() {
       });
       toast.success(t('ghgCreated'));
       setOpenNew(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed'));
+    }
+  }
+  // Edit (PUT) — partial null-means-keep on the server; reportingYear and
+  // scope are immutable identity (the update endpoint never reads them) so
+  // they're excluded from the edit surface. emissionValueTco2e is server-
+  // recomputed from activityData × emissionFactor only when both are present;
+  // for the manually-entered rows here it is taken verbatim.
+  async function onUpdate(values: Record<string, unknown>) {
+    if (!editRec) return;
+    try {
+      await updateGhgRecord(editRec.id!, {
+        category:           String(values.category ?? editRec.category),
+        sourceNameEn:       String(values.sourceNameEn ?? '').trim(),
+        sourceNameAr:       String(values.sourceNameAr ?? '').trim() || undefined,
+        emissionValueTco2e: Number(values.emissionValueTco2e ?? 0),
+        coveragePercent:    Number(values.coveragePercent ?? 100),
+        methodology:        String(values.methodology ?? '').trim() || undefined,
+        evidenceRef:        String(values.evidenceRef ?? '').trim() || undefined,
+        ownerName:          String(values.ownerName ?? '').trim() || undefined,
+      });
+      toast.success(t('ghgUpdated'));
+      setEditRec(null);
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : t('ghgActionFailed'));
@@ -3677,6 +3703,20 @@ function GhgInventoryTab() {
     { kind: 'text',     key: 'evidenceRef',        label: t('ghgFldEvidence'),         span: 6 },
     { kind: 'text',     key: 'ownerName',          label: t('ghgFldOwner'),            span: 6 },
   ];
+
+  // Edit reuses the create field defs minus the immutable identity fields
+  // (reporting year + scope are fixed once a record exists).
+  const EDIT_FIELDS: FieldDef[] = FIELDS.filter(f => f.key !== 'reportingYear' && f.key !== 'scope');
+  const editInitial = useMemo(() => editRec ? {
+    category:           editRec.category,
+    sourceNameEn:       editRec.sourceNameEn,
+    sourceNameAr:       editRec.sourceNameAr ?? '',
+    emissionValueTco2e: Number(editRec.emissionValueTco2e),
+    coveragePercent:    editRec.coveragePercent != null ? Number(editRec.coveragePercent) : 100,
+    methodology:        editRec.methodology ?? '',
+    evidenceRef:        editRec.evidenceRef ?? '',
+    ownerName:          editRec.ownerName ?? '',
+  } : {}, [editRec]);
 
   function pctChip(v?: number) {
     if (v == null) return '—';
@@ -3785,6 +3825,11 @@ function GhgInventoryTab() {
                       <td><Badge tone={ghgStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
                       <td className="esg-text-end">
                         <div className="esg-actions-row">
+                          {(r.status === 'DRAFT' || r.status === 'SUBMITTED') && (
+                            <Button variant="ghost" size="sm" Icon={Pencil}
+                              title={isAr ? 'تعديل' : 'Edit'}
+                              onClick={() => setEditRec(r)} />
+                          )}
                           {r.status === 'DRAFT'     && <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onSubmit_(r.id!)}>{t('ghgActSubmit')}</Button>}
                           {r.status === 'SUBMITTED' && (
                             <Button variant="secondary" size="sm" Icon={CheckCircle2}
@@ -3811,6 +3856,16 @@ function GhgInventoryTab() {
         initial={{ reportingYear: year, scope: 1, coveragePercent: 100 }}
         onClose={() => setOpenNew(false)}
         onSubmit={onCreate}
+      />
+
+      <FormModal
+        open={!!editRec}
+        title={editRec ? `${isAr ? 'تعديل سجل الانبعاثات' : 'Edit emission record'} — ${editRec.recordCode ?? `#${editRec.id}`}` : ''}
+        fields={EDIT_FIELDS}
+        initial={editInitial}
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditRec(null)}
+        onSubmit={onUpdate}
       />
     </div>
   );
