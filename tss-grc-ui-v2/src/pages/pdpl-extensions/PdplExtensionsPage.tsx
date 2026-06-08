@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Globe2, Trash2, FileText, Plus, ShieldCheck, CheckCircle2, XCircle, Play, Send,
-  AlertOctagon, Clock,
+  AlertOctagon, Clock, CopyPlus,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -18,7 +18,7 @@ import { useToast } from '../../lib/toast';
 import {
   listCrossBorderTransfers, createCrossBorderTransfer, cbtAssess, cbtApprove, cbtReject,
   listDisposals, createDisposal, disposalStart, disposalComplete, disposalVerify,
-  listNotices, createNotice, publishNotice, archiveNotice,
+  listNotices, createNotice, publishNotice, archiveNotice, supersedeNotice,
   CBT_STATUS_TONE, DISPOSAL_STATUS_TONE, NOTICE_STATUS_TONE,
   type CrossBorderTransfer, type DisposalCertificate, type PrivacyNotice,
 } from '../../lib/pdplExtensions';
@@ -441,7 +441,8 @@ function DisposalTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, set
 
 // ─── Privacy notice tab ─────────────────────────────────────────────
 
-function NoticeTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreateOpen, prefillRopaCode }: any) {
+function NoticeTab({ rows, busy, setBusy, lang, t, toast, onChanged, createOpen, setCreateOpen, prefillRopaCode }: any) {
+  const ar = lang === 'ar';
   const stats = countByStatus(rows, 'status');
   const FIELDS: FieldDef[] = [
     { kind: 'text', key: 'noticeCode', label: t('pdplExtPnCode') + ' *', required: true, placeholder: 'PN-EMP', span: 6 },
@@ -494,6 +495,21 @@ function NoticeTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCr
     catch { toast.danger(t('pdplExtActionFailedToast')); }
     finally { setBusy(null); }
   }
+  // Supersede a published notice — the server clones it into a fresh DRAFT
+  // (version + 1, supersedesId set) so the new revision can be edited and
+  // re-published while the live one keeps serving until then.
+  async function onSupersede(row: PrivacyNotice) {
+    if (!window.confirm(ar
+      ? `إنشاء نسخة جديدة (v${row.version + 1}) كمسودة من ${row.noticeCode}؟ ستبقى النسخة المنشورة سارية حتى نشر الجديدة.`
+      : `Create a new draft revision (v${row.version + 1}) of ${row.noticeCode}? The published version stays live until the new one is published.`)) return;
+    setBusy(row.id);
+    try {
+      const next = await supersedeNotice(row.id);
+      toast.success(ar ? `أُنشئت المسودة v${next.version}` : `Draft v${next.version} created`);
+      await onChanged();
+    } catch { toast.danger(t('pdplExtActionFailedToast')); }
+    finally { setBusy(null); }
+  }
 
   return (
     <>
@@ -533,6 +549,10 @@ function NoticeTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCr
                     {r.status === 'DRAFT' && (
                       <Button size="sm" variant="primary" Icon={Send} disabled={busy === r.id}
                               onClick={() => onPublish(r)}>{t('pdplExtPnActPublish')}</Button>
+                    )}
+                    {r.status === 'PUBLISHED' && (
+                      <Button size="sm" variant="secondary" Icon={CopyPlus} disabled={busy === r.id}
+                              onClick={() => onSupersede(r)}>{ar ? 'إصدار نسخة جديدة' : 'Supersede'}</Button>
                     )}
                     {r.status === 'PUBLISHED' && (
                       <Button size="sm" variant="ghost" Icon={AlertOctagon} disabled={busy === r.id}
