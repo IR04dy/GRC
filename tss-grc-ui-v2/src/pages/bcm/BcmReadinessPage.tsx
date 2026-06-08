@@ -11,7 +11,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
-import { statusLabel } from '../../lib/statusLabels';
+import { statusLabel, severityLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
@@ -21,6 +21,7 @@ import {
   listStrategies,
   listContacts, createContact, recordCallTreeTest, contactTestStats,
   cycleStatusTone, governanceStatusTone, bcmRiskStatusTone, residualToTone,
+  threatCategoryLabel, strategyTypeLabel, reviewFrequencyLabel,
   type BcmAssessmentCycle, type BcmGovernanceRecord, type BcmRisk,
   type ContinuityStrategy, type BcmCommunicationContact, type CycleStatus, type GovernanceStatus,
   type ThreatCategory, type BcmRiskStatus,
@@ -610,8 +611,8 @@ export function BcmReadinessPage() {
                         {g.objective && <div className="text-2xs text-muted">{g.objective.substring(0, 80)}</div>}
                       </td>
                       <td className="mono text-2xs">v{g.policyVersion}</td>
-                      <td><Badge tone={governanceStatusTone(g.approvalStatus)}>{g.approvalStatus}</Badge></td>
-                      <td className="text-xs">{g.reviewFrequency ?? '—'}</td>
+                      <td><Badge tone={governanceStatusTone(g.approvalStatus)}>{statusLabel(g.approvalStatus, lang)}</Badge></td>
+                      <td className="text-xs">{g.reviewFrequency ? reviewFrequencyLabel(g.reviewFrequency, lang) : '—'}</td>
                       <td className="mono text-2xs">{g.nextReviewDate ?? '—'}</td>
                       <td style={{ textAlign: 'end' }}>
                         {g.approvalStatus !== 'APPROVED' && g.approvalStatus !== 'ACTIVE' && (
@@ -663,7 +664,7 @@ export function BcmReadinessPage() {
                         <div style={{ fontWeight: 600 }}>{isAr && r.titleAr ? r.titleAr : r.titleEn}</div>
                         {r.relatedErmRiskId && <Badge tone="info">{isAr ? 'مرتبط بـERM' : 'linked to ERM'}</Badge>}
                       </td>
-                      <td className="text-2xs">{r.threatCategory}</td>
+                      <td className="text-2xs">{threatCategoryLabel(r.threatCategory, lang)}</td>
                       <td className="mono text-2xs">{r.likelihood ?? '—'}</td>
                       <td className="mono text-2xs">{r.impact ?? '—'}</td>
                       <td className="mono text-2xs">{r.inherentRiskScore ?? '—'}</td>
@@ -713,13 +714,13 @@ export function BcmReadinessPage() {
                 <tbody>
                   {strategies.map(s => (
                     <tr key={s.id}>
-                      <td className="text-xs"><Badge tone="primary">{s.selectedStrategy}</Badge></td>
+                      <td className="text-xs"><Badge tone="primary">{strategyTypeLabel(s.selectedStrategy, lang)}</Badge></td>
                       <td className="mono text-2xs">{s.rtoRequirementHours ?? '—'}</td>
                       <td className="mono text-2xs">{s.rpoRequirementHours ?? '—'}</td>
-                      <td className="text-2xs">{s.feasibility ?? '—'}</td>
+                      <td className="text-2xs">{s.feasibility ? severityLabel(s.feasibility, lang) : '—'}</td>
                       <td className="mono text-2xs">{s.costEstimate ? Number(s.costEstimate).toLocaleString() : '—'}</td>
-                      <td><Badge tone={s.approvalStatus === 'APPROVED' ? 'success' : 'neutral'}>{s.approvalStatus}</Badge></td>
-                      <td className="text-2xs">{s.implementationStatus ?? '—'}</td>
+                      <td><Badge tone={s.approvalStatus === 'APPROVED' ? 'success' : 'neutral'}>{statusLabel(s.approvalStatus, lang)}</Badge></td>
+                      <td className="text-2xs">{s.implementationStatus ? statusLabel(s.implementationStatus, lang) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -771,7 +772,7 @@ export function BcmReadinessPage() {
                         <td className="text-2xs">
                           {c.lastTestResult
                             ? <Badge tone={c.lastTestResult === 'PASSED' ? 'success' : c.lastTestResult === 'FAILED' ? 'danger' : 'warning'}>
-                                {c.lastTestResult}
+                                {statusLabel(c.lastTestResult, lang)}
                               </Badge>
                             : <span className="text-muted">—</span>}
                           {c.lastTestedDate && <span className="text-2xs text-muted" style={{ marginInlineStart: 6 }}>{c.lastTestedDate}</span>}

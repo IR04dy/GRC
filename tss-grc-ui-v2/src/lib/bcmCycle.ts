@@ -3,6 +3,7 @@
 // surfaces. Mirrors the backend Java records.
 
 import { api } from './api';
+import { bilingual } from './statusLabels';
 
 // ─── Cycles ───────────────────────────────────────────────────────
 
@@ -271,6 +272,75 @@ export function residualToTone(score?: number): 'success' | 'warning' | 'danger'
   if (score >= 15) return 'danger';
   if (score >= 8)  return 'warning';
   return 'success';
+}
+
+// ─── BCM domain label catalogs ────────────────────────────────────
+//
+// Threat categories, continuity-strategy types and review frequencies
+// are BCM-specific vocabularies, so their bilingual labels live here
+// next to the type defs rather than bloating the shared statusLabels
+// table. Lookup reuses bilingual() so matching + English fallback behave
+// exactly like the status badges (case-insensitive, '-'/' ' → '_').
+
+const THREAT_CATEGORY_LABELS = {
+  TECH_FAILURE:             { en: 'Tech failure',             ar: 'عطل تقني' },
+  CYBERATTACK:              { en: 'Cyberattack',              ar: 'هجوم سيبراني' },
+  DATA_CENTER_OUTAGE:       { en: 'Data centre outage',       ar: 'تعطّل مركز البيانات' },
+  CLOUD_OUTAGE:             { en: 'Cloud outage',             ar: 'تعطّل الخدمات السحابية' },
+  TELECOM_OUTAGE:           { en: 'Telecom outage',           ar: 'انقطاع الاتصالات' },
+  POWER_FAILURE:            { en: 'Power failure',            ar: 'انقطاع الكهرباء' },
+  FACILITY_UNAVAILABILITY:  { en: 'Facility unavailability',  ar: 'تعذّر استخدام المقر' },
+  WORKFORCE_UNAVAILABILITY: { en: 'Workforce unavailability', ar: 'نقص القوى العاملة' },
+  SUPPLIER_FAILURE:         { en: 'Supplier failure',         ar: 'إخفاق المورّد' },
+  PANDEMIC:                 { en: 'Pandemic',                 ar: 'جائحة' },
+  NATURAL_HAZARD:           { en: 'Natural hazard',           ar: 'خطر طبيعي' },
+  FIRE:                     { en: 'Fire',                     ar: 'حريق' },
+  FLOOD:                    { en: 'Flood',                    ar: 'فيضان' },
+  REGIONAL_DISRUPTION:      { en: 'Regional disruption',      ar: 'اضطراب إقليمي' },
+  REGULATORY_DISRUPTION:    { en: 'Regulatory disruption',    ar: 'اضطراب تنظيمي' },
+  DATA_LOSS:                { en: 'Data loss',                ar: 'فقدان البيانات' },
+  THIRD_PARTY_DEPENDENCY:   { en: 'Third-party dependency',   ar: 'اعتماد على طرف ثالث' },
+  CRITICAL_INFRASTRUCTURE:  { en: 'Critical infrastructure',  ar: 'بنية تحتية حرجة' },
+} satisfies Record<ThreatCategory, { en: string; ar: string }>;
+
+/** Bilingual label for a BCM threat category. */
+export function threatCategoryLabel(c: string | null | undefined, lang: string): string {
+  return bilingual(THREAT_CATEGORY_LABELS, c, lang);
+}
+
+const STRATEGY_TYPE_LABELS = {
+  ACTIVE_ACTIVE:            { en: 'Active-active',            ar: 'نشط-نشط' },
+  ACTIVE_PASSIVE:           { en: 'Active-passive',           ar: 'نشط-احتياطي' },
+  BACKUP_SITE:              { en: 'Backup site',              ar: 'موقع بديل' },
+  ALTERNATE_WORKPLACE:      { en: 'Alternate workplace',      ar: 'مقر عمل بديل' },
+  REMOTE_WORK:              { en: 'Remote work',              ar: 'العمل عن بُعد' },
+  MANUAL_WORKAROUND:        { en: 'Manual workaround',        ar: 'حل يدوي بديل' },
+  ALTERNATE_SUPPLIER:       { en: 'Alternate supplier',       ar: 'مورّد بديل' },
+  STOCKPILING:              { en: 'Stockpiling',              ar: 'تخزين احتياطي' },
+  CLOUD_FAILOVER:           { en: 'Cloud failover',           ar: 'تحويل سحابي' },
+  DATA_REPLICATION:         { en: 'Data replication',         ar: 'تكرار البيانات' },
+  MUTUAL_AID:               { en: 'Mutual aid',               ar: 'مساعدة متبادلة' },
+  PROCESS_TRANSFER:         { en: 'Process transfer',         ar: 'نقل العملية' },
+  WORKFORCE_CROSS_TRAINING: { en: 'Workforce cross-training', ar: 'تدريب متعدد للكوادر' },
+  EMERGENCY_PROCUREMENT:    { en: 'Emergency procurement',    ar: 'شراء طارئ' },
+  CRISIS_COMMUNICATION:     { en: 'Crisis communication',     ar: 'تواصل الأزمات' },
+} satisfies Record<StrategyType, { en: string; ar: string }>;
+
+/** Bilingual label for a continuity-strategy type. */
+export function strategyTypeLabel(t: string | null | undefined, lang: string): string {
+  return bilingual(STRATEGY_TYPE_LABELS, t, lang);
+}
+
+const REVIEW_FREQUENCY_LABELS = {
+  ANNUAL:       { en: 'Annual',       ar: 'سنوي' },
+  SEMI_ANNUAL:  { en: 'Semi-annual',  ar: 'نصف سنوي' },
+  QUARTERLY:    { en: 'Quarterly',    ar: 'ربع سنوي' },
+  ON_CHANGE:    { en: 'On change',    ar: 'عند التغيير' },
+} satisfies Record<NonNullable<BcmGovernanceRecord['reviewFrequency']>, { en: string; ar: string }>;
+
+/** Bilingual label for a governance review frequency. */
+export function reviewFrequencyLabel(f: string | null | undefined, lang: string): string {
+  return bilingual(REVIEW_FREQUENCY_LABELS, f, lang);
 }
 
 // ─── Lessons / Gaps / CAPA — audit Tier-1 #4 ──────────────────────

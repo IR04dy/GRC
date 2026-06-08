@@ -43,6 +43,8 @@ const STATUS_LABELS: Record<string, { en: string; ar: string }> = {
   PENDING:                  { en: 'Pending',          ar: 'بالانتظار' },
   UNDER_REVIEW:             { en: 'Under review',     ar: 'قيد المراجعة' },
   PENDING_REVIEW:           { en: 'Pending review',   ar: 'بانتظار المراجعة' },
+  CHANGES_REQUIRED:         { en: 'Changes required', ar: 'مطلوب تعديلات' },
+  REVIEW_DUE:               { en: 'Review due',       ar: 'مراجعة مستحقة' },
   APPROVED:                 { en: 'Approved',         ar: 'مُعتمدة' },
   REJECTED:                 { en: 'Rejected',         ar: 'مرفوضة' },
   EXPIRED:                  { en: 'Expired',          ar: 'منتهية' },
@@ -86,6 +88,16 @@ const STATUS_LABELS: Record<string, { en: string; ar: string }> = {
   IMPLEMENTING:             { en: 'Implementing',     ar: 'قيد التنفيذ' },
   POST_REVIEW:              { en: 'Post review',      ar: 'مراجعة بعدية' },
   ROLLED_BACK:              { en: 'Rolled back',      ar: 'مُتراجَع عنها' },
+  // ── Execution / implementation ──────────────────────────────────
+  NOT_STARTED:              { en: 'Not started',      ar: 'لم تبدأ' },
+  ON_HOLD:                  { en: 'On hold',          ar: 'مُوقَفة مؤقتاً' },
+  // ── Test / call-tree outcomes ───────────────────────────────────
+  PASSED:                   { en: 'Passed',           ar: 'ناجحة' },
+  FAILED:                   { en: 'Failed',           ar: 'فاشلة' },
+  NOT_REACHED:              { en: 'Not reached',      ar: 'تعذّر الوصول' },
+  // ── BCM risk lifecycle (BcmRiskStatus) ──────────────────────────
+  TREATMENT_PLANNED:        { en: 'Treatment planned', ar: 'مُخطّط للمعالجة' },
+  MITIGATED:                { en: 'Mitigated',        ar: 'مُخفَّفة' },
 };
 
 /** Severity / impact / risk-level enum. */
@@ -116,10 +128,12 @@ const STRATEGY_LABELS: Record<string, { en: string; ar: string }> = {
   ACCEPT:   { en: 'Accept',   ar: 'قبول' },
 };
 
-/** Lookup helper — falls back to a title-cased version of the raw
- *  value if the enum isn't in the table yet. Falling back instead of
- *  throwing keeps demo data + new backend enums rendering correctly. */
-function lookup(
+/** Bilingual lookup helper — falls back to a title-cased version of the
+ *  raw value if the enum isn't in the table yet. Falling back instead of
+ *  throwing keeps demo data + new backend enums rendering correctly.
+ *  Exported so domain modules (e.g. the BCM threat / strategy catalogs)
+ *  can reuse the exact same matching + fallback behaviour. */
+export function bilingual(
   table: Record<string, { en: string; ar: string }>,
   value: string | null | undefined,
   lang: Lang,
@@ -136,17 +150,17 @@ function lookup(
 }
 
 export function statusLabel(status: string | null | undefined, lang: Lang): string {
-  return lookup(STATUS_LABELS, status, lang);
+  return bilingual(STATUS_LABELS, status, lang);
 }
 
 export function severityLabel(severity: string | null | undefined, lang: Lang): string {
-  return lookup(SEVERITY_LABELS, severity, lang);
+  return bilingual(SEVERITY_LABELS, severity, lang);
 }
 
 export function priorityLabel(priority: string | null | undefined, lang: Lang): string {
-  return lookup(PRIORITY_LABELS, priority, lang);
+  return bilingual(PRIORITY_LABELS, priority, lang);
 }
 
 export function strategyLabel(strategy: string | null | undefined, lang: Lang): string {
-  return lookup(STRATEGY_LABELS, strategy, lang);
+  return bilingual(STRATEGY_LABELS, strategy, lang);
 }

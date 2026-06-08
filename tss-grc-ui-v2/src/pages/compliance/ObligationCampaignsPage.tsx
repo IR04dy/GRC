@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Briefcase, Plus, Play, Mail, AlertTriangle, CheckCircle2, FileText, Send,
+  Briefcase, Plus, Play, Mail, AlertTriangle, CheckCircle2, FileText, Send, Ban,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Shell } from '../../components/layout/Shell';
@@ -22,6 +22,7 @@ import {
   sendCampaignReminders,
   escalateCampaign,
   closeCampaign,
+  cancelCampaign,
   type ObligationCampaign,
   type Regulator,
   CAMPAIGN_STATUS_LABELS,
@@ -189,6 +190,24 @@ export function ObligationCampaignsPage() {
     }
   }
 
+  async function onCancel(c: ObligationCampaign) {
+    const reason = await dialog.prompt({
+      title: isAr ? 'سبب إلغاء الحملة' : 'Cancellation reason',
+      type: 'textarea',
+      placeholder: isAr
+        ? 'وضّح سبب إلغاء حملة الإقرار (اختياري) — مثال: دُمجت في حملة الربع القادم، أو خطأ في النطاق.'
+        : 'Why is this attestation campaign being cancelled? (optional) — e.g. merged into next quarter, or scoped in error.',
+    });
+    if (reason === null) return;
+    try {
+      await cancelCampaign(c.id, reason.trim() || undefined);
+      toast.success(isAr ? 'تم إلغاء الحملة' : 'Campaign cancelled');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed');
+    }
+  }
+
   // ─── KPIs ─────────────────────────────────────────────────────────
   const activeCount = items.filter(c => !['CLOSED', 'CANCELLED', 'DRAFT'].includes(c.status)).length;
   const overdueCount = items.reduce((s, c) => s + (c.totalOverdue ?? 0), 0);
@@ -300,6 +319,12 @@ export function ObligationCampaignsPage() {
                           {actions.canClose && (
                             <Button size="sm" variant="secondary" Icon={CheckCircle2} onClick={() => onClose(c)}>
                               {isAr ? 'إغلاق' : 'Close'}
+                            </Button>
+                          )}
+                          {actions.canCancel && (
+                            <Button size="sm" variant="ghost" Icon={Ban}
+                              style={{ color: 'var(--danger)' }} onClick={() => onCancel(c)}>
+                              {isAr ? 'إلغاء' : 'Cancel'}
                             </Button>
                           )}
                         </div>
