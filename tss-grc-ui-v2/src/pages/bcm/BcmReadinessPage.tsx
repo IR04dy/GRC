@@ -17,13 +17,13 @@ import { useDialog } from '../../lib/dialog';
 import {
   listCycles, transitionCycle,
   listGovernance, createGovernance, transitionGovernance,
-  listRisks, createRisk,
+  listRisks, createRisk, transitionRisk,
   listStrategies,
   listContacts, createContact, recordCallTreeTest, contactTestStats,
   cycleStatusTone, governanceStatusTone, bcmRiskStatusTone, residualToTone,
   type BcmAssessmentCycle, type BcmGovernanceRecord, type BcmRisk,
   type ContinuityStrategy, type BcmCommunicationContact, type CycleStatus, type GovernanceStatus,
-  type ThreatCategory,
+  type ThreatCategory, type BcmRiskStatus,
 } from '../../lib/bcmCycle';
 import { downloadEvidencePackage } from '../../lib/bcmEvidencePackage';
 
@@ -65,6 +65,18 @@ const THREAT_CATEGORIES: Array<{ value: ThreatCategory; en: string; ar: string }
   { value: 'THIRD_PARTY_DEPENDENCY',   en: 'Third-party dependency',        ar: 'اعتماد على طرف ثالث' },
   { value: 'CRITICAL_INFRASTRUCTURE',  en: 'Critical infrastructure',       ar: 'بنية تحتية حرجة' },
 ];
+
+// BCM risk lifecycle (mirrors BcmRiskService.transition): a linear assess →
+// treat → accept/mitigate → close flow. DRAFT → ASSESSED additionally needs
+// likelihood + impact, enforced server-side and gated in the UI.
+const RISK_NEXT: Record<BcmRiskStatus, BcmRiskStatus[]> = {
+  DRAFT:             ['ASSESSED'],
+  ASSESSED:          ['TREATMENT_PLANNED', 'ACCEPTED'],
+  TREATMENT_PLANNED: ['MITIGATED', 'ACCEPTED'],
+  ACCEPTED:          ['CLOSED'],
+  MITIGATED:         ['CLOSED'],
+  CLOSED:            [],
+};
 
 type ControlEffectiveness = NonNullable<BcmRisk['controlEffectiveness']>;
 const CONTROL_EFFECTIVENESS: Array<{ value: ControlEffectiveness; en: string; ar: string }> = [
@@ -240,6 +252,21 @@ export function BcmReadinessPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل إضافة المخاطرة' : 'Failed to add risk'));
+    }
+  }
+
+  // Move a BCM risk to its next lifecycle state. The UI only offers the
+  // backend-legal next states, so an illegal transition is never attempted;
+  // server-side guards (e.g. likelihood/impact required for ASSESSED) surface
+  // as a toast.
+  async function onTransitionRisk(risk: BcmRisk, to: BcmRiskStatus) {
+    try {
+      await transitionRisk(risk.id, to);
+      toast.success(isAr ? `حالة المخاطرة → ${statusLabel(to, lang)}` : `Risk → ${statusLabel(to, lang)}`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تغيير حالة المخاطرة' : 'Failed to transition risk'));
     }
   }
 
@@ -525,9 +552,15 @@ export function BcmReadinessPage() {
                   <th>{isAr ? 'كامن' : 'Inherent'}</th>
                   <th>{isAr ? 'متبقّي' : 'Residual'}</th>
                   <th>{isAr ? 'الحالة' : 'Status'}</th>
+                  <th style={{ textAlign: isAr ? 'left' : 'right' }}>{isAr ? 'إجراءات' : 'Actions'}</th>
                 </tr></thead>
                 <tbody>
-                  {risks.map(r => (
+                  {risks.map(r => {
+                    // Gate DRAFT -> ASSESSED until likelihood + impact are set
+                    // (the server rejects it otherwise).
+                    const nexts = (RISK_NEXT[r.status] ?? []).filter(to =>
+                      !(to === 'ASSESSED' && (r.likelihood == null || r.impact == null)));
+                    return (
                     <tr key={r.id}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{isAr && r.titleAr ? r.titleAr : r.titleEn}</div>
@@ -543,8 +576,18 @@ export function BcmReadinessPage() {
                           : <span className="text-muted">—</span>}
                       </td>
                       <td><Badge tone={bcmRiskStatusTone(r.status)}>{statusLabel(r.status, lang)}</Badge></td>
+                      <td style={{ textAlign: isAr ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                        {nexts.length === 0
+                          ? <span className="text-muted">—</span>
+                          : nexts.map(to => (
+                              <Button key={to} size="sm" variant={to === 'CLOSED' ? 'ghost' : 'secondary'}
+                                onClick={() => void onTransitionRisk(r, to)}>
+                                {statusLabel(to, lang)}
+                              </Button>
+                            ))}
+                      </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>}
         </Card>
