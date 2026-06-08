@@ -53,7 +53,7 @@ import {
 } from '../../lib/sustainabilitySgi';
 import {
   listCma, cmaReadiness, markDisclosed, markPartial, markNotDisclosed,
-  markNotApplicable, markUnderReview, attachCmaEvidence, recordCmaGap, createCma,
+  markNotApplicable, markUnderReview, attachCmaEvidence, recordCmaGap, createCma, updateCma,
   cmaStatusTone, cmaStatusLabel, articleLabel, hasGap, hasEvidence,
   type CmaDisclosure as CmaD, type CmaReadiness as CmaR, type CmaStatus,
 } from '../../lib/sustainabilityCma';
@@ -1404,6 +1404,7 @@ function CmaTab() {
   const [evidencingId, setEvidencingId] = useState<number | null>(null);
   const [gappingId, setGappingId]       = useState<{ id: number; toStatus?: 'PARTIAL' | 'NOT_DISCLOSED' } | null>(null);
   const [openNew, setOpenNew]           = useState(false);
+  const [editCma, setEditCma]           = useState<CmaD | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -1547,6 +1548,75 @@ function CmaTab() {
       label: isAr ? 'نص المتطلب (إنجليزي)' : 'Requirement (English)' },
   ];
 
+  // Edit-disclosure — descriptive fields only. Disclosure status is owned by
+  // the mark-* actions, evidence by Attach, and gaps by Gap, so none of those
+  // are in this form. disclosureStatus is echoed back deliberately: the entity
+  // defaults the column to "UNDER_REVIEW", so an omitted value would
+  // deserialize to that default and update() would overwrite the reviewer's
+  // real classification. The service re-applies Rules 5/6 against it on save.
+  const editFields: FieldDef[] = [
+    { kind: 'text', key: 'titleEn', required: true, span: 6,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', span: 6,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'text', key: 'responsibleDepartment', span: 6,
+      label: isAr ? 'الإدارة المسؤولة' : 'Responsible department' },
+    { kind: 'text', key: 'reportSectionReference', span: 6,
+      label: isAr ? 'مرجع قسم التقرير' : 'Report section reference' },
+    { kind: 'text', key: 'reviewerName', span: 6,
+      label: isAr ? 'اسم المراجع' : 'Reviewer name' },
+    { kind: 'text', key: 'reviewerEmail', span: 6,
+      label: isAr ? 'بريد المراجع' : 'Reviewer email' },
+    { kind: 'textarea', key: 'requirementEn', span: 12, rows: 2,
+      label: isAr ? 'نص المتطلب (إنجليزي)' : 'Requirement (English)' },
+    { kind: 'textarea', key: 'requirementAr', span: 12, rows: 2,
+      label: isAr ? 'نص المتطلب (عربي)' : 'Requirement (Arabic)' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    titleEn:                editCma?.titleEn ?? '',
+    titleAr:                editCma?.titleAr ?? '',
+    responsibleDepartment:  editCma?.responsibleDepartment ?? '',
+    reportSectionReference: editCma?.reportSectionReference ?? '',
+    reviewerName:           editCma?.reviewerName ?? '',
+    reviewerEmail:          editCma?.reviewerEmail ?? '',
+    requirementEn:          editCma?.requirementEn ?? '',
+    requirementAr:          editCma?.requirementAr ?? '',
+    notes:                  editCma?.notes ?? '',
+  }), [editCma]);
+
+  async function submitEdit(values: Record<string, unknown>): Promise<void> {
+    if (!editCma?.id) return;
+    const titleEn = String(values.titleEn ?? '').trim();
+    if (!titleEn) {
+      toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'English title is required');
+      return;
+    }
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    try {
+      await updateCma(editCma.id, {
+        disclosureStatus: editCma.disclosureStatus,
+        titleEn,
+        titleAr: str(values.titleAr),
+        requirementEn: str(values.requirementEn),
+        requirementAr: str(values.requirementAr),
+        responsibleDepartment: str(values.responsibleDepartment),
+        reportSectionReference: str(values.reportSectionReference),
+        reviewerName: str(values.reviewerName),
+        reviewerEmail: str(values.reviewerEmail),
+        notes: str(values.notes),
+      });
+      toast.success(isAr ? 'حُدّث الإفصاح' : 'Disclosure updated');
+      setEditCma(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث الإفصاح' : 'Failed to update disclosure'));
+    }
+  }
+
   async function submitCreate(values: Record<string, unknown>): Promise<void> {
     const titleEn = String(values.titleEn ?? '').trim();
     const article = String(values.article ?? '').trim();
@@ -1662,6 +1732,9 @@ function CmaTab() {
                           )}
                         </div>
                         <div className="esg-disclosure-row__btn-row">
+                          <Button size="sm" variant="ghost" Icon={Pencil}
+                            title={isAr ? 'تعديل' : 'Edit'}
+                            onClick={() => setEditCma(d)} />
                           <Button size="sm" variant="secondary" Icon={Paperclip} onClick={() => setEvidencingId(d.id!)}>
                             {isAr ? 'إرفاق دليل' : 'Attach'}
                           </Button>
@@ -1714,6 +1787,19 @@ function CmaTab() {
         submitLabel={isAr ? 'إضافة الإفصاح' : 'Add disclosure'}
         onClose={() => setOpenNew(false)}
         onSubmit={submitCreate}
+      />
+
+      <FormModal
+        open={editCma !== null}
+        title={editCma
+          ? (isAr ? `تعديل الإفصاح · ${articleLabel(editCma, 'ar')}` : `Edit disclosure · ${articleLabel(editCma, 'en')}`)
+          : ''}
+        fields={editFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditCma(null)}
+        onSubmit={submitEdit}
       />
     </div>
   );
