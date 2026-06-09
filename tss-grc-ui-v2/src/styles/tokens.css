@@ -230,12 +230,24 @@
   --sidebar-w:   280px;
   --header-h:    64px;
   --content-max: 1440px;
+
+  /* ─── Display scale (font size) ────────────────────────
+   * One multiplier that zooms the whole workspace uniformly so every text
+   * size — token-based or hardcoded px — scales together. Exposed as the
+   * "Font size" option in تخصيص مساحة العمل; applied via body{zoom} below. */
+  --ui-scale:    1;
 }
 
 /* RTL switches font stack */
 [dir="rtl"] {
   --font-sans: "IBM Plex Sans Arabic", "Plus Jakarta Sans", system-ui, sans-serif;
 }
+
+/* Whole-UI display scale. `zoom` scales layout + type together (unlike
+   transform: scale, it reflows and keeps fixed/sticky positioning correct),
+   so the "Font size" control affects every glyph in the app regardless of
+   whether a given rule used a token or a hardcoded px value. */
+body { zoom: var(--ui-scale, 1); }
 
 /* ============================================================
    Dark mode — eye-comfort enterprise dark palette.

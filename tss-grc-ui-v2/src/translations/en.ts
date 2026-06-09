@@ -492,7 +492,7 @@ export const en = {
   // Settings page
   settingsEyebrow: 'Workspace',
   settingsTitle: 'Personalize your workspace',
-  settingsSub: 'Adjust colors, sidebar and layout. Changes apply live and persist on this device.',
+  settingsSub: 'Adjust colors, font size, sidebar and layout. Changes apply live and persist on this device.',
   settingsReset: 'Reset to defaults',
   settingsPresets: 'Theme presets',
   settingsColors: 'Colors',
@@ -514,6 +514,14 @@ export const en = {
   sizeSidebar: 'Sidebar width',
   sizeHeader: 'Header height',
   sizeRadius: 'Border radius',
+  sizeFontScale: 'Font size',
+  secSizing: 'Sizing',
+
+  settingsQuickColors: 'Quick colors',
+  fontScaleS: 'Small',
+  fontScaleM: 'Default',
+  fontScaleL: 'Large',
+  fontScaleXl: 'Extra large',
 
   presetDefault: 'Eye-Comfort Default',
   presetSand: 'Sand',

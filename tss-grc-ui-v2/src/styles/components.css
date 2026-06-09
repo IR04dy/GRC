@@ -1820,6 +1820,124 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
   box-shadow: 0 0 0 2px rgba(255,255,255,.12);
 }
 
+/* ═══ Workspace customizer · quick brand swatches ════════════════════
+   Premium one-click recolour chips. A dual-tone conic fill previews the
+   primary+accent pairing; the active chip lifts into a brand ring + check. */
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 2px 0 12px;
+}
+.brand-swatch {
+  --sw-primary: var(--primary);
+  --sw-accent:  var(--accent);
+  position: relative;
+  width: 38px; height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+  /* 3/4 primary, 1/4 accent — the pairing reads at a glance; the radial
+     highlight gives it a soft, dimensional, high-end finish. */
+  background:
+    radial-gradient(120% 120% at 30% 22%, rgba(255,255,255,.30), transparent 44%),
+    conic-gradient(from 220deg, var(--sw-accent) 0 25%, var(--sw-primary) 25% 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.32),
+    inset 0 -2px 5px rgba(0,0,0,.18),
+    var(--shadow-1);
+  transition: transform var(--dur-fast) var(--ease-spring),
+              box-shadow var(--dur-fast) var(--ease-standard);
+}
+.brand-swatch::after {
+  content: '';
+  position: absolute; inset: -4px;
+  border-radius: var(--r-pill);
+  border: 2px solid transparent;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              box-shadow var(--dur-fast) var(--ease-standard);
+}
+.brand-swatch > svg { filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+.brand-swatch:hover {
+  transform: translateY(-3px) scale(1.06);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.32),
+    inset 0 -2px 5px rgba(0,0,0,.18),
+    var(--shadow-2);
+}
+.brand-swatch:focus-visible { outline: none; }
+.brand-swatch:focus-visible::after { border-color: var(--sw-primary); }
+.brand-swatch.active { transform: scale(1.05); }
+.brand-swatch.active::after {
+  border-color: var(--sw-primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--sw-primary) 22%, transparent);
+}
+
+/* ═══ Workspace customizer · font-size (display scale) control ═══════
+   High-end segmented control. Each tile previews its scale with a sized
+   "Aa"; the active tile lifts into a brand-tinted, ringed, glowing state. */
+.scale-seg {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 2px 0 6px;
+}
+.scale-seg-btn {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 7px;
+  min-height: 72px;
+  padding: 12px 6px 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform var(--dur-fast) var(--ease-spring),
+              border-color var(--dur-fast) var(--ease-standard),
+              box-shadow var(--dur-fast) var(--ease-standard),
+              background var(--dur-fast) var(--ease-standard);
+}
+.scale-seg-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-200);
+  box-shadow: var(--shadow-1);
+}
+.scale-seg-btn.active {
+  border-color: var(--primary);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--primary) 10%, var(--surface)) 0%,
+    var(--surface) 100%);
+  box-shadow:
+    0 0 0 1px var(--primary),
+    0 6px 18px color-mix(in oklab, var(--primary) 18%, transparent);
+}
+.scale-seg-aa {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-1);
+  letter-spacing: var(--tracking-tight);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.scale-seg-btn.active .scale-seg-aa { color: var(--primary); }
+.scale-seg-aa[data-size="s"]  { font-size: 15px; }
+.scale-seg-aa[data-size="m"]  { font-size: 19px; }
+.scale-seg-aa[data-size="l"]  { font-size: 24px; }
+.scale-seg-aa[data-size="xl"] { font-size: 30px; }
+.scale-seg-label {
+  font: 800 9.5px var(--font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.scale-seg-btn:hover .scale-seg-label { color: var(--ink-2); }
+.scale-seg-btn.active .scale-seg-label { color: var(--primary); }
+
 /* ─── Stepper (workflow stages) ─────────────────── */
 .stepper {
   display: flex; align-items: flex-start;

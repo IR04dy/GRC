@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ColorField } from '../components/ui/ColorField';
 import { RangeField } from '../components/ui/RangeField';
-import { useTheme, TOKEN_DEFS, PRESETS, DEFAULT_VALUES, type Preset, type TokenKey } from '../lib/theme';
+import { useTheme, TOKEN_DEFS, PRESETS, DEFAULT_VALUES, BRAND_SWATCHES, FONT_SCALES, type Preset, type TokenKey } from '../lib/theme';
 import { useI18n } from '../lib/i18n';
 import { cn } from '../lib/cn';
 
@@ -26,6 +26,18 @@ export function SettingsPage() {
     return ''; // user has a hand-tuned theme, no preset matches
   }
   const activePreset = activePresetId();
+
+  // One-click brand recolour — sets primary + accent together, leaving
+  // surfaces/sidebar untouched so it layers cleanly on any preset or mode.
+  const applySwatch = (primary: string, accent: string) => {
+    setOverride('primary', primary);
+    setOverride('accent', accent);
+  };
+  const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const activeSwatch = BRAND_SWATCHES.find(
+    s => eq(resolve('primary'), s.primary) && eq(resolve('accent'), s.accent),
+  );
+  const fontScale = resolve('ui-scale');
 
   return (
     <Shell title={t('itemSettings')} sub={t('settingsSub')}>
@@ -63,6 +75,24 @@ export function SettingsPage() {
 
       <div className="dash-grid">
         <Card title={t('settingsColors')} Icon={Pipette}>
+          <SectionLabel>{t('settingsQuickColors')}</SectionLabel>
+          <div className="swatch-row">
+            {BRAND_SWATCHES.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                className={cn('brand-swatch', activeSwatch?.id === s.id && 'active')}
+                style={{ '--sw-primary': s.primary, '--sw-accent': s.accent } as React.CSSProperties}
+                onClick={() => applySwatch(s.primary, s.accent)}
+                aria-label={s.id}
+                aria-pressed={activeSwatch?.id === s.id}
+                title={s.id}
+              >
+                {activeSwatch?.id === s.id && <Check size={14} strokeWidth={3} />}
+              </button>
+            ))}
+          </div>
+
           <SectionLabel>{t('secSurface')}</SectionLabel>
           {surfaceTokens.map(d => (
             <ColorField
@@ -101,6 +131,23 @@ export function SettingsPage() {
         </Card>
 
         <Card title={t('settingsLayout')} Icon={Sliders}>
+          <SectionLabel>{t('sizeFontScale')}</SectionLabel>
+          <div className="scale-seg" role="group" aria-label={t('sizeFontScale')}>
+            {FONT_SCALES.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                className={cn('scale-seg-btn', fontScale === s.value && 'active')}
+                onClick={() => setOverride('ui-scale', s.value === '1' ? undefined : s.value)}
+                aria-pressed={fontScale === s.value}
+              >
+                <span className="scale-seg-aa" data-size={s.id}>Aa</span>
+                <span className="scale-seg-label">{t(s.labelKey, s.id)}</span>
+              </button>
+            ))}
+          </div>
+
+          <SectionLabel>{t('secSizing')}</SectionLabel>
           {layoutTokens.map(d => (
             <RangeField
               key={d.key}

@@ -8,16 +8,17 @@ export type TokenKey =
   | 'primary' | 'primary-hover' | 'primary-press'
   | 'accent'
   | 'sb-bg' | 'sb-text' | 'sb-active-bg' | 'sb-accent'
-  | 'sidebar-w' | 'header-h' | 'r-md';
+  | 'sidebar-w' | 'header-h' | 'r-md'
+  | 'ui-scale';
 
 export type ThemeOverrides = Partial<Record<TokenKey, string>>;
 
 export interface TokenDef {
   key: TokenKey;
-  kind: 'color' | 'size';
+  kind: 'color' | 'size' | 'scale';
   default: string;
   /** Section (UI grouping) this token belongs to. */
-  group: 'surface' | 'brand' | 'sidebar' | 'layout';
+  group: 'surface' | 'brand' | 'sidebar' | 'layout' | 'type';
   /** Translation key for the label. */
   labelKey: string;
   /** For size tokens. */
@@ -40,6 +41,8 @@ export const TOKEN_DEFS: TokenDef[] = [
   { key: 'sidebar-w',    kind: 'size',  default: '280px',   group: 'layout',   labelKey: 'sizeSidebar', min: 220, max: 360, unit: 'px' },
   { key: 'header-h',     kind: 'size',  default: '64px',    group: 'layout',   labelKey: 'sizeHeader',  min: 52,  max: 88,  unit: 'px' },
   { key: 'r-md',         kind: 'size',  default: '8px',     group: 'layout',   labelKey: 'sizeRadius',  min: 0,   max: 16,  unit: 'px' },
+
+  { key: 'ui-scale',     kind: 'scale', default: '1',       group: 'type',     labelKey: 'sizeFontScale' },
 ];
 
 export const DEFAULT_VALUES: Record<TokenKey, string> = TOKEN_DEFS.reduce(
@@ -162,6 +165,38 @@ export const PRESETS: Preset[] = [
       'sb-accent': '#D4A437',
     },
   },
+];
+
+// ─── Quick-pick brand colours ────────────────────────────────────────────────
+// One-click recolour of the brand (primary + accent) that layers on top of ANY
+// theme/preset and any light/dark mode — it only touches the two brand tokens,
+// leaving surfaces + sidebar intact. Curated, contrast-checked pairings.
+export interface BrandSwatch { id: string; primary: string; accent: string; }
+export const BRAND_SWATCHES: BrandSwatch[] = [
+  { id: 'teal',     primary: '#0E5E5E', accent: '#C8932A' },
+  { id: 'cobalt',   primary: '#0F62CC', accent: '#D89B2A' },
+  { id: 'sky',      primary: '#3D7DCB', accent: '#F2A07B' },
+  { id: 'emerald',  primary: '#1E7A52', accent: '#C8932A' },
+  { id: 'mint',     primary: '#2EA37C', accent: '#E07A5F' },
+  { id: 'violet',   primary: '#6A4E8E', accent: '#C8B042' },
+  { id: 'plum',     primary: '#8E3B6B', accent: '#E5B547' },
+  { id: 'rose',     primary: '#B33F65', accent: '#C8932A' },
+  { id: 'terra',    primary: '#B85042', accent: '#7C9070' },
+  { id: 'amber',    primary: '#B97A2A', accent: '#1E5F74' },
+  { id: 'indigo',   primary: '#3A4DA6', accent: '#D6A22F' },
+  { id: 'graphite', primary: '#3F4A50', accent: '#C8B042' },
+];
+
+// ─── Font size (display scale) levels ────────────────────────────────────────
+// A single --ui-scale multiplier zooms the whole workspace uniformly, so every
+// text size — token-based or hardcoded px — scales together. Works in light,
+// dark and every preset. '1' is the default (clears the override entirely).
+export interface FontScale { id: string; value: string; labelKey: string; }
+export const FONT_SCALES: FontScale[] = [
+  { id: 's',  value: '0.9',  labelKey: 'fontScaleS'  },
+  { id: 'm',  value: '1',    labelKey: 'fontScaleM'  },
+  { id: 'l',  value: '1.1',  labelKey: 'fontScaleL'  },
+  { id: 'xl', value: '1.25', labelKey: 'fontScaleXl' },
 ];
 
 // ─── Provider ────────────────────────────────────────────────────────────────

@@ -488,7 +488,7 @@ export const ar = {
   // Settings page
   settingsEyebrow: 'مساحة العمل',
   settingsTitle: 'تخصيص مساحة العمل',
-  settingsSub: 'تعديل الألوان والشريط الجانبي والتخطيط. التغييرات تُطبَّق فورًا وتُحفظ على هذا الجهاز.',
+  settingsSub: 'تعديل الألوان وحجم الخط والشريط الجانبي والتخطيط. التغييرات تُطبَّق فورًا وتُحفظ على هذا الجهاز.',
   settingsReset: 'استعادة الافتراضيات',
   settingsPresets: 'أنماط جاهزة',
   settingsColors: 'الألوان',
@@ -510,6 +510,14 @@ export const ar = {
   sizeSidebar: 'عرض الشريط الجانبي',
   sizeHeader: 'ارتفاع الشريط العلوي',
   sizeRadius: 'انحناء الزوايا',
+  sizeFontScale: 'حجم الخط',
+  secSizing: 'القياسات',
+
+  settingsQuickColors: 'ألوان سريعة',
+  fontScaleS: 'صغير',
+  fontScaleM: 'افتراضي',
+  fontScaleL: 'كبير',
+  fontScaleXl: 'كبير جدًا',
 
   presetDefault: 'الافتراضي · مريح للعين',
   presetSand: 'رملي',
