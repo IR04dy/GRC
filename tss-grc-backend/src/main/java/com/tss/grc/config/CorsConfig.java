@@ -31,7 +31,12 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(allowedOrigins);
+        // Use allowedOriginPatterns (not allowedOrigins) so entries may contain
+        // wildcards — required for dev LAN access (e.g. http://192.168.*:[*])
+        // while still permitting credentials (the HttpOnly refresh cookie).
+        // Plain, wildcard-free entries still match exactly, so prod behaviour
+        // is unchanged.
+        config.setAllowedOriginPatterns(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
         config.setExposedHeaders(List.of("Authorization", "X-Total-Count", "X-Page-Number", "X-Page-Size"));

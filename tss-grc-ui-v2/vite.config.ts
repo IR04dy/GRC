@@ -20,6 +20,11 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    // Bind to 0.0.0.0 so the dev server is reachable from other machines on
+    // the LAN (not just localhost). allowedHosts:true lets Vite serve requests
+    // whose Host header is the LAN IP / hostname instead of localhost.
+    host: true,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8084',

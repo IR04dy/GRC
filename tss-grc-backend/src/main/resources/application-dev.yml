@@ -63,7 +63,12 @@ grc:
     access-token-expiry-ms: 3600000       # 1 hour in dev
     refresh-token-expiry-ms: 604800000
   cors:
-    allowed-origins: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8086,http://127.0.0.1:8086,http://localhost:8087,http://127.0.0.1:8087"
+    # Exact localhost/127.0.0.1 origins for same-machine dev, plus private-LAN
+    # wildcard patterns (192.168.x / 10.x / 172.x on any port) so the dev UI is
+    # reachable from another machine on the LAN without per-IP config. These are
+    # treated as allowed-origin PATTERNS (see CorsConfig) — wildcards work with
+    # credentials. DEV ONLY; prod is same-origin behind Nginx.
+    allowed-origins: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8086,http://127.0.0.1:8086,http://localhost:8087,http://127.0.0.1:8087,http://192.168.*:[*],http://10.*:[*],http://172.*:[*]"
   security:
     max-failed-login-attempts: 99
     lockout-duration-minutes: 1
