@@ -9,7 +9,7 @@
 // still type-checked by `npm run typecheck`, so a broken refactor of
 // {@code lib/mobileCrisis.ts} surfaces in CI.
 
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import { strict as assert } from 'node:assert';
 // Import from the pure-helper module — avoids dragging in lib/api.ts
 // which reads import.meta.env at evaluation time (Vite-only). Mirrors the

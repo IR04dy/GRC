@@ -11,7 +11,7 @@
 // typecheck` (tsc -b --noEmit), so a broken refactor in
 // {@code lib/threeLines.ts} surfaces in CI even without a test runner.
 
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import { strict as assert } from 'node:assert';
 // Import directly from the pure-helper module — avoids dragging in
 // {@code lib/api.ts} which reads {@code import.meta.env} at evaluation

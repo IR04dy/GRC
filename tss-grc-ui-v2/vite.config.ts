@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
@@ -43,5 +43,11 @@ export default defineConfig({
   build: {
     sourcemap: true,
     target: 'es2022',
+  },
+  // WS14 (FUNC-001): frontend test runner. `npm test` -> vitest.
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
   },
 });
