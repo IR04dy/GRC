@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.cycle.runtime.observer.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.bcm.cycle.runtime.ExerciseRunProjections;
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.InjectView;
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.ResponseView;
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.RunSummary;
@@ -573,43 +574,21 @@ public class ExerciseObserverService {
         log.debug("emitted {} for {} #{}", trigger, entityType, entityId);
     }
 
+    // Runtime-projection helpers are shared with ExerciseRuntimeService via
+    // ExerciseRunProjections (QUAL-BCMP-002). These thin private methods keep
+    // the existing call sites (incl. method references) unchanged while
+    // delegating the actual mapping to the single source.
+
     private RunSummary summarise(ExerciseRun r) {
-        Long orgId = r.getOrganisationId();
-        long pending      = runInjectRepo.countByOrganisationIdAndExerciseRunIdAndStatus(orgId, r.getId(), "PENDING");
-        long dispatched   = runInjectRepo.countByOrganisationIdAndExerciseRunIdAndStatus(orgId, r.getId(), "DISPATCHED");
-        long acknowledged = runInjectRepo.countByOrganisationIdAndExerciseRunIdAndStatus(orgId, r.getId(), "ACKNOWLEDGED");
-        long completed    = runInjectRepo.countByOrganisationIdAndExerciseRunIdAndStatus(orgId, r.getId(), "COMPLETED");
-        long skipped      = runInjectRepo.countByOrganisationIdAndExerciseRunIdAndStatus(orgId, r.getId(), "SKIPPED");
-        long total        = pending + dispatched + acknowledged + completed + skipped;
-        long dispatchedOrMore = dispatched + acknowledged + completed;
-        return new RunSummary(
-            r.getId(), r.getExerciseId(), r.getRunCode(), r.getStatus(), r.getChannel(),
-            r.getFacilitatorUserId(), r.getParticipantCount(),
-            r.getStartedAt(), r.getEndedAt(), r.getCreatedAt(),
-            (int) total, (int) dispatchedOrMore, (int) pending
-        );
+        return ExerciseRunProjections.summarise(runInjectRepo, r);
     }
 
     private InjectView toInjectView(Long orgId, ExerciseRunInject i) {
-        long responseCount = responseRepo.countByOrganisationIdAndRunInjectId(orgId, i.getId());
-        return new InjectView(
-            i.getId(), i.getSourceInjectId(),
-            i.getPlannedTimeOffsetMinutes(), i.getActualDispatchedAt(),
-            i.getInjectType(), i.getInjectTextEn(), i.getInjectTextAr(),
-            i.getExpectedActionEn(), i.getExpectedActionAr(),
-            i.getStatus(), (int) responseCount
-        );
+        return ExerciseRunProjections.toInjectView(responseRepo, orgId, i);
     }
 
     private static ResponseView toResponseView(ExerciseRunResponse r) {
-        return new ResponseView(
-            r.getId(), r.getRunInjectId(), r.getParticipantUserId(),
-            r.getResponseTextEn(), r.getResponseTextAr(),
-            r.getDecisionMadeEn(), r.getDecisionMadeAr(),
-            r.getResponseAt(), r.getResponseTimeSeconds(),
-            r.getQualityScore(),
-            r.getFacilitatorCommentEn(), r.getFacilitatorCommentAr()
-        );
+        return ExerciseRunProjections.toResponseView(r);
     }
 
     private static AssignmentView toAssignmentView(ExerciseObserverAssignment a) {
@@ -631,10 +610,11 @@ public class ExerciseObserverService {
         );
     }
 
-    private static String nullSafe(String s) { return s == null ? "" : s; }
+    private static String nullSafe(String s) {
+        return ExerciseRunProjections.nullSafe(s);
+    }
 
     private static String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
+        return ExerciseRunProjections.truncate(s, max);
     }
 }
