@@ -4,18 +4,22 @@ import { I18nProvider } from './lib/i18n';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
 import { DialogProvider } from './lib/dialog';
-// ─── Critical-path pages (sidebar landings + login + dashboard) stay eager. ───
+// ─── Critical path: only the login page stays eager (first paint). LH-01/WS13:
+//     the module landings used to be eager too, which bundled them all into the
+//     initial chunk (~1.8 MB on /login). They are now lazy like every other
+//     route (the <Routes> block is already wrapped in <Suspense>), so the
+//     initial bundle ships essentially just the login screen. ───
 import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { RiskRegisterPage } from './pages/risk/RiskRegisterPage';
-import { CyberPage } from './pages/cyber/CyberPage';
-import { BcmWorkspacePage } from './pages/bcm/BcmWorkspacePage';
-import { PrivacyPage } from './pages/privacy/PrivacyPage';
-import { CompliancePage } from './pages/compliance/CompliancePage';
-import { TprmPage } from './pages/tprm/TprmPage';
-import { IncidentsPage } from './pages/incidents/IncidentsPage';
-import { EvidencePage } from './pages/evidence/EvidencePage';
+const DashboardPage      = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const SettingsPage       = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const RiskRegisterPage   = lazy(() => import('./pages/risk/RiskRegisterPage').then(m => ({ default: m.RiskRegisterPage })));
+const CyberPage          = lazy(() => import('./pages/cyber/CyberPage').then(m => ({ default: m.CyberPage })));
+const BcmWorkspacePage   = lazy(() => import('./pages/bcm/BcmWorkspacePage').then(m => ({ default: m.BcmWorkspacePage })));
+const PrivacyPage        = lazy(() => import('./pages/privacy/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
+const CompliancePage     = lazy(() => import('./pages/compliance/CompliancePage').then(m => ({ default: m.CompliancePage })));
+const TprmPage           = lazy(() => import('./pages/tprm/TprmPage').then(m => ({ default: m.TprmPage })));
+const IncidentsPage      = lazy(() => import('./pages/incidents/IncidentsPage').then(m => ({ default: m.IncidentsPage })));
+const EvidencePage       = lazy(() => import('./pages/evidence/EvidencePage').then(m => ({ default: m.EvidencePage })));
 
 // ─── Secondary pages — lazy-loaded; each becomes its own chunk. ───
 const VulnerabilitiesV2Page  = lazy(() => import('./pages/cyber/VulnerabilitiesV2Page').then(m => ({ default: m.VulnerabilitiesV2Page })));
