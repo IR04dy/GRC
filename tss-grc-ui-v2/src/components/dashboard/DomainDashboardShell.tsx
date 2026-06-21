@@ -30,9 +30,14 @@ import { useI18n } from '../../lib/i18n';
 export interface DomainDashboardKpi {
   Icon: LucideIcon;
   label: string;
-  value: string | number;
+  /** `null` / `undefined` renders the no-data em-dash treatment (UX-008). */
+  value: string | number | null | undefined;
   tone?: 'primary' | 'success' | 'warning' | 'danger' | 'info';
   to?: string;
+  /** Pre-translated tooltip for the no-data em-dash when `value` is null/undefined. */
+  emptyHint?: string;
+  /** Render a confirming ✓ cue when the value is a genuine, meaningful zero. */
+  zeroConfirm?: boolean;
 }
 
 export interface DomainDashboardWidget {
@@ -72,7 +77,8 @@ export function DomainDashboardShell({
       {kpis.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 12, marginBottom: 14 }}>
           {kpis.map((k, i) => (
-            <Kpi key={i} Icon={k.Icon} label={k.label} value={k.value} tone={k.tone} to={k.to} />
+            <Kpi key={i} Icon={k.Icon} label={k.label} value={k.value} tone={k.tone} to={k.to}
+              emptyHint={k.emptyHint} zeroConfirm={k.zeroConfirm} />
           ))}
         </div>
       )}

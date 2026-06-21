@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ClipboardCheck, FileText, ShieldCheck, Timer, Building2, BookOpen, Bell } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, FileText, ShieldCheck, Timer, Building2, BookOpen, Bell, Check } from 'lucide-react';
 import { DomainDashboardShell, type DomainDashboardKpi, type DomainDashboardWidget } from '../../components/dashboard/DomainDashboardShell';
 import { DashboardLoading, DashboardError } from '../../components/dashboard/DashboardLoadingState';
 import { Badge } from '../../components/ui/Badge';
@@ -62,18 +62,30 @@ export function BcmDashboardPage() {
   }
   const stats = data;
 
+  // UX-008 — tooltip for an unavailable/uninitialised metric, so a "—" tile
+  // reads as "not yet measured" and never collapses to a misleading 0.
+  const notComputed = isAr ? 'لم يُحتسب بعد' : 'Not yet computed';
+
   const kpis: DomainDashboardKpi[] = [
-    { Icon: Building2, label: isAr ? 'خدمات حرجة' : 'Critical services', value: stats.criticalServiceCount ?? 0, tone: 'primary' },
-    { Icon: ClipboardCheck, label: isAr ? 'اكتمال BIA' : 'BIA completion', value: `${stats.biaCompletionPercent ?? 0}%`,
-      tone: tonePct(stats.biaCompletionPercent) },
-    { Icon: FileText, label: isAr ? 'اكتمال BCP' : 'BCP completion', value: `${stats.bcpCompletionPercent ?? 0}%`,
-      tone: tonePct(stats.bcpCompletionPercent) },
-    { Icon: ShieldCheck, label: isAr ? 'اكتمال DRP' : 'DRP completion', value: `${stats.drpCompletionPercent ?? 0}%`,
-      tone: tonePct(stats.drpCompletionPercent) },
-    { Icon: Timer, label: isAr ? 'الالتزام بـ RTO' : 'RTO compliance', value: `${stats.rtoCompliancePercent ?? 0}%`,
-      tone: tonePct(stats.rtoCompliancePercent) },
-    { Icon: AlertTriangle, label: isAr ? 'فجوات مفتوحة' : 'Open BCM gaps', value: stats.openGaps ?? 0,
-      tone: (stats.openGaps ?? 0) > 0 ? 'warning' : 'success' },
+    { Icon: Building2, label: isAr ? 'خدمات حرجة' : 'Critical services', value: stats.criticalServiceCount,
+      tone: 'primary', emptyHint: notComputed },
+    { Icon: ClipboardCheck, label: isAr ? 'اكتمال BIA' : 'BIA completion',
+      value: stats.biaCompletionPercent == null ? null : `${stats.biaCompletionPercent}%`,
+      tone: tonePct(stats.biaCompletionPercent), emptyHint: notComputed },
+    { Icon: FileText, label: isAr ? 'اكتمال BCP' : 'BCP completion',
+      value: stats.bcpCompletionPercent == null ? null : `${stats.bcpCompletionPercent}%`,
+      tone: tonePct(stats.bcpCompletionPercent), emptyHint: notComputed },
+    { Icon: ShieldCheck, label: isAr ? 'اكتمال DRP' : 'DRP completion',
+      value: stats.drpCompletionPercent == null ? null : `${stats.drpCompletionPercent}%`,
+      tone: tonePct(stats.drpCompletionPercent), emptyHint: notComputed },
+    { Icon: Timer, label: isAr ? 'الالتزام بـ RTO' : 'RTO compliance',
+      value: stats.rtoCompliancePercent == null ? null : `${stats.rtoCompliancePercent}%`,
+      tone: tonePct(stats.rtoCompliancePercent), emptyHint: notComputed },
+    // Open BCM gaps — zero here is genuinely good ("clean"), so a real 0 gets a
+    // confirming ✓ + success tint, while a missing metric shows the no-data dash.
+    { Icon: AlertTriangle, label: isAr ? 'فجوات مفتوحة' : 'Open BCM gaps', value: stats.openGaps,
+      tone: (stats.openGaps ?? 0) > 0 ? 'warning' : 'success',
+      zeroConfirm: true, emptyHint: notComputed },
   ];
 
   const readinessBands = ragBands();
@@ -141,8 +153,10 @@ export function BcmDashboardPage() {
       badgeTone: 'warning',
       body: (
         <div className="text-xs" style={{ lineHeight: 1.8 }}>
-          <div>{isAr ? 'فجوات مفتوحة' : 'Open gaps'}: <strong>{stats.openGaps}</strong></div>
-          <div>{isAr ? 'CAPAs متأخرة' : 'Overdue CAPAs'}: <Badge tone="danger">{stats.overdueCapas}</Badge></div>
+          {/* UX-008 — a genuine 0 reads as "clean" (✓), a missing metric as the
+              no-data em-dash, so the two never look identical in the record list. */}
+          <div>{isAr ? 'فجوات مفتوحة' : 'Open gaps'}: <MetricCount value={stats.openGaps} zeroGood hint={notComputed} /></div>
+          <div>{isAr ? 'CAPAs متأخرة' : 'Overdue CAPAs'}: <MetricCount value={stats.overdueCapas} zeroGood danger hint={notComputed} /></div>
         </div>
       ),
       href: '/bcm?tab=gaps',
@@ -279,4 +293,34 @@ export function BcmDashboardPage() {
       widgets={widgets}
     />
   );
+}
+
+/**
+ * Inline metric for the recent-records / gaps list (UX-008). Distinguishes:
+ *   • no-data (null/undefined) → the existing `.empty-inline-compact` em-dash
+ *     with a "not yet computed" tooltip;
+ *   • a genuine, good zero (`zeroGood`) → a confirming ✓ + the number in
+ *     success tone, so "0 open gaps" reads as clean rather than unmeasured;
+ *   • any other value → bold in the caller's tone.
+ */
+function MetricCount({ value, zeroGood, danger, hint }: {
+  value: number | null | undefined;
+  zeroGood?: boolean;
+  danger?: boolean;
+  hint: string;
+}) {
+  if (value == null) {
+    return (
+      <span className="empty-inline-compact" title={hint} aria-label={hint}
+        style={{ display: 'inline', color: 'var(--ink-4)', fontWeight: 700 }}>—</span>
+    );
+  }
+  if (zeroGood && value === 0) {
+    return (
+      <strong style={{ color: 'var(--success-fg)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+        <Check size={13} strokeWidth={3} aria-hidden /> 0
+      </strong>
+    );
+  }
+  return <strong style={danger ? { color: 'var(--danger-fg)' } : undefined}>{value}</strong>;
 }

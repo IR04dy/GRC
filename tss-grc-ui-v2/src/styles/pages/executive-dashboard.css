@@ -1,0 +1,87 @@
+/* ──────────────────────────────────────────────────────────────────────
+ * Executive dashboard — page-scoped layout (UX-005).
+ *
+ * Fixes the mobile hero: on the desktop the posture gauge sits in a second
+ * `auto` column beside the greeting, but under ~640px that two-column
+ * composition crushed the gauge and greeting into one another, so the
+ * headline governance number overlapped the clipped Arabic caption.
+ *
+ * Here the hero is the single source of truth for its own layout (the
+ * inline grid styles were moved out so these media queries can win — inline
+ * styles otherwise out-specify a stylesheet rule). Shared base files
+ * (tokens.css / shell.css / components.css) are deliberately untouched.
+ *
+ * RTL: uses logical properties only; the hero is symmetric so it needs no
+ * direction-specific override.
+ * ────────────────────────────────────────────────────────────────────── */
+
+.exec-hero {
+  background: linear-gradient(135deg, var(--primary-50) 0%, var(--surface-2) 100%);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  padding: 24px 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  /* Stable floor so the hero never collapses to a banner on a short
+     greeting/caption — the focal posture gauge sets the visual weight. */
+  min-height: 200px;
+}
+
+.exec-hero-text { min-width: 0; }
+
+.exec-hero-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* Phone (<=640px): stack greeting -> gauge -> caption/delta vertically with
+ * explicit gaps so the gauge and text never overlap, drop the rigid floor,
+ * shrink to a single centred column, and centre the text block. The gauge
+ * itself is rendered at a smaller pixel size from the component (the SVG has
+ * hard width/height attributes that CSS can't scale), so this just reflows
+ * the surrounding box. */
+@media (max-width: 640px) {
+  .exec-hero {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    min-height: 0;
+    padding: 20px;
+    text-align: center;
+  }
+  .exec-hero-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  /* The date / "all figures live" meta row wraps and centres instead of
+     forcing a wide single line that pushes the gauge sideways. */
+  .exec-hero-meta {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .exec-hero-gauge { padding: 0; }
+}
+
+/* Export / chrome action row on the dashboard page header. On phones the
+ * three board-pack buttons + export menu used to stack full-width and eat the
+ * first screen before any KPI. Collapse them into a single horizontally
+ * scrollable strip so the score + KPIs own the first mobile screen. */
+.dash-actions { flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .dash-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+    padding-bottom: 2px;
+  }
+  .dash-actions::-webkit-scrollbar { display: none; }
+  .dash-actions > * { flex: 0 0 auto; }
+}

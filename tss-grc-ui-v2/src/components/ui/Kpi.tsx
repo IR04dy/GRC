@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { type LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
+import { type LucideIcon, TrendingUp, TrendingDown, Check } from 'lucide-react';
 import { DirectionalArrow } from '../rtl/DirectionalArrow';
 import { Link } from 'react-router-dom';
 
@@ -8,7 +8,25 @@ type KpiTone = 'primary' | 'danger' | 'success' | 'warning' | 'info' | 'accent' 
 interface KpiProps {
   Icon: LucideIcon;
   label: string;
-  value: string | number;
+  /**
+   * The metric value. `null` / `undefined` is treated as an
+   * unavailable/uninitialised metric (NOT a genuine zero) and renders the
+   * `.empty-inline-compact` em-dash treatment with `emptyHint` as a tooltip,
+   * so "not yet measured" never reads as a real "0" (UX-008).
+   */
+  value: string | number | null | undefined;
+  /**
+   * Tooltip shown on the em-dash when `value` is null/undefined — must be a
+   * pre-translated string (e.g. "Not yet computed" / "لم يُحتسب بعد").
+   */
+  emptyHint?: string;
+  /**
+   * When the value is a genuine, meaningful zero (e.g. 0 non-compliant
+   * items = clean), set this to render a subtle confirming ✓ cue beside the
+   * number so a good zero is distinguishable from no-data. Pair with
+   * `tone="success"` for the green value colour.
+   */
+  zeroConfirm?: boolean;
   trend?: { dir: 'up' | 'down'; value: string };
   tone?: KpiTone;
   /**
@@ -53,10 +71,16 @@ function autoTrend(spark?: number[]): { dir: 'up' | 'down'; value: string } | un
   return { dir: delta >= 0 ? 'up' : 'down', value: (pct >= 0 ? '+' : '') + pct + '%' };
 }
 
-export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, onClick }: KpiProps) {
+export function Kpi({ Icon, label, value, emptyHint, zeroConfirm, trend, tone = 'primary', spark, to, onClick }: KpiProps) {
   const { bg, fg, line } = TONES[tone];
   const effectiveTrend = trend ?? autoTrend(spark);
   const isInteractive = !!(to || onClick);
+
+  // Unavailable/uninitialised metric vs genuine zero (UX-008). A null/undefined
+  // value is "not measured" and gets the existing .empty-inline-compact em-dash
+  // (+ tooltip); a real numeric 0 with zeroConfirm gets a subtle ✓ confirming cue.
+  const isNoData = value == null;
+  const isGoodZero = zeroConfirm && value === 0;
 
   // Flash-on-change: when `value` prop changes, briefly highlight the tile so
   // the user notices a live update arrived. First render is suppressed so the
@@ -121,8 +145,19 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
       {/* UX-002: label first (eyebrow, --ink-2) then the number, so the
           reading order is label → value rather than number → caption. */}
       <div className="kpi-label">{label}</div>
-      <div className="kpi-value" title={String(value)}>{value}</div>
-      {spark && spark.length >= 2 && <Sparkline values={spark} color={line} />}
+      {isNoData ? (
+        <div className="kpi-value empty-inline-compact" title={emptyHint}
+          style={{ color: 'var(--ink-4)' }} aria-label={emptyHint}>—</div>
+      ) : (
+        <div className="kpi-value" title={String(value)}>
+          {isGoodZero && (
+            <Check size={16} strokeWidth={3} aria-hidden
+              style={{ verticalAlign: 'middle', marginInlineEnd: 4, color: 'var(--success-fg)' }} />
+          )}
+          {value}
+        </div>
+      )}
+      {!isNoData && spark && spark.length >= 2 && <Sparkline values={spark} color={line} />}
     </>
   );
 

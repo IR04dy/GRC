@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Palette, Pipette, Sliders, RotateCcw, Check } from 'lucide-react';
 import { Shell } from '../components/layout/Shell';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -7,10 +8,31 @@ import { ColorField } from '../components/ui/ColorField';
 import { RangeField } from '../components/ui/RangeField';
 import { useTheme, TOKEN_DEFS, PRESETS, DEFAULT_VALUES, BRAND_SWATCHES, FONT_SCALES, type Preset, type TokenKey } from '../lib/theme';
 import { useI18n } from '../lib/i18n';
+import { useToast } from '../lib/toast';
+import { failsAaContrast } from '../lib/contrast';
 import { cn } from '../lib/cn';
+
+/**
+ * UX-007: tokens whose colour sits directly under body text — the page
+ * background (`bg`) and the card/identity surface (`surface`), i.e. the
+ * #F2EEE6 / #FAF8F4 swatches called out in the finding. A near-ink pick here
+ * silently makes `--ink-1` body text unreadable, so these get an inline AA
+ * contrast guard. The brand `primary`/`accent` fills are intentionally NOT
+ * guarded against `--ink-1`: they carry `--on-primary` (white) text, not body
+ * ink, so an ink-1 check would false-positive on the default teal brand.
+ */
+const CONTRAST_GUARDED: ReadonlySet<TokenKey> = new Set<TokenKey>(['bg', 'surface']);
+
+/** Read the live `--ink-1` body-ink colour so the guard tracks light/dark mode. */
+function currentInk(): string {
+  if (typeof window === 'undefined') return '#15201D';
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--ink-1').trim();
+  return v || '#15201D';
+}
 
 export function SettingsPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const { overrides, setOverride, applyPreset, reset, resolve, isCustom } = useTheme();
 
   const surfaceTokens = TOKEN_DEFS.filter(d => d.group === 'surface');
@@ -19,6 +41,25 @@ export function SettingsPage() {
   const layoutTokens  = TOKEN_DEFS.filter(d => d.group === 'layout');
 
   const totalCustomized = Object.keys(overrides).length;
+
+  // UX-007: per-change Undo. Capture the previous override value before applying
+  // the new one and surface a Gmail-style toast with a single-step "Undo", so a
+  // user can revert just this change without nuking all customisation via Reset.
+  const setOverrideUndoable = useCallback((key: TokenKey, value: string | undefined) => {
+    const prev = overrides[key]; // undefined when the token was at its default
+    setOverride(key, value);
+    toast.undoable(t('settingsColorChanged'), () => setOverride(key, prev));
+  }, [overrides, setOverride, toast, t]);
+
+  // Inline AA contrast guard for the guarded colour tokens. Returns the badge
+  // copy when the resolved colour fails AA against the live body ink, else
+  // undefined (no badge).
+  const contrastWarning = useCallback((key: TokenKey) => {
+    if (!CONTRAST_GUARDED.has(key)) return undefined;
+    return failsAaContrast(resolve(key), currentInk())
+      ? { label: t('settingsContrastWarn'), title: t('settingsContrastWarnTitle') }
+      : undefined;
+  }, [resolve, t]);
 
   function activePresetId(): string {
     const stamp = JSON.stringify(overrides);
@@ -99,9 +140,10 @@ export function SettingsPage() {
               key={d.key}
               label={t(d.labelKey, d.key)}
               value={resolve(d.key)}
-              onChange={v => setOverride(d.key, v)}
+              onChange={v => setOverrideUndoable(d.key, v)}
               isCustom={isCustom(d.key)}
-              onReset={() => setOverride(d.key, undefined)}
+              onReset={() => setOverrideUndoable(d.key, undefined)}
+              warning={contrastWarning(d.key)}
             />
           ))}
 
@@ -111,9 +153,10 @@ export function SettingsPage() {
               key={d.key}
               label={t(d.labelKey, d.key)}
               value={resolve(d.key)}
-              onChange={v => setOverride(d.key, v)}
+              onChange={v => setOverrideUndoable(d.key, v)}
               isCustom={isCustom(d.key)}
-              onReset={() => setOverride(d.key, undefined)}
+              onReset={() => setOverrideUndoable(d.key, undefined)}
+              warning={contrastWarning(d.key)}
             />
           ))}
 
@@ -123,9 +166,10 @@ export function SettingsPage() {
               key={d.key}
               label={t(d.labelKey, d.key)}
               value={resolve(d.key)}
-              onChange={v => setOverride(d.key, v)}
+              onChange={v => setOverrideUndoable(d.key, v)}
               isCustom={isCustom(d.key)}
-              onReset={() => setOverride(d.key, undefined)}
+              onReset={() => setOverrideUndoable(d.key, undefined)}
+              warning={contrastWarning(d.key)}
             />
           ))}
         </Card>

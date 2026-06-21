@@ -17,6 +17,30 @@ import { Progress } from '../../components/ui/Progress';
 import { dashboardApi, type DashboardStats, type TrendPoint } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { mlModelApi, aggregateMlRegistry, type MlModelResponse } from '../../lib/aiGovernance';
+import '../../styles/pages/executive-dashboard.css';
+
+/**
+ * Tracks whether the viewport is phone-width (<=640px). Used to shrink the
+ * posture gauge on mobile (its SVG width/height are hard pixel attributes, so
+ * CSS alone can't scale it) — the surrounding reflow is handled by
+ * executive-dashboard.css. SSR-safe and reduced-listener-clean.
+ */
+function useIsNarrow(): boolean {
+  const query = '(max-width: 640px)';
+  const [narrow, setNarrow] = useState<boolean>(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(query).matches
+      : false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia(query);
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    setNarrow(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
+}
 
 /**
  * Executive Dashboard hero + KPI ribbon — the first impression of the
@@ -143,6 +167,10 @@ function AiGovernanceStrip() {
 function PostureHero({ stats }: { stats: DashboardStats }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
+  const isNarrow = useIsNarrow();
+  // Shrink the focal gauge on phones so it fits a single column without
+  // overlapping the greeting/caption (UX-005). Desktop keeps GAUGE_HERO.
+  const gaugeSize = isNarrow ? { size: 132, thickness: 12 } : GAUGE_HERO;
 
   // Compose a single 0-100 posture score from the available metrics.
   // Inputs: complianceScore (0-100), open critical/high risks (penalty),
@@ -173,21 +201,12 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
   });
 
   return (
-    <div style={{
-      background: `linear-gradient(135deg, var(--primary-50) 0%, var(--surface-2) 100%)`,
-      borderRadius: 'var(--r-lg)',
-      border: '1px solid var(--border)',
-      padding: '24px 28px',
-      display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1fr) auto',
-      gap: 24,
-      alignItems: 'center',
-      // Stable floor so the hero never collapses to a banner on a short
-      // greeting/caption — the focal posture gauge sets the visual weight.
-      minHeight: 200,
-    }}>
+    // Layout (grid columns, gap, min-height, padding) lives in
+    // executive-dashboard.css so the <=640px media query can reflow the hero
+    // into a single stacked column — inline styles would out-specify it.
+    <div className="exec-hero">
       {/* Left: greeting + date */}
-      <div style={{ minWidth: 0 }}>
+      <div className="exec-hero-text">
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '3px 10px', borderRadius: 'var(--r-pill)',
@@ -211,7 +230,7 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
             {isAr ? 'أيمن' : 'Aymen'}
           </span>
         </h1>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 6 }}>
+        <div className="exec-hero-meta" style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 6 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             font: '500 12px var(--font-sans)', color: 'var(--ink-3)',
@@ -226,14 +245,11 @@ function PostureHero({ stats }: { stats: DashboardStats }) {
       </div>
 
       {/* Right: composite posture as an arc-as-number gauge */}
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 8, padding: '4px 0',
-      }}>
+      <div className="exec-hero-gauge">
         <RadialGauge
           value={posture}
           max={100}
-          {...GAUGE_HERO}
+          {...gaugeSize}
           unit="/100"
           rtl={isAr}
           caption={isAr ? 'مؤشّر الحوكمة الشامل' : 'GRC Posture Score'}

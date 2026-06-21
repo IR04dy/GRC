@@ -115,7 +115,10 @@ export function DashboardPage() {
           {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
           {!isDemo && <LivePulse pulse={pulse} enabled={!isDemo} />}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {/* UX-005: on phones this row becomes a single horizontally scrollable
+         * strip (see .dash-actions in executive-dashboard.css) instead of three
+         * full-width stacked buttons that ate the first mobile screen. */}
+        <div className="dash-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Button variant="ghost" Icon={RefreshCw} onClick={load} disabled={loading || refreshing}>
             {t('dashRefresh')}
           </Button>
