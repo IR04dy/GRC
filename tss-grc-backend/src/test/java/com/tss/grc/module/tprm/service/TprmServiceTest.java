@@ -211,6 +211,9 @@ class TprmServiceTest {
     void deleteAssessment_soft_deletes_via_save() {
         VendorAssessment a = assessment(VENDOR_ID, "COMPLETED");
         when(assessmentRepo.findById(ASSESS_ID)).thenReturn(Optional.of(a));
+        // SEC-TPRM-001: deleteAssessment now resolves the parent vendor to enforce
+        // tenant scope — vendor must be in the caller's org for the delete to proceed.
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(ORG_ID, "MEDIUM")));
         when(assessmentRepo.save(any(VendorAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.deleteAssessment(ASSESS_ID);
@@ -218,6 +221,54 @@ class TprmServiceTest {
         assertThat(a.getIsDeleted()).isTrue();
         verify(assessmentRepo).save(a);
         verify(assessmentRepo, never()).deleteById(any());
+    }
+
+    // ─── SEC-TPRM-001: cross-tenant assessment mutation prevention ───
+
+    @Test
+    void updateAssessment_other_tenant_throws_EntityNotFound() {
+        // Assessment exists, but its parent vendor belongs to OTHER_ORG — the
+        // tenant guard via getVendor() must reject before any mutation/save.
+        VendorAssessment existing = assessment(VENDOR_ID, "PLANNED");
+        when(assessmentRepo.findById(ASSESS_ID)).thenReturn(Optional.of(existing));
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(OTHER_ORG, "MEDIUM")));
+
+        VendorAssessment req = assessment(VENDOR_ID, "REVIEWED");
+        assertThatThrownBy(() -> service.updateAssessment(ASSESS_ID, req))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Vendor not found");
+
+        verify(assessmentRepo, never()).save(any());
+    }
+
+    @Test
+    void updateAssessment_same_tenant_succeeds() {
+        VendorAssessment existing = assessment(VENDOR_ID, "PLANNED");
+        when(assessmentRepo.findById(ASSESS_ID)).thenReturn(Optional.of(existing));
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(ORG_ID, "MEDIUM")));
+        when(assessmentRepo.save(any(VendorAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        VendorAssessment req = assessment(VENDOR_ID, "REVIEWED");
+        req.setFindings("clean");
+        service.updateAssessment(ASSESS_ID, req);
+
+        assertThat(existing.getStatus()).isEqualTo("REVIEWED");
+        assertThat(existing.getFindings()).isEqualTo("clean");
+        verify(assessmentRepo).save(existing);
+    }
+
+    @Test
+    void deleteAssessment_other_tenant_throws_EntityNotFound() {
+        VendorAssessment a = assessment(VENDOR_ID, "COMPLETED");
+        when(assessmentRepo.findById(ASSESS_ID)).thenReturn(Optional.of(a));
+        when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(OTHER_ORG, "MEDIUM")));
+
+        assertThatThrownBy(() -> service.deleteAssessment(ASSESS_ID))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Vendor not found");
+
+        assertThat(a.getIsDeleted()).isFalse();
+        verify(assessmentRepo, never()).save(any());
     }
 
     // ─── Stats ───────────────────────────────────────────────────────

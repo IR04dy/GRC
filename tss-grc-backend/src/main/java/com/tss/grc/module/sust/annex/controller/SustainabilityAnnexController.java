@@ -36,28 +36,28 @@ public class SustainabilityAnnexController {
 
     // ── Reporting years ──────────────────────────────────────────────
     @GetMapping("/api/sustainability/reporting-years")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public List<ReportingYear> listYears() { return service.listYears(); }
 
     @GetMapping("/api/sustainability/reporting-years/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public ReportingYear getYear(@PathVariable Long id) { return service.getYear(id); }
 
     @PostMapping("/api/sustainability/reporting-years")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<ReportingYear> createYear(@RequestBody ReportingYear req) {
         return ResponseEntity.status(201).body(service.createYear(req));
     }
 
     @PostMapping("/api/sustainability/reporting-years/{id}/advance")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ReportingYear advanceYear(@PathVariable Long id, @RequestParam String to) {
         return service.transitionYear(id, to);
     }
 
     // ── Reports ──────────────────────────────────────────────────────
     @GetMapping("/api/sustainability/reports")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<SustainabilityReport> listReports(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
@@ -65,13 +65,13 @@ public class SustainabilityAnnexController {
     }
 
     @GetMapping("/api/sustainability/reporting-years/{ryId}/reports")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public List<SustainabilityReport> reportsForYear(@PathVariable Long ryId) {
         return service.listReportsForYear(ryId);
     }
 
     @GetMapping("/api/sustainability/reports/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public SustainabilityReport getReport(@PathVariable Long id) { return service.getReport(id); }
 
     /**
@@ -80,7 +80,7 @@ public class SustainabilityAnnexController {
      * the generated content snapshots.
      */
     @PostMapping("/api/sustainability/reporting-years/{ryId}/generate-annex")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<SustainabilityReport> generateAnnex(@PathVariable Long ryId) {
         return ResponseEntity.status(201).body(service.generateAnnex(ryId));
     }
@@ -92,7 +92,7 @@ public class SustainabilityAnnexController {
      * CAPA_STATUS / EVIDENCE_PKG / DASH_EXPORT.
      */
     @PostMapping("/api/sustainability/reporting-years/{ryId}/generate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<SustainabilityReport> generateReport(
             @PathVariable Long ryId,
             @RequestBody java.util.Map<String, String> body) {
@@ -102,15 +102,15 @@ public class SustainabilityAnnexController {
     }
 
     @PostMapping("/api/sustainability/reports/{id}/submit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SustainabilityReport submit(@PathVariable Long id) { return service.transitionReport(id, "SUBMITTED"); }
 
     @PostMapping("/api/sustainability/reports/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SustainabilityReport approve(@PathVariable Long id) { return service.transitionReport(id, "APPROVED"); }
 
     @PostMapping("/api/sustainability/reports/{id}/publish")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SustainabilityReport publish(@PathVariable Long id) { return service.transitionReport(id, "PUBLISHED"); }
 
     /**
@@ -119,7 +119,7 @@ public class SustainabilityAnnexController {
      * {@code md} | {@code html} | {@code json}.
      */
     @GetMapping("/api/sustainability/reports/{id}/export/{format}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public ResponseEntity<String> export(@PathVariable Long id, @PathVariable String format) {
         SustainabilityReport r = service.getReport(id);
         String body; MediaType mt; String ext;

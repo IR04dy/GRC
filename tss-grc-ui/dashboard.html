@@ -273,6 +273,8 @@
     // ── Helper: severity/alert colours ──────────────────────────────────
     const sevColor = s => ({ CRITICAL:'#fee2e2', HIGH:'#ffedd5', MEDIUM:'#fef9c3', LOW:'#dcfce7' }[s] || '#dbeafe');
     const sevEmoji = s => ({ CRITICAL:'🔴', HIGH:'🟠', MEDIUM:'🟡', LOW:'🟢' }[s] || '🔵');
+    // HTML-escape server/user data before innerHTML interpolation (SEC-FE-001).
+    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
     // ── 8 KPI Cards ──────────────────────────────────────────────────────
     const criticalRisks   = stats.criticalRisks   ?? 0;
@@ -435,8 +437,8 @@
             <div class="alert-item">
                 <div class="alert-icon" style="background:${bg}">${emoji}</div>
                 <div style="min-width:0;flex:1">
-                    <div class="alert-title text-truncate">${lang === 'ar' && inc.titleAr ? inc.titleAr : inc.title}</div>
-                    <div class="alert-meta">${inc.status} · ${date}</div>
+                    <div class="alert-title text-truncate">${esc(lang === 'ar' && inc.titleAr ? inc.titleAr : inc.title)}</div>
+                    <div class="alert-meta">${esc(inc.status)} · ${esc(date)}</div>
                 </div>
             </div>`;
         }).join('');

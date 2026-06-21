@@ -21,53 +21,58 @@ import java.util.List;
 @Tag(name = "NDI — Reports")
 public class NdiReportController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ  = "hasPermission('NDI','READ')";
+    private static final String WRITE = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiReportService service;
     private final NdiReportExporter exporter;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public List<NdiReportDefinition> list(@RequestParam(required = false) String type) {
         return service.list(type);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiReportDefinition get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiReportDefinition> create(@RequestBody NdiReportDefinition body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiReportDefinition update(@PathVariable Long id, @RequestBody NdiReportDefinition body) {
         return service.update(id, body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/run")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public ReportResult run(@PathVariable Long id, @RequestParam(required = false) Long cycleId) {
         return service.run(id, cycleId);
     }
 
     @PostMapping("/run-adhoc")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public ReportResult runAdHoc(@RequestParam String type, @RequestParam(required = false) Long cycleId) {
         return service.runAdHoc(type, cycleId);
     }
 
     /** Run a saved report and stream the result as the requested binary format. */
     @GetMapping("/{id}/export")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public ResponseEntity<byte[]> export(@PathVariable Long id,
                                          @RequestParam(defaultValue = "XLSX") String format,
                                          @RequestParam(required = false) Long cycleId) throws IOException {
@@ -77,7 +82,7 @@ public class NdiReportController {
 
     /** One-shot ad-hoc export — no saved definition required. */
     @GetMapping("/export-adhoc")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public ResponseEntity<byte[]> exportAdHoc(@RequestParam String type,
                                               @RequestParam(defaultValue = "XLSX") String format,
                                               @RequestParam(required = false) Long cycleId) throws IOException {

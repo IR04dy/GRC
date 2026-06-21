@@ -44,7 +44,7 @@ public class PolicyController {
     // ─── Documents ─────────────────────────────────────────────────
 
     @GetMapping("/documents")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public List<PolicyDocument> list(@RequestParam(required = false) String status,
                                      @RequestParam(required = false) String category,
                                      @RequestParam(defaultValue = "false") boolean latestOnly) {
@@ -52,23 +52,23 @@ public class PolicyController {
     }
 
     @GetMapping("/documents/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public PolicyDocument get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping("/documents")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public ResponseEntity<PolicyDocument> create(@RequestBody PolicyDocument body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PutMapping("/documents/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public PolicyDocument update(@PathVariable Long id, @RequestBody PolicyDocument body) {
         return service.update(id, body);
     }
 
     @PostMapping("/documents/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public PolicyDocument transition(@PathVariable Long id,
                                      @RequestBody Map<String, String> body,
                                      Authentication auth) {
@@ -76,57 +76,57 @@ public class PolicyController {
     }
 
     @PostMapping("/documents/{policyCode}/new-version")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public PolicyDocument newVersion(@PathVariable String policyCode,
                                      @RequestBody Map<String, String> body) {
         return service.newVersion(policyCode, body.get("newVersion"));
     }
 
     @DeleteMapping("/documents/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/documents/expiry-sweep")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public Map<String, Object> expirySweep() {
         List<Long> flipped = service.runExpirySweep();
         return Map.of("flippedCount", flipped.size(), "flippedIds", flipped);
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public PolicyAggregate aggregate() { return service.aggregate(); }
 
     // ─── Exceptions ────────────────────────────────────────────────
 
     @GetMapping("/exceptions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public List<PolicyException> listExceptions(@RequestParam(required = false) Long policyId,
                                                 @RequestParam(required = false) String status) {
         return service.listExceptions(policyId, status);
     }
 
     @GetMapping("/exceptions/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public PolicyException getException(@PathVariable Long id) { return service.getException(id); }
 
     @PostMapping("/exceptions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public ResponseEntity<PolicyException> createException(@RequestBody PolicyException body) {
         return ResponseEntity.ok(service.createException(body));
     }
 
     @PutMapping("/exceptions/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public PolicyException updateException(@PathVariable Long id, @RequestBody PolicyException body) {
         return service.updateException(id, body);
     }
 
     @PostMapping("/exceptions/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public PolicyException transitionException(@PathVariable Long id,
                                                @RequestBody Map<String, String> body,
                                                Authentication auth) {
@@ -134,14 +134,14 @@ public class PolicyController {
     }
 
     @DeleteMapping("/exceptions/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','DELETE')")
     public ResponseEntity<Void> deleteException(@PathVariable Long id) {
         service.deleteException(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/exceptions/expiry-sweep")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     public Map<String, Object> exceptionExpirySweep() {
         List<Long> flipped = service.runExceptionExpirySweep();
         return Map.of("flippedCount", flipped.size(), "flippedIds", flipped);
@@ -150,7 +150,7 @@ public class PolicyController {
     // ─── Attestations ──────────────────────────────────────────────
 
     @GetMapping("/attestations")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public List<PolicyAttestation> listAttestations(@RequestParam(required = false) Long policyId,
                                                     @RequestParam(required = false) String username,
                                                     @RequestParam(required = false) String status) {
@@ -158,19 +158,19 @@ public class PolicyController {
     }
 
     @PostMapping("/attestations")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public ResponseEntity<PolicyAttestation> createAttestation(@RequestBody PolicyAttestation body) {
         return ResponseEntity.ok(service.createAttestation(body));
     }
 
     @PostMapping("/attestations/{id}/attest")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public PolicyAttestation attest(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         return service.attest(id, body == null ? null : body.get("evidenceRef"));
     }
 
     @PostMapping("/attestations/{id}/decline")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public PolicyAttestation decline(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.decline(id, body.get("reason"));
     }

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -23,6 +24,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -40,6 +43,7 @@ class DigitalSignatureServiceTest {
 
     private static final Long ORG_ID = 1L;
     private static final Long TX_ID = 42L;
+    private static final Long SIGNER_ID = 7L;
 
     @Mock private DigitalSignatureTransactionRepository repo;
     @InjectMocks private DigitalSignatureService service;
@@ -53,6 +57,7 @@ class DigitalSignatureServiceTest {
         d.setOrganisationId(ORG_ID);
         d.setRelatedEntityType("risk.acceptance");
         d.setRelatedEntityId(100L);
+        d.setSignerUserId(SIGNER_ID);
         d.setSignerName("CRO Office");
         d.setPurpose("Risk acceptance for RSK-2026-001 above appetite");
         d.setStatus(status);
@@ -89,7 +94,7 @@ class DigitalSignatureServiceTest {
         when(repo.save(any(DigitalSignatureTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
 
         SignRequest body = new SignRequest("a".repeat(64), "cert:demo:001");
-        DigitalSignatureTransaction signed = service.sign(TX_ID, body);
+        DigitalSignatureTransaction signed = service.sign(TX_ID, body, SIGNER_ID);
 
         assertThat(signed.getStatus()).isEqualTo("SIGNED");
         assertThat(signed.getSignedDocumentHash()).hasSize(64);
@@ -101,7 +106,7 @@ class DigitalSignatureServiceTest {
         when(repo.findByIdAndOrganisationId(TX_ID, ORG_ID)).thenReturn(Optional.of(tx("SIGNED")));
 
         SignRequest body = new SignRequest("b".repeat(64), null);
-        assertThatThrownBy(() -> service.sign(TX_ID, body))
+        assertThatThrownBy(() -> service.sign(TX_ID, body, SIGNER_ID))
                 .isInstanceOf(IllegalTransitionException.class);
     }
 
@@ -110,7 +115,7 @@ class DigitalSignatureServiceTest {
         when(repo.save(any(DigitalSignatureTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
 
         RejectRequest body = new RejectRequest("Insufficient evidence — please re-submit");
-        DigitalSignatureTransaction rejected = service.reject(TX_ID, body);
+        DigitalSignatureTransaction rejected = service.reject(TX_ID, body, SIGNER_ID);
 
         assertThat(rejected.getStatus()).isEqualTo("REJECTED");
         assertThat(rejected.getRejectionReason()).isEqualTo("Insufficient evidence — please re-submit");
@@ -120,8 +125,38 @@ class DigitalSignatureServiceTest {
         when(repo.findByIdAndOrganisationId(TX_ID, ORG_ID)).thenReturn(Optional.of(tx("REJECTED")));
 
         RejectRequest body = new RejectRequest("Changed mind");
-        assertThatThrownBy(() -> service.reject(TX_ID, body))
+        assertThatThrownBy(() -> service.reject(TX_ID, body, SIGNER_ID))
                 .isInstanceOf(IllegalTransitionException.class);
+    }
+
+    // ── SEC-IAM-003: signer-binding ──────────────────────────────────────────
+
+    @Test void sign_by_non_designated_signer_is_forbidden() {
+        when(repo.findByIdAndOrganisationId(TX_ID, ORG_ID)).thenReturn(Optional.of(tx("REQUESTED")));
+
+        SignRequest body = new SignRequest("c".repeat(64), null);
+        // Caller 99 is not the designated signer (7) — must be rejected.
+        assertThatThrownBy(() -> service.sign(TX_ID, body, 99L))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(repo, never()).save(any());
+    }
+
+    @Test void reject_by_non_designated_signer_is_forbidden() {
+        when(repo.findByIdAndOrganisationId(TX_ID, ORG_ID)).thenReturn(Optional.of(tx("REQUESTED")));
+
+        RejectRequest body = new RejectRequest("Not my call to make");
+        assertThatThrownBy(() -> service.reject(TX_ID, body, 99L))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(repo, never()).save(any());
+    }
+
+    @Test void sign_with_null_caller_id_is_forbidden() {
+        when(repo.findByIdAndOrganisationId(TX_ID, ORG_ID)).thenReturn(Optional.of(tx("REQUESTED")));
+
+        SignRequest body = new SignRequest("d".repeat(64), null);
+        assertThatThrownBy(() -> service.sign(TX_ID, body, null))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(repo, never()).save(any());
     }
 
     @Test void expire_is_idempotent_on_terminal_states() {

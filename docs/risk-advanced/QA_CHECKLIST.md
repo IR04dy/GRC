@@ -76,6 +76,15 @@ from any non-terminal state.
       `dueDate`; `treatmentType` cannot change once recorded (audit
       history).
 
+### Tenant isolation (SEC-RISK-001)
+- [ ] `GET /api/v1/risk/treatments/:id` for a treatment whose parent
+      risk belongs to another tenant returns **404** (not 200, and not a
+      400 that reveals "belongs to another organisation") — ids must not
+      be enumerable across tenants.
+- [ ] `PUT`, `POST /transition`, and `DELETE` on a cross-tenant
+      treatment id likewise return 404; same-tenant operations are
+      unaffected.
+
 ### Rule T1 — risk-in-treatment integrity
 - [ ] Deleting the only live (non-COMPLETED, non-CANCELLED) treatment
       from a risk in TREATMENT status returns 400:

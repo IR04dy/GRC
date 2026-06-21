@@ -122,6 +122,8 @@ public class FrameworkAnchorController {
     public PolicyFrameworkMapping addMapping(@PathVariable Long id, @RequestBody PolicyFrameworkMapping body) {
         requirePolicy(id);
         if (body.getFrameworkId() == null) throw new IllegalArgumentException("frameworkId is required");
+        body.setId(null);            // force INSERT — block merge() into a cross-tenant row (SEC-CMP-001)
+        body.setIsDeleted(false);
         body.setPolicyId(id);
         if (body.getSatisfaction() == null) body.setSatisfaction("PARTIAL");
         return mappingRepo.save(body);

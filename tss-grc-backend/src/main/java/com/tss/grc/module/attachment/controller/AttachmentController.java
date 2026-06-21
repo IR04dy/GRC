@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,6 +35,7 @@ public class AttachmentController {
     private final AttachmentService service;
 
     @GetMapping("/{entityType}/{entityId}")
+    @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
     @Operation(summary = "List attachments for an entity")
     public List<AttachmentResponse> list(@PathVariable String entityType, @PathVariable Long entityId) {
         return service.list(entityType, entityId);
@@ -41,6 +43,7 @@ public class AttachmentController {
 
     @PostMapping(value = "/{entityType}/{entityId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
     @Operation(summary = "Upload a typed attachment for an entity (multipart)")
     public AttachmentResponse upload(
             @PathVariable String entityType,
@@ -56,6 +59,7 @@ public class AttachmentController {
     }
 
     @GetMapping("/{id}/download")
+    @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
     @Operation(summary = "Download an attachment's binary")
     public ResponseEntity<byte[]> download(@PathVariable Long id) {
         AttachmentService.DownloadPayload p = service.download(id);
@@ -66,6 +70,7 @@ public class AttachmentController {
     }
 
     @PostMapping(value = "/{id}/version", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
     @Operation(summary = "Upload a new version that supersedes this attachment (multipart)")
     public AttachmentResponse newVersion(
             @PathVariable Long id,
@@ -80,12 +85,14 @@ public class AttachmentController {
     }
 
     @GetMapping("/{id}/history")
+    @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
     @Operation(summary = "Version history of this attachment's document (newest first)")
     public List<AttachmentResponse> history(@PathVariable Long id) {
         return service.history(id);
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
     @Operation(summary = "Edit attachment metadata (docType / title / expiry) — binary unchanged")
     public AttachmentResponse update(@PathVariable Long id, @RequestBody AttachmentUpdateRequest req) {
         return service.update(id, req.docType(), req.titleEn(), req.validTo());
@@ -93,6 +100,7 @@ public class AttachmentController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasPermission('EVIDENCE', 'DELETE')")
     @Operation(summary = "Delete an attachment (soft)")
     public void delete(@PathVariable Long id) {
         service.delete(id);

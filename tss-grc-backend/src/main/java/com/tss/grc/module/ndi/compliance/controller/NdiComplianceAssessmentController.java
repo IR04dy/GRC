@@ -38,10 +38,15 @@ import java.util.Map;
 @Tag(name = "NDI — Compliance Assessment")
 public class NdiComplianceAssessmentController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiComplianceAssessmentService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Page<NdiComplianceAssessment> list(
             @RequestParam Long cycleId,
             @RequestParam(required = false) String status,
@@ -55,76 +60,76 @@ public class NdiComplianceAssessmentController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Map<String, Object> aggregate(@RequestParam Long cycleId) {
         return service.aggregateForCycle(cycleId);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiComplianceAssessment get(@PathVariable Long id) { return service.get(id); }
 
     /** Cross-module: returns the ERM risk row this compliance assessment's risk_id points to, or null. */
     @GetMapping("/{id}/linked-risk")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public com.tss.grc.module.ndi.integration.NdiCrossLinkService.LinkedRisk linkedRisk(@PathVariable Long id) {
         return service.getLinkedRisk(id);
     }
 
     @PostMapping("/start")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public Map<String, Object> startForCycle(@RequestParam Long cycleId) {
         return service.startForCycle(cycleId);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiComplianceAssessment update(@PathVariable Long id, @RequestBody NdiComplianceAssessment req) {
         return service.update(id, req);
     }
 
     /** Body: {@code { "status": "COMPLIANT", "naJustification": "..." }}. */
     @PostMapping("/{id}/set-status")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiComplianceAssessment setStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.setStatus(id, body.get("status"), body.get("naJustification"));
     }
 
     /** Body: {@code { "evidenceRef": "...", "evidenceOwner": "..." }}. */
     @PostMapping("/{id}/attach-evidence")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiComplianceAssessment attachEvidence(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.attachEvidence(id, body.get("evidenceRef"), body.get("evidenceOwner"));
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiComplianceAssessment submit(@PathVariable Long id) { return service.submit(id); }
 
     @PostMapping("/{id}/mark-under-review")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiComplianceAssessment markUnderReview(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         return service.markUnderReview(id, body == null ? null : body.get("reviewerName"));
     }
 
     @PostMapping("/{id}/return")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiComplianceAssessment returnForChanges(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.returnForChanges(id, body == null ? null : body.get("reason"));
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiComplianceAssessment approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         return service.approve(id, body == null ? null : body.get("approverName"));
     }
 
     @PostMapping("/{id}/reopen")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiComplianceAssessment reopen(@PathVariable Long id) { return service.reopen(id); }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

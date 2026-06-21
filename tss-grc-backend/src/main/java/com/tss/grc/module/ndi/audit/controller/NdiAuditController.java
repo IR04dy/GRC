@@ -20,7 +20,7 @@ public class NdiAuditController {
     private final NdiAuditService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('NDI','READ')")
     public Page<NdiAuditEvent> search(@RequestParam(required = false) Long cycleId,
                                       @RequestParam(required = false) String entityType,
                                       @RequestParam(required = false) String action,
@@ -31,11 +31,19 @@ public class NdiAuditController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('NDI','READ')")
     public AuditAggregate aggregate() { return service.aggregate(); }
 
+    /**
+     * SEC-NDI-002: the append-only NDI audit ledger is normally written only by
+     * {@link com.tss.grc.module.ndi.audit.service.NdiAuditPublisher} from inside
+     * each slice's write path. This manual entry point is retained for platform
+     * administrators only; the actor identity and timestamp are stamped
+     * server-side in {@link NdiAuditService#record} and cannot be supplied by the
+     * caller, preventing audit-log forgery / back-dating.
+     */
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<NdiAuditEvent> record(@RequestBody NdiAuditEvent body) {
         return ResponseEntity.ok(service.record(body));
     }

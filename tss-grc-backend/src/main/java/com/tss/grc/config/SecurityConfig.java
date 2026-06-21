@@ -115,6 +115,23 @@ public class SecurityConfig {
                 // PII-stripped view (no phone/email/national-ID).
                 .requestMatchers(HttpMethod.POST, "/api/v1/complaints/public").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/v1/complaints/public/track/**").permitAll()
+                // SEC-FIN-002: belt-and-braces — the SCM sub-controllers
+                // (/api/scm/**: contract-clauses, fourth-party, resilience,
+                // resilience/tests) are gated per-method with
+                // hasPermission('SCM', ...). This path rule is defence-in-depth:
+                // every /api/scm/** request must carry an SCM authority (or be a
+                // platform admin) so a future endpoint added without an explicit
+                // @PreAuthorize cannot silently fall back to "merely logged in".
+                .requestMatchers("/api/scm/**").access((authn, ctx) -> {
+                    var a = authn.get();
+                    boolean ok = a != null && a.isAuthenticated() && a.getAuthorities().stream()
+                        .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                        .anyMatch(g -> g.equals("ROLE_PLATFORM_ADMIN")
+                                    || g.equals("SCM_READ")
+                                    || g.equals("SCM_WRITE")
+                                    || g.equals("SCM_DELETE"));
+                    return new org.springframework.security.authorization.AuthorizationDecision(ok);
+                })
                 .anyRequest().authenticated()
             )
 

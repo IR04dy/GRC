@@ -26,7 +26,7 @@ public class SustainabilityEvidenceController {
     private final SustainabilityEvidenceService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<SustainabilityEvidence> list(
             @RequestParam(required = false) String moduleArea,
             @RequestParam(required = false) String status,
@@ -39,53 +39,53 @@ public class SustainabilityEvidenceController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> aggregate() { return service.aggregate(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public SustainabilityEvidence get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<SustainabilityEvidence> create(@RequestBody SustainabilityEvidence req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SustainabilityEvidence update(@PathVariable Long id, @RequestBody SustainabilityEvidence req) {
         return service.update(id, req);
     }
 
     /** Body: {@code { "approvedBy": "Name" }}. */
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SustainabilityEvidence approve(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.approve(id, body == null ? null : body.get("approvedBy"));
     }
 
     /** Body: {@code { "reviewerName": "Name", "reason": "..." }}. */
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SustainabilityEvidence reject(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.reject(id, body.get("reviewerName"), body.get("reason"));
     }
 
     /** Supersede an APPROVED row with a fresh upload. */
     @PostMapping("/{id}/supersede")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SustainabilityEvidence supersede(@PathVariable Long id, @RequestBody SustainabilityEvidence newReq) {
         return service.supersede(id, newReq);
     }
 
     /** Rule 9 — flip APPROVED rows whose valid_to has passed to EXPIRED. */
     @PostMapping("/sweep-expired")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public List<SustainabilityEvidence> sweepExpired() { return service.sweepExpired(); }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

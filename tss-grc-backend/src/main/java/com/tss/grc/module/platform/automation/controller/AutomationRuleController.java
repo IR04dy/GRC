@@ -63,7 +63,7 @@ public class AutomationRuleController {
                             String conditionJson, String actionJson) {}
 
     @PatchMapping("/rules/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AUTOMATION','WRITE')")
     @Transactional
     public AutomationRule patch(@PathVariable Long id, @RequestBody PatchBody body) {
         AutomationRule r = rules.findByIdAndOrganisationId(id, org())
@@ -112,7 +112,7 @@ public class AutomationRuleController {
 
     @SuppressWarnings("unused")
     @DeleteMapping("/rules/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AUTOMATION','DELETE')")
     public ResponseEntity<Void> softDelete(@PathVariable Long id) {
         AutomationRule r = rules.findByIdAndOrganisationId(id, org())
             .orElseThrow(() -> new EntityNotFoundException("Rule not found: " + id));

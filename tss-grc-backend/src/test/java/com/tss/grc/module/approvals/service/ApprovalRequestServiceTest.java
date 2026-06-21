@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Optional;
 
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -90,12 +92,13 @@ class ApprovalRequestServiceTest {
         when(repo.save(any(ApprovalRequest.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ApprovalRequestDto.TransitionRequest t = tx("APPROVED");
-        t.setDecidedBy("admin");
+        // SEC-IAM-002: body decidedBy is ignored — attribution is the authenticated caller.
+        t.setDecidedBy("ceo");
         t.setDecisionCommentEn("LGTM");
-        ApprovalRequestDto out = service.transition(EXT_ID, t);
+        ApprovalRequestDto out = service.transition(EXT_ID, t, "riskmanager", false);
 
         assertThat(out.getStatus()).isEqualTo("APPROVED");
-        assertThat(out.getDecidedBy()).isEqualTo("admin");
+        assertThat(out.getDecidedBy()).isEqualTo("riskmanager");
         assertThat(out.getDecidedAt()).isNotNull();
         assertThat(out.getDecisionCommentEn()).isEqualTo("LGTM");
     }
@@ -108,7 +111,7 @@ class ApprovalRequestServiceTest {
         ApprovalRequestDto.TransitionRequest t = tx("DELEGATED");
         t.setNewAssignedTo("auditor");
         t.setDelegationReasonEn("CRO out-of-office");
-        ApprovalRequestDto out = service.transition(EXT_ID, t);
+        ApprovalRequestDto out = service.transition(EXT_ID, t, "riskmanager", false);
 
         assertThat(out.getStatus()).isEqualTo("DELEGATED");
         assertThat(out.getAssignedTo()).isEqualTo("auditor");
@@ -121,7 +124,7 @@ class ApprovalRequestServiceTest {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("DELEGATED")));
         when(repo.save(any(ApprovalRequest.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ApprovalRequestDto out = service.transition(EXT_ID, tx("PENDING"));
+        ApprovalRequestDto out = service.transition(EXT_ID, tx("PENDING"), "riskmanager", false);
         assertThat(out.getStatus()).isEqualTo("PENDING");
     }
 
@@ -129,7 +132,7 @@ class ApprovalRequestServiceTest {
     void transition_DELEGATED_without_newAssignedTo_throws() {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("PENDING")));
 
-        assertThatThrownBy(() -> service.transition(EXT_ID, tx("DELEGATED")))
+        assertThatThrownBy(() -> service.transition(EXT_ID, tx("DELEGATED"), "riskmanager", false))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("DELEGATED requires newAssignedTo");
     }
@@ -138,7 +141,7 @@ class ApprovalRequestServiceTest {
     void transition_APPROVED_to_PENDING_rejected_terminal() {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("APPROVED")));
 
-        assertThatThrownBy(() -> service.transition(EXT_ID, tx("PENDING")))
+        assertThatThrownBy(() -> service.transition(EXT_ID, tx("PENDING"), "riskmanager", false))
             .isInstanceOf(IllegalTransitionException.class)
             .extracting("from", "to")
             .containsExactly("APPROVED", "PENDING");
@@ -148,8 +151,32 @@ class ApprovalRequestServiceTest {
     void transition_unknownExternalId_throwsEntityNotFoundException() {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, "APR-X")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.transition("APR-X", tx("APPROVED")))
+        assertThatThrownBy(() -> service.transition("APR-X", tx("APPROVED"), "riskmanager", false))
             .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // ── SEC-IAM-002: assignee-binding + decider attribution ───────────────────
+
+    @Test
+    void transition_by_non_assignee_is_forbidden() {
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("PENDING")));
+
+        // 'attacker' is neither the assignee (riskmanager) nor a platform admin.
+        assertThatThrownBy(() -> service.transition(EXT_ID, tx("APPROVED"), "attacker", false))
+            .isInstanceOf(AccessDeniedException.class);
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    void transition_by_platform_admin_overrides_assignee_check() {
+        when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("PENDING")));
+        when(repo.save(any(ApprovalRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ApprovalRequestDto out = service.transition(EXT_ID, tx("APPROVED"), "admin", true);
+
+        assertThat(out.getStatus()).isEqualTo("APPROVED");
+        // Decider attribution still binds to the (admin) principal, not the body.
+        assertThat(out.getDecidedBy()).isEqualTo("admin");
     }
 
     // ── F7 / F8 emission contract ─────────────────────────────────────────────
@@ -185,7 +212,7 @@ class ApprovalRequestServiceTest {
 
         ApprovalRequestDto.TransitionRequest t = tx("APPROVED");
         t.setDecidedBy("admin");
-        service.transition(EXT_ID, t);
+        service.transition(EXT_ID, t, "riskmanager", false);
 
         verify(audit).log(eq("TRANSITION"), eq("ApprovalRequest"), any(), any(String.class));
 
@@ -205,7 +232,7 @@ class ApprovalRequestServiceTest {
 
         ApprovalRequestDto.TransitionRequest t = tx("DELEGATED");
         t.setNewAssignedTo("auditor");
-        service.transition(EXT_ID, t);
+        service.transition(EXT_ID, t, "riskmanager", false);
 
         ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publishEvent(ev.capture());
@@ -220,7 +247,7 @@ class ApprovalRequestServiceTest {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(req("PENDING")));
         when(repo.save(any(ApprovalRequest.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.transition(EXT_ID, tx("EXPIRED"));
+        service.transition(EXT_ID, tx("EXPIRED"), "riskmanager", false);
 
         ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publishEvent(ev.capture());

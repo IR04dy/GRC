@@ -16,7 +16,7 @@ public class NdiDashboardController {
     private final NdiDashboardService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('NDI','READ')")
     public DashboardSnapshot snapshot(@RequestParam Long cycleId) {
         return service.snapshot(cycleId);
     }

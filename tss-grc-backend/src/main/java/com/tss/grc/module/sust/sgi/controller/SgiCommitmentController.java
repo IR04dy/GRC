@@ -38,7 +38,7 @@ public class SgiCommitmentController {
     private final SgiCommitmentService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<SgiCommitment> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String sector,
@@ -51,38 +51,38 @@ public class SgiCommitmentController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> aggregate() { return service.aggregate(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public SgiCommitment get(@PathVariable Long id) { return service.get(id); }
 
     @GetMapping("/{id}/progress")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> progress(@PathVariable Long id) {
         return service.progress(service.get(id));
     }
 
     @GetMapping("/by-code/{code}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public SgiCommitment getByCode(@PathVariable String code) { return service.getByCode(code); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<SgiCommitment> create(@RequestBody SgiCommitment req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SgiCommitment update(@PathVariable Long id, @RequestBody SgiCommitment req) {
         return service.update(id, req);
     }
 
     /** Body: {@code { "achievedBy": "Name" }}. Rule A enforced server-side. */
     @PostMapping("/{id}/achieve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SgiCommitment achieve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         String by = body == null ? null : body.get("achievedBy");
         return service.achieve(id, by);
@@ -90,13 +90,13 @@ public class SgiCommitmentController {
 
     /** Body: {@code { "retiredBy": "Name", "reason": "Replaced by …" }}. */
     @PostMapping("/{id}/retire")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public SgiCommitment retire(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.retire(id, body.get("retiredBy"), body.get("reason"));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

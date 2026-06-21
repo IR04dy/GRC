@@ -61,8 +61,13 @@ public class RiskTreatmentService {
 
     @Transactional(readOnly = true)
     public RiskTreatment get(Long id) {
-        return treatments.findById(id)
+        RiskTreatment t = treatments.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Risk treatment not found: " + id));
+        // Tenant guard (SEC-RISK-001): a treatment whose parent risk is not in
+        // this org is invisible — fail with a 404 so ids cannot be enumerated
+        // across tenants. Mirrors the scoping already done by update/transition/delete.
+        ensureRiskInTenant(t.getRiskId());
+        return t;
     }
 
     @Transactional
@@ -141,7 +146,10 @@ public class RiskTreatmentService {
         Risk r = risks.findById(riskId)
             .orElseThrow(() -> new EntityNotFoundException("Risk not found: " + riskId));
         if (!Objects.equals(r.getOrganisationId(), o))
-            throw new IllegalArgumentException("Risk " + riskId + " belongs to another organisation");
+            // SEC-RISK-001: do NOT reveal that the risk exists in another tenant —
+            // a "belongs to another organisation" 400 would confirm the id and
+            // enable cross-tenant enumeration. Treat it as not-found (404).
+            throw new EntityNotFoundException("Risk not found: " + riskId);
         return r;
     }
 }

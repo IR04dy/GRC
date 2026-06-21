@@ -36,26 +36,33 @@ import java.util.Map;
 @Tag(name = "NDI — Submission Package")
 public class NdiSubmissionPackageController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    // Regulator-facing transitions (approve/submit/acknowledge/reject) and delete
+    // are restricted to approvers.
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiSubmissionPackageService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public List<NdiSubmissionPackage> list(@RequestParam Long cycleId) {
         return service.listForCycle(cycleId);
     }
 
     @GetMapping("/preflight")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Preflight preflight(@RequestParam Long cycleId) {
         return service.preflight(cycleId);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiSubmissionPackage get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiSubmissionPackage> create(@RequestParam Long cycleId,
                                                        @RequestBody(required = false) Map<String, String> body) {
         return ResponseEntity.ok(service.create(cycleId,
@@ -64,43 +71,43 @@ public class NdiSubmissionPackageController {
     }
 
     @PostMapping("/{id}/regenerate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiSubmissionPackage regenerate(@PathVariable Long id) { return service.regenerate(id); }
 
     @PostMapping("/{id}/finalize")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiSubmissionPackage finalize_(@PathVariable Long id) { return service.finalize(id); }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiSubmissionPackage approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         return service.approve(id, body == null ? null : body.get("approverName"));
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiSubmissionPackage submit(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.submit(id, body.get("submitterName"), body.get("attestationEn"), body.get("attestationAr"));
     }
 
     @PostMapping("/{id}/acknowledge")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiSubmissionPackage acknowledge(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.acknowledge(id, body.get("sdaiaReference"));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiSubmissionPackage reject(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.reject(id, body.get("reason"));
     }
 
     @PostMapping("/{id}/reopen")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiSubmissionPackage reopen(@PathVariable Long id) { return service.reopen(id); }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

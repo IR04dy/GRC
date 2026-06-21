@@ -25,41 +25,41 @@ public class ConsentRecordController {
     private final ConsentRecordService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Page<ConsentRecord> list(@RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "50") int size) {
         return service.list(page, size);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public ConsentRecord get(@PathVariable Long id) { return service.get(id); }
 
     @GetMapping("/by-subject/{subjectRef}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public List<ConsentRecord> history(@PathVariable String subjectRef) {
         return service.historyFor(subjectRef);
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ResponseEntity<ConsentRecord> grant(@Valid @RequestBody ConsentRecord body) {
         return ResponseEntity.ok(service.grant(body));
     }
 
     @PostMapping("/{id}/withdraw")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ConsentRecord withdraw(@PathVariable Long id, @RequestBody WithdrawBody body) {
         return service.withdraw(id, body.reason());
     }
 
     @PostMapping("/{id}/supersede")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ConsentRecord supersede(@PathVariable Long id, @RequestBody SupersedeBody body) {
         return service.supersede(id, body.supersededByConsentId());
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Map<String, Long> stats() { return service.stats(); }
 }

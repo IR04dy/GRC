@@ -46,7 +46,7 @@ public class LicensingController {
     }
 
     @PostMapping("/modules")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<OrganisationLicense> upsert(@RequestBody OrganisationLicense body) {
         // Force the current tenant onto the body — keeps cross-tenant writes from sneaking through.
         body.setOrganisationId(TenantContext.getCurrentTenant());
@@ -54,7 +54,7 @@ public class LicensingController {
     }
 
     @PostMapping("/modules/{code}/disable")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<Void> disable(@PathVariable String code) {
         service.disable(TenantContext.getCurrentTenant(), code);
         return ResponseEntity.noContent().build();

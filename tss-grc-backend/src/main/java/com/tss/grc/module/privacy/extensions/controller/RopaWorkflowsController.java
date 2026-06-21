@@ -46,7 +46,7 @@ public class RopaWorkflowsController {
                          List<DisposalResponse> disposal) { }
 
     @GetMapping("/{ropaCode}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     @Operation(summary = "Counts + full lists of all three PDPL workflows for one ROPA code.")
     public Bundle bundleFor(@PathVariable String ropaCode) {
         Long orgId = TenantContext.getCurrentTenant();
@@ -67,7 +67,7 @@ public class RopaWorkflowsController {
     }
 
     @GetMapping("/{ropaCode}/counts")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     @Operation(summary = "Counts only — lightweight call for chip rendering on ROPA list/detail.")
     public Counts counts(@PathVariable String ropaCode) {
         Long orgId = TenantContext.getCurrentTenant();

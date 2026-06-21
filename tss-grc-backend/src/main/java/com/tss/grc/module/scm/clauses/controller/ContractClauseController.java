@@ -24,7 +24,7 @@ public class ContractClauseController {
     private final ContractClauseService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public Page<Response> list(@RequestParam(required = false) String status,
                                @RequestParam(required = false) String category,
                                @RequestParam(defaultValue = "0") int page,
@@ -33,31 +33,31 @@ public class ContractClauseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public Response get(@PathVariable Long id) {
         return Response.from(service.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public ResponseEntity<Response> create(@Valid @RequestBody CreateRequest req) {
         return ResponseEntity.status(201).body(Response.from(service.create(req)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public Response update(@PathVariable Long id, @Valid @RequestBody UpdateRequest req) {
         return Response.from(service.update(id, req));
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public Response approve(@PathVariable Long id, Authentication auth) {
         return Response.from(service.approve(id, usernameOf(auth), userIdOf(auth)));
     }
 
     @PostMapping("/{id}/deprecate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public Response deprecate(@PathVariable Long id, @Valid @RequestBody DeprecateRequest req) {
         return Response.from(service.deprecate(id, req));
     }

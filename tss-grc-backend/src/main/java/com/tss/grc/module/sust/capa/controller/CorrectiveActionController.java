@@ -41,7 +41,7 @@ public class CorrectiveActionController {
     private final CorrectiveActionService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<CorrectiveAction> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String sourceType,
@@ -56,11 +56,11 @@ public class CorrectiveActionController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> aggregate() { return service.aggregate(); }
 
     @GetMapping("/for-source")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public List<CorrectiveAction> forSource(
             @RequestParam String sourceType,
             @RequestParam String sourceRef) {
@@ -68,47 +68,47 @@ public class CorrectiveActionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public CorrectiveAction get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<CorrectiveAction> create(@RequestBody CorrectiveAction req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public CorrectiveAction update(@PathVariable Long id, @RequestBody CorrectiveAction req) {
         return service.update(id, req);
     }
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public CorrectiveAction start(@PathVariable Long id) { return service.transition(id, "IN_PROGRESS"); }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public CorrectiveAction complete(@PathVariable Long id) { return service.transition(id, "COMPLETED"); }
 
     /** Body: {@code { "verifiedBy": "Verifier Name" }} — Rule A enforces verifier ≠ owner. */
     @PostMapping("/{id}/verify")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public CorrectiveAction verify(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         String verifier = body == null ? null : body.get("verifiedBy");
         return service.transition(id, "VERIFIED", verifier);
     }
 
     @PostMapping("/{id}/close")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public CorrectiveAction close(@PathVariable Long id) { return service.transition(id, "CLOSED"); }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public CorrectiveAction cancel(@PathVariable Long id) { return service.transition(id, "CANCELLED"); }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

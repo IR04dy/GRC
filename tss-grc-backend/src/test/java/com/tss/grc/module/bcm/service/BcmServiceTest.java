@@ -3,6 +3,8 @@ package com.tss.grc.module.bcm.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.entity.BcmExercise;
 import com.tss.grc.module.bcm.entity.BcmPlan;
+import com.tss.grc.module.bcm.entity.BiaRecord;
+import com.tss.grc.module.bcm.entity.CriticalProcess;
 import com.tss.grc.module.bcm.repository.BcmExerciseRepository;
 import com.tss.grc.module.bcm.repository.BcmPlanRepository;
 import com.tss.grc.module.bcm.repository.BiaRecordRepository;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -22,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -73,6 +77,25 @@ class BcmServiceTest {
         e.setOrganisationId(ORG_ID);
         e.setStatus(status);
         return e;
+    }
+
+    private static final Long PROC_ID = 42L;
+
+    private static CriticalProcess process(Long orgId) {
+        CriticalProcess p = new CriticalProcess();
+        p.setId(PROC_ID);
+        p.setOrganisationId(orgId);
+        p.setProcessNameEn("Core Banking");
+        return p;
+    }
+
+    private static BiaRecord bia(Long processId) {
+        BiaRecord b = new BiaRecord();
+        b.setId(ID);
+        b.setProcessId(processId);
+        b.setStatus("DRAFT");
+        b.setRtoHours(4);
+        return b;
     }
 
     // ─── Plan lifecycle: happy path ──────────────────────────────────
@@ -245,5 +268,80 @@ class BcmServiceTest {
         assertThat(e.getIsDeleted()).isTrue();
         assertThat(e.getUpdatedAt()).isAfter(priorUpdate);
         verify(exerciseRepo, never()).deleteById(any());
+    }
+
+    // ─── BIA tenant scope (SEC-BCM-001 — IDOR / CWE-639) ─────────────
+    //
+    // BiaRecord has no organisationId column; tenant ownership is enforced
+    // via the parent CriticalProcess. These lock the cross-tenant read /
+    // overwrite / hard-delete IDOR shut.
+
+    @Test
+    void listBia_with_processId_of_other_tenant_throws_EntityNotFound() {
+        // Attacker in ORG_ID supplies a processId owned by OTHER_ORG.
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.listBia(PROC_ID))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessageContaining("Critical process not found");
+
+        verify(biaRepo, never()).findByProcessId(any(), any());
+    }
+
+    @Test
+    void listBia_with_own_processId_returns_records() {
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(ORG_ID)));
+        when(biaRepo.findByProcessId(eq(PROC_ID), any()))
+            .thenReturn(new PageImpl<>(java.util.List.of(bia(PROC_ID))));
+
+        assertThat(service.listBia(PROC_ID)).hasSize(1);
+    }
+
+    @Test
+    void createBia_with_processId_of_other_tenant_throws_EntityNotFound() {
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.createBia(bia(PROC_ID)))
+            .isInstanceOf(EntityNotFoundException.class);
+
+        verify(biaRepo, never()).save(any());
+    }
+
+    @Test
+    void updateBia_of_other_tenant_throws_EntityNotFound_and_no_save() {
+        // BIA row exists, but its parent process belongs to OTHER_ORG.
+        when(biaRepo.findById(ID)).thenReturn(Optional.of(bia(PROC_ID)));
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.updateBia(ID, bia(PROC_ID)))
+            .isInstanceOf(EntityNotFoundException.class);
+
+        verify(biaRepo, never()).save(any());
+    }
+
+    @Test
+    void deleteBia_of_other_tenant_throws_EntityNotFound_never_hard_deletes() {
+        when(biaRepo.findById(ID)).thenReturn(Optional.of(bia(PROC_ID)));
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(OTHER_ORG)));
+
+        assertThatThrownBy(() -> service.deleteBia(ID))
+            .isInstanceOf(EntityNotFoundException.class);
+
+        verify(biaRepo, never()).deleteById(any());
+        verify(biaRepo, never()).save(any());
+    }
+
+    @Test
+    void deleteBia_of_own_tenant_soft_deletes_via_save() {
+        BiaRecord b = bia(PROC_ID);
+        when(biaRepo.findById(ID)).thenReturn(Optional.of(b));
+        when(processRepo.findById(PROC_ID)).thenReturn(Optional.of(process(ORG_ID)));
+        when(biaRepo.save(any(BiaRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.deleteBia(ID);
+
+        assertThat(b.getStatus()).isEqualTo("DELETED");
+        verify(biaRepo).save(b);
+        verify(biaRepo, never()).deleteById(any());
     }
 }

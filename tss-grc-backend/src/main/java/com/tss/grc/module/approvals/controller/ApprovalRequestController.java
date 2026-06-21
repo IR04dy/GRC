@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -37,8 +38,12 @@ public class ApprovalRequestController {
     @PostMapping("/{id}/transition")
     @PreAuthorize("isAuthenticated()")
     public ApprovalRequestDto transition(@PathVariable String id,
-                                         @RequestBody @Valid ApprovalRequestDto.TransitionRequest req) {
-        return service.transition(id, req);
+                                         @RequestBody @Valid ApprovalRequestDto.TransitionRequest req,
+                                         Authentication auth) {
+        // SEC-IAM-002: the deciding identity is the authenticated principal, never a
+        // body field. Object-level ownership (caller == assignedTo) and the admin
+        // override are enforced in the service.
+        return service.transition(id, req, auth.getName(), isPlatformAdmin(auth));
     }
 
     @DeleteMapping("/{id}")
@@ -46,5 +51,13 @@ public class ApprovalRequestController {
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean isPlatformAdmin(Authentication auth) {
+        if (auth == null || auth.getAuthorities() == null) return false;
+        for (GrantedAuthority ga : auth.getAuthorities()) {
+            if ("ROLE_PLATFORM_ADMIN".equals(ga.getAuthority())) return true;
+        }
+        return false;
     }
 }

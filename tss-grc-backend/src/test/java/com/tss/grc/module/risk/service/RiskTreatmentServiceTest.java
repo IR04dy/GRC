@@ -6,6 +6,7 @@ import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskTreatment;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import com.tss.grc.module.risk.repository.RiskTreatmentRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,27 @@ class RiskTreatmentServiceTest {
         assertThatThrownBy(() -> service.create(t))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("descriptionEn");
+    }
+
+    @Test void get_inTenantReturnsTreatment() {
+        RiskTreatment t = treatment(1L, "MITIGATE", "PLANNED");
+        when(treatments.findById(1L)).thenReturn(Optional.of(t));
+        when(risks.findById(RISK_ID)).thenReturn(Optional.of(risk("OPEN")));
+
+        RiskTreatment out = service.get(1L);
+        assertThat(out.getId()).isEqualTo(1L);
+    }
+
+    @Test void get_crossTenantTreatmentHiddenAs404() {
+        // SEC-RISK-001: parent risk belongs to a different org → must be invisible.
+        Risk foreign = risk("OPEN");
+        foreign.setOrganisationId(ORG_ID + 1);   // owned by another tenant
+        RiskTreatment t = treatment(1L, "MITIGATE", "PLANNED");
+        when(treatments.findById(1L)).thenReturn(Optional.of(t));
+        when(risks.findById(RISK_ID)).thenReturn(Optional.of(foreign));
+
+        assertThatThrownBy(() -> service.get(1L))
+            .isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test void transition_plannedToInProgressOk() {

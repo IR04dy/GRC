@@ -705,7 +705,9 @@ const SCM = '/scm';
 let _vendors = [];
 
 const ar = () => (typeof I18n !== 'undefined') && I18n.current === 'ar';
-const vname = v => ar() && v.nameAr ? v.nameAr : (v.nameEn || '');
+// HTML-escape server/user data before innerHTML interpolation (SEC-FE-001).
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const vname = v => esc(ar() && v.nameAr ? v.nameAr : (v.nameEn || ''));
 
 function badge(level, txt) {
   const map = {CRITICAL:'danger', HIGH:'warning', MEDIUM:'info', LOW:'success',
@@ -713,7 +715,8 @@ function badge(level, txt) {
                IN_PROGRESS:'warning', COMPLETED:'success', ESCALATED:'danger',
                UNDER_REVIEW:'info', PENDING:'secondary', REJECTED:'danger',
                AT_RISK:'warning', BREACHED:'danger', MET:'success', NOT_MEASURED:'secondary'};
-  return `<span class="badge bg-${map[level]||'secondary'}">${txt||level||''}</span>`;
+  // map[level] is a fixed CSS class; the visible text is escaped.
+  return `<span class="badge bg-${map[level]||'secondary'}">${esc(txt||level||'')}</span>`;
 }
 
 function flash(type, msg) {
@@ -747,11 +750,11 @@ async function loadVendors() {
     if (!_vendors.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No data</td></tr>'; }
     else tb.innerHTML = _vendors.map(v => `
       <tr>
-        <td><strong>${vname(v)}</strong>${v.nameAr && !ar() ? `<br><small class="text-muted" dir="rtl">${v.nameAr}</small>`:''}</td>
-        <td><small>${v.category||''}</small></td>
+        <td><strong>${vname(v)}</strong>${v.nameAr && !ar() ? `<br><small class="text-muted" dir="rtl">${esc(v.nameAr)}</small>`:''}</td>
+        <td><small>${esc(v.category)}</small></td>
         <td>${badge(v.criticality)}</td>
-        <td><small>${v.country||''}</small></td>
-        <td><small>${v.serviceType||''}</small></td>
+        <td><small>${esc(v.country)}</small></td>
+        <td><small>${esc(v.serviceType)}</small></td>
         <td>${badge(v.riskLevel)}</td>
         <td>${badge(v.status)}</td>
         <td>
@@ -776,8 +779,8 @@ async function loadOverviewIncidents() {
     const list = d.content || [];
     if (!list.length) { tb.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>'; return; }
     tb.innerHTML = list.map(i => `
-      <tr><td><small>${ar() && i.vendorNameAr ? i.vendorNameAr : (i.vendorNameEn||'')}</small></td>
-          <td><small>${i.incidentType||''}</small></td>
+      <tr><td><small>${esc(ar() && i.vendorNameAr ? i.vendorNameAr : (i.vendorNameEn||''))}</small></td>
+          <td><small>${esc(i.incidentType)}</small></td>
           <td>${badge(i.impact)}</td>
           <td>${badge(i.status)}</td></tr>`).join('');
   } catch (e) { console.error('Overview incidents failed:', e); }
@@ -790,10 +793,10 @@ async function loadOnboarding() {
     const list = d.content || [];
     if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No data</td></tr>'; return; }
     tb.innerHTML = list.map(o => `
-      <tr><td><strong>${ar() && o.vendorNameAr ? o.vendorNameAr : (o.vendorNameEn||'')}</strong></td>
-          <td><small><code>${o.currentStage||''}</code></small></td>
+      <tr><td><strong>${esc(ar() && o.vendorNameAr ? o.vendorNameAr : (o.vendorNameEn||''))}</strong></td>
+          <td><small><code>${esc(o.currentStage)}</code></small></td>
           <td>${badge(o.status)}</td>
-          <td><small>${o.dueDate||'—'}</small></td>
+          <td><small>${esc(o.dueDate||'—')}</small></td>
           <td><small>${(o.completedStages||'').split(',').filter(Boolean).length}/6</small></td>
           <td>
             <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="advanceOnboarding(${o.id})" title="Advance"><i class="bi bi-arrow-right-circle"></i></button>
@@ -810,10 +813,10 @@ async function loadAssessments() {
     const list = d.content || [];
     if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No data</td></tr>'; return; }
     tb.innerHTML = list.map(a => `
-      <tr><td><strong>${ar() && a.vendorNameAr ? a.vendorNameAr : (a.vendorNameEn||'')}</strong></td>
-          <td><small>${a.assessmentType||''}</small></td>
-          <td><small>${a.assessmentDate||''}</small></td>
-          <td><strong>${a.overallScore!=null?a.overallScore:'—'}</strong></td>
+      <tr><td><strong>${esc(ar() && a.vendorNameAr ? a.vendorNameAr : (a.vendorNameEn||''))}</strong></td>
+          <td><small>${esc(a.assessmentType)}</small></td>
+          <td><small>${esc(a.assessmentDate)}</small></td>
+          <td><strong>${a.overallScore!=null?esc(a.overallScore):'—'}</strong></td>
           <td>${badge(a.riskRating)}</td>
           <td>${badge(a.status)}</td>
           <td><button class="btn btn-sm btn-outline-warning py-0 px-2" onclick="escalateAssessment(${a.id})" title="Escalate to Risk"><i class="bi bi-exclamation-triangle"></i></button></td></tr>`).join('');
@@ -827,12 +830,12 @@ async function loadDependencies() {
     const list = d.content || [];
     if (!list.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No data</td></tr>'; return; }
     tb.innerHTML = list.map(x => `
-      <tr><td>${ar() && x.serviceNameAr ? x.serviceNameAr : (x.serviceNameEn||'')}</td>
-          <td><small>${x.assetName||''}</small></td>
-          <td><small>${x.vendorNameEn||''}</small></td>
-          <td><small>${x.dependencyType||''}</small></td>
+      <tr><td>${esc(ar() && x.serviceNameAr ? x.serviceNameAr : (x.serviceNameEn||''))}</td>
+          <td><small>${esc(x.assetName)}</small></td>
+          <td><small>${esc(x.vendorNameEn)}</small></td>
+          <td><small>${esc(x.dependencyType)}</small></td>
           <td>${badge(x.dependencyLevel)}</td>
-          <td>${x.hasAlternative?'<i class="bi bi-check-circle text-success"></i> '+(x.alternativeVendorNameEn||''):'<i class="bi bi-x-circle text-danger"></i>'}</td>
+          <td>${x.hasAlternative?'<i class="bi bi-check-circle text-success"></i> '+esc(x.alternativeVendorNameEn):'<i class="bi bi-x-circle text-danger"></i>'}</td>
           <td>${badge(x.status)}</td>
           <td><button class="btn btn-sm btn-outline-secondary py-0 px-2"><i class="bi bi-pencil"></i></button></td></tr>`).join('');
   } catch (e) { console.error(e); flash('danger','Failed to load dependencies: ' + e.message); }
@@ -845,9 +848,9 @@ async function loadIncidents() {
     const list = d.content || [];
     if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No data</td></tr>'; return; }
     tb.innerHTML = list.map(i => `
-      <tr><td><small><code>${i.incidentCode||''}</code></small></td>
-          <td><small>${ar() && i.vendorNameAr ? i.vendorNameAr : (i.vendorNameEn||'')}</small></td>
-          <td><small>${i.incidentType||''}</small></td>
+      <tr><td><small><code>${esc(i.incidentCode)}</code></small></td>
+          <td><small>${esc(ar() && i.vendorNameAr ? i.vendorNameAr : (i.vendorNameEn||''))}</small></td>
+          <td><small>${esc(i.incidentType)}</small></td>
           <td>${badge(i.impact)}</td>
           <td>${i.slaBreached?'<i class="bi bi-exclamation-triangle text-danger" title="SLA breached"></i>':'—'}</td>
           <td>${badge(i.status)}</td>
@@ -869,9 +872,9 @@ async function loadResilience() {
     const list = _deps.filter(x => x.dependencyLevel === 'HIGH' || x.dependencyLevel === 'CRITICAL' || !x.hasAlternative);
     if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No data</td></tr>'; return; }
     tb.innerHTML = list.map(x => `
-      <tr><td>${ar() && x.serviceNameAr ? x.serviceNameAr : (x.serviceNameEn||'')}</td>
-          <td><small>${x.vendorNameEn||''}</small></td>
-          <td><small>${x.alternativeVendorNameEn || '<span class="text-danger">— None —</span>'}</small></td>
+      <tr><td>${esc(ar() && x.serviceNameAr ? x.serviceNameAr : (x.serviceNameEn||''))}</td>
+          <td><small>${esc(x.vendorNameEn)}</small></td>
+          <td><small>${x.alternativeVendorNameEn ? esc(x.alternativeVendorNameEn) : '<span class="text-danger">— None —</span>'}</small></td>
           <td>${badge(x.dependencyLevel)}</td>
           <td>${x.hasAlternative ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">No alternative</span>'}</td>
           <td>${x.hasAlternative
@@ -912,13 +915,13 @@ async function loadContracts() {
     const list = d.content || [];
     if (!list.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No data</td></tr>'; return; }
     tb.innerHTML = list.map(c => `
-      <tr><td><code>${c.contractNumber||''}</code></td>
-          <td><small>${c.vendorNameEn||''}</small></td>
-          <td><small>${ar() && c.titleAr ? c.titleAr : (c.titleEn||'')}</small></td>
-          <td><small>${c.contractType||''}</small></td>
-          <td><small>${c.startDate||''}</small></td>
-          <td><small>${c.endDate||''}</small></td>
-          <td><small>${c.contractValue?c.contractValue.toLocaleString():''} ${c.currency||''}</small></td>
+      <tr><td><code>${esc(c.contractNumber)}</code></td>
+          <td><small>${esc(c.vendorNameEn)}</small></td>
+          <td><small>${esc(ar() && c.titleAr ? c.titleAr : (c.titleEn||''))}</small></td>
+          <td><small>${esc(c.contractType)}</small></td>
+          <td><small>${esc(c.startDate)}</small></td>
+          <td><small>${esc(c.endDate)}</small></td>
+          <td><small>${c.contractValue?esc(c.contractValue.toLocaleString()):''} ${esc(c.currency)}</small></td>
           <td>${badge(c.status)}</td></tr>`).join('');
   } catch (e) { console.error(e); flash('danger','Failed to load contracts: ' + e.message); }
 }
@@ -973,9 +976,9 @@ async function loadReports() {
       document.getElementById('rep-expiring').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No contracts expiring</td></tr>';
     } else {
       document.getElementById('rep-expiring').innerHTML = expiring.map(c => `
-        <tr><td><small>${c.vendorNameEn || ''}</small></td>
-            <td><small>${ar() && c.titleAr ? c.titleAr : (c.titleEn || '')}</small></td>
-            <td><small><strong class="text-warning">${c.endDate}</strong></small></td></tr>`).join('');
+        <tr><td><small>${esc(c.vendorNameEn)}</small></td>
+            <td><small>${esc(ar() && c.titleAr ? c.titleAr : (c.titleEn || ''))}</small></td>
+            <td><small><strong class="text-warning">${esc(c.endDate)}</strong></small></td></tr>`).join('');
     }
     if (typeof I18n !== 'undefined' && I18n.applyTranslations) I18n.applyTranslations();
   } catch (e) { console.error(e); flash('danger','Failed to load reports: ' + e.message); }

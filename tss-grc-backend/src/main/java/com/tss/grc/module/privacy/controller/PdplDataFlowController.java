@@ -30,7 +30,7 @@ public class PdplDataFlowController {
     private final PdplDataFlowService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public DataFlowGraph graph() {
         return service.buildGraph();
     }

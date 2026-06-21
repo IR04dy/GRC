@@ -26,16 +26,16 @@ public class OrganisationSettingsController {
     private final OrganisationSettingsService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public OrganisationSettings get() { return service.getOrCreate(); }
 
     @PutMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public OrganisationSettings update(@RequestBody OrganisationSettings req) {
         return service.update(req);
     }
 
     @PostMapping("/reset")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public OrganisationSettings reset() { return service.resetToDefaults(); }
 }

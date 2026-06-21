@@ -20,10 +20,15 @@ import java.util.Map;
 @Tag(name = "NDI — Evidence Repository")
 public class NdiEvidenceItemController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiEvidenceItemService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Page<NdiEvidenceItem> list(@RequestParam(required = false) Long cycleId,
                                       @RequestParam(required = false) String type,
                                       @RequestParam(required = false) String status,
@@ -33,58 +38,58 @@ public class NdiEvidenceItemController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public EvidenceAggregate aggregate() { return service.aggregate(); }
 
     @GetMapping("/expiring-soon")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public List<NdiEvidenceItem> expiringSoon(@RequestParam(defaultValue = "60") int days) {
         return service.expiringSoon(days);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiEvidenceItem get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiEvidenceItem> create(@RequestBody NdiEvidenceItem body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiEvidenceItem update(@PathVariable Long id, @RequestBody NdiEvidenceItem body) {
         return service.update(id, body);
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiEvidenceItem approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         return service.approve(id, body == null ? null : body.get("reviewerName"));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiEvidenceItem reject(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.reject(id, body.get("reason"), body.get("reviewerName"));
     }
 
     @PostMapping("/{oldId}/supersede-by/{newId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiEvidenceItem supersede(@PathVariable Long oldId, @PathVariable Long newId) {
         return service.supersede(oldId, newId);
     }
 
     @PostMapping("/check-expiry")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public Map<String, Object> checkExpiry() {
         List<Long> flipped = service.runExpiryCheck();
         return Map.of("flippedCount", flipped.size(), "flippedIds", flipped);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

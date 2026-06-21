@@ -9,6 +9,7 @@ import com.tss.grc.module.tprm.repository.QuestionnaireQuestionRepository;
 import com.tss.grc.module.tprm.repository.QuestionnaireResponseRepository;
 import com.tss.grc.module.tprm.repository.QuestionnaireTemplateRepository;
 import com.tss.grc.module.tprm.repository.VendorAssessmentRepository;
+import com.tss.grc.module.tprm.repository.VendorRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -65,8 +66,26 @@ public class QuestionnaireService {
     private final QuestionnaireQuestionRepository questions;
     private final QuestionnaireResponseRepository responses;
     private final VendorAssessmentRepository assessments;
+    private final VendorRepository vendorRepo;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    /**
+     * Load a {@link VendorAssessment} scoped to the caller's tenant (SEC-TPRM-002).
+     *
+     * <p>VendorAssessment carries no organisation_id, so tenant isolation is
+     * derived through its parent vendor. We assert the vendor exists in the
+     * current org via the org-scoped finder; a miss throws EntityNotFoundException
+     * (→ 404), giving the same "not found" surface as a non-existent assessment
+     * and preventing cross-tenant workflow/score mutation.
+     */
+    private VendorAssessment loadAssessmentInTenant(Long assessmentId) {
+        VendorAssessment va = assessments.findById(assessmentId)
+            .orElseThrow(() -> new EntityNotFoundException("VendorAssessment not found: " + assessmentId));
+        vendorRepo.findByIdAndOrganisationId(va.getVendorId(), org())
+            .orElseThrow(() -> new EntityNotFoundException("VendorAssessment not found: " + assessmentId));
+        return va;
+    }
 
     // ─── Templates ─────────────────────────────────────────────────
 
@@ -211,8 +230,7 @@ public class QuestionnaireService {
     @Transactional
     public VendorAssessment assignTemplate(Long assessmentId, Long templateId) {
         Long o = org();
-        VendorAssessment va = assessments.findById(assessmentId)
-            .orElseThrow(() -> new EntityNotFoundException("VendorAssessment not found: " + assessmentId));
+        VendorAssessment va = loadAssessmentInTenant(assessmentId);
         QuestionnaireTemplate t = getTemplate(templateId);
         if (!"ACTIVE".equals(t.getStatus()))
             throw new IllegalStateException("Can only assign an ACTIVE template (was " + t.getStatus() + ")");
@@ -238,8 +256,7 @@ public class QuestionnaireService {
     @Transactional
     public QuestionnaireResponse upsertResponse(Long assessmentId, QuestionnaireResponse body, String actor) {
         Long o = org();
-        VendorAssessment va = assessments.findById(assessmentId)
-            .orElseThrow(() -> new EntityNotFoundException("VendorAssessment not found: " + assessmentId));
+        VendorAssessment va = loadAssessmentInTenant(assessmentId);
         if (body.getQuestionId() == null) throw new IllegalArgumentException("questionId is required");
         QuestionnaireQuestion q = questions.findByIdAndOrganisationId(body.getQuestionId(), o)
             .orElseThrow(() -> new EntityNotFoundException("Question not found: " + body.getQuestionId()));
@@ -296,8 +313,7 @@ public class QuestionnaireService {
     @Transactional
     public VendorAssessment markComplete(Long assessmentId) {
         Long o = org();
-        VendorAssessment va = assessments.findById(assessmentId)
-            .orElseThrow(() -> new EntityNotFoundException("VendorAssessment not found: " + assessmentId));
+        VendorAssessment va = loadAssessmentInTenant(assessmentId);
         if (va.getTemplateId() == null)
             throw new IllegalStateException("Assessment has no template assigned");
         List<QuestionnaireQuestion> mandatory = questions
@@ -317,8 +333,7 @@ public class QuestionnaireService {
 
     @Transactional
     public VendorAssessment markReviewed(Long assessmentId) {
-        VendorAssessment va = assessments.findById(assessmentId)
-            .orElseThrow(() -> new EntityNotFoundException("VendorAssessment not found: " + assessmentId));
+        VendorAssessment va = loadAssessmentInTenant(assessmentId);
         if (!"COMPLETED".equals(va.getWorkflowStatus()))
             throw new IllegalStateException("Only COMPLETED assessments can be REVIEWED");
         va.setWorkflowStatus("REVIEWED");

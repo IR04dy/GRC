@@ -12,6 +12,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -141,8 +142,21 @@ public class ApprovalRequestService {
         return out;
     }
 
+    /**
+     * Apply an approval-request state transition.
+     *
+     * <p>SEC-IAM-002 hardening: the transition is bound to the authenticated
+     * principal. Only the user the request is currently {@code assignedTo}
+     * (or a PLATFORM_ADMIN) may move it to APPROVED / REJECTED / DELEGATED;
+     * the decider attribution is taken from {@code callerUsername}, never from
+     * the request body (the body's {@code decidedBy} is ignored).
+     *
+     * @param callerUsername the authenticated principal's username (auth.getName())
+     * @param callerIsAdmin  true when the caller holds ROLE_PLATFORM_ADMIN
+     */
     @Transactional
-    public ApprovalRequestDto transition(String externalId, ApprovalRequestDto.TransitionRequest req) {
+    public ApprovalRequestDto transition(String externalId, ApprovalRequestDto.TransitionRequest req,
+                                         String callerUsername, boolean callerIsAdmin) {
         Long orgId = TenantContext.requireOrganisationId();
         ApprovalRequest r = repo.findByOrganisationIdAndExternalId(orgId, externalId)
             .orElseThrow(() -> new EntityNotFoundException("Approval request not found: " + externalId));
@@ -150,13 +164,24 @@ public class ApprovalRequestService {
         if (!allowed.contains(req.getStatus())) {
             throw new IllegalTransitionException(r.getStatus(), req.getStatus(), allowed);
         }
+
+        // SEC-IAM-002: object-level authorization — only the current assignee may
+        // decide/delegate. PLATFORM_ADMIN may override (admin reassignment / cleanup).
+        boolean isAssignee = callerUsername != null && callerUsername.equals(r.getAssignedTo());
+        if (!isAssignee && !callerIsAdmin) {
+            throw new AccessDeniedException(
+                "Only the assignee may transition this approval request");
+        }
+
         String previousStatus = r.getStatus();
         LocalDateTime now = LocalDateTime.now();
         r.setStatus(req.getStatus());
 
         if ("APPROVED".equals(req.getStatus()) || "REJECTED".equals(req.getStatus())) {
             r.setDecidedAt(now);
-            if (req.getDecidedBy() != null) r.setDecidedBy(req.getDecidedBy());
+            // SEC-IAM-002: decider attribution is the authenticated principal — the
+            // body's decidedBy is never trusted (non-repudiation of the audit trail).
+            r.setDecidedBy(callerUsername);
             if (req.getDecisionCommentEn() != null) r.setDecisionCommentEn(req.getDecisionCommentEn());
             if (req.getDecisionCommentAr() != null) r.setDecisionCommentAr(req.getDecisionCommentAr());
         }
@@ -183,7 +208,7 @@ public class ApprovalRequestService {
             case "APPROVED", "REJECTED" -> {
                 trigger = "APPROVAL_DECIDED";
                 message = "Approval " + req.getStatus().toLowerCase()
-                    + (req.getDecidedBy() != null ? " by " + req.getDecidedBy() : "");
+                    + (r.getDecidedBy() != null ? " by " + r.getDecidedBy() : "");
             }
             case "DELEGATED" -> {
                 trigger = "APPROVAL_DELEGATED";

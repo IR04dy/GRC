@@ -4,11 +4,13 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.tprm.entity.QuestionnaireQuestion;
 import com.tss.grc.module.tprm.entity.QuestionnaireResponse;
 import com.tss.grc.module.tprm.entity.QuestionnaireTemplate;
+import com.tss.grc.module.tprm.entity.Vendor;
 import com.tss.grc.module.tprm.entity.VendorAssessment;
 import com.tss.grc.module.tprm.repository.QuestionnaireQuestionRepository;
 import com.tss.grc.module.tprm.repository.QuestionnaireResponseRepository;
 import com.tss.grc.module.tprm.repository.QuestionnaireTemplateRepository;
 import com.tss.grc.module.tprm.repository.VendorAssessmentRepository;
+import com.tss.grc.module.tprm.repository.VendorRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,18 +50,28 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class QuestionnaireServiceTest {
 
-    private static final Long ORG_ID = 7L;
-    private static final Long TPL_ID = 50L;
-    private static final Long VA_ID  = 200L;
+    private static final Long ORG_ID    = 7L;
+    private static final Long TPL_ID    = 50L;
+    private static final Long VA_ID     = 200L;
+    private static final Long VENDOR_ID = 99L;
 
     @Mock private QuestionnaireTemplateRepository templates;
     @Mock private QuestionnaireQuestionRepository questions;
     @Mock private QuestionnaireResponseRepository responses;
     @Mock private VendorAssessmentRepository assessments;
+    @Mock private VendorRepository vendorRepo;
     @InjectMocks private QuestionnaireService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
+
+    /** Stub the tenant guard (SEC-TPRM-002): the assessment's vendor is in the caller's org. */
+    private void vendorInCallerOrg() {
+        Vendor v = new Vendor();
+        v.setId(VENDOR_ID);
+        v.setOrganisationId(ORG_ID);
+        when(vendorRepo.findByIdAndOrganisationId(VENDOR_ID, ORG_ID)).thenReturn(Optional.of(v));
+    }
 
     private static QuestionnaireTemplate template(String status) {
         QuestionnaireTemplate t = new QuestionnaireTemplate();
@@ -156,6 +168,7 @@ class QuestionnaireServiceTest {
     @Test void assignTemplate_onlyAllowedFromActive() {
         VendorAssessment va = vendorAssessment(); va.setTemplateId(null);
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
         when(templates.findByIdAndOrganisationId(TPL_ID, ORG_ID)).thenReturn(Optional.of(template("DRAFT")));
 
         assertThatThrownBy(() -> service.assignTemplate(VA_ID, TPL_ID))
@@ -166,6 +179,7 @@ class QuestionnaireServiceTest {
     @Test void assignTemplate_initialisesTotalsAndStatus() {
         VendorAssessment va = vendorAssessment(); va.setTemplateId(null);
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
         when(templates.findByIdAndOrganisationId(TPL_ID, ORG_ID)).thenReturn(Optional.of(template("ACTIVE")));
         when(questions.findByOrganisationIdAndTemplateIdOrderBySequenceOrderAsc(ORG_ID, TPL_ID))
             .thenReturn(List.of(
@@ -188,6 +202,7 @@ class QuestionnaireServiceTest {
         QuestionnaireQuestion q2 = question(2L, "Q-2", "BOOLEAN",   1.0, true, false);
 
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
         when(questions.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(q1));
         when(questions.findByIdAndOrganisationId(2L, ORG_ID)).thenReturn(Optional.of(q2));
         when(templates.findByIdAndOrganisationId(TPL_ID, ORG_ID)).thenReturn(Optional.of(template("ACTIVE")));
@@ -239,6 +254,7 @@ class QuestionnaireServiceTest {
         QuestionnaireQuestion q = question(1L, "Q-1", "BOOLEAN", 1.0, true, true);
 
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
         when(questions.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(q));
         when(templates.findByIdAndOrganisationId(TPL_ID, ORG_ID)).thenReturn(Optional.of(template("ACTIVE")));
         when(responses.findByOrganisationIdAndVendorAssessmentIdAndQuestionId(ORG_ID, VA_ID, 1L))
@@ -271,6 +287,7 @@ class QuestionnaireServiceTest {
         QuestionnaireQuestion q = question(1L, "Q-1", "BOOLEAN", 1.0, false, false);
 
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
         when(questions.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(q));
         when(responses.findByOrganisationIdAndVendorAssessmentIdAndQuestionId(ORG_ID, VA_ID, 1L))
             .thenReturn(Optional.empty());
@@ -290,6 +307,7 @@ class QuestionnaireServiceTest {
         QuestionnaireQuestion q = question(1L, "Q-1", "SCALE_1_5", 1.0, true, false);
 
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
         when(questions.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(q));
 
         QuestionnaireResponse body = new QuestionnaireResponse();
@@ -307,6 +325,7 @@ class QuestionnaireServiceTest {
     @Test void markComplete_refusesWhenMandatoryUnanswered() {
         VendorAssessment va = vendorAssessment();
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
         when(questions.findByOrganisationIdAndTemplateIdOrderBySequenceOrderAsc(ORG_ID, TPL_ID))
             .thenReturn(List.of(
                 question(1L, "Q-1", "BOOLEAN", 1.0, true, false),
@@ -326,9 +345,47 @@ class QuestionnaireServiceTest {
         VendorAssessment va = vendorAssessment();
         va.setWorkflowStatus("IN_PROGRESS");
         when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        vendorInCallerOrg();
 
         assertThatThrownBy(() -> service.markReviewed(VA_ID))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("COMPLETED");
+    }
+
+    // ─── SEC-TPRM-002: cross-tenant assessment workflow mutation prevention ───
+
+    @Test void markReviewed_crossTenant_throwsEntityNotFound() {
+        // Assessment exists and is COMPLETED, but its parent vendor is NOT in the
+        // caller's org — the tenant guard must reject before the workflow flips.
+        VendorAssessment va = vendorAssessment();
+        va.setWorkflowStatus("COMPLETED");
+        when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        when(vendorRepo.findByIdAndOrganisationId(VENDOR_ID, ORG_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.markReviewed(VA_ID))
+            .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+            .hasMessageContaining("VendorAssessment not found");
+
+        assertThat(va.getWorkflowStatus()).isEqualTo("COMPLETED");
+    }
+
+    @Test void markComplete_crossTenant_throwsEntityNotFound() {
+        VendorAssessment va = vendorAssessment();
+        when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        when(vendorRepo.findByIdAndOrganisationId(VENDOR_ID, ORG_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.markComplete(VA_ID))
+            .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+            .hasMessageContaining("VendorAssessment not found");
+    }
+
+    @Test void assignTemplate_crossTenant_throwsEntityNotFound() {
+        VendorAssessment va = vendorAssessment(); va.setTemplateId(null);
+        when(assessments.findById(VA_ID)).thenReturn(Optional.of(va));
+        when(vendorRepo.findByIdAndOrganisationId(VENDOR_ID, ORG_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.assignTemplate(VA_ID, TPL_ID))
+            .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+            .hasMessageContaining("VendorAssessment not found");
     }
 }

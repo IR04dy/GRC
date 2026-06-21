@@ -21,7 +21,7 @@ public class ProcessorAssessmentController {
     private final ProcessorAssessmentService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Page<ProcessorAssessment> list(@RequestParam(required = false) String status,
                                           @RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "100") int size) {
@@ -29,28 +29,28 @@ public class ProcessorAssessmentController {
         return status == null ? service.list(p) : service.listByStatus(status, p);
     }
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public ProcessorAssessment get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ResponseEntity<ProcessorAssessment> create(@RequestBody ProcessorAssessment req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PostMapping("/{id}/score")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ProcessorAssessment score(@PathVariable Long id, @RequestBody Map<String, String> controls) {
         return service.scoreAndComplete(id, controls);
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ProcessorAssessment approve(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.approve(id, body.getOrDefault("approverName", "admin"));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ProcessorAssessment reject(@PathVariable Long id) { return service.reject(id); }
 }

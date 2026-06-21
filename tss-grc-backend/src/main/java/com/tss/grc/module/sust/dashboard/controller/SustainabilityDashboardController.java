@@ -25,7 +25,7 @@ public class SustainabilityDashboardController {
     private final SustainabilityDashboardService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> dashboard(@RequestParam(defaultValue = "2025") Short year) {
         return service.dashboard(year);
     }

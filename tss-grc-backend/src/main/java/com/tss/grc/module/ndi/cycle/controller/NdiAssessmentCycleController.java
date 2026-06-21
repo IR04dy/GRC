@@ -38,10 +38,15 @@ import java.util.Map;
 @Tag(name = "NDI — Assessment Cycles")
 public class NdiAssessmentCycleController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiAssessmentCycleService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Page<NdiAssessmentCycle> list(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
@@ -52,39 +57,39 @@ public class NdiAssessmentCycleController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Map<String, Object> aggregate() { return service.aggregate(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiAssessmentCycle get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiAssessmentCycle> create(@RequestBody NdiAssessmentCycle req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiAssessmentCycle update(@PathVariable Long id, @RequestBody NdiAssessmentCycle req) {
         return service.update(id, req);
     }
 
     /** Body: {@code { "to": "PLANNING" } } — see service for the allowed forward steps. */
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiAssessmentCycle transition(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.transition(id, body.get("to"));
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public NdiAssessmentCycle archive(@PathVariable Long id) { return service.transition(id, "ARCHIVED"); }
 
     /** Body: {@code { "newYear": 2026 } }. */
     @PostMapping("/{id}/clone")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiAssessmentCycle> cloneCycle(
             @PathVariable Long id,
             @RequestBody Map<String, Integer> body) {
@@ -94,7 +99,7 @@ public class NdiAssessmentCycleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

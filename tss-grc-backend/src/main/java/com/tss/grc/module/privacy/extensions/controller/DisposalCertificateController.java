@@ -27,44 +27,44 @@ public class DisposalCertificateController {
     private final DisposalCertificateService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Page<DisposalResponse> list(@RequestParam(defaultValue = "0") int page,
                                        @RequestParam(defaultValue = "50") int size) {
         return service.list(PageRequest.of(page, size)).map(DisposalResponse::from);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public DisposalResponse get(@PathVariable Long id) {
         return DisposalResponse.from(service.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ResponseEntity<DisposalResponse> create(@RequestBody @Valid DisposalCreate body, Authentication auth) {
         return ResponseEntity.ok(DisposalResponse.from(service.create(body, userId(auth))));
     }
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DisposalResponse start(@PathVariable Long id, Authentication auth) {
         return DisposalResponse.from(service.start(id, userId(auth)));
     }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DisposalResponse complete(@PathVariable Long id, @RequestBody @Valid DisposalCompleteRequest body, Authentication auth) {
         return DisposalResponse.from(service.complete(id, body, userId(auth)));
     }
 
     @PostMapping("/{id}/verify")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DisposalResponse verify(@PathVariable Long id, @RequestBody @Valid DisposalVerifyRequest body, Authentication auth) {
         return DisposalResponse.from(service.verify(id, body, userId(auth)));
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DisposalResponse cancel(@PathVariable Long id) {
         return DisposalResponse.from(service.cancel(id));
     }

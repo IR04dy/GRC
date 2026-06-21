@@ -40,7 +40,7 @@ public class ThreatIntelController {
     private final ThreatIntelCorrelationService service;
 
     @PostMapping("/correlate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CYBER', 'READ')")
     public CorrelationReport correlate(@Valid @RequestBody CorrelationRequest body) {
         return service.correlate(body);
     }

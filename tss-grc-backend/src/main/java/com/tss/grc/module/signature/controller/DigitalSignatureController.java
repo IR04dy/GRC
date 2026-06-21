@@ -85,15 +85,18 @@ public class DigitalSignatureController {
     @PostMapping("/{id}/sign")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Sign a REQUESTED transaction. Stores hash + cert ref + signature timestamp.")
-    public Response sign(@PathVariable Long id, @RequestBody @Valid SignRequest body) {
-        return Response.from(service.sign(id, body));
+    public Response sign(@PathVariable Long id, @RequestBody @Valid SignRequest body, Authentication auth) {
+        // SEC-IAM-003: bind the signing act to the authenticated principal so only
+        // the designated signer can complete the signature.
+        return Response.from(service.sign(id, body, userIdOf(auth)));
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Reject a REQUESTED transaction. Rejection reason is mandatory.")
-    public Response reject(@PathVariable Long id, @RequestBody @Valid RejectRequest body) {
-        return Response.from(service.reject(id, body));
+    public Response reject(@PathVariable Long id, @RequestBody @Valid RejectRequest body, Authentication auth) {
+        // SEC-IAM-003: only the designated signer may decline the request.
+        return Response.from(service.reject(id, body, userIdOf(auth)));
     }
 
     @PostMapping("/{id}/expire")

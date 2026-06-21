@@ -101,6 +101,10 @@ public class TprmService {
     public VendorAssessment updateAssessment(Long id, VendorAssessment req) {
         VendorAssessment existing = assessmentRepo.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Assessment not found: " + id));
+        // Tenant guard (SEC-TPRM-001): VendorAssessment has no organisation_id, so
+        // ownership is enforced via the parent vendor — getVendor throws if the
+        // vendor is not in the caller's org, blocking cross-tenant tampering.
+        getVendor(existing.getVendorId());
         existing.setAssessmentDate(req.getAssessmentDate());
         existing.setAssessor(req.getAssessor());
         existing.setRiskScore(req.getRiskScore());
@@ -115,6 +119,8 @@ public class TprmService {
     public void deleteAssessment(Long id) {
         VendorAssessment a = assessmentRepo.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Assessment not found: " + id));
+        // Tenant guard (SEC-TPRM-001): block cross-tenant soft-delete via the parent vendor.
+        getVendor(a.getVendorId());
         a.setIsDeleted(true);
         assessmentRepo.save(a);
     }

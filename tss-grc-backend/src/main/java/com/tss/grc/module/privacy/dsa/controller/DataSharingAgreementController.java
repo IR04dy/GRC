@@ -22,7 +22,7 @@ public class DataSharingAgreementController {
     private final DataSharingAgreementService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     @Operation(summary = "List data sharing agreements.")
     public Page<DataSharingAgreement> list(@RequestParam(required = false) String status,
                                            @RequestParam(defaultValue = "0") int page,
@@ -32,31 +32,31 @@ public class DataSharingAgreementController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public DataSharingAgreement get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ResponseEntity<DataSharingAgreement> create(@RequestBody DataSharingAgreement req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DataSharingAgreement submit(@PathVariable Long id) { return service.submit(id); }
 
     @PostMapping("/{id}/activate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DataSharingAgreement activate(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.activate(id, body.get("signerName"), body.get("counterpartySigner"));
     }
 
     @PostMapping("/{id}/expire")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DataSharingAgreement expire(@PathVariable Long id) { return service.expire(id); }
 
     @PostMapping("/{id}/terminate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DataSharingAgreement terminate(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.terminate(id, body.getOrDefault("reasonEn", ""));
     }

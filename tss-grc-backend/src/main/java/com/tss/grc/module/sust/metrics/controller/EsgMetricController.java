@@ -26,7 +26,7 @@ public class EsgMetricController {
     private final EsgMetricService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<EsgMetric> list(
             @RequestParam(defaultValue = "2025") Short year,
             @RequestParam(required = false) String category,
@@ -38,36 +38,36 @@ public class EsgMetricController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> aggregate(@RequestParam(defaultValue = "2025") Short year) {
         return service.aggregate(year);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public EsgMetric get(@PathVariable Long id) { return service.get(id); }
 
     @GetMapping("/{id}/progress")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> progress(@PathVariable Long id) {
         return service.progress(service.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<EsgMetric> create(@RequestBody EsgMetric req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public EsgMetric update(@PathVariable Long id, @RequestBody EsgMetric req) {
         return service.update(id, req);
     }
 
     /** Body: {@code { "currentValue": 41.5, "asOf": "2026-06-30" }}. */
     @PostMapping("/{id}/record-reading")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public EsgMetric recordReading(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Object v = body.get("currentValue");
         if (!(v instanceof Number n))
@@ -78,11 +78,11 @@ public class EsgMetricController {
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public EsgMetric archive(@PathVariable Long id) { return service.archive(id); }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

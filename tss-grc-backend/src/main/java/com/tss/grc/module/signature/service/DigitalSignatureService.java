@@ -12,11 +12,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -104,8 +106,9 @@ public class DigitalSignatureService {
     }
 
     @Transactional
-    public DigitalSignatureTransaction sign(Long id, SignRequest body) {
+    public DigitalSignatureTransaction sign(Long id, SignRequest body, Long callerUserId) {
         DigitalSignatureTransaction d = get(id);
+        requireDesignatedSigner(d, callerUserId);
         requireTransitionable(d, "SIGNED");
         d.setStatus("SIGNED");
         d.setSignedDocumentHash(body.signedDocumentHash());
@@ -117,8 +120,9 @@ public class DigitalSignatureService {
     }
 
     @Transactional
-    public DigitalSignatureTransaction reject(Long id, RejectRequest body) {
+    public DigitalSignatureTransaction reject(Long id, RejectRequest body, Long callerUserId) {
         DigitalSignatureTransaction d = get(id);
+        requireDesignatedSigner(d, callerUserId);
         requireTransitionable(d, "REJECTED");
         d.setStatus("REJECTED");
         d.setRejectionReason(body.rejectionReason());
@@ -150,6 +154,21 @@ public class DigitalSignatureService {
     private void requireTransitionable(DigitalSignatureTransaction d, String target) {
         if (!"REQUESTED".equals(d.getStatus())) {
             throw new IllegalTransitionException(d.getStatus(), target, TERMINAL_FROM_REQUESTED);
+        }
+    }
+
+    /**
+     * SEC-IAM-003: bind the sign/reject act to the designated signer. When a
+     * transaction names a {@code signerUserId}, only that user (the
+     * authenticated principal) may complete or decline it — no other
+     * authenticated tenant user can forge the attestation. A transaction with a
+     * null {@code signerUserId} (open/role-routed request) leaves this check to
+     * the (PLATFORM_ADMIN-gated) expiry path and is not signable by an arbitrary
+     * caller here.
+     */
+    private void requireDesignatedSigner(DigitalSignatureTransaction d, Long callerUserId) {
+        if (d.getSignerUserId() == null || !Objects.equals(d.getSignerUserId(), callerUserId)) {
+            throw new AccessDeniedException("Only the designated signer may sign or reject this transaction");
         }
     }
 

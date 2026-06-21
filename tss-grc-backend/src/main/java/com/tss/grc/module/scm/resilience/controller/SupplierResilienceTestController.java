@@ -21,7 +21,7 @@ public class SupplierResilienceTestController {
     private final SupplierResilienceTestService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public Page<SupplierResilienceTest> list(@RequestParam(required = false) String status,
                                              @RequestParam(defaultValue = "0") int page,
                                              @RequestParam(defaultValue = "100") int size) {
@@ -30,33 +30,33 @@ public class SupplierResilienceTestController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public SupplierResilienceTest get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public ResponseEntity<SupplierResilienceTest> create(@RequestBody SupplierResilienceTest req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public SupplierResilienceTest start(@PathVariable Long id) { return service.start(id); }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public SupplierResilienceTest complete(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         return service.complete(id, body);
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public SupplierResilienceTest approve(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.approve(id, body.getOrDefault("approverName", "admin"));
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public SupplierResilienceTest cancel(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.cancel(id, body.getOrDefault("reason", ""));
     }

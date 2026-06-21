@@ -38,7 +38,7 @@ public class GhgEmissionRecordController {
     private final GhgEmissionRecordService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<GhgEmissionRecord> list(
             @RequestParam(required = false) Short year,
             @RequestParam(required = false) Short scope,
@@ -51,51 +51,51 @@ public class GhgEmissionRecordController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> aggregate(@RequestParam(defaultValue = "2025") Short year) {
         return service.aggregate(year);
     }
 
     @GetMapping("/yoy")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> yoy(@RequestParam(defaultValue = "2025") Short year) {
         return service.yoy(year);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public GhgEmissionRecord get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<GhgEmissionRecord> create(@RequestBody GhgEmissionRecord req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public GhgEmissionRecord update(@PathVariable Long id, @RequestBody GhgEmissionRecord req) {
         return service.update(id, req);
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public GhgEmissionRecord submit(@PathVariable Long id) { return service.transition(id, "SUBMITTED"); }
 
     @PostMapping("/{id}/verify")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public GhgEmissionRecord verify(@PathVariable Long id) { return service.verify(id); }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public GhgEmissionRecord approve(@PathVariable Long id) { return service.transition(id, "APPROVED"); }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public GhgEmissionRecord archive(@PathVariable Long id) { return service.transition(id, "ARCHIVED"); }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

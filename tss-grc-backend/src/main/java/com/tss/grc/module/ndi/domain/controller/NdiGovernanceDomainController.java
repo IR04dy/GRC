@@ -31,53 +31,58 @@ import java.util.List;
 @Tag(name = "NDI — Governance Domains")
 public class NdiGovernanceDomainController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiGovernanceDomainService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public List<NdiGovernanceDomain> list(@RequestParam(defaultValue = "false") boolean activeOnly) {
         return service.list(activeOnly);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiGovernanceDomain get(@PathVariable Long id) {
         return service.get(id);
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiGovernanceDomain> create(@RequestBody NdiGovernanceDomain body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiGovernanceDomain update(@PathVariable Long id, @RequestBody NdiGovernanceDomain body) {
         return service.update(id, body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/mark-official")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiGovernanceDomain markOfficial(@PathVariable Long id) {
         return service.markOfficial(id);
     }
 
     @PostMapping("/{id}/mark-placeholder")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiGovernanceDomain markPlaceholder(@PathVariable Long id) {
         return service.markPlaceholder(id);
     }
 
     @GetMapping("/rollup")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public CycleRollup rollup(@RequestParam Long cycleId) {
         return service.rollupForCycle(cycleId);
     }

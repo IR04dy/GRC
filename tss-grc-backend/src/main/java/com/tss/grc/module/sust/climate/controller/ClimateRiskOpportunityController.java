@@ -30,7 +30,7 @@ public class ClimateRiskOpportunityController {
     private final ClimateRiskOpportunityService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<ClimateRiskOpportunity> list(
             @RequestParam(required = false) String kind,
             @RequestParam(required = false) String status,
@@ -44,57 +44,57 @@ public class ClimateRiskOpportunityController {
 
     /** Top-5 highest-scoring (not RETIRED) — dashboard widget. */
     @GetMapping("/top")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public List<ClimateRiskOpportunity> top() {
         return service.topByRisk();
     }
 
     /** Whole-org rollup — drives the dashboard composite's climate-treated component. */
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public java.util.Map<String, Object> aggregate() { return service.aggregate(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public ClimateRiskOpportunity get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<ClimateRiskOpportunity> create(@RequestBody ClimateRiskOpportunity req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ClimateRiskOpportunity update(@PathVariable Long id, @RequestBody ClimateRiskOpportunity req) {
         return service.update(id, req);
     }
 
     @PostMapping("/{id}/assess")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ClimateRiskOpportunity assess(@PathVariable Long id) { return service.transition(id, "ASSESSED"); }
 
     @PostMapping("/{id}/treat")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ClimateRiskOpportunity treat(@PathVariable Long id) { return service.transition(id, "TREATED"); }
 
     @PostMapping("/{id}/close")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ClimateRiskOpportunity close(@PathVariable Long id) { return service.transition(id, "CLOSED"); }
 
     @PostMapping("/{id}/retire")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ClimateRiskOpportunity retire(@PathVariable Long id) { return service.transition(id, "RETIRED"); }
 
     /** Rule 8 — link the climate item to an existing ERM risk record. */
     @PostMapping("/{id}/link-erm")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ClimateRiskOpportunity linkErm(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         return service.linkErm(id, body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

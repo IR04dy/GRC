@@ -39,10 +39,15 @@ import java.util.Map;
 @Tag(name = "NDI — Gaps + Corrective Actions")
 public class NdiGapController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiGapService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Page<NdiGap> listGaps(@RequestParam Long cycleId,
                                  @RequestParam(required = false) String status,
                                  @RequestParam(required = false) String severity,
@@ -52,41 +57,41 @@ public class NdiGapController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public GapAggregate aggregate(@RequestParam Long cycleId) { return service.aggregate(cycleId); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiGap getGap(@PathVariable Long id) { return service.getGap(id); }
 
     /** Cross-module: returns the ERM risk row this gap's risk_id points to, or null. */
     @GetMapping("/{id}/linked-risk")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public com.tss.grc.module.ndi.integration.NdiCrossLinkService.LinkedRisk linkedRisk(@PathVariable Long id) {
         return service.getLinkedRisk(id);
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiGap> createGap(@RequestBody NdiGap body) {
         return ResponseEntity.ok(service.createGap(body));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiGap updateGap(@PathVariable Long id, @RequestBody NdiGap body) {
         return service.updateGap(id, body);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> deleteGap(@PathVariable Long id) {
         service.deleteGap(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/from-source")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiGap upsertFromSource(@RequestBody Map<String, Object> body) {
         return service.upsertFromSource(
             ((Number) body.get("cycleId")).longValue(),
@@ -102,26 +107,26 @@ public class NdiGapController {
     // ─── CAPAs ─────────────────────────────────────────────────────
 
     @GetMapping("/{gapId}/capas")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public List<NdiCorrectiveAction> listCapas(@PathVariable Long gapId) {
         return service.listCapas(gapId);
     }
 
     @PostMapping("/{gapId}/capas")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiCorrectiveAction> createCapa(@PathVariable Long gapId,
                                                           @RequestBody NdiCorrectiveAction body) {
         return ResponseEntity.ok(service.createCapa(gapId, body));
     }
 
     @PutMapping("/capas/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiCorrectiveAction updateCapa(@PathVariable Long id, @RequestBody NdiCorrectiveAction body) {
         return service.updateCapa(id, body);
     }
 
     @DeleteMapping("/capas/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> deleteCapa(@PathVariable Long id) {
         service.deleteCapa(id);
         return ResponseEntity.noContent().build();

@@ -17,40 +17,45 @@ import java.util.Map;
 @Tag(name = "NDI — Settings")
 public class NdiSettingController {
 
+    // SEC-NDI-001: settings are config — reads open to NDI readers, all mutations
+    // restricted (was isAuthenticated() only).
+    private static final String READ  = "hasPermission('NDI','READ')";
+    private static final String ADMIN = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiSettingService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public List<NdiSetting> list() { return service.list(); }
 
     @GetMapping("/grouped")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Map<String, List<NdiSetting>> grouped() { return service.listGrouped(); }
 
     @GetMapping("/by-key/{key}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiSetting getByKey(@PathVariable String key) { return service.getByKey(key); }
 
     @PutMapping("/by-key/{key}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(ADMIN)
     public NdiSetting setValue(@PathVariable String key, @RequestBody Map<String, String> body) {
         return service.setValue(key, body.get("value"));
     }
 
     @PostMapping("/by-key/{key}/reset")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(ADMIN)
     public NdiSetting reset(@PathVariable String key) {
         return service.resetToDefault(key);
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(ADMIN)
     public ResponseEntity<NdiSetting> create(@RequestBody NdiSetting body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(ADMIN)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

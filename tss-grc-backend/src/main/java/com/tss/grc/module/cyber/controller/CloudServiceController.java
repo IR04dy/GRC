@@ -21,26 +21,26 @@ public class CloudServiceController {
     private final CloudServiceService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CYBER', 'READ')")
     public List<CloudService> list() { return service.list(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CYBER', 'READ')")
     public CloudService get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CYBER', 'WRITE')")
     public ResponseEntity<CloudService> create(@Valid @RequestBody CloudService body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CYBER', 'WRITE')")
     public CloudService update(@PathVariable Long id, @RequestBody CloudService body) {
         return service.update(id, body);
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CYBER', 'READ')")
     public Map<String, Long> stats() { return service.stats(); }
 }

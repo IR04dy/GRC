@@ -25,7 +25,7 @@ public class MaterialTopicController {
     private final MaterialTopicService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Page<MaterialTopic> list(
             @RequestParam(defaultValue = "2025") Short year,
             @RequestParam(required = false) String category,
@@ -39,30 +39,30 @@ public class MaterialTopicController {
     }
 
     @GetMapping("/generate-matrix")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> generateMatrix(@RequestParam(defaultValue = "2025") Short year) {
         return service.generateMatrix(year);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','READ')")
     public MaterialTopic get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public ResponseEntity<MaterialTopic> create(@RequestBody MaterialTopic req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public MaterialTopic update(@PathVariable Long id, @RequestBody MaterialTopic req) {
         return service.update(id, req);
     }
 
     /** Body: {@code { "stakeholderImportance": 4.0, "businessImpact": 3.5 }}. */
     @PostMapping("/{id}/score")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public MaterialTopic score(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         BigDecimal s = asBd(body.get("stakeholderImportance"));
         BigDecimal b = asBd(body.get("businessImpact"));
@@ -71,17 +71,17 @@ public class MaterialTopicController {
 
     /** Body: {@code { "approvedBy": "Name" }}. */
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public MaterialTopic approve(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.approve(id, body == null ? null : body.get("approvedBy"));
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
     public MaterialTopic archive(@PathVariable Long id) { return service.archive(id); }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SUST','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

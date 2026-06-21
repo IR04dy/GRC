@@ -27,38 +27,38 @@ public class CrossBorderTransferController {
     private final CrossBorderTransferService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Page<CrossBorderResponse> list(@RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "50") int size) {
         return service.list(PageRequest.of(page, size)).map(CrossBorderResponse::from);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public CrossBorderResponse get(@PathVariable Long id) {
         return CrossBorderResponse.from(service.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public ResponseEntity<CrossBorderResponse> create(@RequestBody @Valid CrossBorderCreate body, Authentication auth) {
         return ResponseEntity.ok(CrossBorderResponse.from(service.create(body, userId(auth))));
     }
 
     @PostMapping("/{id}/assess")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public CrossBorderResponse assess(@PathVariable Long id, @RequestBody @Valid AssessRequest body) {
         return CrossBorderResponse.from(service.assess(id, body));
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public CrossBorderResponse approve(@PathVariable Long id, Authentication auth) {
         return CrossBorderResponse.from(service.approve(id, userId(auth), auth.getName()));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public CrossBorderResponse reject(@PathVariable Long id, @RequestBody @Valid RejectRequest body) {
         return CrossBorderResponse.from(service.reject(id, body));
     }

@@ -35,10 +35,15 @@ import java.util.Map;
 @Tag(name = "NDI — Framework Library")
 public class NdiFrameworkItemController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiFrameworkItemService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Page<NdiFrameworkItem> list(
             @RequestParam(required = false) String component,
             @RequestParam(required = false) String domain,
@@ -51,36 +56,36 @@ public class NdiFrameworkItemController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Map<String, Object> aggregate() { return service.aggregate(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiFrameworkItem get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiFrameworkItem> create(@RequestBody NdiFrameworkItem req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiFrameworkItem update(@PathVariable Long id, @RequestBody NdiFrameworkItem req) {
         return service.update(id, req);
     }
 
     @PostMapping("/{id}/mark-official")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiFrameworkItem markOfficial(@PathVariable Long id) { return service.markOfficial(id); }
 
     @PostMapping("/{id}/mark-placeholder")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiFrameworkItem markPlaceholder(@PathVariable Long id) { return service.markPlaceholder(id); }
 
     /** Body: {@code { "items": [ { ... }, { ... } ] }}. */
     @PostMapping("/import-json")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public Map<String, Object> importJson(@RequestBody Map<String, Object> body) {
         Object items = body == null ? null : body.get("items");
         if (!(items instanceof List<?> list)) {
@@ -92,7 +97,7 @@ public class NdiFrameworkItemController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

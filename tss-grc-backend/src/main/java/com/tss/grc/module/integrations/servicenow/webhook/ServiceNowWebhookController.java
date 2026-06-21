@@ -1,5 +1,6 @@
 package com.tss.grc.module.integrations.servicenow.webhook;
 
+import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.integrations.servicenow.entity.IntegrationExternalLink;
 import com.tss.grc.module.integrations.servicenow.repository.IntegrationExternalLinkRepository;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -84,8 +85,19 @@ public class ServiceNowWebhookController {
             return ResponseEntity.badRequest().body(ack);
         }
 
+        // Scope the lookup to the authenticated caller's tenant. Never act on,
+        // mutate, or attribute events to a link owned by another organisation:
+        // ServiceNow INC numbers are sequential/predictable, so an org-blind
+        // by-natural-key lookup is a cross-tenant write/IDOR (SEC-INT-002).
+        Long orgId = TenantContext.getCurrentTenant();
+        if (orgId == null) {
+            ack.put("matched", false);
+            ack.put("reason", "missing tenant context");
+            return ResponseEntity.badRequest().body(ack);
+        }
+
         Optional<IntegrationExternalLink> match = linkRepo
-            .findFirstByIntegrationAndExternalNumber("SERVICENOW", number);
+            .findFirstByOrganisationIdAndIntegrationAndExternalNumber(orgId, "SERVICENOW", number);
         if (match.isEmpty()) {
             ack.put("matched", false);
             ack.put("reason", "no GRC record linked to " + number);

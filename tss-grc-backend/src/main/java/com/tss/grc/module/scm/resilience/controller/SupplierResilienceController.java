@@ -39,7 +39,7 @@ public class SupplierResilienceController {
 
     // ─── Alternate suppliers ──────────────────────────────────────────
     @GetMapping("/alternates")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     @Operation(summary = "List alternate suppliers (paginated).")
     public Page<AltResponse> listAlts(@RequestParam(required = false) String status,
                                       @RequestParam(defaultValue = "0") int page,
@@ -51,44 +51,44 @@ public class SupplierResilienceController {
     }
 
     @GetMapping("/alternates/by-primary/{vendorId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public List<AltResponse> altsForPrimary(@PathVariable Long vendorId) {
         return altService.byPrimaryVendor(vendorId).stream().map(AltResponse::from).toList();
     }
 
     @GetMapping("/alternates/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public AltResponse getAlt(@PathVariable Long id) {
         return AltResponse.from(altService.get(id));
     }
 
     @PostMapping("/alternates")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public ResponseEntity<AltResponse> createAlt(@Valid @RequestBody AltCreateRequest req) {
         return ResponseEntity.status(201).body(AltResponse.from(altService.create(req)));
     }
 
     @PutMapping("/alternates/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public AltResponse updateAlt(@PathVariable Long id, @Valid @RequestBody AltUpdateRequest req) {
         return AltResponse.from(altService.update(id, req));
     }
 
     @PostMapping("/alternates/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public AltResponse approveAlt(@PathVariable Long id, Authentication auth) {
         return AltResponse.from(altService.approve(id, usernameOf(auth), userIdOf(auth)));
     }
 
     @PostMapping("/alternates/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public AltResponse archiveAlt(@PathVariable Long id, @Valid @RequestBody AltArchiveRequest req) {
         return AltResponse.from(altService.archive(id, req.reason()));
     }
 
     // ─── Exit plans ───────────────────────────────────────────────────
     @GetMapping("/exit-plans")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public Page<PlanResponse> listPlans(@RequestParam(required = false) String status,
                                         @RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "100") int size) {
@@ -99,56 +99,56 @@ public class SupplierResilienceController {
     }
 
     @GetMapping("/exit-plans/by-vendor/{vendorId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public List<PlanResponse> plansForVendor(@PathVariable Long vendorId) {
         return planService.byVendor(vendorId).stream().map(PlanResponse::from).toList();
     }
 
     @GetMapping("/exit-plans/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','READ')")
     public PlanResponse getPlan(@PathVariable Long id) {
         return PlanResponse.from(planService.get(id));
     }
 
     @PostMapping("/exit-plans")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public ResponseEntity<PlanResponse> createPlan(@Valid @RequestBody PlanCreateRequest req) {
         return ResponseEntity.status(201).body(PlanResponse.from(planService.create(req)));
     }
 
     @PutMapping("/exit-plans/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public PlanResponse updatePlan(@PathVariable Long id, @Valid @RequestBody PlanUpdateRequest req) {
         return PlanResponse.from(planService.update(id, req));
     }
 
     @PostMapping("/exit-plans/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public PlanResponse approvePlan(@PathVariable Long id, Authentication auth) {
         return PlanResponse.from(planService.approve(id, usernameOf(auth), userIdOf(auth)));
     }
 
     @PostMapping("/exit-plans/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public PlanResponse rejectPlan(@PathVariable Long id, @Valid @RequestBody PlanRejectRequest req) {
         return PlanResponse.from(planService.reject(id, req.reason()));
     }
 
     @PostMapping("/exit-plans/{id}/activate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public PlanResponse activatePlan(@PathVariable Long id, @Valid @RequestBody PlanActivateRequest req,
                                      Authentication auth) {
         return PlanResponse.from(planService.activate(id, req.reason(), userIdOf(auth)));
     }
 
     @PostMapping("/exit-plans/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public PlanResponse archivePlan(@PathVariable Long id, @Valid @RequestBody PlanArchiveRequest req) {
         return PlanResponse.from(planService.archive(id, req.reason()));
     }
 
     @PostMapping("/exit-plans/{id}/record-test")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SCM','WRITE')")
     public PlanResponse recordTest(@PathVariable Long id, @Valid @RequestBody PlanTestRequest req) {
         return PlanResponse.from(planService.recordTest(id, req));
     }

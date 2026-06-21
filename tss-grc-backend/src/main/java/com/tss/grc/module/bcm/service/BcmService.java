@@ -196,31 +196,69 @@ public class BcmService {
     }
 
     // ── BIA Records ───────────────────────────────────────────────────────────
+    //
+    // SEC-BCM-001 (IDOR / CWE-639): BiaRecord has no organisationId column —
+    // tenant ownership is inherited transitively via the parent CriticalProcess.
+    // The previous implementation never resolved that parent, so every read /
+    // update / delete by id (or by caller-supplied processId) was effectively
+    // global, allowing cross-tenant read, overwrite, and hard-delete of BIA rows.
+    // Every BIA path now resolves the parent process through the org-scoped
+    // CriticalProcessRepository finder and throws 404 if it is not this tenant's.
+
+    /**
+     * Resolves the parent CriticalProcess and asserts it belongs to the current
+     * tenant. Throws EntityNotFoundException (→ 404) on a miss or cross-tenant
+     * access, so a guessed processId from another tenant is indistinguishable
+     * from a non-existent one.
+     */
+    private CriticalProcess requireOwnedProcess(Long processId) {
+        return processRepo.findById(processId)
+            .filter(p -> p.getOrganisationId().equals(TenantContext.requireOrganisationId()))
+            .orElseThrow(() -> new EntityNotFoundException("Critical process not found: " + processId));
+    }
+
+    /**
+     * Loads a BIA record by id and enforces that its parent process belongs to
+     * the current tenant. Throws EntityNotFoundException (→ 404) on a miss or
+     * cross-tenant access.
+     */
+    private BiaRecord requireOwnedBia(Long id) {
+        BiaRecord b = biaRepo.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("BIA record not found: " + id));
+        requireOwnedProcess(b.getProcessId());   // throws if parent process is another tenant's
+        return b;
+    }
 
     @Transactional(readOnly = true)
     public List<BiaRecord> listBia(Long processId) {
-        if (processId != null) return biaRepo.findByProcessId(processId, Pageable.unpaged()).getContent();
+        if (processId != null) {
+            requireOwnedProcess(processId);   // reject cross-tenant processId before reading its BIAs
+            return biaRepo.findByProcessId(processId, Pageable.unpaged()).getContent();
+        }
         // Return all BIA records for this org's processes
-        List<Long> processIds = processRepo.findByOrganisationId(TenantContext.getCurrentTenant(), Pageable.unpaged())
+        List<Long> processIds = processRepo.findByOrganisationId(TenantContext.requireOrganisationId(), Pageable.unpaged())
             .map(CriticalProcess::getId).getContent();
+        if (processIds.isEmpty()) return List.of();
         return biaRepo.findByProcessIdIn(processIds);
     }
 
     @Transactional
     public BiaRecord createBia(BiaRecord req) {
-        // Mass-assignment defense — see createPlan(). BiaRecord doesn't
-        // carry an organisationId column directly (tenant scoping is
-        // inherited via the parent CriticalProcess link); the
-        // platform-wide tenant guarantee for this entity comes from the
-        // BiaRecordRepository query layer, not the entity field.
+        // Mass-assignment defense — see createPlan(). Null id forces INSERT.
+        // BiaRecord carries no organisationId column; tenant scoping is
+        // inherited via the parent CriticalProcess link, so the target process
+        // must be validated to belong to the current tenant before persisting.
+        requireOwnedProcess(req.getProcessId());
         req.setId(null);
         return biaRepo.save(req);
     }
 
     @Transactional
     public BiaRecord updateBia(Long id, BiaRecord req) {
-        BiaRecord existing = biaRepo.findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("BIA record not found: " + id));
+        BiaRecord existing = requireOwnedBia(id);
+        // The new parent process must also be one of this tenant's, so a BIA
+        // can't be re-pointed to (or stolen by) another tenant's process.
+        requireOwnedProcess(req.getProcessId());
         existing.setProcessId(req.getProcessId());
         existing.setAssessmentDate(req.getAssessmentDate());
         existing.setRtoHours(req.getRtoHours());
@@ -233,7 +271,12 @@ public class BcmService {
 
     @Transactional
     public void deleteBia(Long id) {
-        biaRepo.deleteById(id);
+        // Tenant-scoped + soft delete: re-load under the parent-process tenant
+        // filter (throws 404 cross-tenant) and mark DELETED instead of the
+        // previous hard biaRepo.deleteById(id), which deleted across tenants.
+        BiaRecord b = requireOwnedBia(id);
+        b.setStatus("DELETED");
+        biaRepo.save(b);
     }
 
     // ── Exercises (ISO 22301 §8.5 — exercise programme) ───────────────────────

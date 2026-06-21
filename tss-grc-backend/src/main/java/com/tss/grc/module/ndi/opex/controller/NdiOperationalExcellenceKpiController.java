@@ -34,10 +34,15 @@ import java.util.Map;
 @Tag(name = "NDI — Operational Excellence KPIs")
 public class NdiOperationalExcellenceKpiController {
 
+    // SEC-NDI-001: granular module authorization (was isAuthenticated() only).
+    private static final String READ    = "hasPermission('NDI','READ')";
+    private static final String WRITE   = "hasPermission('NDI','WRITE')";
+    private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+
     private final NdiOperationalExcellenceKpiService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Page<NdiOperationalExcellenceKpi> list(
             @RequestParam Long cycleId,
             @RequestParam(required = false) String status,
@@ -51,30 +56,30 @@ public class NdiOperationalExcellenceKpiController {
     }
 
     @GetMapping("/aggregate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public Map<String, Object> aggregate(@RequestParam Long cycleId) {
         return service.aggregateForCycle(cycleId);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(READ)
     public NdiOperationalExcellenceKpi get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public ResponseEntity<NdiOperationalExcellenceKpi> create(@RequestBody NdiOperationalExcellenceKpi req) {
         return ResponseEntity.status(201).body(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiOperationalExcellenceKpi update(@PathVariable Long id, @RequestBody NdiOperationalExcellenceKpi req) {
         return service.update(id, req);
     }
 
     /** Body: {@code { "actual": 67.5, "asOf": "2026-03-31" }}. */
     @PostMapping("/{id}/update-actual")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(WRITE)
     public NdiOperationalExcellenceKpi updateActual(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Object actualVal = body == null ? null : body.get("actual");
         if (actualVal == null) throw new IllegalArgumentException("actual required");
@@ -85,7 +90,7 @@ public class NdiOperationalExcellenceKpiController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(APPROVE)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();

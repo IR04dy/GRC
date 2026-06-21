@@ -36,14 +36,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ControllerAuthorizationRatchetTest {
 
     /**
-     * Known unguarded write endpoints at the time WS2 started (audit baseline,
-     * measured 2026-06-21). MUST only ever decrease. Do NOT raise this to make a
-     * new endpoint pass — add the correct {@code hasPermission('MODULE','ACTION')}
-     * guard instead. The eventual floor is the small set of legitimately-public
-     * write endpoints (auth login/refresh/logout, the public intake tracker,
-     * inbound webhooks); everything else should carry a real permission/role check.
+     * Unguarded write endpoints remaining after the audit BFLA remediation.
+     * Started at 422 when WS2 began (2026-06-21); the P0/P1 critical+high
+     * authorization fixes (CyberService, socops, approvals, then the
+     * security-Highs batch covering platform/automation/licensing, all 14 NDI
+     * controllers, privacy, compliance, esg, evidence, scm, iam, integrations,
+     * risk, tprm, bcm) brought it to 186 (measured 2026-06-21, post-batch).
+     * MUST only ever decrease. Do NOT raise this to make a new endpoint pass —
+     * add the correct {@code hasPermission('MODULE','ACTION')} guard instead.
+     * The eventual floor is the small set of legitimately-public write endpoints
+     * (auth login/refresh/logout, the public intake tracker, inbound webhooks);
+     * everything else should carry a real permission/role check.
      */
-    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 422;
+    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 186;
 
     @Test
     void noNewUnguardedWriteEndpoints() {

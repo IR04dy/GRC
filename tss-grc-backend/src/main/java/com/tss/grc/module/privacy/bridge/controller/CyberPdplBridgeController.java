@@ -26,7 +26,7 @@ public class CyberPdplBridgeController {
     private final CyberPdplBridgeService service;
 
     @GetMapping("/log")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Page<Response> list(@RequestParam(required = false) String outcome,
                                @RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "200") int size) {
@@ -34,13 +34,13 @@ public class CyberPdplBridgeController {
     }
 
     @GetMapping("/log/by-incident/{cyberIncidentId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public List<Response> byIncident(@PathVariable Long cyberIncidentId) {
         return service.forIncident(cyberIncidentId).stream().map(Response::from).toList();
     }
 
     @PostMapping("/trigger")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE') and hasPermission('CYBER','WRITE')")
     public ResponseEntity<Response> trigger(@Valid @RequestBody ManualTriggerRequest req,
                                             Authentication auth) {
         var l = service.triggerForIncident(

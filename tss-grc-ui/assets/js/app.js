@@ -100,8 +100,14 @@ const App = {
                    ${_renderItem(adminItem)}
                </ul>` : '';
 
-        const displayName = user?.fullNameEn || user?.username || 'User';
-        const initials    = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        const rawName     = user?.fullNameEn || user?.username || 'User';
+        const displayName = this._esc(rawName);
+        const firstName   = this._esc(rawName.split(' ')[0]);
+        const email       = this._esc(user?.email || '');
+        const role        = this._esc(user?.roles?.[0]?.replace('_', ' ') || '');
+        // Initials are derived from the raw value but only single-letter glyphs are kept,
+        // then escaped, so no markup can survive into the DOM.
+        const initials    = this._esc(rawName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase());
 
         return `
         <div class="wrapper d-flex">
@@ -139,7 +145,7 @@ const App = {
                         <div class="avatar-initials" style="width:32px;height:32px;font-size:0.65rem">${initials}</div>
                         <div style="min-width:0">
                             <div style="color:white;font-size:0.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${displayName}</div>
-                            <div style="color:rgba(255,255,255,0.35);font-size:0.65rem">${user?.roles?.[0]?.replace('_', ' ') || ''}</div>
+                            <div style="color:rgba(255,255,255,0.35);font-size:0.65rem">${role}</div>
                         </div>
                     </div>
                 </div>
@@ -172,13 +178,13 @@ const App = {
                                     style="background:var(--color-bg);border-color:var(--color-border)!important"
                                     data-bs-toggle="dropdown">
                                 <div class="avatar-initials" style="width:26px;height:26px;font-size:0.6rem">${initials}</div>
-                                <span style="font-size:0.82rem;font-weight:500;color:var(--color-text)">${displayName.split(' ')[0]}</span>
+                                <span style="font-size:0.82rem;font-weight:500;color:var(--color-text)">${firstName}</span>
                                 <i class="bi bi-chevron-down" style="font-size:0.65rem;color:var(--color-text-muted)"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-1" style="min-width:180px">
                                 <li class="px-3 py-2" style="border-bottom:1px solid var(--color-border)">
                                     <div style="font-size:0.78rem;font-weight:600;color:var(--color-text)">${displayName}</div>
-                                    <div style="font-size:0.7rem;color:var(--color-text-muted)">${user?.email || ''}</div>
+                                    <div style="font-size:0.7rem;color:var(--color-text-muted)">${email}</div>
                                 </li>
                                 <li><a class="dropdown-item py-2" href="/profile/index.html" style="font-size:0.82rem">
                                     <i class="bi bi-person me-2" style="color:var(--color-accent)"></i>
@@ -266,10 +272,24 @@ const App = {
         const id = `flash-${Date.now()}`;
         container.insertAdjacentHTML('beforeend', `
             <div id="${id}" class="alert alert-${type} alert-dismissible fade show" role="alert">
-                <span>${message}</span>
+                <span>${this._esc(message)}</span>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>`);
         setTimeout(() => document.getElementById(id)?.remove(), 5000);
+    },
+
+    /**
+     * HTML-escape a value before interpolating it into innerHTML/insertAdjacentHTML.
+     * Mirrors the _esc() helper used in incidents/index.html. Used for every
+     * server- or user-controlled string rendered by the shell. (SEC-FE-001)
+     */
+    _esc(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 };
 
