@@ -64,6 +64,7 @@ class CrowdStrikeControllerTest {
     @Mock private SecurityEventRepository securityEvents;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private org.springframework.transaction.PlatformTransactionManager txManager;
 
     private StubCrowdStrikeClient stub;
     private CrowdStrikeProperties props;
@@ -99,7 +100,7 @@ class CrowdStrikeControllerTest {
         });
 
         inbound = new CrowdStrikeInboundService(
-            stub, props, detectionLogRepo, linkRepo, securityEvents, audit, publisher, new ObjectMapper()
+            stub, props, detectionLogRepo, linkRepo, securityEvents, audit, publisher, new ObjectMapper(), txManager
         );
         outbound = new CrowdStrikeOutboundService(
             stub, props, actionLogRepo, detectionLogRepo, audit, publisher, new ObjectMapper()

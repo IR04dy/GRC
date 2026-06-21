@@ -19,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -88,7 +87,13 @@ public class SplunkOutboundService {
      * SecurityEvent's {@code externalId} (matches the SIEM connector's
      * upstream key).
      */
-    @Transactional
+    // PERF-IO-001: these push methods are deliberately NOT @Transactional —
+    // push() makes a blocking Splunk HEC call (client.pushEvent); a surrounding
+    // transaction would hold a DB connection across it. The audit row and the
+    // external_link upsert are independent best-effort writes, each in its own
+    // short repository transaction. The pre-read here touches only eager scalar
+    // fields of SecurityEvent, so no LazyInitializationException under
+    // open-in-view=false. Do not re-add @Transactional.
     public SplunkHecEventResponse pushSecurityEvent(Long securityEventId) {
         Long orgId = TenantContext.getCurrentTenant();
         if (orgId == null) {
@@ -137,7 +142,6 @@ public class SplunkOutboundService {
      * surface an arbitrary event in Splunk without pulling in this module's
      * DTO directly. Returns the same response shape as {@link #push}.
      */
-    @Transactional
     public SplunkHecEventResponse pushGenericEvent(
         String sourceModule,
         String sourceId,
@@ -161,7 +165,6 @@ public class SplunkOutboundService {
      * Push directly with a fully-built request DTO — used by the admin
      * {@code POST /test-push} endpoint and by callers that want full control.
      */
-    @Transactional
     public SplunkHecEventResponse push(SplunkHecEventRequest request) {
         if (!props.isEnabled()) {
             log.info("[Splunk] disabled — push() is a no-op for {}#{}",

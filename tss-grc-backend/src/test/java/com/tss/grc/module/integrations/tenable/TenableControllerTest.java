@@ -68,6 +68,7 @@ class TenableControllerTest {
     @Mock private VulnerabilityRepository vulnerabilities;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private org.springframework.transaction.PlatformTransactionManager txManager;
 
     private StubTenableClient stub;
     private TenableProperties props;
@@ -107,7 +108,7 @@ class TenableControllerTest {
             .thenReturn(Optional.of(new TenableFindingLog()));
 
         inbound = new TenableInboundService(
-            stub, props, findingLogRepo, linkRepo, vulnerabilities, audit, publisher
+            stub, props, findingLogRepo, linkRepo, vulnerabilities, audit, publisher, txManager
         );
         outbound = new TenableOutboundService(
             stub, props, recastLogRepo, findingLogRepo, audit, publisher, new ObjectMapper()

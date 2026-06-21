@@ -192,7 +192,7 @@ grc:
         token-url: ${SERVICENOW_TOKEN_URL:}
         username: ${SERVICENOW_USERNAME:}
         password: ${SERVICENOW_PASSWORD:}
-      timeout-seconds: 30
+      timeout-seconds: 10          # PERF-IO-003: 30s -> 10s (4 attempts stay under 60s leak threshold)
       max-retries: 3
       defaults:
         impact: 3                                 # ServiceNow 1=high, 3=low

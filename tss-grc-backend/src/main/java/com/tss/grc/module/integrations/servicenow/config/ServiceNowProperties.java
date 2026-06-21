@@ -26,8 +26,16 @@ public class ServiceNowProperties {
 
     private final Auth auth = new Auth();
 
-    /** HTTP read timeout in seconds. */
-    private int timeoutSeconds = 30;
+    /**
+     * HTTP read timeout in seconds.
+     *
+     * <p>PERF-IO-003: lowered 30s -> 10s. With maxRetries=3 (up to 4 attempts)
+     * the worst-case time budget (4 x 10s + backoff) stays under the 60s
+     * connection-leak-detection threshold. ServiceNow incident creation is a
+     * write, so we keep slightly more headroom than the read-only telemetry
+     * adapters (Tenable/CrowdStrike/Splunk all use 5s).
+     */
+    private int timeoutSeconds = 10;
 
     /** Max retries on 5xx / connection errors (exponential backoff). */
     private int maxRetries = 3;

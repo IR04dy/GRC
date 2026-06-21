@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
 import java.util.Optional;
@@ -55,6 +56,10 @@ class CrowdStrikeInboundServiceTest {
     @Mock private SecurityEventRepository securityEvents;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    // PERF-IO-002: per-detection tx. A bare mock returns a null TransactionStatus,
+    // so TransactionTemplate runs the action and commit(null) is a no-op — ingestOne
+    // still executes against the mock repos.
+    @Mock private PlatformTransactionManager txManager;
 
     private CrowdStrikeProperties props;
     private CrowdStrikeInboundService service;
@@ -64,7 +69,7 @@ class CrowdStrikeInboundServiceTest {
         props = new CrowdStrikeProperties();
         props.setEnabled(true);
         service = new CrowdStrikeInboundService(
-            client, props, detectionLogRepo, linkRepo, securityEvents, audit, publisher, new ObjectMapper()
+            client, props, detectionLogRepo, linkRepo, securityEvents, audit, publisher, new ObjectMapper(), txManager
         );
         TenantContext.setCurrentTenant(1L);
         // Default: no dedupe collisions, save returns the entity unchanged but with an id.

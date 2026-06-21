@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -55,6 +56,10 @@ class TenableInboundServiceTest {
     @Mock private VulnerabilityRepository vulnerabilities;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    // PERF-IO-002: per-finding tx. A bare mock returns a null TransactionStatus
+    // from getTransaction(), so TransactionTemplate runs the action callback and
+    // commit(null) is a no-op — ingestOne still executes against the mock repos.
+    @Mock private PlatformTransactionManager txManager;
 
     private TenableProperties props;
     private TenableInboundService service;
@@ -64,7 +69,7 @@ class TenableInboundServiceTest {
         props = new TenableProperties();
         props.setEnabled(true);
         service = new TenableInboundService(
-            client, props, findingLogRepo, linkRepo, vulnerabilities, audit, publisher
+            client, props, findingLogRepo, linkRepo, vulnerabilities, audit, publisher, txManager
         );
         TenantContext.setCurrentTenant(1L);
         // Default: no dedupe collisions, save returns the entity unchanged but with an id.

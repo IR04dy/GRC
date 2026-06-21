@@ -17,7 +17,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -83,6 +85,15 @@ public class TenableInboundService {
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
 
+    /**
+     * PERF-IO-002: per-finding transaction template. The poll method itself is
+     * NOT transactional (so the blocking client.pollFindings() round-trip never
+     * holds a pooled connection); each ingestOne — whose three saves
+     * (vulnerability + finding_log + external_link) MUST commit atomically to
+     * keep the dedupe invariant — runs in its own short REQUIRES_NEW transaction.
+     */
+    private final TransactionTemplate txTemplate;
+
     public TenableInboundService(
         TenableClient client,
         TenableProperties props,
@@ -90,7 +101,8 @@ public class TenableInboundService {
         IntegrationExternalLinkRepository linkRepo,
         VulnerabilityRepository vulnerabilities,
         AuditLogService audit,
-        ApplicationEventPublisher publisher
+        ApplicationEventPublisher publisher,
+        PlatformTransactionManager txManager
     ) {
         this.client = client;
         this.props = props;
@@ -99,6 +111,8 @@ public class TenableInboundService {
         this.vulnerabilities = vulnerabilities;
         this.audit = audit;
         this.publisher = publisher;
+        this.txTemplate = new TransactionTemplate(txManager);
+        this.txTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     // ── scheduled poll ──────────────────────────────────────────────────
@@ -140,8 +154,11 @@ public class TenableInboundService {
      *
      * <p>When the adapter is disabled this is a no-op that returns 0
      * without touching the client or repository.
+     *
+     * <p>PERF-IO-002: deliberately NOT @Transactional — the blocking remote poll
+     * (client.pollFindings) runs with no DB connection held, and each finding is
+     * persisted in its own short transaction (see {@link #txTemplate}).
      */
-    @Transactional
     public int pollFindings() {
         if (!props.isEnabled()) {
             log.info("[Tenable] disabled — pollFindings() is a no-op");
@@ -173,12 +190,14 @@ public class TenableInboundService {
                 continue; // already ingested — application-side dedupe
             }
             try {
-                ingestOne(orgId, d);
+                final TenableFindingDto finding = d;
+                txTemplate.executeWithoutResult(status -> ingestOne(orgId, finding));
                 ingested++;
             } catch (Exception ex) {
                 log.warn("[Tenable] failed to ingest finding asset={} plugin={} for org {}: {}",
                     d.assetUuid(), d.pluginId(), orgId, ex.getMessage());
-                // Best-effort — keep processing the rest of the batch.
+                // Best-effort — keep processing the rest of the batch. The failed
+                // finding's transaction rolled back on its own; others are unaffected.
             }
         }
         return ingested;

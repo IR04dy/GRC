@@ -10,7 +10,6 @@ import com.tss.grc.module.integrations.servicenow.repository.IntegrationExternal
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -55,23 +54,27 @@ public class ServiceNowOutboundService {
     }
 
     // ── public façade ──────────────────────────────────────────────────
+    //
+    // PERF-IO-001: these push entry points are deliberately NOT @Transactional.
+    // They invoke a blocking remote HTTP client (client.createIncident); holding
+    // an open transaction across that round-trip would pin a pooled Hikari
+    // connection for the entire remote latency + retry backoff. The only DB write
+    // is the single external_link upsert in recordExternalLink(), which runs in
+    // Spring Data's own short repository transaction — atomicity across the HTTP
+    // call is neither needed nor desirable here. Do not re-add @Transactional.
 
-    @Transactional
     public ServiceNowIncidentResponse pushCyberIncident(Map<String, Object> grcFields) {
         return pushGeneric("CYBER_INCIDENT", grcFields);
     }
 
-    @Transactional
     public ServiceNowIncidentResponse pushFinding(Map<String, Object> grcFields) {
         return pushGeneric("AUDIT_FINDING", grcFields);
     }
 
-    @Transactional
     public ServiceNowIncidentResponse pushCapaTask(Map<String, Object> grcFields) {
         return pushGeneric("CAPA_TASK", grcFields);
     }
 
-    @Transactional
     public ServiceNowIncidentResponse pushComplianceGap(Map<String, Object> grcFields) {
         return pushGeneric("COMPLIANCE_GAP", grcFields);
     }
@@ -80,7 +83,6 @@ public class ServiceNowOutboundService {
      * Push directly with a fully-built request DTO — used by the admin
      * {@code POST /test-push} endpoint and by callers that want full control.
      */
-    @Transactional
     public ServiceNowIncidentResponse push(ServiceNowIncidentRequest request) {
         if (!props.isEnabled()) {
             log.info("[ServiceNow] disabled — push() is a no-op for {}#{}",

@@ -59,12 +59,25 @@ public class CrowdStrikeOAuthTokenManager {
     /**
      * Returns a non-expired access token, refreshing if needed. Throws
      * {@link IllegalStateException} if credentials are not configured.
+     *
+     * <p>PERF-IO-004: the common path (a still-valid cached token) is served
+     * lock-free off the {@code volatile} fields, so readers never queue behind a
+     * thread that is mid-{@link #refresh()} performing a blocking HTTP fetch.
+     * Only when the token is stale do we take the monitor, double-checking inside
+     * it so one refresh satisfies all threads that were waiting.
      */
-    public synchronized String getAccessToken() {
-        if (cachedToken != null && Instant.now().isBefore(cachedExpiry.minus(EXPIRY_SKEW))) {
-            return cachedToken;
+    public String getAccessToken() {
+        String token = cachedToken;
+        if (token != null && Instant.now().isBefore(cachedExpiry.minus(EXPIRY_SKEW))) {
+            return token; // fast path — no lock
         }
-        return refresh();
+        synchronized (this) {
+            // Double-check: another thread may have refreshed while we waited.
+            if (cachedToken != null && Instant.now().isBefore(cachedExpiry.minus(EXPIRY_SKEW))) {
+                return cachedToken;
+            }
+            return refresh();
+        }
     }
 
     /**

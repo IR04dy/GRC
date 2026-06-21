@@ -19,7 +19,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -102,7 +101,9 @@ public class TenableOutboundService {
      * @param newSeverity   one of INFO/LOW/MEDIUM/HIGH/CRITICAL (required)
      * @param justification audit trail — minimum 30 chars (required)
      */
-    @Transactional
+    // PERF-IO-001: deliberately NOT @Transactional — runAction() makes a blocking
+    // Tenable HTTP call; a surrounding transaction would pin a DB connection across
+    // it. The single recast_log audit row is written in its own short repo txn.
     public RecastResponse recastSeverity(String pluginId, String assetUuid, String newSeverity, String justification) {
         validatePluginId(pluginId, "RECAST_SEVERITY");
         validateAssetUuid(assetUuid, "RECAST_SEVERITY");
@@ -126,7 +127,6 @@ public class TenableOutboundService {
      * @param justification audit trail — minimum 30 chars (required)
      * @param expiresAt     null = open-ended; populated = acceptance window
      */
-    @Transactional
     public RecastResponse acceptRisk(String pluginId, String assetUuid, String justification, LocalDateTime expiresAt) {
         validatePluginId(pluginId, "ACCEPT_RISK");
         validateAssetUuid(assetUuid, "ACCEPT_RISK");
@@ -142,7 +142,6 @@ public class TenableOutboundService {
      * original severity. No justification required because the audit row
      * for the original recast already carries one.
      */
-    @Transactional
     public RecastResponse removeRecast(String pluginId, String assetUuid) {
         validatePluginId(pluginId, "REMOVE_RECAST");
         validateAssetUuid(assetUuid, "REMOVE_RECAST");

@@ -19,7 +19,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -71,18 +70,21 @@ public class CrowdStrikeOutboundService {
     }
 
     // ── public API ──────────────────────────────────────────────────────
+    //
+    // PERF-IO-001: deliberately NOT @Transactional. runAction() invokes a
+    // blocking Falcon HTTP call (call.get()); a surrounding transaction would
+    // hold a pooled DB connection across that round-trip + retry backoff. The
+    // only writes are the best-effort action_log row (persistActionLog) and the
+    // F7 audit row, each of which runs in its own short repository transaction.
 
-    @Transactional
     public ContainmentResponse containHost(String falconHostId, String reasonText) {
         return runAction("CONTAIN_HOST", falconHostId, reasonText, () -> client.containHost(falconHostId, reasonText));
     }
 
-    @Transactional
     public ContainmentResponse liftContainment(String falconHostId) {
         return runAction("LIFT_CONTAINMENT", falconHostId, null, () -> client.liftContainment(falconHostId));
     }
 
-    @Transactional
     public ContainmentResponse hideHost(String falconHostId) {
         return runAction("HIDE_HOST", falconHostId, null, () -> client.hideHost(falconHostId));
     }

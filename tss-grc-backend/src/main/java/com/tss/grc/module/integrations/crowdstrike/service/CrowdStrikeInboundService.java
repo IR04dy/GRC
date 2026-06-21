@@ -19,7 +19,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -84,6 +86,15 @@ public class CrowdStrikeInboundService {
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
 
+    /**
+     * PERF-IO-002: per-detection transaction template. pollDetections() is NOT
+     * transactional (the blocking client.pollDetections() round-trip holds no
+     * pooled connection); each ingestOne — whose security_event + finding_log +
+     * external_link saves MUST commit atomically to keep the dedupe invariant —
+     * runs in its own short REQUIRES_NEW transaction.
+     */
+    private final TransactionTemplate txTemplate;
+
     public CrowdStrikeInboundService(
         CrowdStrikeClient client,
         CrowdStrikeProperties props,
@@ -92,7 +103,8 @@ public class CrowdStrikeInboundService {
         SecurityEventRepository securityEvents,
         AuditLogService audit,
         ApplicationEventPublisher publisher,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        PlatformTransactionManager txManager
     ) {
         this.client = client;
         this.props = props;
@@ -102,6 +114,8 @@ public class CrowdStrikeInboundService {
         this.audit = audit;
         this.publisher = publisher;
         this.objectMapper = objectMapper;
+        this.txTemplate = new TransactionTemplate(txManager);
+        this.txTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     // ── scheduled poll ──────────────────────────────────────────────────
@@ -138,8 +152,11 @@ public class CrowdStrikeInboundService {
      *
      * <p>When the adapter is disabled this is a no-op that returns 0
      * without touching the client or repository.
+     *
+     * <p>PERF-IO-002: deliberately NOT @Transactional — the blocking remote poll
+     * (client.pollDetections) runs with no DB connection held, and each detection
+     * is persisted in its own short transaction (see {@link #txTemplate}).
      */
-    @Transactional
     public int pollDetections() {
         if (!props.isEnabled()) {
             log.info("[CrowdStrike] disabled — pollDetections() is a no-op");
@@ -169,12 +186,14 @@ public class CrowdStrikeInboundService {
                 continue; // already ingested — application-side dedupe
             }
             try {
-                ingestOne(orgId, d);
+                final FalconDetectionDto detection = d;
+                txTemplate.executeWithoutResult(status -> ingestOne(orgId, detection));
                 ingested++;
             } catch (Exception ex) {
                 log.warn("[CrowdStrike] failed to ingest detection {} for org {}: {}",
                     d.detectionId(), orgId, ex.getMessage());
-                // Best-effort — keep processing the rest of the batch.
+                // Best-effort — keep processing the rest of the batch. The failed
+                // detection's transaction rolled back on its own; others unaffected.
             }
         }
         return ingested;
