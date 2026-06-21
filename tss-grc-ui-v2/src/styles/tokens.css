@@ -25,7 +25,7 @@
   --ink-1: #15201D;
   --ink-2: #2E3A36;
   --ink-3: #5C6A65;
-  --ink-4: #8C9690;
+  --ink-4: #6E7A75; /* A11Y-002: darkened to >=4.5:1 on light surfaces (was #8C9690, 2.7:1) */
   --ink-5: #B8C0BB;
 
   /* ─── Color · Primary (deep teal-petrol) ──────────── */
@@ -113,7 +113,7 @@
   --sb-bg-2:      #102A2E;
   --sb-text:      #DCE6E4;
   --sb-text-2:    #7E928F;
-  --sb-text-3:    #4A5C58;
+  --sb-text-3:    #9DB0AB;   /* A11Y-001: 7.49:1 on --sb-bg — WCAG 1.4.3 AA (was #4A5C58, 2.4:1) */
   --sb-active-bg: rgba(46,136,136,0.18);
   --sb-active-fg: #FFFFFF;
   --sb-hover-bg:  rgba(255,255,255,0.05);
@@ -346,7 +346,7 @@ body { zoom: var(--ui-scale, 1); }
   --sb-bg-2:      #0B1A1D;
   --sb-text:      #DCE6E4;
   --sb-text-2:    #7E928F;
-  --sb-text-3:    #4A5C58;
+  --sb-text-3:    #9DB0AB;   /* A11Y-001: 7.49:1 on --sb-bg — WCAG 1.4.3 AA (was #4A5C58, 2.4:1) */
   --sb-active-bg: rgba(95,188,188,0.22);
   --sb-active-fg: #FFFFFF;
   --sb-hover-bg:  rgba(255,255,255,0.06);

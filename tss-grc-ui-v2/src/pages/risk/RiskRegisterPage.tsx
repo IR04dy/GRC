@@ -114,7 +114,9 @@ function scoreBg(s: number): string {
   if (s >= 4)  return 'var(--risk-med)';
   return 'var(--risk-low)';
 }
-function scoreFg(s: number): string { return s >= 12 ? '#fff' : 'var(--ink-1)'; }
+// A11Y-003: white text only on the dark crit tone (s>=16). vhigh (#D87560) and
+// lighter tones use dark ink (#15201D = 5.28:1+) — white on vhigh was 3.16:1.
+function scoreFg(s: number): string { return s >= 16 ? '#fff' : 'var(--ink-1)'; }
 
 function ScorePill({ score }: { score: number }) {
   return <span className="score-pill" style={{ background: scoreBg(score), color: scoreFg(score) }}>{score}</span>;

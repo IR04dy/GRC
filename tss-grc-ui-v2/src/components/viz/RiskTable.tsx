@@ -19,8 +19,10 @@ function scoreBg(s: number): string {
   if (s >= 4)  return 'var(--risk-med)';
   return 'var(--risk-low)';
 }
+// A11Y-003: white text only on the dark crit tone (s>=16); vhigh + lighter
+// tones use dark ink (5.28:1+). White on vhigh (#D87560) was 3.16:1.
 function scoreFg(s: number): string {
-  return s >= 12 ? '#fff' : 'var(--ink-1)';
+  return s >= 16 ? '#fff' : 'var(--ink-1)';
 }
 
 export function RiskTable({ rows }: { rows: RiskRow[] }) {

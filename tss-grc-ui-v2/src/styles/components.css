@@ -1932,7 +1932,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
   font: 800 9.5px var(--font-mono);
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--ink-4);
+  color: var(--ink-3); /* A11Y-002: ink-3 (#5C6A65) for the 9.5px label; ink-4 still ~4:1 on this surface */
   transition: color var(--dur-fast) var(--ease-standard);
 }
 .scale-seg-btn:hover .scale-seg-label { color: var(--ink-2); }
