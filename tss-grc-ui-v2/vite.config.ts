@@ -43,6 +43,24 @@ export default defineConfig({
   build: {
     sourcemap: true,
     target: 'es2022',
+    // PERF-FE-004: split the monolithic vendor bundle (~1.18 MB) into stable,
+    // separately-cacheable chunks so a change to app code doesn't bust the
+    // whole vendor cache and the browser can parallelise downloads. Charting
+    // (recharts/d3) was already lazy-split; this buckets the remaining libs.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory')) return 'recharts';
+          if (id.includes('react-router') || id.includes('@remix-run')) return 'router';
+          if (id.includes('react-dom') || id.includes('/react/') || id.includes('/scheduler/')) return 'react';
+          if (id.includes('lucide-react')) return 'icons';
+          if (id.includes('@stomp') || id.includes('sockjs')) return 'realtime';
+          if (id.includes('@tanstack')) return 'tanstack';
+          return 'vendor';
+        },
+      },
+    },
   },
   // WS14 (FUNC-001): frontend test runner. `npm test` -> vitest.
   test: {

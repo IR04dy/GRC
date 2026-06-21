@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -17,6 +17,16 @@
     -->
     <script>
       if (typeof window.global === 'undefined') window.global = window;
+      // PERF-FE-005: resolve the locale and set <html lang/dir> BEFORE React
+      // mounts so the first paint already matches the chosen direction. The app
+      // is Arabic-primary (RTL) unless the user previously chose English; the
+      // static tag above defaults to ar/rtl and this honours a stored choice.
+      // Mirrors i18n.tsx (LANG_KEY = 'grc.lang') — avoids the ltr→rtl reflow/CLS.
+      try {
+        var _lang = localStorage.getItem('grc.lang') === 'en' ? 'en' : 'ar';
+        document.documentElement.lang = _lang;
+        document.documentElement.dir = _lang === 'ar' ? 'rtl' : 'ltr';
+      } catch (e) { /* storage blocked — fall back to the static ar/rtl default */ }
     </script>
   </head>
   <body>
