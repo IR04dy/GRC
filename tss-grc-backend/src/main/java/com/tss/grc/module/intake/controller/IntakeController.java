@@ -1,5 +1,6 @@
 package com.tss.grc.module.intake.controller;
 
+import com.tss.grc.module.intake.dto.IntakePublicStatusDto;
 import com.tss.grc.module.intake.dto.IntakeRecordDto;
 import com.tss.grc.module.intake.dto.IntakeSubmissionRequest;
 import com.tss.grc.module.intake.dto.TriageDecisionRequest;
@@ -77,11 +78,15 @@ public class IntakeController {
      * from /portal/case-tracker and get back their submission status. No
      * auth required because the reference code itself is the bearer token
      * for this read.
+     *
+     * SECURITY (SEC-FIN-001): returns ONLY a minimal, PII-free projection
+     * ({@link IntakePublicStatusDto}) — never submitter identity, payload,
+     * assignee, or event history.
      */
     @GetMapping("/track/{referenceCode}")
-    @Operation(summary = "Public case-tracker lookup by reference code")
-    public ResponseEntity<IntakeRecordDto> track(@PathVariable String referenceCode) {
-        return service.findByReferenceCode(referenceCode)
+    @Operation(summary = "Public case-tracker lookup by reference code (PII-free status only)")
+    public ResponseEntity<IntakePublicStatusDto> track(@PathVariable String referenceCode) {
+        return service.findPublicStatusByReferenceCode(referenceCode)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }

@@ -127,11 +127,45 @@ public class IrPlaybookService {
 
     @Transactional
     public IrPlaybook save(IrPlaybook in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        IrPlaybook saved = playbooks.save(in);
+        IrPlaybook target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            IrPlaybook existing = playbooks.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("IrPlaybook " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        IrPlaybook saved = playbooks.save(target);
         audit.log(isNew ? "IR_PLAYBOOK_CREATE" : "IR_PLAYBOOK_UPDATE",
             "IrPlaybook", saved.getId(), saved.getPlaybookCode());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(IrPlaybook in, IrPlaybook target) {
+        target.setPlaybookCode(in.getPlaybookCode());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setDescriptionEn(in.getDescriptionEn());
+        target.setDescriptionAr(in.getDescriptionAr());
+        target.setCategory(in.getCategory());
+        target.setSeverityTrigger(in.getSeverityTrigger());
+        target.setTargetMttdMinutes(in.getTargetMttdMinutes());
+        target.setTargetMttrMinutes(in.getTargetMttrMinutes());
+        target.setAlignedFrameworks(in.getAlignedFrameworks());
+        target.setStatus(in.getStatus());
+        target.setVersion(in.getVersion());
+        target.setLastReviewedAt(in.getLastReviewedAt());
+        target.setLastReviewedBy(in.getLastReviewedBy());
+        target.setInvocationCount(in.getInvocationCount());
     }
 }

@@ -39,13 +39,51 @@ public class CyberInsuranceService {
 
     @Transactional
     public CyberInsurance save(CyberInsurance in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        CyberInsurance saved = repo.save(in);
+        CyberInsurance target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            CyberInsurance existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("CyberInsurance " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        CyberInsurance saved = repo.save(target);
         audit.log(isNew ? "CYBER_INS_CREATE" : "CYBER_INS_UPDATE",
             "CyberInsurance", saved.getId(),
             saved.getPolicyNumber() + " · " + saved.getCarrierName());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(CyberInsurance in, CyberInsurance target) {
+        target.setPolicyNumber(in.getPolicyNumber());
+        target.setCarrierName(in.getCarrierName());
+        target.setBrokerName(in.getBrokerName());
+        target.setPolicyType(in.getPolicyType());
+        target.setCoverageAreas(in.getCoverageAreas());
+        target.setAggregateLimitSar(in.getAggregateLimitSar());
+        target.setPerEventLimitSar(in.getPerEventLimitSar());
+        target.setRetentionSar(in.getRetentionSar());
+        target.setEffectiveFrom(in.getEffectiveFrom());
+        target.setEffectiveTo(in.getEffectiveTo());
+        target.setRenewalDueAt(in.getRenewalDueAt());
+        target.setStatus(in.getStatus());
+        target.setUnderwritingQuestionnaireId(in.getUnderwritingQuestionnaireId());
+        target.setLastRenewalResponsesAt(in.getLastRenewalResponsesAt());
+        target.setClaimCount(in.getClaimCount());
+        target.setLastClaimAt(in.getLastClaimAt());
+        target.setLastClaimPaidSar(in.getLastClaimPaidSar());
+        target.setAggregateClaimsPaidSar(in.getAggregateClaimsPaidSar());
+        target.setNotes(in.getNotes());
     }
 
     @Transactional

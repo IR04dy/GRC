@@ -59,6 +59,9 @@ public class ThreatIntelService {
                     return saved;
                 })
                 .orElseGet(() -> {
+                    // SEC-CYB-002 — force id=null so a forged id on the body
+                    // can't overwrite an existing (cross-tenant) row via merge.
+                    in.setId(null);
                     ThreatIntel saved = repo.save(in);
                     audit.log("TI_CREATE", "ThreatIntel", saved.getId(),
                         saved.getSource() + " · " + saved.getExternalId());
@@ -76,10 +79,40 @@ public class ThreatIntelService {
                     return saved;
                 });
         }
-        ThreatIntel saved = repo.save(in);
+        // SEC-CYB-002 — explicit update path: load the row scoped to the
+        // caller's tenant and copy only mutable fields onto the managed
+        // entity. A detached, client-built entity is never merged.
+        ThreatIntel existing = repo.findByIdAndOrganisationId(in.getId(), org)
+            .orElseThrow(() -> new EntityNotFoundException("ThreatIntel " + in.getId()));
+        copyMutable(in, existing);
+        ThreatIntel saved = repo.save(existing);
         audit.log("TI_UPDATE", "ThreatIntel", saved.getId(),
             saved.getSource() + " · " + saved.getExternalId());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(ThreatIntel in, ThreatIntel target) {
+        target.setExternalId(in.getExternalId());
+        target.setSource(in.getSource());
+        target.setPublishedAt(in.getPublishedAt());
+        target.setExpiresAt(in.getExpiresAt());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setSummary(in.getSummary());
+        target.setIocType(in.getIocType());
+        target.setIocValue(in.getIocValue());
+        target.setSeverity(in.getSeverity());
+        target.setConfidence(in.getConfidence());
+        target.setTlp(in.getTlp());
+        target.setMitreTactics(in.getMitreTactics());
+        target.setMitreTechniques(in.getMitreTechniques());
+        target.setAffectedSectors(in.getAffectedSectors());
+        target.setActioned(in.getActioned());
+        target.setActionedAt(in.getActionedAt());
+        target.setActionedByUserId(in.getActionedByUserId());
+        target.setActionNotes(in.getActionNotes());
     }
 
     @Transactional

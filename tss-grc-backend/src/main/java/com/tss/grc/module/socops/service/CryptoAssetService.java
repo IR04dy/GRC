@@ -42,12 +42,49 @@ public class CryptoAssetService {
 
     @Transactional
     public CryptoAsset save(CryptoAsset in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        CryptoAsset saved = repo.save(in);
+        CryptoAsset target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            CryptoAsset existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("CryptoAsset " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        CryptoAsset saved = repo.save(target);
         audit.log(isNew ? "CRYPTO_ASSET_CREATE" : "CRYPTO_ASSET_UPDATE",
             "CryptoAsset", saved.getId(), saved.getAssetCode());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(CryptoAsset in, CryptoAsset target) {
+        target.setAssetCode(in.getAssetCode());
+        target.setAssetType(in.getAssetType());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setIssuedBy(in.getIssuedBy());
+        target.setSubjectDn(in.getSubjectDn());
+        target.setFingerprint(in.getFingerprint());
+        target.setAlgorithm(in.getAlgorithm());
+        target.setKeyLength(in.getKeyLength());
+        target.setQuantumSafe(in.getQuantumSafe());
+        target.setValidFrom(in.getValidFrom());
+        target.setValidUntil(in.getValidUntil());
+        target.setDeployedOn(in.getDeployedOn());
+        target.setOwner(in.getOwner());
+        target.setRotationPeriodDays(in.getRotationPeriodDays());
+        target.setLastRotatedAt(in.getLastRotatedAt());
+        target.setClassification(in.getClassification());
+        target.setStatus(in.getStatus());
     }
 
     @Transactional

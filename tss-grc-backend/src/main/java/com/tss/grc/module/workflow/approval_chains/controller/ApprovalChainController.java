@@ -130,19 +130,33 @@ public class ApprovalChainController {
     @PreAuthorize("isAuthenticated()")
     public InstanceResponse recordAction(@PathVariable Long id,
                                           @RequestBody @Valid InstanceActionRequest req) {
-        return instanceService.recordAction(id, req);
+        // SECURITY (SEC-IAM-001): the acting identity is taken from the
+        // authenticated principal, NOT from req.actorUserId() (which is ignored).
+        Acting actor = acting();
+        return instanceService.recordAction(id, req, actor.userId(), actor.roles());
     }
 
     @PostMapping("/{id}/withdraw")
     @PreAuthorize("isAuthenticated()")
     public InstanceResponse withdraw(@PathVariable Long id,
                                       @RequestBody @Valid InstanceWithdrawRequest req) {
-        return instanceService.withdraw(id, req);
+        // SECURITY (SEC-IAM-001): only the authenticated originator may withdraw.
+        return instanceService.withdraw(id, req, acting().userId());
     }
 
     @GetMapping("/pending-for-me")
     @PreAuthorize("isAuthenticated()")
     public List<PendingDecisionResponse> pendingForMe() {
+        Acting actor = acting();
+        return instanceService.pendingForUser(actor.userId(), actor.roles());
+    }
+
+    // ── Authenticated-principal helper ───────────────────────────────
+
+    /** The acting user id + un-prefixed role names, derived from the JWT principal. */
+    private record Acting(Long userId, Set<String> roles) {}
+
+    private Acting acting() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         Long userId = null;
         Set<String> roles = new HashSet<>();
@@ -157,6 +171,6 @@ public class ApprovalChainController {
                 }
             }
         }
-        return instanceService.pendingForUser(userId, roles);
+        return new Acting(userId, roles);
     }
 }

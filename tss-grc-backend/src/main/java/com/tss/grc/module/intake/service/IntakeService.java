@@ -1,6 +1,7 @@
 package com.tss.grc.module.intake.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.intake.dto.IntakePublicStatusDto;
 import com.tss.grc.module.intake.dto.IntakeRecordDto;
 import com.tss.grc.module.intake.dto.IntakeSubmissionRequest;
 import com.tss.grc.module.intake.dto.TriageDecisionRequest;
@@ -139,10 +140,12 @@ public class IntakeService {
     }
 
     /** Public case-tracker lookup — anonymous submitters use this from
-     *  /portal/case-tracker?ref=<code> to see their submission status. */
+     *  /portal/case-tracker?ref=&lt;code&gt; to see their submission status.
+     *  SECURITY (SEC-FIN-001): returns a minimal, PII-free projection only —
+     *  never submitter identity, payload, assignee, or event history. */
     @Transactional(readOnly = true)
-    public Optional<IntakeRecordDto> findByReferenceCode(String referenceCode) {
-        return repo.findByReferenceCode(referenceCode).map(IntakeRecordDto::from);
+    public Optional<IntakePublicStatusDto> findPublicStatusByReferenceCode(String referenceCode) {
+        return repo.findByReferenceCode(referenceCode).map(IntakePublicStatusDto::from);
     }
 
     @Transactional

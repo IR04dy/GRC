@@ -3,7 +3,10 @@ package com.tss.grc.module.cyber.service;
 import com.tss.grc.module.cyber.dto.CyberDashboardDto;
 import com.tss.grc.module.cyber.entity.*;
 import com.tss.grc.module.cyber.repository.*;
+import com.tss.grc.common.tenant.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -60,6 +63,11 @@ class CyberServiceTest {
     @Mock private CyberActionPlanRepository actionPlanRepo;
     @InjectMocks private CyberService service;
 
+    // SEC-CYB-001: single-id ops now load via findByIdAndOrganisationId(id, org)
+    // using TenantContext.requireOrganisationId(), so a tenant must be in scope.
+    @BeforeEach void setTenant() { TenantContext.setCurrentTenant(ORG_ID); }
+    @AfterEach  void clearTenant() { TenantContext.clear(); }
+
     // ─── Vulnerability escalation ────────────────────────────────────
 
     @Test
@@ -71,7 +79,7 @@ class CyberServiceTest {
             v.setId(ID);
             v.setOrganisationId(ORG_ID);
             v.setWorkflowStatus(chain[i]);
-            when(vulnerabilityRepo.findById(ID)).thenReturn(Optional.of(v));
+            when(vulnerabilityRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(v));
             when(vulnerabilityRepo.save(any(Vulnerability.class))).thenAnswer(inv -> inv.getArgument(0));
 
             Vulnerability after = service.escalate(ID);
@@ -85,7 +93,7 @@ class CyberServiceTest {
         Vulnerability v = new Vulnerability();
         v.setId(ID);
         v.setWorkflowStatus("CLOSED");
-        when(vulnerabilityRepo.findById(ID)).thenReturn(Optional.of(v));
+        when(vulnerabilityRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(v));
         when(vulnerabilityRepo.save(any(Vulnerability.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Vulnerability after = service.escalate(ID);
@@ -98,7 +106,7 @@ class CyberServiceTest {
         Vulnerability v = new Vulnerability();
         v.setId(ID);
         v.setWorkflowStatus("LEGACY_VALUE");
-        when(vulnerabilityRepo.findById(ID)).thenReturn(Optional.of(v));
+        when(vulnerabilityRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(v));
         when(vulnerabilityRepo.save(any(Vulnerability.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Vulnerability after = service.escalate(ID);
@@ -107,7 +115,7 @@ class CyberServiceTest {
 
     @Test
     void escalate_unknown_id_throws_EntityNotFound() {
-        when(vulnerabilityRepo.findById(ID)).thenReturn(Optional.empty());
+        when(vulnerabilityRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.escalate(ID))
             .isInstanceOf(EntityNotFoundException.class)
@@ -124,7 +132,7 @@ class CyberServiceTest {
             CyberIncident inc = new CyberIncident();
             inc.setId(ID);
             inc.setWorkflowStatus(chain[i]);
-            when(incidentRepo.findById(ID)).thenReturn(Optional.of(inc));
+            when(incidentRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(inc));
             when(incidentRepo.save(any(CyberIncident.class))).thenAnswer(inv -> inv.getArgument(0));
 
             CyberIncident after = service.startResponse(ID);
@@ -137,7 +145,7 @@ class CyberServiceTest {
         CyberIncident inc = new CyberIncident();
         inc.setId(ID);
         inc.setWorkflowStatus("LESSONS_LEARNED");
-        when(incidentRepo.findById(ID)).thenReturn(Optional.of(inc));
+        when(incidentRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(inc));
         when(incidentRepo.save(any(CyberIncident.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CyberIncident after = service.startResponse(ID);
@@ -154,7 +162,7 @@ class CyberServiceTest {
         a.setExternalId("ASSESS-EXT-XYZ");
         a.setGapDescription("MFA missing on jump host");
         a.setStatus("APPROVED");
-        when(assessmentRepo.findById(55L)).thenReturn(Optional.of(a));
+        when(assessmentRepo.findByIdAndOrganisationId(55L, ORG_ID)).thenReturn(Optional.of(a));
         when(actionPlanRepo.save(any(CyberActionPlan.class))).thenAnswer(inv -> {
             CyberActionPlan saved = inv.getArgument(0);
             saved.setId(900L);
@@ -187,7 +195,7 @@ class CyberServiceTest {
         ControlAssessment a = new ControlAssessment();
         a.setId(ID);
         a.setStatus("DRAFT");
-        when(assessmentRepo.findById(ID)).thenReturn(Optional.of(a));
+        when(assessmentRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(a));
         when(assessmentRepo.save(any(ControlAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ControlAssessment after = service.approveAssessment(ID);
@@ -199,7 +207,7 @@ class CyberServiceTest {
         VulnException ex = new VulnException();
         ex.setId(ID);
         ex.setWorkflowStatus("REQUESTED");
-        when(exceptionRepo.findById(ID)).thenReturn(Optional.of(ex));
+        when(exceptionRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(ex));
         when(exceptionRepo.save(any(VulnException.class))).thenAnswer(inv -> inv.getArgument(0));
 
         VulnException after = service.approveException(ID);
@@ -215,7 +223,7 @@ class CyberServiceTest {
         ap.setId(ID);
         ap.setWorkflowStatus("IN_PROGRESS");
         ap.setProgressPct(45);
-        when(actionPlanRepo.findById(ID)).thenReturn(Optional.of(ap));
+        when(actionPlanRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(ap));
         when(actionPlanRepo.save(any(CyberActionPlan.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CyberActionPlan after = service.completeActionPlan(ID);
@@ -230,7 +238,7 @@ class CyberServiceTest {
     void deleteVulnerability_soft_deletes_via_save() {
         Vulnerability v = new Vulnerability();
         v.setId(ID);
-        when(vulnerabilityRepo.findById(ID)).thenReturn(Optional.of(v));
+        when(vulnerabilityRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(v));
         when(vulnerabilityRepo.save(any(Vulnerability.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.deleteVulnerability(ID);
@@ -244,7 +252,7 @@ class CyberServiceTest {
     void deleteIncident_soft_deletes_via_save() {
         CyberIncident inc = new CyberIncident();
         inc.setId(ID);
-        when(incidentRepo.findById(ID)).thenReturn(Optional.of(inc));
+        when(incidentRepo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(inc));
         when(incidentRepo.save(any(CyberIncident.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.deleteIncident(ID);

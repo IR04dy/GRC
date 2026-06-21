@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Cyber-module ControlAssessment repository.
@@ -23,6 +24,9 @@ import java.util.List;
  */
 @Repository("cyberControlAssessmentRepository")
 public interface ControlAssessmentRepository extends JpaRepository<ControlAssessment, Long> {
+
+    /** Tenant-scoped single-row lookup — prevents cross-tenant IDOR (SEC-CYB-001). */
+    Optional<ControlAssessment> findByIdAndOrganisationId(Long id, Long orgId);
 
     Page<ControlAssessment> findByOrganisationId(Long orgId, Pageable pageable);
 

@@ -7,6 +7,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,11 +48,25 @@ public class CustomSqlRunner implements ControlTestRunner {
     @PersistenceContext
     private EntityManager em;
 
-    public CustomSqlRunner() {}
+    /**
+     * SEC-INT-001: free-form CUSTOM_SQL execution is DISABLED by default. The
+     * deny-list of statement types is NOT an access-control boundary — a SELECT
+     * against a shared multi-tenant schema can still read other tenants' rows.
+     * This capability may only be enabled by an operator who has provisioned a
+     * least-privilege, per-tenant database account; never against the shared
+     * application login. Toggle via {@code grc.ccm.custom-sql.enabled}.
+     */
+    private final boolean customSqlEnabled;
+
+    @Autowired
+    public CustomSqlRunner(@Value("${grc.ccm.custom-sql.enabled:false}") boolean customSqlEnabled) {
+        this.customSqlEnabled = customSqlEnabled;
+    }
 
     /** Test seam constructor. */
-    CustomSqlRunner(EntityManager em) {
+    CustomSqlRunner(EntityManager em, boolean customSqlEnabled) {
         this.em = em;
+        this.customSqlEnabled = customSqlEnabled;
     }
 
     @Override
@@ -61,6 +77,15 @@ public class CustomSqlRunner implements ControlTestRunner {
     public RunResult execute(ControlTestDefinition def) {
         long start = System.nanoTime();
         try {
+            // SEC-INT-001: hard kill-switch — refuse to run any tenant-supplied
+            // SQL unless an operator has explicitly enabled the capability.
+            if (!customSqlEnabled) {
+                return RunResult.error(
+                    "CUSTOM_SQL execution is disabled by policy (SEC-INT-001). Enable "
+                    + "grc.ccm.custom-sql.enabled only with a least-privilege, per-tenant DB account.",
+                    millisSince(start));
+            }
+
             Map<String, Object> cond = parseJson(def.getExpectedConditionJson());
             String sql = strOr(cond, "sql", "");
             int maxRows = intOr(cond, "maxRowCount", 0);
@@ -133,6 +158,12 @@ public class CustomSqlRunner implements ControlTestRunner {
         if (stripped.contains(";")) {
             // Reject any statement chaining.
             return "Multiple statements are not permitted in CCM CUSTOM_SQL tests";
+        }
+        // SEC-INT-001: enforce tenant scoping — the query MUST reference
+        // organisation_id so a CCM test cannot read across tenants in the
+        // shared schema. (Defence-in-depth on top of the default kill-switch.)
+        if (!stripped.toLowerCase().contains("organisation_id")) {
+            return "CCM CUSTOM_SQL must filter by organisation_id (tenant scoping required)";
         }
         return null;
     }

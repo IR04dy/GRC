@@ -46,22 +46,32 @@ public class IamJmlEventService {
 
     @Transactional
     public IamJmlEvent save(IamJmlEvent in) {
-        // Snapshot prior state so transitions (outcome COMPLETED, SoD flag
-        // first-trip) only fire once. Read-then-write is fine inside the
-        // same transaction — Hibernate's first-level cache returns the same
-        // managed instance after the save.
-        String  priorOutcome   = null;
-        Boolean priorSod       = null;
-        if (in.getId() != null) {
-            IamJmlEvent prior = repo.findByIdAndOrganisationId(in.getId(), TenantContext.getCurrentTenant()).orElse(null);
-            if (prior != null) {
-                priorOutcome = prior.getOutcome();
-                priorSod     = prior.getSodViolationDetected();
-            }
-        }
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — never trust the client-supplied id on a write. On
+        // create we force id=null so a forged id can't overwrite an existing
+        // (possibly cross-tenant) row via Hibernate merge. On update we load
+        // the row scoped to the caller's tenant and copy only mutable fields
+        // onto the managed entity — a detached client-built entity is never
+        // merged.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        IamJmlEvent saved = repo.save(in);
+        IamJmlEvent target;
+        // Snapshot prior state so transitions (outcome COMPLETED, SoD flag
+        // first-trip) only fire once.
+        String  priorOutcome = null;
+        Boolean priorSod     = null;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            IamJmlEvent existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("IamJmlEvent " + in.getId()));
+            priorOutcome = existing.getOutcome();
+            priorSod     = existing.getSodViolationDetected();
+            copyMutable(in, existing);
+            target = existing;
+        }
+        IamJmlEvent saved = repo.save(target);
         audit.log(isNew ? "JML_CREATE" : "JML_UPDATE",
             "IamJmlEvent", saved.getId(),
             saved.getEventType() + " · " + saved.getSubjectUsername()
@@ -93,6 +103,36 @@ public class IamJmlEventService {
                 "IamJmlEvent", saved.getId(), payload));
         }
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(IamJmlEvent in, IamJmlEvent target) {
+        target.setEventCode(in.getEventCode());
+        target.setEventType(in.getEventType());
+        target.setOccurredAt(in.getOccurredAt());
+        target.setSubjectUserId(in.getSubjectUserId());
+        target.setSubjectUsername(in.getSubjectUsername());
+        target.setSubjectEmail(in.getSubjectEmail());
+        target.setSubjectDepartment(in.getSubjectDepartment());
+        target.setSubjectJobTitle(in.getSubjectJobTitle());
+        target.setSourceSystem(in.getSourceSystem());
+        target.setTargetSystem(in.getTargetSystem());
+        target.setRoleOrEntitlement(in.getRoleOrEntitlement());
+        target.setPrivileged(in.getPrivileged());
+        target.setJustification(in.getJustification());
+        target.setApproverUsername(in.getApproverUsername());
+        target.setApproverRole(in.getApproverRole());
+        target.setOutcome(in.getOutcome());
+        target.setSodViolationDetected(in.getSodViolationDetected());
+        target.setSodViolationDetail(in.getSodViolationDetail());
+        target.setRequestedAt(in.getRequestedAt());
+        target.setApprovedAt(in.getApprovedAt());
+        target.setCompletedAt(in.getCompletedAt());
+        target.setRevokedAt(in.getRevokedAt());
+        target.setReviewDueAt(in.getReviewDueAt());
+        target.setRelatedTicketId(in.getRelatedTicketId());
+        target.setNotes(in.getNotes());
     }
 
     @Transactional

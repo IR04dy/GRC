@@ -37,17 +37,31 @@ public class OtAssetService {
 
     @Transactional
     public OtAsset save(OtAsset in) {
+        // SEC-CYB-002 — never trust the client-supplied id on a write. On
+        // create we force id=null so a forged id can't overwrite an existing
+        // (possibly cross-tenant) row via Hibernate merge. On update we load
+        // the row scoped to the caller's tenant and copy only mutable fields
+        // onto the managed entity — a detached client-built entity is never
+        // merged.
+        Long org = TenantContext.getCurrentTenant();
+        boolean isNew = in.getId() == null;
+        OtAsset target;
         // Snapshot prior remote-access state before write — only fire AR-131
         // (OT remote access activated) on the transition OFF→ON. Without
         // the prior value the rule would refire on every subsequent save.
         Boolean priorRemote = null;
-        if (in.getId() != null) {
-            OtAsset prior = repo.findByIdAndOrganisationId(in.getId(), TenantContext.getCurrentTenant()).orElse(null);
-            if (prior != null) priorRemote = prior.getRemoteAccessEnabled();
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            OtAsset existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("OtAsset " + in.getId()));
+            priorRemote = existing.getRemoteAccessEnabled();
+            copyMutable(in, existing);
+            target = existing;
         }
-        in.setOrganisationId(TenantContext.getCurrentTenant());
-        boolean isNew = in.getId() == null;
-        OtAsset saved = repo.save(in);
+        OtAsset saved = repo.save(target);
         audit.log(isNew ? "OT_ASSET_CREATE" : "OT_ASSET_UPDATE",
             "OtAsset", saved.getId(),
             saved.getAssetCode() + " · L" + saved.getPurdueLevel() + " · " + saved.getCriticality());
@@ -67,6 +81,32 @@ public class OtAssetService {
                        "siteName",     saved.getSiteName()     == null ? "" : saved.getSiteName())));
         }
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(OtAsset in, OtAsset target) {
+        target.setAssetCode(in.getAssetCode());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setPurdueLevel(in.getPurdueLevel());
+        target.setAssetClass(in.getAssetClass());
+        target.setVendor(in.getVendor());
+        target.setModel(in.getModel());
+        target.setFirmwareVersion(in.getFirmwareVersion());
+        target.setSerialNumber(in.getSerialNumber());
+        target.setSiteCode(in.getSiteCode());
+        target.setSiteName(in.getSiteName());
+        target.setProcessFunction(in.getProcessFunction());
+        target.setIndustrialProtocols(in.getIndustrialProtocols());
+        target.setSafetyIntegrityLevel(in.getSafetyIntegrityLevel());
+        target.setCriticality(in.getCriticality());
+        target.setLastPatchedAt(in.getLastPatchedAt());
+        target.setPatchWindow(in.getPatchWindow());
+        target.setRemoteAccessEnabled(in.getRemoteAccessEnabled());
+        target.setNetworkSegment(in.getNetworkSegment());
+        target.setStatus(in.getStatus());
+        target.setNotes(in.getNotes());
     }
 
     @Transactional

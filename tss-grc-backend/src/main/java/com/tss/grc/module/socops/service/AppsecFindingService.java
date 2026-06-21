@@ -56,6 +56,9 @@ public class AppsecFindingService {
             existing.setRemediationAdvice(in.getRemediationAdvice());
             existing = repo.save(existing);
         } else {
+            // SEC-CYB-002 — a connector never carries our PK; force id=null so a
+            // forged id on the ingest body can't overwrite an existing row.
+            in.setId(null);
             if (in.getStatus() == null) in.setStatus("OPEN");
             if (in.getDiscoveredAt() == null) in.setDiscoveredAt(LocalDateTime.now());
             if (in.getSlaDueAt() == null) in.setSlaDueAt(computeSla(in.getDiscoveredAt(), in.getSeverity()));
@@ -102,12 +105,56 @@ public class AppsecFindingService {
 
     @Transactional
     public AppsecFinding save(AppsecFinding in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        AppsecFinding saved = repo.save(in);
+        AppsecFinding target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            AppsecFinding existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("AppsecFinding " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        AppsecFinding saved = repo.save(target);
         audit.log(isNew ? "APPSEC_CREATE" : "APPSEC_UPDATE",
             "AppsecFinding", saved.getId(), saved.getFindingTitle());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(AppsecFinding in, AppsecFinding target) {
+        target.setExternalId(in.getExternalId());
+        target.setScanner(in.getScanner());
+        target.setScanType(in.getScanType());
+        target.setApplicationName(in.getApplicationName());
+        target.setApplicationId(in.getApplicationId());
+        target.setRepositoryUrl(in.getRepositoryUrl());
+        target.setBranch(in.getBranch());
+        target.setFindingTitle(in.getFindingTitle());
+        target.setCwe(in.getCwe());
+        target.setCve(in.getCve());
+        target.setSeverity(in.getSeverity());
+        target.setCvssScore(in.getCvssScore());
+        target.setFilePath(in.getFilePath());
+        target.setLineNumber(in.getLineNumber());
+        target.setComponentName(in.getComponentName());
+        target.setComponentVersion(in.getComponentVersion());
+        target.setFixedVersion(in.getFixedVersion());
+        target.setDescription(in.getDescription());
+        target.setRemediationAdvice(in.getRemediationAdvice());
+        target.setStatus(in.getStatus());
+        target.setAssignedToUserId(in.getAssignedToUserId());
+        target.setDiscoveredAt(in.getDiscoveredAt());
+        target.setFixedAt(in.getFixedAt());
+        target.setSlaDueAt(in.getSlaDueAt());
+        target.setSuppressionReason(in.getSuppressionReason());
     }
 
     @Transactional

@@ -25,7 +25,8 @@ class CustomSqlRunnerTest {
 
     @BeforeEach
     void setUp() {
-        runner = new CustomSqlRunner(em);
+        // Enabled for the execution-path tests; a disabled-runner test is below.
+        runner = new CustomSqlRunner(em, true);
     }
 
     private static ControlTestDefinition def(String sql, int maxRows) {
@@ -43,7 +44,7 @@ class CustomSqlRunnerTest {
         when(query.getResultList()).thenReturn(List.of(0L));
 
         ControlTestRunner.RunResult r = runner.execute(
-                def("SELECT COUNT(*) FROM customer WHERE created_at < '2020-01-01'", 0));
+                def("SELECT COUNT(*) FROM customer WHERE organisation_id = 1 AND created_at < '2020-01-01'", 0));
 
         assertThat(r.status()).isEqualTo("PASS");
         assertThat(r.actualValueJson()).contains("\"rowCount\":0");
@@ -55,7 +56,7 @@ class CustomSqlRunnerTest {
         when(query.getResultList()).thenReturn(List.of(15L));
 
         ControlTestRunner.RunResult r = runner.execute(
-                def("SELECT COUNT(*) FROM customer WHERE created_at < '2020-01-01'", 0));
+                def("SELECT COUNT(*) FROM customer WHERE organisation_id = 1 AND created_at < '2020-01-01'", 0));
 
         assertThat(r.status()).isEqualTo("FAIL");
         assertThat(r.failureReason()).contains("15");
@@ -98,18 +99,39 @@ class CustomSqlRunnerTest {
         when(query.getResultList()).thenThrow(new RuntimeException("Invalid syntax"));
 
         ControlTestRunner.RunResult r = runner.execute(
-                def("SELECT garbage", 0));
+                def("SELECT garbage FROM x WHERE organisation_id = 1", 0));
         assertThat(r.status()).isEqualTo("ERROR");
         assertThat(r.failureReason()).contains("Invalid syntax");
     }
 
     @Test
     void rejectionReasonHelperUnitTest() {
-        assertThat(CustomSqlRunner.rejectionReason("SELECT 1")).isNull();
-        assertThat(CustomSqlRunner.rejectionReason("/* test */ SELECT 1")).isNull();
-        assertThat(CustomSqlRunner.rejectionReason("-- comment\nSELECT 1")).isNull();
+        // Tenant-scoped SELECTs pass.
+        assertThat(CustomSqlRunner.rejectionReason("SELECT 1 WHERE organisation_id = 1")).isNull();
+        assertThat(CustomSqlRunner.rejectionReason("/* test */ SELECT count(*) FROM t WHERE organisation_id = 1")).isNull();
+        assertThat(CustomSqlRunner.rejectionReason("-- c\nSELECT 1 FROM t WHERE organisation_id = 1")).isNull();
         assertThat(CustomSqlRunner.rejectionReason("INSERT INTO x VALUES (1)")).contains("Only SELECT");
         assertThat(CustomSqlRunner.rejectionReason("")).contains("missing");
         assertThat(CustomSqlRunner.rejectionReason(null)).contains("missing");
+    }
+
+    // ─── SEC-INT-001 regressions ──────────────────────────────────
+
+    @Test
+    void disabledRunner_rejectsEvenValidSelect() {
+        CustomSqlRunner disabled = new CustomSqlRunner(em, false);
+        ControlTestRunner.RunResult r = disabled.execute(
+                def("SELECT COUNT(*) FROM customer WHERE organisation_id = 1", 0));
+        assertThat(r.status()).isEqualTo("ERROR");
+        assertThat(r.failureReason()).contains("disabled by policy");
+    }
+
+    @Test
+    void selectWithoutOrganisationScope_isRejected() {
+        // The classic cross-tenant exfiltration attempt — must be blocked.
+        ControlTestRunner.RunResult r = runner.execute(
+                def("SELECT username, password_hash FROM iam.users", 0));
+        assertThat(r.status()).isEqualTo("ERROR");
+        assertThat(r.failureReason()).contains("organisation_id");
     }
 }

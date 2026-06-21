@@ -182,7 +182,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public CyberControl getControl(Long id) {
-        return controlRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        return controlRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberControl not found: " + id));
     }
 
@@ -238,7 +239,8 @@ public class CyberService {
 
     @Transactional
     public CyberSubControl updateSubControl(Long id, CyberSubControl req) {
-        CyberSubControl existing = subControlRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        CyberSubControl existing = subControlRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberSubControl not found: " + id));
         req.setId(existing.getId());
         req.setOrganisationId(existing.getOrganisationId());
@@ -250,7 +252,8 @@ public class CyberService {
 
     @Transactional
     public void deleteSubControl(Long id) {
-        CyberSubControl s = subControlRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        CyberSubControl s = subControlRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberSubControl not found: " + id));
         s.setIsDeleted(true);
         subControlRepo.save(s);
@@ -267,7 +270,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public ControlAssessment getAssessment(Long id) {
-        return assessmentRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        return assessmentRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("ControlAssessment not found: " + id));
     }
 
@@ -339,7 +343,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public Vulnerability getVulnerability(Long id) {
-        return vulnerabilityRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        return vulnerabilityRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("Vulnerability not found: " + id));
     }
 
@@ -398,7 +403,8 @@ public class CyberService {
 
     @Transactional
     public VulnException approveException(Long id) {
-        VulnException e = exceptionRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        VulnException e = exceptionRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("VulnException not found: " + id));
         e.setWorkflowStatus("APPROVED");
         e.setApprovedAt(LocalDate.now());
@@ -409,7 +415,8 @@ public class CyberService {
 
     @Transactional
     public VulnException updateException(Long id, VulnException req) {
-        VulnException existing = exceptionRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        VulnException existing = exceptionRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("VulnException not found: " + id));
         req.setId(existing.getId());
         req.setOrganisationId(existing.getOrganisationId());
@@ -421,7 +428,8 @@ public class CyberService {
 
     @Transactional
     public void deleteException(Long id) {
-        VulnException e = exceptionRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        VulnException e = exceptionRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("VulnException not found: " + id));
         e.setIsDeleted(true);
         exceptionRepo.save(e);
@@ -438,7 +446,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public CyberIncident getIncident(Long id) {
-        return incidentRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        return incidentRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberIncident not found: " + id));
     }
 
@@ -506,7 +515,8 @@ public class CyberService {
 
     @Transactional
     public CyberAsset updateAsset(Long id, CyberAsset req) {
-        CyberAsset existing = assetRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        CyberAsset existing = assetRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberAsset not found: " + id));
         req.setId(existing.getId());
         req.setOrganisationId(existing.getOrganisationId());
@@ -518,7 +528,8 @@ public class CyberService {
 
     @Transactional
     public void deleteAsset(Long id) {
-        CyberAsset a = assetRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        CyberAsset a = assetRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberAsset not found: " + id));
         a.setIsDeleted(true);
         assetRepo.save(a);
@@ -542,7 +553,8 @@ public class CyberService {
 
     @Transactional
     public CyberEvidence updateEvidence(Long id, CyberEvidence req) {
-        CyberEvidence existing = evidenceRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        CyberEvidence existing = evidenceRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberEvidence not found: " + id));
         req.setId(existing.getId());
         req.setOrganisationId(existing.getOrganisationId());
@@ -554,7 +566,8 @@ public class CyberService {
 
     @Transactional
     public void deleteEvidence(Long id) {
-        CyberEvidence e = evidenceRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        CyberEvidence e = evidenceRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberEvidence not found: " + id));
         e.setIsDeleted(true);
         evidenceRepo.save(e);
@@ -571,7 +584,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public CyberActionPlan getActionPlan(Long id) {
-        return actionPlanRepo.findById(id)
+        // SEC-CYB-001: scope by tenant — never load another org's row by id.
+        return actionPlanRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberActionPlan not found: " + id));
     }
 

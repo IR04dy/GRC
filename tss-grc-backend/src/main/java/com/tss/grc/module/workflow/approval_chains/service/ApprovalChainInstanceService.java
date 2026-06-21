@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -200,8 +201,16 @@ public class ApprovalChainInstanceService {
         return toResponse(saved, orgId);
     }
 
+    /**
+     * Record an approval action. SECURITY: the acting identity ({@code actingUserId}
+     * + {@code actingRoles}) MUST be derived from the authenticated principal by the
+     * controller — never from the request body. {@code req.actorUserId()} is ignored.
+     * The acting principal must satisfy the target step's required user/role, else a
+     * {@link AccessDeniedException} (403) is thrown.
+     */
     @Transactional
-    public InstanceResponse recordAction(Long instanceId, InstanceActionRequest req) {
+    public InstanceResponse recordAction(Long instanceId, InstanceActionRequest req,
+                                         Long actingUserId, Set<String> actingRoles) {
         Long orgId = org();
         ApprovalChainInstance i = loadOrThrow(instanceId);
         if (TERMINAL_STATUSES.contains(i.getStatus())) {
@@ -224,10 +233,10 @@ public class ApprovalChainInstanceService {
                 "Template " + i.getTemplateId() + " has no step at order " + req.stepOrder());
         }
 
-        // Pick the step row the actor satisfies — service callers don't
-        // pre-resolve a step_id; we resolve from actor + role catalogue.
-        // For DELEGATED, the step's canDelegate flag gates acceptance.
-        ApprovalChainStep target = resolveStepForActor(stepsAtOrder, req);
+        // Pick the step row the AUTHENTICATED actor satisfies. Throws 403 if
+        // the principal is neither the step's required user nor holder of its
+        // required role (no silent rows.get(0) fallback for restricted steps).
+        ApprovalChainStep target = resolveStepForActor(stepsAtOrder, actingUserId, actingRoles);
 
         if ("DELEGATED".equals(req.action()) && !Boolean.TRUE.equals(target.getCanDelegate())) {
             throw new IllegalArgumentException(
@@ -242,7 +251,7 @@ public class ApprovalChainInstanceService {
         a.setInstanceId(i.getId());
         a.setStepOrder(req.stepOrder());
         a.setStepId(target.getId());
-        a.setActorUserId(req.actorUserId());
+        a.setActorUserId(actingUserId);
         a.setAction(req.action());
         a.setDecidedAt(LocalDateTime.now());
         a.setCommentEn(req.commentEn());
@@ -253,7 +262,7 @@ public class ApprovalChainInstanceService {
         // ── Audit + emit per-action event ──────────────────────────
         audit.log("ACTION", "ApprovalChainInstance", i.getId(),
             "Step " + req.stepOrder() + " action=" + req.action()
-                + " by user=" + req.actorUserId()
+                + " by user=" + actingUserId
                 + " on step '" + target.getTitleEn() + "'");
 
         if ("DELEGATED".equals(req.action())) {
@@ -307,22 +316,27 @@ public class ApprovalChainInstanceService {
         return toResponse(i, orgId);
     }
 
+    /**
+     * Withdraw an in-flight chain. SECURITY: {@code actingUserId} MUST be the
+     * authenticated principal id (not a body field). Only the originator may
+     * withdraw; any other principal gets a 403.
+     */
     @Transactional
-    public InstanceResponse withdraw(Long instanceId, InstanceWithdrawRequest req) {
+    public InstanceResponse withdraw(Long instanceId, InstanceWithdrawRequest req, Long actingUserId) {
         Long orgId = org();
         ApprovalChainInstance i = loadOrThrow(instanceId);
         if (TERMINAL_STATUSES.contains(i.getStatus())) {
             throw new IllegalTransitionException(i.getStatus(), "WITHDRAWN", TERMINAL_STATUSES);
         }
-        if (!Objects.equals(i.getOriginatorUserId(), req.actorUserId())) {
-            throw new IllegalArgumentException("Only the originator can withdraw the chain");
+        if (!Objects.equals(i.getOriginatorUserId(), actingUserId)) {
+            throw new AccessDeniedException("Only the originator can withdraw the chain");
         }
         i.setStatus("WITHDRAWN");
         i.setCompletedAt(LocalDateTime.now());
         i.setUpdatedAt(LocalDateTime.now());
         instanceRepo.save(i);
         audit.log("WITHDRAW", "ApprovalChainInstance", i.getId(),
-            "Approval-chain withdrawn by originator " + req.actorUserId()
+            "Approval-chain withdrawn by originator " + actingUserId
                 + (req.reasonEn() != null ? " — " + req.reasonEn() : ""));
         emit(i, null, "APPROVAL_CHAIN_WITHDRAWN", null);
         return toResponse(i, orgId);
@@ -428,20 +442,32 @@ public class ApprovalChainInstanceService {
     }
 
     /**
-     * Pick the step row the actor satisfies. Service contract: callers
-     * pass actorUserId + optional role hint via the request; we walk
-     * the rows at the current step_order and pick the first match.
+     * Pick the step row the AUTHENTICATED actor is authorised to sign.
+     *
+     * <p>SECURITY (SEC-IAM-001): a restricted step (one that declares a
+     * {@code requiredUserId} or {@code requiredRole}) may only be actioned by a
+     * principal that matches it. If no restricted row matches the principal, and
+     * no open (unconstrained) row exists, a {@link AccessDeniedException} (403) is
+     * thrown — there is no {@code rows.get(0)} fallback that previously let any
+     * authenticated user forge an approval.
      */
-    ApprovalChainStep resolveStepForActor(List<ApprovalChainStep> rows, InstanceActionRequest req) {
-        // Prefer a row that matches by required_user_id (most specific).
+    ApprovalChainStep resolveStepForActor(List<ApprovalChainStep> rows, Long actingUserId, Set<String> actingRoles) {
+        // 1) A row the principal is explicitly authorised for (user id or role).
         for (ApprovalChainStep s : rows) {
-            if (s.getRequiredUserId() != null && Objects.equals(s.getRequiredUserId(), req.actorUserId())) {
+            if (matchesActor(s, actingUserId, actingRoles)) {
                 return s;
             }
         }
-        // Otherwise the actor is signing against the first row at this
-        // step_order — UI surfaces which rows the actor matched.
-        return rows.get(0);
+        // 2) An open row that imposes no actor/role constraint — any authenticated
+        //    user may sign these (preserves legitimately-unrestricted steps).
+        for (ApprovalChainStep s : rows) {
+            if (s.getRequiredUserId() == null && s.getRequiredRole() == null) {
+                return s;
+            }
+        }
+        throw new AccessDeniedException(
+            "Not an authorised approver for step "
+                + (rows.isEmpty() ? "?" : String.valueOf(rows.get(0).getStepOrder())));
     }
 
     /**
