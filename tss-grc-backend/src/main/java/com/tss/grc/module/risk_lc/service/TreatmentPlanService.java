@@ -196,7 +196,9 @@ public class TreatmentPlanService {
 
     /** TP-2026-001 generator. */
     private String generateExternalId(Long orgId) {
-        long count = repo.findByOrganisationIdOrderByCreatedAtDesc(orgId).size();
+        // PERF-NQ-007: count via the DB instead of loading every plan (and its
+        // actions) just to call size().
+        long count = repo.countByOrganisationId(orgId);
         return String.format("TP-%d-%03d", LocalDateTime.now().getYear(), count + 1);
     }
 }

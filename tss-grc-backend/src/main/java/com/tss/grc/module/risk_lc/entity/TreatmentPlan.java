@@ -74,7 +74,13 @@ public class TreatmentPlan {
     @Column(name = "is_deleted", nullable = false)
     private Short isDeleted = 0;
 
-    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    // PERF-NQ-007: LAZY (was EAGER). EAGER triggered a separate actions SELECT for
+    // every plan on list views (N+1). The repository's read finders now LEFT JOIN
+    // FETCH this collection in a single query (see TreatmentPlanRepository), and
+    // the @Transactional write paths initialise it within their open session — so
+    // TreatmentPlanDto.from() never hits a LazyInitializationException despite
+    // spring.jpa.open-in-view=false.
+    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Where(clause = "is_deleted = 0")
     private List<TreatmentAction> actions = new ArrayList<>();
 }
