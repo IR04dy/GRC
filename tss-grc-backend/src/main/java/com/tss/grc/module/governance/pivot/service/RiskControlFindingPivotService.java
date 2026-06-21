@@ -143,6 +143,10 @@ public class RiskControlFindingPivotService {
 
         List<RiskControlLink> links = safeList(() ->
                 riskControlLinkRepo.findByOrganisationIdAndRiskIdOrderByIdAsc(orgId, riskId));
+        // PERF-NQ-004: load the org's CCM test definitions ONCE per pivot (grouped
+        // by controlId) instead of re-scanning the whole table inside toControlPivot
+        // for every control and again in ccmCoverageForControls.
+        Map<Long, List<ControlTestDefinition>> defsByControl = loadDefsByControl(orgId);
         List<ControlPivot> controlRows = new ArrayList<>();
         List<Long> controlIds = new ArrayList<>();
         for (RiskControlLink link : links) {
@@ -150,12 +154,12 @@ public class RiskControlFindingPivotService {
                     .orElse(null);
             if (c == null) continue;
             controlIds.add(c.getId());
-            controlRows.add(toControlPivot(c, link.getEffectiveness(), orgId));
+            controlRows.add(toControlPivot(c, link.getEffectiveness(), orgId, defsByControl));
         }
 
         List<FindingPivot> findingRows = findingsForControls(orgId, controlRows);
         List<CapaPivot> capaRows = capasForFindings(orgId, findingRows);
-        CcmCoverageStats ccm = ccmCoverageForControls(orgId, controlIds);
+        CcmCoverageStats ccm = ccmCoverageForControls(orgId, controlIds, defsByControl);
 
         PivotResponse out = new PivotResponse(
                 FocalEntity.RISK,
@@ -198,12 +202,14 @@ public class RiskControlFindingPivotService {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElseGet(() -> latestAssessmentEffectiveness(orgId, controlId));
-        ControlPivot selfRow = toControlPivot(c, selfEffectiveness, orgId);
+        // PERF-NQ-004: see buildRiskPivot — CCM defs loaded once.
+        Map<Long, List<ControlTestDefinition>> defsByControl = loadDefsByControl(orgId);
+        ControlPivot selfRow = toControlPivot(c, selfEffectiveness, orgId, defsByControl);
         List<ControlPivot> controlRows = List.of(selfRow);
 
         List<FindingPivot> findingRows = findingsForControls(orgId, controlRows);
         List<CapaPivot> capaRows = capasForFindings(orgId, findingRows);
-        CcmCoverageStats ccm = ccmCoverageForControls(orgId, List.of(controlId));
+        CcmCoverageStats ccm = ccmCoverageForControls(orgId, List.of(controlId), defsByControl);
 
         PivotResponse out = new PivotResponse(
                 FocalEntity.CONTROL,
@@ -238,6 +244,8 @@ public class RiskControlFindingPivotService {
         List<Long> controlIds = new ArrayList<>();
         List<RiskPivot> riskRows = new ArrayList<>();
         Map<Long, Boolean> seenRiskIds = new LinkedHashMap<>();
+        // PERF-NQ-004: see buildRiskPivot — CCM defs loaded once.
+        Map<Long, List<ControlTestDefinition>> defsByControl = loadDefsByControl(orgId);
         if (!controlCodes.isEmpty()) {
             List<Control> orgControls = safeList(() ->
                     controlRepo.findByOrganisationIdOrderByDomainAscControlCodeAsc(orgId));
@@ -245,7 +253,7 @@ public class RiskControlFindingPivotService {
             for (Control c : orgControls) {
                 if (c.getControlCode() == null || !codeSet.contains(c.getControlCode())) continue;
                 controlIds.add(c.getId());
-                controlRows.add(toControlPivot(c, latestAssessmentEffectiveness(orgId, c.getId()), orgId));
+                controlRows.add(toControlPivot(c, latestAssessmentEffectiveness(orgId, c.getId()), orgId, defsByControl));
                 for (RiskControlLink link : safeList(() ->
                         riskControlLinkRepo.findByOrganisationIdAndControlIdOrderByIdAsc(orgId, c.getId()))) {
                     if (seenRiskIds.containsKey(link.getRiskId())) continue;
@@ -269,7 +277,7 @@ public class RiskControlFindingPivotService {
             }
         }
 
-        CcmCoverageStats ccm = ccmCoverageForControls(orgId, controlIds);
+        CcmCoverageStats ccm = ccmCoverageForControls(orgId, controlIds, defsByControl);
 
         FindingPivot self = toFindingPivot(f);
         PivotResponse out = new PivotResponse(
@@ -348,13 +356,30 @@ public class RiskControlFindingPivotService {
         return out;
     }
 
-    private CcmCoverageStats ccmCoverageForControls(Long orgId, List<Long> controlIds) {
+    /**
+     * PERF-NQ-004: load the org's CCM test definitions ONCE and group them by
+     * controlId. Both {@link #toControlPivot} (per control) and
+     * {@link #ccmCoverageForControls} consume this map, so a pivot scans the
+     * control_test_definitions table a single time instead of once per control
+     * (toControlPivot) plus once more in the coverage rollup.
+     */
+    private Map<Long, List<ControlTestDefinition>> loadDefsByControl(Long orgId) {
+        Map<Long, List<ControlTestDefinition>> byControl = new HashMap<>();
+        for (ControlTestDefinition d : safeList(() ->
+                ccmDefRepo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId))) {
+            if (d.getControlId() == null) continue;
+            byControl.computeIfAbsent(d.getControlId(), k -> new ArrayList<>()).add(d);
+        }
+        return byControl;
+    }
+
+    private CcmCoverageStats ccmCoverageForControls(Long orgId, List<Long> controlIds,
+            Map<Long, List<ControlTestDefinition>> defsByControl) {
         if (controlIds == null || controlIds.isEmpty()) {
             return new CcmCoverageStats(0L, 0L, 0L, 0L, null);
         }
-        List<ControlTestDefinition> defs = safeList(() ->
-                ccmDefRepo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId)).stream()
-                .filter(d -> d.getControlId() != null && controlIds.contains(d.getControlId()))
+        List<ControlTestDefinition> defs = controlIds.stream().distinct()
+                .flatMap(id -> defsByControl.getOrDefault(id, List.of()).stream())
                 .toList();
         if (defs.isEmpty()) {
             return new CcmCoverageStats(0L, 0L, 0L, 0L, null);
@@ -571,7 +596,8 @@ public class RiskControlFindingPivotService {
                 r.getStatus());
     }
 
-    private ControlPivot toControlPivot(Control c, String effectivenessHint, Long orgId) {
+    private ControlPivot toControlPivot(Control c, String effectivenessHint, Long orgId,
+            Map<Long, List<ControlTestDefinition>> defsByControl) {
         String eff = effectivenessHint;
         if (eff == null || eff.isBlank() || "NOT_TESTED".equals(eff)) {
             String fromAssessment = latestAssessmentEffectiveness(orgId, c.getId());
@@ -583,10 +609,9 @@ public class RiskControlFindingPivotService {
         }
         String lastStatus = null;
         LocalDateTime lastAt = null;
-        List<ControlTestDefinition> defs = safeList(() ->
-                ccmDefRepo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId)).stream()
-                .filter(d -> c.getId().equals(d.getControlId()))
-                .toList();
+        // PERF-NQ-004: defs for this control come from the once-loaded map (was a
+        // full control_test_definitions scan + filter on every call).
+        List<ControlTestDefinition> defs = defsByControl.getOrDefault(c.getId(), List.of());
         for (ControlTestDefinition d : defs) {
             if (d.getLastRunAt() == null) continue;
             if (lastAt == null || d.getLastRunAt().isAfter(lastAt)) {
