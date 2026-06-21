@@ -41,6 +41,7 @@ public class AuthController {
 
     private final AuthenticationManager authManager;
     private final JwtTokenProvider      tokenProvider;
+    private final LoginAttemptService   loginAttempts;
     /**
      * Optional — server-side refresh-token store (Open Issue #002). When the
      * bean isn't on the classpath (e.g. in slim test slices) the controller
@@ -63,10 +64,15 @@ public class AuthController {
             auth = authManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.username(), loginRequest.password()));
         } catch (AuthenticationException ex) {
+            // SEC-AUTH-001: record the failed attempt (and lock at the threshold).
+            // Generic 401 either way — never reveal whether the account is locked.
+            loginAttempts.onFailure(loginRequest.username());
             return ResponseEntity.status(401).body(Map.of("message", "Invalid username or password"));
         }
 
         GrcUserDetails principal   = (GrcUserDetails) auth.getPrincipal();
+        // SEC-AUTH-001: successful login clears the failure counter + lock and stamps lastLoginAt.
+        loginAttempts.onSuccess(principal.getUserId());
         String          accessToken = tokenProvider.generateAccessToken(auth);
 
         // Open Issue #002 — if the refresh-token store is available, mint the

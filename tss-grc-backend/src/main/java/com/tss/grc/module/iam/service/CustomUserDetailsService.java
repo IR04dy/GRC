@@ -46,13 +46,19 @@ public class CustomUserDetailsService implements UserDetailsService {
                 authorities.add(new SimpleGrantedAuthority(perm.getPermissionName()));
             }
         }
+        // SEC-AUTH-001: an account is locked only while isLocked AND the lockout
+        // window is still open. Once lockedUntil has passed, it auto-unlocks
+        // (the next successful login resets the counter via LoginAttemptService).
+        boolean currentlyLocked = Boolean.TRUE.equals(user.getIsLocked())
+            && (user.getLockedUntil() == null || java.time.LocalDateTime.now().isBefore(user.getLockedUntil()));
+
         return new GrcUserDetails(
             user.getId(),
             user.getOrganisationId(),
             user.getUsername(),
             user.getPasswordHash(),
             Boolean.TRUE.equals(user.getIsActive()),
-            !Boolean.TRUE.equals(user.getIsLocked()),
+            !currentlyLocked,
             authorities
         );
     }

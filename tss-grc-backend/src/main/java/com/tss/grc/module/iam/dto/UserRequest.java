@@ -1,12 +1,16 @@
 package com.tss.grc.module.iam.dto;
 
+import com.tss.grc.common.validation.StrongPassword;
 import jakarta.validation.constraints.*;
 import java.util.Set;
 
 public record UserRequest(
     @NotBlank @Size(min = 3, max = 100) String username,
     @NotBlank @Email @Size(max = 200) String email,
-    @Size(min = 8, max = 100) String password,
+    // SEC-AUTH-002: strong-password policy (>=12 chars, >=3 character classes).
+    // Null/blank passes so an admin update that omits the password keeps the
+    // existing one; the service still requires a password on create.
+    @Size(max = 100) @StrongPassword String password,
     @NotBlank @Size(max = 200) String fullNameEn,
     @Size(max = 200) String fullNameAr,
     @Size(max = 200) String jobTitleEn,
