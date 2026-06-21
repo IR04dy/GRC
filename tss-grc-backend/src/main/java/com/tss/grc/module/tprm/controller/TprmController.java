@@ -61,10 +61,13 @@ public class TprmController {
 
     // ── Assessments ───────────────────────────────────────────────────────────
 
+    // PERF-PG-002: paged (mirrors /vendors). vendorId still optional: present =>
+    // that vendor's assessments, absent => the whole org's, both paged + capped.
     @GetMapping("/assessments")
     @PreAuthorize("hasPermission('TPRM', 'READ')")
-    public List<VendorAssessment> listAssessments(@RequestParam(required = false) Long vendorId) {
-        return tprmService.listAssessments(vendorId);
+    public Page<VendorAssessment> listAssessments(@RequestParam(required = false) Long vendorId,
+                                                  @PageableDefault(size = 20) Pageable pageable) {
+        return tprmService.listAssessments(vendorId, pageable);
     }
 
     @PostMapping("/assessments")

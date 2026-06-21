@@ -10,4 +10,8 @@ import java.util.List;
 public interface VendorAssessmentRepository extends JpaRepository<VendorAssessment, Long> {
     Page<VendorAssessment> findByVendorId(Long vendorId, Pageable pageable);
     List<VendorAssessment> findByVendorIdIn(List<Long> vendorIds);
+
+    /** PERF-PG-002: paged, org-scoped — replaces the unpaged vendor scan + unbounded
+     *  findByVendorIdIn for the org-wide assessment listing. */
+    Page<VendorAssessment> findByOrganisationId(Long organisationId, Pageable pageable);
 }

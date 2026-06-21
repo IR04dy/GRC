@@ -191,11 +191,26 @@ class TprmServiceTest {
         // belonging to OTHER_ORG is rejected before any assessment query runs.
         when(vendorRepo.findById(VENDOR_ID)).thenReturn(Optional.of(vendor(OTHER_ORG, "MEDIUM")));
 
-        assertThatThrownBy(() -> service.listAssessments(VENDOR_ID))
+        assertThatThrownBy(() -> service.listAssessments(VENDOR_ID, Pageable.unpaged()))
             .isInstanceOf(EntityNotFoundException.class);
 
         // assessmentRepo.findByVendorId never called
         verify(assessmentRepo, never()).findByVendorId(any(), any());
+    }
+
+    @Test
+    void listAssessments_noVendorId_usesPagedOrgScopedFinder_notVendorScan() {
+        // PERF-PG-002: the org-wide listing must hit the paged org-scoped finder
+        // directly — never the old "scan every vendor + findByVendorIdIn" path.
+        Page<VendorAssessment> page = new PageImpl<>(java.util.List.of(assessment(VENDOR_ID, "REVIEWED")));
+        when(assessmentRepo.findByOrganisationId(eq(ORG_ID), any(Pageable.class))).thenReturn(page);
+
+        Page<VendorAssessment> out = service.listAssessments(null, Pageable.ofSize(20));
+
+        assertThat(out.getContent()).hasSize(1);
+        verify(assessmentRepo).findByOrganisationId(eq(ORG_ID), any(Pageable.class));
+        verify(assessmentRepo, never()).findByVendorIdIn(any());
+        verify(vendorRepo, never()).findByOrganisationId(any(), any());
     }
 
     @Test

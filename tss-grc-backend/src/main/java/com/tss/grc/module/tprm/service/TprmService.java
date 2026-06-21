@@ -81,19 +81,20 @@ public class TprmService {
     // ── Assessments ───────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<VendorAssessment> listAssessments(Long vendorId) {
+    public Page<VendorAssessment> listAssessments(Long vendorId, Pageable pageable) {
         if (vendorId != null) {
             getVendor(vendorId); // verify org ownership
-            return assessmentRepo.findByVendorId(vendorId, Pageable.unpaged()).getContent();
+            return assessmentRepo.findByVendorId(vendorId, pageable);
         }
-        List<Long> vendorIds = vendorRepo.findByOrganisationId(TenantContext.getCurrentTenant(), Pageable.unpaged())
-            .map(Vendor::getId).getContent();
-        return assessmentRepo.findByVendorIdIn(vendorIds);
+        // PERF-PG-002: paged, org-scoped finder — no longer scans every vendor with
+        // Pageable.unpaged() and builds an unbounded findByVendorIdIn(...) IN-list.
+        return assessmentRepo.findByOrganisationId(TenantContext.getCurrentTenant(), pageable);
     }
 
     @Transactional
     public VendorAssessment createAssessment(VendorAssessment req) {
-        getVendor(req.getVendorId()); // verify org ownership
+        Vendor v = getVendor(req.getVendorId()); // verify org ownership
+        req.setOrganisationId(v.getOrganisationId()); // PERF-PG-002: denormalised tenant anchor
         return assessmentRepo.save(req);
     }
 

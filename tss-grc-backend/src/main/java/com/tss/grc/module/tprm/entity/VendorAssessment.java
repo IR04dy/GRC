@@ -20,6 +20,12 @@ public class VendorAssessment {
     @Column(name = "external_id", nullable = false, updatable = false)
     private UUID externalId = UUID.randomUUID();
 
+    // PERF-PG-002: denormalised tenant anchor (backfilled from the parent vendor by
+    // V230) so /assessments can be scoped + paged directly, without first scanning
+    // every vendor and building an unbounded findByVendorIdIn(...) IN-list.
+    @Column(name = "organisation_id", nullable = false)
+    private Long organisationId;
+
     @Column(name = "vendor_id", nullable = false)
     private Long vendorId;
 
