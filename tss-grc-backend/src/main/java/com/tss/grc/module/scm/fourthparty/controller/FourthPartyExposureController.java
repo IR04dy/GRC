@@ -1,10 +1,14 @@
 package com.tss.grc.module.scm.fourthparty.controller;
 
+import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.CreateRequest;
+import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.Response;
+import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.UpdateRequest;
 import com.tss.grc.module.scm.fourthparty.entity.FourthPartyExposure;
 import com.tss.grc.module.scm.fourthparty.service.FourthPartyExposureService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -46,14 +50,14 @@ public class FourthPartyExposureController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SCM','WRITE')")
-    public ResponseEntity<FourthPartyExposure> create(@RequestBody FourthPartyExposure req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<Response> create(@Valid @RequestBody CreateRequest req) {
+        return ResponseEntity.status(201).body(Response.from(service.create(req)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasPermission('SCM','WRITE')")
-    public FourthPartyExposure update(@PathVariable Long id, @RequestBody FourthPartyExposure req) {
-        return service.update(id, req);
+    public Response update(@PathVariable Long id, @Valid @RequestBody UpdateRequest req) {
+        return Response.from(service.update(id, req));
     }
 
     @PostMapping("/{id}/validate")

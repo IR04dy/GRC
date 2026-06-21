@@ -55,53 +55,53 @@ public class BcmBiaAssessmentController {
     private final BcmService bcmService;     // for materialising the generated BCP
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Page<BcmBiaAssessment> list(@RequestParam(defaultValue = "0") int page,
                                        @RequestParam(defaultValue = "50") int size) {
         return service.list(page, size);
     }
 
     @GetMapping("/by-cycle/{cycleId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmBiaAssessment> byCycle(@PathVariable Long cycleId) {
         return service.byCycle(cycleId);
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Map<String, Long> stats() { return service.stats(); }
 
     @GetMapping("/catalog")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public CatalogResponse catalog() {
         return new CatalogResponse(BcmBiaAssessmentService.TIME_BANDS,
                                    BcmBiaAssessmentService.IMPACT_DIMENSIONS);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmBiaAssessment get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmBiaAssessment> create(@Valid @RequestBody BcmBiaAssessment body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmBiaAssessment update(@PathVariable Long id, @RequestBody BcmBiaAssessment body) {
         return service.update(id, body);
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmBiaAssessment transition(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transition(id, body.to());
     }
 
     @PostMapping("/{id}/calculate-criticality")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmBiaAssessment calculateCriticality(@PathVariable Long id) {
         return service.calculateCriticality(id);
     }
@@ -112,7 +112,7 @@ public class BcmBiaAssessmentController {
      * BIA's metadata and stamps the BIA's {@code generatedBcpId}. Returns both.
      */
     @PostMapping("/{id}/generate-bcp")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public Map<String, Object> generateBcp(@PathVariable Long id, @RequestBody GeneratePlanBody body) {
         BcmBiaAssessment bia = service.get(id);
         if (!"APPROVED".equals(bia.getApprovalStatus()) && !"ACTIVE".equals(bia.getApprovalStatus()))
@@ -140,7 +140,7 @@ public class BcmBiaAssessmentController {
      * separate audit-Tier-2 item.
      */
     @PostMapping("/{id}/generate-drp")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public Map<String, Object> generateDrp(@PathVariable Long id, @RequestBody GeneratePlanBody body) {
         BcmBiaAssessment bia = service.get(id);
         if (!"APPROVED".equals(bia.getApprovalStatus()) && !"ACTIVE".equals(bia.getApprovalStatus()))

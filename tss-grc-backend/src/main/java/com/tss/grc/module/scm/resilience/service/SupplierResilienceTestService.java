@@ -1,6 +1,7 @@
 package com.tss.grc.module.scm.resilience.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.TestCreateRequest;
 import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
 import com.tss.grc.module.scm.resilience.repository.SupplierResilienceTestRepository;
 import com.tss.grc.module.tprm.automation.TprmAutomationService;
@@ -43,14 +44,39 @@ public class SupplierResilienceTestService {
     }
 
     @Transactional
-    public SupplierResilienceTest create(SupplierResilienceTest req) {
-        if (!TYPES.contains(req.getTestType())) throw new IllegalArgumentException("testType must be one of " + TYPES);
-        if (req.getScenarioScope() != null && !SCOPES.contains(req.getScenarioScope()))
+    public SupplierResilienceTest create(TestCreateRequest req) {
+        if (!TYPES.contains(req.testType())) throw new IllegalArgumentException("testType must be one of " + TYPES);
+        if (req.scenarioScope() != null && !SCOPES.contains(req.scenarioScope()))
             throw new IllegalArgumentException("scenarioScope must be one of " + SCOPES);
-        req.setOrganisationId(TenantContext.getCurrentTenant());
-        req.setId(null);
-        if (req.getStatus() == null) req.setStatus("SCHEDULED");
-        return repo.save(req);
+        // Build a fresh entity from the DTO. status/outcome and all attribution,
+        // audit, soft-delete and rowVersion columns are server-controlled
+        // (SEC-FIN-004) — never taken from the request body.
+        SupplierResilienceTest e = new SupplierResilienceTest();
+        e.setVendorId(req.vendorId());
+        e.setVendorName(req.vendorName());
+        e.setTestCode(req.testCode());
+        e.setTitleEn(req.titleEn());
+        e.setTitleAr(req.titleAr());
+        e.setTestType(req.testType());
+        if (req.scenarioScope() != null) e.setScenarioScope(req.scenarioScope());
+        e.setScenarioDescriptionEn(req.scenarioDescriptionEn());
+        e.setScenarioDescriptionAr(req.scenarioDescriptionAr());
+        e.setSuccessCriteriaEn(req.successCriteriaEn());
+        e.setParticipants(req.participants());
+        e.setLinkedAlternateId(req.linkedAlternateId());
+        e.setLinkedExitPlanId(req.linkedExitPlanId());
+        e.setLinkedBcmPlanId(req.linkedBcmPlanId());
+        e.setScheduledFor(req.scheduledFor());
+        e.setDuration(req.duration());
+        e.setRtoTargetMinutes(req.rtoTargetMinutes());
+        e.setFacilitator(req.facilitator());
+        e.setNextTestDue(req.nextTestDue());
+        e.setOrganisationId(TenantContext.getCurrentTenant());
+        e.setId(null);
+        e.setStatus("SCHEDULED");      // force initial workflow state
+        e.setIsDeleted((short) 0);
+        e.setIsActive((short) 1);
+        return repo.save(e);
     }
 
     @Transactional

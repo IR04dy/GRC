@@ -54,24 +54,43 @@ public class RiskAssessmentService {
             .orElseThrow(() -> new EntityNotFoundException("Risk assessment not found: " + id));
     }
 
+    /**
+     * Record a new re-assessment (SEC-RISK-002).
+     *
+     * <p>Server-controlled fields are stamped here, never taken from the client:
+     * <ul>
+     *   <li>{@code assessorId} comes from the authenticated principal — attribution
+     *       must not be forgeable for the regulator-facing audit trail.</li>
+     *   <li>{@code assessmentDate} is set to today — no client backdating.</li>
+     *   <li>{@code id}/{@code externalId}/{@code score} are server-/DB-managed.</li>
+     * </ul>
+     */
     @Transactional
-    public RiskAssessment record(RiskAssessment body) {
-        if (body.getRiskId() == null) throw new IllegalArgumentException("riskId is required");
-        validateScale(body.getLikelihood(), "likelihood");
-        validateScale(body.getImpact(), "impact");
-        Risk risk = ensureRiskInTenant(body.getRiskId());
-        body.setId(null);
-        if (body.getAssessmentDate() == null) body.setAssessmentDate(LocalDate.now());
+    public RiskAssessment record(Long riskId, Integer likelihood, Integer impact,
+                                 String notesEn, String notesAr, Long assessorId) {
+        if (riskId == null) throw new IllegalArgumentException("riskId is required");
+        validateScale(likelihood, "likelihood");
+        validateScale(impact, "impact");
+        Risk risk = ensureRiskInTenant(riskId);
+
+        RiskAssessment body = new RiskAssessment();
+        body.setRiskId(riskId);
+        body.setLikelihood(likelihood);
+        body.setImpact(impact);
+        body.setAssessmentNotesEn(notesEn);
+        body.setAssessmentNotesAr(notesAr);
+        body.setAssessorId(assessorId);          // from JWT principal, not the body
+        body.setAssessmentDate(LocalDate.now());  // stamped server-side
         RiskAssessment saved = assessments.save(body);
 
         // Rule A2: promote to parent Risk's residual snapshot.
-        risk.setResidualLikelihood(body.getLikelihood());
-        risk.setResidualImpact(body.getImpact());
+        risk.setResidualLikelihood(saved.getLikelihood());
+        risk.setResidualImpact(saved.getImpact());
         // residual_score is a computed column on the DB side, no manual set.
         risks.save(risk);
 
-        log.info("[risk-assessment] recorded id={} risk={} L={} I={} → residual updated",
-            saved.getId(), saved.getRiskId(), saved.getLikelihood(), saved.getImpact());
+        log.info("[risk-assessment] recorded id={} risk={} L={} I={} assessor={} → residual updated",
+            saved.getId(), saved.getRiskId(), saved.getLikelihood(), saved.getImpact(), assessorId);
         return saved;
     }
 

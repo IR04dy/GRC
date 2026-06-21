@@ -1,5 +1,7 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.risk.dto.KriDefinitionRequest;
+import com.tss.grc.module.risk.dto.RiskAppetiteRequest;
 import com.tss.grc.module.risk.entity.AppetiteBreachEvent;
 import com.tss.grc.module.risk.entity.KriBreachEvent;
 import com.tss.grc.module.risk.entity.KriDefinition;
@@ -10,6 +12,7 @@ import com.tss.grc.module.risk.service.RiskAppetiteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -52,13 +55,13 @@ public class KriAppetiteController {
     @PostMapping("/kris")
     @PreAuthorize("hasPermission('RISK','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public KriDefinition createKri(@RequestBody KriDefinition body) {
+    public KriDefinition createKri(@Valid @RequestBody KriDefinitionRequest body) {
         return kriService.createDefinition(body);
     }
 
     @PutMapping("/kris/{id}")
     @PreAuthorize("hasPermission('RISK','WRITE')")
-    public KriDefinition updateKri(@PathVariable Long id, @RequestBody KriDefinition body) {
+    public KriDefinition updateKri(@PathVariable Long id, @Valid @RequestBody KriDefinitionRequest body) {
         return kriService.updateDefinition(id, body);
     }
 
@@ -131,13 +134,13 @@ public class KriAppetiteController {
     @PostMapping("/appetite")
     @PreAuthorize("hasPermission('RISK','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public RiskAppetiteStatement createAppetite(@RequestBody RiskAppetiteStatement body) {
+    public RiskAppetiteStatement createAppetite(@Valid @RequestBody RiskAppetiteRequest body) {
         return appetiteService.create(body);
     }
 
     @PutMapping("/appetite/{id}")
     @PreAuthorize("hasPermission('RISK','WRITE')")
-    public RiskAppetiteStatement updateAppetite(@PathVariable Long id, @RequestBody RiskAppetiteStatement body) {
+    public RiskAppetiteStatement updateAppetite(@PathVariable Long id, @Valid @RequestBody RiskAppetiteRequest body) {
         return appetiteService.update(id, body);
     }
 

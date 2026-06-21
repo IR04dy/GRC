@@ -85,6 +85,10 @@ class CrowdStrikeControllerTest {
         // without a database.
         when(detectionLogRepo.findByOrganisationIdAndFalconDetectionId(anyLong(), anyString()))
             .thenReturn(Optional.empty());
+        // SEC-INT-003 — the outbound containment path now verifies the target
+        // host is in this tenant's inventory; treat every host as owned here.
+        when(detectionLogRepo.findFirstByOrganisationIdAndFalconHostId(anyLong(), anyString()))
+            .thenReturn(Optional.of(new CrowdStrikeDetectionLog()));
         when(linkRepo.findByOrganisationIdAndIntegrationAndGrcModuleAndGrcRecordId(
             anyLong(), anyString(), anyString(), anyString()))
             .thenReturn(Optional.empty());
@@ -98,7 +102,7 @@ class CrowdStrikeControllerTest {
             stub, props, detectionLogRepo, linkRepo, securityEvents, audit, publisher, new ObjectMapper()
         );
         outbound = new CrowdStrikeOutboundService(
-            stub, props, actionLogRepo, audit, publisher, new ObjectMapper()
+            stub, props, actionLogRepo, detectionLogRepo, audit, publisher, new ObjectMapper()
         );
 
         @SuppressWarnings("unchecked")

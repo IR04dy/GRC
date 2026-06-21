@@ -35,8 +35,12 @@ public class FairCalculatorController {
     private final FairCalculatorService service;
 
     @PostMapping("/calculate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     public FairResult calculate(@Valid @RequestBody FairInputs body) {
+        // SEC-RISK-004: pure read-only what-if computation (no persistence),
+        // so RISK:READ is the correct gate — but it must be a real module
+        // permission, not isAuthenticated(), to keep low-privilege roles out
+        // of the risk surface and preserve segregation of duties.
         return service.calculate(body);
     }
 }

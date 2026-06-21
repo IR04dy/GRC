@@ -65,14 +65,17 @@ public class NdiEvidenceItemController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize(APPROVE)
-    public NdiEvidenceItem approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.approve(id, body == null ? null : body.get("reviewerName"));
+    public NdiEvidenceItem approve(@PathVariable Long id) {
+        // SEC-NDI-003: reviewer resolved server-side from the authenticated
+        // principal; SoD (reviewer != owner) enforced in the service.
+        return service.approve(id);
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize(APPROVE)
     public NdiEvidenceItem reject(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.reject(id, body.get("reason"), body.get("reviewerName"));
+        // SEC-NDI-003: reviewer resolved server-side from the principal; only the reason comes from the body.
+        return service.reject(id, body.get("reason"));
     }
 
     @PostMapping("/{oldId}/supersede-by/{newId}")

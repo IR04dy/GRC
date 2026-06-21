@@ -70,7 +70,15 @@ public class MaterialTopicService {
     public MaterialTopic create(MaterialTopic req) {
         req.setId(null);
         req.setOrganisationId(org());
-        if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("DRAFT");
+        // Mass-assignment guard (SEC-ESG-003): force the initial lifecycle
+        // state (scoring/approval happen only via score()/approve()) and
+        // scrub approval attribution + audit columns so a topic cannot be
+        // born APPROVED with a forged approver.
+        req.setStatus("DRAFT");
+        req.setApprovedBy(null);
+        req.setApprovedAt(null);
+        req.setCreatedBy(null);
+        req.setUpdatedBy(null);
         validate(req);
         recomputeScore(req);
         return repo.save(req);

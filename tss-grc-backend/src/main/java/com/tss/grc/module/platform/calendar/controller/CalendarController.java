@@ -34,7 +34,7 @@ public class CalendarController {
      * {@code event_type} ("CAPA_DUE,FINDING_DEADLINE,PUBLIC_HOLIDAY" …).
      */
     @GetMapping("/events")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public List<CalendarEventDto> list(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -55,7 +55,7 @@ public class CalendarController {
      * browser download saves a sensibly-named .ics file too.
      */
     @GetMapping(value = "/events.ics", produces = "text/calendar; charset=UTF-8")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public ResponseEntity<byte[]> exportIcs(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
@@ -75,33 +75,33 @@ public class CalendarController {
     /** "On the calendar" panel — every persisted event linked to
      *  this entity. */
     @GetMapping("/events/for-entity")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public List<CalendarEventDto> listForEntity(@RequestParam String entityType,
                                                 @RequestParam Long entityId) {
         return service.listForEntity(entityType, entityId);
     }
 
     @GetMapping("/events/{externalId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public CalendarEventDto get(@PathVariable UUID externalId) {
         return service.get(externalId);
     }
 
     @PostMapping("/events")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public ResponseEntity<CalendarEventDto> create(@Valid @RequestBody CalendarEventDto.CreateRequest req) {
         return ResponseEntity.ok(service.create(req));
     }
 
     @PutMapping("/events/{externalId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public CalendarEventDto update(@PathVariable UUID externalId,
                                    @Valid @RequestBody CalendarEventDto.CreateRequest req) {
         return service.update(externalId, req);
     }
 
     @DeleteMapping("/events/{externalId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public ResponseEntity<Void> delete(@PathVariable UUID externalId) {
         service.delete(externalId);
         return ResponseEntity.noContent().build();

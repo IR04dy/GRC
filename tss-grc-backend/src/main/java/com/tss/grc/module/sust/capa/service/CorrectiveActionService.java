@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
+import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -78,7 +79,18 @@ public class CorrectiveActionService {
     public CorrectiveAction create(CorrectiveAction req) {
         req.setId(null);
         req.setOrganisationId(org());
-        if (req.getStatus()   == null || req.getStatus().isBlank())   req.setStatus("OPEN");
+        // Mass-assignment guard (SEC-ESG-003): force the initial lifecycle
+        // state (transitions are the only path forward) and scrub the
+        // workflow timestamps + verification attribution + audit columns so
+        // a CAPA cannot be born VERIFIED/CLOSED or carry a forged verifier.
+        req.setStatus("OPEN");
+        req.setStartedAt(null);
+        req.setCompletedAt(null);
+        req.setVerifiedBy(null);
+        req.setVerifiedAt(null);
+        req.setClosedAt(null);
+        req.setCreatedBy(null);
+        req.setUpdatedBy(null);
         if (req.getPriority() == null || req.getPriority().isBlank()) req.setPriority("MEDIUM");
         validate(req);
         return repo.save(req);
@@ -119,15 +131,20 @@ public class CorrectiveActionService {
 
     @Transactional
     public CorrectiveAction transition(Long id, String to) {
-        return transition(id, to, null);
+        return transition(id, to, (GrcUserDetails) null);
     }
 
     /**
-     * Status transition. When transitioning to {@code VERIFIED} the
-     * verifier name must be supplied (Rule A enforces verifier ≠ owner).
+     * Status transition. When transitioning to {@code VERIFIED} the acting
+     * verifier is derived from the authenticated principal — never from a
+     * client-supplied string — so attribution cannot be forged and the
+     * separation-of-duties control (Rule A) compares a trusted identity
+     * against the stored owner (SEC-ESG-002).
+     *
+     * @param actor the authenticated caller; required for VERIFIED.
      */
     @Transactional
-    public CorrectiveAction transition(Long id, String to, String verifierName) {
+    public CorrectiveAction transition(Long id, String to, GrcUserDetails actor) {
         CorrectiveAction cur = get(id);
         if (!STATUSES.contains(to))
             throw new IllegalArgumentException("Unknown status: " + to);
@@ -149,14 +166,18 @@ public class CorrectiveActionService {
                 cur.setCompletedAt(now);
             }
             case "VERIFIED" -> {
-                if (verifierName == null || verifierName.isBlank())
-                    throw new IllegalArgumentException("Verification requires a verifier name.");
-                // Rule A — separation of duties.
-                if (cur.getOwnerName() != null
-                    && verifierName.trim().equalsIgnoreCase(cur.getOwnerName().trim()))
+                if (actor == null || actor.getUsername() == null || actor.getUsername().isBlank())
+                    throw new IllegalArgumentException("Verification requires an authenticated verifier.");
+                // Verifier identity is the authenticated principal — not a
+                // request-body string — so the attribution is non-forgeable.
+                String verifier = actor.getUsername();
+                // Rule A — separation of duties: the verifier must not be the
+                // owner. Compared against both the owner display name and the
+                // owner email so a free-text owner field cannot be side-stepped.
+                if (sameActor(verifier, cur.getOwnerName()) || sameActor(verifier, cur.getOwnerEmail()))
                     throw new IllegalArgumentException(
                         "Verifier must differ from owner (Rule A — separation of duties).");
-                cur.setVerifiedBy(verifierName);
+                cur.setVerifiedBy(verifier);
                 cur.setVerifiedAt(now);
             }
             case "CLOSED" -> cur.setClosedAt(now);
@@ -165,6 +186,11 @@ public class CorrectiveActionService {
         }
         cur.setStatus(to);
         return repo.save(cur);
+    }
+
+    /** Trim-aware, case-insensitive identity compare used by Rule A. */
+    private static boolean sameActor(String a, String b) {
+        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
     }
 
     /**

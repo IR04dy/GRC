@@ -32,6 +32,11 @@ public record RecastRequest(
           message = "justification must be at least 30 characters for the audit trail")
     String justification,
 
+    // Optional — when present must be a Tenable asset UUID. Constrained so it
+    // cannot smuggle path-traversal / delimiter characters into the outbound
+    // Tenable API URL (SEC-INT-004).
     @Size(max = 80)
+    @Pattern(regexp = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+             message = "assetUuid must be a valid UUID")
     String assetUuid
 ) {}

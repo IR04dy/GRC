@@ -380,7 +380,14 @@ public class EvidenceItemService {
         item.setValidFrom(req.validFrom());
         item.setValidTo(req.validTo());
         item.setFileName(req.fileName());
-        if (req.status() != null) item.setStatus(req.status());
+        // SEC-EVD-002: `status` is a workflow-controlled field and must NOT be
+        // mass-assigned from the request body. Letting a caller set it on
+        // create/update bypasses the DRAFT→PENDING_REVIEW→APPROVED state machine
+        // (validateTransition) and the four-eyes Segregation-of-Duties guard in
+        // approve(). New items always start in DRAFT; existing items keep their
+        // current status. All status changes flow exclusively through
+        // transitionStatus()/submitForReview()/approve()/reject()/requestRevision().
+        if (item.getStatus() == null) item.setStatus("DRAFT");
     }
 
     private EvidenceItemResponse toResponse(EvidenceItem e) {

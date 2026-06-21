@@ -1,6 +1,7 @@
 package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.risk.dto.KriDefinitionRequest;
 import com.tss.grc.module.risk.entity.KriBreachEvent;
 import com.tss.grc.module.risk.entity.KriDefinition;
 import com.tss.grc.module.risk.entity.KriReading;
@@ -49,7 +50,9 @@ public class KriEngineService {
     }
 
     @Transactional
-    public KriDefinition createDefinition(KriDefinition req) {
+    public KriDefinition createDefinition(KriDefinitionRequest req) {
+        // SEC-RISK-002: organisationId is stamped from the tenant context, never
+        // from the request body; id/externalId/createdBy are server-managed.
         KriDefinition k = new KriDefinition();
         k.setOrganisationId(TenantContext.getCurrentTenant());
         apply(k, req);
@@ -58,8 +61,8 @@ public class KriEngineService {
     }
 
     @Transactional
-    public KriDefinition updateDefinition(Long id, KriDefinition req) {
-        KriDefinition k = require(id);
+    public KriDefinition updateDefinition(Long id, KriDefinitionRequest req) {
+        KriDefinition k = require(id);  // tenant-scoped load
         apply(k, req);
         return kriRepo.save(k);
     }
@@ -71,24 +74,24 @@ public class KriEngineService {
         kriRepo.save(k);
     }
 
-    private void apply(KriDefinition target, KriDefinition src) {
-        if (src.getRiskId()        != null) target.setRiskId(src.getRiskId());
-        if (src.getCategoryId()    != null) target.setCategoryId(src.getCategoryId());
-        if (src.getCode()          != null) target.setCode(src.getCode());
-        if (src.getNameEn()        != null) target.setNameEn(src.getNameEn());
-        if (src.getNameAr()        != null) target.setNameAr(src.getNameAr());
-        if (src.getDescriptionEn() != null) target.setDescriptionEn(src.getDescriptionEn());
-        if (src.getDescriptionAr() != null) target.setDescriptionAr(src.getDescriptionAr());
-        if (src.getUnit()          != null) target.setUnit(src.getUnit());
-        if (src.getDirection()     != null) target.setDirection(src.getDirection());
-        if (src.getGreenMax()      != null) target.setGreenMax(src.getGreenMax());
-        if (src.getAmberMax()      != null) target.setAmberMax(src.getAmberMax());
-        if (src.getTargetValue()   != null) target.setTargetValue(src.getTargetValue());
-        if (src.getFrequency()     != null) target.setFrequency(src.getFrequency());
-        if (src.getOwner()         != null) target.setOwner(src.getOwner());
-        if (src.getDataSource()    != null) target.setDataSource(src.getDataSource());
-        if (src.getFramework()     != null) target.setFramework(src.getFramework());
-        if (src.getIsActive()      != null) target.setIsActive(src.getIsActive());
+    private void apply(KriDefinition target, KriDefinitionRequest src) {
+        if (src.riskId()        != null) target.setRiskId(src.riskId());
+        if (src.categoryId()    != null) target.setCategoryId(src.categoryId());
+        if (src.code()          != null) target.setCode(src.code());
+        if (src.nameEn()        != null) target.setNameEn(src.nameEn());
+        if (src.nameAr()        != null) target.setNameAr(src.nameAr());
+        if (src.descriptionEn() != null) target.setDescriptionEn(src.descriptionEn());
+        if (src.descriptionAr() != null) target.setDescriptionAr(src.descriptionAr());
+        if (src.unit()          != null) target.setUnit(src.unit());
+        if (src.direction()     != null) target.setDirection(src.direction());
+        if (src.greenMax()      != null) target.setGreenMax(src.greenMax());
+        if (src.amberMax()      != null) target.setAmberMax(src.amberMax());
+        if (src.targetValue()   != null) target.setTargetValue(src.targetValue());
+        if (src.frequency()     != null) target.setFrequency(src.frequency());
+        if (src.owner()         != null) target.setOwner(src.owner());
+        if (src.dataSource()    != null) target.setDataSource(src.dataSource());
+        if (src.framework()     != null) target.setFramework(src.framework());
+        if (src.isActive()      != null) target.setIsActive(src.isActive());
     }
 
     // ── Readings + auto-breach generation ───────────────────────────────────

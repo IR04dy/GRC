@@ -231,6 +231,12 @@ public class DataclassService {
     // ────────────────────────────────────────────── Exceptions
 
     public ExceptionResponse createException(CreateExceptionRequest req) {
+        // SEC-NDI-004: any referenced asset/flow must belong to the caller's org
+        // before it is linked — exactly as createFlow() validates via loadAsset().
+        // loadAsset/loadFlow throw EntityNotFoundException (404) on a cross-tenant
+        // or non-existent id. Both ids are optional, so guard only when present.
+        if (req.dataAssetId() != null) loadAsset(req.dataAssetId());
+        if (req.dataFlowId() != null)  loadFlow(req.dataFlowId());
         DataException e = new DataException();
         e.setOrganisationId(org());
         e.setReference(req.reference());

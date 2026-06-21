@@ -99,11 +99,18 @@ class TenableControllerTest {
             return v;
         });
 
+        // SEC-INT-003 — the outbound recast/accept/remove path verifies the
+        // target finding is in this tenant's inventory. Treat every plugin as
+        // owned for the global-scope checks; the inbound dedupe finder above
+        // stays empty so polling still ingests.
+        when(findingLogRepo.findFirstByOrganisationIdAndTenablePluginId(anyLong(), anyString()))
+            .thenReturn(Optional.of(new TenableFindingLog()));
+
         inbound = new TenableInboundService(
             stub, props, findingLogRepo, linkRepo, vulnerabilities, audit, publisher
         );
         outbound = new TenableOutboundService(
-            stub, props, recastLogRepo, audit, publisher, new ObjectMapper()
+            stub, props, recastLogRepo, findingLogRepo, audit, publisher, new ObjectMapper()
         );
 
         @SuppressWarnings("unchecked")
@@ -184,17 +191,23 @@ class TenableControllerTest {
 
     @Test
     void recast_invokesOutboundAndReturnsAcceptedResponse() {
+        // Plugin id is numeric and asset id is a UUID (SEC-INT-004 constraints).
+        String assetUuid = "11111111-1111-1111-1111-111111111111";
+        when(findingLogRepo.findByOrganisationIdAndTenableAssetUuidAndTenablePluginId(
+                1L, assetUuid, "100501"))
+            .thenReturn(Optional.of(new TenableFindingLog()));
+
         RecastResponse resp = controller.recast(
-            "TEN-FND-5",
-            new RecastRequest("LOW", GOOD_JUSTIFICATION, "fake-asset-1")
+            "100501",
+            new RecastRequest("LOW", GOOD_JUSTIFICATION, assetUuid)
         );
         assertThat(resp.accepted()).isTrue();
         assertThat(resp.actionType()).isEqualTo("RECAST_SEVERITY");
-        assertThat(resp.targetPluginId()).isEqualTo("TEN-FND-5");
+        assertThat(resp.targetPluginId()).isEqualTo("100501");
         // Stub recorded a RECAST call carrying the analyst justification.
         assertThat(stub.getRecordedCalls()).anyMatch(c ->
             c.method().equals("RECAST")
-            && "TEN-FND-5".equals(c.targetId())
+            && "100501".equals(c.targetId())
             && "LOW".equals(c.payload().get("newSeverity"))
         );
     }
@@ -205,14 +218,14 @@ class TenableControllerTest {
     void acceptRisk_invokesOutbound_andRecordsAcceptCall() {
         LocalDateTime exp = LocalDateTime.of(2026, 12, 31, 0, 0);
         RecastResponse resp = controller.acceptRisk(
-            "TEN-FND-9",
+            "100509",
             new AcceptRiskRequest(GOOD_JUSTIFICATION, exp, null)
         );
         assertThat(resp.accepted()).isTrue();
         assertThat(resp.actionType()).isEqualTo("ACCEPT_RISK");
         assertThat(stub.getRecordedCalls()).anyMatch(c ->
             c.method().equals("ACCEPT_RISK")
-            && "TEN-FND-9".equals(c.targetId())
+            && "100509".equals(c.targetId())
             && exp.toString().equals(c.payload().get("expiresAt"))
         );
     }
@@ -224,7 +237,7 @@ class TenableControllerTest {
         // The DTO Bean Validation runs at the MVC layer; the service-level
         // double-check is exercised here.
         assertThatThrownBy(() -> controller.acceptRisk(
-            "TEN-FND-X",
+            "100599",
             new AcceptRiskRequest("too short", null, null)
         )).isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("30 characters");
@@ -234,14 +247,19 @@ class TenableControllerTest {
 
     @Test
     void removeRecast_invokesOutbound_andRecordsRemoveCall() {
+        String assetUuid = "22222222-2222-2222-2222-222222222222";
+        when(findingLogRepo.findByOrganisationIdAndTenableAssetUuidAndTenablePluginId(
+                1L, assetUuid, "100503"))
+            .thenReturn(Optional.of(new TenableFindingLog()));
+
         RecastResponse resp = controller.removeRecast(
-            "TEN-FND-3",
-            new TenableController.RemoveRecastBody("fake-asset-2")
+            "100503",
+            new TenableController.RemoveRecastBody(assetUuid)
         );
         assertThat(resp.accepted()).isTrue();
         assertThat(resp.actionType()).isEqualTo("REMOVE_RECAST");
         assertThat(stub.getRecordedCalls()).anyMatch(c ->
-            c.method().equals("REMOVE_RECAST") && "TEN-FND-3".equals(c.targetId())
+            c.method().equals("REMOVE_RECAST") && "100503".equals(c.targetId())
         );
     }
 
@@ -249,9 +267,24 @@ class TenableControllerTest {
 
     @Test
     void removeRecast_withNullBody_treatsAsGlobal() {
-        RecastResponse resp = controller.removeRecast("TEN-FND-11", null);
+        RecastResponse resp = controller.removeRecast("100511", null);
         assertThat(resp.accepted()).isTrue();
         assertThat(resp.targetAssetUuid()).isNull();
+    }
+
+    // ── SEC-INT-003 — recast on a plugin not in this tenant's inventory ──
+
+    @Test
+    void recast_pluginNotInTenantInventory_isDenied() {
+        // Global-scope recast (null asset) where the plugin was never ingested
+        // by this tenant must be rejected.
+        when(findingLogRepo.findFirstByOrganisationIdAndTenablePluginId(1L, "100777"))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.recast(
+            "100777",
+            new RecastRequest("LOW", GOOD_JUSTIFICATION, null)
+        )).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
     // ── /stub/recorded-calls ────────────────────────────────────────────

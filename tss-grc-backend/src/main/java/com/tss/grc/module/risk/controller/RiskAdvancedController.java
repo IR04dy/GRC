@@ -1,13 +1,19 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.risk.dto.RiskAssessmentRequest;
+import com.tss.grc.module.risk.dto.RiskTreatmentRequest;
+import com.tss.grc.module.risk.dto.RiskTreatmentUpdateRequest;
 import com.tss.grc.module.risk.entity.RiskAssessment;
 import com.tss.grc.module.risk.entity.RiskTreatment;
 import com.tss.grc.module.risk.service.RiskAssessmentService;
 import com.tss.grc.module.risk.service.RiskTreatmentService;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -48,9 +54,14 @@ public class RiskAdvancedController {
     @PostMapping("/risks/{riskId}/assessments")
     @PreAuthorize("hasPermission('RISK','WRITE')")
     public ResponseEntity<RiskAssessment> recordAssessment(@PathVariable Long riskId,
-                                                           @RequestBody RiskAssessment body) {
-        body.setRiskId(riskId);
-        return ResponseEntity.ok(assessmentService.record(body));
+                                                           @Valid @RequestBody RiskAssessmentRequest req,
+                                                           @AuthenticationPrincipal GrcUserDetails principal) {
+        // SEC-RISK-002: assessor comes from the token, not the body — attribution
+        // must not be forgeable; assessmentDate/id/score are stamped server-side.
+        Long assessorId = principal != null ? principal.getUserId() : null;
+        return ResponseEntity.ok(assessmentService.record(
+            riskId, req.likelihood(), req.impact(),
+            req.assessmentNotesEn(), req.assessmentNotesAr(), assessorId));
     }
 
     @PutMapping("/assessments/{id}")
@@ -79,15 +90,17 @@ public class RiskAdvancedController {
     @PostMapping("/risks/{riskId}/treatments")
     @PreAuthorize("hasPermission('RISK','WRITE')")
     public ResponseEntity<RiskTreatment> createTreatment(@PathVariable Long riskId,
-                                                         @RequestBody RiskTreatment body) {
-        body.setRiskId(riskId);
-        return ResponseEntity.ok(treatmentService.create(body));
+                                                         @Valid @RequestBody RiskTreatmentRequest req) {
+        // SEC-RISK-002: riskId from the path, status forced to PLANNED server-side.
+        return ResponseEntity.ok(treatmentService.create(riskId, req));
     }
 
     @PutMapping("/treatments/{id}")
     @PreAuthorize("hasPermission('RISK','WRITE')")
-    public RiskTreatment updateTreatment(@PathVariable Long id, @RequestBody RiskTreatment body) {
-        return treatmentService.update(id, body);
+    public RiskTreatment updateTreatment(@PathVariable Long id,
+                                         @Valid @RequestBody RiskTreatmentUpdateRequest req) {
+        // SEC-RISK-002: status/completedAt/riskId/treatmentType are not bindable here.
+        return treatmentService.update(id, req);
     }
 
     @PostMapping("/treatments/{id}/transition")

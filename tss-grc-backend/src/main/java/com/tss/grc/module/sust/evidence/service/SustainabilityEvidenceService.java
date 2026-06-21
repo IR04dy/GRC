@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.evidence.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.evidence.entity.SustainabilityEvidence;
 import com.tss.grc.module.sust.evidence.repository.SustainabilityEvidenceRepository;
+import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -63,8 +64,18 @@ public class SustainabilityEvidenceService {
     public SustainabilityEvidence create(SustainabilityEvidence req) {
         req.setId(null);
         req.setOrganisationId(org());
-        if (req.getApprovalStatus() == null || req.getApprovalStatus().isBlank())
-            req.setApprovalStatus("PENDING_REVIEW");
+        // Mass-assignment guard (SEC-ESG-003): a create can never set
+        // lifecycle / approval / attribution / audit columns. Force the
+        // initial state and scrub any client-supplied workflow fields so a
+        // row cannot be born APPROVED or carry a forged approver.
+        req.setApprovalStatus("PENDING_REVIEW");
+        req.setApprovedBy(null);
+        req.setApprovedAt(null);
+        req.setReviewerName(null);
+        req.setReviewedAt(null);
+        req.setRejectionReason(null);
+        req.setCreatedBy(null);
+        req.setUpdatedBy(null);
         if (req.getConfidentiality() == null || req.getConfidentiality().isBlank())
             req.setConfidentiality("INTERNAL");
         validate(req);
@@ -103,27 +114,44 @@ public class SustainabilityEvidenceService {
     }
 
     @Transactional
-    public SustainabilityEvidence approve(Long id, String approvedBy) {
+    public SustainabilityEvidence approve(Long id, GrcUserDetails approver) {
         SustainabilityEvidence cur = get(id);
         if (!"PENDING_REVIEW".equals(cur.getApprovalStatus()))
             throw new IllegalStateException("Only PENDING_REVIEW evidence can be approved.");
-        if (approvedBy == null || approvedBy.isBlank())
-            throw new IllegalArgumentException("approvedBy required.");
+        if (approver == null || approver.getUsername() == null || approver.getUsername().isBlank())
+            throw new IllegalArgumentException("Approval requires an authenticated approver.");
+        // Approver identity is the authenticated principal — never a
+        // request-body string — so approval attribution cannot be forged
+        // (SEC-ESG-002).
+        String approvedBy = approver.getUsername();
+        // Separation of duties — the approver must not be the evidence owner.
+        if (sameActor(approvedBy, cur.getOwnerName()) || sameActor(approvedBy, cur.getOwnerEmail()))
+            throw new IllegalArgumentException(
+                "Approver must differ from the evidence owner (separation of duties).");
         cur.setApprovalStatus("APPROVED");
         cur.setApprovedBy(approvedBy);
         cur.setApprovedAt(LocalDateTime.now());
         return repo.save(cur);
     }
 
+    /** Trim-aware, case-insensitive identity compare used by the SoD check. */
+    private static boolean sameActor(String a, String b) {
+        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
+    }
+
     @Transactional
-    public SustainabilityEvidence reject(Long id, String reviewerName, String reason) {
+    public SustainabilityEvidence reject(Long id, GrcUserDetails reviewer, String reason) {
         SustainabilityEvidence cur = get(id);
         if (!"PENDING_REVIEW".equals(cur.getApprovalStatus()))
             throw new IllegalStateException("Only PENDING_REVIEW evidence can be rejected.");
         if (reason == null || reason.isBlank())
             throw new IllegalArgumentException("Rejection reason required.");
+        if (reviewer == null || reviewer.getUsername() == null || reviewer.getUsername().isBlank())
+            throw new IllegalArgumentException("Rejection requires an authenticated reviewer.");
         cur.setApprovalStatus("REJECTED");
-        cur.setReviewerName(reviewerName);
+        // Reviewer attribution is the authenticated principal — not a
+        // request-body string (SEC-ESG-002).
+        cur.setReviewerName(reviewer.getUsername());
         cur.setReviewedAt(LocalDateTime.now());
         cur.setRejectionReason(reason);
         return repo.save(cur);

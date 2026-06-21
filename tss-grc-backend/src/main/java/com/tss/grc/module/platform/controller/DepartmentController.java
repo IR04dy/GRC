@@ -30,26 +30,26 @@ public class DepartmentController {
     private final DepartmentService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public List<Department> list() { return service.list(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public Department get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public ResponseEntity<Department> create(@Valid @RequestBody Department body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public Department update(@PathVariable Long id, @RequestBody Department body) {
         return service.update(id, body);
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public Department archive(@PathVariable Long id) { return service.archive(id); }
 }

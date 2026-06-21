@@ -59,54 +59,54 @@ public class BuyerGapController {
                                   BigDecimal contributionPct, String notes) {}
 
     @GetMapping("/api/v1/risk/risks/{id}/controls")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     public List<RiskControl> listRiskControls(@PathVariable Long id) {
         return service.listRiskControls(id);
     }
 
     @PostMapping("/api/v1/risk/risks/{id}/controls")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
     public RiskControl linkRiskControl(@PathVariable Long id, @RequestBody LinkControlBody body) {
         return service.linkRiskControl(id, body.controlId(), body.effectiveness(),
             body.contributionPct(), body.notes());
     }
 
     @GetMapping("/api/v1/risk/appetite/variance")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     public AppetiteVariance appetiteVariance() { return service.appetiteVariance(); }
 
     // ── Evidence freshness ─────────────────────────────────────
 
     @PostMapping("/api/v1/evidence/items/freshness/sweep")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('EVIDENCE','WRITE')")
     public FreshnessSweepResult freshnessSweep() { return service.evidenceFreshnessSweep(); }
 
     // ── Privacy: at-risk transfers + special-category ──────────
 
     @GetMapping("/api/v1/privacy/processing-activities/at-risk-transfers")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public List<AtRiskTransfer> atRiskTransfers() { return service.atRiskTransfers(); }
 
     @GetMapping("/api/v1/privacy/processing-activities/special-category")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','READ')")
     public List<ProcessingActivity> specialCategory() { return service.specialCategoryActivities(); }
 
     // ── §5.1 #6 — Risk owner attestation cycle (V115) ─────────────────
 
     @PostMapping("/api/v1/risk/risks/{id}/attestations")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
     public RiskAttestation attestRisk(@PathVariable Long id, @RequestBody AttestBody body) {
         return service.attestRisk(id, body);
     }
 
     @GetMapping("/api/v1/risk/risks/{id}/attestations")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     public List<RiskAttestation> listRiskAttestations(@PathVariable Long id) {
         return service.listRiskAttestations(id);
     }
 
     @PostMapping("/api/v1/risk/attestations/sweep")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
     public AttestationSweepResult riskAttestationSweep() {
         return service.riskAttestationSweep();
     }
@@ -114,7 +114,7 @@ public class BuyerGapController {
     // ── §5.4 #1 — DSR 30-day SLA sweep (V115) ─────────────────────────
 
     @PostMapping("/api/v1/privacy/dsr/sla/sweep")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DsrSlaSweepResult dsrSlaSweep() {
         return service.dsrSlaSweep();
     }
@@ -122,7 +122,7 @@ public class BuyerGapController {
     // ── §5.4 #2 — PDPL 72-hour breach deadline sweep (V115) ───────────
 
     @PostMapping("/api/v1/privacy/breach/pdpl-72h/sweep")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public Pdpl72hSweepResult pdpl72hSweep() {
         return service.pdpl72hSweep();
     }
@@ -133,13 +133,13 @@ public class BuyerGapController {
     // owns /api/v1/evidence/connectors and returns a different shape
     // (ConnectorDefinition mock vs. our V115 EvidenceConnector entity).
     @GetMapping("/api/v1/evidence/connector-registry")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('EVIDENCE','READ')")
     public List<EvidenceConnector> listConnectors() {
         return service.listConnectors();
     }
 
     @PatchMapping("/api/v1/evidence/connector-registry/{code}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('EVIDENCE','WRITE')")
     public EvidenceConnector updateConnector(@PathVariable String code,
                                              @RequestBody ConnectorPatch body) {
         return service.updateConnectorStatus(code, body);

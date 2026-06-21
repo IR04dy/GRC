@@ -19,9 +19,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,7 +62,13 @@ import java.util.Map;
 @RequestMapping("/api/v1/integrations/tenable")
 @Tag(name = "Tenable VM Integration")
 @SecurityRequirement(name = "bearerAuth")
+@Validated
 public class TenableController {
+
+    /** Tenable plugin ids are numeric. Constraining the path variable keeps it
+     *  out of the outbound API URL path as a traversal / delimiter vector
+     *  (SEC-INT-004). */
+    private static final String PLUGIN_ID_PATTERN = "\\d{1,12}";
 
     private final TenableClient client;
     private final TenableProperties props;
@@ -159,7 +168,7 @@ public class TenableController {
     @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
     @Operation(summary = "Recast (override) the severity Tenable assigns to a finding — body must include a justification of at least 30 characters")
     public RecastResponse recast(
-        @PathVariable("pluginId") String pluginId,
+        @PathVariable("pluginId") @Pattern(regexp = PLUGIN_ID_PATTERN, message = "pluginId must be numeric") String pluginId,
         @Valid @RequestBody RecastRequest req
     ) {
         return outbound.recastSeverity(pluginId, req.assetUuid(), req.newSeverity(), req.justification());
@@ -171,7 +180,7 @@ public class TenableController {
     @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN','BOARD_MEMBER')")
     @Operation(summary = "Mark a Tenable finding as risk-accepted — body must include a justification of at least 30 characters")
     public RecastResponse acceptRisk(
-        @PathVariable("pluginId") String pluginId,
+        @PathVariable("pluginId") @Pattern(regexp = PLUGIN_ID_PATTERN, message = "pluginId must be numeric") String pluginId,
         @Valid @RequestBody AcceptRiskRequest req
     ) {
         return outbound.acceptRisk(pluginId, req.assetUuid(), req.justification(), req.expiresAt());
@@ -183,8 +192,8 @@ public class TenableController {
     @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     @Operation(summary = "Remove an existing Tenable recast/acceptance rule, restoring Tenable's original severity")
     public RecastResponse removeRecast(
-        @PathVariable("pluginId") String pluginId,
-        @RequestBody(required = false) RemoveRecastBody body
+        @PathVariable("pluginId") @Pattern(regexp = PLUGIN_ID_PATTERN, message = "pluginId must be numeric") String pluginId,
+        @Valid @RequestBody(required = false) RemoveRecastBody body
     ) {
         String assetUuid = body == null ? null : body.assetUuid();
         return outbound.removeRecast(pluginId, assetUuid);
@@ -211,6 +220,13 @@ public class TenableController {
         return s.substring(0, 2) + "****" + s.substring(s.length() - 2);
     }
 
-    /** Optional body for /remove-recast — carries just the optional asset uuid. */
-    public record RemoveRecastBody(String assetUuid) {}
+    /** Optional body for /remove-recast — carries just the optional asset uuid.
+     *  Constrained to a UUID so it cannot smuggle path-traversal / delimiter
+     *  characters into the outbound Tenable API URL (SEC-INT-004). */
+    public record RemoveRecastBody(
+        @Size(max = 80)
+        @Pattern(regexp = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+                 message = "assetUuid must be a valid UUID")
+        String assetUuid
+    ) {}
 }

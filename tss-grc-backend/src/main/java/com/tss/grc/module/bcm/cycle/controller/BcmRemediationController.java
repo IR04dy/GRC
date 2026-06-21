@@ -54,23 +54,23 @@ public class BcmRemediationController {
     // ── Lessons ────────────────────────────────────────────────────
 
     @GetMapping("/lessons")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmLessonLearned> listLessons(@RequestParam(required = false) String status) {
         return service.listLessons(status);
     }
 
     @GetMapping("/lessons/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmLessonLearned getLesson(@PathVariable Long id) { return service.getLesson(id); }
 
     @PostMapping("/lessons")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmLessonLearned> createLesson(@RequestBody BcmLessonLearned body) {
         return ResponseEntity.ok(service.createLesson(body));
     }
 
     @PostMapping("/lessons/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmLessonLearned transitionLesson(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionLesson(id, body.to(), actor());
     }
@@ -78,7 +78,7 @@ public class BcmRemediationController {
     // ── Gaps ───────────────────────────────────────────────────────
 
     @GetMapping("/gaps")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmGap> listGaps(@RequestParam(required = false) String status,
                                  @RequestParam(required = false) String severity,
                                  @RequestParam(required = false) Long cycleId) {
@@ -86,17 +86,17 @@ public class BcmRemediationController {
     }
 
     @GetMapping("/gaps/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmGap getGap(@PathVariable Long id) { return service.getGap(id); }
 
     @PostMapping("/gaps")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmGap> createGap(@RequestBody BcmGap body) {
         return ResponseEntity.ok(service.createGap(body));
     }
 
     @PostMapping("/gaps/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmGap transitionGap(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionGap(id, body.to(), actor());
     }
@@ -104,42 +104,42 @@ public class BcmRemediationController {
     // ── CAPAs ──────────────────────────────────────────────────────
 
     @GetMapping("/capas")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmCorrectiveAction> listCapas(@RequestParam(required = false) String status,
                                                 @RequestParam(required = false) Long gapId) {
         return service.listCapas(status, gapId);
     }
 
     @GetMapping("/capas/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmCorrectiveAction getCapa(@PathVariable Long id) { return service.getCapa(id); }
 
     @PostMapping("/capas")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmCorrectiveAction> createCapa(@RequestBody BcmCorrectiveAction body) {
         return ResponseEntity.ok(service.createCapa(body));
     }
 
     @PutMapping("/capas/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmCorrectiveAction updateCapa(@PathVariable Long id, @RequestBody BcmCorrectiveAction body) {
         return service.updateCapa(id, body);
     }
 
     @PostMapping("/capas/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmCorrectiveAction transitionCapa(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionCapa(id, body.to(), actor());
     }
 
     @PostMapping("/capas/flag-overdue")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public Map<String, Object> flagOverdue() {
         int n = service.flagOverdueCapas();
         return Map.of("flippedToOverdue", n);
     }
 
     @GetMapping("/remediation/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Map<String, Long> stats() { return service.stats(); }
 }

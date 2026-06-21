@@ -50,8 +50,10 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WorkflowSubmissionServiceTest {
 
-    private static final Long ORG_ID    = 7L;
-    private static final Long OTHER_ORG = 99L;
+    private static final Long ORG_ID      = 7L;
+    private static final Long OTHER_ORG   = 99L;
+    private static final Long SUBMITTER   = 1001L;   // owner of the submission
+    private static final Long REVIEWER    = 2002L;   // distinct checker (maker-checker)
 
     @Mock private WorkflowSubmissionRepository repo;
     @Mock private AuditLogService audit;
@@ -79,7 +81,7 @@ class WorkflowSubmissionServiceTest {
             null, null,
             "{\"quarter\":\"Q2 2026\",\"audience\":\"BOARD\"}");
 
-        var saved = service.create(body);
+        var saved = service.create(body, SUBMITTER);
 
         assertThat(saved.getOrganisationId()).isEqualTo(ORG_ID);
         assertThat(saved.getWorkflowId()).isEqualTo("governance-board-pack");
@@ -99,7 +101,7 @@ class WorkflowSubmissionServiceTest {
             "PDPL Art. 29", "APPROVED",
             "{\"recipientName\":\"Acme Inc.\"}");
 
-        var saved = service.create(body);
+        var saved = service.create(body, SUBMITTER);
 
         assertThat(saved.getStatus()).isEqualTo("APPROVED");
         assertThat(saved.getRegulatoryAnchor()).isEqualTo("PDPL Art. 29");
@@ -108,7 +110,7 @@ class WorkflowSubmissionServiceTest {
     @Test void create_blankWorkflowId_rejects() {
         var body = new WorkflowSubmissionService.CreateBody(
             "", "ERM", "x", null, null, null, null, null, "{}");
-        assertThatThrownBy(() -> service.create(body))
+        assertThatThrownBy(() -> service.create(body, SUBMITTER))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("workflowId");
     }
@@ -116,7 +118,7 @@ class WorkflowSubmissionServiceTest {
     @Test void create_blankModule_rejects() {
         var body = new WorkflowSubmissionService.CreateBody(
             "erm-risk-treatment", "", "x", null, null, null, null, null, "{}");
-        assertThatThrownBy(() -> service.create(body))
+        assertThatThrownBy(() -> service.create(body, SUBMITTER))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("workflowModule");
     }
@@ -124,7 +126,7 @@ class WorkflowSubmissionServiceTest {
     @Test void create_blankTitle_rejects() {
         var body = new WorkflowSubmissionService.CreateBody(
             "erm-risk-treatment", "ERM", " ", null, null, null, null, null, "{}");
-        assertThatThrownBy(() -> service.create(body))
+        assertThatThrownBy(() -> service.create(body, SUBMITTER))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("titleEn");
     }
@@ -132,7 +134,7 @@ class WorkflowSubmissionServiceTest {
     @Test void create_blankPayload_rejects() {
         var body = new WorkflowSubmissionService.CreateBody(
             "erm-risk-treatment", "ERM", "Some title", null, null, null, null, null, "");
-        assertThatThrownBy(() -> service.create(body))
+        assertThatThrownBy(() -> service.create(body, SUBMITTER))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("payloadJson");
     }
@@ -143,10 +145,11 @@ class WorkflowSubmissionServiceTest {
         var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
-        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", "Looks good"));
+        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", "Looks good"), REVIEWER);
 
         assertThat(out.getStatus()).isEqualTo("APPROVED");
         assertThat(out.getReviewerNote()).isEqualTo("Looks good");
+        assertThat(out.getReviewedBy()).isEqualTo(REVIEWER);
         assertThat(out.getReviewedAt()).isNotNull();
     }
 
@@ -154,7 +157,7 @@ class WorkflowSubmissionServiceTest {
         var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
-        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("reject", null));
+        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("reject", null), REVIEWER);
 
         assertThat(out.getStatus()).isEqualTo("REJECTED");
     }
@@ -163,7 +166,7 @@ class WorkflowSubmissionServiceTest {
         var existing = sampleSaved(ORG_ID, 555L, "APPROVED");
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
-        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("close", null));
+        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("close", null), REVIEWER);
 
         assertThat(out.getStatus()).isEqualTo("CLOSED");
     }
@@ -172,7 +175,7 @@ class WorkflowSubmissionServiceTest {
         var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
-        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("UNDER_REVIEW", null));
+        var out = service.review(555L, new WorkflowSubmissionService.ReviewBody("UNDER_REVIEW", null), REVIEWER);
 
         assertThat(out.getStatus()).isEqualTo("UNDER_REVIEW");
     }
@@ -182,7 +185,7 @@ class WorkflowSubmissionServiceTest {
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.review(555L,
-                new WorkflowSubmissionService.ReviewBody("DEFER", null)))
+                new WorkflowSubmissionService.ReviewBody("DEFER", null), REVIEWER))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("DEFER");
     }
@@ -193,9 +196,53 @@ class WorkflowSubmissionServiceTest {
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.review(555L,
-                new WorkflowSubmissionService.ReviewBody("APPROVE", null)))
+                new WorkflowSubmissionService.ReviewBody("APPROVE", null), REVIEWER))
             .isInstanceOf(EntityNotFoundException.class)
             .hasMessageContaining("555");
+    }
+
+    // ── Segregation of duties (maker-checker) ──────────────────────────
+
+    @Test void create_stampsSubmitterFromAuthenticatedPrincipal() {
+        // SEC-IAM-004: the submitter is server-stamped from the caller so the
+        // self-review guard has a trustworthy owner to compare against.
+        var body = new WorkflowSubmissionService.CreateBody(
+            "erm-risk-acceptance", "ERM", "Accept above-appetite risk", null,
+            null, null, null, null, "{}");
+
+        var saved = service.create(body, SUBMITTER);
+
+        assertThat(saved.getSubmittedBy()).isEqualTo(SUBMITTER);
+    }
+
+    @Test void review_bySubmitter_rejectedAsSelfReview() {
+        // SEC-IAM-004: a user must not approve / reject / close their own
+        // submission. The owner is SUBMITTER; reviewing as SUBMITTER fails.
+        var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
+        existing.setSubmittedBy(SUBMITTER);
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.review(555L,
+                new WorkflowSubmissionService.ReviewBody("APPROVE", null), SUBMITTER))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Segregation of duties");
+
+        // The self-review attempt must not mutate the row or fire an event.
+        verify(repo, never()).save(any(WorkflowSubmission.class));
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    @Test void review_byDifferentUser_thanSubmitter_succeeds() {
+        // SEC-IAM-004: a distinct reviewer (the checker) is allowed.
+        var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
+        existing.setSubmittedBy(SUBMITTER);
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
+
+        var out = service.review(555L,
+            new WorkflowSubmissionService.ReviewBody("APPROVE", null), REVIEWER);
+
+        assertThat(out.getStatus()).isEqualTo("APPROVED");
+        assertThat(out.getReviewedBy()).isEqualTo(REVIEWER);
     }
 
     // ── list*() — tenant-scoped finders ────────────────────────────────
@@ -241,7 +288,7 @@ class WorkflowSubmissionServiceTest {
         var body = new WorkflowSubmissionService.CreateBody(
             "x", "ERM", "x", null, null, null, null, null, "{}");
 
-        assertThatThrownBy(() -> service.create(body))
+        assertThatThrownBy(() -> service.create(body, SUBMITTER))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("tenant");
     }
@@ -255,7 +302,7 @@ class WorkflowSubmissionServiceTest {
             "PDPL Art. 23", null,
             "{\"q\":\"Q2 2026\"}");
 
-        service.create(body);
+        service.create(body, SUBMITTER);
 
         ArgumentCaptor<String> action  = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
@@ -272,7 +319,7 @@ class WorkflowSubmissionServiceTest {
         var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
-        service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", "Looks good"));
+        service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", "Looks good"), REVIEWER);
 
         ArgumentCaptor<String> action  = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
@@ -288,7 +335,7 @@ class WorkflowSubmissionServiceTest {
         var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
-        service.review(555L, new WorkflowSubmissionService.ReviewBody("REJECT", null));
+        service.review(555L, new WorkflowSubmissionService.ReviewBody("REJECT", null), REVIEWER);
 
         ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
         verify(audit).log(eq("REJECTED"), eq("WorkflowSubmission"),
@@ -300,7 +347,7 @@ class WorkflowSubmissionServiceTest {
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.review(555L,
-                new WorkflowSubmissionService.ReviewBody("APPROVE", null)))
+                new WorkflowSubmissionService.ReviewBody("APPROVE", null), REVIEWER))
             .isInstanceOf(EntityNotFoundException.class);
 
         // Cross-tenant attempt must NOT leave an audit trail under our tenant
@@ -318,7 +365,7 @@ class WorkflowSubmissionServiceTest {
             "PDPL Art. 23", null,
             "{\"discoveredAt\":\"2026-05-20T08:00:00Z\"}");
 
-        service.create(body);
+        service.create(body, SUBMITTER);
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
@@ -337,7 +384,7 @@ class WorkflowSubmissionServiceTest {
         var existing = sampleSaved(ORG_ID, 555L, "SUBMITTED");
         when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
 
-        service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", null));
+        service.review(555L, new WorkflowSubmissionService.ReviewBody("APPROVE", null), REVIEWER);
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
@@ -357,7 +404,7 @@ class WorkflowSubmissionServiceTest {
             null /* no anchor */, null,
             "{}");
 
-        service.create(body);
+        service.create(body, SUBMITTER);
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());

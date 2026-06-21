@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -158,20 +159,23 @@ class PolicyServiceTest {
         when(attestations.findByIdAndOrganisationId(50L, ORG_ID)).thenReturn(Optional.of(a));
         when(attestations.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PolicyAttestation out = service.attest(50L, "EV-001");
+        // SEC-CMP-004: completed by the assignee herself ("carol"), no admin override.
+        PolicyAttestation out = service.attest(50L, "EV-001", "carol", false);
         assertThat(out.getStatus()).isEqualTo("ATTESTED");
         assertThat(out.getAttestedAt()).isNotNull();
         assertThat(out.getEvidenceRef()).isEqualTo("EV-001");
+        assertThat(out.getUpdatedBy()).isEqualTo("carol");
     }
 
     @Test void attestation_doubleAttestRefused() {
         PolicyAttestation a = new PolicyAttestation();
         a.setId(50L);
         a.setOrganisationId(ORG_ID);
+        a.setUserUsername("carol");
         a.setStatus("ATTESTED");
         when(attestations.findByIdAndOrganisationId(50L, ORG_ID)).thenReturn(Optional.of(a));
 
-        assertThatThrownBy(() -> service.attest(50L, null))
+        assertThatThrownBy(() -> service.attest(50L, null, "carol", false))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("PENDING");
     }
@@ -180,12 +184,61 @@ class PolicyServiceTest {
         PolicyAttestation a = new PolicyAttestation();
         a.setId(50L);
         a.setOrganisationId(ORG_ID);
+        a.setUserUsername("carol");
         a.setStatus("PENDING");
         when(attestations.findByIdAndOrganisationId(50L, ORG_ID)).thenReturn(Optional.of(a));
 
-        assertThatThrownBy(() -> service.decline(50L, "   "))
+        assertThatThrownBy(() -> service.decline(50L, "   ", "carol", false))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("reason");
+    }
+
+    // SEC-CMP-004: an attestation-of-record may only be completed by its assignee.
+    @Test void attestation_attestByNonAssigneeRejected() {
+        PolicyAttestation a = new PolicyAttestation();
+        a.setId(50L);
+        a.setOrganisationId(ORG_ID);
+        a.setUserUsername("carol");
+        a.setStatus("PENDING");
+        when(attestations.findByIdAndOrganisationId(50L, ORG_ID)).thenReturn(Optional.of(a));
+
+        // 'bob' is not the assignee and holds no admin override → rejected, status unchanged.
+        assertThatThrownBy(() -> service.attest(50L, "EV-001", "bob", false))
+            .isInstanceOf(AccessDeniedException.class)
+            .hasMessageContaining("assignee");
+        assertThat(a.getStatus()).isEqualTo("PENDING");
+    }
+
+    // SEC-CMP-004: a compliance/platform admin may complete on the assignee's behalf.
+    @Test void attestation_attestByAdminOverrideAllowed() {
+        PolicyAttestation a = new PolicyAttestation();
+        a.setId(50L);
+        a.setOrganisationId(ORG_ID);
+        a.setUserUsername("carol");
+        a.setStatus("PENDING");
+        when(attestations.findByIdAndOrganisationId(50L, ORG_ID)).thenReturn(Optional.of(a));
+        when(attestations.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PolicyAttestation out = service.attest(50L, "EV-001", "admin", true);
+        assertThat(out.getStatus()).isEqualTo("ATTESTED");
+        // Assignee-of-record is preserved; the acting admin is captured separately.
+        assertThat(out.getUserUsername()).isEqualTo("carol");
+        assertThat(out.getUpdatedBy()).isEqualTo("admin");
+    }
+
+    // SEC-CMP-004: decline by a non-assignee without override is rejected.
+    @Test void attestation_declineByNonAssigneeRejected() {
+        PolicyAttestation a = new PolicyAttestation();
+        a.setId(50L);
+        a.setOrganisationId(ORG_ID);
+        a.setUserUsername("carol");
+        a.setStatus("PENDING");
+        when(attestations.findByIdAndOrganisationId(50L, ORG_ID)).thenReturn(Optional.of(a));
+
+        assertThatThrownBy(() -> service.decline(50L, "no longer applicable", "bob", false))
+            .isInstanceOf(AccessDeniedException.class)
+            .hasMessageContaining("assignee");
+        assertThat(a.getStatus()).isEqualTo("PENDING");
     }
 
     @Test void expirySweep_flipsExpiredPublished() {
@@ -271,7 +324,7 @@ class PolicyServiceTest {
         when(attestations.findByIdAndOrganisationId(50L, ORG_ID)).thenReturn(Optional.of(a));
         when(attestations.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.attest(50L, "EV-001");
+        service.attest(50L, "EV-001", "carol", false);
 
         verify(audit).log(eq("ATTEST"), eq("PolicyAttestation"), eq(50L), any(String.class));
 

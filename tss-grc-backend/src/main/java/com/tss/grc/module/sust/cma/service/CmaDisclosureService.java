@@ -66,6 +66,17 @@ public class CmaDisclosureService {
         req.setOrganisationId(org());
         if (req.getDisclosureStatus() == null || req.getDisclosureStatus().isBlank())
             req.setDisclosureStatus("UNDER_REVIEW");
+        // Mass-assignment guard (SEC-ESG-003): the approval gate is reached
+        // only through approve(); a create can never pre-set the approval
+        // status or its attribution, nor stamp audit columns. (The working
+        // disclosure_status is legitimate data entry and is left as-supplied,
+        // subject to Rule 5/6 in applyRules.)
+        req.setApprovalStatus(null);
+        req.setApprovedBy(null);
+        req.setApprovedAt(null);
+        req.setLastReviewedAt(null);
+        req.setCreatedBy(null);
+        req.setUpdatedBy(null);
         validate(req);
         applyRules(req);
         return repo.save(req);

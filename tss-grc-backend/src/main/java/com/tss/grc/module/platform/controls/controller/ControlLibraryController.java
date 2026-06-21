@@ -58,24 +58,24 @@ public class ControlLibraryController {
     // ─── Controls ─────────────────────────────────────────────────
 
     @GetMapping("/controls")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<Control> listControls(@RequestParam(required = false) String domain,
                                       @RequestParam(required = false) String status) {
         return service.listControls(domain, status);
     }
 
     @GetMapping("/controls/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public Control getControl(@PathVariable Long id) { return service.getControl(id); }
 
     @PostMapping("/controls")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public ResponseEntity<Control> createControl(@RequestBody Control body) {
         return ResponseEntity.ok(service.createControl(body));
     }
 
     @PutMapping("/controls/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public Control updateControl(@PathVariable Long id, @RequestBody Control body) {
         return service.updateControl(id, body);
     }
@@ -83,13 +83,13 @@ public class ControlLibraryController {
     public record TransitionBody(String to) {}
 
     @PostMapping("/controls/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public Control transitionControl(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionControl(id, body.to());
     }
 
     @DeleteMapping("/controls/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','DELETE')")
     public ResponseEntity<Void> deleteControl(@PathVariable Long id) {
         service.deleteControl(id);
         return ResponseEntity.noContent().build();
@@ -98,19 +98,19 @@ public class ControlLibraryController {
     // ─── Objectives ───────────────────────────────────────────────
 
     @GetMapping("/control-objectives")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<ControlObjective> listObjectives(@RequestParam(required = false) String domain) {
         return service.listObjectives(domain);
     }
 
     @PostMapping("/control-objectives")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public ResponseEntity<ControlObjective> createObjective(@RequestBody ControlObjective body) {
         return ResponseEntity.ok(service.createObjective(body));
     }
 
     @GetMapping("/control-objectives/{id}/controls")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<Control> listObjectiveControls(@PathVariable Long id) {
         return service.listControlsForObjective(id);
     }
@@ -118,38 +118,38 @@ public class ControlLibraryController {
     // ─── Mappings ─────────────────────────────────────────────────
 
     @GetMapping("/controls/{id}/mappings")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<ControlMapping> listControlMappings(@PathVariable Long id) {
         return service.listMappingsForControl(id);
     }
 
     @GetMapping("/citations/{id}/mappings")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<ControlMapping> listCitationMappings(@PathVariable Long id) {
         return service.listMappingsForCitation(id);
     }
 
     @PostMapping("/control-mappings")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public ResponseEntity<ControlMapping> createMapping(@RequestBody ControlMapping body) {
         return ResponseEntity.ok(service.createMapping(body));
     }
 
     @PutMapping("/control-mappings/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public ControlMapping updateMapping(@PathVariable Long id, @RequestBody ControlMapping body) {
         return service.updateMapping(id, body);
     }
 
     @DeleteMapping("/control-mappings/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','DELETE')")
     public ResponseEntity<Void> deleteMapping(@PathVariable Long id) {
         service.deleteMapping(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/control-mappings/coverage")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<Long> mappingCoverage() {
         return service.distinctMappedAuthorityDocumentIds();
     }
@@ -157,31 +157,31 @@ public class ControlLibraryController {
     // ─── Risk ↔ Control links ─────────────────────────────────────
 
     @GetMapping("/risks/{riskId}/control-links")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<RiskControlLink> listLinksForRisk(@PathVariable Long riskId) {
         return service.listLinksForRisk(riskId);
     }
 
     @GetMapping("/controls/{id}/risk-links")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<RiskControlLink> listLinksForControl(@PathVariable Long id) {
         return service.listLinksForControl(id);
     }
 
     @PostMapping("/risk-control-links")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public ResponseEntity<RiskControlLink> linkRiskToControl(@RequestBody RiskControlLink body) {
         return ResponseEntity.ok(service.linkRiskToControl(body));
     }
 
     @PutMapping("/risk-control-links/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public RiskControlLink updateLink(@PathVariable Long id, @RequestBody RiskControlLink body) {
         return service.updateLink(id, body);
     }
 
     @DeleteMapping("/risk-control-links/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','DELETE')")
     public ResponseEntity<Void> deleteLink(@PathVariable Long id) {
         service.deleteLink(id);
         return ResponseEntity.noContent().build();
@@ -190,19 +190,19 @@ public class ControlLibraryController {
     // ─── Assessments ──────────────────────────────────────────────
 
     @GetMapping("/controls/{id}/assessments")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','READ')")
     public List<ControlAssessment> listAssessments(@PathVariable Long id) {
         return service.listAssessmentsForControl(id);
     }
 
     @PostMapping("/control-assessments")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public ResponseEntity<ControlAssessment> createAssessment(@RequestBody ControlAssessment body) {
         return ResponseEntity.ok(service.createAssessment(body));
     }
 
     @PostMapping("/control-assessments/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CONTROL_LIB','WRITE')")
     public ControlAssessment transitionAssessment(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionAssessment(id, body.to());
     }

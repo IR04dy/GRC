@@ -491,6 +491,9 @@ public class DataOfficerService {
         Long o = org();
         if (disposalRepo.findByOrganisationIdAndReference(o, req.reference()).isPresent())
             throw new IllegalStateException("Disposal " + req.reference() + " already exists");
+        // SEC-NDI-004: the referenced retention rule must belong to the caller's org.
+        retentionRepo.findByOrganisationIdAndId(o, req.retentionRuleId())
+            .orElseThrow(() -> new EntityNotFoundException("Retention rule " + req.retentionRuleId() + " not found"));
         DisposalJob j = new DisposalJob();
         j.setOrganisationId(o);
         j.setRetentionRuleId(req.retentionRuleId());
@@ -623,8 +626,16 @@ public class DataOfficerService {
     }
 
     public LineageResponse createLineage(CreateLineageRequest req) {
+        Long o = org();
+        // SEC-NDI-004: validate both endpoints belong to the caller's org before
+        // persisting the edge — never trust caller-supplied FK ids. A 404 on miss
+        // prevents planting lineage that points at another tenant's catalog ids.
+        catalogRepo.findByOrganisationIdAndId(o, req.sourceEntryId())
+            .orElseThrow(() -> new EntityNotFoundException("Source catalog entry " + req.sourceEntryId() + " not found"));
+        catalogRepo.findByOrganisationIdAndId(o, req.targetEntryId())
+            .orElseThrow(() -> new EntityNotFoundException("Target catalog entry " + req.targetEntryId() + " not found"));
         CatalogLineage l = new CatalogLineage();
-        l.setOrganisationId(org());
+        l.setOrganisationId(o);
         l.setSourceEntryId(req.sourceEntryId());
         l.setTargetEntryId(req.targetEntryId());
         l.setTransformLabel(req.transformLabel());
@@ -644,6 +655,9 @@ public class DataOfficerService {
         Long o = org();
         if (qualityRuleRepo.findByOrganisationIdAndReference(o, req.reference()).isPresent())
             throw new IllegalStateException("Quality rule " + req.reference() + " already exists");
+        // SEC-NDI-004: the referenced catalog entry must belong to the caller's org.
+        catalogRepo.findByOrganisationIdAndId(o, req.catalogEntryId())
+            .orElseThrow(() -> new EntityNotFoundException("Catalog entry " + req.catalogEntryId() + " not found"));
         QualityRule r = new QualityRule();
         r.setOrganisationId(o);
         r.setReference(req.reference());
@@ -667,8 +681,12 @@ public class DataOfficerService {
     }
 
     public QualityRunResponse recordQualityRun(RecordQualityRunRequest req) {
+        Long o = org();
+        // SEC-NDI-004: the referenced quality rule must belong to the caller's org.
+        qualityRuleRepo.findByOrganisationIdAndId(o, req.qualityRuleId())
+            .orElseThrow(() -> new EntityNotFoundException("Quality rule " + req.qualityRuleId() + " not found"));
         QualityRun run = new QualityRun();
-        run.setOrganisationId(org());
+        run.setOrganisationId(o);
         run.setQualityRuleId(req.qualityRuleId());
         run.setRecordsChecked(req.recordsChecked());
         run.setRecordsFailed(req.recordsFailed());

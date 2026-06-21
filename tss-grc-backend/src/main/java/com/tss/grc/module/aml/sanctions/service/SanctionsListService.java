@@ -19,6 +19,9 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -103,11 +106,7 @@ public class SanctionsListService {
     @Transactional
     public ListResponse update(Long id, ListUpdateRequest req) {
         SanctionsList l = loadOrThrow(id);
-        if (l.getOrganisationId() == null) {
-            // Cannot edit platform-global lists from a tenant context.
-            throw new IllegalArgumentException(
-                "Cannot edit platform-global list " + l.getListCode() + " from tenant context");
-        }
+        assertWritable(l, "edit");
         if (req.titleEn() != null) l.setTitleEn(req.titleEn());
         if (req.titleAr() != null) l.setTitleAr(req.titleAr());
         if (req.sourceUrl() != null) l.setSourceUrl(req.sourceUrl());
@@ -129,6 +128,7 @@ public class SanctionsListService {
     @Transactional
     public ListResponse refresh(Long id) {
         SanctionsList l = loadOrThrow(id);
+        assertWritable(l, "refresh");
         long entries = entryRepo.countByListIdAndIsDeletedFalse(l.getId());
         // Preserve a realistic platform-global count where available — if
         // the seeded entry_count is much larger than the JPA-visible rows
@@ -156,6 +156,7 @@ public class SanctionsListService {
     @Transactional
     public EntryBulkImportResponse bulkImportEntries(EntryBulkImportRequest req) {
         SanctionsList l = loadOrThrow(req.listId());
+        assertWritable(l, "import into");
         int created = 0;
         int skipped = 0;
         for (EntryCreateRequest e : req.entries()) {
@@ -198,6 +199,32 @@ public class SanctionsListService {
     SanctionsList loadOrThrow(Long id) {
         return listRepo.findByIdVisibleTo(id, org())
             .orElseThrow(() -> new EntityNotFoundException("Sanctions list not found: " + id));
+    }
+
+    /**
+     * Guards every mutating path on a sanctions list. {@code findByIdVisibleTo}
+     * deliberately returns platform-global lists ({@code organisationId IS NULL})
+     * to every tenant so they can be screened against — but "visible" is not
+     * "writable". A tenant officer may only mutate lists their own org owns;
+     * writes to a global OFAC/UN/EU list require PLATFORM_ADMIN (cross-tenant
+     * scope). Without this guard, any tenant AML_OFFICER could poison the shared
+     * screening lists for every tenant (SEC-FIN-003).
+     */
+    private void assertWritable(SanctionsList l, String verb) {
+        if (l.getOrganisationId() == null && !isPlatformAdmin()) {
+            throw new IllegalArgumentException(
+                "Cannot " + verb + " platform-global list " + l.getListCode()
+                    + " from tenant context");
+        }
+    }
+
+    private static boolean isPlatformAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) return false;
+        for (GrantedAuthority ga : auth.getAuthorities()) {
+            if ("ROLE_PLATFORM_ADMIN".equals(ga.getAuthority())) return true;
+        }
+        return false;
     }
 
     static ListResponse toResponse(SanctionsList l) {

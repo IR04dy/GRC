@@ -22,8 +22,8 @@ import java.util.Map;
  *   POST   /?cycleId=                       create new DRAFT and populate snapshot
  *   POST   /:id/regenerate                  rebuild snapshot from live state
  *   POST   /:id/finalize                    DRAFT → READY (preflight-gated)
- *   POST   /:id/approve                     stamps approver_name + approved_at
- *   POST   /:id/submit                      READY → SUBMITTED with attestation
+ *   POST   /:id/approve                     stamps approver_name (= principal, != preparer) + approved_at
+ *   POST   /:id/submit                      READY → SUBMITTED with attestation (submitter = principal)
  *   POST   /:id/acknowledge                 SUBMITTED → ACKNOWLEDGED with sdaia_reference
  *   POST   /:id/reject                      SUBMITTED → REJECTED with reason
  *   POST   /:id/reopen                      REJECTED → DRAFT (clears stamps)
@@ -80,14 +80,18 @@ public class NdiSubmissionPackageController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize(APPROVE)
-    public NdiSubmissionPackage approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.approve(id, body == null ? null : body.get("approverName"));
+    public NdiSubmissionPackage approve(@PathVariable Long id) {
+        // SEC-NDI-003: approver resolved server-side from the authenticated
+        // principal; SoD (approver != preparer) enforced in the service.
+        return service.approve(id);
     }
 
     @PostMapping("/{id}/submit")
     @PreAuthorize(APPROVE)
     public NdiSubmissionPackage submit(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.submit(id, body.get("submitterName"), body.get("attestationEn"), body.get("attestationAr"));
+        // SEC-NDI-003: submitterName resolved server-side from the principal;
+        // only the attestation text comes from the body.
+        return service.submit(id, body.get("attestationEn"), body.get("attestationAr"));
     }
 
     @PostMapping("/{id}/acknowledge")

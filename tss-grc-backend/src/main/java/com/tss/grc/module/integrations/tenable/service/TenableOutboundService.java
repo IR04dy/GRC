@@ -7,6 +7,7 @@ import com.tss.grc.module.integrations.tenable.client.TenableClient;
 import com.tss.grc.module.integrations.tenable.config.TenableProperties;
 import com.tss.grc.module.integrations.tenable.dto.RecastResponse;
 import com.tss.grc.module.integrations.tenable.entity.TenableRecastLog;
+import com.tss.grc.module.integrations.tenable.repository.TenableFindingLogRepository;
 import com.tss.grc.module.integrations.tenable.repository.TenableRecastLogRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -14,6 +15,7 @@ import com.tss.grc.security.GrcUserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -53,9 +55,21 @@ public class TenableOutboundService {
     /** Minimum justification length — compliance audit evidence requirement. */
     private static final int MIN_JUSTIFICATION_CHARS = 30;
 
+    /** Tenable plugin ids are numeric. Defence-in-depth against path injection
+     *  (SEC-INT-004) — the controller @Pattern is the first gate; this is the
+     *  service-layer backstop. */
+    private static final java.util.regex.Pattern PLUGIN_ID_RX =
+        java.util.regex.Pattern.compile("\\d{1,12}");
+
+    /** Canonical 8-4-4-4-12 hex UUID for the optional asset scope. */
+    private static final java.util.regex.Pattern ASSET_UUID_RX =
+        java.util.regex.Pattern.compile(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+
     private final TenableClient client;
     private final TenableProperties props;
     private final TenableRecastLogRepository recastLogRepo;
+    private final TenableFindingLogRepository findingLogRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
@@ -64,6 +78,7 @@ public class TenableOutboundService {
         TenableClient client,
         TenableProperties props,
         TenableRecastLogRepository recastLogRepo,
+        TenableFindingLogRepository findingLogRepo,
         AuditLogService audit,
         ApplicationEventPublisher publisher,
         ObjectMapper objectMapper
@@ -71,6 +86,7 @@ public class TenableOutboundService {
         this.client = client;
         this.props = props;
         this.recastLogRepo = recastLogRepo;
+        this.findingLogRepo = findingLogRepo;
         this.audit = audit;
         this.publisher = publisher;
         this.objectMapper = objectMapper;
@@ -89,6 +105,7 @@ public class TenableOutboundService {
     @Transactional
     public RecastResponse recastSeverity(String pluginId, String assetUuid, String newSeverity, String justification) {
         validatePluginId(pluginId, "RECAST_SEVERITY");
+        validateAssetUuid(assetUuid, "RECAST_SEVERITY");
         validateJustification(justification, "RECAST_SEVERITY");
         if (newSeverity == null || !VALID_SEVERITIES.contains(newSeverity.toUpperCase(java.util.Locale.ROOT))) {
             throw new IllegalArgumentException(
@@ -112,6 +129,7 @@ public class TenableOutboundService {
     @Transactional
     public RecastResponse acceptRisk(String pluginId, String assetUuid, String justification, LocalDateTime expiresAt) {
         validatePluginId(pluginId, "ACCEPT_RISK");
+        validateAssetUuid(assetUuid, "ACCEPT_RISK");
         validateJustification(justification, "ACCEPT_RISK");
         return runAction(
             "ACCEPT_RISK", pluginId, assetUuid, null, justification, expiresAt,
@@ -127,6 +145,7 @@ public class TenableOutboundService {
     @Transactional
     public RecastResponse removeRecast(String pluginId, String assetUuid) {
         validatePluginId(pluginId, "REMOVE_RECAST");
+        validateAssetUuid(assetUuid, "REMOVE_RECAST");
         return runAction(
             "REMOVE_RECAST", pluginId, assetUuid, null, "REMOVE_RECAST: revert to Tenable default severity", null,
             () -> client.removeRecast(pluginId, assetUuid)
@@ -154,6 +173,16 @@ public class TenableOutboundService {
             throw new IllegalStateException(
                 "No tenant in TenantContext — TenableOutboundService." + actionType + " requires a tenant scope.");
         }
+
+        // Object-level authz (SEC-INT-003): the upstream Tenable backend can be
+        // shared across tenants, so a functional role check is not enough. The
+        // target finding must appear in *this* tenant's ingested finding log
+        // before we recast / accept-risk / remove a recast on it. When an
+        // assetUuid is supplied we require the exact (asset, plugin) pair;
+        // otherwise (global scope) the plugin must at least be in this tenant's
+        // inventory.
+        verifyTenantOwnsFinding(orgId, pluginId, assetUuid, actionType);
+
         Long userId = currentUserId();
 
         RecastResponse resp = null;
@@ -262,6 +291,21 @@ public class TenableOutboundService {
         if (pluginId == null || pluginId.isBlank()) {
             throw new IllegalArgumentException("Tenable plugin id is required for " + actionType);
         }
+        if (!PLUGIN_ID_RX.matcher(pluginId).matches()) {
+            throw new IllegalArgumentException(
+                "Tenable plugin id must be numeric for " + actionType + " (got: " + pluginId + ")");
+        }
+    }
+
+    /** Optional asset scope — when present must be a UUID (SEC-INT-004). */
+    private static void validateAssetUuid(String assetUuid, String actionType) {
+        if (assetUuid == null || assetUuid.isBlank()) {
+            return; // null/blank = global scope, allowed
+        }
+        if (!ASSET_UUID_RX.matcher(assetUuid).matches()) {
+            throw new IllegalArgumentException(
+                "Tenable asset uuid must be a valid UUID for " + actionType);
+        }
     }
 
     private static void validateJustification(String justification, String actionType) {
@@ -269,6 +313,24 @@ public class TenableOutboundService {
             throw new IllegalArgumentException(
                 "Justification must be at least " + MIN_JUSTIFICATION_CHARS
                     + " characters for " + actionType + " (audit evidence requirement)");
+        }
+    }
+
+    /**
+     * Reject recast / accept-risk / remove-recast on a finding this tenant has
+     * never ingested (SEC-INT-003). Prevents a SOC/risk user in tenant A from
+     * mutating tenant B's findings on a shared upstream Tenable instance.
+     */
+    private void verifyTenantOwnsFinding(Long orgId, String pluginId, String assetUuid, String actionType) {
+        boolean owned = (assetUuid == null || assetUuid.isBlank())
+            ? findingLogRepo.findFirstByOrganisationIdAndTenablePluginId(orgId, pluginId).isPresent()
+            : findingLogRepo
+                .findByOrganisationIdAndTenableAssetUuidAndTenablePluginId(orgId, assetUuid, pluginId)
+                .isPresent();
+        if (!owned) {
+            log.warn("[Tenable] {} rejected — plugin {} asset {} is not in tenant {}'s finding inventory",
+                actionType, pluginId, assetUuid, orgId);
+            throw new AccessDeniedException("Tenable finding is not in this tenant's inventory");
         }
     }
 

@@ -10,6 +10,8 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,17 @@ public class NdiComplianceAssessmentService {
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    /**
+     * SEC-NDI-003: the acting identity on a privileged transition must come
+     * from the authenticated principal, never from a request-body field —
+     * otherwise the recorded approver/reviewer cannot be trusted. Mirrors the
+     * SEC-NDI-002 pattern in {@code NdiAuditService.record()}.
+     */
+    private static String currentUsername() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        return a == null ? null : a.getName();
+    }
 
     // ── Reads ─────────────────────────────────────────────────────────
     public Page<NdiComplianceAssessment> listByCycle(Long cycleId, Pageable p) {
@@ -150,8 +163,9 @@ public class NdiComplianceAssessmentService {
         if (req.getControlOwnerName() != null) cur.setControlOwnerName(req.getControlOwnerName());
         if (req.getControlOwnerEmail() != null) cur.setControlOwnerEmail(req.getControlOwnerEmail());
         if (req.getEvidenceOwnerName() != null) cur.setEvidenceOwnerName(req.getEvidenceOwnerName());
-        if (req.getReviewerName() != null)     cur.setReviewerName(req.getReviewerName());
-        if (req.getReviewerEmail() != null)    cur.setReviewerEmail(req.getReviewerEmail());
+        // SEC-NDI-003: reviewerName/Email are attribution fields for the
+        // maker/checker SoD control — they are stamped server-side from the
+        // authenticated principal at markUnderReview, never bound from the body.
         if (req.getNotes() != null)            cur.setNotes(req.getNotes());
         if (req.getComplianceStatus() != null
             && COMPLIANCE_STATUSES.contains(req.getComplianceStatus())) {
@@ -210,12 +224,13 @@ public class NdiComplianceAssessmentService {
     }
 
     @Transactional
-    public NdiComplianceAssessment markUnderReview(Long id, String reviewerName) {
+    public NdiComplianceAssessment markUnderReview(Long id) {
         NdiComplianceAssessment cur = get(id);
         if (!"SUBMITTED".equals(cur.getLifecycleStatus())) {
             throw new IllegalTransitionException(cur.getLifecycleStatus(), "UNDER_REVIEW", Set.of("SUBMITTED"));
         }
-        if (reviewerName != null && !reviewerName.isBlank()) cur.setReviewerName(reviewerName);
+        // SEC-NDI-003: reviewer identity is the authenticated principal, not a body field.
+        cur.setReviewerName(currentUsername());
         cur.setLifecycleStatus("UNDER_REVIEW");
         cur.setReviewedAt(LocalDateTime.now());
         NdiComplianceAssessment saved = repo.save(cur);
@@ -245,7 +260,7 @@ public class NdiComplianceAssessmentService {
     }
 
     @Transactional
-    public NdiComplianceAssessment approve(Long id, String approverName) {
+    public NdiComplianceAssessment approve(Long id) {
         NdiComplianceAssessment cur = get(id);
         if (!"UNDER_REVIEW".equals(cur.getLifecycleStatus())) {
             throw new IllegalTransitionException(cur.getLifecycleStatus(), "APPROVED", Set.of("UNDER_REVIEW"));
@@ -256,9 +271,17 @@ public class NdiComplianceAssessmentService {
             throw new IllegalArgumentException(
                 "Cannot approve: item is flagged EVIDENCE_REQUIRED (Rule 3). Attach evidence first.");
         }
+        // SEC-NDI-003: the approver is the authenticated principal, not a body
+        // field; and segregation-of-duties requires the approver to differ from
+        // the reviewer who marked the item UNDER_REVIEW.
+        String approverName = currentUsername();
+        if (approverName != null && approverName.equalsIgnoreCase(cur.getReviewerName())) {
+            throw new IllegalStateException(
+                "Segregation of duties: the reviewer cannot also approve this assessment.");
+        }
         cur.setLifecycleStatus("APPROVED");
         cur.setApprovedAt(LocalDateTime.now());
-        if (approverName != null && !approverName.isBlank()) cur.setApproverName(approverName);
+        cur.setApproverName(approverName);
         NdiComplianceAssessment saved = repo.save(cur);
         audit.publishTransition("COMPLIANCE", saved.getId(), saved.getRequirementCode(),
             saved.getCycleId(), "UNDER_REVIEW", "APPROVED", "Approved by " + approverName);

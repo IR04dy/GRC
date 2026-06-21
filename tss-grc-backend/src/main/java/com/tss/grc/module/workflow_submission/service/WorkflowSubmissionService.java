@@ -6,6 +6,8 @@ import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.workflow_submission.entity.WorkflowSubmission;
 import com.tss.grc.module.workflow_submission.repository.WorkflowSubmissionRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -43,23 +45,29 @@ public class WorkflowSubmissionService {
     // ── Inputs ────────────────────────────────────────────────────────
 
     public record CreateBody(
-        String workflowId,
-        String workflowModule,
-        String titleEn,
-        String titleAr,
-        String summaryEn,
-        String summaryAr,
-        String regulatoryAnchor,
-        String status,
-        String payloadJson
+        @NotBlank @Size(max = 80)   String workflowId,
+        @NotBlank @Size(max = 40)   String workflowModule,
+        @NotBlank @Size(max = 300)  String titleEn,
+        @Size(max = 300)            String titleAr,
+        @Size(max = 1000)           String summaryEn,
+        @Size(max = 1000)           String summaryAr,
+        @Size(max = 60)             String regulatoryAnchor,
+        @Size(max = 40)             String status,
+        // Wizard draft JSON — capped so a single submission cannot store an
+        // unbounded blob. NVARCHAR(MAX) on the column, but 1 MiB is well
+        // beyond any legitimate wizard payload.
+        @NotBlank @Size(max = 1_048_576) String payloadJson
     ) {}
 
-    public record ReviewBody(String decision, String reviewerNote) {}
+    public record ReviewBody(
+        @NotBlank @Size(max = 40)   String decision,
+        @Size(max = 1000)           String reviewerNote
+    ) {}
 
     // ── Mutations ─────────────────────────────────────────────────────
 
     @Transactional
-    public WorkflowSubmission create(CreateBody body) {
+    public WorkflowSubmission create(CreateBody body, Long submitterUserId) {
         if (body.workflowId() == null || body.workflowId().isBlank())
             throw new IllegalArgumentException("workflowId is required");
         if (body.workflowModule() == null || body.workflowModule().isBlank())
@@ -71,6 +79,11 @@ public class WorkflowSubmissionService {
 
         WorkflowSubmission s = new WorkflowSubmission();
         s.setOrganisationId(org());
+        // Stamp the submitter server-side from the authenticated principal so
+        // the maker-checker self-review guard in review(...) has a trustworthy
+        // owner to compare the reviewer against.
+        s.setSubmittedBy(submitterUserId);
+        s.setCreatedBy(submitterUserId);
         s.setWorkflowId(body.workflowId());
         s.setWorkflowModule(body.workflowModule());
         s.setTitleEn(body.titleEn());
@@ -103,10 +116,22 @@ public class WorkflowSubmissionService {
     }
 
     @Transactional
-    public WorkflowSubmission review(Long id, ReviewBody body) {
+    public WorkflowSubmission review(Long id, ReviewBody body, Long reviewerUserId) {
         WorkflowSubmission s = repo.findByOrganisationIdAndId(org(), id)
             .orElseThrow(() -> new EntityNotFoundException(
                 "WorkflowSubmission %d not found for this tenant".formatted(id)));
+
+        // Segregation of duties (maker-checker): the reviewer must not be the
+        // submitter. Both ids are server-stamped (submittedBy on create,
+        // reviewerUserId derived from the authenticated principal), so a user
+        // cannot approve / reject / close their own submission.
+        if (reviewerUserId != null
+                && s.getSubmittedBy() != null
+                && reviewerUserId.equals(s.getSubmittedBy())) {
+            throw new IllegalStateException(
+                "Segregation of duties: a submission cannot be reviewed by its own submitter");
+        }
+
         String decision = body.decision() == null ? "" : body.decision().toUpperCase();
         String previousStatus = s.getStatus();
         switch (decision) {
@@ -118,6 +143,7 @@ public class WorkflowSubmissionService {
                 "Unknown review decision: " + body.decision());
         }
         s.setReviewerNote(body.reviewerNote());
+        s.setReviewedBy(reviewerUserId);
         s.setReviewedAt(LocalDateTime.now());
         WorkflowSubmission saved = repo.save(s);
         audit.log(s.getStatus(), "WorkflowSubmission", saved.getId(),

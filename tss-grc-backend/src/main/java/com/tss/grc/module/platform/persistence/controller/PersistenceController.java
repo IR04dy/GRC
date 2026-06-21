@@ -83,7 +83,11 @@ public class PersistenceController {
         return ResponseEntity.ok(Map.of("key", key, "replaced", killed, "inserted", seq));
     }
 
+    /** Max serialised payload size for a single appended row (1 MiB). */
+    private static final int MAX_ROW_BYTES = 1024 * 1024;
+
     @PostMapping("/{key}")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     @Transactional
     public ResponseEntity<Map<String, Object>> append(
             @PathVariable String key,
@@ -95,6 +99,9 @@ public class PersistenceController {
         try { json = mapper.writeValueAsString(row); }
         catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid payload"));
+        }
+        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_ROW_BYTES) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Payload too large"));
         }
         PersistenceRow saved = repo.save(new PersistenceRow(orgId, key, seq, json, "API_APPEND"));
         return ResponseEntity.ok(Map.of("key", key, "rowSeq", saved.getRowSeq()));

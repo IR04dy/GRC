@@ -17,7 +17,7 @@ public class CapaTaskController {
     private final CapaTaskService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','READ')")
     public List<CapaTaskDto> list(@RequestParam(defaultValue = "false") boolean overdueOnly,
                                   @RequestParam(required = false) String originType,
                                   @RequestParam(required = false) String originId) {
@@ -30,23 +30,23 @@ public class CapaTaskController {
      *  {@code overdue}) for one cheap COUNT each. Avoids pulling N rows
      *  just to render "CAPA · 12" in the nav. */
     @GetMapping("/counts")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','READ')")
     public CapaTaskService.CapaCounts counts() {
         return service.counts();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','READ')")
     public CapaTaskDto get(@PathVariable String id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','WRITE')")
     public ResponseEntity<CapaTaskDto> create(@RequestBody @Valid CapaTaskDto req) {
         return ResponseEntity.ok(service.create(req));
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','WRITE')")
     public CapaTaskDto transition(@PathVariable String id,
                                   @RequestBody @Valid CapaTaskDto.TransitionRequest req) {
         return service.transition(id, req);

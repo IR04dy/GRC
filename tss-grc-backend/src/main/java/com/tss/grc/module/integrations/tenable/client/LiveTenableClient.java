@@ -75,12 +75,17 @@ public class LiveTenableClient implements TenableClient {
     /** Cap exponential back-off — never sleep more than this between attempts. */
     private static final long BACKOFF_CAP_MS = 30_000L;
 
-    // Tenable.io paths
+    // Tenable.io paths — {asset}/{plugin} are RestClient URI variables so they
+    // are percent-encoded by the client rather than concatenated raw into the
+    // path (SEC-INT-004 — prevents path traversal / delimiter injection).
     private static final String IO_EXPORT_PATH         = "/vulns/export";
-    private static final String IO_RECAST_PATH_FMT     = "/workbenches/assets/%s/vulnerabilities/%s/recast";
-    private static final String IO_ACCEPT_PATH_FMT     = "/workbenches/assets/%s/vulnerabilities/%s/accept-risk";
-    private static final String IO_REMOVE_PATH_FMT     = "/workbenches/assets/%s/vulnerabilities/%s/recast";
+    private static final String IO_RECAST_PATH_TPL     = "/workbenches/assets/{asset}/vulnerabilities/{plugin}/recast";
+    private static final String IO_ACCEPT_PATH_TPL     = "/workbenches/assets/{asset}/vulnerabilities/{plugin}/accept-risk";
+    private static final String IO_REMOVE_PATH_TPL     = "/workbenches/assets/{asset}/vulnerabilities/{plugin}/recast";
     private static final String IO_HEALTH_PATH         = "/session";
+
+    /** Sentinel asset id for global (all-asset) scope in the Tenable URL. */
+    private static final String GLOBAL_ASSET_SCOPE     = "*";
 
     // Tenable.sc paths
     private static final String SC_ANALYSIS_PATH       = "/rest/analysis";
@@ -174,10 +179,9 @@ public class LiveTenableClient implements TenableClient {
         } else {
             body.put("scope", "global");
         }
+        String assetScope = (assetUuid == null || assetUuid.isBlank()) ? GLOBAL_ASSET_SCOPE : assetUuid;
         return runOutbound("RECAST_SEVERITY", pluginId, assetUuid,
-            assetUuid == null ? IO_RECAST_PATH_FMT.formatted("*", pluginId)
-                              : IO_RECAST_PATH_FMT.formatted(assetUuid, pluginId),
-            body);
+            IO_RECAST_PATH_TPL, body, assetScope, pluginId);
     }
 
     @Override
@@ -190,10 +194,9 @@ public class LiveTenableClient implements TenableClient {
         } else {
             body.put("scope", "global");
         }
+        String assetScope = (assetUuid == null || assetUuid.isBlank()) ? GLOBAL_ASSET_SCOPE : assetUuid;
         return runOutbound("ACCEPT_RISK", pluginId, assetUuid,
-            assetUuid == null ? IO_ACCEPT_PATH_FMT.formatted("*", pluginId)
-                              : IO_ACCEPT_PATH_FMT.formatted(assetUuid, pluginId),
-            body);
+            IO_ACCEPT_PATH_TPL, body, assetScope, pluginId);
     }
 
     @Override
@@ -201,9 +204,9 @@ public class LiveTenableClient implements TenableClient {
         // Tenable.io: DELETE the recast rule. We model it as a POST with an
         // explicit "remove" body so the audit row carries the same shape as
         // the other actions — the live HTTP call is still a DELETE.
+        String assetScope = (assetUuid == null || assetUuid.isBlank()) ? GLOBAL_ASSET_SCOPE : assetUuid;
         return runOutboundDelete("REMOVE_RECAST", pluginId, assetUuid,
-            assetUuid == null ? IO_REMOVE_PATH_FMT.formatted("*", pluginId)
-                              : IO_REMOVE_PATH_FMT.formatted(assetUuid, pluginId));
+            IO_REMOVE_PATH_TPL, assetScope, pluginId);
     }
 
     @Override
@@ -227,7 +230,7 @@ public class LiveTenableClient implements TenableClient {
     // ── outbound runners with attempt counting ──────────────────────────
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private RecastResponse runOutbound(String actionType, String pluginId, String assetUuid, String path, Map<String, Object> reqBody) {
+    private RecastResponse runOutbound(String actionType, String pluginId, String assetUuid, String pathTemplate, Map<String, Object> reqBody, Object... uriVars) {
         int maxAttempts = Math.max(1, props.getRetry().getMaxAttempts());
         long delayMs = Math.max(0L, props.getRetry().getInitialDelayMs());
         double mult = props.getRetry().getBackoffMultiplier();
@@ -236,7 +239,7 @@ public class LiveTenableClient implements TenableClient {
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 ResponseEntity<Map> entity = http.post()
-                    .uri(url(path))
+                    .uri(url(pathTemplate), uriVars)
                     .headers(this::authHeader)
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
@@ -267,7 +270,7 @@ public class LiveTenableClient implements TenableClient {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private RecastResponse runOutboundDelete(String actionType, String pluginId, String assetUuid, String path) {
+    private RecastResponse runOutboundDelete(String actionType, String pluginId, String assetUuid, String pathTemplate, Object... uriVars) {
         int maxAttempts = Math.max(1, props.getRetry().getMaxAttempts());
         long delayMs = Math.max(0L, props.getRetry().getInitialDelayMs());
         double mult = props.getRetry().getBackoffMultiplier();
@@ -276,7 +279,7 @@ public class LiveTenableClient implements TenableClient {
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 ResponseEntity<Map> entity = http.delete()
-                    .uri(url(path))
+                    .uri(url(pathTemplate), uriVars)
                     .headers(this::authHeader)
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()

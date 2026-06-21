@@ -13,6 +13,7 @@ import com.tss.grc.module.policy.repository.PolicyExceptionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -444,27 +445,63 @@ public class PolicyService {
         return saved;
     }
 
+    /**
+     * Complete an attestation.
+     *
+     * <p>SEC-CMP-004 hardening: an attestation-of-record may only be completed by
+     * the user it is assigned to ({@code userUsername}); a compliance/platform
+     * admin may override (campaign cleanup / proxy attestation). The caller's
+     * identity is taken from the authenticated principal — never from a body
+     * field — and recorded in {@code updatedBy} for forensics so the row shows
+     * both who it was assigned to and who actually acted.
+     *
+     * @param currentUsername the authenticated principal's username (auth.getName())
+     * @param callerIsAdmin   true when the caller holds the compliance/platform admin override
+     */
     @Transactional
-    public PolicyAttestation attest(Long id, String evidenceRef) {
+    public PolicyAttestation attest(Long id, String evidenceRef, String currentUsername, boolean callerIsAdmin) {
         PolicyAttestation a = attestations.findByIdAndOrganisationId(id, org())
             .orElseThrow(() -> new EntityNotFoundException("Attestation not found: " + id));
+        // SEC-CMP-004: object-level authorization — only the assignee (or an admin
+        // override) may complete an attestation-of-record.
+        boolean isAssignee = currentUsername != null && currentUsername.equalsIgnoreCase(a.getUserUsername());
+        if (!isAssignee && !callerIsAdmin)
+            throw new AccessDeniedException("Attestation may only be completed by its assignee");
         if (!"PENDING".equals(a.getStatus()))
             throw new IllegalStateException("Only PENDING attestations can be attested (was " + a.getStatus() + ")");
         a.setStatus("ATTESTED");
         a.setAttestedAt(LocalDateTime.now());
         if (evidenceRef != null) a.setEvidenceRef(evidenceRef);
+        // Record the actual actor separately from the assignee for non-repudiation.
+        if (currentUsername != null) a.setUpdatedBy(currentUsername);
         PolicyAttestation saved = attestations.save(a);
         audit.log("ATTEST", "PolicyAttestation", saved.getId(),
-            "Attestation completed by " + nullSafe(saved.getUserUsername())
+            "Attestation completed by " + nullSafe(currentUsername)
+                + " for " + nullSafe(saved.getUserUsername())
                 + (evidenceRef != null ? " (evidence " + evidenceRef + ")" : ""));
         emitAttestation("POLICY_ATTESTED", saved, "PENDING");
         return saved;
     }
 
+    /**
+     * Decline an attestation.
+     *
+     * <p>SEC-CMP-004 hardening: only the assignee (or an admin override) may
+     * decline; the acting identity is the authenticated principal and is recorded
+     * in {@code updatedBy}.
+     *
+     * @param currentUsername the authenticated principal's username (auth.getName())
+     * @param callerIsAdmin   true when the caller holds the compliance/platform admin override
+     */
     @Transactional
-    public PolicyAttestation decline(Long id, String reason) {
+    public PolicyAttestation decline(Long id, String reason, String currentUsername, boolean callerIsAdmin) {
         PolicyAttestation a = attestations.findByIdAndOrganisationId(id, org())
             .orElseThrow(() -> new EntityNotFoundException("Attestation not found: " + id));
+        // SEC-CMP-004: object-level authorization — only the assignee (or an admin
+        // override) may decline an attestation-of-record.
+        boolean isAssignee = currentUsername != null && currentUsername.equalsIgnoreCase(a.getUserUsername());
+        if (!isAssignee && !callerIsAdmin)
+            throw new AccessDeniedException("Attestation may only be declined by its assignee");
         if (!"PENDING".equals(a.getStatus()))
             throw new IllegalStateException("Only PENDING attestations can be declined (was " + a.getStatus() + ")");
         if (reason == null || reason.isBlank())
@@ -472,9 +509,12 @@ public class PolicyService {
         a.setStatus("DECLINED");
         a.setDeclinedAt(LocalDateTime.now());
         a.setDeclinedReason(reason);
+        // Record the actual actor separately from the assignee for non-repudiation.
+        if (currentUsername != null) a.setUpdatedBy(currentUsername);
         PolicyAttestation saved = attestations.save(a);
         audit.log("DECLINE", "PolicyAttestation", saved.getId(),
-            "Attestation declined by " + nullSafe(saved.getUserUsername()) + ": " + reason);
+            "Attestation declined by " + nullSafe(currentUsername)
+                + " for " + nullSafe(saved.getUserUsername()) + ": " + reason);
         emitAttestation("POLICY_ATTESTATION_DECLINED", saved, "PENDING");
         return saved;
     }

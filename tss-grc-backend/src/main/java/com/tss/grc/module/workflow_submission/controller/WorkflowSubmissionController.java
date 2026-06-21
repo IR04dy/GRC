@@ -5,9 +5,12 @@ import com.tss.grc.module.workflow_submission.service.WorkflowSubmissionService;
 import com.tss.grc.module.workflow_submission.service.WorkflowSubmissionService.CreateBody;
 import com.tss.grc.module.workflow_submission.service.WorkflowSubmissionService.ReviewBody;
 import com.tss.grc.module.workflow_submission.service.WorkflowSubmissionService.WorkflowCount;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,13 +37,13 @@ public class WorkflowSubmissionController {
     private final WorkflowSubmissionService service;
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
-    public WorkflowSubmission create(@RequestBody CreateBody body) {
-        return service.create(body);
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
+    public WorkflowSubmission create(@Valid @RequestBody CreateBody body, Authentication auth) {
+        return service.create(body, userIdOf(auth));
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public List<WorkflowSubmission> list(
         @RequestParam(required = false) String workflowId,
         @RequestParam(required = false) String module
@@ -51,7 +54,7 @@ public class WorkflowSubmissionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public WorkflowSubmission get(@PathVariable Long id) {
         return service.get(id);
     }
@@ -65,14 +68,24 @@ public class WorkflowSubmissionController {
      * visit. Single tenant-scoped SQL query under the hood.
      */
     @GetMapping("/counts/by-workflow")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public List<WorkflowCount> countsByWorkflow() {
         return service.countsByWorkflowId();
     }
 
     @PostMapping("/{id}/review")
-    @PreAuthorize("isAuthenticated()")
-    public WorkflowSubmission review(@PathVariable Long id, @RequestBody ReviewBody body) {
-        return service.review(id, body);
+    @PreAuthorize("hasPermission('WORKFLOW','APPROVE') or hasRole('PLATFORM_ADMIN')")
+    public WorkflowSubmission review(@PathVariable Long id,
+                                     @Valid @RequestBody ReviewBody body,
+                                     Authentication auth) {
+        // Segregation of duties: the acting reviewer is derived from the
+        // authenticated principal (never the request body); the service
+        // rejects self-review (reviewer == submitter).
+        return service.review(id, body, userIdOf(auth));
+    }
+
+    private static Long userIdOf(Authentication auth) {
+        if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUserId();
+        return null;
     }
 }

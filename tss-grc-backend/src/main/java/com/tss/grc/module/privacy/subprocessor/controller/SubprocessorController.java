@@ -8,6 +8,8 @@ import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.Subprocessor
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.SubprocessorEventResponse;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.SubprocessorRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.SubprocessorResponse;
+import com.tss.grc.module.platform.entity.Organisation;
+import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.privacy.subprocessor.service.SubprocessorEventService;
 import com.tss.grc.module.privacy.subprocessor.service.SubprocessorPublicListService;
 import com.tss.grc.module.privacy.subprocessor.service.SubprocessorService;
@@ -22,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -36,7 +39,10 @@ import java.util.UUID;
  * <p>The public-list endpoint
  * {@code GET /api/v1/privacy/subprocessors/public} is wired to
  * {@code permitAll} in {@code SecurityConfig} — no auth, no
- * {@code @PreAuthorize}.
+ * {@code @PreAuthorize}. SEC-PRIV-003: it resolves the tenant from the
+ * opaque organisation short code ({@code ?org=<shortCode>}) and 404s on
+ * an unknown/inactive org, rather than trusting an enumerable numeric id
+ * (which previously defaulted to org 1).
  */
 @RestController
 @RequestMapping("/api/v1/privacy/subprocessors")
@@ -53,6 +59,7 @@ public class SubprocessorController {
     private final SubprocessorService service;
     private final SubprocessorEventService eventService;
     private final SubprocessorPublicListService publicListService;
+    private final OrganisationRepository organisationRepository;
 
     // ─── List + get ───────────────────────────────────────────────
 
@@ -156,9 +163,27 @@ public class SubprocessorController {
 
     @GetMapping("/public")
     @Operation(summary = "Public PDPL Article 12 transparency list — APPROVED sub-processors only, internal fields stripped.")
-    public List<PublicSubprocessorResponse> publicList(@RequestParam(name = "org", required = false) Long orgId) {
-        // Default to org 1 when not supplied — for the demo bank.
-        return publicListService.publicList(orgId == null ? 1L : orgId);
+    public List<PublicSubprocessorResponse> publicList(
+            @RequestParam(name = "org", required = false) String orgCode) {
+        // SEC-PRIV-003: this endpoint is permitAll, so there is no JWT and
+        // no TenantContext to scope the read. Previously it trusted a
+        // client-supplied *numeric* org id (defaulting to 1), which let an
+        // unauthenticated caller iterate org=1,2,3,… and harvest every
+        // tenant's approved sub-processor / vendor map.
+        //
+        // Hardening (no schema change): the caller must name the tenant by
+        // its opaque, non-enumerable short code (the public
+        // ethics.<bank>.sa-style identifier), NOT a sequential DB id. The
+        // org must exist and be active; otherwise we return 404 — we never
+        // silently fall back to org 1, and an unknown/inactive org is
+        // indistinguishable from one that has not published a list.
+        if (orgCode == null || orgCode.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        Organisation org = organisationRepository.findByShortCode(orgCode.trim())
+                .filter(o -> Boolean.TRUE.equals(o.getIsActive()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return publicListService.publicList(org.getId());
     }
 
     // ─── Helpers ──────────────────────────────────────────────────

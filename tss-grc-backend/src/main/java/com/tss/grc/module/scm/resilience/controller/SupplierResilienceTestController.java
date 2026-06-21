@@ -1,8 +1,11 @@
 package com.tss.grc.module.scm.resilience.controller;
 
+import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.TestCreateRequest;
+import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.TestResponse;
 import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
 import com.tss.grc.module.scm.resilience.service.SupplierResilienceTestService;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -35,8 +38,8 @@ public class SupplierResilienceTestController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SCM','WRITE')")
-    public ResponseEntity<SupplierResilienceTest> create(@RequestBody SupplierResilienceTest req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<TestResponse> create(@Valid @RequestBody TestCreateRequest req) {
+        return ResponseEntity.status(201).body(TestResponse.from(service.create(req)));
     }
 
     @PostMapping("/{id}/start")

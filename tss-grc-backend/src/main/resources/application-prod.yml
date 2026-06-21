@@ -108,6 +108,15 @@ grc:
     session-timeout-minutes: 30
     max-login-attempts: 5
     lockout-duration-minutes: 30
+    # SEC-CFG-009 — platform-wide Hibernate-level cross-tenant write backstop
+    # (TenantWriteGuardInterceptor). The per-service setId(null)/org-scoping
+    # checks remain the primary defense; this is defense-in-depth that must be
+    # ON in production so a single missed per-service guard cannot silently
+    # write across tenants. Activate only after the documented staging soak
+    # (docs/security/MASS_ASSIGNMENT_DEFENSE.md) — watch the audit log for any
+    # SECURITY_BLOCK entries on legitimate flows before relying on it.
+    tenant-write-guard:
+      enabled: true
   storage:
     base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
   notifications:

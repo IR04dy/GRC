@@ -83,6 +83,16 @@ class EvidenceItemServiceTest {
         );
     }
 
+    /** Like {@link #createReq()} but with a client-supplied (and forbidden) status. */
+    private static EvidenceItemCreateRequest createReqWithStatus(String status) {
+        return new EvidenceItemCreateRequest(
+            "Q1 Pen Test", "اختبار الاختراق Q1", "Network test results",
+            null, null, "DOCUMENT", null, null, null, "1.0",
+            LocalDate.now().minusDays(30), LocalDate.now().plusDays(335),
+            status, "pentest-q1.pdf"
+        );
+    }
+
     // ─── Lifecycle: status transitions are unguarded but tenant-scoped ──
 
     @Test
@@ -185,6 +195,41 @@ class EvidenceItemServiceTest {
         ArgumentCaptor<EvidenceItem> captor = ArgumentCaptor.forClass(EvidenceItem.class);
         verify(itemRepository).save(captor.capture());
         assertThat(captor.getValue().getOrganisationId()).isEqualTo(ORG_ID);
+    }
+
+    @Test
+    void create_ignores_client_supplied_status_and_forces_DRAFT() {
+        // SEC-EVD-002: a caller must not be able to mint an item directly in
+        // APPROVED (or any other state) and bypass the review state machine /
+        // four-eyes SoD guard. The status field on the request is ignored.
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> {
+            EvidenceItem saved = inv.getArgument(0);
+            saved.setId(ID);
+            return saved;
+        });
+
+        EvidenceItemResponse resp = service.create(createReqWithStatus("APPROVED"));
+
+        assertThat(resp.status()).isEqualTo("DRAFT");
+
+        ArgumentCaptor<EvidenceItem> captor = ArgumentCaptor.forClass(EvidenceItem.class);
+        verify(itemRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo("DRAFT");
+    }
+
+    @Test
+    void update_does_not_mutate_existing_status_from_request_body() {
+        // SEC-EVD-002: update() shares applyRequest(); it must never re-set the
+        // workflow status. An existing APPROVED item stays APPROVED even when the
+        // request body asks for REJECTED — status moves only via transition APIs.
+        EvidenceItem existing = item("APPROVED");
+        when(itemRepository.findById(ID)).thenReturn(Optional.of(existing));
+        when(itemRepository.save(any(EvidenceItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EvidenceItemResponse resp = service.update(ID, createReqWithStatus("REJECTED"));
+
+        assertThat(resp.status()).isEqualTo("APPROVED");
+        assertThat(existing.getStatus()).isEqualTo("APPROVED");
     }
 
     @Test

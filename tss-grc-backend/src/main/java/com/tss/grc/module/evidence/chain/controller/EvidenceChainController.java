@@ -22,19 +22,23 @@ public class EvidenceChainController {
     private final EvidenceChainService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
     public List<ItemSummary> list(@RequestParam(required = false) String status) {
         return service.listItems(status);
     }
 
     @GetMapping("/{evidenceId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
     public ChainReport report(@PathVariable Long evidenceId) {
         return service.readReport(evidenceId);
     }
 
+    // SEC-EVD-003: chain verification mutates the WORM integrity ledger
+    // (chain_status / chain_verified_by). It must require the module write
+    // permission, not bare authentication, so a principal with no evidence
+    // rights cannot stamp itself as verifier on tamper-evidence records.
     @PostMapping("/{evidenceId}/verify")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
     public ChainReport verify(@PathVariable Long evidenceId, Authentication auth) {
         return service.verifyChain(evidenceId, userIdOf(auth));
     }

@@ -44,6 +44,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Tag(name = "BCM — Quantitative BIA (Slice 9-C)")
 @SecurityRequirement(name = "bearerAuth")
+// Class-level grant is the READ floor — every endpoint requires at least one of
+// these roles. Mutating / approval verbs are narrowed per-method below so a
+// read-only assurance role (AUDITOR) and RISK_MANAGER cannot create, edit,
+// approve or archive a quantitative BIA (segregation of duties — ISO 22301 §5.3).
 @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')")
 public class BiaQuantitativeController {
 
@@ -66,39 +70,46 @@ public class BiaQuantitativeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN')")
     public BiaQuantitativeResponse create(@RequestBody @Valid BiaQuantitativeRequest req) {
         return service.create(req);
     }
 
     @PutMapping("/{externalId}")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN')")
     public BiaQuantitativeResponse update(@PathVariable UUID externalId,
                                           @RequestBody @Valid BiaQuantitativeRequest req) {
         return service.update(externalId, req);
     }
 
     @PostMapping("/{externalId}/submit")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN')")
     public BiaQuantitativeResponse submitForReview(@PathVariable UUID externalId) {
         return service.submitForReview(externalId);
     }
 
     @PostMapping("/{externalId}/bcm-review")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN')")
     public BiaQuantitativeResponse bcmLeadReview(@PathVariable UUID externalId) {
         return service.bcmLeadReview(externalId, actor());
     }
 
     @PostMapping("/{externalId}/cfo-approve")
+    @PreAuthorize("hasAnyRole('CFO','PLATFORM_ADMIN')")
     public BiaQuantitativeResponse cfoApprove(@PathVariable UUID externalId,
                                               @RequestBody @Valid CfoApprovalRequest req) {
         return service.cfoApprove(externalId, req);
     }
 
     @PostMapping("/{externalId}/board-approve")
+    @PreAuthorize("hasAnyRole('BOARD_MEMBER','PLATFORM_ADMIN')")
     public BiaQuantitativeResponse boardApprove(@PathVariable UUID externalId,
                                                 @RequestBody @Valid BoardApprovalRequest req) {
         return service.boardApprove(externalId, req.minutesRef());
     }
 
     @DeleteMapping("/{externalId}")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
     public ResponseEntity<BiaQuantitativeResponse> archive(@PathVariable UUID externalId) {
         return ResponseEntity.ok(service.archive(externalId));
     }

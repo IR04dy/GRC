@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * File upload endpoints — production-grade companion to the frontend
@@ -41,6 +42,29 @@ public class FileUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
 
+    /** Hard upper bound for a single upload (25 MiB) — defence-in-depth on top
+     *  of {@code spring.servlet.multipart.max-file-size}. */
+    private static final long MAX_FILE_BYTES = 25L * 1024 * 1024;
+
+    /** MIME allowlist — only document/image/archive types a GRC record attaches. */
+    private static final Set<String> ALLOWED_MIME = Set.of(
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "text/plain",
+        "text/csv",
+        "application/json",
+        "application/zip",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "application/octet-stream"
+    );
+
     private final FileMetadataRepository repo;
 
     public FileUploadController(FileMetadataRepository repo) {
@@ -48,6 +72,7 @@ public class FileUploadController {
     }
 
     @GetMapping
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public ResponseEntity<Map<String, Object>> list(@RequestParam String attachedTo) {
         Long orgId = TenantContext.requireOrganisationId();
         List<FileMetadata> rows = repo.findByOrganisationIdAndAttachedToOrderByUploadedAtDesc(orgId, attachedTo);
@@ -59,6 +84,7 @@ public class FileUploadController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     @Transactional
     public ResponseEntity<Map<String, Object>> upload(
             @RequestParam("file") MultipartFile file,
@@ -71,6 +97,18 @@ public class FileUploadController {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Empty file"));
         }
+
+        // 0. Enforce a hard upper bound on file size + a MIME allowlist before
+        //    we read any bytes into memory. (multipart.max-file-size also caps
+        //    this at the servlet layer; this is the in-code defence-in-depth.)
+        if (file.getSize() > MAX_FILE_BYTES) {
+            return ResponseEntity.status(413).body(Map.of("error", "File too large"));
+        }
+        String mime = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+        if (!ALLOWED_MIME.contains(mime)) {
+            return ResponseEntity.status(415).body(Map.of("error", "Unsupported media type", "mime", mime));
+        }
+        String safeName = sanitiseFilename(file.getOriginalFilename());
 
         // 1. Hash for dedupe + tamper detection.
         byte[] bytes = file.getBytes();
@@ -92,15 +130,16 @@ public class FileUploadController {
         }
 
         // 4. Persist (storage adapter would write the bytes here; the stub
-        //    assigns a placeholder S3 key).
+        //    assigns a placeholder S3 key). Use the sanitised filename so a
+        //    crafted originalFilename cannot traverse / inject into the key.
         String storageRef = existing.map(FileMetadata::getStorageRef)
-            .orElseGet(() -> "s3://files/" + orgId + "/" + sha.substring(0, 8) + "/" + file.getOriginalFilename());
+            .orElseGet(() -> "s3://files/" + orgId + "/" + sha.substring(0, 8) + "/" + safeName);
 
         FileMetadata meta = new FileMetadata();
         meta.setOrganisationId(orgId);
         meta.setAttachedTo(attachedTo);
-        meta.setFilename(file.getOriginalFilename());
-        meta.setMime(file.getContentType() == null ? "application/octet-stream" : file.getContentType());
+        meta.setFilename(safeName);
+        meta.setMime(mime);
         meta.setSizeBytes(file.getSize());
         meta.setSha256(sha);
         meta.setStorageRef(storageRef);
@@ -114,7 +153,7 @@ public class FileUploadController {
         FileMetadata saved = repo.save(meta);
 
         log.info("File uploaded org={} attachedTo={} filename={} sha256={} dedup={}",
-            orgId, attachedTo, file.getOriginalFilename(), sha, existing.isPresent());
+            orgId, attachedTo, safeName, sha, existing.isPresent());
 
         Map<String, Object> resp = new HashMap<>();
         resp.put("id", saved.getId());
@@ -127,6 +166,7 @@ public class FileUploadController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public ResponseEntity<FileMetadata> get(@PathVariable Long id) {
         return repo.findById(id)
             .filter(f -> f.getOrganisationId().equals(TenantContext.requireOrganisationId()))
@@ -157,6 +197,25 @@ public class FileUploadController {
     private static String currentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return (auth != null && auth.isAuthenticated()) ? auth.getName() : "anonymous";
+    }
+
+    /**
+     * Strip path components and dangerous characters from a client-supplied
+     * filename before it is stored or used to build the storage key. Prevents
+     * path traversal ("../"), embedded separators, and control characters.
+     */
+    private static String sanitiseFilename(String original) {
+        if (original == null || original.isBlank()) return "upload.bin";
+        // Drop any directory portion a client may have sent (both separators).
+        String base = original.replace('\\', '/');
+        int slash = base.lastIndexOf('/');
+        if (slash >= 0) base = base.substring(slash + 1);
+        // Keep only a safe charset; collapse everything else to '_'.
+        base = base.replaceAll("[^A-Za-z0-9._-]", "_");
+        // Strip leading dots so we cannot produce ".." or hidden names.
+        base = base.replaceAll("^\\.+", "");
+        if (base.isBlank()) base = "upload.bin";
+        return base.length() > 200 ? base.substring(base.length() - 200) : base;
     }
 
     // ─── Virus-scan stub ───────────────────────────────────────────────

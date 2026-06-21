@@ -21,6 +21,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
@@ -61,7 +64,19 @@ class SanctionsListServiceTest {
         service = new SanctionsListService(listRepo, entryRepo, audit, publisher);
     }
 
-    @AfterEach void tearDown() { TenantContext.clear(); }
+    @AfterEach void tearDown() {
+        TenantContext.clear();
+        SecurityContextHolder.clearContext();
+    }
+
+    /** Put a PLATFORM_ADMIN principal in the SecurityContext so the
+     *  service's {@code assertWritable} guard permits writes to a
+     *  platform-global (org-NULL) list. */
+    private static void asPlatformAdmin() {
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                "admin", "x", List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))));
+    }
 
     private static SanctionsList orgList() {
         SanctionsList l = new SanctionsList();
@@ -147,7 +162,9 @@ class SanctionsListServiceTest {
 
     // ─── refresh ─────────────────────────────────────────────────────
 
-    @Test void refresh_stampsTimestampAndEmitsF8() {
+    @Test void refresh_stampsTimestampAndEmitsF8_asPlatformAdmin() {
+        // Only PLATFORM_ADMIN may refresh a platform-global (org-NULL) list (SEC-FIN-003).
+        asPlatformAdmin();
         SanctionsList l = globalList();
         when(listRepo.findByIdVisibleTo(200L, ORG_ID)).thenReturn(Optional.of(l));
         when(entryRepo.countByListIdAndIsDeletedFalse(200L)).thenReturn(4L);
@@ -162,6 +179,27 @@ class SanctionsListServiceTest {
         verify(publisher).publishEvent(ev.capture());
         assertThat(ev.getValue().triggerEvent()).isEqualTo("SANCTIONS_LIST_REFRESHED");
         assertThat(ev.getValue().payload()).containsEntry("listCode", "OFAC-SDN");
+    }
+
+    @Test void refresh_blockedOnPlatformGlobalList_forTenantOfficer() {
+        // No PLATFORM_ADMIN in context: a tenant AML_OFFICER must not be able to
+        // mutate a shared global list (SEC-FIN-003 — cross-tenant integrity).
+        when(listRepo.findByIdVisibleTo(200L, ORG_ID)).thenReturn(Optional.of(globalList()));
+        assertThatThrownBy(() -> service.refresh(200L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("platform-global");
+    }
+
+    @Test void bulkImport_blockedOnPlatformGlobalList_forTenantOfficer() {
+        // The poisoning vector: a tenant officer appending entries to a global
+        // OFAC/UN/EU list must be rejected before any entry is persisted.
+        when(listRepo.findByIdVisibleTo(200L, ORG_ID)).thenReturn(Optional.of(globalList()));
+        EntryBulkImportRequest req = new EntryBulkImportRequest(200L, List.of(
+            new EntryCreateRequest("FAKE", "INDIVIDUAL", "Fabricated Target", "هدف ملفّق",
+                null, null, null, null, null, null, null, null, null)));
+        assertThatThrownBy(() -> service.bulkImportEntries(req))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("platform-global");
     }
 
     // ─── bulk import entries ─────────────────────────────────────────

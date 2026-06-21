@@ -1,6 +1,8 @@
 package com.tss.grc.module.privacy.subprocessor.controller;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.entity.Organisation;
+import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.LifecycleTransitionRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.MaterialChangeRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.PublicSubprocessorResponse;
@@ -20,15 +22,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.web.server.ResponseStatusException;
 import com.tss.grc.security.GrcUserDetails;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -50,7 +56,17 @@ class SubprocessorControllerTest {
     @Mock private SubprocessorService service;
     @Mock private SubprocessorEventService eventService;
     @Mock private SubprocessorPublicListService publicListService;
+    @Mock private OrganisationRepository organisationRepository;
     @InjectMocks private SubprocessorController controller;
+
+    private static Organisation activeOrg(Long id, String shortCode) {
+        Organisation o = new Organisation();
+        o.setId(id);
+        o.setNameEn("Demo Bank");
+        o.setShortCode(shortCode);
+        o.setIsActive(true);
+        return o;
+    }
 
     @BeforeEach
     void setUp() { TenantContext.setCurrentTenant(ORG_ID); }
@@ -143,17 +159,53 @@ class SubprocessorControllerTest {
     }
 
     @Test
-    void publicList_servesUnauthenticatedRequest() {
-        // The /public endpoint has no @PreAuthorize — SecurityConfig
-        // permitAlls it. The controller method should work with a null
-        // Authentication and just delegate to the public-list service.
-        when(publicListService.publicList(1L)).thenReturn(List.of(
+    void publicList_resolvesTenantByOpaqueShortCode() {
+        // SEC-PRIV-003: the /public endpoint is permitAll, so the caller
+        // names the tenant by its opaque short code (NOT an enumerable
+        // numeric id). An active org resolves to its internal id and the
+        // approved list is served.
+        when(organisationRepository.findByShortCode("DEMOBANK"))
+                .thenReturn(Optional.of(activeOrg(7L, "DEMOBANK")));
+        when(publicListService.publicList(7L)).thenReturn(List.of(
                 new PublicSubprocessorResponse(
                         "SUBP-2026-001", "Microsoft Saudi Arabia", "مايكروسوفت",
                         "SA", "Riyadh", "Cloud hosting", "استضافة سحابية", "KSA_RESIDENT")));
 
-        List<PublicSubprocessorResponse> out = controller.publicList(null);
+        List<PublicSubprocessorResponse> out = controller.publicList("DEMOBANK");
         assertThat(out).hasSize(1);
         assertThat(out.get(0).subprocessorCode()).isEqualTo("SUBP-2026-001");
+        verify(publicListService).publicList(7L);
+    }
+
+    @Test
+    void publicList_rejectsMissingOrgParamWith404_andNeverDefaultsToOrg1() {
+        // SEC-PRIV-003: a missing org code must 404, NOT silently fall
+        // back to org 1 — that default was the enumeration vector.
+        assertThatThrownBy(() -> controller.publicList(null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        assertThatThrownBy(() -> controller.publicList("   "))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(publicListService, never()).publicList(any());
+    }
+
+    @Test
+    void publicList_unknownOrgReturns404() {
+        // An unknown short code is indistinguishable from one that has
+        // not published a list — return 404, do not leak existence.
+        when(organisationRepository.findByShortCode("GHOST"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.publicList("GHOST"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(publicListService, never()).publicList(any());
     }
 }

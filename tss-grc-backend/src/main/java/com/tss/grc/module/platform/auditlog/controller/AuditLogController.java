@@ -30,29 +30,29 @@ public class AuditLogController {
     private final AuditLogService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AUDIT_LOG','READ')")
     public Page<AuditLogEntry> list(
             @RequestParam(required = false) String actionType,
             @RequestParam(required = false) String sourceModule,
             @RequestParam(required = false) String severity,
             @RequestParam(defaultValue = "0")   int page,
             @RequestParam(defaultValue = "100") int size) {
-        return service.list(actionType, sourceModule, severity, page, size);
+        return service.list(actionType, sourceModule, severity, page, Math.min(size, 200));
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AUDIT_LOG','READ')")
     public Map<String, Long> stats() { return service.stats24h(); }
 
     @GetMapping("/history")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AUDIT_LOG','READ')")
     public List<AuditLogEntry> history(@RequestParam String entityType,
                                        @RequestParam Long entityId) {
         return service.historyFor(entityType, entityId);
     }
 
     @GetMapping("/trace/{correlationId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AUDIT_LOG','READ')")
     public List<AuditLogEntry> trace(@PathVariable String correlationId) {
         return service.trace(correlationId);
     }

@@ -1,6 +1,7 @@
 package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.risk.dto.RiskAppetiteRequest;
 import com.tss.grc.module.risk.entity.AppetiteBreachEvent;
 import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
 import com.tss.grc.module.risk.repository.AppetiteBreachEventRepository;
@@ -39,21 +40,24 @@ public class RiskAppetiteService {
     }
 
     @Transactional
-    public RiskAppetiteStatement create(RiskAppetiteStatement req) {
+    public RiskAppetiteStatement create(RiskAppetiteRequest req) {
+        // SEC-RISK-002: organisationId stamped from tenant context; status forced
+        // to DRAFT; approvedBy/approvedAt are not bindable (sign-off goes through
+        // the approve endpoint, which derives the approver from the principal).
         RiskAppetiteStatement s = new RiskAppetiteStatement();
         s.setOrganisationId(TenantContext.getCurrentTenant());
         apply(s, req);
-        if (s.getStatus() == null) s.setStatus("DRAFT");
+        s.setStatus("DRAFT");
         return repo.save(s);
     }
 
     @Transactional
-    public RiskAppetiteStatement update(Long id, RiskAppetiteStatement req) {
-        RiskAppetiteStatement s = require(id);
+    public RiskAppetiteStatement update(Long id, RiskAppetiteRequest req) {
+        RiskAppetiteStatement s = require(id);  // tenant-scoped load
         BigDecimal previousExposure = s.getCurrentExposure();
         apply(s, req);
         // Auto-evaluate breach on exposure change
-        if (req.getCurrentExposure() != null && !req.getCurrentExposure().equals(previousExposure)) {
+        if (req.currentExposure() != null && !req.currentExposure().equals(previousExposure)) {
             evaluateExposure(s);
         }
         return repo.save(s);
@@ -121,22 +125,22 @@ public class RiskAppetiteService {
         return out;
     }
 
-    private void apply(RiskAppetiteStatement target, RiskAppetiteStatement src) {
-        if (src.getCategoryId()      != null) target.setCategoryId(src.getCategoryId());
-        if (src.getTitleEn()         != null) target.setTitleEn(src.getTitleEn());
-        if (src.getTitleAr()         != null) target.setTitleAr(src.getTitleAr());
-        if (src.getStatementEn()     != null) target.setStatementEn(src.getStatementEn());
-        if (src.getStatementAr()     != null) target.setStatementAr(src.getStatementAr());
-        if (src.getRiskDimension()   != null) target.setRiskDimension(src.getRiskDimension());
-        if (src.getAppetiteLevel()   != null) target.setAppetiteLevel(src.getAppetiteLevel());
-        if (src.getToleranceLower()  != null) target.setToleranceLower(src.getToleranceLower());
-        if (src.getToleranceUpper()  != null) target.setToleranceUpper(src.getToleranceUpper());
-        if (src.getUnit()            != null) target.setUnit(src.getUnit());
-        if (src.getCurrentExposure() != null) target.setCurrentExposure(src.getCurrentExposure());
-        if (src.getApprovedBy()      != null) target.setApprovedBy(src.getApprovedBy());
-        if (src.getApprovedAt()      != null) target.setApprovedAt(src.getApprovedAt());
-        if (src.getNextReviewDate()  != null) target.setNextReviewDate(src.getNextReviewDate());
-        if (src.getStatus()          != null) target.setStatus(src.getStatus());
+    private void apply(RiskAppetiteStatement target, RiskAppetiteRequest src) {
+        // SEC-RISK-002 allow-list. status / approvedBy / approvedAt are NOT copied
+        // here — they are governance fields driven by approve()/retire(), so a
+        // client cannot self-attest sign-off via create/update.
+        if (src.categoryId()      != null) target.setCategoryId(src.categoryId());
+        if (src.titleEn()         != null) target.setTitleEn(src.titleEn());
+        if (src.titleAr()         != null) target.setTitleAr(src.titleAr());
+        if (src.statementEn()     != null) target.setStatementEn(src.statementEn());
+        if (src.statementAr()     != null) target.setStatementAr(src.statementAr());
+        if (src.riskDimension()   != null) target.setRiskDimension(src.riskDimension());
+        if (src.appetiteLevel()   != null) target.setAppetiteLevel(src.appetiteLevel());
+        if (src.toleranceLower()  != null) target.setToleranceLower(src.toleranceLower());
+        if (src.toleranceUpper()  != null) target.setToleranceUpper(src.toleranceUpper());
+        if (src.unit()            != null) target.setUnit(src.unit());
+        if (src.currentExposure() != null) target.setCurrentExposure(src.currentExposure());
+        if (src.nextReviewDate()  != null) target.setNextReviewDate(src.nextReviewDate());
     }
 
     private void evaluateExposure(RiskAppetiteStatement s) {

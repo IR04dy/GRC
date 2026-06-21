@@ -287,25 +287,24 @@ public class SplunkWebhookController {
      * Verify HMAC-SHA256 of the raw request body against the
      * {@code X-Splunk-Signature} header. The header value is hex-encoded.
      *
-     * <p>HttpServletRequest's input stream may have been consumed by the JSON
-     * binder; we re-read it via the cached content. If the body wasn't
-     * cached (no filter set this up), we fall back to verifying against a
-     * canonical re-serialisation of the parsed payload — acceptable here
-     * because Splunk's outbound JSON is deterministic in field order for a
-     * single saved search.
+     * <p>The HMAC must be computed over the <em>exact bytes Splunk signed</em>.
+     * Those bytes are stashed in the {@code RAW_BODY} request attribute by
+     * {@link SplunkRawBodyCachingFilter} <em>before</em> the {@code @RequestBody}
+     * binder consumes the stream. If that attribute is missing or empty we
+     * <b>fail closed</b> (SEC-INT-005) rather than hashing an empty / partial
+     * re-read of an already-drained stream — the old fallback let an attacker
+     * present {@code HMAC('')} and have it validate.
      */
     private boolean verifySignature(HttpServletRequest req, String headerHex, String secret) {
         try {
-            String body;
-            if (req.getAttribute("RAW_BODY") instanceof String cached) {
-                body = cached;
-            } else {
-                // Best-effort fallback — read whatever the servlet container still has.
-                body = req.getReader().lines().reduce("", (a, b) -> a + b);
+            Object cached = req.getAttribute("RAW_BODY");
+            if (!(cached instanceof String raw) || raw.isEmpty()) {
+                log.warn("[Splunk-Webhook] raw body unavailable — failing signature check closed");
+                return false; // fail closed; never hash an empty/partial body
             }
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] digest = mac.doFinal(body.getBytes(StandardCharsets.UTF_8));
+            byte[] digest = mac.doFinal(raw.getBytes(StandardCharsets.UTF_8));
             String expected = HexFormat.of().formatHex(digest);
             return constantTimeEquals(expected, headerHex.trim());
         } catch (Exception ex) {

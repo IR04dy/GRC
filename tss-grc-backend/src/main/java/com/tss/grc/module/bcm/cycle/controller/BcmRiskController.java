@@ -50,7 +50,7 @@ public class BcmRiskController {
     // ─── BCM risks ────────────────────────────────────────────────
 
     @GetMapping("/risks")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmRisk> listRisks(@RequestParam(required = false) Long cycleId,
                                    @RequestParam(required = false) Long serviceId,
                                    @RequestParam(required = false) String status) {
@@ -58,29 +58,29 @@ public class BcmRiskController {
     }
 
     @GetMapping("/risks/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmRisk getRisk(@PathVariable Long id) { return risks.get(id); }
 
     @PostMapping("/risks")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmRisk> createRisk(@RequestBody BcmRisk body) {
         return ResponseEntity.ok(risks.create(body));
     }
 
     @PutMapping("/risks/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmRisk updateRisk(@PathVariable Long id, @RequestBody BcmRisk body) {
         return risks.update(id, body);
     }
 
     @PostMapping("/risks/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmRisk transitionRisk(@PathVariable Long id, @RequestBody TransitionBody body) {
         return risks.transition(id, body.to(), actor());
     }
 
     @DeleteMapping("/risks/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'DELETE')")
     public ResponseEntity<Void> deleteRisk(@PathVariable Long id) {
         risks.delete(id);
         return ResponseEntity.noContent().build();
@@ -89,7 +89,7 @@ public class BcmRiskController {
     // ─── Continuity strategies ────────────────────────────────────
 
     @GetMapping("/strategies")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<ContinuityStrategy> listStrategies(@RequestParam(required = false) Long cycleId,
                                                     @RequestParam(required = false) Long serviceId,
                                                     @RequestParam(required = false) String approvalStatus) {
@@ -97,29 +97,29 @@ public class BcmRiskController {
     }
 
     @GetMapping("/strategies/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public ContinuityStrategy getStrategy(@PathVariable Long id) { return strategies.get(id); }
 
     @PostMapping("/strategies")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<ContinuityStrategy> createStrategy(@RequestBody ContinuityStrategy body) {
         return ResponseEntity.ok(strategies.create(body));
     }
 
     @PutMapping("/strategies/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ContinuityStrategy updateStrategy(@PathVariable Long id, @RequestBody ContinuityStrategy body) {
         return strategies.update(id, body);
     }
 
     @PostMapping("/strategies/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ContinuityStrategy transitionStrategy(@PathVariable Long id, @RequestBody TransitionBody body) {
         return strategies.transitionApproval(id, body.to(), actor());
     }
 
     @DeleteMapping("/strategies/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'DELETE')")
     public ResponseEntity<Void> deleteStrategy(@PathVariable Long id) {
         strategies.delete(id);
         return ResponseEntity.noContent().build();

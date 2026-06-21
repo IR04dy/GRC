@@ -178,11 +178,52 @@ class SplunkWebhookControllerTest {
     @Test
     void alertReceived_withInvalidHmac_isRejected() {
         props.setWebhookSharedSecret("super-secret");
+        // Even with a cached raw body, a wrong signature is rejected.
+        when(httpRequest.getAttribute("RAW_BODY")).thenReturn("{\"some\":\"body\"}");
         ResponseEntity<Map<String, Object>> resp = controller.alertReceived(
             samplePayload("high", "rid-007"), "deadbeef", httpRequest
         );
         assertThat(resp.getStatusCodeValue()).isEqualTo(401);
         assertThat(resp.getBody()).containsEntry("received", false);
+        verify(securityEvents, never()).save(any());
+    }
+
+    @Test
+    void alertReceived_withValidHmacOverRawBody_isAccepted() throws Exception {
+        props.setWebhookSharedSecret("super-secret");
+        String rawBody = "{\"result\":{\"severity\":\"high\"},\"result_id\":\"rid-sig\"}";
+        when(httpRequest.getAttribute("RAW_BODY")).thenReturn(rawBody);
+        when(securityEvents.findByOrganisationIdAndSourceSystemAndExternalId(eq(1L), eq("SPLUNK"), anyString()))
+            .thenReturn(Optional.empty());
+        when(securityEvents.save(any(SecurityEvent.class))).thenAnswer(inv -> {
+            SecurityEvent ev = inv.getArgument(0);
+            ev.setId(303L);
+            return ev;
+        });
+        when(linkRepo.findByOrganisationIdAndIntegrationAndGrcModuleAndGrcRecordId(
+            anyLong(), anyString(), anyString(), anyString()))
+            .thenReturn(Optional.empty());
+
+        String validSig = hmac(rawBody, "super-secret");
+        ResponseEntity<Map<String, Object>> resp = controller.alertReceived(
+            samplePayload("high", "rid-sig"), validSig, httpRequest
+        );
+        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getBody()).containsEntry("received", true);
+    }
+
+    @Test
+    void alertReceived_whenRawBodyUnavailable_failsClosed_evenWithSignature() throws Exception {
+        // SEC-INT-005: no RAW_BODY cached → must reject rather than hash "".
+        props.setWebhookSharedSecret("super-secret");
+        when(httpRequest.getAttribute("RAW_BODY")).thenReturn(null);
+        // An attacker presenting HMAC('') must NOT validate.
+        String hmacOfEmpty = hmac("", "super-secret");
+        ResponseEntity<Map<String, Object>> resp = controller.alertReceived(
+            samplePayload("critical", "rid-forged"), hmacOfEmpty, httpRequest
+        );
+        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getBody()).containsEntry("reason", "invalid signature");
         verify(securityEvents, never()).save(any());
     }
 

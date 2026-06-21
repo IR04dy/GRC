@@ -29,41 +29,41 @@ public class IssueController {
     private final IssueService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public Page<Issue> list(@RequestParam(defaultValue = "0") int page,
                             @RequestParam(defaultValue = "50") int size) {
-        return service.list(page, size);
+        return service.list(page, Math.min(size, 200));
     }
 
     @GetMapping("/by-source/{module}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public List<Issue> bySource(@PathVariable("module") String module) {
         return service.bySource(module);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public Issue get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public ResponseEntity<Issue> create(@Valid @RequestBody Issue body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public Issue update(@PathVariable Long id, @RequestBody Issue body) {
         return service.update(id, body);
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','WRITE')")
     public Issue transition(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transition(id, body.to(), body.resolution());
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('PLATFORM','READ')")
     public Map<String, Long> stats() { return service.stats(); }
 }

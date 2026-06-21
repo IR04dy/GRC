@@ -57,7 +57,7 @@ public class BcpPlanController {
     private final BcpPlanPdfExporter pdfExporter;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Page<BcpPlan> list(@RequestParam(required = false) String planType,
                               @RequestParam(defaultValue = "0") int page,
                               @RequestParam(defaultValue = "50") int size) {
@@ -65,13 +65,13 @@ public class BcpPlanController {
     }
 
     @GetMapping("/section-catalogue/{type}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<SectionDef> sectionCatalogue(@PathVariable String type) {
         return "DRP".equalsIgnoreCase(type) ? BcpPlanService.DRP_SECTIONS : BcpPlanService.BCP_SECTIONS;
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Map<String, Long> stats() { return service.stats(); }
 
     /**
@@ -80,7 +80,7 @@ public class BcpPlanController {
      * browser saves "BCP-2026-000001.pdf" rather than "export".
      */
     @GetMapping("/{id}/export.pdf")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
         BcpPlan p = service.get(id);
         byte[] pdf = pdfExporter.export(id);
@@ -92,35 +92,35 @@ public class BcpPlanController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcpPlan get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcpPlan> create(@Valid @RequestBody BcpPlan body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcpPlan update(@PathVariable Long id, @RequestBody BcpPlan body) {
         return service.update(id, body);
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcpPlan transition(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transition(id, body.to(), currentPrincipalName());
     }
 
     @PostMapping("/{id}/reopen")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcpPlan reopen(@PathVariable Long id) {
         return service.reopen(id, currentPrincipalName());
     }
 
     @PostMapping("/generate-from-bia")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcpPlan> generateFromBia(@RequestBody GenerateFromBiaBody body) {
         return ResponseEntity.ok(service.generateFromBia(
             body.biaId(), body.planType(), body.titleEn(), body.titleAr()));
@@ -129,17 +129,17 @@ public class BcpPlanController {
     // ─── Sections ─────────────────────────────────────────────
 
     @GetMapping("/{id}/sections")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcpSection> sections(@PathVariable Long id) { return service.sectionsFor(id); }
 
     @PostMapping("/{id}/sections")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcpSection> addSection(@PathVariable Long id, @RequestBody BcpSection body) {
         return ResponseEntity.ok(service.addSection(id, body));
     }
 
     @PatchMapping("/sections/{sectionId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcpSection editSection(@PathVariable Long sectionId, @RequestBody SectionPatchBody body) {
         return service.updateSection(sectionId, body.bodyEn(), body.bodyAr(), currentPrincipalName());
     }
@@ -147,11 +147,11 @@ public class BcpPlanController {
     // ─── Versions ─────────────────────────────────────────────
 
     @GetMapping("/{id}/versions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcpVersion> versions(@PathVariable Long id) { return service.versionsFor(id); }
 
     @GetMapping("/{id}/versions/diff")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public VersionDiff diff(@PathVariable Long id,
                             @RequestParam int from, @RequestParam int to) {
         return service.diff(id, from, to);

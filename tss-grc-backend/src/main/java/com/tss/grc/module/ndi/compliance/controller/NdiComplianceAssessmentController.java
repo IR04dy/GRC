@@ -25,9 +25,9 @@ import java.util.Map;
  *   POST   /:id/set-status                body { status, naJustification? } — Rules 3/4/5
  *   POST   /:id/attach-evidence           body { evidenceRef, evidenceOwner? }
  *   POST   /:id/submit                    DRAFT/IN_PROGRESS/RETURNED → SUBMITTED
- *   POST   /:id/mark-under-review         SUBMITTED → UNDER_REVIEW
+ *   POST   /:id/mark-under-review         SUBMITTED → UNDER_REVIEW (reviewer = principal)
  *   POST   /:id/return                    body { reason } → RETURNED
- *   POST   /:id/approve                   body { approverName } → APPROVED
+ *   POST   /:id/approve                   → APPROVED (approver = principal, must differ from reviewer)
  *   POST   /:id/reopen                    APPROVED → IN_PROGRESS
  *   DELETE /:id                           soft-delete
  * </pre>
@@ -108,8 +108,9 @@ public class NdiComplianceAssessmentController {
 
     @PostMapping("/{id}/mark-under-review")
     @PreAuthorize(WRITE)
-    public NdiComplianceAssessment markUnderReview(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.markUnderReview(id, body == null ? null : body.get("reviewerName"));
+    public NdiComplianceAssessment markUnderReview(@PathVariable Long id) {
+        // SEC-NDI-003: reviewer resolved server-side from the authenticated principal.
+        return service.markUnderReview(id);
     }
 
     @PostMapping("/{id}/return")
@@ -120,8 +121,10 @@ public class NdiComplianceAssessmentController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize(APPROVE)
-    public NdiComplianceAssessment approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.approve(id, body == null ? null : body.get("approverName"));
+    public NdiComplianceAssessment approve(@PathVariable Long id) {
+        // SEC-NDI-003: approverName resolved server-side from the authenticated
+        // principal; SoD (approver != reviewer) enforced in the service.
+        return service.approve(id);
     }
 
     @PostMapping("/{id}/reopen")

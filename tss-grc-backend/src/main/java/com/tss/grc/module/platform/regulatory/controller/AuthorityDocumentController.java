@@ -41,28 +41,28 @@ public class AuthorityDocumentController {
     // ─── Documents ────────────────────────────────────────────────
 
     @GetMapping("/authority-documents")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','READ')")
     public List<AuthorityDocument> list(@RequestParam(required = false) String family,
                                          @RequestParam(required = false) String status) {
         return service.list(family, status);
     }
 
     @GetMapping("/authority-documents/rollup")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','READ')")
     public Map<String, Long> rollup() { return service.rollupByFamily(); }
 
     @GetMapping("/authority-documents/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','READ')")
     public AuthorityDocument get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping("/authority-documents")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','WRITE')")
     public ResponseEntity<AuthorityDocument> create(@RequestBody AuthorityDocument body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PutMapping("/authority-documents/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','WRITE')")
     public AuthorityDocument update(@PathVariable Long id, @RequestBody AuthorityDocument body) {
         return service.update(id, body);
     }
@@ -70,13 +70,13 @@ public class AuthorityDocumentController {
     public record TransitionBody(String to, Long supersededById) {}
 
     @PostMapping("/authority-documents/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','WRITE')")
     public AuthorityDocument transition(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transition(id, body.to(), body.supersededById());
     }
 
     @DeleteMapping("/authority-documents/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
@@ -85,27 +85,27 @@ public class AuthorityDocumentController {
     // ─── Citations ────────────────────────────────────────────────
 
     @GetMapping("/authority-documents/{id}/citations")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','READ')")
     public List<AuthorityDocumentCitation> listCitations(@PathVariable Long id) {
         return service.listCitations(id);
     }
 
     @PostMapping("/authority-documents/{id}/citations")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','WRITE')")
     public ResponseEntity<AuthorityDocumentCitation> createCitation(@PathVariable Long id,
                                                                      @RequestBody AuthorityDocumentCitation body) {
         return ResponseEntity.ok(service.createCitation(id, body));
     }
 
     @PutMapping("/citations/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','WRITE')")
     public AuthorityDocumentCitation updateCitation(@PathVariable Long id,
                                                      @RequestBody AuthorityDocumentCitation body) {
         return service.updateCitation(id, body);
     }
 
     @DeleteMapping("/citations/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REGULATORY','DELETE')")
     public ResponseEntity<Void> deleteCitation(@PathVariable Long id) {
         service.deleteCitation(id);
         return ResponseEntity.noContent().build();

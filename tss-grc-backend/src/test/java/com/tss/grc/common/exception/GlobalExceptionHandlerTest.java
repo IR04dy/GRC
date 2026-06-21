@@ -6,7 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.UnexpectedRollbackException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.sql.SQLException;
 
@@ -19,7 +21,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class GlobalExceptionHandlerTest {
 
+    /**
+     * Default handler — {@code verboseErrors=false} (the value in base/prod
+     * profiles, SEC-CFG-001). Internal exception class names and SQL
+     * object/schema names must NOT leak to the client in this mode.
+     */
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    /** Handler configured as dev runs it ({@code grc.errors.verbose=true}). */
+    private GlobalExceptionHandler verboseHandler() {
+        GlobalExceptionHandler h = new GlobalExceptionHandler();
+        ReflectionTestUtils.setField(h, "verboseErrors", true);
+        return h;
+    }
 
     @Test
     void exportException_pdf_returns500_withDocumentKindAndUserMessage() {
@@ -49,7 +63,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void missingDbObject_sqlServerSignature_returns503() {
+    void missingDbObject_sqlServerSignature_returns503_andDoesNotLeakSchemaInProd() {
         // Simulate the exact error a Spring repo throws when a JPA
         // query hits a SQL Server table that doesn't exist yet —
         // the common case on a fresh dev DB before a module's
@@ -64,6 +78,24 @@ class GlobalExceptionHandlerTest {
         assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
         assertThat(pd.getTitle()).isEqualTo("Module not yet bootstrapped");
         assertThat(pd.getDetail()).contains("setup_<module>_db.py");
+        // SEC-CFG-001: with verbose diagnostics OFF (base/prod default) the SQL
+        // object/schema name must NOT be echoed to the client.
+        assertThat(pd.getProperties()).doesNotContainKey("rootCause");
+        assertThat(pd.getDetail()).doesNotContain("admin.committee_templates");
+    }
+
+    @Test
+    void missingDbObject_sqlServerSignature_surfacesRootCauseWhenVerbose() {
+        // In dev (grc.errors.verbose=true) the SQL root message is still
+        // surfaced so developers see "Invalid object name 'schema.table'".
+        Throwable root = new RuntimeException(
+            "Invalid object name 'admin.committee_templates'.");
+        InvalidDataAccessResourceUsageException ex =
+            new InvalidDataAccessResourceUsageException("could not execute query", root);
+
+        ProblemDetail pd = verboseHandler().handleMissingDbObject(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
         assertThat(pd.getProperties()).containsKey("rootCause");
         assertThat(pd.getProperties().get("rootCause"))
             .asString().contains("admin.committee_templates");
@@ -159,8 +191,78 @@ class GlobalExceptionHandlerTest {
 
         assertThat(pd.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
         assertThat(pd.getTitle()).isEqualTo("Module not yet bootstrapped");
-        assertThat(pd.getProperties().get("rootCause"))
+        // SEC-CFG-001: non-verbose (base/prod) default must not echo the SQL
+        // object/schema name; the verbose path still surfaces it.
+        assertThat(pd.getProperties()).doesNotContainKey("rootCause");
+        ProblemDetail verbose = verboseHandler().handleUnexpectedRollback(ex);
+        assertThat(verbose.getProperties().get("rootCause"))
             .asString().contains("admin.committee_templates");
+    }
+
+    @Test
+    void handleGeneral_nonVerbose_returnsGenericMessageWithReference_noLeak() {
+        // SEC-CFG-001: the catch-all must not disclose the exception class
+        // name, package path, or root-cause text to the client in base/prod.
+        IllegalStateException root = new IllegalStateException(
+            "connection to db.internal.tss.local refused");
+        RuntimeException ex = new RuntimeException("service failure", root);
+
+        ProblemDetail pd = handler.handleGeneral(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        assertThat(pd.getTitle()).isEqualTo("Internal Server Error");
+        assertThat(pd.getDetail()).contains("An unexpected error occurred");
+        // A correlation reference is returned so the client can quote it to
+        // support; the server log carries the full detail under the same id.
+        assertThat(pd.getProperties()).containsKey("reference");
+        assertThat(pd.getDetail()).contains(String.valueOf(pd.getProperties().get("reference")));
+        // None of the internal detail leaks.
+        assertThat(pd.getProperties()).doesNotContainKey("exception");
+        assertThat(pd.getProperties()).doesNotContainKey("rootCause");
+        assertThat(pd.getDetail()).doesNotContain("RuntimeException");
+        assertThat(pd.getDetail()).doesNotContain("db.internal.tss.local");
+    }
+
+    @Test
+    void handleGeneral_verbose_surfacesExceptionAndRootCause() {
+        // In dev (grc.errors.verbose=true) the diagnostics are still surfaced
+        // so a developer can grep the server log from the toast text.
+        IllegalStateException root = new IllegalStateException("boom-cause");
+        RuntimeException ex = new RuntimeException("service failure", root);
+
+        ProblemDetail pd = verboseHandler().handleGeneral(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        assertThat(pd.getProperties().get("exception"))
+            .asString().contains("RuntimeException");
+        assertThat(pd.getProperties().get("rootCause"))
+            .asString().contains("boom-cause");
+        assertThat(pd.getProperties()).containsKey("reference");
+    }
+
+    @Test
+    void responseStatusException_honoursEmbeddedStatusAndReason_not500() {
+        // SEC-PRIV-003 regression: the public sub-processor endpoint throws
+        // ResponseStatusException(404). Without a dedicated handler the catch-all
+        // hijacked it and returned 500; this must surface the real 404 + reason.
+        ResponseStatusException ex = new ResponseStatusException(
+            HttpStatus.NOT_FOUND, "No published list for that organisation.");
+
+        ProblemDetail pd = handler.handleResponseStatus(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(pd.getTitle()).isEqualTo("Not Found");
+        assertThat(pd.getDetail()).isEqualTo("No published list for that organisation.");
+    }
+
+    @Test
+    void responseStatusException_withoutReason_fallsBackToStatusPhrase() {
+        ResponseStatusException ex = new ResponseStatusException(HttpStatus.FORBIDDEN);
+
+        ProblemDetail pd = handler.handleResponseStatus(ex);
+
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(pd.getDetail()).isEqualTo("Forbidden");
     }
 
     @Test

@@ -25,7 +25,7 @@ public class DrPlanController {
     private final DrPlanService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Page<Response> list(@RequestParam(required = false) String status,
                                @RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "100") int size) {
@@ -33,49 +33,49 @@ public class DrPlanController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Response get(@PathVariable Long id) {
         return Response.from(service.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<Response> create(@Valid @RequestBody CreateRequest req) {
         return ResponseEntity.status(201).body(Response.from(service.create(req)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public Response update(@PathVariable Long id, @Valid @RequestBody UpdateRequest req) {
         return Response.from(service.update(id, req));
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'APPROVE')")
     public Response approve(@PathVariable Long id, Authentication auth) {
         return Response.from(service.approve(id, usernameOf(auth), userIdOf(auth)));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'APPROVE')")
     public Response reject(@PathVariable Long id, @Valid @RequestBody RejectRequest req) {
         return Response.from(service.reject(id, req));
     }
 
     @PostMapping("/{id}/activate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public Response activate(@PathVariable Long id, @Valid @RequestBody ActivateRequest req, Authentication auth) {
         return Response.from(service.activate(id, req, userIdOf(auth)));
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'DELETE')")
     public Response archive(@PathVariable Long id, @Valid @RequestBody ArchiveRequest req) {
         return Response.from(service.archive(id, req));
     }
 
     @PostMapping("/{id}/record-test")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public Response recordTest(@PathVariable Long id, @Valid @RequestBody TestRequest req, Authentication auth) {
         return Response.from(service.recordTest(id, req, userIdOf(auth)));
     }

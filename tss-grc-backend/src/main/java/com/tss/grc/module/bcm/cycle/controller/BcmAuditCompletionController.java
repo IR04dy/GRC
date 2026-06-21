@@ -56,21 +56,21 @@ public class BcmAuditCompletionController {
     // ── Management reviews ──────────────────────────────────────
 
     @GetMapping("/management-reviews")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmManagementReview> listReviews() { return service.listManagementReviews(); }
 
     @GetMapping("/management-reviews/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmManagementReview getReview(@PathVariable Long id) { return service.getManagementReview(id); }
 
     @PostMapping("/management-reviews")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmManagementReview> createReview(@RequestBody BcmManagementReview body) {
         return ResponseEntity.ok(service.createManagementReview(body));
     }
 
     @PostMapping("/management-reviews/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmManagementReview transitionReview(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionManagementReview(id, body.to(), actor());
     }
@@ -78,18 +78,21 @@ public class BcmAuditCompletionController {
     // ── SIEM webhook ────────────────────────────────────────────
 
     @GetMapping("/siem-events")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<SiemInboundEvent> listSiem(@RequestParam(required = false) String status) {
         return service.listSiemEvents(status);
     }
 
     /**
-     * Webhook ingest — accepts any authenticated caller for now. A future
-     * sprint will swap to a shared-secret header so SIEM systems can post
-     * without a user JWT.
+     * Webhook ingest. Auto-escalates a high-severity event into a live
+     * {@code CrisisEvent}, so it is a BCM write and must carry BCM:WRITE —
+     * a read-only role (e.g. AUDITOR) must not be able to inject a fake
+     * high-severity alert that spins up a crisis. A future sprint will add a
+     * shared-secret header so SIEM systems can post without a user JWT; until
+     * then the JWT-bearing caller still needs the BCM write permission.
      */
     @PostMapping("/siem-events")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public SiemInboundEvent ingestSiem(@RequestBody SiemInboundPayload payload) {
         return service.ingestSiemEvent(payload);
     }
@@ -97,13 +100,13 @@ public class BcmAuditCompletionController {
     // ── OPRES summary (Tier-4 #24) ──────────────────────────────
 
     @GetMapping("/opres/summary")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public OpresSummary opresSummary() { return service.opresSummary(); }
 
     // ── PDPL Art. 23 draft (Tier-4 #29) ─────────────────────────
 
     @PostMapping("/crisis-events/{id}/pdpl-draft")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public CrisisEvent draftPdpl(@PathVariable Long id, @RequestBody(required = false) PdplDraftBody body) {
         return service.draftPdplNotification(id, body == null ? null : body.reference());
     }

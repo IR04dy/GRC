@@ -22,6 +22,13 @@ public interface TenableFindingLogRepository
      *  endpoint's {@code lastSuccessfulPollAt}. */
     TenableFindingLog findFirstByOrganisationIdOrderByCreatedAtDesc(Long organisationId);
 
+    /** Tenant-ownership probe for outbound recast/accept actions — does this
+     *  tenant have any ingested finding for the target plugin? Used to reject
+     *  cross-tenant recast/accept-risk on a plugin the tenant has never seen
+     *  (SEC-INT-003). */
+    Optional<TenableFindingLog> findFirstByOrganisationIdAndTenablePluginId(
+        Long organisationId, String tenablePluginId);
+
     /** Browse history for the integrations dashboard. */
     Page<TenableFindingLog> findByOrganisationIdOrderByCreatedAtDesc(
         Long organisationId, Pageable pageable);

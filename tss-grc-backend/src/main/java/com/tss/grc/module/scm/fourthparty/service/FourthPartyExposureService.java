@@ -1,6 +1,8 @@
 package com.tss.grc.module.scm.fourthparty.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.CreateRequest;
+import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.UpdateRequest;
 import com.tss.grc.module.scm.fourthparty.entity.FourthPartyExposure;
 import com.tss.grc.module.scm.fourthparty.repository.FourthPartyExposureRepository;
 import com.tss.grc.module.tprm.automation.TprmAutomationService;
@@ -56,33 +58,56 @@ public class FourthPartyExposureService {
     }
 
     @Transactional
-    public FourthPartyExposure create(FourthPartyExposure req) {
-        validate(req);
-        req.setOrganisationId(TenantContext.getCurrentTenant());
-        req.setId(null);
-        FourthPartyExposure saved = repo.save(req);
+    public FourthPartyExposure create(CreateRequest req) {
+        // Build a fresh entity from the DTO. Server-controlled fields (id,
+        // organisationId, status, concentrationRisk, soft-delete, audit and
+        // validation columns) are NOT taken from the client (SEC-FIN-004) —
+        // they keep their entity defaults / are stamped here.
+        FourthPartyExposure e = new FourthPartyExposure();
+        e.setPrimaryVendorId(req.primaryVendorId());
+        e.setPrimaryVendorName(req.primaryVendorName());
+        e.setFourthPartyName(req.fourthPartyName());
+        e.setFourthPartyCountry(req.fourthPartyCountry());
+        e.setDependencyType(req.dependencyType());
+        e.setDownstreamCriticality(req.downstreamCriticality());
+        e.setServiceDescriptionEn(req.serviceDescriptionEn());
+        e.setServiceDescriptionAr(req.serviceDescriptionAr());
+        e.setDataCategoriesShared(req.dataCategoriesShared());
+        e.setContractChainClauses(req.contractChainClauses());
+        if (req.subContractingAllowed() != null) e.setSubContractingAllowed(req.subContractingAllowed());
+        if (req.flowDownClausesPresent() != null) e.setFlowDownClausesPresent(req.flowDownClausesPresent());
+        e.setMitigationNotesEn(req.mitigationNotesEn());
+        e.setMitigationNotesAr(req.mitigationNotesAr());
+        validate(e);
+        e.setId(null);
+        e.setOrganisationId(TenantContext.getCurrentTenant());
+        e.setStatus("DISCOVERED");           // force initial workflow state
+        e.setConcentrationRisk("LOW");        // derived by recomputeConcentration()
+        e.setIsDeleted((short) 0);
+        e.setIsActive((short) 1);
+        FourthPartyExposure saved = repo.save(e);
         recomputeConcentration();
         return repo.findByIdAndOrganisationId(saved.getId(), TenantContext.getCurrentTenant())
                 .orElse(saved);
     }
 
     @Transactional
-    public FourthPartyExposure update(Long id, FourthPartyExposure req) {
-        validate(req);
+    public FourthPartyExposure update(Long id, UpdateRequest req) {
         FourthPartyExposure existing = get(id);
-        existing.setPrimaryVendorName(req.getPrimaryVendorName());
-        existing.setFourthPartyName(req.getFourthPartyName());
-        existing.setFourthPartyCountry(req.getFourthPartyCountry());
-        existing.setDependencyType(req.getDependencyType());
-        existing.setDownstreamCriticality(req.getDownstreamCriticality());
-        existing.setServiceDescriptionEn(req.getServiceDescriptionEn());
-        existing.setServiceDescriptionAr(req.getServiceDescriptionAr());
-        existing.setDataCategoriesShared(req.getDataCategoriesShared());
-        existing.setContractChainClauses(req.getContractChainClauses());
-        existing.setSubContractingAllowed(req.getSubContractingAllowed());
-        existing.setFlowDownClausesPresent(req.getFlowDownClausesPresent());
-        existing.setMitigationNotesEn(req.getMitigationNotesEn());
-        existing.setMitigationNotesAr(req.getMitigationNotesAr());
+        if (req.primaryVendorName() != null) existing.setPrimaryVendorName(req.primaryVendorName());
+        if (req.fourthPartyName() != null) existing.setFourthPartyName(req.fourthPartyName());
+        existing.setFourthPartyCountry(req.fourthPartyCountry());
+        if (req.dependencyType() != null) existing.setDependencyType(req.dependencyType());
+        if (req.downstreamCriticality() != null) existing.setDownstreamCriticality(req.downstreamCriticality());
+        if (req.serviceDescriptionEn() != null) existing.setServiceDescriptionEn(req.serviceDescriptionEn());
+        existing.setServiceDescriptionAr(req.serviceDescriptionAr());
+        existing.setDataCategoriesShared(req.dataCategoriesShared());
+        existing.setContractChainClauses(req.contractChainClauses());
+        if (req.subContractingAllowed() != null) existing.setSubContractingAllowed(req.subContractingAllowed());
+        if (req.flowDownClausesPresent() != null) existing.setFlowDownClausesPresent(req.flowDownClausesPresent());
+        existing.setMitigationNotesEn(req.mitigationNotesEn());
+        existing.setMitigationNotesAr(req.mitigationNotesAr());
+        validate(existing);
         FourthPartyExposure saved = repo.save(existing);
         recomputeConcentration();
         return repo.findByIdAndOrganisationId(saved.getId(), TenantContext.getCurrentTenant())

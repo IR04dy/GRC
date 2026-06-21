@@ -178,10 +178,17 @@
 
     const API_LOGIN = 'http://localhost:8084/api/auth/login';
 
+    // SEC-FE-003: only honour same-origin relative redirect targets.
+    // Reject absolute (https://evil) and protocol-relative (//evil) URLs to
+    // prevent open-redirect phishing; fall back to the default landing page.
+    function safeRedirect() {
+        const raw = new URLSearchParams(location.search).get('redirect');
+        return (raw && raw.startsWith('/') && !raw.startsWith('//')) ? raw : '/dashboard.html';
+    }
+
     // If already logged in, redirect to dashboard
     if (sessionStorage.getItem('grc_jwt')) {
-        const redirect = new URLSearchParams(location.search).get('redirect') || '/dashboard.html';
-        window.location.replace(redirect);
+        window.location.replace(safeRedirect());
     }
 
     // Sync language buttons with current lang
@@ -287,8 +294,7 @@
             sessionStorage.setItem('grc_jwt',  data.accessToken);
             sessionStorage.setItem('grc_user', JSON.stringify(data.user));
 
-            const redirect = new URLSearchParams(location.search).get('redirect') || '/dashboard.html';
-            window.location.replace(redirect);
+            window.location.replace(safeRedirect());
 
         } catch (err) {
             document.getElementById('loginErrorMsg').textContent = I18n.t('msg.error.generic');

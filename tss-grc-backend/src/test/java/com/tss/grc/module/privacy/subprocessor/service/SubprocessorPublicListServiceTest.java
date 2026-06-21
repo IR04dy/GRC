@@ -127,4 +127,13 @@ class SubprocessorPublicListServiceTest {
 
         assertThat(service.publicList(1L)).isEmpty();
     }
+
+    @Test
+    void publicList_nullOrgNeverRunsUnscopedRead() {
+        // SEC-PRIV-003 defence-in-depth: a null/unresolved org must return
+        // empty WITHOUT hitting the repository, so this method can never
+        // perform an unscoped cross-tenant read.
+        assertThat(service.publicList(null)).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(repo);
+    }
 }

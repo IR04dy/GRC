@@ -48,29 +48,29 @@ public class BcmCycleController {
     // ─── Cycles ────────────────────────────────────────────────────
 
     @GetMapping("/cycles")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmAssessmentCycle> listCycles(@RequestParam(required = false) String status) {
         return service.listCycles(status);
     }
 
     @GetMapping("/cycles/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmAssessmentCycle getCycle(@PathVariable Long id) { return service.getCycle(id); }
 
     @PostMapping("/cycles")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmAssessmentCycle> createCycle(@RequestBody BcmAssessmentCycle body) {
         return ResponseEntity.ok(service.createCycle(body));
     }
 
     @PutMapping("/cycles/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmAssessmentCycle updateCycle(@PathVariable Long id, @RequestBody BcmAssessmentCycle body) {
         return service.updateCycle(id, body);
     }
 
     @PostMapping("/cycles/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmAssessmentCycle transitionCycle(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionCycle(id, body.to(), actor());
     }
@@ -78,29 +78,29 @@ public class BcmCycleController {
     // ─── Governance ────────────────────────────────────────────────
 
     @GetMapping("/governance")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<BcmGovernanceRecord> listGovernance(@RequestParam(required = false) String approvalStatus) {
         return service.listGovernance(approvalStatus);
     }
 
     @GetMapping("/governance/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public BcmGovernanceRecord getGovernance(@PathVariable Long id) { return service.getGovernance(id); }
 
     @PostMapping("/governance")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<BcmGovernanceRecord> createGovernance(@RequestBody BcmGovernanceRecord body) {
         return ResponseEntity.ok(service.createGovernance(body));
     }
 
     @PutMapping("/governance/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmGovernanceRecord updateGovernance(@PathVariable Long id, @RequestBody BcmGovernanceRecord body) {
         return service.updateGovernance(id, body);
     }
 
     @PostMapping("/governance/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmGovernanceRecord transitionGovernance(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionGovernance(id, body.to(), actor());
     }

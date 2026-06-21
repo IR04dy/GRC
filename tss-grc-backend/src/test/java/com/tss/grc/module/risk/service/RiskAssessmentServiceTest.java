@@ -60,6 +60,9 @@ class RiskAssessmentServiceTest {
         return r;
     }
 
+    private static final Long ASSESSOR_ID = 42L;
+
+    /** Helper for the correct() tests, which still operate on a persisted entity. */
     private static RiskAssessment assessment(int likelihood, int impact) {
         RiskAssessment a = new RiskAssessment();
         a.setRiskId(RISK_ID);
@@ -78,37 +81,38 @@ class RiskAssessmentServiceTest {
         });
         when(risks.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        RiskAssessment out = service.record(assessment(3, 4));
+        // SEC-RISK-002: assessor + riskId are explicit params; the service stamps
+        // assessmentDate server-side and attributes the assessment to the principal.
+        RiskAssessment out = service.record(RISK_ID, 3, 4, null, null, ASSESSOR_ID);
 
         assertThat(out.getId()).isEqualTo(1L);
         assertThat(out.getAssessmentDate()).isEqualTo(LocalDate.now());
+        assertThat(out.getAssessorId()).isEqualTo(ASSESSOR_ID);
         assertThat(r.getResidualLikelihood()).isEqualTo(3);
         assertThat(r.getResidualImpact()).isEqualTo(4);
     }
 
     @Test void record_likelihoodOutOfRangeRejected() {
-        assertThatThrownBy(() -> service.record(assessment(6, 3)))
+        assertThatThrownBy(() -> service.record(RISK_ID, 6, 3, null, null, ASSESSOR_ID))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("likelihood must be 1..5");
     }
 
     @Test void record_impactOutOfRangeRejected() {
-        assertThatThrownBy(() -> service.record(assessment(3, 0)))
+        assertThatThrownBy(() -> service.record(RISK_ID, 3, 0, null, null, ASSESSOR_ID))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("impact must be 1..5");
     }
 
     @Test void record_missingRiskIdRejected() {
-        RiskAssessment a = new RiskAssessment();
-        a.setLikelihood(3); a.setImpact(3);
-        assertThatThrownBy(() -> service.record(a))
+        assertThatThrownBy(() -> service.record(null, 3, 3, null, null, ASSESSOR_ID))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("riskId");
     }
 
     @Test void record_crossTenantRiskRejected() {
         when(risks.findById(RISK_ID)).thenReturn(Optional.of(risk(OTHER_ORG)));
-        assertThatThrownBy(() -> service.record(assessment(3, 3)))
+        assertThatThrownBy(() -> service.record(RISK_ID, 3, 3, null, null, ASSESSOR_ID))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("another organisation");
     }

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -165,13 +166,32 @@ public class PolicyController {
 
     @PostMapping("/attestations/{id}/attest")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
-    public PolicyAttestation attest(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        return service.attest(id, body == null ? null : body.get("evidenceRef"));
+    public PolicyAttestation attest(@PathVariable Long id,
+                                    @RequestBody(required = false) Map<String, String> body,
+                                    Authentication auth) {
+        // SEC-CMP-004: the attesting identity is the authenticated principal, never a
+        // body field. Object-level ownership (caller == assignee) and the admin
+        // override are enforced in the service.
+        return service.attest(id, body == null ? null : body.get("evidenceRef"),
+            actor(auth), isComplianceAdmin(auth));
     }
 
     @PostMapping("/attestations/{id}/decline")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
-    public PolicyAttestation decline(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.decline(id, body.get("reason"));
+    public PolicyAttestation decline(@PathVariable Long id,
+                                     @RequestBody Map<String, String> body,
+                                     Authentication auth) {
+        // SEC-CMP-004: only the assignee (or a compliance/platform admin) may decline.
+        return service.decline(id, body.get("reason"), actor(auth), isComplianceAdmin(auth));
+    }
+
+    /** Compliance/platform-admin override for proxy attestation / campaign cleanup. */
+    private static boolean isComplianceAdmin(Authentication auth) {
+        if (auth == null || auth.getAuthorities() == null) return false;
+        for (GrantedAuthority ga : auth.getAuthorities()) {
+            String role = ga.getAuthority();
+            if ("ROLE_PLATFORM_ADMIN".equals(role) || "ROLE_COMPLIANCE_ADMIN".equals(role)) return true;
+        }
+        return false;
     }
 }

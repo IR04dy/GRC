@@ -2,6 +2,7 @@ package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.risk.dto.RiskTreatmentRequest;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskTreatment;
 import com.tss.grc.module.risk.repository.RiskRepository;
@@ -68,11 +69,12 @@ class RiskTreatmentServiceTest {
         return t;
     }
 
-    @Test void create_invalidTypeRejected() {
-        RiskTreatment bad = treatment(null, "DELEGATE", null);
-        bad.setId(null);
+    private static RiskTreatmentRequest req(String type, String descriptionEn) {
+        return new RiskTreatmentRequest(type, descriptionEn, null, null, null);
+    }
 
-        assertThatThrownBy(() -> service.create(bad))
+    @Test void create_invalidTypeRejected() {
+        assertThatThrownBy(() -> service.create(RISK_ID, req("DELEGATE", "Implement compensating controls")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("treatmentType");
     }
@@ -84,21 +86,16 @@ class RiskTreatmentServiceTest {
             x.setId(1L);
             return x;
         });
-        RiskTreatment body = treatment(null, "MITIGATE", null);
-        body.setId(null);
-        body.setStatus(null);
 
-        RiskTreatment saved = service.create(body);
+        // SEC-RISK-002: status is forced to PLANNED server-side; a client value is
+        // not even bindable on the DTO.
+        RiskTreatment saved = service.create(RISK_ID, req("MITIGATE", "Implement compensating controls"));
         assertThat(saved.getStatus()).isEqualTo("PLANNED");
         assertThat(saved.getId()).isEqualTo(1L);
     }
 
     @Test void create_missingDescriptionRejected() {
-        RiskTreatment t = treatment(null, "MITIGATE", null);
-        t.setId(null);
-        t.setDescriptionEn(null);
-
-        assertThatThrownBy(() -> service.create(t))
+        assertThatThrownBy(() -> service.create(RISK_ID, req("MITIGATE", null)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("descriptionEn");
     }

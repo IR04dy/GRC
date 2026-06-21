@@ -58,8 +58,18 @@ public class GhgEmissionRecordService {
     public GhgEmissionRecord create(GhgEmissionRecord req) {
         req.setId(null);
         req.setOrganisationId(org());
+        // Mass-assignment guard (SEC-ESG-003): force the initial lifecycle
+        // state and scrub workflow / verification / attribution / audit
+        // columns so a record cannot be born VERIFIED or APPROVED, nor carry
+        // a forged verification or audit attribution.
+        req.setStatus("DRAFT");
+        req.setVerified(false);
+        req.setVerificationDate(null);
+        req.setSubmittedAt(null);
+        req.setApprovedAt(null);
+        req.setCreatedBy(null);
+        req.setUpdatedBy(null);
         validate(req);
-        if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("DRAFT");
         // Auto-recompute emission value from activity × factor when both
         // are set; otherwise trust the caller-supplied emissionValueTco2e.
         if (req.getActivityData() != null && req.getEmissionFactor() != null) {

@@ -76,7 +76,18 @@ public class SgiCommitmentService {
     public SgiCommitment create(SgiCommitment req) {
         req.setId(null);
         req.setOrganisationId(org());
-        if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("ACTIVE");
+        // Mass-assignment guard (SEC-ESG-003): force the initial lifecycle
+        // state (achieve()/retire() are the only paths out of ACTIVE) and
+        // scrub the achievement / retirement / audit attribution columns so
+        // a commitment cannot be born ACHIEVED with a forged signer.
+        req.setStatus("ACTIVE");
+        req.setAchievedAt(null);
+        req.setAchievedBy(null);
+        req.setRetiredAt(null);
+        req.setRetiredBy(null);
+        req.setRetiredReason(null);
+        req.setCreatedBy(null);
+        req.setUpdatedBy(null);
         validate(req);
         return repo.save(req);
     }

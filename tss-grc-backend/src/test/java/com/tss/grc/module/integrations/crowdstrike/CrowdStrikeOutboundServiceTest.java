@@ -6,7 +6,9 @@ import com.tss.grc.module.integrations.crowdstrike.client.CrowdStrikeClient;
 import com.tss.grc.module.integrations.crowdstrike.config.CrowdStrikeProperties;
 import com.tss.grc.module.integrations.crowdstrike.dto.ContainmentResponse;
 import com.tss.grc.module.integrations.crowdstrike.entity.CrowdStrikeActionLog;
+import com.tss.grc.module.integrations.crowdstrike.entity.CrowdStrikeDetectionLog;
 import com.tss.grc.module.integrations.crowdstrike.repository.CrowdStrikeActionLogRepository;
+import com.tss.grc.module.integrations.crowdstrike.repository.CrowdStrikeDetectionLogRepository;
 import com.tss.grc.module.integrations.crowdstrike.service.CrowdStrikeOutboundService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -26,6 +28,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -52,6 +56,7 @@ class CrowdStrikeOutboundServiceTest {
 
     @Mock private CrowdStrikeClient client;
     @Mock private CrowdStrikeActionLogRepository actionLogRepo;
+    @Mock private CrowdStrikeDetectionLogRepository detectionLogRepo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
 
@@ -63,8 +68,12 @@ class CrowdStrikeOutboundServiceTest {
         props = new CrowdStrikeProperties();
         props.setEnabled(true);
         service = new CrowdStrikeOutboundService(
-            client, props, actionLogRepo, audit, publisher, new ObjectMapper()
+            client, props, actionLogRepo, detectionLogRepo, audit, publisher, new ObjectMapper()
         );
+        // Default: the target host is in this tenant's inventory (SEC-INT-003).
+        // Individual tests override to exercise the cross-tenant rejection.
+        when(detectionLogRepo.findFirstByOrganisationIdAndFalconHostId(anyLong(), anyString()))
+            .thenReturn(Optional.of(new CrowdStrikeDetectionLog()));
         TenantContext.setCurrentTenant(1L);
         // Seed SecurityContext with a fake user — requested_by_user_id pulls from this.
         GrcUserDetails principal = new GrcUserDetails(
@@ -187,6 +196,20 @@ class CrowdStrikeOutboundServiceTest {
             .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.containHost(null, "no host"))
             .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void containHost_hostNotInTenantInventory_isDenied() {
+        // SEC-INT-003 — host belongs to another tenant: not in our detection log.
+        when(detectionLogRepo.findFirstByOrganisationIdAndFalconHostId(eq(1L), eq("aid-foreign")))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.containHost("aid-foreign", "isolate"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+
+        verify(client, never()).containHost(anyString(), anyString());
+        verify(actionLogRepo, never()).save(any());
+        verify(publisher, never()).publishEvent(any(DomainEvent.class));
     }
 
     @Test

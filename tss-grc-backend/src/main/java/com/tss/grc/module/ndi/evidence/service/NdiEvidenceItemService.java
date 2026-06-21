@@ -6,6 +6,8 @@ import com.tss.grc.module.ndi.evidence.repository.NdiEvidenceItemRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,16 @@ public class NdiEvidenceItemService {
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    /**
+     * SEC-NDI-003: the reviewer who approves/rejects evidence must be the
+     * authenticated principal, never a request-body field. Mirrors the
+     * SEC-NDI-002 pattern in {@code NdiAuditService.record()}.
+     */
+    private static String currentUsername() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        return a == null ? null : a.getName();
+    }
 
     public record EvidenceAggregate(
         long total,
@@ -87,7 +99,9 @@ public class NdiEvidenceItemService {
         if (body.getSourceSystem()    != null) e.setSourceSystem(body.getSourceSystem());
         if (body.getOwnerName()       != null) e.setOwnerName(body.getOwnerName());
         if (body.getOwnerEmail()      != null) e.setOwnerEmail(body.getOwnerEmail());
-        if (body.getReviewerName()    != null) e.setReviewerName(body.getReviewerName());
+        // SEC-NDI-003: reviewerName is the attribution field for the maker/checker
+        // SoD control — it is stamped server-side from the authenticated principal
+        // at approve/reject, never bound from the request body.
         if (body.getEffectiveDate()   != null) e.setEffectiveDate(body.getEffectiveDate());
         if (body.getExpiryDate()      != null) e.setExpiryDate(body.getExpiryDate());
         if (body.getReviewedAt()      != null) e.setReviewedAt(body.getReviewedAt());
@@ -98,10 +112,17 @@ public class NdiEvidenceItemService {
         return repo.save(e);
     }
 
-    public NdiEvidenceItem approve(Long id, String reviewerName) {
+    public NdiEvidenceItem approve(Long id) {
         NdiEvidenceItem e = get(id);
         if (!"PENDING".equals(e.getStatus()))
             throw new IllegalStateException("Only PENDING evidence can be approved (was " + e.getStatus() + ")");
+        // SEC-NDI-003: the reviewer is the authenticated principal, not a body
+        // field; SoD requires the reviewer to differ from the evidence owner.
+        String reviewerName = currentUsername();
+        if (reviewerName != null && reviewerName.equalsIgnoreCase(e.getOwnerName())) {
+            throw new IllegalStateException(
+                "Segregation of duties: the evidence owner cannot also approve it.");
+        }
         e.setStatus("ACTIVE");
         e.setReviewerName(reviewerName);
         e.setReviewedAt(LocalDate.now());
@@ -112,10 +133,12 @@ public class NdiEvidenceItemService {
         return saved;
     }
 
-    public NdiEvidenceItem reject(Long id, String reason, String reviewerName) {
+    public NdiEvidenceItem reject(Long id, String reason) {
         NdiEvidenceItem e = get(id);
         if (reason == null || reason.isBlank())
             throw new IllegalArgumentException("rejection reason is required");
+        // SEC-NDI-003: the reviewer is the authenticated principal, not a body field.
+        String reviewerName = currentUsername();
         String from = e.getStatus();
         e.setStatus("REJECTED");
         e.setRejectionReason(reason);

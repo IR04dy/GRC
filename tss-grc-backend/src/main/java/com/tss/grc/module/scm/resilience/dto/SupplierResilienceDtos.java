@@ -3,6 +3,7 @@ package com.tss.grc.module.scm.resilience.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.tss.grc.module.scm.resilience.entity.AlternateSupplier;
 import com.tss.grc.module.scm.resilience.entity.ExitPlan;
+import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -14,6 +15,95 @@ import java.time.LocalDateTime;
 public final class SupplierResilienceDtos {
 
     private SupplierResilienceDtos() {}
+
+    // ═══ SupplierResilienceTest ═══════════════════════════════════════
+    //
+    // SEC-FIN-004: the controller previously bound the raw @Entity and
+    // persisted it, letting a caller pre-set status/outcome, audit columns,
+    // isDeleted/isActive, approver attribution and rowVersion. This DTO
+    // exposes only the fields a client may legitimately supply on create;
+    // the workflow state (status) and all attribution / outcome columns are
+    // driven by the dedicated start/complete/approve/cancel transitions.
+
+    public record TestCreateRequest(
+            Long vendorId,
+            @NotBlank @Size(max = 255) String vendorName,
+            @Size(max = 40) String testCode,
+            @NotBlank @Size(max = 255) String titleEn,
+            @Size(max = 255) String titleAr,
+            @NotBlank @Size(max = 30) String testType,
+            @Size(max = 30) String scenarioScope,
+            @NotBlank String scenarioDescriptionEn,
+            String scenarioDescriptionAr,
+            String successCriteriaEn,
+            String participants,
+            Long linkedAlternateId,
+            Long linkedExitPlanId,
+            Long linkedBcmPlanId,
+            LocalDateTime scheduledFor,
+            Integer duration,
+            Integer rtoTargetMinutes,
+            @Size(max = 255) String facilitator,
+            LocalDate nextTestDue
+    ) {}
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record TestResponse(
+            Long id,
+            String externalId,
+            String testCode,
+            Long vendorId,
+            String vendorName,
+            String titleEn,
+            String titleAr,
+            String testType,
+            String scenarioScope,
+            String scenarioDescriptionEn,
+            String scenarioDescriptionAr,
+            String successCriteriaEn,
+            String participants,
+            Long linkedAlternateId,
+            Long linkedExitPlanId,
+            Long linkedBcmPlanId,
+            LocalDateTime scheduledFor,
+            LocalDateTime executedAt,
+            Integer duration,
+            String outcome,
+            Integer rtoTargetMinutes,
+            Integer rtoActualMinutes,
+            String observationsEn,
+            String observationsAr,
+            String actionItemsEn,
+            String capaRefs,
+            String evidenceRefs,
+            LocalDate nextTestDue,
+            String facilitator,
+            String approverName,
+            LocalDateTime approvedAt,
+            String status,
+            String cancellationReason,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {
+        public static TestResponse from(SupplierResilienceTest t) {
+            return new TestResponse(
+                    t.getId(), t.getExternalId(), t.getTestCode(),
+                    t.getVendorId(), t.getVendorName(),
+                    t.getTitleEn(), t.getTitleAr(),
+                    t.getTestType(), t.getScenarioScope(),
+                    t.getScenarioDescriptionEn(), t.getScenarioDescriptionAr(),
+                    t.getSuccessCriteriaEn(), t.getParticipants(),
+                    t.getLinkedAlternateId(), t.getLinkedExitPlanId(), t.getLinkedBcmPlanId(),
+                    t.getScheduledFor(), t.getExecutedAt(), t.getDuration(),
+                    t.getOutcome(), t.getRtoTargetMinutes(), t.getRtoActualMinutes(),
+                    t.getObservationsEn(), t.getObservationsAr(),
+                    t.getActionItemsEn(), t.getCapaRefs(), t.getEvidenceRefs(),
+                    t.getNextTestDue(), t.getFacilitator(),
+                    t.getApproverName(), t.getApprovedAt(),
+                    t.getStatus(), t.getCancellationReason(),
+                    t.getCreatedAt(), t.getUpdatedAt());
+        }
+    }
 
     // ═══ AlternateSupplier ════════════════════════════════════════════
     public record AltCreateRequest(

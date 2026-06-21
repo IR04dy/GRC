@@ -2,7 +2,9 @@ package com.tss.grc.config;
 
 import com.tss.grc.security.JwtAuthenticationFilter;
 import com.tss.grc.security.ModulePermissionEvaluator;
+import com.tss.grc.security.PublicEndpointRateLimitFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -47,6 +49,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ModulePermissionEvaluator modulePermissionEvaluator;
+    private final PublicEndpointRateLimitFilter publicEndpointRateLimitFilter;
 
     /**
      * Dedicated filter chain for Swagger UI endpoints.
@@ -64,6 +67,24 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
+    }
+
+    /**
+     * SEC-CFG-006: {@link PublicEndpointRateLimitFilter} is a {@code @Component}
+     * that extends {@code OncePerRequestFilter}, so Spring Boot would otherwise
+     * auto-register it as a servlet filter for {@code /*} in ADDITION to the
+     * explicit position it occupies inside the security chain (added via
+     * {@code addFilterBefore} below). That double registration would count every
+     * public-portal request twice and halve the effective throttle. Disabling the
+     * servlet auto-registration leaves it running exactly once — in the security
+     * chain, ahead of the JWT filter.
+     */
+    @Bean
+    public FilterRegistrationBean<PublicEndpointRateLimitFilter> publicRateLimitFilterRegistration(
+            PublicEndpointRateLimitFilter filter) {
+        FilterRegistrationBean<PublicEndpointRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
@@ -92,8 +113,10 @@ public class SecurityConfig {
                 // intake by reference code without logging in.
                 .requestMatchers(HttpMethod.GET, "/api/v1/intake/track/**").permitAll()
                 // Slice 10-D: vendor BCP attestation submission portal — token IS
-                // the credential, so these two endpoints are auth-free. Full vendor
-                // portal hardening (rate-limit, MFA bind, full audit) is a follow-up.
+                // the credential, so these two endpoints are auth-free.
+                // SEC-CFG-006: brute-force/enumeration is now throttled per-IP by
+                // PublicEndpointRateLimitFilter (wired below) for this and every
+                // other public token/portal path; tokens are 122-bit random UUIDs.
                 .requestMatchers(HttpMethod.GET,  "/api/v1/tprm/bcp-attestations/by-token/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/tprm/bcp-attestations/by-token/**").permitAll()
                 // Sprint 11 — PDPL Article 12 transparency: public list of
@@ -134,6 +157,17 @@ public class SecurityConfig {
                 })
                 .anyRequest().authenticated()
             )
+
+            // ── SEC-CFG-006: per-IP throttle on the public token/portal
+            //     endpoints, ahead of the JWT filter so anonymous callers are
+            //     rate-limited before any authentication work. Non-public paths
+            //     pass straight through. Anchored on the same framework filter
+            //     (UsernamePasswordAuthenticationFilter) as the JWT filter — a
+            //     custom filter class cannot be used as an ordering anchor
+            //     because it has no registered order in Spring Security's
+            //     FilterComparator. It is registered BEFORE the JWT filter
+            //     below, so it stays ahead of it in the resolved chain. ───────
+            .addFilterBefore(publicEndpointRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
 
             // ── JWT filter: validates Bearer token on every request ───────
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

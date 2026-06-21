@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,12 +30,14 @@ public class ControlMapController {
     private final ControlMapService service;
 
     @GetMapping("/{entityType}/{entityId}")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     @Operation(summary = "List the sub-controls an entity maps to")
     public List<ControlLinkResponse> get(@PathVariable String entityType, @PathVariable Long entityId) {
         return service.getMappings(entityType, entityId);
     }
 
     @GetMapping("/{entityType}/{entityId}/evidence")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     @Operation(summary = "The entity's mapped sub-controls with recommended evidence + live coverage")
     public List<EntityControlEvidenceResponse> evidence(@PathVariable String entityType,
                                                         @PathVariable Long entityId) {
@@ -42,6 +45,7 @@ public class ControlMapController {
     }
 
     @PutMapping("/{entityType}/{entityId}")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     @Operation(summary = "Replace the entity's control mappings with the supplied set")
     public List<ControlLinkResponse> set(@PathVariable String entityType,
                                          @PathVariable Long entityId,

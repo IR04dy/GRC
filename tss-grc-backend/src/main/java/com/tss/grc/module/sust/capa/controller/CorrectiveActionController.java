@@ -2,12 +2,14 @@ package com.tss.grc.module.sust.capa.controller;
 
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -91,12 +93,16 @@ public class CorrectiveActionController {
     @PreAuthorize("hasPermission('SUST','WRITE')")
     public CorrectiveAction complete(@PathVariable Long id) { return service.transition(id, "COMPLETED"); }
 
-    /** Body: {@code { "verifiedBy": "Verifier Name" }} — Rule A enforces verifier ≠ owner. */
+    /**
+     * Verify a corrective action. The verifier is the authenticated caller —
+     * Rule A (verifier ≠ owner) is enforced against the principal, not a
+     * client-supplied name, so the four-eyes control cannot be bypassed and
+     * the attribution cannot be forged (SEC-ESG-002).
+     */
     @PostMapping("/{id}/verify")
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public CorrectiveAction verify(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        String verifier = body == null ? null : body.get("verifiedBy");
-        return service.transition(id, "VERIFIED", verifier);
+    public CorrectiveAction verify(@PathVariable Long id, @AuthenticationPrincipal GrcUserDetails me) {
+        return service.transition(id, "VERIFIED", me);
     }
 
     @PostMapping("/{id}/close")

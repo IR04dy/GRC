@@ -8,12 +8,14 @@ import com.tss.grc.module.integrations.crowdstrike.config.CrowdStrikeProperties;
 import com.tss.grc.module.integrations.crowdstrike.dto.ContainmentResponse;
 import com.tss.grc.module.integrations.crowdstrike.entity.CrowdStrikeActionLog;
 import com.tss.grc.module.integrations.crowdstrike.repository.CrowdStrikeActionLogRepository;
+import com.tss.grc.module.integrations.crowdstrike.repository.CrowdStrikeDetectionLogRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.security.GrcUserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,7 @@ public class CrowdStrikeOutboundService {
     private final CrowdStrikeClient client;
     private final CrowdStrikeProperties props;
     private final CrowdStrikeActionLogRepository actionLogRepo;
+    private final CrowdStrikeDetectionLogRepository detectionLogRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper objectMapper;
@@ -53,6 +56,7 @@ public class CrowdStrikeOutboundService {
         CrowdStrikeClient client,
         CrowdStrikeProperties props,
         CrowdStrikeActionLogRepository actionLogRepo,
+        CrowdStrikeDetectionLogRepository detectionLogRepo,
         AuditLogService audit,
         ApplicationEventPublisher publisher,
         ObjectMapper objectMapper
@@ -60,6 +64,7 @@ public class CrowdStrikeOutboundService {
         this.client = client;
         this.props = props;
         this.actionLogRepo = actionLogRepo;
+        this.detectionLogRepo = detectionLogRepo;
         this.audit = audit;
         this.publisher = publisher;
         this.objectMapper = objectMapper;
@@ -103,6 +108,17 @@ public class CrowdStrikeOutboundService {
             throw new IllegalStateException(
                 "No tenant in TenantContext — CrowdStrikeOutboundService." + actionType + " requires a tenant scope.");
         }
+
+        // Object-level authz (SEC-INT-003): the upstream Falcon backend can be
+        // shared across tenants, so a functional role check is not enough. The
+        // target host must appear in *this* tenant's ingested detection log
+        // before we dispatch a destructive containment action against it.
+        if (detectionLogRepo.findFirstByOrganisationIdAndFalconHostId(orgId, falconHostId).isEmpty()) {
+            log.warn("[CrowdStrike] {} rejected — host {} is not in tenant {}'s inventory",
+                actionType, falconHostId, orgId);
+            throw new AccessDeniedException("Falcon host is not in this tenant's inventory");
+        }
+
         Long userId = currentUserId();
 
         ContainmentResponse resp = null;

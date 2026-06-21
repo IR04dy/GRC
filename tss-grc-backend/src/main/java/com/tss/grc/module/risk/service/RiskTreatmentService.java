@@ -2,6 +2,8 @@ package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.risk.dto.RiskTreatmentRequest;
+import com.tss.grc.module.risk.dto.RiskTreatmentUpdateRequest;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskTreatment;
 import com.tss.grc.module.risk.repository.RiskRepository;
@@ -70,34 +72,49 @@ public class RiskTreatmentService {
         return t;
     }
 
+    /**
+     * Create a treatment (SEC-RISK-002). Builds the entity from an allow-listed
+     * DTO; {@code id}/{@code externalId} are server-generated and {@code status}
+     * is forced to PLANNED — the client cannot pre-set status or completedAt.
+     */
     @Transactional
-    public RiskTreatment create(RiskTreatment body) {
-        if (body.getRiskId() == null)        throw new IllegalArgumentException("riskId is required");
-        if (body.getTreatmentType() == null) throw new IllegalArgumentException("treatmentType is required");
-        if (!TREATMENT_TYPES.contains(body.getTreatmentType()))
+    public RiskTreatment create(Long riskId, RiskTreatmentRequest req) {
+        if (riskId == null)                 throw new IllegalArgumentException("riskId is required");
+        if (req.treatmentType() == null)    throw new IllegalArgumentException("treatmentType is required");
+        if (!TREATMENT_TYPES.contains(req.treatmentType()))
             throw new IllegalArgumentException("treatmentType must be one of " + TREATMENT_TYPES);
-        if (body.getDescriptionEn() == null || body.getDescriptionEn().isBlank())
+        if (req.descriptionEn() == null || req.descriptionEn().isBlank())
             throw new IllegalArgumentException("descriptionEn is required");
-        ensureRiskInTenant(body.getRiskId());
-        body.setId(null);
-        if (body.getStatus() == null) body.setStatus("PLANNED");
-        if (!TREATMENT_STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid status: " + body.getStatus());
+        ensureRiskInTenant(riskId);
+
+        RiskTreatment body = new RiskTreatment();
+        body.setRiskId(riskId);
+        body.setTreatmentType(req.treatmentType());
+        body.setDescriptionEn(req.descriptionEn());
+        body.setDescriptionAr(req.descriptionAr());
+        body.setOwnerId(req.ownerId());
+        body.setDueDate(req.dueDate());
+        body.setStatus("PLANNED");  // initial status forced server-side
         RiskTreatment saved = treatments.save(body);
         log.info("[risk-treatment] created id={} risk={} type={} status={}",
             saved.getId(), saved.getRiskId(), saved.getTreatmentType(), saved.getStatus());
         return saved;
     }
 
+    /**
+     * Update a treatment (SEC-RISK-002). Only the allow-listed fields on the DTO
+     * are copied; {@code status}, {@code completedAt}, {@code riskId} and the
+     * immutable {@code treatmentType} cannot be mass-assigned through update.
+     */
     @Transactional
-    public RiskTreatment update(Long id, RiskTreatment body) {
+    public RiskTreatment update(Long id, RiskTreatmentUpdateRequest req) {
         RiskTreatment t = get(id);
         ensureRiskInTenant(t.getRiskId());
         // Type can't change once recorded — would invalidate the audit history.
-        if (body.getDescriptionEn() != null) t.setDescriptionEn(body.getDescriptionEn());
-        if (body.getDescriptionAr() != null) t.setDescriptionAr(body.getDescriptionAr());
-        if (body.getOwnerId() != null)       t.setOwnerId(body.getOwnerId());
-        if (body.getDueDate() != null)       t.setDueDate(body.getDueDate());
+        if (req.descriptionEn() != null) t.setDescriptionEn(req.descriptionEn());
+        if (req.descriptionAr() != null) t.setDescriptionAr(req.descriptionAr());
+        if (req.ownerId() != null)       t.setOwnerId(req.ownerId());
+        if (req.dueDate() != null)       t.setDueDate(req.dueDate());
         return treatments.save(t);
     }
 

@@ -47,61 +47,65 @@ public class RiskScenarioController {
     private final RiskScenarioService service;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     @Operation(summary = "List risk scenarios (paginated, org-scoped).")
     public Page<Response> list(@RequestParam(required = false) String status,
                                @RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "50") int size) {
-        var pageable = PageRequest.of(page, size);
+        // SEC-RISK-003: clamp client-supplied page size so an unbounded
+        // ?size=… cannot drive a single huge fetch (CWE-770/400).
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        int safePage = Math.max(page, 0);
+        var pageable = PageRequest.of(safePage, safeSize);
         return (status == null
                 ? service.list(pageable)
                 : service.listByStatus(status, pageable)).map(Response::from);
     }
 
     @GetMapping("/by-risk/{riskId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     @Operation(summary = "All scenarios attached to one risk (newest first).")
     public List<Response> byRisk(@PathVariable Long riskId) {
         return service.forRisk(riskId).stream().map(Response::from).toList();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','READ')")
     @Operation(summary = "Single scenario by id.")
     public Response get(@PathVariable Long id) {
         return Response.from(service.get(id));
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
     @Operation(summary = "Open a new scenario (status starts DRAFT).")
     public ResponseEntity<Response> create(@Valid @RequestBody CreateRequest req) {
         return ResponseEntity.status(201).body(Response.from(service.create(req)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
     @Operation(summary = "Update a DRAFT scenario.")
     public Response update(@PathVariable Long id, @Valid @RequestBody UpdateRequest req) {
         return Response.from(service.update(id, req));
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','APPROVE')")
     @Operation(summary = "Approve a DRAFT scenario.")
     public Response approve(@PathVariable Long id, Authentication auth) {
         return Response.from(service.approve(id, usernameOf(auth), userIdOf(auth)));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','APPROVE')")
     @Operation(summary = "Reject a DRAFT scenario.")
     public Response reject(@PathVariable Long id, @Valid @RequestBody RejectRequest req) {
         return Response.from(service.reject(id, req.reason()));
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
     @Operation(summary = "Archive a scenario (supersede with a newer run, etc.).")
     public Response archive(@PathVariable Long id, @Valid @RequestBody ArchiveRequest req,
                             Authentication auth) {

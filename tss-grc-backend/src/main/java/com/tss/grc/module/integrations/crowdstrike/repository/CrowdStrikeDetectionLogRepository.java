@@ -22,6 +22,12 @@ public interface CrowdStrikeDetectionLogRepository
      *  endpoint's {@code lastSuccessfulPollAt}. */
     CrowdStrikeDetectionLog findFirstByOrganisationIdOrderByCreatedAtDesc(Long organisationId);
 
+    /** Tenant-ownership probe for outbound containment actions — does this
+     *  tenant have any ingested detection for the target Falcon host? Used to
+     *  reject cross-tenant host containment (SEC-INT-003). */
+    Optional<CrowdStrikeDetectionLog> findFirstByOrganisationIdAndFalconHostId(
+        Long organisationId, String falconHostId);
+
     /** Browse history for the integrations dashboard. */
     Page<CrowdStrikeDetectionLog> findByOrganisationIdOrderByCreatedAtDesc(
         Long organisationId, Pageable pageable);

@@ -54,6 +54,12 @@ server:
   port: 8084
 
 grc:
+  # SEC-CFG-001 — verbose error diagnostics (exception class name + SQL
+  # root-cause message echoed in the HTTP response) are DEV ONLY. Base/prod
+  # leave this at its false default so unhandled errors return only a generic
+  # message + correlation reference; the full detail stays in the server log.
+  errors:
+    verbose: true
   jwt:
     # JWT secret must be sourced from JWT_SECRET env var. The literal default
     # is intentionally a recognisably-broken placeholder so an unconfigured

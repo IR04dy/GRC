@@ -3,9 +3,11 @@ package com.tss.grc.common.exception;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,16 +20,30 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * SEC-CFG-001 — when {@code false} (the default, and the value in every
+     * non-dev profile) the catch-all handler returns a generic message plus a
+     * correlation {@code reference} and OMITS the internal exception class name,
+     * SQL object/schema names, and root-cause text from the client response.
+     * The full detail is always written to the server log keyed by the same
+     * reference. Set {@code grc.errors.verbose=true} only in dev so developers
+     * still get the diagnostic surfaced in the toast.
+     */
+    @Value("${grc.errors.verbose:false}")
+    private boolean verboseErrors;
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
@@ -246,7 +262,13 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail);
         pd.setTitle("Module not yet bootstrapped");
         pd.setType(URI.create("https://grc.tss.com/errors/db-object-missing"));
-        pd.setProperty("rootCause", rootMessage(ex));
+        // SEC-CFG-001 — the SQL root message echoes "Invalid object name
+        // 'schema.table'", disclosing schema/table names. Only surface it
+        // to the client in verbose (dev) mode; the warn-log above always
+        // captures it server-side.
+        if (verboseErrors) {
+            pd.setProperty("rootCause", rootMessage(ex));
+        }
         pd.setProperty("timestamp", Instant.now());
         return pd;
     }
@@ -359,26 +381,62 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * A controller may deliberately signal an HTTP status via
+     * {@link ResponseStatusException} (e.g. the PDPL Art.12 public sub-processor
+     * endpoint returns 404 for an unknown/blank org code — SEC-PRIV-003). Spring's
+     * built-in {@code ResponseStatusExceptionResolver} runs AFTER this
+     * {@code @RestControllerAdvice}, so without an explicit handler the catch-all
+     * {@link #handleGeneral} hijacks the exception and mis-reports a deliberate
+     * 4xx as a 500. Honour the embedded status + reason instead. Logged at WARN
+     * (4xx) — these are client-facing signals, not server faults.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ProblemDetail handleResponseStatus(ResponseStatusException ex) {
+        HttpStatusCode status = ex.getStatusCode();
+        HttpStatus resolved = HttpStatus.resolve(status.value());
+        String detail = ex.getReason() != null && !ex.getReason().isBlank()
+            ? ex.getReason()
+            : (resolved != null ? resolved.getReasonPhrase() : "Request failed.");
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
+        pd.setTitle(resolved != null ? resolved.getReasonPhrase() : "Error");
+        pd.setType(URI.create("https://grc.tss.com/errors/response-status"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
      * Catch-all for any exception that wasn't recognised above. Stays a 500
      * — these are genuine server errors that need investigating.
      *
-     * <p>Returns a detail message that includes the exception class name +
-     * its root message so the developer can grep the server log straight
-     * from the toast text. The {@code rootCause} property carries the same
-     * for structured access. Real bugs surface clearly instead of hiding
-     * behind "An unexpected error occurred."
+     * <p>SEC-CFG-001 — diagnostics are gated to {@code grc.errors.verbose=true}
+     * (dev only). In verbose mode the detail includes the exception class name
+     * + its root message so the developer can grep the server log straight from
+     * the toast text, and the {@code exception}/{@code rootCause} properties
+     * carry the same for structured access. In every other profile the client
+     * receives only a generic message plus a {@code reference} correlation id;
+     * the full detail is logged server-side keyed by that same id, so internal
+     * class names, package paths, and SQL object/schema names are never echoed
+     * to the caller.
      */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneral(Exception ex) {
-        log.error("Unhandled exception [{}]: {}", ex.getClass().getName(), ex.getMessage(), ex);
-        String root = rootMessage(ex);
-        String detail = ex.getClass().getSimpleName()
-            + (root != null && !root.isBlank() ? ": " + root : "");
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detail);
+        String ref = UUID.randomUUID().toString();
+        log.error("Unhandled exception ref={} [{}]: {}", ref, ex.getClass().getName(), ex.getMessage(), ex);
+        ProblemDetail pd;
+        if (verboseErrors) {
+            String root = rootMessage(ex);
+            String detail = ex.getClass().getSimpleName()
+                + (root != null && !root.isBlank() ? ": " + root : "");
+            pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detail);
+            pd.setProperty("exception", ex.getClass().getName());
+            pd.setProperty("rootCause", root);
+        } else {
+            pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred. Reference: " + ref);
+        }
         pd.setTitle("Internal Server Error");
         pd.setType(URI.create("https://grc.tss.com/errors/internal"));
-        pd.setProperty("exception", ex.getClass().getName());
-        pd.setProperty("rootCause", root);
+        pd.setProperty("reference", ref);
         pd.setProperty("timestamp", Instant.now());
         return pd;
     }

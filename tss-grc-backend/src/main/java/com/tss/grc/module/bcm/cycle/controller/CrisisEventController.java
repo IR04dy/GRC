@@ -55,14 +55,14 @@ public class CrisisEventController {
     private final CrisisEventPdfExporter pdfExporter;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Page<CrisisEvent> list(@RequestParam(defaultValue = "0") int page,
                                   @RequestParam(defaultValue = "50") int size) {
         return service.list(page, size);
     }
 
     @GetMapping("/active")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<CrisisEvent> active() { return service.listActive(); }
 
     /**
@@ -78,11 +78,11 @@ public class CrisisEventController {
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public Map<String, Long> stats() { return service.stats(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public CrisisEvent get(@PathVariable Long id) { return service.get(id); }
 
     /**
@@ -90,7 +90,7 @@ public class CrisisEventController {
      * Includes the SitReps timeline, decisions log, and regulator notifications.
      */
     @GetMapping("/{id}/export.pdf")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
         CrisisEvent e = service.get(id);
         byte[] pdf = pdfExporter.export(id);
@@ -102,31 +102,31 @@ public class CrisisEventController {
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<CrisisEvent> create(@Valid @RequestBody CrisisEvent body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public CrisisEvent update(@PathVariable Long id, @RequestBody CrisisEvent body) {
         return service.update(id, body);
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public CrisisEvent transition(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transition(id, body.to());
     }
 
     @PostMapping("/{id}/activate-bcp")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public CrisisEvent activateBcp(@PathVariable Long id, @RequestBody ActivateBcpBody body) {
         return service.activateBcp(id, body.bcpId());
     }
 
     @PostMapping("/{id}/activate-drp")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public CrisisEvent activateDrp(@PathVariable Long id, @RequestBody ActivateDrpBody body) {
         return service.activateDrp(id, body.drpId());
     }
@@ -134,13 +134,13 @@ public class CrisisEventController {
     // ─── SitReps ──────────────────────────────────────────────
 
     @GetMapping("/{id}/sitreps")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<CrisisSituationReport> listSitReps(@PathVariable Long id) {
         return service.listSitReps(id);
     }
 
     @PostMapping("/{id}/sitreps")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<CrisisSituationReport> addSitRep(@PathVariable Long id,
                                                            @Valid @RequestBody CrisisSituationReport body) {
         return ResponseEntity.ok(service.addSitRep(id, body));
@@ -149,13 +149,13 @@ public class CrisisEventController {
     // ─── Decisions ────────────────────────────────────────────
 
     @GetMapping("/{id}/decisions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<CrisisDecision> listDecisions(@PathVariable Long id) {
         return service.listDecisions(id);
     }
 
     @PostMapping("/{id}/decisions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<CrisisDecision> addDecision(@PathVariable Long id,
                                                       @Valid @RequestBody CrisisDecision body) {
         return ResponseEntity.ok(service.addDecision(id, body));
@@ -164,20 +164,20 @@ public class CrisisEventController {
     // ─── Regulatory notifications ─────────────────────────────
 
     @GetMapping("/{id}/regulatory-notifications")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'READ')")
     public List<CrisisRegulatoryNotification> listRegNotifs(@PathVariable Long id) {
         return service.listRegulatoryNotifications(id);
     }
 
     @PostMapping("/{id}/regulatory-notifications")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public ResponseEntity<CrisisRegulatoryNotification> logRegNotif(@PathVariable Long id,
                                                                     @Valid @RequestBody CrisisRegulatoryNotification body) {
         return ResponseEntity.ok(service.logRegulatoryNotification(id, body));
     }
 
     @PostMapping("/{id}/regulatory-notifications/{notifId}/acknowledge")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public CrisisRegulatoryNotification ack(@PathVariable Long id,
                                              @PathVariable Long notifId,
                                              @RequestBody AckBody body) {

@@ -42,13 +42,30 @@ class ControllerAuthorizationRatchetTest {
      * security-Highs batch covering platform/automation/licensing, all 14 NDI
      * controllers, privacy, compliance, esg, evidence, scm, iam, integrations,
      * risk, tprm, bcm) brought it to 186 (measured 2026-06-21, post-batch).
+     * The P1 risk-hardening batch (SEC-RISK-004: EmergingRiskController,
+     * RiskScenarioController, CapaTaskController, FairCalculatorController —
+     * 14 write endpoints moved from isAuthenticated() to
+     * hasPermission('RISK'|'CAPA', …)) brought it to 172.
+     * The P1 BCM-hardening batch (SEC-BCM-002: 55 write endpoints across
+     * CrisisEventController, BcpPlanController, BcmRiskController,
+     * BcmRemediationController, BcmCycleController, BcmAuditCompletionController,
+     * BcmBiaAssessmentController and DrPlanController moved from
+     * isAuthenticated() to hasPermission('BCM', …)) brought it to 117.
+     * The full P1 security-MEDIUM batch (SEC-CMP/ESG/EVD/IAM/INT/NDI/PLAT/PRIV/
+     * RISK/FIN/TPRM/CFG: controlmap, sustainability, evidence-chain & board-pack,
+     * workflow-submission & committee, integrations, NDI, the platform controllers
+     * — control-library/regulatory/audit-log/persistence/file-upload/buyer-gap/
+     * department/issue/calendar — emerging-risk/scenario/capa/fair, fourth-party &
+     * supplier-resilience, third-party-cyber, etc. all moved from isAuthenticated()
+     * to hasPermission('MODULE','ACTION')) brought the measured count to 61
+     * (re-measured authoritatively 2026-06-21 after the batch landed).
      * MUST only ever decrease. Do NOT raise this to make a new endpoint pass —
      * add the correct {@code hasPermission('MODULE','ACTION')} guard instead.
      * The eventual floor is the small set of legitimately-public write endpoints
-     * (auth login/refresh/logout, the public intake tracker, inbound webhooks);
-     * everything else should carry a real permission/role check.
+     * (auth login/refresh/logout, the public intake/whistleblower trackers,
+     * inbound webhooks); everything else should carry a real permission/role check.
      */
-    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 186;
+    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 61;
 
     @Test
     void noNewUnguardedWriteEndpoints() {

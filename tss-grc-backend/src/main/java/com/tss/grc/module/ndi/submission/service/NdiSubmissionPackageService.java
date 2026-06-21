@@ -25,6 +25,8 @@ import com.tss.grc.module.ndi.plan.repository.NdiImprovementPlanRepository;
 import com.tss.grc.module.ndi.submission.entity.NdiSubmissionPackage;
 import com.tss.grc.module.ndi.submission.repository.NdiSubmissionPackageRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,6 +89,17 @@ public class NdiSubmissionPackageService {
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    /**
+     * SEC-NDI-003: the acting identity on a regulator-facing transition must
+     * come from the authenticated principal, never from a request-body field —
+     * otherwise the recorded approver/submitter cannot be trusted. Mirrors the
+     * SEC-NDI-002 pattern in {@code NdiAuditService.record()}.
+     */
+    private static String currentUsername() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        return a == null ? null : a.getName();
+    }
 
     public record Preflight(
         Long cycleId,
@@ -170,10 +183,18 @@ public class NdiSubmissionPackageService {
         return saved;
     }
 
-    public NdiSubmissionPackage approve(Long id, String approverName) {
+    public NdiSubmissionPackage approve(Long id) {
         NdiSubmissionPackage p = get(id);
         if (!"READY".equals(p.getStatus()))
             throw new IllegalStateException("Only READY packages can be approved (was " + p.getStatus() + ")");
+        // SEC-NDI-003: the approver is the authenticated principal, not a body
+        // field; segregation-of-duties requires the approver to differ from the
+        // preparer who built the package.
+        String approverName = currentUsername();
+        if (approverName != null && approverName.equalsIgnoreCase(p.getPreparerName())) {
+            throw new IllegalStateException(
+                "Segregation of duties: the preparer cannot also approve this submission package.");
+        }
         p.setApproverName(approverName);
         p.setApprovedAt(LocalDateTime.now());
         // Approval stays in READY — submission is a separate explicit step.
@@ -183,7 +204,7 @@ public class NdiSubmissionPackageService {
         return saved;
     }
 
-    public NdiSubmissionPackage submit(Long id, String submitterName, String attestationEn, String attestationAr) {
+    public NdiSubmissionPackage submit(Long id, String attestationEn, String attestationAr) {
         NdiSubmissionPackage p = get(id);
         if (!"READY".equals(p.getStatus()))
             throw new IllegalStateException("Only READY packages can be submitted (was " + p.getStatus() + ")");
@@ -191,6 +212,8 @@ public class NdiSubmissionPackageService {
             throw new IllegalStateException("Package must be approved before submission");
         if (attestationEn == null || attestationEn.isBlank())
             throw new IllegalArgumentException("English attestation text is required for submission");
+        // SEC-NDI-003: the submitter is the authenticated principal, not a body field.
+        String submitterName = currentUsername();
         p.setStatus("SUBMITTED");
         p.setSubmitterName(submitterName);
         p.setAttestationEn(attestationEn);

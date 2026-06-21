@@ -35,6 +35,13 @@ public class SubprocessorPublicListService {
 
     @Transactional(readOnly = true)
     public List<PublicSubprocessorResponse> publicList(Long organisationId) {
+        // SEC-PRIV-003 defence-in-depth: the caller (the permitAll public
+        // endpoint) is responsible for resolving the tenant from an opaque
+        // identifier and rejecting unknown orgs. Refuse a null/unresolved
+        // org here too so this method can never run an unscoped read.
+        if (organisationId == null) {
+            return List.of();
+        }
         return repo.findByOrganisationIdAndLifecycleStageAndIsDeletedFalse(organisationId, "APPROVED")
                 .stream().map(PublicSubprocessorResponse::from).toList();
     }
