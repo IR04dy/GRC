@@ -64,6 +64,10 @@ public class BcmDependencyGraphService {
         Map<String, Node> nodes = new LinkedHashMap<>();
         Map<String, Edge> edges = new LinkedHashMap<>();
         Map<String, Long> nodesByType = new LinkedHashMap<>();
+        // PERF-NQ-006: index the BIAs we already load below so the per-plan
+        // RTO-mismatch check resolves from memory instead of issuing a
+        // findByIdAndOrganisationId query for every plan.
+        Map<Long, BcmBiaAssessment> biaById = new HashMap<>();
         long rtoMismatches = 0;
         long criticalServices = 0;
 
@@ -71,6 +75,7 @@ public class BcmDependencyGraphService {
         List<BcmBiaAssessment> biaRows = bias.findByOrganisationIdOrderByIdDesc(
                 org, PageRequest.of(0, 1000)).getContent();
         for (BcmBiaAssessment b : biaRows) {
+            biaById.put(b.getId(), b);
             String biaNodeId = "bia-" + b.getId();
             nodes.put(biaNodeId, new Node(biaNodeId, "BIA", b.getBiaCode(),
                 Map.of(
@@ -122,18 +127,21 @@ public class BcmDependencyGraphService {
                     Map.of("source", "soft_fk_from_plan")));
                 addEdge(edges, svc, planNodeId, "covered_by");
             }
-            // RTO mismatch detection: plan's RTO must be ≤ BIA's RTO
+            // RTO mismatch detection: plan's RTO must be ≤ BIA's RTO.
+            // PERF-NQ-006: resolve the source BIA from the in-memory map built
+            // above rather than re-querying per plan. (The map is scoped to the
+            // same BIA set that produced the graph's bia- nodes, so the mismatch
+            // tag always references a node that exists in the payload.)
             if (p.getSourceBiaId() != null && p.getRtoHours() != null) {
-                bias.findByIdAndOrganisationId(p.getSourceBiaId(), org).ifPresent(b -> {
-                    if (b.getRtoHours() != null && p.getRtoHours() > b.getRtoHours()) {
-                        // Tag the plan node — UI overlays this as a warning indicator
-                        Node existing = nodes.get(planNodeId);
-                        Map<String, Object> data = new HashMap<>(existing.data());
-                        data.put("rto_mismatch_vs_bia", true);
-                        nodes.put(planNodeId, new Node(existing.id(), existing.type(), existing.label(), data));
-                    }
-                });
-                // Recount in a separate pass below so we don't double-count in the closure
+                BcmBiaAssessment srcBia = biaById.get(p.getSourceBiaId());
+                if (srcBia != null && srcBia.getRtoHours() != null && p.getRtoHours() > srcBia.getRtoHours()) {
+                    // Tag the plan node — UI overlays this as a warning indicator
+                    Node existing = nodes.get(planNodeId);
+                    Map<String, Object> data = new HashMap<>(existing.data());
+                    data.put("rto_mismatch_vs_bia", true);
+                    nodes.put(planNodeId, new Node(existing.id(), existing.type(), existing.label(), data));
+                }
+                // Recount in a separate pass below so we don't double-count
             }
         }
         // Second pass to count mismatches (closure-friendly final variable)

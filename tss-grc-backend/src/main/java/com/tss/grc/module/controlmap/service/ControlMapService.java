@@ -109,19 +109,36 @@ public class ControlMapService {
             }
         }
 
+        // PERF-NQ-005: batch-resolve the static sub-control -> control -> framework
+        // catalog with three findAllById calls + in-memory maps, instead of three
+        // findById queries per mapped link. (These are global catalog tables, so
+        // findAllById has the same scoping as the prior per-row findById.)
+        List<Long> scIds = links.stream().map(ControlLink::getSubControlId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, EvidenceSubControl> scById = new HashMap<>();
+        subControlRepository.findAllById(scIds).forEach(sc -> scById.put(sc.getId(), sc));
+        List<Long> ctrlIds = scById.values().stream().map(EvidenceSubControl::getControlId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, EvidenceControl> ctrlById = new HashMap<>();
+        controlRepository.findAllById(ctrlIds).forEach(c -> ctrlById.put(c.getId(), c));
+        List<Long> fwIds = ctrlById.values().stream().map(EvidenceControl::getFrameworkId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, EvidenceFramework> fwById = new HashMap<>();
+        frameworkRepository.findAllById(fwIds).forEach(f -> fwById.put(f.getId(), f));
+
         List<EntityControlEvidenceResponse> out = new ArrayList<>();
         for (ControlLink l : links) {
             Long scId = l.getSubControlId();
-            EvidenceSubControl sc = subControlRepository.findById(scId).orElse(null);
+            EvidenceSubControl sc = scId == null ? null : scById.get(scId);
             String controlCode = null, frameworkCode = null, guidanceEn = null, guidanceAr = null;
             String code = null, nameEn = null, nameAr = null;
             if (sc != null) {
                 code = sc.getSubControlCode(); nameEn = sc.getNameEn(); nameAr = sc.getNameAr();
                 guidanceEn = sc.getEvidenceGuidance(); guidanceAr = sc.getEvidenceGuidanceAr();
-                EvidenceControl ctrl = controlRepository.findById(sc.getControlId()).orElse(null);
+                EvidenceControl ctrl = sc.getControlId() == null ? null : ctrlById.get(sc.getControlId());
                 if (ctrl != null) {
                     controlCode = ctrl.getControlCode();
-                    EvidenceFramework fw = frameworkRepository.findById(ctrl.getFrameworkId()).orElse(null);
+                    EvidenceFramework fw = ctrl.getFrameworkId() == null ? null : fwById.get(ctrl.getFrameworkId());
                     if (fw != null) frameworkCode = fw.getCode();
                 }
             }
