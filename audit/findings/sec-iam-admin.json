@@ -1,0 +1,229 @@
+{
+  "findings": [
+    {
+      "id": "SEC-IAM-001",
+      "title": "Approval-chain actor identity taken from request body — any authenticated user can forge approvals and advance/finalise chains",
+      "phase": "Security",
+      "category": "Broken Access Control / Broken Function Level Authorization (A01)",
+      "severity": "Critical",
+      "cvss": "CVSS ~8.8 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N) — privilege escalation + integrity loss on governance approvals",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/controller/ApprovalChainController.java",
+      "lines": "129-141",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:203-308",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:310-329",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:435-445",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/dto/ApprovalChainDtos.java:117-130"
+      ],
+      "description": "The endpoints POST /api/v1/workflow/chains/{id}/actions (recordAction) and POST /api/v1/workflow/chains/{id}/withdraw are guarded only by @PreAuthorize(\"isAuthenticated()\"). The acting identity is read entirely from the request body field actorUserId (InstanceActionRequest.actorUserId / InstanceWithdrawRequest.actorUserId), NOT from the authenticated principal (Authentication / GrcUserDetails). The service never verifies that the caller actually IS actorUserId, nor that the caller satisfies the step's requiredUserId/requiredRole. resolveStepForActor() falls back to rows.get(0) when no user matches (line 444), so a caller who matches no step at all still gets a valid step row and their APPROVED action is counted by isStepOrderSatisfied(). Because recordAction can drive the state machine to APPROVED (lines 277-296) including final completion, any authenticated low-privilege user can push a board/risk/policy approval chain to a COMPLETED/APPROVED state on behalf of someone else. withdraw only checks Objects.equals(i.getOriginatorUserId(), req.actorUserId()) (line 317) — but actorUserId is attacker-supplied, so anyone can satisfy it by sending the originator's id. The instance lookup IS tenant-scoped (loadOrThrow -> findByOrganisationIdAndIdAndIsDeletedFalse), so this is a same-tenant BFLA / approval-forgery issue, not cross-tenant.",
+      "rootCause": "Acting identity is trusted from client input instead of being derived from the security context, and the authorization check (isAuthenticated) does not enforce that the caller matches the step's required actor/role.",
+      "evidence": "Controller: @PostMapping(\"/{id}/actions\") @PreAuthorize(\"isAuthenticated()\") public InstanceResponse recordAction(@PathVariable Long id, @RequestBody @Valid InstanceActionRequest req) { return instanceService.recordAction(id, req); }  // Service uses req.actorUserId() with no principal cross-check; resolveStepForActor: \"return rows.get(0);\" when no requiredUserId match.",
+      "impact": "Forged approvals on governance/risk/compliance approval chains. An ordinary authenticated user can self-approve their own submission, approve on behalf of a CISO/DPO/board member, complete an entire multi-step chain, or withdraw another user's in-flight chain. The audit log and emitted DomainEvents record the attacker-chosen actorUserId, so the forged decision is attributed to an innocent user — defeating the non-repudiation the approval chain exists to provide.",
+      "reproduction": "1. Log in as any low-privilege user (e.g. AUDITOR). 2. GET /api/v1/workflow/chains to find an in-progress instance {id} and its currentStepOrder. 3. POST /api/v1/workflow/chains/{id}/actions with body {\"stepOrder\": <current>, \"actorUserId\": <CISO user id>, \"action\": \"APPROVED\"}. 4. Observe the chain advances / completes and the audit row reads 'action=APPROVED by user=<CISO id>'. 5. To cancel someone else's chain: POST /api/v1/workflow/chains/{id}/withdraw with {\"actorUserId\": <originator id>, \"reasonEn\": \"x\"}.",
+      "resolution": "Derive the acting user id from the authenticated principal (GrcUserDetails.getUserId()) in the controller and pass it to the service; ignore/reject any client-supplied actorUserId. In recordAction, require that the resolved principal matches the target step's requiredUserId OR holds requiredRole (reuse matchesActor); throw 403 otherwise instead of defaulting to rows.get(0). In withdraw, compare originatorUserId against the principal id, not a body field.",
+      "patchBefore": "@PostMapping(\"/{id}/actions\")\n@PreAuthorize(\"isAuthenticated()\")\npublic InstanceResponse recordAction(@PathVariable Long id,\n                                     @RequestBody @Valid InstanceActionRequest req) {\n    return instanceService.recordAction(id, req);\n}",
+      "patchAfter": "@PostMapping(\"/{id}/actions\")\n@PreAuthorize(\"isAuthenticated()\")\npublic InstanceResponse recordAction(@PathVariable Long id,\n                                     @RequestBody @Valid InstanceActionRequest req,\n                                     @AuthenticationPrincipal GrcUserDetails me) {\n    // Identity comes from the token, never from the body.\n    return instanceService.recordAction(id, req, me.getUserId(), authorityRoles(me));\n}\n// service: resolve step strictly via matchesActor(target, callerUserId, callerRoles);\n// if no step matches -> throw new AccessDeniedException(\"Not an assigned approver for this step\");",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-862: Missing Authorization",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-IAM-002",
+      "title": "Approval-request transition has no assignee check and trusts decidedBy from the body — any user can approve/reject any request and forge the decider",
+      "phase": "Security",
+      "category": "Broken Access Control / Broken Function Level Authorization (A01)",
+      "severity": "High",
+      "cvss": "CVSS ~8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — integrity/non-repudiation loss on approvals",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/controller/ApprovalRequestController.java",
+      "lines": "37-42",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:144-211",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/dto/ApprovalRequestDto.java:48-58"
+      ],
+      "description": "POST /api/approvals/requests/{id}/transition is annotated @PreAuthorize(\"isAuthenticated()\"). The service ApprovalRequestService.transition() looks the request up org-scoped (good for tenancy) but performs NO check that the authenticated caller equals the request's assignedTo before allowing APPROVED/REJECTED/DELEGATED. Worse, the decider identity is taken from the request body field TransitionRequest.decidedBy (set at lines 159, 186-187 of the service) rather than from the security context, so the caller chooses who the decision is attributed to. The DELEGATED branch lets any caller re-route the request to an arbitrary newAssignedTo. There is no optimistic locking, so two concurrent transitions race on the same row.",
+      "rootCause": "Function-level authorization stops at 'is logged in'; object-level ownership (assignedTo == caller) and decider attribution are never bound to the authenticated principal.",
+      "evidence": "Controller: @PostMapping(\"/{id}/transition\") @PreAuthorize(\"isAuthenticated()\") public ApprovalRequestDto transition(...) { return service.transition(id, req); }  // service: if (req.getDecidedBy() != null) r.setDecidedBy(req.getDecidedBy());  — no assignedTo/principal comparison anywhere.",
+      "impact": "Any authenticated tenant user can approve or reject an approval request that was routed to a different (e.g. senior) user, and can stamp the decision with any decidedBy value, destroying the audit trail's non-repudiation. They can also hijack a pending request by delegating it elsewhere. For a GRC platform whose approvals gate risk acceptances, policy publication and regulator notifications, this is a direct controls-bypass.",
+      "reproduction": "1. Log in as user A (any role). 2. Find a PENDING approval assigned to user B: GET /api/approvals/requests. 3. POST /api/approvals/requests/{externalId}/transition with {\"status\":\"APPROVED\",\"decidedBy\":\"ceo\"}. 4. Request flips to APPROVED, decidedBy='ceo', although neither A nor 'ceo' was the assignee.",
+      "resolution": "Load the request, then require the authenticated principal's username equals assignedTo (or the caller holds an explicit approvals-admin permission) before permitting APPROVED/REJECTED/DELEGATED. Set decidedBy from auth.getName(), never from the body. Add a @Version column for optimistic locking on the status mutation.",
+      "patchBefore": "@PostMapping(\"/{id}/transition\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ApprovalRequestDto transition(@PathVariable String id,\n                                     @RequestBody @Valid ApprovalRequestDto.TransitionRequest req) {\n    return service.transition(id, req);\n}",
+      "patchAfter": "@PostMapping(\"/{id}/transition\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ApprovalRequestDto transition(@PathVariable String id,\n                                     @RequestBody @Valid ApprovalRequestDto.TransitionRequest req,\n                                     Authentication auth) {\n    return service.transition(id, req, auth.getName());\n}\n// service: ApprovalRequest r = ...findByOrganisationIdAndExternalId(orgId, externalId)...;\n// if (!callerUsername.equals(r.getAssignedTo())) throw new AccessDeniedException(\"Not the assignee\");\n// r.setDecidedBy(callerUsername); // ignore req.getDecidedBy()",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API5:2023 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-IAM-003",
+      "title": "Digital signature can be applied/rejected by any authenticated user — no binding to the designated signer (signature forgery)",
+      "phase": "Security",
+      "category": "Broken Access Control / Improper Authentication of Signer (A01)",
+      "severity": "High",
+      "cvss": "CVSS ~7.6 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — e-signature integrity/non-repudiation loss",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/signature/controller/DigitalSignatureController.java",
+      "lines": "85-97",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/signature/service/DigitalSignatureService.java:106-128"
+      ],
+      "description": "POST /api/signature/transactions/{id}/sign and /reject are guarded only by @PreAuthorize(\"isAuthenticated()\"). The service DigitalSignatureService.sign()/reject() loads the transaction org-scoped via get() (tenancy is fine) and then transitions REQUESTED -> SIGNED/REJECTED. Neither the controller nor the service compares the authenticated principal against the transaction's signerUserId (the user the signature was requested from). Any authenticated user in the tenant can therefore complete a signature that was assigned to a different person. The sign() method records body-supplied signedDocumentHash and certificateReference verbatim with no proof the caller is the intended signer.",
+      "rootCause": "Signer authorization is reduced to 'authenticated'; the transaction's signerUserId is never enforced against the caller's identity.",
+      "evidence": "@PostMapping(\"/{id}/sign\") @PreAuthorize(\"isAuthenticated()\") public Response sign(@PathVariable Long id, @RequestBody @Valid SignRequest body) { return Response.from(service.sign(id, body)); }  // service.sign: DigitalSignatureTransaction d = get(id); requireTransitionable(d,\"SIGNED\"); ... no d.getSignerUserId() vs caller check.",
+      "impact": "A signature transaction representing legal/regulatory sign-off (the module's stated purpose) can be SIGNED or REJECTED by someone other than the named signer. This forges attribution on attestations, board approvals, and compliance sign-offs and undermines any evidentiary value of the e-signature trail.",
+      "reproduction": "1. Initiator creates a transaction assigned to signer B (signerUserId=B). 2. Log in as user A. 3. POST /api/signature/transactions/{id}/sign with {\"signedDocumentHash\":\"<64 hex>\"}. 4. Transaction becomes SIGNED even though A is not B.",
+      "resolution": "In sign()/reject(), require that the authenticated principal's userId equals the transaction's signerUserId (or that signerUserId is null AND the caller is an explicitly delegated signer). Pass the principal id from the controller and throw 403 on mismatch. Keep /expire restricted to PLATFORM_ADMIN as it already is.",
+      "patchBefore": "@PostMapping(\"/{id}/sign\")\n@PreAuthorize(\"isAuthenticated()\")\npublic Response sign(@PathVariable Long id, @RequestBody @Valid SignRequest body) {\n    return Response.from(service.sign(id, body));\n}",
+      "patchAfter": "@PostMapping(\"/{id}/sign\")\n@PreAuthorize(\"isAuthenticated()\")\npublic Response sign(@PathVariable Long id, @RequestBody @Valid SignRequest body,\n                     Authentication auth) {\n    return Response.from(service.sign(id, body, userIdOf(auth)));\n}\n// service.sign(id, body, callerId): d = get(id);\n//   if (d.getSignerUserId() != null && !d.getSignerUserId().equals(callerId))\n//       throw new AccessDeniedException(\"Only the designated signer may sign\");",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-345: Insufficient Verification of Data Authenticity",
+        "OWASP API1:2023 Broken Object Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-IAM-004",
+      "title": "Workflow-submission review (APPROVE/REJECT/CLOSE) allowed for any authenticated user; create body not validated",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS ~5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — same-tenant approval integrity",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/workflow_submission/controller/WorkflowSubmissionController.java",
+      "lines": "73-77",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow_submission/controller/WorkflowSubmissionController.java:36-38",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow_submission/service/WorkflowSubmissionService.java:105-139"
+      ],
+      "description": "POST /api/v1/workflow-submissions/{id}/review transitions a submission to APPROVED/REJECTED/CLOSED/UNDER_REVIEW but is guarded only by @PreAuthorize(\"isAuthenticated()\"). There is no role gate (e.g. reviewer/approver) and no check the caller is distinct from the submitter, so a user can approve their own submission. Reads/writes ARE org-scoped (repo.findByOrganisationIdAndId), so this is a same-tenant segregation-of-duties / BFLA issue rather than cross-tenant. Separately, the create endpoint (line 36-38) binds @RequestBody CreateBody with no @Valid; only manual null/blank checks in the service exist and payloadJson is stored unbounded/unparsed.",
+      "rootCause": "Authorization for a state-changing review action is only 'authenticated'; no segregation-of-duties or approver role is enforced.",
+      "evidence": "@PostMapping(\"/{id}/review\") @PreAuthorize(\"isAuthenticated()\") public WorkflowSubmission review(@PathVariable Long id, @RequestBody ReviewBody body) { return service.review(id, body); }",
+      "impact": "Any authenticated tenant user can approve, reject or close any workflow submission in their organisation — including ones they themselves submitted — bypassing the reviewer/maker-checker control these submissions are meant to enforce (V127 seed rules route PDPL breaches, NCA incidents, above-appetite risk acceptances through this flow).",
+      "reproduction": "1. As any user, POST /api/v1/workflow-submissions to create a submission. 2. POST /api/v1/workflow-submissions/{id}/review with {\"decision\":\"APPROVE\"}. 3. Submission is APPROVED by its own author with no reviewer role required.",
+      "resolution": "Restrict /review to an approver/reviewer permission (e.g. hasPermission('WORKFLOW','APPROVE') or per-module reviewer roles), and reject self-review by comparing the submitter to the caller. Add @Valid + Jakarta constraints to CreateBody (size caps on titleEn/payloadJson, required fields) instead of relying on manual checks.",
+      "patchBefore": "@PostMapping(\"/{id}/review\")\n@PreAuthorize(\"isAuthenticated()\")\npublic WorkflowSubmission review(@PathVariable Long id, @RequestBody ReviewBody body) {\n    return service.review(id, body);\n}",
+      "patchAfter": "@PostMapping(\"/{id}/review\")\n@PreAuthorize(\"hasPermission('WORKFLOW','APPROVE') or hasRole('PLATFORM_ADMIN')\")\npublic WorkflowSubmission review(@PathVariable Long id,\n                                 @RequestBody @Valid ReviewBody body,\n                                 Authentication auth) {\n    return service.review(id, body, auth.getName()); // service rejects self-review\n}",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-841: Improper Enforcement of Behavioral Workflow",
+        "OWASP API5:2023 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-IAM-005",
+      "title": "Committee lifecycle mutations (create/dissolve/approve-minutes) gated only by isAuthenticated() — governance BFLA, inconsistent with rest of module",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS ~5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — same-tenant governance integrity",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeController.java",
+      "lines": "44-62",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeController.java:85-122"
+      ],
+      "description": "Every endpoint in CommitteeController (the primary committee + meeting CRUD, including createCommittee, updateCommittee, dissolveCommittee, createMeeting, completeMeeting, approveMinutes, cancelMeeting) is guarded only by @PreAuthorize(\"isAuthenticated()\"). This is markedly weaker than — and inconsistent with — the sibling committee controllers (CommitteeResolutionController, CommitteeMeetingPapersController, CommitteeMemberRegistryController, CommitteeActionItemController, CommitteeCalendarController) which all require hasPermission('ADMIN','READ'|'WRITE'). The service layer IS tenant-scoped (TenantContext throughout CommitteeService), so this is a same-tenant function-level authorization gap, not cross-tenant. approveMinutes correctly derives the approver from the Authentication object (good), but any authenticated user can still trigger it.",
+      "rootCause": "The controller was not brought in line with the module's ADMIN:WRITE authorization convention; 'isAuthenticated()' grants every logged-in user (auditors, risk analysts, viewers) full write access to board/committee governance records.",
+      "evidence": "@PostMapping(\"/{id}/dissolve\") @PreAuthorize(\"isAuthenticated()\") public CommitteeResponse dissolveCommittee(...) ; @PostMapping(\"/meetings/{id}/approve-minutes\") @PreAuthorize(\"isAuthenticated()\") public MeetingResponse approveMinutes(...)",
+      "impact": "A low-privilege but authenticated user can create or dissolve committees and approve official meeting minutes for the organisation — high-integrity governance records (board/audit-committee minutes feed CMA/SAMA corporate-governance attestations). This is a controls-integrity and segregation-of-duties failure even though data stays within the tenant.",
+      "reproduction": "1. Log in as a non-admin role (e.g. AUDITOR). 2. POST /api/admin/committees/{id}/dissolve with {\"reason\":\"x\"} — succeeds. 3. POST /api/admin/committees/meetings/{id}/approve-minutes — succeeds, minutes marked MINUTES_APPROVED.",
+      "resolution": "Align CommitteeController with the rest of the module: require hasPermission('ADMIN','READ') on GETs and hasPermission('ADMIN','WRITE') (or a dedicated COMMITTEE permission) on the create/update/dissolve/meeting-mutation endpoints. Consider a narrower role for approve-minutes (committee secretary/chair).",
+      "patchBefore": "@PostMapping(\"/{id}/dissolve\")\n@PreAuthorize(\"isAuthenticated()\")\npublic CommitteeResponse dissolveCommittee(@PathVariable Long id,\n                                           @Valid @RequestBody CommitteeDissolveRequest req) {\n    return CommitteeResponse.from(service.dissolveCommittee(id, req));\n}",
+      "patchAfter": "@PostMapping(\"/{id}/dissolve\")\n@PreAuthorize(\"hasPermission('ADMIN','WRITE')\")\npublic CommitteeResponse dissolveCommittee(@PathVariable Long id,\n                                           @Valid @RequestBody CommitteeDissolveRequest req) {\n    return CommitteeResponse.from(service.dissolveCommittee(id, req));\n}",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-1220: Insufficient Granularity of Access Control",
+        "OWASP API5:2023 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-IAM-006",
+      "title": "Workflow-engine instance/transition actor (executedById, ownerId) taken from request body, not the principal",
+      "phase": "Security",
+      "category": "Improper Authorization / Insufficient Verification of Data Authenticity (A01/A08)",
+      "severity": "Low",
+      "cvss": "CVSS ~4.3 (AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:L/A:N) — attribution spoofing, gated behind PLATFORM_ADMIN",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/controller/WorkflowEngineController.java",
+      "lines": "44-70",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/service/WorkflowEngineService.java:154-187"
+      ],
+      "description": "startInstance() reads ownerId and executeTransition() reads executedById from the untyped @RequestBody Map<String,Object>, then persists them into the workflow instance and the WorkflowActionLog audit record. These are never reconciled with the authenticated principal, so the recorded actor is whatever the caller types. Additionally, executeTransition only validates that a transition with the given actionCode exists from the current state; it does NOT enforce the transition's requiredRole (WorkflowTransition.requiredRole is surfaced for rendering at WorkflowEngineService line 79 but never checked on execute). Mitigating factor: both endpoints require hasPermission('PLATFORM_ADMIN','WRITE'), and reads/writes are tenant-scoped, so exploitation requires an already-privileged admin — hence Low.",
+      "rootCause": "Actor identity is accepted from client input and the data-defined requiredRole on transitions is not enforced at execution time.",
+      "evidence": "Long executedById = body.get(\"executedById\") instanceof Number n ? n.longValue() : null;  // WorkflowEngineController line 67, written to WorkflowActionLog.setExecutedById without principal check.",
+      "impact": "A platform admin can attribute workflow transitions and instance ownership to arbitrary user IDs, weakening the integrity of the workflow audit trail. Because requiredRole is ignored, the data-driven RBAC intended for the workflow engine is not enforced server-side. Limited blast radius because the endpoints are admin-only today.",
+      "reproduction": "1. As PLATFORM_ADMIN, POST /api/v1/workflow/instances/{id}/transitions with {\"actionCode\":\"APPROVE\",\"executedById\":<any user id>,\"comments\":\"x\"}. 2. WorkflowActionLog row records executedById as the spoofed value regardless of who called.",
+      "resolution": "Derive executedById/ownerId from GrcUserDetails.getUserId() instead of the body. Replace the untyped Map bodies with validated DTOs. Enforce WorkflowTransition.requiredRole against the caller's authorities inside executeTransition before applying the transition.",
+      "patchBefore": "Long executedById = body.get(\"executedById\") instanceof Number n ? n.longValue() : null;\nString comments   = (String) body.get(\"comments\");\nreturn engine.executeTransition(id, actionCode, executedById, comments);",
+      "patchAfter": "@AuthenticationPrincipal GrcUserDetails me;\nreturn engine.executeTransition(id, req.actionCode(), me.getUserId(), req.comments());\n// engine.executeTransition additionally: if (tr.getRequiredRole()!=null && !callerHasRole(tr.getRequiredRole())) throw new AccessDeniedException(...);",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-345: Insufficient Verification of Data Authenticity",
+        "OWASP API5:2023 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-IAM-007",
+      "title": "Committee controllers bind raw JPA @Entity objects as request bodies (mass-assignment surface)",
+      "phase": "Security",
+      "category": "Mass Assignment / Improper Input Handling (A08)",
+      "severity": "Low",
+      "cvss": "CVSS ~3.7 (AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:L/A:N) — largely mitigated by service-layer id/org reset",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeResolutionController.java",
+      "lines": "46-50",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeMeetingPapersController.java:37-41",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeMemberRegistryController.java:41-45",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeActionItemController.java:63-67"
+      ],
+      "description": "Several committee write endpoints accept the persistence entity directly as @RequestBody (create(@RequestBody CommitteeResolution in), circulate(@RequestBody CommitteeMeetingPaper in), appoint(@RequestBody CommitteeMemberTerm in), addSkill(@RequestBody CommitteeMemberSkill in), create(@RequestBody CommitteeActionItem in)). Clients can therefore submit server-managed fields (id, organisationId, isDeleted, createdAt, audit columns) and cross-tenant foreign keys (committeeId/meetingId). The corresponding services largely neutralise this: each create-style method calls in.setId(null) and in.setOrganisationId(TenantContext.getCurrentTenant()) (see CommitteeResolutionService:89-92, CommitteeMeetingPapersService:63-66, CommitteeMemberRegistryService:76-79,209-212) and the comments explicitly cite mass-assignment defence. Residual gap: the foreign-key fields (committeeId, meetingId) are NOT validated to belong to the caller's tenant on these create paths, so a row can be linked to a committee/meeting id from another tenant; because the row itself is org-stamped it does not leak data, but it can corrupt referential integrity and pollute another tenant's by-committee/by-meeting aggregates only if that id collides within the same org (cross-tenant linkage is invisible to reads, which are all org-scoped).",
+      "rootCause": "Entities are used as the API binding type instead of purpose-built request DTOs, exposing server-owned columns; foreign-key ownership is not verified.",
+      "evidence": "@PostMapping @PreAuthorize(\"hasPermission('ADMIN','WRITE')\") public CommitteeResolution create(@RequestBody CommitteeResolution in) { return service.create(in); }",
+      "impact": "Primary mass-assignment vectors (id/organisationId override) are already blocked in the service layer, so cross-tenant takeover is not achievable on these paths. Remaining risk is referential-integrity pollution via unvalidated committeeId/meetingId and reliance on every future service method remembering to reset id/org — a fragile invariant. No validation annotations are applied to the entity bodies either.",
+      "reproduction": "1. As an ADMIN:WRITE user, POST /api/v1/committees/resolutions with a body that includes {\"id\":999,\"organisationId\":2,...}. 2. Confirm the saved row keeps the caller's org and a new id (service resets them) — i.e. the defence holds today, demonstrating the dependency on it.",
+      "resolution": "Introduce explicit create/update DTOs for these endpoints (mirroring CommitteeDtos) that expose only client-settable fields, with Jakarta validation. Validate that committeeId/meetingId resolve to a row in the caller's tenant before persisting. Keep the service-layer id/org reset as defence in depth.",
+      "patchBefore": "@PostMapping\n@PreAuthorize(\"hasPermission('ADMIN','WRITE')\")\npublic CommitteeResolution create(@RequestBody CommitteeResolution in) {\n    return service.create(in);\n}",
+      "patchAfter": "@PostMapping\n@PreAuthorize(\"hasPermission('ADMIN','WRITE')\")\npublic CommitteeResolution create(@RequestBody @Valid ResolutionCreateRequest req) {\n    return service.create(req); // service validates req.committeeId()/meetingId() belong to TenantContext org\n}",
+      "effort": "M",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "CWE-20: Improper Input Validation",
+        "OWASP API6:2023 Unrestricted Access to Sensitive Business Flows"
+      ]
+    },
+    {
+      "id": "SEC-IAM-008",
+      "title": "Authentication user lookup is not tenant-scoped (findByUsername) — username uniqueness assumed across all tenants",
+      "phase": "Security",
+      "category": "Multi-Tenancy / Identification & Authentication (A07)",
+      "severity": "Info",
+      "cvss": "Risk rationale: design assumption to verify — username collisions across tenants would let one tenant's login resolve another tenant's account",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/iam/service/CustomUserDetailsService.java",
+      "lines": "28-32",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/repository/UserRepository.java:13-14",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/service/UserService.java:49-50"
+      ],
+      "description": "CustomUserDetailsService.loadUserByUsername() resolves the login principal with UserRepository.findByUsername(username), which is NOT scoped by organisationId (a findByUsernameAndOrganisationId variant exists and is used elsewhere). UserService.create() only enforces uniqueness per-org (existsByUsernameAndOrganisationId), so two tenants CAN hold the same username. If that happens, findByUsername returns whichever single row JPA picks (or throws on multiple), making login resolution ambiguous/non-deterministic across tenants. This is the authentication path (outside the assigned controller set) so it is reported as Info for the auth-module owners to confirm: either usernames are globally unique by DB constraint (then this is safe) or the login flow must disambiguate by tenant.",
+      "rootCause": "Per-tenant uniqueness on create vs. global lookup on authenticate — the two are only consistent if a global unique constraint on username also exists.",
+      "evidence": "UserRepository: Optional<User> findByUsername(String username);  // used by loadUserByUsername. Creation guard is existsByUsernameAndOrganisationId(req.username(), orgId) — per-org only.",
+      "impact": "If a global unique constraint on username is absent, a duplicate username across tenants causes ambiguous authentication: a user could authenticate against another tenant's account (cross-tenant account confusion) or logins could fail nondeterministically. No exploit confirmed without DB schema review — hence Info.",
+      "reproduction": "Schema/behaviour check: 1. Create user 'admin' in org 1 and org 2 (allowed by per-org guard). 2. Attempt login as 'admin' and observe which org's account/authorities are loaded. Confirm whether a unique index on iam.users(username) prevents step 1.",
+      "resolution": "Either enforce a global unique index on username (documenting that usernames are tenant-global), or make the login flow tenant-aware (resolve via username+tenant) so authentication cannot bind to the wrong tenant's account.",
+      "patchBefore": "User user = userRepository.findByUsername(username)\n    .orElseThrow(() -> new UsernameNotFoundException(\"User not found: \" + username));",
+      "patchAfter": "// Option A: keep findByUsername but back it with a GLOBAL unique constraint on username.\n// Option B: resolve with tenant context, e.g.\n// userRepository.findByUsernameAndOrganisationId(username, resolvedTenantId)",
+      "effort": "S",
+      "references": [
+        "CWE-287: Improper Authentication",
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP A07:2021 Identification and Authentication Failures"
+      ]
+    }
+  ]
+}

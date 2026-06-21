@@ -1,0 +1,137 @@
+[
+  {
+    "id": "SEC-NDI-002",
+    "title": "Append-only NDI audit ledger is writable by any authenticated user (audit log forgery)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Security Logging & Monitoring Failures (A09)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/controller/NdiAuditController.java",
+    "lines": "37-41"
+  },
+  {
+    "id": "SEC-NPM-001",
+    "title": "Vite dev server — server.fs.deny bypass + path traversal + LAN exposure (high)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Path Traversal / Information Disclosure (A01/A05)",
+    "file": "tss-grc-ui-v2/package.json",
+    "lines": "32-32"
+  },
+  {
+    "id": "QUAL-IE-001",
+    "title": "EvidenceMatrixService.matrix() is a triple-nested N+1 query loop (86 LOC, queries scale with the whole framework catalog)",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "Performance / Cyclomatic complexity",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java",
+    "lines": "57-143"
+  },
+  {
+    "id": "PERF-NQ-003",
+    "title": "EvidenceMatrixService.matrix() is a 4-level nested N+1 (framework -> control -> sub-control -> evidence items)",
+    "phase": "Performance",
+    "severity": "Critical",
+    "category": "Nested N+1 Query",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java",
+    "lines": "57-143"
+  },
+  {
+    "id": "PERF-IX-002",
+    "title": "Early core-module migrations (compliance, incident, tprm) create tables with zero secondary indexes — inconsistent indexing discipline left foundational registers unindexed",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Database Indexing / Schema Standards",
+    "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql",
+    "lines": "1-112"
+  },
+  {
+    "id": "FUNC-001",
+    "title": "Frontend (tss-grc-ui-v2) ships with zero executable automated tests and no test runner wired into the build",
+    "phase": "Functional",
+    "severity": "High",
+    "category": "Test Coverage / Quality Assurance",
+    "file": "tss-grc-ui-v2/package.json",
+    "lines": "1-40"
+  },
+  {
+    "id": "FUNC-002",
+    "title": "Backend branch coverage is 26.0% and 762 of 1324 classes (57.6%) have 0% coverage — decision logic is largely unexercised",
+    "phase": "Functional",
+    "severity": "High",
+    "category": "Test Coverage / Quality Assurance",
+    "file": "tss-grc-backend/target/site/jacoco/jacoco.csv",
+    "lines": "1-1324"
+  },
+  {
+    "id": "FUNC-003",
+    "title": "Confirmed Critical/High security findings have no test asserting the vulnerable path — 5 of 6 Critical findings sit on classes at 0% coverage or with tests that miss the exploit",
+    "phase": "Functional",
+    "severity": "High",
+    "category": "Test Coverage / Security Regression Testing",
+    "file": "audit/crit_high.json",
+    "lines": "1-55"
+  },
+  {
+    "id": "COPY-01",
+    "title": "Login form ships with pre-filled admin / Admin@12345 credentials and a plaintext credential hint",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Microcopy / Security-adjacent UX",
+    "file": "tss-grc-ui-v2/src/pages/LoginPage.tsx",
+    "lines": "25-26, 114"
+  },
+  {
+    "id": "LH-01",
+    "title": "Critical-path module pages eagerly imported in App.tsx defeat code-splitting on the public /login route",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Performance / Bundle size",
+    "file": "tss-grc-ui-v2/src/App.tsx",
+    "lines": "7-18,167"
+  },
+  {
+    "id": "LH-02",
+    "title": "Both full-language translation dictionaries (ar.ts ~1.05 MiB + en.ts ~0.84 MiB) statically imported and shipped to /login",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Performance / Bundle size",
+    "file": "tss-grc-ui-v2/src/lib/i18n.tsx",
+    "lines": "2-3"
+  },
+  {
+    "id": "LH-03",
+    "title": "Catastrophic Core Web Vitals on /login: FCP 37.4 s, LCP 72.3 s, Speed Index 37.4 s, TTI 72.3 s",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Performance / Core Web Vitals",
+    "file": "audit/raw/lighthouse-login.report.json",
+    "lines": "76-100"
+  },
+  {
+    "id": "A11Y-001",
+    "title": "Sidebar muted text (--sb-text-3) fails WCAG 1.4.3 contrast on every authenticated page (2.4:1)",
+    "phase": "Accessibility",
+    "severity": "High",
+    "category": "Color Contrast",
+    "file": "tss-grc-ui-v2/src/styles/tokens.css",
+    "lines": "116"
+  },
+  {
+    "id": "A11Y-002",
+    "title": "Muted body/label grey (--ink-4) fails WCAG 1.4.3 on light surfaces (2.7:1)",
+    "phase": "Accessibility",
+    "severity": "High",
+    "category": "Color Contrast",
+    "file": "tss-grc-ui-v2/src/styles/tokens.css",
+    "lines": "28"
+  },
+  {
+    "id": "A11Y-003",
+    "title": "Risk score pills: white text on --risk-vhigh fails WCAG 1.4.3 (3.16:1) — 25 instances on the Risk Register",
+    "phase": "Accessibility",
+    "severity": "High",
+    "category": "Color Contrast",
+    "file": "tss-grc-ui-v2/src/styles/tokens.css",
+    "lines": "98"
+  }
+]

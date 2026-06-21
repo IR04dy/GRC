@@ -1,0 +1,229 @@
+{
+  "findings": [
+    {
+      "id": "SEC-INT-001",
+      "title": "CCM CUSTOM_SQL runner executes arbitrary tenant-supplied SELECT as native SQL — cross-tenant data exfiltration",
+      "phase": "Security",
+      "category": "SQL Injection / Broken Access Control (A03 / A01)",
+      "severity": "Critical",
+      "cvss": "CVSS 9.1 (AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:L) — authenticated operator reads any table in the shared DB, crossing the tenant boundary",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/CustomSqlRunner.java",
+      "lines": "59-138",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/controller/CcmController.java:63-97",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/service/CcmService.java:172-203",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/dto/CcmDtos.java:22-36"
+      ],
+      "description": "A CCM test definition of type CUSTOM_SQL stores a free-form SQL string in expected_condition_json.sql. The CustomSqlRunner reads that string and runs it verbatim through em.createNativeQuery(sql).getResultList(). The only gate is rejectionReason(): it requires the statement to begin with SELECT, rejects a fixed blacklist of DML/DDL tokens (INSERT/UPDATE/DELETE/...), and rejects ';'. None of this constrains WHICH tables or columns a SELECT may read, and there is no organisation_id predicate injected. The SQL runs against the single shared TSS_GRC database that holds every tenant's rows. Therefore any operator who can create/run a CUSTOM_SQL test (COMPLIANCE_OFFICER, CISO, PLATFORM_ADMIN per WRITE_GUARD/RUN_GUARD in CcmController) can read arbitrary data belonging to other tenants — e.g. SELECT username, password_hash FROM iam.users, or risk/incident/privacy rows for any organisation_id. The blacklist is irrelevant because exfiltration needs no forbidden keyword: a plain SELECT is sufficient. The blacklist itself is also weak (token must be surrounded by spaces, so 'DELETE(' or comment tricks can slip past), but the dominant impact is the unrestricted read.",
+      "rootCause": "User-controlled SQL is executed as native SQL with no allow-list of tables/columns and no enforced organisation_id scoping. A deny-list of statement types is mistaken for an access-control boundary; SELECT-only does not prevent cross-tenant reads in a shared-schema multi-tenant DB.",
+      "evidence": "Query q = em.createNativeQuery(sql);\nList<?> result = q.getResultList();\n// rejectionReason() only checks: starts-with SELECT, forbidden DML tokens, ';' — never which table/org",
+      "impact": "Full cross-tenant confidentiality breach: a compliance officer in tenant A can dump credentials (password hashes), PDPL-protected PII, risk registers and incidents for tenants B and C from one shared DB. Because the runner is also reachable from the scheduler, a crafted definition runs repeatedly. This defeats the platform's #1 control (organisation_id scoping). Even within a single tenant it exposes columns the role would never be allowed to read through the normal API (e.g. auth secrets).",
+      "reproduction": "1. Authenticate as a COMPLIANCE_OFFICER (or CISO/PLATFORM_ADMIN).\n2. POST /api/v1/ccm/tests with testType='CUSTOM_SQL', expectedConditionJson='{\"sql\":\"SELECT username, password_hash FROM iam.users\",\"maxRowCount\":0}'.\n3. POST /api/v1/ccm/tests/{externalId}/run-now.\n4. GET /api/v1/ccm/tests/{externalId}/runs — the actualValueJson / failureReason and rowCount reveal data from every tenant (no organisation_id filter was applied). Swap the query to any other tenant's table to confirm cross-tenant read.",
+      "resolution": "Do not execute free-form tenant SQL. Replace CUSTOM_SQL with parameterised, pre-registered query templates whose table set is allow-listed, or run such queries only against a dedicated read-only schema that contains no other module/tenant data. If free SQL must stay, run it on a per-tenant least-privilege DB account that can only SELECT from that tenant's views, parse the statement with a real SQL grammar (not regex), reject any reference to tables outside an allow-list, and mandatorily append a WHERE organisation_id = :ctx predicate. Restrict the capability to PLATFORM_ADMIN at minimum and audit every definition.",
+      "patchBefore": "Query q = em.createNativeQuery(sql);\nList<?> result = q.getResultList();",
+      "patchAfter": "// CUSTOM_SQL free-form execution removed.\n// Resolve a pre-registered, parameterised template by id and bind the tenant:\nQueryTemplate tmpl = templates.requireAllowListed(strOr(cond, \"templateId\", \"\"));\nQuery q = em.createNativeQuery(tmpl.sql());            // sql is developer-authored, table allow-listed\nq.setParameter(\"orgId\", TenantContext.getCurrentTenant());\nList<?> result = q.getResultList();",
+      "effort": "L",
+      "references": [
+        "CWE-89: SQL Injection",
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP A03:2021 Injection",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-INT-002",
+      "title": "ServiceNow inbound webhook resolves IntegrationExternalLink without organisation_id — cross-tenant write/IDOR",
+      "phase": "Security",
+      "category": "Broken Access Control / IDOR (A01)",
+      "severity": "High",
+      "cvss": "CVSS 7.1 (AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:H/A:N) — cross-tenant state mutation and event injection via predictable INC number",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/servicenow/webhook/ServiceNowWebhookController.java",
+      "lines": "68-120",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/servicenow/repository/IntegrationExternalLinkRepository.java:15-16"
+      ],
+      "description": "The webhook handler locates the GRC record by linkRepo.findFirstByIntegrationAndExternalNumber(\"SERVICENOW\", number), a finder that is NOT scoped by organisation_id (it is the only non-org-scoped method on the repository). It then mutates that link (lastKnownState/lastPulledAt) and publishes a DomainEvent under link.getOrganisationId() — i.e. under whatever tenant happens to own the first matching row, regardless of which tenant's service account called the webhook. The endpoint is guarded only by hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE'); there is no check that the caller's TenantContext owns the matched link. ServiceNow incident numbers (INC0012345) are sequential and predictable, so a caller authenticated as one tenant's integration service account can drive state changes and emit automation-triggering events against another tenant's records by posting that tenant's INC number.",
+      "rootCause": "A by-natural-key lookup that omits organisation_id, combined with trusting the matched row's own org id instead of the authenticated caller's TenantContext. Multi-tenant scoping is the developer's per-query responsibility here and was skipped.",
+      "evidence": "Optional<IntegrationExternalLink> match = linkRepo\n    .findFirstByIntegrationAndExternalNumber(\"SERVICENOW\", number);\n...\npublisher.publishEvent(DomainEvent.of(link.getOrganisationId(), \"SNOW_INCIDENT_UPDATED\", ...));",
+      "impact": "A holder of one tenant's INTEGRATION_SERVICE/SOC_AUTOMATION account can flip the tracked state of another tenant's incident/finding/CAPA and fire that tenant's automation rules (e.g. auto-close a GRC item) by guessing/enumerating INC numbers. Cross-tenant integrity loss and potential abuse of downstream automation. Also a confused-deputy: the event is attributed to the victim tenant.",
+      "reproduction": "1. As tenant-A's service account (one of the three allowed roles), POST /api/v1/integrations/servicenow/webhook/incident-updated with {\"number\":\"INC0010001\",\"state\":\"7\"} where INC0010001 belongs to tenant B.\n2. Response returns matched=true with tenant B's grcModule/grcRecordId, the tenant-B link row is updated, and a SNOW_INCIDENT_UPDATED event fires under tenant B's org id. No tenant-ownership check occurred.",
+      "resolution": "Scope the lookup by the caller's tenant: read orgId from TenantContext (the JWT filter populates it for an authenticated service account) and use a findByOrganisationIdAndIntegrationAndExternalNumber finder; treat a miss as 'not matched' (return 200 with matched=false). Never act on or attribute events to a row whose organisation_id differs from the authenticated context.",
+      "patchBefore": "Optional<IntegrationExternalLink> match = linkRepo\n    .findFirstByIntegrationAndExternalNumber(\"SERVICENOW\", number);",
+      "patchAfter": "Long orgId = TenantContext.getCurrentTenant();\nif (orgId == null) return ResponseEntity.status(400).body(Map.of(\"received\", false, \"reason\", \"missing tenant\"));\nOptional<IntegrationExternalLink> match = linkRepo\n    .findFirstByOrganisationIdAndIntegrationAndExternalNumber(orgId, \"SERVICENOW\", number);",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-565: Reliance on Cookies/Identifiers without Validation",
+        "OWASP A01:2021 Broken Access Control",
+        "OWASP API1:2023 Broken Object Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-INT-003",
+      "title": "Outbound EDR/VM actions accept arbitrary host/asset IDs with no tenant-ownership check (cross-tenant containment / risk-acceptance)",
+      "phase": "Security",
+      "category": "Broken Object Level Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:H) — applicable when one platform instance serves multiple tenants against one shared Falcon/Tenable",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/service/CrowdStrikeOutboundService.java",
+      "lines": "70-134",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/controller/CrowdStrikeController.java:150-167",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/service/TenableOutboundService.java:89-134",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/controller/TenableController.java:158-191"
+      ],
+      "description": "containHost(hostId)/liftContainment(hostId)/hideHost(hostId) and Tenable recastSeverity/acceptRisk/removeRecast(pluginId, assetUuid) take the target identifier straight from the URL path/body and forward it to the single, globally-configured Falcon/Tenable instance. The services require a non-null TenantContext but never verify that the supplied hostId/assetUuid actually belongs to the calling tenant (there is no lookup against this tenant's known assets/detections). The integration credentials are platform-global config (one baseUrl + one credential pair), so when a single deployment serves more than one tenant they all share one upstream EDR/VM tenant. A SOC operator in tenant A can therefore isolate (network-quarantine) or un-isolate a host, or recast/accept-risk a finding, that belongs to tenant B simply by supplying B's host/asset id. Containment is a destructive, availability-impacting action.",
+      "rootCause": "No binding between the tenant scope and the external object identifier. Authorization is purely functional (role can contain) with no object-level check that the host/asset is in the caller's tenant inventory; the upstream integration is shared across tenants.",
+      "evidence": "public ContainmentResponse containHost(String falconHostId, String reasonText) {\n    return runAction(\"CONTAIN_HOST\", falconHostId, reasonText, () -> client.containHost(falconHostId, reasonText));\n}\n// runAction requires TenantContext != null but never checks falconHostId belongs to that tenant",
+      "impact": "In a multi-tenant deployment sharing one Falcon/Tenable backend, a user can quarantine another tenant's production hosts (denial of service) or downgrade/accept-risk another tenant's vulnerabilities (integrity / compliance evasion). If each tenant maps 1:1 to its own integration instance the exposure is limited to intra-tenant BFLA; the audit trail records userId, which mitigates non-repudiation but not the action itself.",
+      "reproduction": "1. In a deployment where tenants A and B share one configured CrowdStrike instance, authenticate as tenant A SOC_TIER_2.\n2. POST /api/v1/integrations/crowdstrike/contain/{hostId} with hostId = a Falcon device id owned by tenant B and any reason >0 chars.\n3. The action is dispatched to the shared Falcon tenant and host B is isolated; no check confirmed host B belongs to tenant A.",
+      "resolution": "Before dispatching, resolve the target id against the calling tenant's own inventory (e.g. crowdstrike_detection_log / tenable_finding_log scoped by organisation_id, or an asset registry) and reject ids not owned by TenantContext. For genuinely multi-tenant deployments, also segregate upstream credentials per tenant so one tenant cannot act on another's upstream objects.",
+      "patchBefore": "public ContainmentResponse containHost(String falconHostId, String reasonText) {\n    return runAction(\"CONTAIN_HOST\", falconHostId, reasonText, () -> client.containHost(falconHostId, reasonText));\n}",
+      "patchAfter": "public ContainmentResponse containHost(String falconHostId, String reasonText) {\n    Long orgId = TenantContext.getCurrentTenant();\n    if (detectionLogRepo.findFirstByOrganisationIdAndFalconHostId(orgId, falconHostId).isEmpty())\n        throw new AccessDeniedException(\"host not in this tenant's inventory\");\n    return runAction(\"CONTAIN_HOST\", falconHostId, reasonText, () -> client.containHost(falconHostId, reasonText));\n}",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-INT-004",
+      "title": "Tenable plugin/asset id interpolated into outbound API URL path without validation (path injection / SSRF-adjacent)",
+      "phase": "Security",
+      "category": "Improper Neutralization in URL / SSRF (A10 / A03)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N) — authenticated request-path manipulation against the configured Tenable host",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/client/LiveTenableClient.java",
+      "lines": "167-207",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/client/LiveTenableClient.java:343-348",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/controller/TenableController.java:158-191",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/service/TenableOutboundService.java:261-265"
+      ],
+      "description": "recastSeverity/acceptRisk/removeRecast build the request path with IO_RECAST_PATH_FMT.formatted(assetUuid, pluginId) and pass the resulting string to RestClient .uri(url(path)). pluginId comes from the @PathVariable with no @Pattern (validatePluginId only checks non-blank), and assetUuid from the body has only @Size(max=80) with no character constraint (the /remove-recast RemoveRecastBody.assetUuid has no constraint at all). Because the values are concatenated raw into the URL path, a value such as a/../../session or one containing %2f / query-delimiter characters can traverse to a different Tenable API path or alter query semantics on the configured Tenable host. The base host is fixed by config so this is host-bounded path manipulation, not full SSRF, but it lets an authorized user reach Tenable endpoints other than the intended recast/accept-risk routes (e.g. read or mutate other workbench resources the API key can reach).",
+      "rootCause": "Untrusted identifiers are placed into a URL path via String.format and a raw .uri(String) template instead of being validated against a strict format and passed as encoded URI variables.",
+      "evidence": "return runOutbound(\"RECAST_SEVERITY\", pluginId, assetUuid,\n    assetUuid == null ? IO_RECAST_PATH_FMT.formatted(\"*\", pluginId)\n                      : IO_RECAST_PATH_FMT.formatted(assetUuid, pluginId), body);\n// url(path): base + path  -> http.post().uri(url(path))   // pluginId/assetUuid unvalidated",
+      "impact": "An authorized CISO/RISK_MANAGER can craft pluginId/assetUuid to redirect the outbound call to unintended Tenable API paths under the same host, using the platform's privileged API key — expanding the effective surface of the integration credential beyond recast/accept-risk and bypassing the justification/audit semantics those routes assume.",
+      "reproduction": "1. Authenticate as RISK_MANAGER.\n2. POST /api/v1/integrations/tenable/recast/{pluginId} where pluginId = '1/../../scans' (URL-encoded as needed) with a valid body and a 30+ char justification.\n3. Observe the outbound request path resolves to a non-recast Tenable endpoint (visible in stub recorded-calls or via the audit log/ruleId mismatch). Constrain pluginId to digits to confirm the fix blocks it.",
+      "resolution": "Validate pluginId (Tenable plugin ids are numeric) with @Pattern(\"\\\\d+\") and assetUuid with a UUID @Pattern on both RecastRequest, AcceptRiskRequest and RemoveRecastBody; re-validate in the service. Pass identifiers as RestClient URI variables (uri(template, vars)) so they are percent-encoded, rather than pre-formatting them into the path string.",
+      "patchBefore": "// controller\n@PathVariable(\"pluginId\") String pluginId\n// client\nIO_RECAST_PATH_FMT.formatted(assetUuid, pluginId)",
+      "patchAfter": "// DTO / path var\n@Pattern(regexp = \"\\\\d{1,12}\") String pluginId;\n@Pattern(regexp = \"[0-9a-fA-F-]{36}\") String assetUuid;\n// client — let RestClient encode the variables\nhttp.post().uri(\"/workbenches/assets/{a}/vulnerabilities/{p}/recast\", assetUuid, pluginId)",
+      "effort": "M",
+      "references": [
+        "CWE-88: Improper Neutralization of Argument Delimiters (Argument Injection)",
+        "CWE-918: Server-Side Request Forgery",
+        "OWASP A10:2021 Server-Side Request Forgery",
+        "OWASP A03:2021 Injection"
+      ]
+    },
+    {
+      "id": "SEC-INT-005",
+      "title": "Splunk webhook HMAC verification has a body-mismatch fallback that allows signature bypass",
+      "phase": "Security",
+      "category": "Improper Verification of Cryptographic Signature (A02/A08)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.3 (AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:H/A:N) — forged alert ingestion when raw body is not cached",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/webhook/SplunkWebhookController.java",
+      "lines": "286-315",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/webhook/SplunkWebhookController.java:114-139"
+      ],
+      "description": "The HMAC check computes the digest over the request body, but when the raw body was not cached as the 'RAW_BODY' request attribute it falls back to req.getReader().lines().reduce(\"\", (a,b) -> a+b). By the time the handler runs, Spring's @RequestBody Map binder has already consumed the servlet input stream, so getReader() typically yields an empty string. The HMAC is then computed over \"\" — a value the attacker can also compute — while the actual JSON payload that gets ingested is the already-parsed Map. This decouples the signed bytes from the processed content: an attacker who knows the shared secret-over-empty-string (or who can force the empty-body path) can present a valid-looking signature for an arbitrary alert body. There is no servlet filter in this package that sets RAW_BODY, so the fragile fallback path is the default. Additionally the comparison uses a non-constant-time length check before the constant-time loop, and the whole verification is silently skipped when no shared secret is configured (role guard only).",
+      "rootCause": "Signature is verified against a best-effort re-read of an already-consumed request stream rather than against the exact bytes that produced the parsed payload. No ContentCachingRequestWrapper / filter guarantees the signed bytes equal the processed bytes.",
+      "evidence": "if (req.getAttribute(\"RAW_BODY\") instanceof String cached) { body = cached; }\nelse { body = req.getReader().lines().reduce(\"\", (a, b) -> a + b); }  // stream already consumed by @RequestBody\nbyte[] digest = mac.doFinal(body.getBytes(StandardCharsets.UTF_8));",
+      "impact": "The HMAC control intended to authenticate Splunk's outbound webhook can be defeated when the raw body is not cached (the default), letting a party that reaches the endpoint inject forged SIEM alerts into socops.security_event with attacker-chosen severity/host, polluting the SOC triage queue and SLA timers and triggering downstream automation. Combined with SEC-INT-002's missing tenant scoping, forged events are written under the caller's tenant.",
+      "reproduction": "1. Configure grc.integrations.splunk.webhook-shared-secret.\n2. POST a JSON alert to /api/v1/integrations/splunk/webhook with X-Splunk-Signature = HMAC-SHA256('', secret).\n3. Because @RequestBody already drained the stream, verifySignature computes HMAC over \"\" and matches the header, so the forged alert with attacker-controlled severity is accepted and stored.",
+      "resolution": "Register a ContentCachingRequestWrapper (or a filter that stores the exact raw bytes in RAW_BODY) for this route and verify the HMAC over those bytes; fail closed if the raw body is unavailable instead of hashing an empty string. Keep the constant-time compare but drop the early length-based exit only after confirming both inputs are fixed-length hex. Consider making the shared secret mandatory in non-dev profiles so verification is never silently skipped.",
+      "patchBefore": "if (req.getAttribute(\"RAW_BODY\") instanceof String cached) { body = cached; }\nelse { body = req.getReader().lines().reduce(\"\", (a, b) -> a + b); }",
+      "patchAfter": "Object cached = req.getAttribute(\"RAW_BODY\");\nif (!(cached instanceof String raw) || raw.isEmpty()) {\n    log.warn(\"[Splunk-Webhook] raw body unavailable — failing signature check closed\");\n    return false;   // fail closed; do not hash an empty/partial body\n}\nbyte[] digest = mac.doFinal(raw.getBytes(StandardCharsets.UTF_8));",
+      "effort": "M",
+      "references": [
+        "CWE-347: Improper Verification of Cryptographic Signature",
+        "CWE-345: Insufficient Verification of Data Authenticity",
+        "OWASP A08:2021 Software and Data Integrity Failures"
+      ]
+    },
+    {
+      "id": "SEC-INT-006",
+      "title": "Inbound webhooks rely on user-JWT roles for machine-to-machine auth (no dedicated webhook authentication)",
+      "phase": "Security",
+      "category": "Identification & Authentication Failures (A07)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — broad standing credential for inbound integration traffic",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/servicenow/webhook/ServiceNowWebhookController.java",
+      "lines": "68-69",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/webhook/SplunkWebhookController.java:114-115"
+      ],
+      "description": "Both inbound webhooks authenticate the external system as a normal platform user holding one of PLATFORM_ADMIN / SOC_AUTOMATION / INTEGRATION_SERVICE roles (a long-lived bearer JWT). The ServiceNow webhook has no payload signature at all; the Splunk webhook's HMAC is optional and skipped when no shared secret is configured (and is itself bypassable — see SEC-INT-005). The design comment acknowledges 'The platform does not yet have a dedicated machine-to-machine auth scheme'. A leaked service-account token grants full webhook access and (per the code) the SOC_AUTOMATION/INTEGRATION_SERVICE roles are reused across multiple sensitive endpoints (poll triggers, etc.).",
+      "rootCause": "No purpose-scoped credential or mandatory request signing for inbound integration callbacks; reuse of broad human-style roles for system-to-system calls.",
+      "evidence": "@PreAuthorize(\"hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')\")  // ServiceNow: no signature\n// SplunkWebhookController: same role guard; HMAC only when a shared secret is configured",
+      "impact": "A single compromised/over-shared service-account JWT lets an attacker post forged incident-update and alert events for whatever the lookup matches (amplified by SEC-INT-002). No per-message authenticity for ServiceNow. Standing broad roles increase blast radius of token leakage.",
+      "reproduction": "1. Obtain a JWT for an account with INTEGRATION_SERVICE (e.g. via token reuse/leak).\n2. POST to either webhook with a crafted payload; it is accepted with only the role check (ServiceNow) or with an optional/bypassable HMAC (Splunk).",
+      "resolution": "Introduce a dedicated webhook authentication mechanism: mandatory per-integration HMAC signing (correctly implemented over raw bytes), short-lived/narrowly-scoped credentials, and a least-privilege role used only for the specific webhook route. Make the Splunk shared secret mandatory outside dev and add an equivalent signature for ServiceNow.",
+      "patchBefore": "@PreAuthorize(\"hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')\")\npublic ResponseEntity<Map<String, Object>> incidentUpdated(@RequestBody Map<String, Object> payload) {",
+      "patchAfter": "@PreAuthorize(\"hasRole('INTEGRATION_SERVICE')\")  // narrow, webhook-only role\npublic ResponseEntity<Map<String, Object>> incidentUpdated(\n        @RequestBody Map<String, Object> payload,\n        @RequestHeader(\"X-Snow-Signature\") String sig, HttpServletRequest req) {\n    if (!verifyMandatorySignature(req, sig)) return ResponseEntity.status(401).build();",
+      "effort": "M",
+      "references": [
+        "CWE-306: Missing Authentication for Critical Function",
+        "CWE-1390: Weak Authentication",
+        "OWASP A07:2021 Identification and Authentication Failures"
+      ]
+    },
+    {
+      "id": "SEC-INT-007",
+      "title": "CCM run-listing endpoints accept an unbounded limit parameter",
+      "phase": "Security",
+      "category": "Improper Input Validation / Resource Exhaustion (A04)",
+      "severity": "Low",
+      "cvss": "CVSS 3.7 (AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:L) — authenticated resource-consumption via large page size",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/controller/CcmController.java",
+      "lines": "101-114",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/service/CcmService.java:298-321"
+      ],
+      "description": "GET /tests/{externalId}/runs and GET /runs/recent take @RequestParam(defaultValue=\"50\") int limit with no upper bound (no @Max / clamp). The service passes it straight into PageRequest.of(0, Math.max(1, limit)), so limit=2000000000 requests an enormous page. An authenticated reader can repeatedly request very large pages to pressure the DB and heap.",
+      "rootCause": "Page size is taken from the client without a maximum bound.",
+      "evidence": "public List<TestRunResponse> recent(@RequestParam(defaultValue = \"50\") int limit) {\n    return service.listLatestRuns(limit);\n}\n// service: runRepo.findRecent(orgId, PageRequest.of(0, Math.max(1, limit)))",
+      "impact": "Low-severity denial-of-service / memory pressure from oversized result sets; bounded to the caller's own tenant data and requires a valid read role, so impact is limited.",
+      "reproduction": "1. Authenticate with any READ_GUARD role.\n2. GET /api/v1/ccm/runs/recent?limit=100000000 and observe the server attempt to materialise a very large page.",
+      "resolution": "Clamp the page size to a sane maximum (e.g. 200) in the controller or service, or annotate the param with @Max.",
+      "patchBefore": "public List<TestRunResponse> recent(@RequestParam(defaultValue = \"50\") int limit) {\n    return service.listLatestRuns(limit);\n}",
+      "patchAfter": "public List<TestRunResponse> recent(@RequestParam(defaultValue = \"50\") @Max(200) @Min(1) int limit) {\n    return service.listLatestRuns(Math.min(Math.max(1, limit), 200));\n}",
+      "effort": "S",
+      "references": [
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "OWASP A04:2021 Insecure Design",
+        "OWASP API4:2023 Unrestricted Resource Consumption"
+      ]
+    },
+    {
+      "id": "SEC-INT-008",
+      "title": "Splunk verifySsl flag is documented but never wired into the RestClient",
+      "phase": "Security",
+      "category": "Security Misconfiguration (A05)",
+      "severity": "Info",
+      "cvss": "N/A — fails safe (TLS always verified); correctness/expectation gap, not an exploitable weakness",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/config/SplunkIntegrationConfig.java",
+      "lines": "49-63",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/config/SplunkProperties.java:42-45"
+      ],
+      "description": "SplunkProperties exposes verifySsl (default true) and the bean Javadoc says 'SSL verification is controlled via verifySsl'. In practice splunkRestClient() builds a SimpleClientHttpRequestFactory and never reads props.isVerifySsl(); the default JDK trust store is always used. The good news is the flag is effectively dead in the secure direction — setting verifySsl=false does NOT actually disable TLS verification (so there is no accidental cert-bypass). The risk is the inverse expectation gap: an operator may believe they can toggle verification and the /config endpoint reports verifySsl=true, masking that the setting has no effect. If a future change wires the flag through, the disable path must be guarded to non-dev profiles. Flagged as Info because nothing is currently exploitable.",
+      "rootCause": "Configuration property declared and surfaced in /config but not consumed by the HTTP client factory.",
+      "evidence": "@Bean(\"splunkRestClient\") public RestClient splunkRestClient() {\n    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();\n    // ... verifySsl never read here ...\n    return RestClient.builder().requestFactory(factory).build();\n}",
+      "impact": "No direct security impact today (TLS stays verified). Operational confusion only: the toggle and its /config readout are misleading. Documented here so a later 'make verifySsl work' change does not introduce an insecure default.",
+      "reproduction": "1. Set grc.integrations.splunk.verify-ssl=false and mode=LIVE.\n2. Observe outbound HEC calls still validate the server certificate (handshake fails against a self-signed host), proving the flag is inert; GET /config still reports verifySsl=false while behaviour is verified=true.",
+      "resolution": "Either remove the unused property (and its /config field) to avoid confusion, or wire it through a custom request factory while restricting the insecure value to dev-only profiles with a loud startup warning.",
+      "patchBefore": "// verifySsl declared in SplunkProperties, never consumed by splunkRestClient()",
+      "patchAfter": "// Option A: delete the verifySsl property + /config field.\n// Option B (if needed): build a request factory honouring verifySsl, and on prod profiles refuse verifySsl=false.",
+      "effort": "S",
+      "references": [
+        "CWE-295: Improper Certificate Validation",
+        "CWE-1059: Incomplete Documentation of Program Execution",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    }
+  ]
+}

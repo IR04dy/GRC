@@ -1,0 +1,144 @@
+{
+  "findings": [
+    {
+      "id": "SEC-AUTH-001",
+      "title": "No automatic account lockout or brute-force throttling on login",
+      "phase": "Security",
+      "category": "Identification and Authentication Failures (A07) / CWE-307",
+      "severity": "High",
+      "cvss": "CVSS ~7.5 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N) — unlimited online password guessing against any account, including admin",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java",
+      "lines": "56-119",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/entity/User.java:47-54",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/service/CustomUserDetailsService.java:41-58",
+        "tss-grc-backend/src/main/resources/application.yml:149-150",
+        "tss-grc-backend/src/main/resources/application-prod.yml:109-110"
+      ],
+      "description": "The login flow authenticates via AuthenticationManager.authenticate(...) and, on success, returns tokens. The User entity defines failed_login_attempts, locked_until and is_locked columns, and every profile defines grc.security.max-failed-login-attempts / lockout-duration-minutes (prod uses max-login-attempts). However, NO Java code ever reads those properties, increments failedLoginAttempts, sets lockedUntil, or flips isLocked on repeated failures, and there is no AuthenticationFailure event listener and no rate-limiting filter on /api/auth/login. A grep for setFailedLoginAttempts / setLockedUntil / AuthenticationFailureBadCredentialsEvent across src/main/java returns no matches; the lockout property keys are referenced nowhere in Java. The only lockout signal that reaches Spring Security is accountNonLocked, derived from the static is_locked boolean (CustomUserDetailsService line 55), which can only be toggled manually by an administrator. Consequently an attacker can submit unlimited password guesses against any username with no slowdown, no lockout, and no captcha. (Note: the dev profile intentionally sets max-failed-login-attempts=99 / lockout=1min, but even that value is never consumed.)",
+      "rootCause": "The data model and configuration for lockout were scaffolded (User.failedLoginAttempts/lockedUntil, grc.security.* keys) but the enforcement logic — a failure/success event listener that updates the counter and locks the account, plus a request throttle on the login endpoint — was never implemented.",
+      "evidence": "AuthController.login(): catch (AuthenticationException ex) { return ResponseEntity.status(401).body(Map.of(\"message\", \"Invalid username or password\")); }  // no failure counter, no lockout. CustomUserDetailsService.buildUserDetails(): new GrcUserDetails(..., !Boolean.TRUE.equals(user.getIsLocked()), authorities)  // accountNonLocked driven only by the manual is_locked flag. grep setFailedLoginAttempts|setLockedUntil|AuthenticationFailureBadCredentialsEvent over src/main/java => No matches found.",
+      "impact": "Online brute-force and credential-stuffing against any account (including the seeded PLATFORM_ADMIN `admin`) is unrestricted. With BCrypt cost 12 the per-guess server cost is high, but there is still no account-level or IP-level limit, so a determined attacker can run a slow-but-unbounded guessing campaign and a botnet can parallelise credential stuffing. Compromise of a PLATFORM_ADMIN grants full cross-tenant control.",
+      "reproduction": "1. POST /api/auth/login with {\"username\":\"admin\",\"password\":\"wrong-1\"} → 401 \"Invalid username or password\". 2. Repeat 100+ times with different passwords. 3. Observe every attempt returns 401 with no lockout, no Retry-After, no captcha; failed_login_attempts in iam.users stays 0 and locked_until stays NULL. 4. The account is never locked regardless of failure count.",
+      "resolution": "Implement an AuthenticationFailureBadCredentialsEvent / AuthenticationSuccessEvent listener that increments User.failedLoginAttempts, sets lockedUntil = now + grc.security.lockout-duration-minutes once attempts >= grc.security.max-failed-login-attempts, and resets the counter + sets lastLoginAt on success. Make accountNonLocked also honour lockedUntil (lock if lockedUntil is in the future). Add per-IP/per-username rate limiting on /api/auth/login (e.g. Bucket4j or a Spring filter). Bind the existing grc.security.* keys via a @ConfigurationProperties bean and standardise the prod key name (max-login-attempts vs max-failed-login-attempts).",
+      "patchBefore": "@Override public boolean isAccountNonLocked() { return accountNonLocked; }\n// CustomUserDetailsService:\n!Boolean.TRUE.equals(user.getIsLocked())  // only the manual flag\n// AuthController.login: catch (AuthenticationException ex) { return 401; }  // no counter",
+      "patchAfter": "@Component @RequiredArgsConstructor\nclass LoginAttemptListener {\n  private final UserRepository users;\n  @Value(\"${grc.security.max-failed-login-attempts:5}\") int max;\n  @Value(\"${grc.security.lockout-duration-minutes:30}\") long lockMin;\n  @EventListener void onFailure(AuthenticationFailureBadCredentialsEvent e) {\n    users.findByUsername(String.valueOf(e.getAuthentication().getName())).ifPresent(u -> {\n      int n = (u.getFailedLoginAttempts()==null?0:u.getFailedLoginAttempts())+1;\n      u.setFailedLoginAttempts(n);\n      if (n >= max) u.setLockedUntil(LocalDateTime.now().plusMinutes(lockMin));\n      users.save(u);\n    });\n  }\n  @EventListener void onSuccess(AuthenticationSuccessEvent e) { /* reset counter + lastLoginAt */ }\n}\n// GrcUserDetails: isAccountNonLocked() returns accountNonLocked && (lockedUntil == null || lockedUntil.isBefore(now))",
+      "effort": "M",
+      "references": [
+        "CWE-307: Improper Restriction of Excessive Authentication Attempts",
+        "OWASP A07:2021 Identification and Authentication Failures",
+        "OWASP ASVS 4.0 2.2.1 (anti-automation/lockout)"
+      ]
+    },
+    {
+      "id": "SEC-AUTH-002",
+      "title": "Weak password policy — minimum length 8, no complexity, no breach check",
+      "phase": "Security",
+      "category": "Identification and Authentication Failures (A07) / CWE-521",
+      "severity": "Medium",
+      "cvss": "CVSS ~5.3 — weak passwords accepted, amplifies the lack of lockout in SEC-AUTH-001",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/iam/dto/UserRequest.java",
+      "lines": "6-21",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/service/UserService.java:46-86"
+      ],
+      "description": "Passwords are validated only by Jakarta `@Size(min = 8, max = 100)` on UserRequest.password. There is no complexity requirement (no required mix of upper/lower/digit/symbol), no check against common/breached passwords, no maximum-repeat / dictionary check, and no dedicated change-password endpoint with re-validation (password is simply re-encoded in UserService.create/update). The field is also nullable (not @NotBlank), so passwords are set wherever provided with no policy beyond length. For a regulated GRC platform targeting SAMA/NCA controls, an 8-char minimum with no complexity is below typical baselines. (Note: PasswordPolicyRunner referencing minLength 14 is a STUB control-test for external AD systems, not enforcement of this application's own user passwords.)",
+      "rootCause": "Password strength is enforced only by a bean-validation length annotation; no PasswordPolicy/validator component exists for the application's own user store.",
+      "evidence": "public record UserRequest( @NotBlank @Size(min = 3, max = 100) String username, ..., @Size(min = 8, max = 100) String password, ...)  // only length, password not even @NotBlank",
+      "impact": "Users (and admins creating users) can set trivially guessable passwords such as 'password' or 'aaaaaaaa'. Combined with the absence of lockout/throttling (SEC-AUTH-001), this materially increases the success probability of online guessing and credential stuffing.",
+      "reproduction": "1. As an admin, POST /api/v1/iam/users with password \"password\" (8 chars, all lowercase). 2. The request passes validation and the account is created with that password. 3. No complexity or breach-list rejection occurs.",
+      "resolution": "Introduce a password-policy validator (custom @StrongPassword constraint or a service-layer check) enforcing length >= 12, at least three of four character classes, rejection of the username/email substrings, and ideally a breached-password (k-anonymity HaveIBeenPwned) or local common-password blocklist. Apply it on create, update, and a dedicated self-service change-password endpoint that also requires the current password.",
+      "patchBefore": "@Size(min = 8, max = 100) String password,",
+      "patchAfter": "@StrongPassword @Size(min = 12, max = 100) String password,\n// where @StrongPassword enforces >=3 of {upper,lower,digit,symbol},\n// rejects username/email substrings, and checks a breached-password list",
+      "effort": "M",
+      "references": [
+        "CWE-521: Weak Password Requirements",
+        "OWASP A07:2021 Identification and Authentication Failures",
+        "NIST SP 800-63B 5.1.1 (memorized secrets)"
+      ]
+    },
+    {
+      "id": "SEC-AUTH-003",
+      "title": "Refresh-token store falls back to organisation_id = 1 when TenantContext is empty",
+      "phase": "Security",
+      "category": "Broken Access Control / Multi-tenancy (A01) / CWE-840",
+      "severity": "Low",
+      "cvss": "CVSS ~3.1 — tenant-attribution defect on a non-authorization audit row; no direct cross-tenant data read proven",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/auth/refresh_token/service/RefreshTokenStoreService.java",
+      "lines": "93-94",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java:86-93",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java:163-171"
+      ],
+      "description": "recordIssuance reads orgId from TenantContext and, if null, hard-codes orgId = 1L (\"login is the only path where TenantContext isn't yet set\"). Both call sites in AuthController do set TenantContext to the principal's / refresh-token's organisationId before calling recordIssuance, so in the normal flows the fallback is not hit. The risk is latent: if a future caller invokes recordIssuance without first populating TenantContext, the refresh-token row is silently mis-attributed to organisation 1 (the seeded TSS GRC tenant). Because the user-facing 'list my sessions' query (listActive/listAll) filters by organisation_id AND user_id, a row stamped with the wrong org would not surface in that user's own session list — i.e. it becomes an invisible/forensically-misleading session record rather than a cross-tenant read. The jti lookup (assertValid/findByJti) is org-agnostic, so refresh/revoke still function regardless of the stamped org.",
+      "rootCause": "Defensive default that picks an arbitrary concrete tenant id (1) instead of failing closed when the tenant is genuinely unknown.",
+      "evidence": "Long orgId = TenantContext.getCurrentTenant();\nif (orgId == null) orgId = 1L;   // login is the only path where TenantContext isn't yet set",
+      "impact": "Refresh-token audit/session rows can be attributed to the wrong tenant if recordIssuance is ever called outside the two current AuthController paths, undermining per-tenant session forensics and the 'list my active sessions' UI. No proven cross-tenant data disclosure today because both real callers set the context first.",
+      "reproduction": "1. Call RefreshTokenStoreService.recordIssuance(...) from a code path that has not set TenantContext (e.g. a future scheduled job or test). 2. Observe the persisted platform.refresh_token row has organisation_id = 1 regardless of the user's real org. 3. That user's GET /api/v1/auth/sessions (filtered by their real org) will not list the session.",
+      "resolution": "Pass the principal's organisationId explicitly into recordIssuance rather than reading it from thread-local, or fail closed (throw) when TenantContext is null instead of defaulting to 1. AuthController already has principal.getOrganisationId() / orgId in scope at both call sites.",
+      "patchBefore": "Long orgId = TenantContext.getCurrentTenant();\nif (orgId == null) orgId = 1L;   // login is the only path where TenantContext isn't yet set",
+      "patchAfter": "// Pass orgId in as a parameter from the authenticated principal:\nif (organisationId == null) throw new IllegalStateException(\"organisationId required to record refresh token\");\nrow.setOrganisationId(organisationId);",
+      "effort": "S",
+      "references": [
+        "CWE-840: Business Logic Errors",
+        "OWASP A01:2021 Broken Access Control (tenant isolation)"
+      ]
+    },
+    {
+      "id": "SEC-AUTH-004",
+      "title": "HMAC key derived from secret using platform-default charset (secret.getBytes())",
+      "phase": "Security",
+      "category": "Cryptographic Failures (A02) / CWE-326",
+      "severity": "Low",
+      "cvss": "CVSS ~2.0 — robustness/portability defect; HMAC strength itself is adequate",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/security/JwtTokenProvider.java",
+      "lines": "83-91",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/security/JwtTokenProvider.java:108",
+        "tss-grc-backend/src/main/java/com/tss/grc/security/JwtTokenProvider.java:127-129"
+      ],
+      "description": "The signing key is built with Keys.hmacShaKeyFor(secret.getBytes()) — String.getBytes() with no Charset argument, so it uses the JVM default charset. If two nodes (or the rotation tooling) run with different default charsets and the secret contains non-ASCII bytes, the derived key differs and tokens fail to verify across nodes. Separately, validateSecret enforces secret.length() >= 32 characters; for a key with non-ASCII characters the byte length (true entropy fed to HMAC) can differ from the character count, and the length check is on characters not bytes. The default dev secret placeholder is correctly rejected by validateSecret (it contains 'change_me'), so the historic 'known default key' regression is mitigated. The algorithm is HS256 via signWith(secretKey) and verification uses Jwts.parser().verifyWith(secretKey) (JJWT 0.12.6), which pins HMAC verification and rejects alg:none / RS-to-HS confusion — so those classic JWT attacks are NOT present.",
+      "rootCause": "getBytes() without an explicit StandardCharsets.UTF_8 argument, and a strength check expressed in characters rather than key bytes.",
+      "evidence": "this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());  // platform-default charset\nif (secret.length() < 32) { throw new IllegalStateException(\"JWT_SECRET must be at least 32 characters (256 bits)...\"); }",
+      "impact": "Mostly an operational/portability robustness issue: ASCII secrets (the documented recommendation: openssl rand -base64 48) are unaffected, but a non-ASCII secret could cause intermittent token-verification failures across heterogeneous nodes or after a JVM/locale change, and the byte-length of the key is not directly asserted.",
+      "reproduction": "1. Set JWT_SECRET to a 32-char string containing multi-byte UTF-8 characters. 2. Run one backend node with file.encoding=UTF-8 and another with a different default charset. 3. Tokens minted on node A may fail signature verification on node B.",
+      "resolution": "Use secret.getBytes(StandardCharsets.UTF_8) consistently for both the current and previous keys, and validate the resulting key length in bytes (>= 32 bytes = 256 bits) rather than characters.",
+      "patchBefore": "this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());\nif (secret.length() < 32) { ... }",
+      "patchAfter": "byte[] keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);\nif (keyBytes.length < 32) { throw new IllegalStateException(\"JWT_SECRET must be >= 32 bytes (256 bits)\"); }\nthis.secretKey = Keys.hmacShaKeyFor(keyBytes);",
+      "effort": "S",
+      "references": [
+        "CWE-326: Inadequate Encryption Strength",
+        "CWE-176: Improper Handling of Unicode Encoding",
+        "OWASP A02:2021 Cryptographic Failures"
+      ]
+    },
+    {
+      "id": "SEC-AUTH-005",
+      "title": "Refresh-token cookie scoped to /api/auth/refresh but logout/login path mismatch and absent on non-cookie clients",
+      "phase": "Security",
+      "category": "Session Management (A07) / CWE-613",
+      "severity": "Info",
+      "cvss": "Informational — defense-in-depth observation; no direct exploit",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java",
+      "lines": "232-244",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java:215-217",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/auth/refresh_token/repository/RefreshTokenStoreRepository.java:35-43"
+      ],
+      "description": "The refresh cookie is set with HttpOnly; Secure; Path=/api/auth/refresh; SameSite=Strict — a strong attribute set that correctly limits cookie exposure and gives CSRF protection on the refresh endpoint. Two minor observations: (1) the cookie Path is /api/auth/refresh, which means the browser will NOT send it to /api/auth/logout (a different path); logout therefore relies on the client also clearing it and on the server's best-effort revoke, and the server-side revoke in logout() only runs if the cookie happens to be presented. (2) The bulk-revoke query revokeAllByUserId intentionally omits organisation_id (documented), which is acceptable for the self-service path (caller passes their own userId) but means an admin revoke flushes a user's sessions across all tenants — fine by design but worth noting in tenant-isolation reviews. These are noted for completeness; the cookie hardening itself (single fully-attributed Set-Cookie, no duplicate cookie without SameSite) is correctly implemented.",
+      "rootCause": "Cookie Path is scoped narrowly to the refresh endpoint; logout lives on a sibling path so it cannot rely on automatic cookie transmission for server-side revocation in all clients.",
+      "evidence": "response.addHeader(\"Set-Cookie\", String.format(\"grc_refresh=%s; HttpOnly; Secure; Path=/api/auth/refresh; SameSite=Strict; Max-Age=%d\", refreshToken, refreshTokenExpiryMs / 1000));\n// logout writes: grc_refresh=; ... Path=/api/auth/refresh; ... Max-Age=0",
+      "impact": "Low: if a browser does not include the refresh cookie on the POST /api/auth/logout call (because the cookie Path is /api/auth/refresh), the server's revoke-on-logout is skipped and only the client-side cookie clear (Max-Age=0) happens, so a previously captured refresh token remains valid until rolled or expired. Rolling-refresh revocation and admin revoke still mitigate stolen tokens on the next refresh.",
+      "reproduction": "1. Log in, capture the grc_refresh cookie. 2. Call POST /api/auth/logout; because the cookie Path is /api/auth/refresh, some clients will not attach the cookie, so the server cannot read the jti to revoke. 3. The refresh-token row stays active in platform.refresh_token until its next use triggers rolling revocation or it expires.",
+      "resolution": "Either widen the cookie Path to /api/auth (covering both /refresh and /logout) so logout can read and revoke it server-side, or have the frontend always include credentials on logout and confirm the cookie is transmitted; keep SameSite=Strict and HttpOnly/Secure unchanged. Optionally consider whether cross-tenant bulk revoke should require an explicit org scope for non-platform-admin callers.",
+      "patchBefore": "Path=/api/auth/refresh   // set on login, logout, and clear",
+      "patchAfter": "Path=/api/auth          // covers /api/auth/refresh and /api/auth/logout so logout can revoke server-side",
+      "effort": "S",
+      "references": [
+        "CWE-613: Insufficient Session Expiration",
+        "OWASP A07:2021 Identification and Authentication Failures",
+        "OWASP Session Management Cheat Sheet"
+      ]
+    }
+  ]
+}

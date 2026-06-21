@@ -1,0 +1,396 @@
+{
+  "findings": [
+    {
+      "id": "QUAL-BCMP-001",
+      "title": "Systemic dead-code: no-op _touch() methods and KEEP_* dummy fields used to suppress unused-import warnings across 11 classes",
+      "phase": "Quality",
+      "category": "Dead Code",
+      "severity": "Medium",
+      "cvss": "No runtime risk, but a pervasive maintainability smell: 11 classes carry deliberately useless members that confuse readers, defeat the compiler/IDE's unused-detection, and signal that genuinely unused imports/fields/loggers were papered over rather than removed.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java",
+      "lines": "535-536",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java:535-536",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/QuantitativeBiaService.java:503-504",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmRiskService.java:227-228",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmCycleService.java:322-323",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/observer/service/ExerciseObserverService.java:641-643",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:494-495",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackPptxService.java:402-406",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/calendar/service/CalendarService.java:344-352",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/controls/service/ControlLibraryService.java:394-395",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/regulatory/service/CompliancePostureService.java:235-236"
+      ],
+      "description": "A repeated anti-pattern appears across the assigned modules: a private no-op method `_touch()` (variously `{ log.trace(\"bound\"); }` or `{ Objects.requireNonNull(this); }`) annotated `@SuppressWarnings(\"unused\")`, plus dummy `private static final Class<?> KEEP = SomeType.class;` fields whose only purpose is to keep an otherwise-unused import 'referenced'. ExportService even comments `// Suppress unused warning for CellRangeAddress import (kept for future merging)`. CalendarService adds an unused `label()` method and `OBJECTS_KEEP_IMPORT = Objects.equals(\"a\",\"a\")`. These exist solely to silence the compiler/IDE rather than deleting the dead import, field, or logger they pretend to use.",
+      "rootCause": "Imports / loggers / utility-class references became unused after refactors, but instead of deleting them the author added a fake consumer (`_touch`, `KEEP`) to suppress the warning. The pattern then got copy-pasted as new classes were created from old ones.",
+      "evidence": "StrategyRoiService.java:536  `private Optional<StrategyRoiAnalysis> _touch() { log.trace(\"bound\"); return Optional.empty(); }`  — keeps the otherwise-unused `Optional` import and `log` field alive. ExportService.java:494-495  `@SuppressWarnings(\"unused\") private static final Class<?> KEEP = CellRangeAddress.class;`. BoardPackPptxService.java:403-406 has two such fields (KEEP_PICTURE_DATA, KEEP_TABLE_CELL). grep across the four modules: 10 distinct files match `_touch|KEEP|OBJECTS_KEEP_IMPORT` (11 member sites).",
+      "impact": "Readers waste time deciphering why a service has a method that does nothing. The fake references mask which imports are truly needed, so the codebase can never be cleanly linted; future unused code hides behind the same noise. Each `_touch` is also a (tiny) reflectively-reachable method on a Spring bean.",
+      "reproduction": "Run `rg -n \"_touch|private static final Class<\\?> KEEP|OBJECTS_KEEP_IMPORT\" tss-grc-backend/src/main/java/com/tss/grc/module/{bcm,platform,dashboard,reporting}` — 10 files, ~11 member declarations.",
+      "resolution": "Delete each `_touch()` method and each `KEEP*`/`OBJECTS_KEEP_IMPORT` field, then remove the now-genuinely-unused imports, loggers, and fields they were shielding. If a logger field (e.g. `log` in StrategyRoiService) has no real call site, drop the field and its slf4j imports. Configure the build (e.g. error-prone / checkstyle RedundantImport) to fail on unused imports so the workaround cannot reappear.",
+      "patchBefore": "    @SuppressWarnings(\"unused\")\n    private Optional<StrategyRoiAnalysis> _touch() { log.trace(\"bound\"); return Optional.empty(); }\n}",
+      "patchAfter": "}\n// _touch() removed; delete the now-unused `import java.util.Optional;` and the\n// `log` field if it has no real call site.",
+      "effort": "M",
+      "references": [
+        "https://errorprone.info/bugpattern/UnusedMethod",
+        "https://checkstyle.org/checks/imports/unusedimports.html"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-002",
+      "title": "Duplicated runtime-projection helpers between ExerciseObserverService and ExerciseRuntimeService (summarise / toInjectView / toResponseView / nullSafe / truncate)",
+      "phase": "Quality",
+      "category": "Code Duplication",
+      "severity": "Medium",
+      "cvss": "Two sibling services in the same sub-package carry byte-for-byte copies of the run-summary, inject-view and response-view projection logic. A change to the projection (or the inject-status set used to compute counts) must be made in two places or the two views silently diverge.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/observer/service/ExerciseObserverService.java",
+      "lines": "575-639",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/observer/service/ExerciseObserverService.java:575-639",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/service/ExerciseRuntimeService.java:600-653"
+      ],
+      "description": "ExerciseObserverService reimplements `summarise(ExerciseRun)`, `toInjectView(...)`, `toResponseView(...)`, `nullSafe(...)` and `truncate(...)` identically to ExerciseRuntimeService. jscpd flags two clones between these files (27 lines / 195 tokens at ExerciseObserverService 589-615 ↔ ExerciseRuntimeService 615-641, and 16 lines / 171 tokens at 488-503 ↔ 749-764). Both `summarise` implementations issue five separate `countByOrganisationIdAndExerciseRunIdAndStatus` queries to derive total/dispatched/pending counts (see also QUAL-BCMP-006).",
+      "rootCause": "ExerciseObserverService was created by copy-pasting projection helpers from ExerciseRuntimeService instead of extracting a shared mapper/projection component for the runtime entities.",
+      "evidence": "ExerciseObserverService.java:593-602 `private InjectView toInjectView(Long orgId, ExerciseRunInject i) {...}` is identical to ExerciseRuntimeService.java:619-628. `toResponseView` (Observer 604-613) == Runtime 630-639. `nullSafe`/`truncate` duplicated (Observer 634-639, Runtime 646-653). jscpd-report.json lists both blocks as duplicates.",
+      "impact": "Bug-fix and behaviour drift risk: e.g. if the inject-status taxonomy gains a new state, one `summarise` will count it and the other will not, producing inconsistent RunSummary totals depending on which service rendered them.",
+      "reproduction": "Diff the two helper regions, or open audit/raw/jscpd/jscpd-report.json and filter for ExerciseObserverService vs ExerciseRuntimeService.",
+      "resolution": "Extract a package-private `ExerciseRunProjections` (or a `@Component RuntimeViewMapper`) under `bcm/cycle/runtime` exposing `summarise`, `toInjectView`, `toResponseView`, plus the shared `nullSafe`/`truncate`. Inject it into both services. Consolidating also fixes the count-query fan-out in one place.",
+      "patchBefore": "// ExerciseObserverService\nprivate InjectView toInjectView(Long orgId, ExerciseRunInject i) { /* dup of Runtime */ }\nprivate RunSummary summarise(ExerciseRun r) { /* 5 count queries, dup of Runtime */ }",
+      "patchAfter": "// shared component\n@Component\nclass RuntimeViewMapper {\n    InjectView toInjectView(Long orgId, ExerciseRunInject i) { ... }\n    RunSummary summarise(ExerciseRun r) { ... }\n}\n// both services: private final RuntimeViewMapper views; ... views.toInjectView(orgId, i);",
+      "effort": "M",
+      "references": [
+        "https://refactoring.guru/smells/duplicate-code"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-003",
+      "title": "God service: BuyerGapService bundles 7 unrelated concerns and reaches into 6 other modules' repositories",
+      "phase": "Quality",
+      "category": "SOLID / Layering",
+      "severity": "Medium",
+      "cvss": "A single 548-line service owns ERM risk-control linkage, appetite variance, evidence-freshness sweeps, evidence connectors, privacy cross-border listings, DSR SLA sweeps, and PDPL 72h crisis sweeps. It directly wires repositories from risk, evidence, privacy, privacy_lc, and bcm.cycle — a Single-Responsibility and module-boundary violation that concentrates cross-cutting blast radius in one class.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapService.java",
+      "lines": "56-548",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapService.java:60-72",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapService.java:88-191",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapService.java:219-270",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapService.java:340-521"
+      ],
+      "description": "BuyerGapService is explicitly described in its own Javadoc as a grab-bag (\"combined backend for the three module gaps the May-2026 buyer assessment flagged\"). It injects 8 repositories spanning RiskControlRepository, RiskRepository, RiskAttestationRepository (risk module), EvidenceItemRepository, EvidenceConnectorRepository (evidence module), ProcessingActivityRepository (privacy module), DsrCaseRepository (privacy_lc module), and CrisisEventRepository (bcm.cycle module), and runs raw native/JPQL against risk.risks, risk.risk_appetite_statements, and EvidenceItem. It contains 7 distinct public operations plus 6 nested record DTOs. The class admits the design is convenience-driven: \"Bundled into one service because each piece is a thin orchestrator ... Splitting into three services would spread the audit-trail wiring across near-empty classes.\"",
+      "rootCause": "Organised by delivery milestone (a buyer-assessment checklist) rather than by domain. The platform module became a dumping ground for cross-module 'completion' logic that properly belongs in the risk, evidence, privacy, and bcm services.",
+      "evidence": "Constructor-injected repos at lines 60-69 cross 5 module packages. appetiteVariance() (146-191) hand-writes a native join over risk.risks + risk.risk_appetite_statements. pdpl72hSweep() (480-521) mutates bcm CrisisEvent rows. evidenceFreshnessSweep() (219-270) mutates evidence EvidenceItem rows. Class length: 548 LOC.",
+      "impact": "Any change to risk, evidence, privacy, or bcm schemas can force edits to this platform-layer class; the class cannot be reasoned about or tested in isolation; module ownership is blurred so two teams touch the same file. Cross-module repo reach circumvents the per-module service layer that owns audit/event wiring.",
+      "reproduction": "Open the file; count distinct module packages in the import block (risk, evidence, privacy, privacy_lc, bcm.cycle) and the 7 public methods.",
+      "resolution": "Split into domain-aligned services living in their owning modules: move risk-control linkage + appetite variance + attestation sweep into the risk module, the evidence freshness sweep + connector registry into the evidence module, and the DSR/PDPL sweeps into privacy/bcm respectively. If a thin orchestration facade is still wanted for the scheduler, have it delegate to those services rather than owning their repositories.",
+      "patchBefore": "@Service\npublic class BuyerGapService {\n    private final RiskControlRepository riskControls;\n    private final EvidenceItemRepository evidence;\n    private final ProcessingActivityRepository ropa;\n    private final CrisisEventRepository crises; // ...8 repos across 5 modules\n}",
+      "patchAfter": "// risk module:    RiskControlLinkageService, AppetiteVarianceService, RiskAttestationService\n// evidence module: EvidenceFreshnessService, EvidenceConnectorService\n// privacy module:  CrossBorderTransferService, DsrSlaSweepService\n// bcm module:      Pdpl72hCrisisSweepService\n// platform scheduler delegates to the above; owns no foreign repositories.",
+      "effort": "L",
+      "references": [
+        "https://en.wikipedia.org/wiki/Single-responsibility_principle"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-004",
+      "title": "Long, high-complexity method: CrisisEventService.getActiveCrisisSummary() (114 LOC) embeds the entire multi-regulator deadline engine inline",
+      "phase": "Quality",
+      "category": "Cyclomatic Complexity / Long Method",
+      "severity": "Medium",
+      "cvss": "A single 114-line method computes the shortest regulatory notification deadline across five Saudi regulators (SDAIA/PDPL, NCA, SAMA Cyber, SAMA BCF, NCEMA) with ~10 nested severity/flag conditionals, then derives escalation tier, an Arabic next-action label, builds a 16-field row, and sorts with a 6-branch comparator — all in one place. High branching makes the regulator-window rules hard to test and easy to break.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/CrisisEventService.java",
+      "lines": "125-238",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/CrisisEventService.java:138-173",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/CrisisEventService.java:221-236"
+      ],
+      "description": "getActiveCrisisSummary() loops active crises and, per crisis, runs five branch blocks (lines 141-173) to find the earliest regulatory deadline, mixing severity thresholds (>=3, >=4), boolean flags (personalDataAffected, cyberRelated) and window constants. It then computes an escalation tier (3-way), a 6-case Arabic label switch, constructs a 16-arg row, and finally sorts via a comparator with six null-handling branches. The deadline computation is reusable domain logic (the same windows appear in RegulatorCountdownService and BuyerGapService.pdpl72hSweep) but is locked inside this view method.",
+      "rootCause": "The mobile-summary view was built end-to-end in one method; the regulatory-deadline rules were never extracted into a dedicated, unit-testable component.",
+      "evidence": "Method spans lines 125-238 (114 LOC, the largest in the 650-LOC file per a brace-depth scan). Branch count in the deadline block alone: 5 outer `if` + nested severity/comparison conditions ≈ cyclomatic complexity well above 15 for the method.",
+      "impact": "The regulator-deadline logic is hard to test in isolation, easy to get wrong (a misplaced `isBefore` silently picks the wrong regulator/deadline), and is duplicated conceptually elsewhere. Long method hampers review and future regulator additions.",
+      "reproduction": "Open lines 125-238; count the conditional branches in 141-173 and the comparator 221-236.",
+      "resolution": "Extract a `RegulatoryDeadlineCalculator` returning `record Deadline(String regulator, LocalDateTime at)` from a `CrisisEvent`, with one unit test per regulator window. Extract `escalationTier(sev)` and `nextActionLabel(status)` helpers. Reduce getActiveCrisisSummary() to: load -> map(row) -> sort, delegating to the calculator and a named `Comparator`.",
+      "patchBefore": "public List<ActiveCrisisSummaryRow> getActiveCrisisSummary() {\n    // ...114 lines: 5 regulator branches + tier + label switch + 16-arg row + 6-branch comparator\n}",
+      "patchAfter": "public List<ActiveCrisisSummaryRow> getActiveCrisisSummary() {\n    return events.findActive(org()).stream()\n        .map(e -> toRow(e, deadlineCalc.shortest(e)))\n        .sorted(ACTIVE_CRISIS_ORDER)\n        .toList();\n}\n// RegulatoryDeadlineCalculator.shortest(e) holds the 5-regulator logic, unit-tested.",
+      "effort": "M",
+      "references": [
+        "https://refactoring.guru/extract-method"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-005",
+      "title": "DashboardStats 'open critical' / 'open high' tiles are fed total counts, and pendingTasks is hardcoded 0L",
+      "phase": "Quality",
+      "category": "Correctness Smell / Magic Number",
+      "severity": "Medium",
+      "cvss": "The 15-arg DashboardStats record is constructed with positional args; positions 10/11 (openCriticalRisks/openHighRisks) are passed the SAME variables as positions 2/3 (criticalRisks/highRisks), so the 'open critical' and 'open high' dashboard tiles actually display the total critical/high counts, not the open subset. pendingTasks is hardcoded 0L. Misleading executive KPIs masquerading as real data.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java",
+      "lines": "46-76",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java:74-75",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/dto/DashboardStats.java:14-19"
+      ],
+      "description": "In getStats(), the DashboardStats constructor call is `new DashboardStats(total, critical, high, medium, low, open, closed, totalUsers, activeUsers, critical, high, openIncidents, complianceScore, 0L, overdueItems)`. The record fields at those positions are `openCriticalRisks` and `openHighRisks` (DashboardStats.java:14) — explicitly documented as 'Aliases used by the dashboard UI'. They are populated with the unfiltered `critical`/`high` totals, so 'open critical risks' equals 'critical risks'. `pendingTasks` (position 14) is the literal `0L`, a placeholder the DTO comment confirms ('0 until those modules are implemented'). Passing 15 positional longs with no field names is itself error-prone and is what allowed this aliasing to go unnoticed.",
+      "rootCause": "A wide positional record + duplicated UI 'alias' fields encouraged copy-pasting the total values rather than querying the open subset (e.g. countByOrganisationIdAndRiskLevelAndStatus). No compiler help because every parameter is `long`.",
+      "evidence": "DashboardService.java:74-75 passes `critical`/`high` twice and `0L` once. DashboardStats.java:14-19 declares openCriticalRisks, openHighRisks, openIncidents, complianceScore, pendingTasks.",
+      "impact": "The dashboard reports inflated 'open critical/high' figures (closed criticals are counted as open) and a permanently-zero 'pending tasks' tile, undermining the credibility of the executive dashboard — a core selling feature.",
+      "reproduction": "Seed a CRITICAL risk in CLOSED status; call getStats(); observe openCriticalRisks == criticalRisks (closed ones included). pendingTasks is always 0.",
+      "resolution": "Either compute the real open-by-level counts (add countByOrganisationIdAndRiskLevelAndStatus finders and pass them) or remove the redundant alias fields and have the UI derive them. Replace the wide positional constructor with a builder or named-component construction so position-mismatch bugs are impossible. If pendingTasks is genuinely not yet implemented, document it as such or drop the field.",
+      "patchBefore": "return new DashboardStats(total, critical, high, medium, low, open, closed,\n        totalUsers, activeUsers, critical, high, openIncidents, complianceScore, 0L, overdueItems);",
+      "patchAfter": "long openCritical = riskRepository.countByOrganisationIdAndRiskLevelAndStatus(organisationId, \"CRITICAL\", \"OPEN\");\nlong openHigh     = riskRepository.countByOrganisationIdAndRiskLevelAndStatus(organisationId, \"HIGH\", \"OPEN\");\nreturn DashboardStats.builder().totalRisks(total).criticalRisks(critical).highRisks(high)\n        ...\n        .openCriticalRisks(openCritical).openHighRisks(openHigh)\n        .openIncidents(openIncidents).complianceScore(complianceScore)\n        .pendingTasks(pendingTasks).overdueItems(overdueItems).build();",
+      "effort": "M",
+      "references": [
+        "https://refactoring.guru/smells/long-parameter-list"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-006",
+      "title": "N+1 query pattern in KRI rendering (BoardPackService, ExportService) and 5-query fan-out in run summarise()",
+      "phase": "Quality",
+      "category": "Performance / Inefficient Code",
+      "severity": "Medium",
+      "cvss": "KRI report sections call findFirstByKriIdOrderByReadingAtDesc once per KRI to compute band counts, then again per KRI to fill the table — 2 queries per KRI on top of the list query. The board pack's executive summary also re-runs the same risk page query twice. Run summaries issue five count queries each. These multiply DB round-trips on read-heavy reporting endpoints.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java",
+      "lines": "294-330",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:298",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:320",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:170-176",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:191",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:219",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/service/ExerciseRuntimeService.java:600-617"
+      ],
+      "description": "BoardPackService.renderKris() loops KRIs computing band counts via readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()) (line 298), then loops the same KRIs again calling the identical finder per row (line 320) — 2N queries. ExportService.kriDashboardPdf() does the same (lines 191 and 219). BoardPackService.renderExecutiveSummary() calls riskRepo.findByOrganisationId(org, PageRequest.of(0,1000)) at line 170 (for getTotalElements) and again at line 176 — two full page loads to read two scalars. ExerciseRuntimeService.summarise()/ExerciseObserverService.summarise() each fire 5 separate countByOrganisationIdAndExerciseRunIdAndStatus queries per run (Runtime 600-610).",
+      "rootCause": "Latest-reading lookups are done row-by-row instead of with a single grouped query; scalar counts are derived from full entity-page loads; status breakdowns use one COUNT per status instead of a GROUP BY.",
+      "evidence": "BoardPackService.java:298 and :320 call the same per-KRI finder in two separate loops over the same list. ExportService.java:191 and :219 identical. BoardPackService.java:170 and :176 both call findByOrganisationId(org, PageRequest.of(0,1000)). ExerciseRuntimeService.java:602-610 issues 5 (then 3 more) count queries.",
+      "impact": "Reporting endpoints scale O(2N) DB round-trips with KRI count; board-pack generation pays a double full-page risk load; run summaries issue 5+ count queries each. On large tenants these endpoints become slow and DB-chatty for no functional reason.",
+      "reproduction": "Enable Hibernate SQL logging and hit /api/v1/reports board pack or KRI dashboard with N KRIs — observe ~2N+ latest-reading selects. For summarise, observe 5 count statements per run summary.",
+      "resolution": "Add a repository query that returns each KRI's latest band in one shot (e.g. a JPQL projection grouped by kriId, or a window-function native query) and build a Map<Long,band> once. Replace the double findByOrganisationId with countByOrganisationId + countByOrganisationIdAndStatus. Replace the 5 per-status counts in summarise with a single GROUP BY status query mapped into a Map.",
+      "patchBefore": "for (KriDefinition k : kris) { ... findFirstByKriIdOrderByReadingAtDesc(k.getId()) ... } // count loop\nfor (KriDefinition k : kris) { ... findFirstByKriIdOrderByReadingAtDesc(k.getId()) ... } // table loop",
+      "patchAfter": "Map<Long,String> latestBand = readingRepo.latestBandByKri(org); // one grouped query\nfor (KriDefinition k : kris) { String band = latestBand.get(k.getId()); ... }",
+      "effort": "M",
+      "references": [
+        "https://vladmihalcea.com/n-plus-1-query-problem/"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-007",
+      "title": "Swallowed exception drops the cause when an exercise run completes (AAR draft failure logged without stacktrace)",
+      "phase": "Quality",
+      "category": "Error Handling",
+      "severity": "Low",
+      "cvss": "On run completion, createAfterActionDraft is wrapped in `catch (RuntimeException ignored)` that logs only a generic warning with no exception object, discarding the stacktrace and cause. The transition is intentionally allowed to stand, but the failure becomes effectively undiagnosable in production.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/service/ExerciseRuntimeService.java",
+      "lines": "280-286",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/service/ExerciseRuntimeService.java:280-286"
+      ],
+      "description": "When a run transitions to COMPLETED, the AAR draft is created in a try/catch where the catch parameter is named `ignored` and the log statement is `log.warn(\"AAR draft creation for run {} failed but transition stands\", saved.getId());` — the caught exception is never passed to the logger, so the cause and stacktrace are lost. The intent (don't roll back the transition for a courtesy draft) is sound, but the diagnostic is gutted.",
+      "rootCause": "Catch-and-continue written for resilience but logging the exception object was omitted; the `ignored` name signals the swallow.",
+      "evidence": "Lines 283-285: `} catch (RuntimeException ignored) {\\n    log.warn(\"AAR draft creation for run {} failed but transition stands\", saved.getId());\\n}` — no `ignored` reference in the warn call.",
+      "impact": "If AAR draft creation starts failing (e.g. a NPE in buildObserverFindingsSection or a DB constraint), operators see only 'failed' with no reason, making the bug hard to triage. AAR drafts silently stop being produced.",
+      "reproduction": "Force an exception inside createAfterActionDraft; complete a run; observe a warn line with no stacktrace/cause.",
+      "resolution": "Log the exception object so the cause is preserved: `log.warn(\"AAR draft creation for run {} failed but transition stands\", saved.getId(), ex);` and name the variable `ex` not `ignored`.",
+      "patchBefore": "            } catch (RuntimeException ignored) {\n                log.warn(\"AAR draft creation for run {} failed but transition stands\", saved.getId());\n            }",
+      "patchAfter": "            } catch (RuntimeException ex) {\n                log.warn(\"AAR draft creation for run {} failed but transition stands\", saved.getId(), ex);\n            }",
+      "effort": "S",
+      "references": [
+        "https://wiki.sei.cmu.edu/confluence/display/java/ERR00-J.+Do+not+suppress+or+ignore+checked+exceptions"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-008",
+      "title": "Over-broad catch(Exception) in XLSX export methods masks IOExceptions and unrelated runtime faults as 'Excel generation failed'",
+      "phase": "Quality",
+      "category": "Error Handling",
+      "severity": "Low",
+      "cvss": "Three XLSX builders wrap their entire body in catch(Exception) and rethrow a generic ExportException, conflating genuine POI/IO failures with NPEs and other programming errors. The cause is preserved, but the blanket catch hides the failure category and makes data-shape bugs surface as 'Excel generation failed'.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java",
+      "lines": "307-467",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:357-359",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:401-403",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:464-466"
+      ],
+      "description": "riskRegisterXlsx(), findingsXlsx(), and kriDashboardXlsx() each end with `} catch (Exception e) { throw new ExportException(\"Excel\", \"Excel generation failed\", e); }`. The only checked exception in scope is IOException from writeWorkbook(); catching Exception additionally swallows the category of every RuntimeException (e.g. a NullPointerException from a malformed reading) into the same generic message. The PDF path (buildReportPdf) correctly catches only the specific DocumentException.",
+      "rootCause": "Defensive blanket catch added to guarantee a friendly error, at the cost of distinguishing IO failures from logic bugs.",
+      "evidence": "ExportService.java:357, 401, 464 all `catch (Exception e)`; contrast buildReportPdf at line 280 which catches `DocumentException` specifically. writeWorkbook declares only `throws java.io.IOException`.",
+      "impact": "A programming defect in row mapping is reported to callers as an Excel-generation infrastructure failure, sending triage in the wrong direction. RuntimeExceptions that should bubble to the global handler are reclassified.",
+      "reproduction": "Introduce a NullPointerException in the row loop of riskRegisterXlsx(); call it; observe ExportException('Excel','Excel generation failed') instead of the NPE propagating.",
+      "resolution": "Catch only IOException around writeWorkbook (the workbook try-with-resources already handles close), and let RuntimeExceptions propagate to the GlobalExceptionHandler. If a uniform export error is required, catch IOException specifically and wrap that.",
+      "patchBefore": "        } catch (Exception e) {\n            throw new ExportException(\"Excel\", \"Excel generation failed\", e);\n        }",
+      "patchAfter": "        } catch (java.io.IOException e) {\n            throw new ExportException(\"Excel\", \"Excel workbook write failed\", e);\n        }\n        // RuntimeExceptions propagate to GlobalExceptionHandler",
+      "effort": "S",
+      "references": [
+        "https://wiki.sei.cmu.edu/confluence/display/java/ERR08-J.+Do+not+catch+NullPointerException+or+any+of+its+ancestors"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-009",
+      "title": "Recommendation state machine encoded twice in StrategyRoiService (guardRecommendation vs allowedFrom) — guaranteed to drift",
+      "phase": "Quality",
+      "category": "Code Duplication",
+      "severity": "Low",
+      "cvss": "The same PENDING_REVIEW/APPROVED/REJECTED/DEFERRED transition table is written as two parallel switch expressions: one returning a boolean (validation), one returning the allowed-set (for the error message). Editing one without the other yields a guard that rejects/accepts a transition while reporting the wrong allowed set.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java",
+      "lines": "401-422",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java:401-412",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java:414-422"
+      ],
+      "description": "guardRecommendation(from,to) (401-412) and allowedFrom(from) (414-422) both hard-code the identical transition map by state. guardRecommendation checks `Set.of(...).contains(to)` per case; allowedFrom returns the same `Set.of(...)` per case. The two must be kept byte-aligned by hand.",
+      "rootCause": "Need both a boolean check and the allowed-set for the IllegalTransitionException message; instead of deriving the boolean from the set, both were written out.",
+      "evidence": "Both methods list `case \"PENDING_REVIEW\" -> Set.of(\"APPROVED\",\"REJECTED\",\"DEFERRED\")` etc. The same data appears twice (also echoed a third time in the class Javadoc at lines 57-63 and 391-399).",
+      "impact": "A future transition rule change applied to only one method produces inconsistent behaviour: guard allows a transition whose error message claims it isn't allowed, or vice-versa. Classic single-source-of-truth violation.",
+      "reproduction": "Add a new allowed transition to guardRecommendation only; trigger an invalid transition; the thrown IllegalTransitionException's allowed-set (from allowedFrom) is now wrong.",
+      "resolution": "Define one `Map<String,Set<String>> ALLOWED` (as ExerciseRuntimeService already does at its ALLOWED_TRANSITIONS) and derive both the boolean and the allowed-set from it.",
+      "patchBefore": "private static void guardRecommendation(String from, String to) {\n    boolean ok = switch (from) { case \"PENDING_REVIEW\" -> Set.of(\"APPROVED\",\"REJECTED\",\"DEFERRED\").contains(to); ... };\n}\nprivate static Set<String> allowedFrom(String from) {\n    return switch (from) { case \"PENDING_REVIEW\" -> Set.of(\"APPROVED\",\"REJECTED\",\"DEFERRED\"); ... };\n}",
+      "patchAfter": "private static final Map<String,Set<String>> ALLOWED = Map.of(\n    \"PENDING_REVIEW\", Set.of(\"APPROVED\",\"REJECTED\",\"DEFERRED\"),\n    \"DEFERRED\",       Set.of(\"APPROVED\",\"REJECTED\",\"PENDING_REVIEW\"),\n    \"APPROVED\",       Set.of(\"PENDING_REVIEW\"),\n    \"REJECTED\",       Set.of(\"PENDING_REVIEW\"));\nprivate static Set<String> allowedFrom(String f) { return ALLOWED.getOrDefault(f, Set.of()); }\nprivate static void guardRecommendation(String f, String t) { if (!allowedFrom(f).contains(t)) throw new IllegalTransitionException(f, t, allowedFrom(f)); }",
+      "effort": "S",
+      "references": [
+        "https://refactoring.guru/smells/duplicate-code"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-010",
+      "title": "null-safe string helpers (safe/nullSafe/truncate) re-implemented in 10+ classes across the four modules",
+      "phase": "Quality",
+      "category": "Code Duplication",
+      "severity": "Low",
+      "cvss": "The trivial `safe(String)` null-guard is hand-copied into 10 classes within the assigned modules (with two subtly different return values — empty-string vs em-dash), alongside duplicate `nullSafe` and `truncate` helpers. Harmless individually but a recurring copy-paste that should be one shared utility.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java",
+      "lines": "478",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:478",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:301",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackPptxService.java:400",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/DocxExportService.java:342",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/calendar/service/CalendarService.java:342",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/calendar/service/IcsBuilder.java:229",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/help/service/HelpTopicService.java:246",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/CrisisAarService.java:335",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmAnnualCycleScheduledSweep.java:191",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/service/ExerciseRuntimeService.java:651-653"
+      ],
+      "description": "A `private static String safe(String)` helper is declared independently in at least 10 classes across reporting, platform, and bcm. Two distinct semantics coexist: reporting/PDF variants return em-dash ('—') for null while platform/calendar variants return empty string, so the helper name is overloaded with different meaning. Separately, `nullSafe(String)` and `truncate(String,int)` are duplicated between ExerciseRuntimeService and ExerciseObserverService (see QUAL-BCMP-002).",
+      "rootCause": "No shared text/formatting utility; each exporter/service re-adds the tiny helper it needs.",
+      "evidence": "grep `private static String safe(String` over the four modules: 10 matches with two return-value variants (`? \"\" :` vs `? \"—\" :`).",
+      "impact": "Low functional risk, but the same-named helper meaning two different things (blank vs dash) is a trap for readers and code-search-driven edits; widens the surface that must be touched for any formatting policy change.",
+      "reproduction": "Run `rg -n 'private static String safe\\(String' tss-grc-backend/src/main/java/com/tss/grc/module/{bcm,platform,dashboard,reporting}`.",
+      "resolution": "Introduce a single `common/util/Strings` (or `TextFormat`) with `orDash(String)` and `orEmpty(String)` plus `truncate(String,int)`, and replace the per-class copies. Picking distinct names removes the blank-vs-dash ambiguity.",
+      "patchBefore": "// repeated in 10 classes\nprivate static String safe(String s) { return s == null ? \"—\" : s; }  // some return \"\" instead",
+      "patchAfter": "// common/util/TextFormat.java\npublic static String orDash(String s)  { return s == null ? \"—\" : s; }\npublic static String orEmpty(String s) { return s == null ? \"\"  : s; }\n// call sites: TextFormat.orDash(name) / TextFormat.orEmpty(name)",
+      "effort": "M",
+      "references": [
+        "https://refactoring.guru/smells/duplicate-code"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-011",
+      "title": "Escalation-tier aging thresholds (30/60/90 days) and the day clamp (28) are magic numbers duplicated across reporting builders",
+      "phase": "Quality",
+      "category": "Magic Numbers",
+      "severity": "Low",
+      "cvss": "The findings-aging escalation tier rule (>=90 EXEC, >=60 DIRECTOR, >=30 MANAGER) is hand-inlined in at least three places, and the month/quarter day clamp (28) is repeated. Changing escalation policy requires hunting down each literal; the three copies can silently diverge.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java",
+      "lines": "162-176",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:165",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:390",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:257-260",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ReportSchedulerService.java:228",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ReportSchedulerService.java:237"
+      ],
+      "description": "The aging-tier ternary `daysOpen >= 90 ? \"EXEC\" : daysOpen >= 60 ? \"DIRECTOR\" : daysOpen >= 30 ? \"MANAGER\" : \"ON_TRACK\"` is duplicated verbatim in ExportService.findingsAgingPdf (165) and ExportService.findingsXlsx (390); BoardPackService.renderFindings (257-260) re-implements the same 90/60/30 buckets inline. ReportSchedulerService clamps anchor day with `if (day < 1) day = 1; if (day > 28) day = 28;` twice (228, 237) — also two statements per line, hurting readability.",
+      "rootCause": "Business thresholds embedded as bare integer literals at each use site rather than named constants or a shared classifier.",
+      "evidence": "ExportService.java:165 and :390 identical tier ternary; BoardPackService.java:257-260 the same thresholds; ReportSchedulerService.java:228,237 duplicate `day>28` clamp.",
+      "impact": "An escalation-policy change (e.g. tighten DIRECTOR to 45 days) must be applied in three files and risks the PDF and XLSX exports disagreeing; the 28-day clamp magic number is unexplained at the call site.",
+      "reproduction": "grep for `>= 90` / `>= 60` / `>= 30` and `> 28` in the reporting package; observe the repeated literals.",
+      "resolution": "Define named constants (AGING_EXEC_DAYS=90, AGING_DIRECTOR_DAYS=60, AGING_MANAGER_DAYS=30, MAX_ANCHOR_DAY=28) or a single `agingTier(long days)` helper, and reuse across the PDF, XLSX, and board-pack renderers.",
+      "patchBefore": "String tier = daysOpen >= 90 ? \"EXEC\" : daysOpen >= 60 ? \"DIRECTOR\" : daysOpen >= 30 ? \"MANAGER\" : \"ON_TRACK\"; // copied 3x\nif (day < 1) day = 1; if (day > 28) day = 28;",
+      "patchAfter": "static String agingTier(long days) {\n    if (days >= AGING_EXEC_DAYS) return \"EXEC\";\n    if (days >= AGING_DIRECTOR_DAYS) return \"DIRECTOR\";\n    if (days >= AGING_MANAGER_DAYS) return \"MANAGER\";\n    return \"ON_TRACK\";\n}\nint day = Math.min(MAX_ANCHOR_DAY, Math.max(1, parseInt(anchor, 1)));",
+      "effort": "S",
+      "references": [
+        "https://refactoring.guru/replace-magic-number-with-symbolic-constant"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-012",
+      "title": "Reflection-based principal probing with a blanket swallow in BcpBinderService.currentUserId()",
+      "phase": "Quality",
+      "category": "Error Handling / Layering",
+      "severity": "Low",
+      "cvss": "currentUserId() uses reflection to call getUserId()/getId() on the security principal to avoid importing GrcUserDetails, wrapped in a catch(Exception ignored) that swallows everything. Reflection over the auth principal is fragile (breaks silently on principal-shape changes) and the swallow hides genuine failures.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/binder/service/BcpBinderService.java",
+      "lines": "290-310",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/binder/service/BcpBinderService.java:290-310"
+      ],
+      "description": "currentUserId() obtains the Authentication, then reflectively probes method names {\"getUserId\",\"getId\"} on the principal and returns the first Long result; the whole block is inside `catch (Exception ignored) { /* never bubble up */ }`. The codebase already has a concrete `GrcUserDetails` (referenced in CLAUDE.md security notes) exposing getUserId(); reflecting to avoid the import couples this service to method-name strings that the compiler cannot verify.",
+      "rootCause": "An attempt to keep the binder service decoupled from the security package for test wiring, implemented via reflection + total exception suppression rather than a small shared accessor.",
+      "evidence": "Lines 298-304 reflectively invoke getter names; lines 306-308 `catch (Exception ignored) { // never bubble up — current user id is informational only }`.",
+      "impact": "If the principal type changes (or a getter is renamed), the user id silently becomes null with no log, degrading audit/attribution quietly. Reflection also bypasses compile-time safety and is slower than a direct call.",
+      "reproduction": "Swap the principal to a type without getUserId/getId; call currentUserId(); it returns null with no diagnostic.",
+      "resolution": "Replace with a shared `SecurityUtils.currentUserId()` that does an `instanceof GrcUserDetails` cast (the type already exists), or inject a small `CurrentUserProvider` bean. Keep the null-on-anonymous behaviour but drop the reflection and the blanket swallow; if a defensive catch is retained, log at debug with the exception.",
+      "patchBefore": "try {\n    Object principal = a.getPrincipal();\n    for (String name : new String[]{\"getUserId\",\"getId\"}) {\n        try { var g = principal.getClass().getMethod(name); Object v = g.invoke(principal); if (v instanceof Long l) return l; }\n        catch (NoSuchMethodException ignored) {}\n    }\n} catch (Exception ignored) {}\nreturn null;",
+      "patchAfter": "Object principal = a.getPrincipal();\nreturn principal instanceof GrcUserDetails u ? u.getUserId() : null;",
+      "effort": "S",
+      "references": [
+        "https://docs.spring.io/spring-security/reference/servlet/authentication/architecture.html"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-013",
+      "title": "Legacy BcmController binds JPA entities directly as request bodies instead of validated DTOs",
+      "phase": "Quality",
+      "category": "Layering",
+      "severity": "Low",
+      "cvss": "CRUD endpoints accept and return @Entity types (BcmPlan, CriticalProcess, BiaRecord, BcmExercise) directly over the wire with no request DTO or Jakarta validation, exposing persistence internals (e.g. organisationId, isDeleted, audit columns) to the client and allowing mass-assignment-style binding.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java",
+      "lines": "66-205",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:69",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:128",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:156",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:190"
+      ],
+      "description": "createPlan(@RequestBody BcmPlan req), createProcess(@RequestBody CriticalProcess req), createBia(@RequestBody BiaRecord req), createExercise(@RequestBody BcmExercise req) (and their update counterparts) accept the JPA entity directly. The controller is marked @Deprecated (legacy surface), and the module convention elsewhere uses dedicated request/response DTOs with `@Valid`. No `@Valid` appears on these bodies, so server-side validation messages (the messages*.properties machinery) are not exercised, and client-supplied entity fields like organisationId/isDeleted/createdAt can be bound.",
+      "rootCause": "Legacy CRUD controller predates the DTO convention; entities double as the API contract.",
+      "evidence": "BcmController.java:69 `public BcmPlan createPlan(@RequestBody BcmPlan req)`, :128 CriticalProcess, :156 BiaRecord, :190 BcmExercise — none annotated `@Valid`; methods return the entity directly too.",
+      "impact": "Tenant-owned columns are part of the bind surface (defence relies entirely on the service overwriting organisationId); response leaks internal columns; no declarative validation; API contract is coupled to the DB schema so any entity change is a breaking API change.",
+      "reproduction": "POST /api/v1/bcm/legacy-plans with a JSON body including organisationId and isDeleted; observe they bind onto the entity before the service runs.",
+      "resolution": "Introduce request/response DTOs (BcmPlanRequest/Response, etc.) with Jakarta validation and `@Valid`, mapping in the service; never accept or return @Entity at the controller boundary. Since the controller is already @Deprecated, schedule this with the documented cycle-controller migration.",
+      "patchBefore": "@PostMapping(\"/legacy-plans\")\npublic BcmPlan createPlan(@RequestBody BcmPlan req) { return bcmService.createPlan(req); }",
+      "patchAfter": "@PostMapping(\"/legacy-plans\")\npublic BcmPlanResponse createPlan(@Valid @RequestBody BcmPlanRequest req) {\n    return bcmService.createPlan(req);\n}",
+      "effort": "M",
+      "references": [
+        "https://owasp.org/www-community/vulnerabilities/Mass_Assignment_Cheat_Sheet"
+      ]
+    },
+    {
+      "id": "QUAL-BCMP-014",
+      "title": "Dashboard KPI-trend builds native SQL by concatenating table names and filter clauses from a config map",
+      "phase": "Quality",
+      "category": "Maintainability / Layering",
+      "severity": "Info",
+      "cvss": "getKpiTrend() assembles native SQL by string-concatenating table names, open-filters, and date columns drawn from a static METRICS map spanning 7 modules' tables. Values are from a fixed allowlist (not user input) so this is not SQL injection, but raw cross-module SQL string-building in the dashboard service is brittle and couples the dashboard to other modules' physical schemas.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java",
+      "lines": "133-205",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java:135-157",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java:168-185",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java:65-72"
+      ],
+      "description": "The METRICS map hard-codes 12 metric keys to (table, openFilter, extra, dateColumn) tuples referencing risk.risks, cyber.incidents, compliance.findings, privacy.data_subject_requests, privacy.data_breaches, scm.vendors, and bcm.exercises. getKpiTrend() then builds the query as `\" FROM \" + src.table() + \" WHERE organisation_id = :org AND is_deleted = 0\" + src.openFilter() + src.extra()` and `\"SELECT \" + dateCol + base + ...`. getStats() similarly issues a hand-written native COUNT against compliance.findings. The metric key is lower-cased and defaulted to 'risks', and all interpolated fragments come from the constant map, so there is no injection vector — but the dashboard service now embeds knowledge of seven other modules' table names, columns, and status vocabularies.",
+      "rootCause": "Trend logic implemented generically via SQL templating instead of per-module query methods, to avoid writing one finder per metric.",
+      "evidence": "DashboardService.java:169-170 string-concatenates table/filter; :173 and :182 concatenate dateCol; the METRICS map (135-157) lists physical schema.table names for 7 modules; getStats() :65-72 hand-writes native SQL for overdue findings.",
+      "impact": "If any of those modules rename a table, status value, or the is_deleted/created_at columns, the dashboard breaks at runtime with no compile-time signal. The dashboard becomes a hidden consumer of every module's schema, undermining module boundaries. The string-concat style is also a latent injection footgun if a future edit lets any fragment come from request input.",
+      "reproduction": "Rename e.g. scm.vendors or its status column; the 'vendors' KPI trend throws at runtime; nothing in dashboard compiles-against the change.",
+      "resolution": "Prefer per-module repository/query methods (or read-model views owned by each module) that the dashboard calls, returning the weekly buckets, rather than templating physical SQL in the dashboard layer. At minimum, centralise the table/column metadata behind module-provided constants and add an integration test per metric so schema drift is caught. Keep all interpolated fragments compile-time constants (never request-derived).",
+      "patchBefore": "String base = \" FROM \" + src.table() + \" WHERE organisation_id = :org AND is_deleted = 0\" + src.openFilter() + src.extra();\nem.createNativeQuery(\"SELECT \" + dateCol + base + \" AND \" + dateCol + \" >= :start\")",
+      "patchAfter": "// Each module exposes a TrendSource bean returning its open-item timestamps:\n//   interface TrendSource { String metricKey(); List<LocalDateTime> openSince(Long org, LocalDateTime from); }\n// DashboardService injects List<TrendSource>, buckets in Java — no cross-module SQL strings.",
+      "effort": "L",
+      "references": [
+        "https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html"
+      ]
+    }
+  ]
+}

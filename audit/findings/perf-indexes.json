@@ -1,0 +1,177 @@
+{
+  "findings": [
+    {
+      "id": "PERF-IX-001",
+      "title": "74 multi-tenant tables carry organisation_id but have no supporting index — every org-scoped query is a full clustered-index scan",
+      "phase": "Performance",
+      "category": "Database Indexing / Multi-Tenancy",
+      "severity": "High",
+      "cvss": "High operational risk: the platform's universal access pattern (1,377 repository methods filter by organisation_id) hits 74 tables whose only index is the clustered PK on id. As soon as any tenant table grows past a few thousand rows, every list/search/dashboard read degrades to an O(N) scan with a residual organisation_id predicate, and degradation compounds under multi-tenant concurrency. Not a confidentiality issue, hence not CVSS-scored, but a direct throughput/latency and cost driver in production.",
+      "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql",
+      "lines": "15-108",
+      "locations": [
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql:15-108",
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V7__tprm_module.sql:18-46",
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V4__incident_module.sql:1-60",
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V1__core_schemas.sql:1178-1208",
+        "setup_cyber_db.py:79-320",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/asm/repository/AttackSurfaceAssetRepository.java:19-27"
+      ],
+      "description": "The platform is multi-tenant by design: TenantContext puts organisation_id on every thread and CLAUDE.md mandates 'every repository query must filter by organisation_id'. Static analysis of the applied Flyway DDL (V1__core_schemas.sql .. V224__*, the set wired into prod via application-prod.yml `locations: classpath:db/migration/sqlserver`) shows 303 tables declare an org_id/organisation_id column, but only 230 have any index that references that column. That leaves 74 tenant tables (24%) with no organisation_id index at all; 46 of those 74 have no secondary index whatsoever (clustered PK on `id` only). The missing-index tables span every core module: bcm (14), cyber (11), privacy (6), risk (6), scm (6), workflow (4), compliance (3), platform (3), reporting (3), tprm (3), plus iam, ndi, kb, admin, aml and the *_lc lifecycle schemas. Concretely, canonical hot tables are affected: compliance.controls / compliance.assessments / compliance.findings, tprm.vendors, cyber.cyber_assets / cyber.vulnerabilities / cyber.cyber_incidents, privacy.processing_activities / privacy.data_subject_requests / privacy.consents, iam.users, platform.business_units, platform.notifications, and reporting.report_executions.",
+      "rootCause": "Index creation was treated as optional and applied inconsistently per migration rather than as a schema-wide standard. The early Sprint-1/Sprint-2 module migrations (V3 compliance, V4 incident, V7 tprm) and the dev Python bootstrap (setup_cyber_db.py, setup_bcm_db.py) create tables with only a clustered PK and never add an organisation_id index. SQL Server does not auto-create any index for a NOT NULL FK/tenant column, so the omission is silent. There is no convention or lint that requires a leading-organisation_id index for every tenant table.",
+      "evidence": "Parser over all V*.sql migrations: 344 distinct CREATE TABLE; 303 declare a tenant column; only 230 have an index referencing org_id/organisation_id => 74 tenant tables with NO org index, 46 with NO secondary index at all. Example DDL — compliance.assessments (V3 lines 49-73): `organisation_id BIGINT NOT NULL, ... status NVARCHAR(50) NOT NULL DEFAULT 'PLANNED', ... CONSTRAINT PK_assessments PRIMARY KEY CLUSTERED (id ASC)` and the file contains ZERO CREATE INDEX statements (grep -c CREATE INDEX V3 = 0). Repository side: `grep findByOrganisationId` = 1,377 hits; the single most common method is findByIdAndOrganisationId (313 declarations), then findByOrganisationId (141) and findByOrganisationIdOrderByCreatedAtDesc (120).",
+      "impact": "On the curated dev DB (~450 rows) the scans are invisible, but production tenants accumulate registers (risks, assessments, vulnerabilities, DSRs, audit findings) into the thousands-to-millions of rows. Every list view, dashboard widget, export, and pagination query on these 74 tables performs a clustered-index scan reading the entire table and discarding rows for other tenants. Under multi-tenant concurrency this multiplies buffer-pool pressure and lock/latch contention, producing slow dashboards, export timeouts, and a noisy-neighbour effect where one large tenant degrades all tenants on the shared SQL Server 2019 Express instance (which itself caps at 1 GB buffer pool / 10 GB per DB, amplifying scan cost).",
+      "reproduction": "1) Pick any affected table, e.g. compliance.assessments. 2) Seed e.g. 100k rows across 3 org_ids. 3) Run `SET STATISTICS IO ON; SELECT * FROM compliance.assessments WHERE organisation_id = 1 AND is_deleted = 0 ORDER BY created_at DESC;` and inspect the actual execution plan: it shows a Clustered Index Scan on PK_assessments with a residual predicate on organisation_id (logical reads ~= total pages of the table), not a seek. 4) Repeat for cyber.vulnerabilities, tprm.vendors, iam.users — same scan. 5) Confirm in the DB: `SELECT t.name FROM sys.tables t WHERE EXISTS(SELECT 1 FROM sys.columns c WHERE c.object_id=t.object_id AND c.name IN ('organisation_id','org_id')) AND NOT EXISTS(SELECT 1 FROM sys.index_columns ic JOIN sys.columns c2 ON ic.object_id=c2.object_id AND ic.column_id=c2.column_id WHERE ic.object_id=t.object_id AND ic.key_ordinal=1 AND c2.name IN ('organisation_id','org_id'));`",
+      "resolution": "Adopt a schema-wide standard: every tenant table gets a nonclustered index with organisation_id as the leading key, extended with is_deleted (filtered `WHERE is_deleted = 0`) and the columns most queries sort/filter on (status, created_at). Backfill the 74 missing tables in a new Flyway migration so it applies in prod. For tables soft-deleted via @Where, use a filtered index to keep it small. Prioritise by row growth: risk.*, cyber.*, compliance.*, privacy.*, tprm.vendors, iam.users, platform.notifications.",
+      "patchBefore": "-- V3__compliance_module.sql\nCREATE TABLE compliance.assessments (\n    id              BIGINT IDENTITY(1,1) NOT NULL,\n    organisation_id BIGINT               NOT NULL,\n    framework       NVARCHAR(100)        NOT NULL,\n    status          NVARCHAR(50)         NOT NULL DEFAULT 'PLANNED',\n    ...\n    CONSTRAINT PK_assessments PRIMARY KEY CLUSTERED (id ASC)\n);\n-- (no CREATE INDEX anywhere in this file)",
+      "patchAfter": "-- New Flyway migration, e.g. V225__backfill_tenant_org_indexes.sql\nCREATE NONCLUSTERED INDEX IX_assessments_org_status\n    ON compliance.assessments (organisation_id, status)\n    WHERE is_deleted = 0\n    INCLUDE (framework, score, assessment_date);\nGO\nCREATE NONCLUSTERED INDEX IX_findings_org_status\n    ON compliance.findings (organisation_id, status, severity)\n    WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_tprm_vendors_org_status\n    ON tprm.vendors (organisation_id, status)\n    WHERE is_deleted = 0\n    INCLUDE (vendor_name, risk_rating);\nGO\n-- ... repeat for the remaining 71 tenant tables, leading on organisation_id",
+      "effort": "L",
+      "references": [
+        "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-index-design-guide",
+        "https://learn.microsoft.com/en-us/sql/relational-databases/indexes/create-filtered-indexes",
+        "CLAUDE.md — 'Every repository query must filter by organisation_id'",
+        "tss-grc-backend/db/sqlserver/indexes/01-shared-indexes.sql (intended-but-unwired index set)"
+      ]
+    },
+    {
+      "id": "PERF-IX-002",
+      "title": "Early core-module migrations (compliance, incident, tprm) create tables with zero secondary indexes — inconsistent indexing discipline left foundational registers unindexed",
+      "phase": "Performance",
+      "category": "Database Indexing / Schema Standards",
+      "severity": "High",
+      "cvss": "High: these are the original, most-used GRC registers (controls, assessments, findings, vendors, incidents). They were created first, are referenced by the most screens, and received no indexes at all — neither for tenant scoping nor for their FK joins. The defect is structural (a whole file with 0 indexes), not a one-off omission.",
+      "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql",
+      "lines": "1-112",
+      "locations": [
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql:1-112",
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V4__incident_module.sql:1-60",
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V7__tprm_module.sql:18-90"
+      ],
+      "description": "Indexing discipline in the migration chain is inconsistent: later migrations (V8 evidence: 8 indexes, V11 intake: 5 indexes, and most post-V90 modules) add nonclustered indexes, but the earliest module migrations create their tables with none. V3__compliance_module.sql creates compliance.controls, compliance.assessments and compliance.findings (3 tables, all with organisation_id + status) and contains 0 CREATE INDEX statements. V4__incident_module.sql (1 table) and V7__tprm_module.sql (tprm.vendors + tprm.vendor_assessments) likewise contain 0 indexes. These are not obscure tables — they are the foundational Compliance, Incident and Third-Party registers that nearly every dashboard, report and cross-module link reads.",
+      "rootCause": "No enforced 'every CREATE TABLE ships with its indexes' rule. The team added indexes ad hoc as performance problems surfaced in later sprints, but never went back to backfill the Sprint-1/Sprint-2 core tables. The dedicated index files under db/sqlserver/indexes/ (which DO contain IX_assessments_org_framework, IX_findings_assessment_status, etc.) were authored separately and never wired into the applied migration chain (see PERF-IX-006).",
+      "evidence": "grep -c 'CREATE.*INDEX' per file: V3__compliance_module.sql=0 (3 tables), V4__incident_module.sql=0 (1 table), V7__tprm_module.sql=0 (2 tables) — versus V8__evidence_module.sql=8 (7 tables), V11__intake_records.sql=5 (2 tables). compliance.findings even declares an FK on assessment_id (V3 lines 103-104) with no backing index. tprm.vendors (V7 lines 18-43): organisation_id NOT NULL, status NVARCHAR(50) with CHECK, only PK_vendors clustered on id.",
+      "impact": "The most heavily-trafficked registers in the product are the slowest to read at scale. Compliance assessment lists, audit-finding inboxes, and the third-party vendor register all scan. The unindexed FK on compliance.findings.assessment_id forces a scan whenever findings are loaded for an assessment (a per-assessment drill-down) and whenever the parent assessment row is updated/deleted (FK integrity check scans the child).",
+      "reproduction": "1) `grep -c -iE 'CREATE.*INDEX' V3__compliance_module.sql` returns 0. 2) Apply V3 to a SQL Server DB and run `SELECT name, type_desc FROM sys.indexes WHERE object_id = OBJECT_ID('compliance.findings');` — only the clustered PK is returned. 3) `SELECT * FROM compliance.findings WHERE assessment_id = 42;` produces a Clustered Index Scan in the actual plan.",
+      "resolution": "Backfill index migrations for the V3/V4/V7 core tables (folding the already-authored definitions from db/sqlserver/indexes/02-module-indexes.sql) and institute a review rule that any migration adding a CREATE TABLE must also add (a) a leading-organisation_id index and (b) an index on every FK column.",
+      "patchBefore": "-- V3__compliance_module.sql (findings) — no index on the FK column\nCREATE TABLE compliance.findings (\n    id BIGINT IDENTITY(1,1) NOT NULL,\n    organisation_id BIGINT NOT NULL,\n    assessment_id BIGINT NULL,\n    status NVARCHAR(50) NOT NULL DEFAULT 'OPEN',\n    ...\n    CONSTRAINT FK_findings_assessment FOREIGN KEY (assessment_id)\n        REFERENCES compliance.assessments(id)\n);\n-- 0 CREATE INDEX in this file",
+      "patchAfter": "-- Add at the end of the migration (or a new backfill migration)\nCREATE NONCLUSTERED INDEX IX_findings_org_status\n    ON compliance.findings (organisation_id, status, severity)\n    WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_findings_assessment\n    ON compliance.findings (assessment_id)\n    WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_controls_org_status\n    ON compliance.controls (organisation_id, status) WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_vendors_org_status\n    ON tprm.vendors (organisation_id, status) WHERE is_deleted = 0;\nGO",
+      "effort": "M",
+      "references": [
+        "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-index-design-guide#general_index_design_guidelines",
+        "tss-grc-backend/db/sqlserver/indexes/02-module-indexes.sql"
+      ]
+    },
+    {
+      "id": "PERF-IX-003",
+      "title": "iam.users has no index beyond the clustered PK — username/email login lookups and per-request principal resolution scan the user table; no unique constraint on username/email",
+      "phase": "Performance",
+      "category": "Database Indexing / Authentication Hot Path",
+      "severity": "High",
+      "cvss": "High: iam.users is on the critical path of every authentication and every JWT-authenticated request (principal lookup). With only PK_users on id, the canonical 'find user by username' login query scans the whole table. The missing UNIQUE on (organisation_id, username)/(email) is also a data-integrity gap (duplicate usernames are physically possible) layered on top of the performance problem.",
+      "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V1__core_schemas.sql",
+      "lines": "1178-1209",
+      "locations": [
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V1__core_schemas.sql:1178-1209"
+      ],
+      "description": "iam.users is created in V1__core_schemas.sql (lines 1178-1209) with username, email, password_hash and organisation_id columns and only `CONSTRAINT pk_users PRIMARY KEY (id)`. There is no index on username, no index on email, no unique constraint on either, and no organisation_id index — confirmed by grepping the entire migration set for any index referencing iam.users (zero matches). The authentication flow looks up users by username (and resolves the principal by id on every request via the JWT filter); the by-username lookup has no supporting index and degrades to a scan.",
+      "rootCause": "The table was hand-written in the consolidated V1 core-schema file without the supporting indexes/unique constraints. A separate, never-applied file (db/sqlserver/indexes/01-shared-indexes.sql lines 40-55) defines IX_users_org and IX_users_active_login INCLUDE(username, email, password_hash, ...), showing the indexes were designed but never reached the applied schema (see PERF-IX-006).",
+      "evidence": "V1 lines 1178-1208: only `CONSTRAINT [pk_users] PRIMARY KEY ([id])`; no UNIQUE/INDEX on username or email. `grep -rniE 'INDEX.*iam\\.users|ON +iam\\.users|UNIQUE.*username' db/migration/sqlserver/` returns no rows. The orphaned design file db/sqlserver/indexes/01-shared-indexes.sql:51-55 shows the intended `IX_users_active_login ON iam.users (is_active, is_locked) ... INCLUDE (username, email, password_hash, org_id, bu_id)`.",
+      "impact": "Login throughput is bounded by a full scan of iam.users per attempt — and because dev disables lockout (99 attempts/min) and prod relies on this table, credential-stuffing or simple growth (thousands of users across tenants) turns auth into a hotspot. The absence of a UNIQUE on (organisation_id, username) and on email also permits duplicate accounts, which can corrupt login resolution.",
+      "reproduction": "1) `SELECT name, type_desc FROM sys.indexes WHERE object_id = OBJECT_ID('iam.users');` returns only the clustered PK. 2) `SELECT * FROM iam.users WHERE username = 'admin' AND is_deleted = 0;` shows a Clustered Index Scan in the actual plan. 3) `INSERT` two rows with the same username succeeds (no unique constraint).",
+      "resolution": "Add a unique index on (organisation_id, username) and a unique index on email (filtered on is_deleted=0), which simultaneously fixes the lookup performance and enforces uniqueness. Add a covering index for the login path including password_hash/is_active/is_locked.",
+      "patchBefore": "CREATE TABLE iam.users (\n    [id] BIGINT IDENTITY(1,1) NOT NULL,\n    [organisation_id] BIGINT NOT NULL,\n    [username] NVARCHAR(100) NOT NULL,\n    [email] NVARCHAR(200) NOT NULL,\n    [password_hash] NVARCHAR(200) NOT NULL,\n    [is_active] BIT NOT NULL DEFAULT ((1)),\n    [is_locked] BIT NOT NULL DEFAULT ((0)),\n    ...\n    CONSTRAINT [pk_users] PRIMARY KEY ([id])\n);\n-- no index/unique on username, email, or organisation_id",
+      "patchAfter": "-- backfill migration\nCREATE UNIQUE NONCLUSTERED INDEX UX_users_org_username\n    ON iam.users (organisation_id, username) WHERE is_deleted = 0;\nGO\nCREATE UNIQUE NONCLUSTERED INDEX UX_users_email\n    ON iam.users (email) WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_users_login\n    ON iam.users (username, is_deleted)\n    INCLUDE (password_hash, is_active, is_locked, organisation_id);\nGO",
+      "effort": "S",
+      "references": [
+        "https://learn.microsoft.com/en-us/sql/relational-databases/indexes/unique-indexes",
+        "tss-grc-backend/db/sqlserver/indexes/01-shared-indexes.sql:40-55",
+        "tss-grc-backend/src/main/resources/application-dev.yml (lockout 99 attempts/min in dev)"
+      ]
+    },
+    {
+      "id": "PERF-IX-004",
+      "title": "status / workflow_status columns are queried as filters but lack supporting indexes on several cyber tables",
+      "phase": "Performance",
+      "category": "Database Indexing / Workflow Filtering",
+      "severity": "Medium",
+      "cvss": "Medium: status and workflow_status are common WHERE/ORDER predicates (findByOrganisationIdAndStatus appears 30x, findByOrganisationIdAndStatusOrderByCreatedAtDesc 25x). Where the underlying table also lacks an org index, status filtering compounds the scan. Bounded scope (cyber tables most affected) keeps this Medium.",
+      "file": "setup_cyber_db.py",
+      "lines": "202-320",
+      "locations": [
+        "setup_cyber_db.py:202-320",
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V1__core_schemas.sql:781"
+      ],
+      "description": "Of the tables that carry a workflow_status column, several have no index on workflow_status or status: cyber.cyber_action_plans, cyber.cyber_incidents, cyber.vuln_exceptions, cyber.vulnerabilities. These tables are filtered by status in the service layer (workflow state machines) and via repository finders. The cyber.* tables are created by setup_cyber_db.py with only an IDENTITY clustered PK and no secondary indexes at all (the script contains 0 CREATE INDEX), so a query like 'open vulnerabilities for org N' scans the whole table and filters status as a residual predicate. Even the migration-defined cyber.incidents (V1 line 781) only adds IX_cyber_inc_nist on nist_phase, not on (organisation_id, status).",
+      "rootCause": "Status/workflow_status filtering was implemented in the service layer and repositories but the corresponding columns were never indexed. The dev bootstrap scripts for cyber and bcm (setup_cyber_db.py, setup_bcm_db.py) create tables with no indexes (grep CREATE INDEX = 0 in both), so status-driven queries have no seek path.",
+      "evidence": "Parser: 5 tables carry workflow_status; 4 have no index on workflow_status/status (cyber.cyber_action_plans, cyber.cyber_incidents, cyber.vuln_exceptions, cyber.vulnerabilities). setup_cyber_db.py creates 10 cyber tables each with `organisation_id BIGINT NOT NULL DEFAULT 1` and `id INT IDENTITY(1,1) PRIMARY KEY`, with grep -c 'CREATE INDEX' = 0. Repository pattern counts: findByOrganisationIdAndStatus=30, findByOrganisationIdAndStatusOrderByCreatedAtDesc=25, findByOrganisationIdAndStatusOrderByIdDesc=9.",
+      "impact": "Status-filtered dashboards and worklists on cyber tables (open vulnerabilities, in-progress incidents, pending action plans) scan the full table per tenant. Because these tables also lack an org index, the cost is the union of both problems; remediating with a composite (organisation_id, status) index resolves both at once.",
+      "reproduction": "1) Run setup_cyber_db.py and `SELECT name FROM sys.indexes WHERE object_id=OBJECT_ID('cyber.vulnerabilities');` — only the PK. 2) `SELECT * FROM cyber.vulnerabilities WHERE organisation_id=1 AND status='OPEN';` shows a scan. 3) Confirm 0 status indexes: `SELECT i.name FROM sys.indexes i JOIN sys.index_columns ic ON i.object_id=ic.object_id JOIN sys.columns c ON ic.object_id=c.object_id AND ic.column_id=c.column_id WHERE c.name IN ('status','workflow_status') AND i.object_id=OBJECT_ID('cyber.vulnerabilities');`",
+      "resolution": "Add composite indexes leading with organisation_id and including status/workflow_status for the affected cyber tables, mirroring the design already present in db/sqlserver/indexes/02-module-indexes.sql (IX_vulnerabilities_org_status etc.). Apply via Flyway and update setup_cyber_db.py so the dev DB matches.",
+      "patchBefore": "-- setup_cyber_db.py\nCREATE TABLE cyber.vulnerabilities (\n    id              INT IDENTITY(1,1) PRIMARY KEY,\n    organisation_id BIGINT NOT NULL DEFAULT 1,\n    ...\n    status          NVARCHAR(...) ,\n    workflow_status NVARCHAR(...)\n);\n-- no CREATE INDEX in the whole script",
+      "patchAfter": "CREATE NONCLUSTERED INDEX IX_vulnerabilities_org_status\n    ON cyber.vulnerabilities (organisation_id, status, severity)\n    WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_cyber_incidents_org_wf\n    ON cyber.cyber_incidents (organisation_id, workflow_status)\n    WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_cyber_action_plans_org_status\n    ON cyber.cyber_action_plans (organisation_id, status) WHERE is_deleted = 0;\nGO",
+      "effort": "S",
+      "references": [
+        "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-index-design-guide",
+        "tss-grc-backend/db/sqlserver/indexes/02-module-indexes.sql:47-71"
+      ]
+    },
+    {
+      "id": "PERF-IX-005",
+      "title": "Foreign-key columns are not indexed — SQL Server does not auto-index FKs, so child-table joins and parent delete/update integrity checks scan",
+      "phase": "Performance",
+      "category": "Database Indexing / Foreign Keys",
+      "severity": "Medium",
+      "cvss": "Medium: SQL Server creates no index for a FOREIGN KEY constraint. ~23 distinct FK column names across the schema are never used as a leading index key, so the standard 'children of parent X' drill-down and the FK integrity check on parent modify both scan the child table. Approximate (name-based) detection keeps this Medium.",
+      "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql",
+      "lines": "103-105",
+      "locations": [
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql:103-105",
+        "tss-grc-backend/src/main/resources/db/migration/sqlserver/V7__tprm_module.sql:53-63"
+      ],
+      "description": "Across the applied migrations there are 92 FOREIGN KEY declarations on 55 distinct FK column names. Of those, 23 FK column names are never used as the leading key of any index anywhere in the schema — including assessment_id, asset_id, engagement_id, playbook_id, subprocessor_id, parent_processor_id, parent_audit_id, step_id, snapshot_id, primary_vendor_id, reporting_year_id and others. Because SQL Server does not auto-create an index to back a FOREIGN KEY constraint, every join from parent to child on these columns (and every cascade/integrity check when the parent is modified) performs a scan of the child table. compliance.findings.assessment_id (FK_findings_assessment, V3 lines 103-105) and tprm.vendor_assessments.vendor_id (V7) are concrete examples.",
+      "rootCause": "FK constraints were declared for referential integrity but the matching index on the FK column was not created. This is a well-known SQL Server gap: PRIMARY KEY and UNIQUE auto-create indexes, but FOREIGN KEY does not.",
+      "evidence": "Parser: 92 FK declarations, 55 distinct FK columns, 23 of those never appear as a leading index key. compliance.findings: `CONSTRAINT FK_findings_assessment FOREIGN KEY (assessment_id) REFERENCES compliance.assessments(id)` (V3:103-105) with no index on assessment_id. Note detection is name-based (a FK column may be indexed under a synonymous name), so treat the 23 as an upper bound and verify per table.",
+      "impact": "Parent->child drill-downs (e.g. all findings for an assessment, all assessments for a vendor, all steps for a playbook) scan the child. Deleting or soft-deleting a parent row triggers a child scan per FK integrity check, slowing writes on busy registers.",
+      "reproduction": "1) `SELECT fk.name, c.name col FROM sys.foreign_key_columns fkc JOIN sys.foreign_keys fk ON fkc.constraint_object_id=fk.object_id JOIN sys.columns c ON fkc.parent_object_id=c.object_id AND fkc.parent_column_id=c.column_id;` to list FK columns. 2) For each, `SELECT 1 FROM sys.index_columns ic JOIN sys.columns c2 ON ic.object_id=c2.object_id AND ic.column_id=c2.column_id WHERE ic.key_ordinal=1 AND c2.name=@fkcol AND ic.object_id=@parent;` — empty means unindexed. 3) `SELECT * FROM compliance.findings WHERE assessment_id=1;` shows a scan.",
+      "resolution": "Create a nonclustered index on each FK column (leading with organisation_id where the child is tenant-scoped, otherwise leading with the FK column). Add to the schema-standard checklist alongside the org-index rule from PERF-IX-001.",
+      "patchBefore": "CONSTRAINT FK_findings_assessment FOREIGN KEY (assessment_id)\n    REFERENCES compliance.assessments(id)\n-- no index on assessment_id",
+      "patchAfter": "CREATE NONCLUSTERED INDEX IX_findings_assessment\n    ON compliance.findings (assessment_id) WHERE is_deleted = 0;\nGO\nCREATE NONCLUSTERED INDEX IX_vendor_assessments_vendor\n    ON tprm.vendor_assessments (vendor_id);\nGO",
+      "effort": "M",
+      "references": [
+        "https://learn.microsoft.com/en-us/sql/relational-databases/tables/create-foreign-key-relationships#indexes",
+        "https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-index-design-guide"
+      ]
+    },
+    {
+      "id": "PERF-IX-006",
+      "title": "Curated index files (db/sqlserver/indexes/*.sql) are orphaned — never wired into the Flyway chain or the dev Python bootstrap, so ~40 designed indexes never get created",
+      "phase": "Performance",
+      "category": "Database Indexing / Migration Wiring",
+      "severity": "Medium",
+      "cvss": "Medium: the project already CONTAINS well-designed organisation_id/status/FK indexes for iam.users, risk.risks, cyber.assets, compliance.assessments, etc. in db/sqlserver/indexes/01-shared-indexes.sql and 02-module-indexes.sql — but neither file is on the Flyway classpath nor invoked by any setup_*.py, so they are dead. This is the root cause behind several other findings and an easy, high-leverage fix.",
+      "file": "tss-grc-backend/db/sqlserver/indexes/01-shared-indexes.sql",
+      "lines": "1-209",
+      "locations": [
+        "tss-grc-backend/db/sqlserver/indexes/01-shared-indexes.sql:1-209",
+        "tss-grc-backend/db/sqlserver/indexes/02-module-indexes.sql:1-161",
+        "tss-grc-backend/src/main/resources/application-prod.yml:28",
+        "tss-grc-backend/db/sqlserver/migrations/README.md:1-60"
+      ],
+      "description": "The repository contains two hand-authored index files: 01-shared-indexes.sql (~25 indexes: organizations, business_units, iam.users, user_roles, controls, workflow_instances, attachments, notifications, audit_logs, licenses) and 02-module-indexes.sql (~15 indexes: risk.risks, risk_assessments, cyber.assets, vulnerabilities, incidents, bcm.*, privacy.*, compliance.*, reporting.*). These define exactly the organisation_id/status/FK composite indexes the other findings call for. However: (a) prod Flyway is configured with `locations: classpath:db/migration/sqlserver` (application-prod.yml:28) — i.e. only the V*.sql files under src/main/resources, NOT tss-grc-backend/db/sqlserver/indexes/; (b) the dev DB is bootstrapped by setup_*.py + seed_real_data.py, none of which reference these files; (c) the only mention of them anywhere in the repo is SESSION_SUMMARY.md. The migrations/README.md even describes a legacy layout (V1.0.13__create_shared_indexes.sql / V1.0.14__create_module_indexes.sql) that does not exist in the actual V1..V224 chain. Net effect: these ~40 designed indexes are never created in any environment.",
+      "rootCause": "Index DDL was authored as standalone scripts under a parallel db/sqlserver/ tree that was superseded by the consolidated src/main/resources/db/migration/sqlserver/V*.sql chain. The migration toward the V* layout never folded the index files in, and the README documenting the intended wiring went stale.",
+      "evidence": "application-prod.yml:28 `locations: classpath:db/migration/sqlserver` (resolves under src/main/resources only; the indexes/ files live under tss-grc-backend/db/sqlserver/ and are not on the classpath). `grep -ril '01-shared-indexes|02-module-indexes|sqlserver/indexes'` across *.py/*.md/*.bat/*.ps1/*.sql returns only SESSION_SUMMARY.md. application-dev.yml: flyway.enabled=false and ddl-auto=none, so neither Flyway nor Hibernate creates them in dev; application.yml base uses ddl-auto=validate (Hibernate creates nothing). The 01-shared-indexes.sql file itself contains the missing IX_users_org / IX_users_active_login (lines 40-55) and IX_controls_org_active (lines 86-90) referenced by PERF-IX-003 and PERF-IX-001.",
+      "impact": "The team believes the platform is indexed (the files exist and look complete) while production runs with only the inline V* indexes, leaving the gaps quantified in PERF-IX-001..005. This false sense of coverage is itself a risk: a perf regression in prod has no quick lever because the prepared indexes are not deployable as-is.",
+      "reproduction": "1) Inspect application-prod.yml:28 — Flyway location does not include db/sqlserver/indexes/. 2) `grep -ril 'sqlserver/indexes'` over the repo returns only SESSION_SUMMARY.md. 3) After a clean Flyway migrate of V1..V224 into a fresh DB, `SELECT name FROM sys.indexes WHERE name LIKE 'IX_users_%';` returns nothing (IX_users_org was never applied).",
+      "resolution": "Convert 01-shared-indexes.sql and 02-module-indexes.sql into a properly versioned Flyway migration under src/main/resources/db/migration/sqlserver/ (e.g. V225__shared_and_module_indexes.sql) so they apply in prod, and update the dev bootstrap to run them (or run the same SQL from a setup_indexes.py). Reconcile the index set against PERF-IX-001's gap list before applying. Delete or clearly deprecate the stale migrations/README.md layout.",
+      "patchBefore": "# application-prod.yml\nflyway:\n  locations: classpath:db/migration/sqlserver   # excludes db/sqlserver/indexes/*.sql\n\n# db/sqlserver/indexes/01-shared-indexes.sql, 02-module-indexes.sql\n#   -> referenced nowhere except SESSION_SUMMARY.md (orphaned)",
+      "patchAfter": "# Move/convert the curated index DDL into the applied chain:\n#   src/main/resources/db/migration/sqlserver/V225__shared_and_module_indexes.sql\n# containing the contents of 01-shared-indexes.sql + 02-module-indexes.sql\n# (wrapped in IF NOT EXISTS guards), then for dev add a setup_indexes.py that\n# executes the same SQL after the setup_*_db.py bootstrap.",
+      "effort": "M",
+      "references": [
+        "https://documentation.red-gate.com/fd/flyway-locations-184127476.html",
+        "tss-grc-backend/db/sqlserver/indexes/01-shared-indexes.sql",
+        "tss-grc-backend/db/sqlserver/indexes/02-module-indexes.sql",
+        "tss-grc-backend/db/sqlserver/migrations/README.md"
+      ]
+    }
+  ]
+}

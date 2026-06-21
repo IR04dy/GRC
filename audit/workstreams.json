@@ -1,0 +1,455 @@
+{
+  "WS1 Cross-tenant isolation": {
+    "n": 20,
+    "sev": {
+      "Critical": 2,
+      "High": 8,
+      "Medium": 6,
+      "Low": 3,
+      "Info": 1
+    },
+    "ids": [
+      "SEC-CYB-001",
+      "SEC-CYB-002",
+      "SEC-BCM-001",
+      "SEC-CMP-001",
+      "SEC-EVD-001",
+      "SEC-INT-001",
+      "SEC-INT-002",
+      "SEC-RISK-001",
+      "SEC-TPRM-001",
+      "SEC-TPRM-002",
+      "SEC-CFG-009",
+      "SEC-CMP-004",
+      "SEC-CVE-011",
+      "SEC-INT-003",
+      "SEC-NDI-004",
+      "SEC-PRIV-003",
+      "SEC-CMP-007",
+      "SEC-EVD-006",
+      "SEC-FIN-005",
+      "SEC-BCM-006"
+    ]
+  },
+  "WS2 Function-level authz": {
+    "n": 39,
+    "sev": {
+      "Critical": 2,
+      "High": 11,
+      "Medium": 20,
+      "Low": 4,
+      "Info": 2
+    },
+    "ids": [
+      "SEC-FIN-001",
+      "SEC-IAM-001",
+      "SEC-CMP-003",
+      "SEC-CYB-003",
+      "SEC-ESG-001",
+      "SEC-FIN-002",
+      "SEC-IAM-002",
+      "SEC-IAM-003",
+      "SEC-NDI-001",
+      "SEC-PLAT-001",
+      "SEC-PLAT-002",
+      "SEC-PRIV-001",
+      "SEC-PRIV-002",
+      "SEC-BCM-002",
+      "SEC-BCM-003",
+      "SEC-CFG-006",
+      "SEC-CMP-002",
+      "SEC-ESG-002",
+      "SEC-EVD-002",
+      "SEC-EVD-003",
+      "SEC-EVD-004",
+      "SEC-FIN-003",
+      "SEC-IAM-004",
+      "SEC-IAM-005",
+      "SEC-NDI-003",
+      "SEC-PLAT-003",
+      "SEC-PLAT-004",
+      "SEC-PLAT-005",
+      "SEC-PLAT-006",
+      "SEC-PLAT-007",
+      "SEC-RISK-002",
+      "SEC-RISK-004",
+      "SEC-TPRM-003",
+      "SEC-AUTH-003",
+      "SEC-CFG-005",
+      "SEC-CMP-005",
+      "SEC-ESG-004",
+      "SEC-EVD-007",
+      "SEC-PRIV-006"
+    ]
+  },
+  "WS3 Auth/session hardening": {
+    "n": 20,
+    "sev": {
+      "High": 1,
+      "Medium": 7,
+      "Low": 7,
+      "Info": 5
+    },
+    "ids": [
+      "SEC-AUTH-001",
+      "SEC-AUTH-002",
+      "SEC-CVE-007",
+      "SEC-CVE-013",
+      "SEC-FE-002",
+      "SEC-NPM-002",
+      "SEC-PY-002",
+      "SEC-SEC-001",
+      "SEC-CVE-004",
+      "SEC-CVE-005",
+      "SEC-INT-006",
+      "SEC-LEAK-004",
+      "SEC-PY-001",
+      "SEC-SEC-004",
+      "SEC-TPRM-005",
+      "SEC-AUTH-005",
+      "SEC-CFG-010",
+      "SEC-IAM-008",
+      "SEC-LEAK-001",
+      "SEC-SEC-005"
+    ]
+  },
+  "WS4 Injection/unsafe input": {
+    "n": 23,
+    "sev": {
+      "High": 2,
+      "Medium": 9,
+      "Low": 10,
+      "Info": 2
+    },
+    "ids": [
+      "SEC-FE-001",
+      "SEC-NDI-002",
+      "SEC-CVE-003",
+      "SEC-CVE-014",
+      "SEC-ESG-003",
+      "SEC-FE-003",
+      "SEC-FIN-004",
+      "SEC-INT-004",
+      "SEC-INT-005",
+      "SEC-NPM-003",
+      "SEC-NPM-004",
+      "SEC-BCM-005",
+      "SEC-CYB-004",
+      "SEC-EVD-005",
+      "SEC-FE-004",
+      "SEC-IAM-006",
+      "SEC-IAM-007",
+      "SEC-NDI-006",
+      "SEC-PRIV-005",
+      "SEC-PY-004",
+      "SEC-TPRM-004",
+      "SEC-PY-003",
+      "SEC-RISK-006"
+    ]
+  },
+  "WS5 Dependency CVEs": {
+    "n": 10,
+    "sev": {
+      "High": 1,
+      "Medium": 7,
+      "Low": 1,
+      "Info": 1
+    },
+    "ids": [
+      "SEC-CVE-001",
+      "SEC-CVE-002",
+      "SEC-CVE-006",
+      "SEC-CVE-008",
+      "SEC-CVE-009",
+      "SEC-CVE-010",
+      "SEC-CVE-012",
+      "SEC-NPM-001",
+      "SEC-NPM-005",
+      "SEC-PY-005"
+    ]
+  },
+  "WS6 Secrets/config": {
+    "n": 13,
+    "sev": {
+      "Medium": 1,
+      "Low": 7,
+      "Info": 5
+    },
+    "ids": [
+      "SEC-CFG-001",
+      "SEC-AUTH-004",
+      "SEC-CFG-002",
+      "SEC-CFG-003",
+      "SEC-CFG-004",
+      "SEC-CFG-007",
+      "SEC-CFG-008",
+      "SEC-SEC-003",
+      "SEC-FE-005",
+      "SEC-INT-008",
+      "SEC-LEAK-002",
+      "SEC-LEAK-003",
+      "SEC-SEC-006"
+    ]
+  },
+  "WS7 Input validation": {
+    "n": 13,
+    "sev": {
+      "Medium": 1,
+      "Low": 12
+    },
+    "ids": [
+      "SEC-RISK-003",
+      "SEC-BCM-004",
+      "SEC-CMP-006",
+      "SEC-ESG-005",
+      "SEC-FIN-006",
+      "SEC-INT-007",
+      "SEC-NDI-005",
+      "SEC-PLAT-008",
+      "SEC-PLAT-009",
+      "SEC-PRIV-004",
+      "SEC-RISK-005",
+      "SEC-SEC-002",
+      "SEC-TPRM-006"
+    ]
+  },
+  "WS8 God-class/SOLID": {
+    "n": 27,
+    "sev": {
+      "High": 4,
+      "Medium": 9,
+      "Low": 11,
+      "Info": 3
+    },
+    "ids": [
+      "QUAL-ESG-001",
+      "QUAL-IE-001",
+      "QUAL-IE-002",
+      "QUAL-RC-003",
+      "QUAL-BCMP-003",
+      "QUAL-BCMP-006",
+      "QUAL-CP-001",
+      "QUAL-ESG-004",
+      "QUAL-ESG-005",
+      "QUAL-FA-006",
+      "QUAL-IE-004",
+      "QUAL-RC-007",
+      "QUAL-TI-008",
+      "QUAL-BCMP-013",
+      "QUAL-CP-006",
+      "QUAL-CP-009",
+      "QUAL-CP-010",
+      "QUAL-ESG-008",
+      "QUAL-ESG-009",
+      "QUAL-FA-008",
+      "QUAL-FA-010",
+      "QUAL-IE-006",
+      "QUAL-IE-010",
+      "QUAL-TI-010",
+      "QUAL-BCMP-014",
+      "QUAL-CP-008",
+      "QUAL-ESG-010"
+    ]
+  },
+  "WS9 Duplication": {
+    "n": 33,
+    "sev": {
+      "High": 5,
+      "Medium": 13,
+      "Low": 15
+    },
+    "ids": [
+      "QUAL-DUP-001",
+      "QUAL-DUP-002",
+      "QUAL-RC-001",
+      "QUAL-TI-001",
+      "QUAL-TI-002",
+      "QUAL-BCMP-002",
+      "QUAL-BCMP-005",
+      "QUAL-CP-005",
+      "QUAL-DUP-003",
+      "QUAL-ESG-002",
+      "QUAL-FA-001",
+      "QUAL-IE-003",
+      "QUAL-RC-004",
+      "QUAL-RC-005",
+      "QUAL-RC-006",
+      "QUAL-TI-003",
+      "QUAL-TI-004",
+      "QUAL-TI-007",
+      "QUAL-BCMP-009",
+      "QUAL-BCMP-010",
+      "QUAL-BCMP-011",
+      "QUAL-CP-002",
+      "QUAL-CP-007",
+      "QUAL-DUP-004",
+      "QUAL-ESG-006",
+      "QUAL-FA-002",
+      "QUAL-IE-007",
+      "QUAL-IE-009",
+      "QUAL-IE-011",
+      "QUAL-IE-012",
+      "QUAL-RC-008",
+      "QUAL-RC-010",
+      "QUAL-TI-011"
+    ]
+  },
+  "WS10 Error handling": {
+    "n": 12,
+    "sev": {
+      "Medium": 7,
+      "Low": 5
+    },
+    "ids": [
+      "QUAL-CP-003",
+      "QUAL-CP-004",
+      "QUAL-ESG-003",
+      "QUAL-FA-005",
+      "QUAL-FA-007",
+      "QUAL-IE-008",
+      "QUAL-TI-006",
+      "QUAL-BCMP-007",
+      "QUAL-BCMP-008",
+      "QUAL-BCMP-012",
+      "QUAL-FA-009",
+      "QUAL-TI-009"
+    ]
+  },
+  "WS11 Dead code": {
+    "n": 9,
+    "sev": {
+      "Medium": 4,
+      "Low": 5
+    },
+    "ids": [
+      "QUAL-BCMP-001",
+      "QUAL-BCMP-004",
+      "QUAL-RC-002",
+      "QUAL-TI-005",
+      "QUAL-ESG-007",
+      "QUAL-FA-003",
+      "QUAL-FA-004",
+      "QUAL-IE-005",
+      "QUAL-RC-009"
+    ]
+  },
+  "WS12 Backend perf (N+1/index/pool)": {
+    "n": 24,
+    "sev": {
+      "High": 9,
+      "Medium": 12,
+      "Low": 3
+    },
+    "ids": [
+      "PERF-IO-001",
+      "PERF-IO-002",
+      "PERF-IX-001",
+      "PERF-IX-003",
+      "PERF-NQ-001",
+      "PERF-NQ-002",
+      "PERF-NQ-003",
+      "PERF-NQ-004",
+      "PERF-PG-001",
+      "PERF-FE-003",
+      "PERF-FE-004",
+      "PERF-IO-003",
+      "PERF-IO-004",
+      "PERF-IX-002",
+      "PERF-IX-004",
+      "PERF-IX-005",
+      "PERF-IX-006",
+      "PERF-NQ-005",
+      "PERF-NQ-007",
+      "PERF-PG-002",
+      "PERF-PG-003",
+      "PERF-IO-005",
+      "PERF-NQ-006",
+      "PERF-PG-004"
+    ]
+  },
+  "WS13 Frontend perf": {
+    "n": 4,
+    "sev": {
+      "High": 2,
+      "Medium": 1,
+      "Info": 1
+    },
+    "ids": [
+      "PERF-FE-001",
+      "PERF-FE-002",
+      "PERF-FE-005",
+      "PERF-FE-006"
+    ]
+  },
+  "WS14 Test coverage": {
+    "n": 13,
+    "sev": {
+      "High": 3,
+      "Medium": 5,
+      "Low": 2,
+      "Info": 3
+    },
+    "ids": [
+      "FUNC-001",
+      "FUNC-002",
+      "FUNC-003",
+      "FUNC-004",
+      "FUNC-005",
+      "E2E-003",
+      "E2E-005",
+      "E2E-006",
+      "E2E-007",
+      "E2E-004",
+      "E2E-001",
+      "E2E-002",
+      "E2E-008"
+    ]
+  },
+  "WS15 Accessibility": {
+    "n": 7,
+    "sev": {
+      "High": 3,
+      "Medium": 3,
+      "Info": 1
+    },
+    "ids": [
+      "A11Y-001",
+      "A11Y-002",
+      "A11Y-003",
+      "A11Y-004",
+      "A11Y-005",
+      "A11Y-006",
+      "A11Y-007"
+    ]
+  },
+  "WS16 UX & microcopy": {
+    "n": 20,
+    "sev": {
+      "High": 3,
+      "Medium": 9,
+      "Low": 8
+    },
+    "ids": [
+      "COPY-01",
+      "LH-01",
+      "LH-02",
+      "COPY-02",
+      "COPY-03",
+      "LH-03",
+      "LH-04",
+      "UX-001",
+      "UX-002",
+      "UX-003",
+      "UX-004",
+      "UX-005",
+      "COPY-04",
+      "COPY-05",
+      "LH-05",
+      "LH-06",
+      "LH-07",
+      "UX-006",
+      "UX-007",
+      "UX-008"
+    ]
+  }
+}

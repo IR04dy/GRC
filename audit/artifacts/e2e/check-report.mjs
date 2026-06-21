@@ -1,0 +1,26 @@
+import { chromium } from '@playwright/test';
+const url = 'file:///D:/AYMAN/GRC/reports/audit-report.html';
+const b = await chromium.launch({ channel: 'chrome', headless: true });
+const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
+const errors = [];
+p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+p.on('pageerror', e => errors.push('PAGEERROR ' + e.message));
+await p.goto(url, { waitUntil: 'load' });
+await p.waitForTimeout(800);
+// interact: click a severity filter, type a search, expand all
+const visibleCards = await p.locator('.finding:not(.hide)').count();
+await p.locator('.fbtn[data-sev="Critical"]').click();
+await p.waitForTimeout(200);
+const critVisible = await p.locator('.finding:not(.hide)').count();
+await p.locator('.fbtn[data-sev="all"]').click();
+await p.fill('input[type=search]', 'tenant');
+await p.waitForTimeout(200);
+const searchVisible = await p.locator('.finding:not(.hide)').count();
+await p.fill('input[type=search]', '');
+await p.screenshot({ path: 'results/report-render.png', fullPage: false });
+console.log('console errors      :', errors.length);
+if (errors.length) console.log(errors.slice(0, 5).join('\n'));
+console.log('cards visible (all) :', visibleCards);
+console.log('cards after Critical:', critVisible);
+console.log('cards matching tenant:', searchVisible);
+await b.close();

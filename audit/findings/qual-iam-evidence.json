@@ -1,0 +1,323 @@
+{
+  "findings": [
+    {
+      "id": "QUAL-IE-001",
+      "title": "EvidenceMatrixService.matrix() is a triple-nested N+1 query loop (86 LOC, queries scale with the whole framework catalog)",
+      "phase": "Quality",
+      "category": "Performance / Cyclomatic complexity",
+      "severity": "High",
+      "cvss": "High operational risk: a single GET /api/v1/evidence/matrix fires O(frameworks + controls + sub-controls) DB round-trips. For a full NCA ECC / ISO 27001 catalog (hundreds of sub-controls per tenant) this is hundreds of queries per page load, causing slow dashboards and DB connection-pool pressure under concurrent users. Not a security CVSS, but a clear scalability defect.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java",
+      "lines": "57-143",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:64",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:71",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:77",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:85"
+      ],
+      "description": "matrix() loops over every active framework (frameworkRepo.findAll(), line 64), then for each framework queries controls (controlRepo.findByFrameworkIdAndIsActiveTrue, line 71), then for each control queries sub-controls (subControlRepo.findByControlIdAndIsActiveTrue, line 77), then inside the innermost loop runs itemRepo.findBySubControl(org, s.getId()) once per sub-control (line 85) plus an in-memory method-mix tally. The number of SQL statements grows linearly with the size of the entire control catalog, not with the data actually requested. The method is also a single 86-LOC block with three levels of nested loops and several inline aggregations (freshest-expiry, method mix, freshness band), giving it high cyclomatic complexity.",
+      "rootCause": "Per-row repository lookups inside nested loops instead of set-based / batch queries. The matrix is materialized by walking the object graph one entity at a time rather than fetching counts/aggregates in bulk.",
+      "evidence": "Innermost call at line 85: `List<EvidenceItem> items = itemRepo.findBySubControl(org, s.getId());` executed once per sub-control, nested inside `for (EvidenceControl c : controls)` (line 74) which is nested inside `for (EvidenceFramework fw : frameworks)` (line 68). The sibling GrcExpertService.listExpertCatalog() solves the identical framework→control→sub-control rollup with batch finders (findByControlIdInAndIsActiveTrue) and three aggregate queries (aggregateStatusBySubControl / aggregateExpiryBySubControl / aggregateFreshApprovedBySubControl) — proving the batch pattern already exists in the same package.",
+      "impact": "Dashboard latency grows with catalog size; DB load multiplies under concurrent tenants; the read-only transaction holds a connection for the full duration of the loop.",
+      "reproduction": "Seed a tenant with a full ECC framework (~100+ sub-controls), enable Hibernate SQL logging (show_sql), call GET /api/v1/evidence/matrix, and count the emitted SELECT statements — it equals 1 (frameworks) + N(controls-per-fw) + M(subs-per-ctrl) + K(findBySubControl per sub-control).",
+      "resolution": "Replace the per-sub-control itemRepo.findBySubControl call with batch aggregation queries keyed by sub-control id (mirroring GrcExpertService.aggregate*BySubControl), fetch all controls/sub-controls for the active frameworks with findBy...In finders, then assemble the matrix in memory from the pre-fetched maps. Extract the sub-control block builder into a private helper to reduce the method below ~30 LOC.",
+      "patchBefore": "for (EvidenceSubControl s : subs) {\n    if (Boolean.FALSE.equals(s.getIsActive())) continue;\n    List<EvidenceItem> items = itemRepo.findBySubControl(org, s.getId());\n    int count = items.size();\n    ...\n}",
+      "patchAfter": "// Pre-fetch once, outside the loops:\nMap<Long, List<EvidenceItem>> itemsBySc = itemRepo.findByOrganisationIdAndSubControlIdIn(org, allSubControlIds)\n        .stream().collect(Collectors.groupingBy(EvidenceItem::getSubControlId));\n...\nfor (EvidenceSubControl s : subs) {\n    List<EvidenceItem> items = itemsBySc.getOrDefault(s.getId(), List.of());\n    ...\n}",
+      "effort": "M",
+      "references": [
+        "Hibernate N+1 select problem",
+        "Compare GrcExpertService.listExpertCatalog (same module) which uses aggregate queries"
+      ]
+    },
+    {
+      "id": "QUAL-IE-002",
+      "title": "EvidenceItemService.toResponse() issues up to 4 lookup queries per item, causing N+1 on every list/page endpoint",
+      "phase": "Quality",
+      "category": "Performance",
+      "severity": "High",
+      "cvss": "High operational risk: every list(), listExpired(), listBySubControl() and page response maps each EvidenceItem through toResponse(), which performs up to four extra single-row DB reads (sub-control, control, framework, owner). A 20-row page therefore costs up to 80 extra queries.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java",
+      "lines": "386-422",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:390",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:394",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:397",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:405"
+      ],
+      "description": "toResponse(EvidenceItem) resolves the sub-control code/name (subControlRepository.findById, line 390), then the parent control (controlRepository.findById, line 394), then the framework (frameworkRepository.findById, line 397), then the owner's name (userRepository.findById, line 405). Because list()/page().map(this::toResponse) (lines 110-117) and the other read methods all funnel through this mapper, the per-item cost is multiplied across every result row — a classic N+1.",
+      "rootCause": "Enrichment by per-row findById inside a response mapper that is invoked once per row in a collection/page, instead of batching the joins or projecting them in the query.",
+      "evidence": "Lines 389-407 chain four findById calls per item; list() at line 116 does `return page.map(this::toResponse);` so the mapper runs once per page row.",
+      "impact": "Slow list endpoints and dashboard widgets, multiplied DB load. Latency scales with page size.",
+      "reproduction": "Enable show_sql, GET /api/v1/evidence/items?size=20 and count SELECTs — base query plus up to 4 lookups per returned item.",
+      "resolution": "Either (a) project the joined sub-control/control/framework codes and owner name directly in the EvidenceItemRepository query (DTO projection / JOIN FETCH), or (b) pre-fetch the referenced sub-controls/controls/frameworks/owners in bulk for the page and pass lookup maps into toResponse.",
+      "patchBefore": "if (e.getSubControlId() != null) {\n    Optional<EvidenceSubControl> sc = subControlRepository.findById(e.getSubControlId());\n    if (sc.isPresent()) { ... controlRepository.findById(...); frameworkRepository.findById(...); }\n}\n...\nownerName = userRepository.findById(e.getOwnerId()).map(User::getFullNameEn).orElse(null);",
+      "patchAfter": "// Build a single projection query joining sub_control -> control -> framework + owner,\n// or pre-load maps for the page once and pass them in:\nEvidenceItemResponse toResponse(EvidenceItem e, Map<Long,ScView> scMap, Map<Long,String> ownerNames) { ... }",
+      "effort": "M",
+      "references": [
+        "Spring Data JPA DTO projections",
+        "Hibernate JOIN FETCH"
+      ]
+    },
+    {
+      "id": "QUAL-IE-003",
+      "title": "EvidenceStorageService and AttachmentStorageService are ~90% duplicated (allow-list, size cap, store(), extensionOf, sha256Hex)",
+      "phase": "Quality",
+      "category": "Code duplication / DRY",
+      "severity": "Medium",
+      "cvss": "Medium maintainability risk: two near-identical file-storage implementations means security-relevant logic (extension allow-list, path-traversal guard, size cap) must be patched in two places. jscpd flags four overlapping duplicate blocks (20 + 17 + 13 + 10 lines) between these two files.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentStorageService.java",
+      "lines": "26-113",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentStorageService.java:28-32",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceStorageService.java:39-43",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentStorageService.java:97-112",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceStorageService.java:106-122"
+      ],
+      "description": "AttachmentStorageService and EvidenceStorageService have identical ALLOWED_EXTENSIONS sets (byte-for-byte the same 26 extensions), identical maxBytes/root constructor wiring, identical empty/size/extension validation, identical path-traversal guard, and identical extensionOf() and sha256Hex() helpers. The AttachmentStorageService javadoc even says it 'Mirrors the proven evidence storage'. sha256Hex() is in fact triplicated — EvidenceChainService has a third copy (lines 223-233).",
+      "rootCause": "Copy-paste of a working storage service for a second entity type rather than extracting a shared base class / utility for validation + hashing + path-traversal.",
+      "evidence": "jscpd-report.json reports four AttachmentStorageService <-> EvidenceStorageService duplicate blocks (20L, 17L, 13L, 10L). sha256Hex appears verbatim in AttachmentStorageService:103-112, EvidenceStorageService:112-122, and EvidenceChainService:223-233.",
+      "impact": "Divergent fixes: e.g. tightening the extension allow-list or the traversal guard in one service silently leaves the other vulnerable. Higher maintenance cost.",
+      "reproduction": "Diff the two files; or run jscpd over module/attachment and module/evidence.",
+      "resolution": "Extract an abstract LocalFileStorage base (or a FileStorageSupport utility) holding ALLOWED_EXTENSIONS, the size cap, validate(), extensionOf(), the path-traversal guard, and sha256Hex(); have both services subclass/delegate. Move sha256Hex to a shared HashUtil so EvidenceChainService reuses it too.",
+      "patchBefore": "// AttachmentStorageService and EvidenceStorageService each define their own:\nprivate static final Set<String> ALLOWED_EXTENSIONS = Set.of(\"pdf\", \"png\", ...);\nprivate static String sha256Hex(byte[] bytes) { ... }",
+      "patchAfter": "public abstract class LocalFileStorageSupport {\n    protected static final Set<String> ALLOWED_EXTENSIONS = Set.of(\"pdf\", \"png\", ...);\n    protected StoredFile validateAndWrite(Path root, Long orgId, MultipartFile f, String subdir) { ... }\n    protected static String sha256Hex(byte[] bytes) { ... }\n}",
+      "effort": "M",
+      "references": [
+        "audit/raw/jscpd/jscpd-report.json",
+        "DRY principle"
+      ]
+    },
+    {
+      "id": "QUAL-IE-004",
+      "title": "ApprovalChainInstanceService.recordAction() is a 104-LOC method with the entire state machine inlined",
+      "phase": "Quality",
+      "category": "Cyclomatic complexity / Long method",
+      "severity": "Medium",
+      "cvss": "Medium maintainability risk: the core approval-chain state-machine transition lives in one 104-line method with many branches (terminal-status guard, step-order match, parallel-rung resolution, delegation gating, REJECTED short-circuit, APPROVED rung-satisfied advance/finalise, fall-through statuses). High branch count concentrated in a single security-relevant method makes it hard to test and easy to regress.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java",
+      "lines": "203-308",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:203-308"
+      ],
+      "description": "recordAction() does, in one method: terminal-status validation (207), step-order match check (210), step rows lookup (219), actor->step resolution (230), two delegation guards (232-238), action-row persistence + audit + delegated-event (240-262), then the branching state machine for REJECTED (267-274), APPROVED-with-rung-satisfied advance-or-finalise (277-301), and the else fall-through (302-306). Each of the i.setUpdatedAt/instanceRepo.save pairs is repeated five times across the branches.",
+      "rootCause": "All transition concerns (validation, persistence, audit, eventing, advancement) handled inline instead of being decomposed into helpers (validateActionable, persistAction, applyDecision).",
+      "evidence": "Method spans lines 203-308 (104 LOC). instanceRepo.save(i) with a preceding i.setUpdatedAt(LocalDateTime.now()) appears at lines 271, 290, 295, 300, 305 — five duplicated save blocks within the one method.",
+      "impact": "Hard to unit-test individual transitions; the repeated setUpdatedAt+save pattern invites a missed update on a new branch.",
+      "reproduction": "Open the file and count branches/LOC of recordAction; note the five repeated save sites.",
+      "resolution": "Extract: (1) a guard method validating terminal status + step order + delegation, (2) a recordActionRow(...) for persistence+audit, (3) an applyApproval(...) for the advance/finalise logic. Collapse the repeated setUpdatedAt+save into a single touch-and-save call at the end.",
+      "patchBefore": "@Transactional\npublic InstanceResponse recordAction(Long instanceId, InstanceActionRequest req) {\n    // 100+ lines: guards, resolution, persist, audit, REJECTED branch, APPROVED branch, else branch\n}",
+      "patchAfter": "@Transactional\npublic InstanceResponse recordAction(Long instanceId, InstanceActionRequest req) {\n    ApprovalChainInstance i = loadOrThrow(instanceId);\n    validateActionable(i, req);\n    ApprovalChainStep target = resolveAndValidateStep(i, req);\n    recordActionRow(i, target, req);\n    applyDecision(i, target, req);   // handles REJECTED / APPROVED / fall-through, single save\n    return toResponse(i, org());\n}",
+      "effort": "M",
+      "references": [
+        "Single Responsibility Principle"
+      ]
+    },
+    {
+      "id": "QUAL-IE-005",
+      "title": "Unused Logger field and SLF4J imports in ApprovalChainInstanceService (dead code)",
+      "phase": "Quality",
+      "category": "Dead code / Unused fields",
+      "severity": "Low",
+      "cvss": "Low: cosmetic dead code. A declared-but-unused logger plus its two imports add noise and falsely suggest the service logs at debug/info level when it does not.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java",
+      "lines": "24-25,79",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:79"
+      ],
+      "description": "Line 79 declares `private static final Logger log = LoggerFactory.getLogger(ApprovalChainInstanceService.java)`, but a grep of the file shows `log` is never invoked (only `audit.log(...)` from the AuditLogService is used). The org.slf4j Logger/LoggerFactory imports at lines 24-25 exist solely for this dead field.",
+      "rootCause": "Logger scaffolding added by convention but never wired to any log statement.",
+      "evidence": "grep for `log` invocations returns only the declaration at line 79 and audit.log(...) calls; no `log.info/debug/warn/error` exists in the file.",
+      "impact": "Negligible runtime impact; minor readability/IDE-warning noise.",
+      "reproduction": "grep -n 'log\\.' on the file — only audit.log matches, the slf4j field is never called.",
+      "resolution": "Remove the unused Logger field (line 79) and the two slf4j imports (lines 24-25), or add the intended log statements (e.g. on escalate()).",
+      "patchBefore": "import org.slf4j.Logger;\nimport org.slf4j.LoggerFactory;\n...\nprivate static final Logger log = LoggerFactory.getLogger(ApprovalChainInstanceService.class);",
+      "patchAfter": "// removed: unused Logger field and slf4j imports",
+      "effort": "S",
+      "references": []
+    },
+    {
+      "id": "QUAL-IE-006",
+      "title": "LdapRoleMapper is annotated with both @Configuration and @Component",
+      "phase": "Quality",
+      "category": "Misconfiguration / Layering",
+      "severity": "Low",
+      "cvss": "Low: redundant/confusing stereotype. Both @Configuration and @Component are class-level stereotypes that register the bean; pairing them on a plain ConfigurationProperties POJO is contradictory and can mislead readers into thinking the class is a @Bean factory.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/iam/ldap/LdapRoleMapper.java",
+      "lines": "52-55",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/ldap/LdapRoleMapper.java:5-7",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/ldap/LdapRoleMapper.java:52-55"
+      ],
+      "description": "The class carries @Slf4j (52), @Component (53) and @ConfigurationProperties (54) — and also imports @Configuration (line 6). The @Configuration import is present and the class is documented as a plain List<String>->Set<String> mapper bean. A bean should not be both @Component and @Configuration; @Configuration implies a CGLIB-proxied @Bean factory, which this class is not. (Note: the active annotations are @Component + @ConfigurationProperties, but the unused @Configuration import signals confused intent and at minimum is a dead import.)",
+      "rootCause": "Annotation scaffolding left over from an earlier shape; the @Configuration import was never removed when @Component was chosen.",
+      "evidence": "Line 6 `import org.springframework.context.annotation.Configuration;` with no @Configuration usage on the class (the class uses @Component at line 53). Unused import + ambiguous stereotype intent.",
+      "impact": "Reader confusion; lint warning for the unused import. No functional bug while only @Component is active.",
+      "reproduction": "Open the file; the Configuration import (line 6) is unused given the class is annotated @Component.",
+      "resolution": "Remove the unused @Configuration import. Keep exactly one stereotype — @Component (with @ConfigurationProperties) is correct for this binder POJO.",
+      "patchBefore": "import org.springframework.context.annotation.Configuration;\n...\n@Slf4j\n@Component\n@ConfigurationProperties(prefix = \"grc.iam.ldap\")\npublic class LdapRoleMapper {",
+      "patchAfter": "@Slf4j\n@Component\n@ConfigurationProperties(prefix = \"grc.iam.ldap\")\npublic class LdapRoleMapper {",
+      "effort": "S",
+      "references": [
+        "Spring @Configuration vs @Component semantics"
+      ]
+    },
+    {
+      "id": "QUAL-IE-007",
+      "title": "AttachmentService duplicates docType-validation logic across upload/replaceVersion/update; DOC_TYPES check copied 3x",
+      "phase": "Quality",
+      "category": "Code duplication / DRY",
+      "severity": "Low",
+      "cvss": "Low maintainability risk: the same 'normalize to upper-case, validate against DOC_TYPES, throw IllegalArgumentException' block is hand-copied into three methods. A change to the validation rule must be applied in all three.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentService.java",
+      "lines": "37-132",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentService.java:41-44",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentService.java:78-81",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentService.java:122-127"
+      ],
+      "description": "upload() (41-44), replaceVersion() (78-81) and update() (122-127) each repeat the pattern: derive `type` from docType (defaulting/upper-casing), then `if (!DOC_TYPES.contains(type)) throw new IllegalArgumentException(\"Unknown docType ...\")`. Three copies of the same string-literal error message and the same allow-list check.",
+      "rootCause": "No shared resolveDocType(...) helper; the validation was inlined where needed.",
+      "evidence": "Identical `if (!DOC_TYPES.contains(type)) throw new IllegalArgumentException(\"Unknown docType '\" + docType + \"'. Valid: \" + DOC_TYPES);` at lines 42-44, 79-81 and 124-126.",
+      "impact": "Drift risk if the error wording or normalization changes; mild bloat.",
+      "reproduction": "Read the three methods; compare the validation blocks.",
+      "resolution": "Extract a private `String resolveDocType(String docType, String fallback)` helper that normalizes and validates once, and call it from all three methods.",
+      "patchBefore": "String type = (docType == null || docType.isBlank()) ? \"OTHER\" : docType.toUpperCase();\nif (!DOC_TYPES.contains(type)) {\n    throw new IllegalArgumentException(\"Unknown docType '\" + docType + \"'. Valid: \" + DOC_TYPES);\n}",
+      "patchAfter": "String type = resolveDocType(docType, \"OTHER\");\n...\nprivate String resolveDocType(String docType, String fallback) {\n    String t = (docType == null || docType.isBlank()) ? fallback : docType.toUpperCase();\n    if (!DOC_TYPES.contains(t)) throw new IllegalArgumentException(\"Unknown docType '\" + docType + \"'. Valid: \" + DOC_TYPES);\n    return t;\n}",
+      "effort": "S",
+      "references": []
+    },
+    {
+      "id": "QUAL-IE-008",
+      "title": "AuthController.refresh()/login() swallow the cause in broad catch(Exception) — no log, 500 with cause lost",
+      "phase": "Quality",
+      "category": "Error handling",
+      "severity": "Medium",
+      "cvss": "Medium operability risk: when the server-side refresh-token store fails to persist/rotate, the controller returns a generic 500 but never logs the underlying exception (no logger is even present in AuthController). A real DB/store fault on the security-critical login/refresh path becomes invisible to operators, making incidents hard to diagnose.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java",
+      "lines": "94-100",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java:94-100",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java:173-176"
+      ],
+      "description": "In login() the issuance block catches `Exception ex` (line 94) and returns a 500 body but discards `ex` entirely — it is never logged. The refresh() rotation block does the same (lines 173-176). AuthController has no Logger field at all, so these failures leave no server-side trace. 'Fail closed' (returning 500) is the correct security behaviour, but losing the cause is an error-handling defect.",
+      "rootCause": "Broad catch(Exception) used to fail-closed, but without log.error(\"...\", ex) the stack trace and cause are dropped on the floor.",
+      "evidence": "Lines 94-100: `} catch (Exception ex) { ... return ResponseEntity.status(500).body(Map.of(\"message\", \"Unable to record refresh token — please retry.\")); }` — `ex` is captured but never used/logged. Same pattern at 173-176. No `private static final Logger` exists in the class.",
+      "impact": "Refresh-store outages or persistence errors on login/refresh are undiagnosable from logs; on-call engineers see only client-side 500s.",
+      "reproduction": "Force store.recordIssuance to throw (e.g. DB down), call POST /api/auth/login — client gets a 500 but no server log line records why.",
+      "resolution": "Add a class Logger and `log.error(\"refresh-token issuance/rotation failed for user {}\", userId, ex);` inside both catch blocks before returning the 500. Keep the fail-closed 500 behaviour.",
+      "patchBefore": "} catch (Exception ex) {\n    return ResponseEntity.status(500).body(Map.of(\n        \"message\", \"Unable to record refresh token — please retry.\"));\n}",
+      "patchAfter": "} catch (Exception ex) {\n    log.error(\"Refresh-token issuance failed for user {}\", principal.getUserId(), ex);\n    return ResponseEntity.status(500).body(Map.of(\n        \"message\", \"Unable to record refresh token — please retry.\"));\n}",
+      "effort": "S",
+      "references": [
+        "Logging the cause when catching broadly"
+      ]
+    },
+    {
+      "id": "QUAL-IE-009",
+      "title": "Repeated nullSafe/nullSafeStr/payload helpers duplicated across approval & evidence services",
+      "phase": "Quality",
+      "category": "Code duplication / DRY",
+      "severity": "Low",
+      "cvss": "Low maintainability risk: the same tiny null-coercion helpers and F8 payload-builder shape are re-implemented per service. jscpd flags many service-to-service blocks across approvals/evidence/committee. The behaviour is correct but the pattern is copy-pasted, not shared.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java",
+      "lines": "66-90",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:84",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:232",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:90",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:93"
+      ],
+      "description": "ApprovalRequestService defines `nullSafeStr` (returns \"\" for null, line 84) and `nullSafe` (returns \"<not provided>\", line 232) plus a HashMap payload-builder (66-81). EvidenceItemService defines the identical pair `nullSafeStr` (90) and `nullSafe` (93) plus its own payloadFor (74-87). The DomainEvent payload-building idiom (put each field via nullSafeStr) is repeated verbatim in shape across these and the committee services. jscpd reports numerous matching blocks among approvals/evidence/committee service files.",
+      "rootCause": "Per-service copies of trivial helpers and the event-payload idiom instead of a shared utility (e.g. a Nulls util and a DomainEvent payload builder).",
+      "evidence": "Identical method `private static String nullSafeStr(Object o) { return o == null ? \"\" : o.toString(); }` in ApprovalRequestService:84 and EvidenceItemService:90; identical `nullSafe` returning \"<not provided>\" in ApprovalRequestService:232 and EvidenceItemService:93. jscpd-report.json lists ApprovalRequestService duplicated against capa/cyber_lc/privacy_lc/regchange/risk_lc service files.",
+      "impact": "Minor drift risk and bloat; harmless individually but adds up across the many services using the F7/F8 idiom.",
+      "reproduction": "grep -rn 'nullSafeStr\\|<not provided>' across module services; or inspect jscpd-report.json entries for ApprovalRequestService.",
+      "resolution": "Move nullSafe/nullSafeStr into a shared com.tss.grc.common util and provide a small DomainEvent payload-builder (fluent put) so services stop re-declaring identical helpers.",
+      "patchBefore": "private static String nullSafeStr(Object o) { return o == null ? \"\" : o.toString(); }\nprivate static String nullSafe(Object o) { return o == null ? \"<not provided>\" : o.toString(); }",
+      "patchAfter": "// in common: Nulls.str(o) / Nulls.label(o); services call the shared util",
+      "effort": "M",
+      "references": [
+        "audit/raw/jscpd/jscpd-report.json"
+      ]
+    },
+    {
+      "id": "QUAL-IE-010",
+      "title": "Status state machines hard-coded as string literals scattered per service (magic strings, no shared enum/constant)",
+      "phase": "Quality",
+      "category": "Naming / Magic constants",
+      "severity": "Low",
+      "cvss": "Low risk: lifecycle states ('PENDING', 'APPROVED', 'REJECTED', 'DELEGATED', 'EXPIRED', 'IN_PROGRESS', etc.) are bare string literals compared with .equals across multiple services. A typo in any branch silently fails to match, and there is no compile-time guarantee transition tables and branches use the same vocabulary.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java",
+      "lines": "144-211",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:157-176",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:81",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/signature/service/DigitalSignatureService.java:147-153",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:48-58"
+      ],
+      "description": "Each lifecycle service re-expresses its states as raw strings: ApprovalRequestService compares req.getStatus() against \"APPROVED\"/\"REJECTED\"/\"DELEGATED\"/\"PENDING\"/\"EXPIRED\" (157-176); DigitalSignatureService against \"REQUESTED\"/\"SIGNED\"/\"REJECTED\"/\"EXPIRED\" (138, 147-153); ApprovalChainInstanceService against \"APPROVED\"/\"REJECTED\"/\"DELEGATED\" plus a TERMINAL_STATUSES set (81); EvidenceItemService keeps a transition Map keyed by string states (48-58). There is no shared enum or per-module constant class, so the same status vocabulary is duplicated as literals.",
+      "rootCause": "Statuses modeled as free-form String columns and compared with literal .equals rather than enums or named constants.",
+      "evidence": "ApprovalRequestService:157 `if (\"APPROVED\".equals(req.getStatus()) || \"REJECTED\".equals(req.getStatus()))`; DigitalSignatureService:138 `if (!\"REQUESTED\".equals(d.getStatus())) return d;`. The literals recur across at least four services in scope.",
+      "impact": "Typos in a state literal fail silently (no match) rather than at compile time; harder to enumerate valid states for docs/UI.",
+      "reproduction": "grep -rn '\"APPROVED\"\\|\"REJECTED\"\\|\"PENDING\"' across the in-scope services to see the literal spread.",
+      "resolution": "Introduce per-domain status enums (or at minimum a constants class per module) and convert at the persistence boundary; replace literal comparisons with enum/constant references.",
+      "patchBefore": "if (\"APPROVED\".equals(req.getStatus()) || \"REJECTED\".equals(req.getStatus())) { ... }",
+      "patchAfter": "if (status == ApprovalStatus.APPROVED || status == ApprovalStatus.REJECTED) { ... }",
+      "effort": "L",
+      "references": [
+        "Replace magic strings with enums"
+      ]
+    },
+    {
+      "id": "QUAL-IE-011",
+      "title": "noRollbackFor + missing-table swallowing pattern duplicated across committee services and lacks try/catch on get()",
+      "phase": "Quality",
+      "category": "Error handling / Duplication",
+      "severity": "Low",
+      "cvss": "Low risk: the 'catch RuntimeException, sniff message for invalid object name, return empty page' workaround is repeated in CommitteeService and CommitteeActionItemService, and one method declares noRollbackFor without any try/catch, making the annotation misleading. Message-string sniffing for schema errors is brittle.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/service/CommitteeActionItemService.java",
+      "lines": "43-106",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/service/CommitteeActionItemService.java:56-60",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/service/CommitteeService.java:51-86",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/service/CommitteeService.java:152-166"
+      ],
+      "description": "CommitteeService.listCommittees/listMeetings (72-86, 152-166) and CommitteeActionItemService.list/listByMeeting/listByCommittee/openActions* (43-106) all repeat: @Transactional(noRollbackFor=RuntimeException.class) + try { repo... } catch (RuntimeException e) { if (isMissingObjectError/CommitteeSqlGuards.isMissingObjectError) return empty; throw e; }. isMissingObjectError works by lower-casing the exception message and searching for 'invalid object name'/'does not exist'/'not found' — fragile message-sniffing. Worse, CommitteeActionItemService.get() (56-60) carries `noRollbackFor = RuntimeException.class` but has NO try/catch, so the annotation does nothing there and misleads readers.",
+      "rootCause": "Dev-profile schema-not-bootstrapped tolerance bolted on per read method via copy-paste, with string-based error detection; the annotation was pasted onto get() without the matching handler.",
+      "evidence": "CommitteeService.isMissingObjectError (51-64) checks `low.contains(\"invalid object name\")`. CommitteeActionItemService.get (56) is annotated `@Transactional(readOnly = true, noRollbackFor = RuntimeException.class)` but its body (57-59) has no try/catch and just rethrows EntityNotFoundException.",
+      "impact": "Message-sniffing breaks if the DB driver/locale changes the wording; the no-op noRollbackFor on get() is confusing; logic is duplicated across two services.",
+      "reproduction": "Read CommitteeActionItemService.get (no try/catch despite noRollbackFor); compare isMissingObjectError in CommitteeService with CommitteeSqlGuards.",
+      "resolution": "Centralize the missing-table tolerance in a single helper (CommitteeSqlGuards already exists — use it everywhere instead of CommitteeService's private copy) and prefer detecting SQLServerException error code over message text. Remove noRollbackFor from get() since it has no handler.",
+      "patchBefore": "@Transactional(readOnly = true, noRollbackFor = RuntimeException.class)\npublic CommitteeActionItem get(Long id) {\n    return repo.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())\n        .orElseThrow(() -> new EntityNotFoundException(\"CommitteeActionItem \" + id));\n}",
+      "patchAfter": "@Transactional(readOnly = true)\npublic CommitteeActionItem get(Long id) {\n    return repo.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())\n        .orElseThrow(() -> new EntityNotFoundException(\"CommitteeActionItem \" + id));\n}",
+      "effort": "M",
+      "references": [
+        "CommitteeSqlGuards.java",
+        "Detect SQL errors by error code, not message text"
+      ]
+    },
+    {
+      "id": "QUAL-IE-012",
+      "title": "ApprovalRequestService.transition() has empty no-op if-block and is a 66-LOC method mixing status mutation with event dispatch",
+      "phase": "Quality",
+      "category": "Dead code / Long method",
+      "severity": "Low",
+      "cvss": "Low risk: transition() contains an `if (\"PENDING\".equals(...)) { /* comment only */ }` empty block that does nothing, and the method bundles status-field mutation, a second status switch for trigger/message, audit, emit, and broadcast into 66 lines. The empty branch is dead code that reads as if logic were intended but omitted.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java",
+      "lines": "144-211",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:171-173"
+      ],
+      "description": "Lines 171-173 are `if (\"PENDING\".equals(req.getStatus())) { // From DELEGATED back to PENDING — assignedTo is already updated... }` — an empty conditional whose only content is a comment. It compiles to a no-op branch. The method also evaluates the status twice: once as a chain of if-blocks (157-176) to set fields, then again as a switch (183-204) to choose the trigger/message. Combining these would shrink the method and remove the dead branch.",
+      "rootCause": "A placeholder branch left in to document intent, plus duplicated status dispatch (if-chain then switch).",
+      "evidence": "Lines 171-173 form an if statement with no executable body. The same req.getStatus() is branched on at 157, 163, 171, 174 (field mutation) and again at 183 (switch for trigger/message).",
+      "impact": "Reader confusion (looks like missing logic); minor over-length method.",
+      "reproduction": "Read lines 171-173; observe the empty if body.",
+      "resolution": "Delete the empty if-block (the comment can move to the DELEGATED branch or be dropped). Optionally merge the field-mutation if-chain and the trigger/message switch into a single switch to remove the double dispatch.",
+      "patchBefore": "if (\"PENDING\".equals(req.getStatus())) {\n    // From DELEGATED back to PENDING — assignedTo is already updated by previous DELEGATED.\n}",
+      "patchAfter": "// (removed empty no-op branch)",
+      "effort": "S",
+      "references": []
+    }
+  ]
+}

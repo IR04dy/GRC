@@ -1,0 +1,184 @@
+{
+  "findings": [
+    {
+      "id": "SEC-NDI-001",
+      "title": "Entire NDI module uses only isAuthenticated() — no MODULE:ACTION authorization (broken function-level access control)",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N) — any authenticated low-privilege user can read, create, modify and delete NDI governance data across every sub-module",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/cycle/controller/NdiAssessmentCycleController.java",
+      "lines": "43-101",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/compliance/controller/NdiComplianceAssessmentController.java:43-131",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/gap/controller/NdiGapController.java:44-128",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/evidence/controller/NdiEvidenceItemController.java:25-91",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/reports/controller/NdiReportController.java:27-85",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/settings/controller/NdiSettingController.java:22-57",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/submission/controller/NdiSubmissionPackageController.java:41-107",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/dashboard/controller/NdiDashboardController.java:18-22"
+      ],
+      "description": "Every @RestController in the ndi package guards 100% of its endpoints with @PreAuthorize(\"isAuthenticated()\") only. There is no use of the platform's ModulePermissionEvaluator (hasPermission('NDI','READ'/'WRITE') or hasRole(...)) anywhere in the module. As a result, the only access requirement is a valid JWT — any user of any role (AUDITOR, a basic RISK_MANAGER, or any seeded/self-registered role) can perform privileged write operations: create/update/delete assessment cycles, compliance assessments, gaps/CAPAs, evidence items, settings, report definitions, and submission packages. Read and write/delete are not separated, and operations that should be DPO/CISO/admin-restricted (approve, submit, archive, delete, settings mutation) are wide open to every authenticated principal. This contrasts sharply with sibling modules in this audit set: DataclassController (READ/WRITE/APPROVE role constants) and DataOfficerController (hasPermission('PRIVACY',...)) both implement proper granular authorization, confirming this is a defect in NDI rather than a platform convention.",
+      "rootCause": "Authorization was stubbed with the placeholder isAuthenticated() during NDI development and never replaced with module-permission expressions. No class-level @PreAuthorize either, so there is no coarse fallback.",
+      "evidence": "NdiAssessmentCycleController.java:62-66\n    @PostMapping\n    @PreAuthorize(\"isAuthenticated()\")\n    public ResponseEntity<NdiAssessmentCycle> create(@RequestBody NdiAssessmentCycle req) {\n        return ResponseEntity.status(201).body(service.create(req));\n    }\n... and DELETE /{id}, PUT /{id}, /{id}/transition, /{id}/archive all also only @PreAuthorize(\"isAuthenticated()\").",
+      "impact": "A read-only/low-privilege tenant user can corrupt or destroy the organisation's entire SDAIA NDI assessment: delete cycles, falsify compliance statuses, soft-delete gaps and their CAPAs, mutate NDI settings, and tamper with submission packages destined for the regulator. This breaks segregation of duties and the integrity of regulatory submissions.",
+      "reproduction": "1. Log in as a low-privilege user (e.g. the seeded `auditor` / Audit@12345) to obtain a JWT.\n2. curl -X DELETE http://localhost:8084/api/ndi/cycles/1 -H \"Authorization: Bearer <token>\"  → 204, cycle soft-deleted.\n3. curl -X POST http://localhost:8084/api/ndi/settings -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"settingKey\":\"x\",\"nameEn\":\"x\"}'  → 200, setting created despite no NDI:WRITE permission.",
+      "resolution": "Replace isAuthenticated() with granular method security consistent with the rest of the platform: read endpoints -> hasPermission('NDI','READ'); create/update/state-change -> hasPermission('NDI','WRITE'); delete/approve/submit/settings -> a stricter permission or role (e.g. hasPermission('NDI','APPROVE') or hasAnyRole('PLATFORM_ADMIN','CISO','DPO')). Add an NDI module to the permission catalogue and consider a class-level default-deny.",
+      "patchBefore": "@DeleteMapping(\"/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Void> delete(@PathVariable Long id) {\n    service.softDelete(id);\n    return ResponseEntity.noContent().build();\n}",
+      "patchAfter": "@DeleteMapping(\"/{id}\")\n@PreAuthorize(\"hasPermission('NDI','WRITE') or hasRole('PLATFORM_ADMIN')\")\npublic ResponseEntity<Void> delete(@PathVariable Long id) {\n    service.softDelete(id);\n    return ResponseEntity.noContent().build();\n}\n// + read endpoints: @PreAuthorize(\"hasPermission('NDI','READ')\")\n// + write endpoints: @PreAuthorize(\"hasPermission('NDI','WRITE')\")",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-285: Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-NDI-002",
+      "title": "Append-only NDI audit ledger is writable by any authenticated user (audit log forgery)",
+      "phase": "Security",
+      "category": "Security Logging & Monitoring Failures (A09)",
+      "severity": "High",
+      "cvss": "CVSS 7.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — integrity loss on the regulatory audit trail",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/controller/NdiAuditController.java",
+      "lines": "37-41",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/service/NdiAuditService.java:57-64"
+      ],
+      "description": "POST /api/ndi/audit is exposed with @PreAuthorize(\"isAuthenticated()\") and binds a raw NdiAuditEvent entity straight from the request body. The service comment describes the table as an \"append-only ndi.audit_event table\", but the only controls applied in record() are: id nulled, organisationId stamped from the tenant, and a default severity. Every other field — entityType, action, entityCode, cycleId, occurredAt, actor identity fields, before/after values, severity, message — is taken verbatim from the attacker. Any authenticated tenant user can therefore inject fabricated audit entries (e.g. forge an APPROVED transition by another user, or backdate occurredAt) into the same ledger that legitimate state-change code writes via NdiAuditPublisher. Because the search/aggregate endpoints surface this ledger to the Audit tab and to the AUDIT_TRAIL report, forged entries are indistinguishable from genuine ones.",
+      "rootCause": "A write endpoint was provided on an audit ledger that is supposed to be system-generated only, with no authorization gate and no server-side control over the recorded fields (actor, timestamp, action).",
+      "evidence": "NdiAuditService.record():\n    public NdiAuditEvent record(NdiAuditEvent body) {\n        body.setId(null);\n        body.setOrganisationId(org());\n        if (body.getAction() == null) throw new IllegalArgumentException(\"action is required\");\n        if (body.getEntityType() == null) throw new IllegalArgumentException(\"entityType is required\");\n        if (body.getSeverity() == null) body.setSeverity(\"INFO\");\n        return repo.save(body);   // occurredAt, actor, message all attacker-controlled\n    }",
+      "impact": "An insider can pollute or frame the NDI audit trail — fabricate evidence that an approval/submission happened, attribute actions to other users, or flood the ledger to bury real events. This undermines the evidentiary value of the audit trail used for SDAIA NDI compliance and incident investigation.",
+      "reproduction": "1. Obtain any tenant JWT.\n2. curl -X POST http://localhost:8084/api/ndi/audit -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"entityType\":\"COMPLIANCE\",\"action\":\"APPROVE\",\"severity\":\"INFO\",\"message\":\"Approved by CISO\",\"actorName\":\"ciso@victim\",\"occurredAt\":\"2026-01-01T00:00:00\"}'\n3. GET /api/ndi/audit returns the forged, back-dated, mis-attributed event alongside genuine ones.",
+      "resolution": "Remove the public POST endpoint (audit events should only be produced internally by NdiAuditPublisher). If an external write must exist, restrict it to hasRole('PLATFORM_ADMIN'), and always stamp occurredAt and the actor from the SecurityContext server-side rather than trusting the body. Enforce table-level append-only (no UPDATE/DELETE grant) in the DB.",
+      "patchBefore": "@PostMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<NdiAuditEvent> record(@RequestBody NdiAuditEvent body) {\n    return ResponseEntity.ok(service.record(body));\n}",
+      "patchAfter": "// Prefer removing this endpoint entirely; audit rows are produced by NdiAuditPublisher.\n// If retained:\n@PostMapping\n@PreAuthorize(\"hasRole('PLATFORM_ADMIN')\")\npublic ResponseEntity<NdiAuditEvent> record(@RequestBody NdiAuditEvent body) {\n    return ResponseEntity.ok(service.record(body));\n}\n// in service.record(): force server-controlled fields\n//   body.setOccurredAt(LocalDateTime.now());\n//   body.setActorUserId(currentUserId());  body.setActorName(currentUserName());",
+      "effort": "S",
+      "references": [
+        "CWE-117: Improper Output Neutralization for Logs",
+        "CWE-862: Missing Authorization",
+        "OWASP A09:2021 Security Logging and Monitoring Failures"
+      ]
+    },
+    {
+      "id": "SEC-NDI-003",
+      "title": "Workflow approval / submission state changes have no segregation-of-duties control",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — any user can self-approve and submit regulatory packages",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/submission/controller/NdiSubmissionPackageController.java",
+      "lines": "74-90",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/compliance/controller/NdiComplianceAssessmentController.java:116-124",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/compliance/service/NdiComplianceAssessmentService.java:247-266",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/evidence/controller/NdiEvidenceItemController.java:61-71"
+      ],
+      "description": "The compliance, evidence, and submission-package workflows implement a maker/checker lifecycle (DRAFT -> SUBMITTED -> UNDER_REVIEW -> APPROVED; submission DRAFT -> READY -> SUBMITTED -> ACKNOWLEDGED). The state machine is enforced (illegal transitions throw), but the *authorization* on the privileged steps (approve, submit, acknowledge, reject) is only isAuthenticated(). The approver/submitter identity is also taken from a free-text body field (approverName, submitterName) rather than the authenticated principal. Consequently a single low-privilege user can drive an item all the way to APPROVED and submit the package to the regulator, and can name any person as the approver. There is no enforced separation between the user who prepares/submits and the user who approves.",
+      "rootCause": "Same isAuthenticated() gap as SEC-NDI-001, compounded by attribution (approverName/submitterName) coming from the request body instead of the SecurityContext, so the recorded approver cannot be trusted.",
+      "evidence": "NdiSubmissionPackageController.approve(): @PreAuthorize(\"isAuthenticated()\") ... service.approve(id, body.get(\"approverName\"));\nNdiComplianceAssessmentService.approve(): cur.setApproverName(approverName);  // free-text, from body",
+      "impact": "Defeats the maker/checker control intended for NDI submissions. A single account compromise or a malicious insider can fabricate an approved, attested submission package and mark it SUBMITTED/ACKNOWLEDGED with an arbitrary named approver, producing a false regulatory record.",
+      "reproduction": "1. As any tenant user, create a compliance assessment, set status COMPLIANT with evidence, submit, mark-under-review, then approve — all with the same token.\n2. POST /api/ndi/submission-package/{id}/approve with body {\"approverName\":\"Some CISO\"} succeeds; the package shows an approver who never acted.",
+      "resolution": "Gate approve/submit/acknowledge with a distinct permission (e.g. hasPermission('NDI','APPROVE') / hasRole) separate from WRITE, and derive approverName/submitterName from the authenticated principal, not the body. Optionally enforce that the approver != the last editor/submitter.",
+      "patchBefore": "@PostMapping(\"/{id}/approve\")\n@PreAuthorize(\"isAuthenticated()\")\npublic NdiComplianceAssessment approve(@PathVariable Long id, @RequestBody(required=false) Map<String,String> body) {\n    return service.approve(id, body == null ? null : body.get(\"approverName\"));\n}",
+      "patchAfter": "@PostMapping(\"/{id}/approve\")\n@PreAuthorize(\"hasPermission('NDI','APPROVE') or hasAnyRole('PLATFORM_ADMIN','CISO','DPO')\")\npublic NdiComplianceAssessment approve(@PathVariable Long id) {\n    // approverName resolved server-side from SecurityContext inside the service\n    return service.approve(id);\n}",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API5:2023 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-NDI-004",
+      "title": "Cross-tenant soft-FK references stored without ownership validation (dataclass / data_officer)",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N) — bounded cross-tenant linkage / referential integrity violation",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java",
+      "lines": "625-639",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java:490-505",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java:643-686",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/dataclass/service/DataclassService.java:233-256"
+      ],
+      "description": "Several create paths persist caller-supplied foreign-key ids onto new rows without verifying those ids belong to the caller's organisation. In DataOfficerService: createLineage() stores sourceEntryId/targetEntryId, scheduleDisposal() stores retentionRuleId, createQualityRule() stores catalogEntryId, and recordQualityRun() stores qualityRuleId — none re-load the referenced row with a findByOrganisationIdAndId check. In DataclassService.createException() the request's dataAssetId/dataFlowId are written directly to the exception (unlike createFlow(), which loads the asset via the org-scoped loadAsset()). Because the dependent listing endpoints (e.g. listLineage(sourceId), listQualityRuns(ruleId)) are themselves org-scoped, these do not directly leak another tenant's data, but they let one tenant create rows that point at another tenant's entity ids, corrupting referential integrity and producing misleading lineage/quality/exception linkages. The NDI module, by contrast, validates cross-module risk_id ownership via NdiCrossLinkService.validateRiskExists() — the data modules lack the equivalent.",
+      "rootCause": "FK ids are trusted from the request DTO and set directly on the entity; no companion findByOrganisationIdAndId existence/ownership check is performed before persisting the link.",
+      "evidence": "DataOfficerService.createLineage():\n    CatalogLineage l = new CatalogLineage();\n    l.setOrganisationId(org());\n    l.setSourceEntryId(req.sourceEntryId());   // not validated against org\n    l.setTargetEntryId(req.targetEntryId());   // not validated against org\n    lineageRepo.save(l);\nDataclassService.createException():\n    e.setDataAssetId(req.dataAssetId());        // not validated\n    e.setDataFlowId(req.dataFlowId());          // not validated",
+      "impact": "A tenant can plant lineage edges, quality runs, disposal jobs, or data-classification exceptions that reference identifiers belonging to other tenants or to non-existent rows, polluting NDMO/PDPL records and dashboards and undermining data trustworthiness. Direct cross-tenant data disclosure is not achieved because read paths are org-filtered, hence Medium rather than High.",
+      "reproduction": "1. As tenant A user, POST /api/v1/data-officer/lineage with {\"sourceEntryId\": <a catalog id owned by tenant B>, \"targetEntryId\": <another tenant B id>}.\n2. The lineage row is created under tenant A pointing at tenant B's ids; integrity of both tenants' catalogs is now questionable.",
+      "resolution": "For every caller-supplied FK, load the referenced row with the org-scoped finder (findByOrganisationIdAndId) and reject if absent, exactly as createFlow() already does with loadAsset() and as NdiCrossLinkService.validateRiskExists() does for NDI.",
+      "patchBefore": "public LineageResponse createLineage(CreateLineageRequest req) {\n    CatalogLineage l = new CatalogLineage();\n    l.setOrganisationId(org());\n    l.setSourceEntryId(req.sourceEntryId());\n    l.setTargetEntryId(req.targetEntryId());\n    ...\n}",
+      "patchAfter": "public LineageResponse createLineage(CreateLineageRequest req) {\n    Long o = org();\n    catalogRepo.findByOrganisationIdAndId(o, req.sourceEntryId())\n        .orElseThrow(() -> new EntityNotFoundException(\"source catalog entry not in org\"));\n    catalogRepo.findByOrganisationIdAndId(o, req.targetEntryId())\n        .orElseThrow(() -> new EntityNotFoundException(\"target catalog entry not in org\"));\n    CatalogLineage l = new CatalogLineage();\n    l.setOrganisationId(o);\n    l.setSourceEntryId(req.sourceEntryId());\n    l.setTargetEntryId(req.targetEntryId());\n    ...\n}",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-1220: Insufficient Granularity of Access Control",
+        "OWASP API1:2023 Broken Object Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-NDI-005",
+      "title": "Unbounded page size and unpaged in-memory aggregation enable resource exhaustion",
+      "phase": "Security",
+      "category": "Resource Exhaustion / Uncontrolled Resource Consumption (A05)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L) — authenticated DoS / memory pressure",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/compliance/controller/NdiComplianceAssessmentController.java",
+      "lines": "43-55",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/gap/controller/NdiGapController.java:44-52",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/controller/NdiAuditController.java:22-31",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/evidence/controller/NdiEvidenceItemController.java:25-33",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/service/NdiAuditService.java:42-55"
+      ],
+      "description": "Paged list endpoints accept a client-controlled `size` parameter (defaults 50-200) with no upper bound, so a caller may request size=1000000 and force the DB and JSON serializer to materialise an arbitrarily large result set. Separately, NdiAuditService.aggregate() calls repo.findByOrganisationIdOrderByOccurredAtDesc(o, Pageable.unpaged()), loading the tenant's entire audit_event table into memory on every dashboard/aggregate request. For a tenant with a large audit history (or after the audit-injection issue SEC-NDI-002 is abused to flood the table) this is a cheap way to drive memory/CPU pressure.",
+      "rootCause": "No server-side clamp on the requested page size, and an unpaged full-table scan used to compute aggregates instead of a DB-side GROUP BY/COUNT.",
+      "evidence": "NdiComplianceAssessmentController.list(... @RequestParam(defaultValue = \"200\") int size) -> PageRequest.of(page, size);  // size never clamped\nNdiAuditService.aggregate(): Page<NdiAuditEvent> page = repo.findByOrganisationIdOrderByOccurredAtDesc(o, Pageable.unpaged());",
+      "impact": "An authenticated user can degrade availability for the tenant (and potentially the JVM) by requesting huge pages or repeatedly hitting the audit aggregate endpoint; risk grows with data volume.",
+      "reproduction": "1. GET /api/ndi/compliance?cycleId=1&size=10000000 with a valid token — server attempts to load and serialize up to 10M rows.\n2. Repeatedly GET /api/ndi/audit/aggregate on a tenant with a large audit table — each call loads the full table.",
+      "resolution": "Clamp size to a sane maximum (e.g. Math.min(size, 200)) in each controller or via a shared Pageable resolver, and compute audit aggregates with DB-side count/group-by queries instead of Pageable.unpaged().",
+      "patchBefore": "@RequestParam(defaultValue = \"200\") int size) {\n    var p = PageRequest.of(page, size);",
+      "patchAfter": "@RequestParam(defaultValue = \"200\") int size) {\n    var p = PageRequest.of(page, Math.min(Math.max(size, 1), 200));",
+      "effort": "S",
+      "references": [
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "CWE-400: Uncontrolled Resource Consumption",
+        "OWASP API4:2023 Unrestricted Resource Consumption"
+      ]
+    },
+    {
+      "id": "SEC-NDI-006",
+      "title": "Raw JPA entities bound from request bodies (mass assignment exposure)",
+      "phase": "Security",
+      "category": "Mass Assignment / Improper Input Handling (A08)",
+      "severity": "Low",
+      "cvss": "CVSS 3.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — limited; server overrides the security-sensitive fields",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/reports/controller/NdiReportController.java",
+      "lines": "37-47",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/cycle/controller/NdiAssessmentCycleController.java:62-71",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/gap/controller/NdiGapController.java:69-79",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/evidence/controller/NdiEvidenceItemController.java:49-59",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/settings/controller/NdiSettingController.java:46-50",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/controller/NdiAuditController.java:37-41"
+      ],
+      "description": "Across the NDI module the controllers accept the persistence entities themselves as @RequestBody (NdiReportDefinition, NdiAssessmentCycle, NdiGap, NdiComplianceAssessment, NdiEvidenceItem, NdiSetting, NdiAuditEvent) with no @Valid and no DTO boundary. The client can therefore set any settable field on the entity, including id, organisationId, isDeleted, createdAt/createdBy, and last_run_* audit columns. In the create()/update() service methods reviewed, the sensitive fields are defended (id forced to null, organisationId stamped from TenantContext, update() whitelists fields), which prevents cross-tenant writes — so the practical impact today is low. However the pattern is fragile: any future entity field added becomes silently client-writable, and the lack of bean validation means malformed/oversized values reach the DB layer. NdiAuditEvent is the worst case (see SEC-NDI-002) because record() does not whitelist fields.",
+      "rootCause": "No DTO/validation layer for NDI write endpoints; JPA entities are used directly as the API contract.",
+      "evidence": "NdiReportController.create(@RequestBody NdiReportDefinition body) ...; NdiAssessmentCycleController.create(@RequestBody NdiAssessmentCycle req) ...; NdiAuditController.record(@RequestBody NdiAuditEvent body) — no @Valid, entity bound directly.",
+      "impact": "Defence-in-depth weakness: relies entirely on each service method remembering to null id and stamp organisationId. A missed override (as in NdiAuditService.record for non-id/org fields) becomes an injection of attacker-chosen state. No structural protection against over-posting or invalid input.",
+      "reproduction": "1. POST /api/ndi/reports with extra fields {\"nameEn\":\"x\",\"reportType\":\"GAP_REGISTER\",\"organisationId\":999,\"isDeleted\":true,\"lastRunStatus\":\"SUCCESS\"}.\n2. organisationId/id are overridden by the service (good), but lastRunStatus and other non-whitelisted-on-create fields are persisted as supplied.",
+      "resolution": "Introduce request DTOs with Jakarta @Valid constraints (as dataclass and data_officer already do) and map explicitly to entities, never binding @Entity types at the controller. Continue to stamp organisationId/id server-side.",
+      "patchBefore": "@PostMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<NdiReportDefinition> create(@RequestBody NdiReportDefinition body) {\n    return ResponseEntity.ok(service.create(body));\n}",
+      "patchAfter": "@PostMapping\n@PreAuthorize(\"hasPermission('NDI','WRITE')\")\npublic ResponseEntity<NdiReportDefinition> create(@Valid @RequestBody CreateReportDefinitionRequest req) {\n    return ResponseEntity.ok(service.create(req));   // service maps DTO -> entity, sets org & id\n}",
+      "effort": "L",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "CWE-20: Improper Input Validation",
+        "OWASP API6:2023 / A08:2021 Software and Data Integrity Failures"
+      ]
+    }
+  ]
+}

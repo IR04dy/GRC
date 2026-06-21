@@ -1,0 +1,136 @@
+{
+  "findings": [
+    {
+      "id": "QUAL-DUP-001",
+      "title": "188 of 368 JPA entities re-declare the full audit/soft-delete/versioning column block instead of extending the existing BaseEntity mapped superclass",
+      "phase": "Quality",
+      "category": "Code Duplication / Maintainability",
+      "severity": "High",
+      "cvss": "Not a security CVE. Maintainability risk rated High: ~4,500 LOC of copy-pasted persistence boilerplate spread across 188 files. A change to the audit model (e.g. adding a tenant column to the audit listener, renaming row_version, fixing the soft-delete contract) must be hand-applied 188 times, and the inline copies bypass the @CreatedDate/@LastModifiedBy/@EntityListeners(AuditingEntityListener) wiring that BaseEntity provides, so the duplicated entities silently lose automatic audit population.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/entity/ObligationAttestationCampaign.java",
+      "lines": "36-142",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/common/model/BaseEntity.java:14-56",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/entity/ObligationAttestationCampaign.java:36-142",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/bcp_attestation/entity/VendorBcpCampaign.java:107-148",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/aml/sanctions/entity/SanctionsList.java",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/aml/sanctions/entity/ScreeningCheck.java",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/entity/Committee.java"
+      ],
+      "description": "jscpd reports 404 java-entity <-> java-entity clone instances totalling 5,940 duplicated lines — the single largest Java duplication cluster. The root of the cluster is an audit/soft-delete/versioning field group that is copy-pasted verbatim into entity after entity: createdByUserId, createdAt, updatedAt, createdBy, updatedBy, isDeleted, deletedAt, deletedBy, and a @Version row_version byte[]. A static scan of all @Entity classes shows 188 of 368 entities (51%) declare this inline `@Column(name = \"is_deleted\", nullable = false)` block, while 137 entities correctly extend the project's own `BaseEntity` mapped superclass which already defines the exact same nine columns plus id and a softDelete() helper. None of the 188 both extend BaseEntity and inline the block, so this is pure copy-paste, not field shadowing. The two largest individual entity clones jscpd found (ObligationAttestationCampaign:102-143 vs VendorBcpCampaign:107-148, 42 lines; EmergingRisk:118-157 vs ContractClause:57-76, 40 lines) are both instances of this block.",
+      "rootCause": "A canonical BaseEntity (@MappedSuperclass, @EntityListeners(AuditingEntityListener.class), with @CreatedDate/@LastModifiedDate/@CreatedBy/@LastModifiedBy and @Version) already exists at common/model/BaseEntity.java and is used by 137 entities. New modules (aml, ndi, tprm/*, bcm/*, sust/*, audit_lc, etc.) were scaffolded by copying an existing entity file wholesale rather than extending BaseEntity, so each new entity re-typed the same audit columns. There is no architectural guardrail (e.g. an ArchUnit test) requiring entities to extend BaseEntity.",
+      "evidence": "Static counts on tss-grc-backend/src/main/java/com/tss/grc/module: `@Column(name = \"is_deleted\", nullable = false)` appears in 187 files; `@Column(name = \"row_version\", insertable = false, updatable = false)` in 33 files; cross-reference script result: 368 @Entity classes total, 188 with inline is_deleted block and NOT extending BaseEntity, 0 that both inline and extend, 137 clean (extends + no inline). jscpd statistics.formats.java = 1008 clones / 7.87% / 12,532 dup lines; entity<->entity sub-cluster = 404 clones / 5,940 dup lines. Example block in ObligationAttestationCampaign.java lines 116-142 is identical column-for-column to BaseEntity.java lines 22-49.",
+      "impact": "Every change to the audit/soft-delete contract is an O(188) hand edit with high risk of one file being missed (drift). Entities that inline the columns instead of inheriting BaseEntity's @EntityListeners do not get JPA auditing auto-population, so createdBy/updatedBy may be silently null unless each service sets them manually — a correctness and traceability gap in a GRC product where audit trails are a compliance requirement (PDPL/SAMA). The ~4,500 duplicated lines also inflate review surface and bury the entity-specific fields that actually matter.",
+      "reproduction": "1) Open tss-grc-backend/src/main/java/com/tss/grc/common/model/BaseEntity.java — note id + 8 audit columns + softDelete(). 2) Open ObligationAttestationCampaign.java — note it does NOT extend BaseEntity yet redeclares id (36-38) and the audit block (116-142). 3) Run: grep -rl '@Column(name = \"is_deleted\", nullable = false)' tss-grc-backend/src/main/java/com/tss/grc/module --include=*.java | wc -l  → 187. 4) Run the cross-reference confirming 188 such files do not extend BaseEntity.",
+      "resolution": "Migrate the 188 standalone entities to `extends BaseEntity`: delete the inline id and the nine audit columns from each entity, add the extends clause, and drop the now-redundant @Id/@GeneratedValue. Where an entity used `createdByUserId` distinctly from BaseEntity's `createdBy`, reconcile to a single field. Do this module-by-module behind tests. Add an ArchUnit (or simple reflection) test asserting that every class annotated @Entity (excluding pure join/lookup tables) is assignable from BaseEntity, to prevent regression. Because @Where(clause = \"is_deleted = 0\") is still declared per-entity, keep that annotation; only the columns move to the superclass.",
+      "patchBefore": "@Entity\n@Table(schema = \"compliance\", name = \"obligation_attestation_campaign\")\n@Where(clause = \"is_deleted = 0\")\n@Getter @Setter @NoArgsConstructor\npublic class ObligationAttestationCampaign {\n\n    @Id\n    @GeneratedValue(strategy = GenerationType.IDENTITY)\n    private Long id;\n    // ... business columns ...\n    @Column(name = \"created_at\", updatable = false)\n    private LocalDateTime createdAt = LocalDateTime.now();\n    @Column(name = \"updated_at\")  private LocalDateTime updatedAt;\n    @Column(name = \"created_by\")  private Long createdBy;\n    @Column(name = \"updated_by\")  private Long updatedBy;\n    @Column(name = \"is_deleted\", nullable = false) private Boolean isDeleted = false;\n    @Column(name = \"deleted_at\")  private LocalDateTime deletedAt;\n    @Column(name = \"deleted_by\")  private Long deletedBy;\n    @Version\n    @Column(name = \"row_version\", insertable = false, updatable = false)\n    private byte[] rowVersion;\n}",
+      "patchAfter": "@Entity\n@Table(schema = \"compliance\", name = \"obligation_attestation_campaign\")\n@Where(clause = \"is_deleted = 0\")\n@Getter @Setter @NoArgsConstructor\npublic class ObligationAttestationCampaign extends BaseEntity {\n    // id + createdAt/updatedAt/createdBy/updatedBy/isDeleted/deletedAt/\n    // deletedBy/rowVersion + softDelete() are all inherited from BaseEntity.\n    // Only the business columns remain here.\n}",
+      "effort": "L",
+      "references": [
+        "tss-grc-backend/src/main/java/com/tss/grc/common/model/BaseEntity.java",
+        "audit/raw/jscpd/jscpd-report.json (statistics.formats.java, entity<->entity clones)",
+        "https://docs.spring.io/spring-data/jpa/reference/auditing.html",
+        "https://jakarta.ee/specifications/persistence/3.1/ (MappedSuperclass)"
+      ]
+    },
+    {
+      "id": "QUAL-DUP-002",
+      "title": "TSX pages duplicate whole presentational components and helpers (ProgressBar, card components, bilingual pickers) across modules — 609 clones / 8,602 lines",
+      "phase": "Quality",
+      "category": "Code Duplication / Maintainability",
+      "severity": "High",
+      "cvss": "Not a security issue. Maintainability rated High: 8,602 duplicated lines across 439 TSX sources (5.44% of frontend). UI fixes (accessibility, RTL direction, theming token changes) must be applied in many copies; the copies drift, producing inconsistent UX across modules in a product whose key selling point is a uniform bilingual UI.",
+      "file": "tss-grc-ui-v2/src/pages/compliance/ObligationCampaignsPage.tsx",
+      "lines": "344-365",
+      "locations": [
+        "tss-grc-ui-v2/src/pages/compliance/ObligationCampaignsPage.tsx:344-365",
+        "tss-grc-ui-v2/src/pages/bcm/FacilitatorConsolePage.tsx:683-761",
+        "tss-grc-ui-v2/src/pages/bcm/ObserverDashboardPage.tsx:568-646",
+        "tss-grc-ui-v2/src/components/privacy/ConsentTab.tsx:16-57",
+        "tss-grc-ui-v2/src/pages/detail/ConsentDetailPage.tsx:38-71",
+        "tss-grc-ui-v2/src/pages/ndi/NdiPage.tsx:747-867",
+        "tss-grc-ui-v2/src/pages/tprm/VendorBcpCampaignsPage.tsx:324-364"
+      ],
+      "description": "tsx <-> tsx is the largest single duplication cluster overall: 609 clone instances / 8,602 duplicated lines. The duplication is concentrated in (a) per-page copies of small presentational helpers and (b) whole card/sub-components copied between sibling pages. Confirmed examples opened on disk: the `ProgressBar({percent,label})` component is byte-for-byte duplicated in ObligationCampaignsPage.tsx:344-365 and at least one other campaigns page; the `ActiveInjectCard`/`ResponseCard` components are copied between FacilitatorConsolePage.tsx (683-761) and ObserverDashboardPage.tsx (568-646) — a 45-line + 35-line back-to-back clone, the two largest TSX clones in the report; and the consent panel is duplicated between components/privacy/ConsentTab.tsx:16-57 and pages/detail/ConsentDetailPage.tsx:38-71. The single most-cloned file is pages/ndi/NdiPage.tsx with 69 clone instances / 1,001 dup lines, including an intra-file 40-line clone (NdiPage.tsx:747-786 vs 828-867).",
+      "rootCause": "No shared component library for the recurring building blocks (progress bars, stat/metric cards, status pills, campaign tables, bilingual label pickers). New pages were created by copying a nearby page. The bilingual `isAr && xAr ? xAr : xEn` selection idiom appears in 160 TSX files inline rather than via one helper, and a `tlabel(...)`-style label picker is reimplemented in ~30 files.",
+      "evidence": "jscpd statistics.formats.tsx = 609 clones / 5.44% / 7,993 dup lines (8,602 by per-clone line sum). Top TSX files by clone instances: NdiPage.tsx (69), EsgPage.tsx (49), AiLifecycleRecertificationsPage.tsx (43), BcmExerciseWizard.tsx (28), CptyCounterpartiesPage.tsx (25). Largest single TSX clone = FacilitatorConsolePage.tsx:683-727 vs ObserverDashboardPage.tsx:568-612 (45 lines). grep: `function ProgressBar` in 2 files (identical bodies), inline bilingual `isAr ?`/`isAr &&` picker pattern in 160 tsx files.",
+      "impact": "Inconsistent and drift-prone UI: a fix to ProgressBar color thresholds, an RTL `dir` correction, or a design-token rename only lands in the page the developer happened to edit, leaving others stale. Doubles the review burden for every page and obscures genuinely page-specific logic. Increases bundle size with repeated component definitions.",
+      "reproduction": "1) Open tss-grc-ui-v2/src/pages/compliance/ObligationCampaignsPage.tsx:344-365 and compare ProgressBar to the same function in another campaigns page. 2) Diff FacilitatorConsolePage.tsx:683-761 against ObserverDashboardPage.tsx:568-646 — ActiveInjectCard/ResponseCard are identical. 3) grep -rl 'function ProgressBar' tss-grc-ui-v2/src --include=*.tsx → 2 files with identical bodies.",
+      "resolution": "Extract the recurring presentational components into a shared module (e.g. src/components/ui/ProgressBar.tsx, StatCard.tsx, StatusPill.tsx, CampaignTable.tsx) and the bilingual selection into a single helper (e.g. src/lib/i18n.ts exporting `pick(isAr, ar, en)` and `tlabel(map, key, isAr)`), then replace the inline copies with imports. Co-locate the BCM crisis-exercise cards (ActiveInjectCard/ResponseCard) in one shared file imported by both the facilitator and observer pages. Prioritize the highest-clone files (NdiPage, EsgPage, the campaigns pages) first.",
+      "patchBefore": "// duplicated verbatim in ObligationCampaignsPage.tsx, VendorBcpCampaignsPage.tsx, ...\nfunction ProgressBar({ percent, label }: { percent: number; label: string }) {\n  const color = percent >= 80 ? 'var(--success)'\n    : percent >= 50 ? 'var(--info)'\n    : percent > 0 ? 'var(--warning)'\n    : 'var(--ink-4)';\n  return (<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>\n    <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'var(--surface-3)', overflow: 'hidden', minWidth: 80 }}>\n      <div style={{ width: `${Math.max(0, Math.min(100, percent))}%`, height: '100%', background: color, transition: 'width 200ms' }} />\n    </div>\n    <span style={{ fontSize: 12, color: 'var(--ink-3)', minWidth: 56 }}>{label}</span>\n  </div>);\n}",
+      "patchAfter": "// src/components/ui/ProgressBar.tsx  (single definition)\nexport function ProgressBar({ percent, label }: { percent: number; label: string }) { /* ...as before... */ }\n\n// in each page:\nimport { ProgressBar } from '@/components/ui/ProgressBar';",
+      "effort": "L",
+      "references": [
+        "tss-grc-ui-v2/src/pages/compliance/ObligationCampaignsPage.tsx",
+        "tss-grc-ui-v2/src/pages/bcm/FacilitatorConsolePage.tsx",
+        "tss-grc-ui-v2/src/pages/ndi/NdiPage.tsx",
+        "audit/raw/jscpd/jscpd-report.json (statistics.formats.tsx)"
+      ]
+    },
+    {
+      "id": "QUAL-DUP-003",
+      "title": "Service classes copy-paste the org()/currentUserId()/emit() tenant-and-actor helper trio instead of sharing a base service or utility",
+      "phase": "Quality",
+      "category": "Code Duplication / Maintainability",
+      "severity": "Medium",
+      "cvss": "Not a security CVE, but adjacent to a security-relevant concern: the duplicated currentUserId()/org() helpers are how tenant id and actor id are resolved for writes. 259 service<->service clones / 3,219 dup lines. If one copy diverges (e.g. fails to null-check the principal, or reads the wrong tenant source), it produces a per-module tenant/actor-resolution bug that the other modules will not exhibit — exactly the kind of subtle multi-tenant isolation defect that is hard to spot. Rated Medium for maintainability + latent isolation risk.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java",
+      "lines": "635-644",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:635-652",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sharia/service/ShariaService.java:672-703",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/fraud/service/FraudService.java",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/rrp/service/RrpService.java",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reginspect/service/RegInspectService.java",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/opres/service/OpResService.java"
+      ],
+      "description": "java-service <-> java-service is the third-largest Java cluster: 259 clones / 3,219 dup lines. The recurring fragment is a trio of private helpers used by virtually every write path: `private static Long org() { return TenantContext.requireOrganisationId(); }`, `private static Long currentUserId()` (reads SecurityContextHolder, null-guards, casts to GrcUserDetails, returns userId), and a `private void emit(...)`/event-recording method. The top service clone the report found (ObService.java:625-656 vs ShariaService.java:672-703, 32 lines) is exactly this helper block plus the surrounding event-emit method. Static grep shows `private static Long currentUserId()` duplicated in 18 service/controller files and `TenantContext.requireOrganisationId()` referenced in 69 files.",
+      "rootCause": "There is no abstract base service or shared SecurityUtils/TenantUtils class exposing currentUserId()/org(). Each module's service was bootstrapped by copying a prior module's service, carrying the private helpers along. The helpers are declared `private static`, so they cannot be reused even by sibling services in the same module.",
+      "evidence": "jscpd: service<->service = 259 clones / 3,219 dup lines. grep on tss-grc-backend/src/main/java/com/tss/grc/module: `private static Long currentUserId()` in 18 files; `TenantContext.requireOrganisationId()` in 69 files. Confirmed body in ObService.java:637-644 (Authentication auth = SecurityContextHolder...; instanceof GrcUserDetails u; return u.getUserId();) is identical to the ShariaService copy.",
+      "impact": "Tenant- and actor-resolution logic is the security-critical seam of a multi-tenant GRC platform, yet it lives in ~18-69 hand-copied fragments. A divergence in any one copy (missing null check, wrong tenant accessor) is a per-module isolation or audit-attribution bug. Maintenance of the event-emit plumbing is likewise multiplied across every service.",
+      "reproduction": "1) Open ObService.java:635-644 and ShariaService.java around 672-703 — identical currentUserId()/org(). 2) grep -rl 'private static Long currentUserId()' tss-grc-backend/src/main/java/com/tss/grc/module --include=*.java | wc -l → 18. 3) grep -rl 'TenantContext.requireOrganisationId()' ... | wc -l → 69.",
+      "resolution": "Introduce a shared, package-visible utility (e.g. common/security/CurrentActor.java with `static Long userId()` and `static Long organisationId()`), or an `AbstractTenantService` base class exposing protected `org()`/`currentUserId()`/`emit(...)`. Replace the per-service private statics with calls to the shared helper. Centralising currentUserId() also gives one place to fix any future principal-type or null-handling change. Keep TenantContext as the source of truth; the utility just wraps it.",
+      "patchBefore": "// repeated (private static) in 18+ services\nprivate static Long org() { return TenantContext.requireOrganisationId(); }\nprivate static Long currentUserId() {\n    Authentication auth = SecurityContextHolder.getContext().getAuthentication();\n    if (auth == null || !auth.isAuthenticated()\n            || !(auth.getPrincipal() instanceof GrcUserDetails u)) {\n        return null;\n    }\n    return u.getUserId();\n}",
+      "patchAfter": "// common/security/CurrentActor.java  (single definition)\npublic final class CurrentActor {\n    private CurrentActor() {}\n    public static Long organisationId() { return TenantContext.requireOrganisationId(); }\n    public static Long userId() {\n        Authentication auth = SecurityContextHolder.getContext().getAuthentication();\n        return (auth != null && auth.isAuthenticated()\n                && auth.getPrincipal() instanceof GrcUserDetails u) ? u.getUserId() : null;\n    }\n}\n// in services: CurrentActor.organisationId() / CurrentActor.userId()",
+      "effort": "M",
+      "references": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java",
+        "tss-grc-backend/src/main/java/com/tss/grc/security/GrcUserDetails.java",
+        "audit/raw/jscpd/jscpd-report.json (statistics.formats.java, service<->service clones)"
+      ]
+    },
+    {
+      "id": "QUAL-DUP-004",
+      "title": "REST controllers replicate identical import + class-annotation boilerplate header across 200+ controllers (CommitteeController is the canonical donor)",
+      "phase": "Quality",
+      "category": "Code Duplication / Maintainability",
+      "severity": "Low",
+      "cvss": "Not a security issue. Largely unavoidable Spring framework scaffolding; rated Low. 202 controller<->controller clones / 2,635 dup lines, but most is the import block + @RestController/@RequestMapping/@RequiredArgsConstructor/@Tag/@SecurityRequirement header that idiomatic Spring requires per class. Real but limited dedupe opportunity.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeController.java",
+      "lines": "5-39",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeController.java:5-39",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/controller/ObController.java:18-40",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/opres/controller/OpResController.java:9-31",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reginspect/controller/RegInspectController.java:12-34",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/rrp/controller/RrpController.java:18-40",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sharia/controller/ShariaController.java:22-44"
+      ],
+      "description": "java-controller <-> java-controller = 202 clones / 2,635 dup lines. CommitteeController.java:5-39 is the most frequent clone donor in the whole report — it forms a 31-to-35-line clone with at least 30 distinct module controllers (openbanking, opres, reginspect, rrp, sharia, fraud, evidence, incident, intake, ...). The duplicated span is the import list plus the class-level annotation header: @RestController, @RequestMapping(\"/api/...\"), @RequiredArgsConstructor, @Tag(...), @SecurityRequirement(name = \"bearerAuth\"), and the `private final XService service;` field. Beyond the header, many endpoint methods follow an identical CRUD shape (@GetMapping list with status/page/size params, @GetMapping/{id}, @PostMapping create returning 201, @PutMapping/{id}). There is no abstract base controller in the codebase (grep for BaseController/abstract *Controller → 0).",
+      "rootCause": "Spring's annotation-driven style requires the same import set and class-level annotations on every @RestController, and the team standardized on a fixed header (RequiredArgsConstructor + Tag + SecurityRequirement). New controllers are created by copying the header from an existing one. No shared @PageableDefault/constant or meta-annotation consolidates the repeated @PreAuthorize/@SecurityRequirement.",
+      "evidence": "jscpd: controller<->controller = 202 clones / 2,635 dup lines. CommitteeController.java:5-39 partners with 30 distinct controllers in the duplicates array (count of unique partner files). 233 files contain @RestController. Confirmed header identity by reading CommitteeController.java:20-27 and ObController.java:43-48 (same @RestController/@RequestMapping/@RequiredArgsConstructor/@Tag/@SecurityRequirement stack).",
+      "impact": "Low functional risk — this is mostly idiomatic framework boilerplate. The realistic cost is that cross-cutting controller conventions (e.g. standardizing the default page size, adding a common @SecurityRequirement, a shared pagination param) can't be changed in one place. The repeated CRUD method bodies (list/get/create/update) are a secondary, more valuable dedupe target than the import header.",
+      "reproduction": "1) Open CommitteeController.java:5-39 and ObController.java:18-48 — identical annotation header. 2) In jscpd-report.json, filter duplicates where firstFile/secondFile contains CommitteeController.java → 30 distinct partner controllers. 3) grep -rl 'abstract class.*Controller' tss-grc-backend → 0 (no base controller).",
+      "resolution": "Two targeted moves: (a) introduce a composed meta-annotation, e.g. `@GrcRestController` bundling @RestController + @RequiredArgsConstructor + @SecurityRequirement(name=\"bearerAuth\") + @Tag, to collapse the annotation header; (b) for the genuinely repeated CRUD bodies, consider a thin generic `AbstractCrudController<TResp, TCreate, TUpdate>` or shared response helpers — but keep this optional, since over-abstracting controllers can hurt readability. The import-block portion of the clone is inherent to Java/Spring and is acceptable to leave; do not chase it. Prioritize this finding below DUP-001/002/003.",
+      "patchBefore": "@RestController\n@RequestMapping(\"/api/admin/committees\")\n@RequiredArgsConstructor\n@Tag(name = \"Committee Workflows\")\n@SecurityRequirement(name = \"bearerAuth\")\npublic class CommitteeController {\n    private final CommitteeService service;\n    // ...\n}",
+      "patchAfter": "// common/web/GrcRestController.java\n@Target(ElementType.TYPE) @Retention(RetentionPolicy.RUNTIME)\n@RestController @RequiredArgsConstructor\n@SecurityRequirement(name = \"bearerAuth\")\npublic @interface GrcRestController { }\n\n// controller:\n@GrcRestController\n@RequestMapping(\"/api/admin/committees\")\n@Tag(name = \"Committee Workflows\")\npublic class CommitteeController {\n    private final CommitteeService service;\n}",
+      "effort": "M",
+      "references": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeController.java",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/controller/ObController.java",
+        "audit/raw/jscpd/jscpd-report.json (statistics.formats.java, controller<->controller clones)",
+        "https://docs.spring.io/spring-framework/reference/core/beans/classpath-scanning.html#beans-meta-annotations"
+      ]
+    }
+  ]
+}

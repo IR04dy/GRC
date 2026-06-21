@@ -1,0 +1,180 @@
+{
+  "findings": [
+    {
+      "id": "SEC-TPRM-001",
+      "title": "Cross-tenant IDOR: VendorAssessment update/delete not scoped to organisation",
+      "phase": "Security",
+      "category": "Broken Object Level Authorization / IDOR (A01)",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N) — cross-tenant read+write of vendor risk assessments",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/TprmService.java",
+      "lines": "100-120",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/TprmService.java:84-92",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/repository/VendorAssessmentRepository.java:10-13",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/entity/VendorAssessment.java:16-24",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/controller/TprmController.java:77-88"
+      ],
+      "description": "TprmService.updateAssessment(id, req) and deleteAssessment(id) load the VendorAssessment with the bare JpaRepository method assessmentRepo.findById(id), with no organisation/tenant check. The Vendor-side methods in the same service (getVendor/updateVendor/deleteVendor) correctly filter on TenantContext.getCurrentTenant(), but the assessment methods do not. VendorAssessment carries only a vendor_id column and NO organisation_id (entity has no org field — see lines 16-24), so org ownership can only be enforced by resolving the parent vendor; neither method does this. The @Where(clause = \"is_deleted = 0\") on the entity does not constrain tenant. The controller endpoints PUT /api/v1/tprm/assessments/{id} and DELETE /api/v1/tprm/assessments/{id} are guarded by hasPermission('TPRM','WRITE'/'DELETE'), which any TPRM user in any tenant holds, so the permission check does not stop cross-tenant access.",
+      "rootCause": "Assessment lookups use the unscoped JpaRepository.findById instead of resolving and validating the parent Vendor's organisationId (as getVendor does). VendorAssessment has no organisation_id column, so tenant isolation must be derived via the vendor and was omitted.",
+      "evidence": "public VendorAssessment updateAssessment(Long id, VendorAssessment req) {\n    VendorAssessment existing = assessmentRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"Assessment not found: \" + id));\n    ... // no org / vendor-ownership check\n}\npublic void deleteAssessment(Long id) {\n    VendorAssessment a = assessmentRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"Assessment not found: \" + id));\n    a.setIsDeleted(true); ...\n}",
+      "impact": "A user authenticated in tenant A with TPRM:WRITE/DELETE can enumerate sequential assessment ids and overwrite findings/risk scores/status or soft-delete vendor risk assessments belonging to any other tenant (e.g. another bank). This is cross-tenant data tampering and destruction of regulated third-party risk records.",
+      "reproduction": "1. Log in as a TPRM user in tenant A (e.g. riskmanager). 2. Identify an assessment id belonging to tenant B (ids are sequential IDENTITY values). 3. curl -X PUT http://localhost:8084/api/v1/tprm/assessments/{idFromTenantB} -H 'Authorization: Bearer <tenantA token>' -H 'Content-Type: application/json' -d '{\"assessmentDate\":\"2026-01-01\",\"riskScore\":1,\"riskRating\":\"LOW\",\"status\":\"REVIEWED\",\"findings\":\"tampered\"}' . The response returns tenant B's mutated assessment. 4. DELETE the same id soft-deletes tenant B's record.",
+      "resolution": "Resolve the parent vendor and assert org ownership before mutating, exactly as getVendor does. Add an org-scoped finder (e.g. findByIdAndVendor_OrganisationId or join on vendor) or fetch the existing assessment, then call getVendor(existing.getVendorId()) to enforce the tenant guard before applying changes.",
+      "patchBefore": "@Transactional\npublic VendorAssessment updateAssessment(Long id, VendorAssessment req) {\n    VendorAssessment existing = assessmentRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"Assessment not found: \" + id));\n    existing.setAssessmentDate(req.getAssessmentDate());\n    // ...\n    return assessmentRepo.save(existing);\n}\n\n@Transactional\npublic void deleteAssessment(Long id) {\n    VendorAssessment a = assessmentRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"Assessment not found: \" + id));\n    a.setIsDeleted(true);\n    assessmentRepo.save(a);\n}",
+      "patchAfter": "@Transactional\npublic VendorAssessment updateAssessment(Long id, VendorAssessment req) {\n    VendorAssessment existing = assessmentRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"Assessment not found: \" + id));\n    getVendor(existing.getVendorId()); // tenant guard: throws if vendor not in current org\n    existing.setAssessmentDate(req.getAssessmentDate());\n    // ...\n    return assessmentRepo.save(existing);\n}\n\n@Transactional\npublic void deleteAssessment(Long id) {\n    VendorAssessment a = assessmentRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"Assessment not found: \" + id));\n    getVendor(a.getVendorId()); // tenant guard\n    a.setIsDeleted(true);\n    assessmentRepo.save(a);\n}",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-TPRM-002",
+      "title": "Cross-tenant mutation of VendorAssessment via questionnaire workflow (unscoped findById)",
+      "phase": "Security",
+      "category": "Broken Object Level Authorization / IDOR (A01)",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — cross-tenant write/corruption of vendor assessment workflow + scores",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java",
+      "lines": "210-326",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java:212-226",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java:238-293",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java:296-326",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/controller/QuestionnaireController.java:104-130"
+      ],
+      "description": "In QuestionnaireService, every assessment-workflow method loads the parent VendorAssessment with the unscoped assessments.findById(assessmentId): assignTemplate (line 214), upsertResponse (line 241), markComplete (line 299) and markReviewed (line 320). Unlike templates/questions/responses (which are loaded with findByIdAndOrganisationId / findByOrganisationId... finders), VendorAssessment is fetched without a tenant guard and VendorAssessment has no organisation_id column to let Hibernate filter it. The corresponding endpoints (POST /api/v1/tprm/assessments/{id}/assign-template, /responses, /complete, /review) only require hasPermission('TPRM','WRITE'), held by every TPRM writer in every tenant. A user in tenant A can therefore reference an assessment id owned by tenant B and: flip its workflow_status to IN_PROGRESS/COMPLETED/REVIEWED, overwrite its templateId/totalQuestions/answeredCount, and (when the foreign assessment has no template, so the template-mismatch guard at line 246 is skipped) write a response row and trigger recomputeAssessment, which saves a recomputed computedScorePct/riskScore/riskRating onto tenant B's assessment.",
+      "rootCause": "VendorAssessment is loaded by id alone with no derivation of the owning organisation (it has no organisation_id and no parent-vendor org check), so tenant isolation is not enforced on the assessment object even though the questionnaire child entities are correctly org-scoped.",
+      "evidence": "@Transactional\npublic VendorAssessment markComplete(Long assessmentId) {\n    Long o = org();\n    VendorAssessment va = assessments.findById(assessmentId)   // <-- not org-scoped\n        .orElseThrow(() -> new EntityNotFoundException(\"VendorAssessment not found: \" + assessmentId));\n    ...\n    va.setWorkflowStatus(\"COMPLETED\");\n    return assessments.save(va);\n}",
+      "impact": "Cross-tenant integrity violation: an attacker in one tenant can corrupt the workflow state and computed risk scores of another tenant's third-party risk assessments, and prematurely mark them COMPLETED/REVIEWED — undermining the integrity of regulated vendor-risk records and audit trails.",
+      "reproduction": "1. Authenticate as a TPRM writer in tenant A. 2. Pick an assessment id belonging to tenant B. 3. curl -X POST http://localhost:8084/api/v1/tprm/assessments/{idFromTenantB}/review -H 'Authorization: Bearer <tenantA token>' . If tenant B's assessment is COMPLETED, its workflow_status flips to REVIEWED under tenant A's action. The /complete and /assign-template endpoints similarly mutate it.",
+      "resolution": "Resolve the assessment through a tenant-aware path. Either add organisation_id to vendor_assessments and load via findByIdAndOrganisationId, or add a private helper that loads the assessment, then validates the owning vendor's org (vendorRepo.findById(va.getVendorId()).filter org == current). Apply it in assignTemplate, upsertResponse, markComplete, markReviewed and recomputeAssessment.",
+      "patchBefore": "VendorAssessment va = assessments.findById(assessmentId)\n    .orElseThrow(() -> new EntityNotFoundException(\"VendorAssessment not found: \" + assessmentId));",
+      "patchAfter": "VendorAssessment va = loadAssessmentInTenant(assessmentId); // new helper\n\nprivate VendorAssessment loadAssessmentInTenant(Long id) {\n    VendorAssessment va = assessments.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"VendorAssessment not found: \" + id));\n    vendorRepo.findById(va.getVendorId())\n        .filter(v -> v.getOrganisationId().equals(org()))\n        .orElseThrow(() -> new EntityNotFoundException(\"VendorAssessment not found: \" + id));\n    return va;\n}",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-TPRM-003",
+      "title": "Missing function-level authorization on third-party cyber-assessment endpoints (isAuthenticated only)",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — any authenticated user can create/approve/retire vendor cyber assessments within their org",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/cyber/controller/ThirdPartyCyberAssessmentController.java",
+      "lines": "23-61",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/cyber/service/ThirdPartyCyberAssessmentService.java:52-105"
+      ],
+      "description": "Every endpoint on ThirdPartyCyberAssessmentController (GET list, GET /{id}, POST create, POST /{id}/posture, POST /{id}/submit, POST /{id}/approve, POST /{id}/retire) is annotated only with @PreAuthorize(\"isAuthenticated()\"). There is no module/action permission (no hasPermission('TPRM',...) / role guard), unlike the rest of the audited TPRM surface which uses hasPermission('TPRM','READ'/'WRITE') or explicit hasAnyRole(...) lists. As a result any authenticated principal — regardless of whether they have any TPRM entitlement (e.g. an AUDITOR, a read-only user, or a user from an unrelated module) — can read, create, edit, submit, and crucially APPROVE and RETIRE third-party cyber risk assessments. The service is correctly tenant-scoped (findByIdAndOrganisationId), so the exposure is confined to the caller's own organisation, but it is a clear privilege/function-level authorization gap (anyone can self-approve risk acceptance).",
+      "rootCause": "Authorization on this controller was stubbed with isAuthenticated() and never tightened to a module permission or approver role, in contrast to the platform-wide hasPermission('MODULE','ACTION') convention.",
+      "evidence": "@PostMapping(\"/{id}/approve\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ThirdPartyCyberAssessment approve(@PathVariable Long id, @RequestBody Map<String, String> body) {\n    return service.approve(id, body.getOrDefault(\"approverName\", \"admin\"));\n}",
+      "impact": "Within a tenant, the segregation-of-duties intent of an approve step is voided: a low-privileged user can move a third-party cyber assessment to APPROVED (formal risk acceptance) or RETIRED, and can create/alter posture data that feeds the residual-risk tier. This weakens governance over vendor cyber risk decisions and the associated audit trail.",
+      "reproduction": "1. Log in as any authenticated user that has NO TPRM permission (e.g. a user with only a non-TPRM role). 2. curl -X POST http://localhost:8084/api/tprm/cyber-assessments/{id}/approve -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' -d '{\"approverName\":\"attacker\"}' . The assessment transitions to APPROVED.",
+      "resolution": "Replace isAuthenticated() with the platform permission convention: hasPermission('TPRM','READ') on reads, hasPermission('TPRM','WRITE') on create/posture/submit, and a tighter approver guard (e.g. hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN') or hasPermission('TPRM','APPROVE')) on approve/retire.",
+      "patchBefore": "@PostMapping(\"/{id}/approve\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ThirdPartyCyberAssessment approve(@PathVariable Long id, @RequestBody Map<String, String> body) { ... }",
+      "patchAfter": "@PostMapping(\"/{id}/approve\")\n@PreAuthorize(\"hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')\")\npublic ThirdPartyCyberAssessment approve(@PathVariable Long id, @RequestBody Map<String, String> body) { ... }\n// and replace isAuthenticated() with hasPermission('TPRM','READ'/'WRITE') on the other methods",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-TPRM-004",
+      "title": "Mass assignment and missing input validation: JPA entities bound directly as request bodies",
+      "phase": "Security",
+      "category": "Mass Assignment / Improper Input Validation (A08/A04)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — client-controlled internal fields + unvalidated input",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/controller/TprmController.java",
+      "lines": "42-75",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/entity/Vendor.java:16-69",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/entity/VendorAssessment.java:16-75",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/TprmService.java:45-98"
+      ],
+      "description": "The legacy TprmController binds the persistence @Entity types directly as @RequestBody (createVendor(@RequestBody Vendor), updateVendor(@RequestBody Vendor), createAssessment(@RequestBody VendorAssessment), updateAssessment(@RequestBody VendorAssessment)) with no @Valid and no DTO layer. This is inconsistent with the rest of the audited modules (cpty, openbanking, outsourcing, bcp_attestation) which all use validated request DTOs. Two concrete weaknesses follow: (1) Mass assignment — a client can supply id, externalId, isDeleted, createdAt (Vendor) or id, externalId, isDeleted, workflowStatus, computedScorePct (VendorAssessment) in the JSON body; createVendor saves the entity as-is (only organisationId is overwritten server-side). A client could, for example, POST a vendor with isDeleted=true or seed arbitrary externalId/createdAt. (2) No bean validation — vendorName, riskRating, status, emails, etc. are persisted with no @NotBlank/@Size/@Email/enum checks, so malformed or oversized values reach the database and the bilingual/workflow invariants are not enforced at the boundary.",
+      "rootCause": "No DTO/validation layer for the original vendors/assessments endpoints; the JPA entity doubles as the API contract, exposing internal/managed columns to client binding.",
+      "evidence": "@PostMapping(\"/vendors\")\n@PreAuthorize(\"hasPermission('TPRM', 'WRITE')\")\npublic Vendor createVendor(@RequestBody Vendor req) {   // raw entity, no @Valid\n    return tprmService.createVendor(req);\n}\n// TprmService.createVendor only overrides organisationId; id/externalId/isDeleted/createdAt come from the client",
+      "impact": "Lower than the IDOR findings because organisationId is forced server-side, but a client can set internal-state fields (e.g. isDeleted, workflowStatus, computedScorePct) and inject unvalidated/oversized data, leading to inconsistent records and bypass of workflow/scoring invariants. Combined with SEC-TPRM-001, the lack of validation widens the tampering surface.",
+      "reproduction": "1. As a TPRM writer, POST /api/v1/tprm/vendors with body {\"vendorName\":\"x\",\"isDeleted\":true} — the row is created already soft-deleted. 2. POST /api/v1/tprm/assessments with {\"vendorId\":<own>,\"assessmentDate\":\"2026-01-01\",\"workflowStatus\":\"REVIEWED\",\"computedScorePct\":0} — workflow/score fields are accepted directly, bypassing the questionnaire engine that is supposed to own them.",
+      "resolution": "Introduce VendorCreate/Update and AssessmentCreate/Update DTOs with Jakarta constraints (@NotBlank, @Size, @Email, allowed-value checks) and @Valid on the controller params; map only whitelisted fields in the service. Never bind JPA entities directly to request bodies.",
+      "patchBefore": "@PostMapping(\"/vendors\")\n@PreAuthorize(\"hasPermission('TPRM', 'WRITE')\")\npublic Vendor createVendor(@RequestBody Vendor req) {\n    return tprmService.createVendor(req);\n}",
+      "patchAfter": "@PostMapping(\"/vendors\")\n@PreAuthorize(\"hasPermission('TPRM', 'WRITE')\")\npublic VendorResponse createVendor(@Valid @RequestBody VendorCreateRequest req) {\n    return tprmService.createVendor(req); // service maps only whitelisted fields\n}\n// VendorCreateRequest exposes no id/externalId/isDeleted/createdAt",
+      "effort": "M",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "CWE-20: Improper Input Validation",
+        "OWASP API6:2023 / A08:2021"
+      ]
+    },
+    {
+      "id": "SEC-TPRM-005",
+      "title": "Public token-authenticated vendor-portal endpoints lack expiry, rate-limiting, and leak PII",
+      "phase": "Security",
+      "category": "Broken Authentication / Sensitive Data Exposure (A07/A02)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N) — unauthenticated endpoints; bounded by 122-bit unguessable token",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/bcp_attestation/controller/VendorBcpAttestationController.java",
+      "lines": "62-85",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/bcp_attestation/service/VendorBcpAttestationService.java:89-120",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/bcp_attestation/service/VendorBcpAttestationService.java:263-285",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/bcp_attestation/entity/VendorBcpAttestation.java:59-61"
+      ],
+      "description": "GET /api/v1/tprm/bcp-attestations/by-token/{token} and POST /api/v1/tprm/bcp-attestations/by-token/{token}/submit are @PreAuthorize(\"permitAll()\") — fully unauthenticated. The opaque token is the only credential. Mitigating factors: the token is a random UUIDv4 (submissionToken = UUID.randomUUID(), ~122 bits of entropy, not enumerable) and getByToken/submitByToken/doSubmit resolve the row by token and enforce a state guard (guardSubmit allows only INVITED/REMINDED/OVERDUE/REJECTED). Residual weaknesses: (1) the token never expires and is not single-use/rotated after submission, so a leaked URL (referrer logs, email forwarding, browser history, proxy logs) is replayable indefinitely; (2) the permitAll() submit endpoint has no rate-limiting or abuse audit (the controller Javadoc itself defers rate-limit/audit/MFA-bind to a follow-up); (3) the AttestationResponse returned by the public getByToken includes submitted-by contact name/email (PII), evidence file path/name, and the submissionToken itself, so anyone with the token reads vendor contact PII and internal evidence paths.",
+      "rootCause": "v1 vendor-portal design intentionally treats the bearer token as the sole credential without expiry, single-use semantics, rate-limiting, or response field minimization for the unauthenticated path.",
+      "evidence": "@GetMapping(\"/by-token/{token}\")\n@PreAuthorize(\"permitAll()\")\npublic AttestationResponse getByToken(@PathVariable UUID token) { return service.getByToken(token); }\n\n@PostMapping(\"/by-token/{token}/submit\")\n@PreAuthorize(\"permitAll()\")\npublic AttestationResponse submitByToken(@PathVariable UUID token, @RequestBody @Valid AttestationSubmitRequest req) { return service.submitByToken(token, req); }",
+      "impact": "If a submission URL leaks, an outsider can read the vendor's contact PII and evidence file path and (while the row is in a submittable state) overwrite the attested RTO/MTPD/BCP test data. Brute force is impractical due to the 122-bit token, so this is defense-in-depth rather than a directly exploitable break, hence Low.",
+      "reproduction": "1. Obtain a submission token (e.g. from a forwarded vendor email or logs). 2. curl http://localhost:8084/api/v1/tprm/bcp-attestations/by-token/<uuid> with no Authorization header — returns the attestation incl. submittedByContactEmail, evidenceFilePath and the token. 3. curl -X POST .../by-token/<uuid>/submit with a JSON body overwrites the attestation while it is INVITED/REMINDED/OVERDUE/REJECTED.",
+      "resolution": "Add an expiry (token_expires_at) and reject expired tokens; make the token single-use (rotate/invalidate after SUBMITTED); add rate-limiting + audit on the permitAll() submit path; and minimize the by-token response (omit submissionToken and trim contact PII / internal evidence paths for the unauthenticated view).",
+      "patchBefore": "@Transactional(readOnly = true)\npublic AttestationResponse getByToken(UUID token) {\n    VendorBcpAttestation a = attestationRepo.findBySubmissionTokenAndIsDeletedFalse(token)\n        .orElseThrow(() -> new EntityNotFoundException(\"Invalid submission token\"));\n    return toResponse(a); // returns full PII + token\n}",
+      "patchAfter": "@Transactional(readOnly = true)\npublic AttestationResponse getByToken(UUID token) {\n    VendorBcpAttestation a = attestationRepo.findBySubmissionTokenAndIsDeletedFalse(token)\n        .orElseThrow(() -> new EntityNotFoundException(\"Invalid submission token\"));\n    if (a.getTokenExpiresAt() != null && a.getTokenExpiresAt().isBefore(LocalDateTime.now()))\n        throw new EntityNotFoundException(\"Invalid submission token\");\n    return toPortalResponse(a); // minimized view, no token, no internal evidence path\n}",
+      "effort": "M",
+      "references": [
+        "CWE-613: Insufficient Session Expiration",
+        "CWE-307: Improper Restriction of Excessive Authentication Attempts",
+        "CWE-200: Exposure of Sensitive Information",
+        "OWASP A07:2021 Identification and Authentication Failures"
+      ]
+    },
+    {
+      "id": "SEC-TPRM-006",
+      "title": "Unbounded client-controlled page size on list endpoints (resource exhaustion)",
+      "phase": "Security",
+      "category": "Uncontrolled Resource Consumption (A04)",
+      "severity": "Low",
+      "cvss": "CVSS 3.7 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L) — authenticated DoS via large page size",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/controller/ObController.java",
+      "lines": "142-148",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/controller/ObController.java:69-75",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/controller/ObController.java:117-123",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cpty/controller/CptyController.java:68-74",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/cyber/controller/ThirdPartyCyberAssessmentController.java:23-30"
+      ],
+      "description": "Several list endpoints accept a client-supplied size request param with a default but no upper bound, passing it straight into PageRequest.of(page, size): ObController.listApiCalls/listTpps/listConsents/listIncidents, CptyController.list, and ThirdPartyCyberAssessmentController.list (size default 100, no @Max). A caller can request size=1000000 and force the backend to materialize and serialize an arbitrarily large result set in one query. The TprmController vendor list uses @PageableDefault(size=20) but also has no max-page-size cap configured. These are authenticated endpoints, so impact is limited to authorized users, but a single tenant user can degrade the service for the shared backend.",
+      "rootCause": "No maximum page-size clamp on raw int size params (and no global spring.data.web.pageable.max-page-size), so the client fully controls fetch size.",
+      "evidence": "@GetMapping(\"/api-calls\")\n@PreAuthorize(READ_GUARD)\npublic Page<ApiCallResponse> listApiCalls(\n        @RequestParam(defaultValue = \"0\") int page,\n        @RequestParam(defaultValue = \"100\") int size) {  // no upper bound\n    return service.listApiCalls(page, size);\n}",
+      "impact": "An authenticated user can issue size=1000000 against api-calls (an append-only high-volume table) and similar endpoints, causing large heap allocation, slow queries, and potential OOM/GC pressure affecting all tenants on the shared instance.",
+      "reproduction": "curl 'http://localhost:8084/api/v1/openbanking/api-calls?page=0&size=1000000' -H 'Authorization: Bearer <token>' — the server attempts to fetch and serialize up to a million rows.",
+      "resolution": "Clamp the page size to a sane maximum (e.g. Math.min(size, 200)) in each controller/service, or set spring.data.web.pageable.max-page-size globally and prefer Pageable params with @PageableDefault plus a configured max.",
+      "patchBefore": "public Page<ApiCallResponse> listApiCalls(\n        @RequestParam(defaultValue = \"0\") int page,\n        @RequestParam(defaultValue = \"100\") int size) {\n    return service.listApiCalls(page, size);\n}",
+      "patchAfter": "public Page<ApiCallResponse> listApiCalls(\n        @RequestParam(defaultValue = \"0\") int page,\n        @RequestParam(defaultValue = \"100\") int size) {\n    int capped = Math.min(Math.max(size, 1), 200);\n    return service.listApiCalls(page, capped);\n}",
+      "effort": "S",
+      "references": [
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "OWASP API4:2023 Unrestricted Resource Consumption",
+        "OWASP A04:2021 Insecure Design"
+      ]
+    }
+  ]
+}

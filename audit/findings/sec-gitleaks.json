@@ -1,0 +1,132 @@
+{
+  "findings": [
+    {
+      "id": "SEC-LEAK-004",
+      "title": "Hardcoded vendor-portal access codes shipped in the frontend bundle",
+      "phase": "Security",
+      "category": "Identification and Authentication Failures (A07) / CWE-798 Use of Hard-coded Credentials",
+      "severity": "Low",
+      "cvss": "CVSS 3.7 (AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N) — demo-only vendor data, client-side plaintext auth; no real tenant data behind it",
+      "file": "tss-grc-ui-v2/src/lib/vendorPortal.ts",
+      "lines": "228-330",
+      "locations": [
+        "tss-grc-ui-v2/src/lib/vendorPortal.ts:231",
+        "tss-grc-ui-v2/src/lib/vendorPortal.ts:267",
+        "tss-grc-ui-v2/src/lib/vendorPortal.ts:300",
+        "tss-grc-ui-v2/src/lib/vendorPortal.ts:328-330"
+      ],
+      "description": "The vendor self-service portal authenticates vendors by an `accessCode` field. The full set of valid access codes is hard-coded as plaintext string literals in the `DEMO_VENDORS` array (e.g. 'NEOM-2026-A4Z9' line 231, 'TABUK-LOG-2026-X7M2' line 267, 'JEDDAH-CON-2026-B2K8' line 300) and matched at runtime by `findVendorByAccessCode()`, which performs a simple case-insensitive plaintext equality check (`v.accessCode.toLowerCase() === code.toLowerCase()`, line 329). Because this is a static frontend, these codes ship in the served JS bundle and the entire authentication decision happens client-side. Gitleaks flagged 'NEOM-2026-A4Z9' as a generic API key; on inspection it is a hard-coded vendor login credential rather than an API key. The data set is explicitly demo data ('Demo vendor accounts' comment, line 222) — the named orgs (NEOM/Tabuk/Jeddah) are illustrative, not live customers — which is why this is Low and not High.",
+      "rootCause": "Demo/seed authentication data was embedded directly in the shipped frontend source as plaintext literals, and the vendor-portal login is implemented as a pure client-side string comparison with no backend verification.",
+      "evidence": "vendorPortal.ts:231  `vendorCode: 'V-204', accessCode: 'NEOM-2026-A4Z9',`\nvendorPortal.ts:328-330  `export function findVendorByAccessCode(code: string): VendorProfile | undefined {\n  return DEMO_VENDORS.find(v => v.accessCode.toLowerCase() === code.toLowerCase());\n}`",
+      "impact": "Anyone who reads the (publicly served) frontend bundle can recover every demo vendor's login code and impersonate that vendor in the portal. In the current state the blast radius is limited to demo data, but the pattern is a trap: if real vendors are onboarded by adding rows to this array, their credentials would be exposed the same way, and the client-side-only auth would let any client bypass it entirely (DevTools / call `findVendorByAccessCode` directly).",
+      "reproduction": "1. Build/serve tss-grc-ui-v2. 2. Open the served bundle (or vendorPortal.ts in source) and read the `accessCode` literals. 3. Navigate to the vendor portal login and submit 'NEOM-2026-A4Z9' — you are logged in as NEOM Tech Services LLC (V-204) without any server check.",
+      "resolution": "Move vendor authentication server-side: verify the access code against a hashed value stored per-vendor on the backend (org-scoped, behind the existing JWT/TenantContext model) and return a real session token. Keep the frontend free of any credential material; the DEMO_VENDORS array should hold display fields only, with access codes provisioned out-of-band. Treat access codes as secrets (random, single-tenant, rotatable, hashed at rest).",
+      "patchBefore": "export const DEMO_VENDORS: VendorProfile[] = [\n  {\n    vendorCode: 'V-204', accessCode: 'NEOM-2026-A4Z9',\n    ...\n  },\n];\n\nexport function findVendorByAccessCode(code: string): VendorProfile | undefined {\n  return DEMO_VENDORS.find(v => v.accessCode.toLowerCase() === code.toLowerCase());\n}",
+      "patchAfter": "// No access codes in the bundle. Auth is delegated to the backend.\nexport const DEMO_VENDORS: VendorProfile[] = [\n  { vendorCode: 'V-204', /* accessCode removed */ ... },\n];\n\nexport async function authenticateVendor(code: string): Promise<VendorSession> {\n  // backend hashes + compares, org-scoped, returns a JWT\n  return Api.post('/api/v1/tprm/vendor-portal/login', { accessCode: code });\n}",
+      "effort": "M",
+      "references": [
+        "CWE-798: Use of Hard-coded Credentials",
+        "CWE-603: Use of Client-Side Authentication",
+        "OWASP Top 10 2021 A07: Identification and Authentication Failures",
+        "OWASP ASVS 2.10 (Service Authentication)"
+      ]
+    },
+    {
+      "id": "SEC-LEAK-001",
+      "title": "Gitleaks: placeholder tokens in integration docs (Splunk HEC / Tenable) are illustrative, not real",
+      "phase": "Security",
+      "category": "Hard-coded Credentials (A05) / CWE-798 — false positive",
+      "severity": "Info",
+      "cvss": "No exploitable risk — documentation placeholders, not live credentials",
+      "file": "tss-grc-backend/docs/integrations/SPLUNK.md",
+      "lines": "43-49",
+      "locations": [
+        "tss-grc-backend/docs/integrations/SPLUNK.md:46",
+        "tss-grc-backend/docs/integrations/TENABLE.md:127-130"
+      ],
+      "description": "Gitleaks raised two 'generic-api-key' hits inside integration setup documentation. SPLUNK.md line 46 shows `export SPLUNK_HEC_TOKEN=\"00112233-4455-6677-8899-aabbccddeeff\"` — a sequential dummy UUID inside a '## Switching from STUB to LIVE' how-to. TENABLE.md line 128 shows `export TENABLE_ACCESS_KEY=\"abc123def456...\"` — an obvious truncated placeholder, immediately followed by `export TENABLE_SECRET_KEY=\"...\"   # never commit` (line 129). Both are example env-var assignments instructing operators where to paste THEIR own credentials at deploy time. Neither is a working secret. The Splunk doc even instructs generating the companion webhook secret with `openssl rand -hex 32` (line 48), reinforcing that nothing real is committed.",
+      "rootCause": "Generic-API-key entropy/regex rules in gitleaks match any quoted token-shaped string, including documentation placeholders, producing false positives.",
+      "evidence": "SPLUNK.md:46  `export SPLUNK_HEC_TOKEN=\"00112233-4455-6677-8899-aabbccddeeff\"`\nTENABLE.md:128-129  `export TENABLE_ACCESS_KEY=\"abc123def456...\"\nexport TENABLE_SECRET_KEY=\"...\"   # never commit`",
+      "impact": "None. The strings are non-functional examples; using them against a real Splunk HEC or Tenable.sc endpoint would fail authentication. No secret is exposed.",
+      "reproduction": "N/A — verified by reading the surrounding documentation context confirming these are placeholder values in a setup guide.",
+      "resolution": "No remediation required. Optionally add these fingerprints to a gitleaks allowlist (.gitleaks.toml) to suppress recurring noise, or change the doc placeholders to an unmistakable form such as `<your-hec-token>` to avoid future scanner hits.",
+      "patchBefore": "export SPLUNK_HEC_TOKEN=\"00112233-4455-6677-8899-aabbccddeeff\"\nexport TENABLE_ACCESS_KEY=\"abc123def456...\"",
+      "patchAfter": "export SPLUNK_HEC_TOKEN=\"<your-splunk-hec-token>\"\nexport TENABLE_ACCESS_KEY=\"<your-tenable-access-key>\"",
+      "effort": "S",
+      "references": [
+        "CWE-798: Use of Hard-coded Credentials",
+        "gitleaks rule: generic-api-key (false positive)",
+        "OWASP Top 10 2021 A05: Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-LEAK-002",
+      "title": "Gitleaks: 'grc.*.v1' strings are localStorage persistence keys, not secrets (false positive, 16 hits)",
+      "phase": "Security",
+      "category": "Hard-coded Credentials (A05) / CWE-798 — false positive",
+      "severity": "Info",
+      "cvss": "No risk — application namespace identifiers, not credentials",
+      "file": "tss-grc-ui-v2/src/lib/platformPersistence.ts",
+      "lines": "194-262",
+      "locations": [
+        "tss-grc-ui-v2/src/lib/mfa.ts:8",
+        "tss-grc-ui-v2/src/lib/persistence.ts:206",
+        "tss-grc-ui-v2/src/lib/persistence.ts:236",
+        "tss-grc-ui-v2/src/lib/bcmLifecycle.ts:202",
+        "tss-grc-ui-v2/src/lib/cyberLifecycle.ts:216",
+        "tss-grc-ui-v2/src/lib/cyberLifecycle.ts:221",
+        "tss-grc-ui-v2/src/lib/processorAssessments.ts:69",
+        "tss-grc-ui-v2/src/lib/processorAssessments.ts:71",
+        "tss-grc-ui-v2/src/lib/whiteLabel.ts:43",
+        "tss-grc-ui-v2/src/lib/whiteLabel.ts:44",
+        "tss-grc-ui-v2/src/lib/riskLifecycle.ts:162",
+        "tss-grc-ui-v2/src/lib/riskLifecycle.ts:164",
+        "tss-grc-ui-v2/src/lib/workflowChains.ts:265",
+        "tss-grc-ui-v2/src/lib/platformPersistence.ts:194",
+        "tss-grc-ui-v2/src/lib/platformPersistence.ts:212",
+        "tss-grc-ui-v2/src/lib/platformPersistence.ts:218",
+        "tss-grc-ui-v2/src/lib/platformPersistence.ts:262"
+      ],
+      "description": "Sixteen of the twenty-one gitleaks hits are dotted, versioned string constants of the form `grc.<module>.<thing>.v1` (e.g. `grc.mfa.enrolment.v1`, `grc.risk.treatment.v1`, `grc.cyber.filing.v1`, `grc.whitelabel.v1`, `c5BreachNotification`). The entropy-based generic-api-key rule matched them. On inspection every one is a browser localStorage key name used by the frontend persistence layer. persistence.ts defines a `PERSISTENCE_REGISTRY` (lines 204+) listing these keys with human labels and a `backendReady` flag; mfa.ts line 8 (`const KEY = 'grc.mfa.enrolment.v1'`) and the lifecycle modules use them as storage keys for client-side state. They are public, non-secret application identifiers — they grant no access and protect nothing.",
+      "rootCause": "Versioned dotted identifiers have enough character variety to trip the generic-API-key entropy heuristic, even though they are namespace strings rather than credentials.",
+      "evidence": "mfa.ts:8  `const KEY = 'grc.mfa.enrolment.v1';`\npersistence.ts:206  `key: 'grc.chains.fires.v1',` (inside PERSISTENCE_REGISTRY, with labelEn 'Cross-module chain fires')\nplatformPersistence.ts:194  `localKey: 'grc.risk.treatment.v1',`",
+      "impact": "None. These keys are inherently visible in any browser's devtools (Application > Local Storage); they convey no authorization and reveal no sensitive data.",
+      "reproduction": "N/A — verified by opening each cited file; every match is a localStorage key constant / registry entry.",
+      "resolution": "No remediation required. Suppress via a gitleaks allowlist regex such as `grc\\.[a-z.]+\\.v\\d+` (and the `c5*/c7*` assessment-criterion keys) in .gitleaks.toml to remove this recurring false-positive class.",
+      "patchBefore": "# .gitleaks.toml — no allowlist for app namespace keys (current state)",
+      "patchAfter": "# .gitleaks.toml\n[allowlist]\nregexes = [\n  '''grc\\.[a-z0-9.]+\\.v\\d+''',   # frontend localStorage key namespace\n]",
+      "effort": "S",
+      "references": [
+        "CWE-798: Use of Hard-coded Credentials (false positive)",
+        "gitleaks rule: generic-api-key (false positive)"
+      ]
+    },
+    {
+      "id": "SEC-LEAK-003",
+      "title": "Gitleaks: open-banking FAPI 'client' values are OAuth client identifiers in demo seed, not secrets",
+      "phase": "Security",
+      "category": "Hard-coded Credentials (A05) / CWE-798 — false positive",
+      "severity": "Info",
+      "cvss": "No risk — public OAuth client_id in non-production seed data; no paired client_secret committed",
+      "file": "setup_openbanking_seed.py",
+      "lines": "35-53",
+      "locations": [
+        "setup_openbanking_seed.py:185"
+      ],
+      "description": "Gitleaks flagged `fapi_client=\"lean-prod-aspsp1-2024\"` (line 185) as a generic API key. Tracing the parameter: `insert_tpp(...)` (signature line 35) writes `fapi_client` into the `fapi_client_id` column (INSERT column list, line 46). It is therefore an OAuth/FAPI client_id — a public identifier for a Third-Party Provider, not a credential. The value lives in `setup_openbanking_seed.py`, an idempotent demo-data seeding script that populates illustrative TPPs (Lean, Tarabut, Drahim, etc.) for the three demo tenants. There is no `client_secret`/private-key column in the insert and none is committed anywhere in the file (grep for client_secret/fapi_secret returns nothing). A FAPI client_id without its private key or mTLS cert grants no access.",
+      "rootCause": "An OAuth client identifier in seed data matched the entropy-based generic-api-key rule; the rule cannot distinguish a public client_id from a secret.",
+      "evidence": "setup_openbanking_seed.py:46  `\" sama_licence_ref, fapi_client_id, roles, country, status, \"`\nsetup_openbanking_seed.py:185  `sama_licence=\"SAMA-OB-AISP-2022-001\", fapi_client=\"lean-prod-aspsp1-2024\",`  (passed to insert_tpp -> fapi_client_id column)",
+      "impact": "None. Client identifiers are non-secret by OAuth design and these are fabricated demo TPP records for non-production tenants. No authentication material (client secret, signing key, mTLS cert) is exposed.",
+      "reproduction": "N/A — verified by reading the insert_tpp definition and confirming the value maps to fapi_client_id and that no secret column exists in the script.",
+      "resolution": "No remediation required. The value is correctly an identifier, not a secret. Optionally allowlist this fingerprint in .gitleaks.toml. Ensure that when LIVE open-banking integration is configured, the real FAPI client secrets / private keys are externalised (env / secret manager) and never committed — consistent with the prod-profile externalised-secrets posture.",
+      "patchBefore": "lean = insert_tpp(\n    org, \"TPP-LEAN-001\", \"Lean Technologies KSA\", ...,\n    sama_licence=\"SAMA-OB-AISP-2022-001\", fapi_client=\"lean-prod-aspsp1-2024\", ...)",
+      "patchAfter": "# unchanged — fapi_client is a public OAuth client_id (demo seed).\n# Real client secrets are never seeded; they are env-sourced in LIVE mode.",
+      "effort": "S",
+      "references": [
+        "CWE-798: Use of Hard-coded Credentials (false positive)",
+        "RFC 6749 Section 2.2: client identifiers are not confidential",
+        "gitleaks rule: generic-api-key (false positive)"
+      ]
+    }
+  ]
+}

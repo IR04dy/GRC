@@ -1,0 +1,206 @@
+{
+  "findings": [
+    {
+      "id": "LH-01",
+      "title": "Critical-path module pages eagerly imported in App.tsx defeat code-splitting on the public /login route",
+      "phase": "UX",
+      "category": "Performance / Bundle size",
+      "severity": "High",
+      "cvss": "Not a CVE. Performance/UX impact: the public, unauthenticated login screen downloads and parses the JS for nine authenticated module landing pages (Risk, Cyber, BCM, Privacy, Compliance, TPRM, Incidents, Evidence, SCM) that a logged-out user can never reach. Lighthouse Performance category = 0.38 (38/100). High because it inflates Time-to-Interactive for every first-time visitor and every logged-out user, and the fix is squarely in app code (App.tsx import strategy).",
+      "file": "tss-grc-ui-v2/src/App.tsx",
+      "lines": "7-18,167",
+      "locations": [
+        "tss-grc-ui-v2/src/App.tsx:8-18 (eager critical-path imports)",
+        "tss-grc-ui-v2/src/App.tsx:167 (eager import { ScmPage })",
+        "audit/raw/lighthouse-login.report.json audits.total-byte-weight",
+        "audit/raw/lighthouse-login.report.json audits.unused-javascript"
+      ],
+      "description": "App.tsx splits routes into a lazy()/Suspense set (the bulk of the file, ~hundreds of lazy chunks) but deliberately keeps the heavy module landing pages eager: LoginPage, DashboardPage, SettingsPage, RiskRegisterPage, CyberPage, BcmWorkspacePage, PrivacyPage, CompliancePage, TprmPage, IncidentsPage, EvidencePage (lines 8-18) and ScmPage (line 167). Because these are top-level static `import` statements, the bundler/dev-server folds them into the entry graph that loads on EVERY route — including /login. Lighthouse confirms it: on /login the byte-weight report lists src/App.tsx, src/pages/compliance/CompliancePage.tsx, src/pages/scm/ScmPage.tsx, src/pages/cyber/CyberPage.tsx and src/pages/tprm/TprmPage.tsx as downloaded resources, and unused-javascript attributes 108 KiB (Compliance), 95 KiB (TPRM), 93 KiB (SCM), 82 KiB (Cyber), 63 KiB (Evidence), 56 KiB (Risk) of wasted bytes to exactly these pages — proof their code shipped to the login page but went unexecuted. The /login navigation issued 196 network requests (182 to localhost:5173).",
+      "rootCause": "The comment at App.tsx:7 ('Critical-path pages (sidebar landings + login + dashboard) stay eager') treats authenticated module landings as critical path for ALL routes. They are critical for the authenticated shell, but not for /login. Eager top-level imports cannot be tree-shaken away from the entry chunk that the login route also loads.",
+      "evidence": "audit/raw/lighthouse-login.report.json: categories.performance.score=0.38; audits.total-byte-weight: 'Total size was 12,119 KiB', items include CompliancePage.tsx (337,307 B), ScmPage.tsx (289,426 B), CyberPage.tsx (286,941 B), TprmPage.tsx (258,133 B) all on /login. audits.unused-javascript displayValue 'Est savings of 1,742 KiB' with per-page waste: CompliancePage 108,588 B, TprmPage 95,159 B, ScmPage 93,529 B, CyberPage 82,234 B. audits.network-requests = 196 total / 182 to localhost:5173. App.tsx:8-18 static imports; App.tsx:167 `import { ScmPage } from './pages/scm/ScmPage';`.",
+      "impact": "Every first-time and logged-out visitor downloads ~1.7 MiB of authenticated-only module code that is never executed on /login, inflating parse/compile time and contributing to the catastrophic FCP/LCP/TTI on this route. Highest-impact lever to move the Performance score off 38.",
+      "reproduction": "1. Serve the v2 UI (vite, port 5173). 2. Run Lighthouse mobile against http://localhost:5173/login. 3. Open the Treemap / byte-weight & unused-javascript audits and observe authenticated module pages (Compliance/SCM/Cyber/TPRM/Risk/Evidence) listed as resources loaded on the login page. Reproduced in audit/raw/lighthouse-login.report.json.",
+      "resolution": "Move the authenticated module landing pages to lazy() like every other route. Only LoginPage (and any genuinely public pages) should be eager. Each lazy page becomes its own chunk fetched on first navigation after auth, so /login no longer pulls them. Optionally split the auth shell (eager) from the marketing/login shell so the entry chunk for unauthenticated routes is minimal.",
+      "patchBefore": "import { LoginPage } from './pages/LoginPage';\nimport { DashboardPage } from './pages/DashboardPage';\nimport { SettingsPage } from './pages/SettingsPage';\nimport { RiskRegisterPage } from './pages/risk/RiskRegisterPage';\nimport { CyberPage } from './pages/cyber/CyberPage';\nimport { BcmWorkspacePage } from './pages/bcm/BcmWorkspacePage';\nimport { PrivacyPage } from './pages/privacy/PrivacyPage';\nimport { CompliancePage } from './pages/compliance/CompliancePage';\nimport { TprmPage } from './pages/tprm/TprmPage';\nimport { IncidentsPage } from './pages/incidents/IncidentsPage';\nimport { EvidencePage } from './pages/evidence/EvidencePage';\n// ...\nimport { ScmPage } from './pages/scm/ScmPage';",
+      "patchAfter": "// Only the public login page stays eager.\nimport { LoginPage } from './pages/LoginPage';\n// Authenticated module landings become lazy chunks (fetched post-auth, NOT on /login):\nconst DashboardPage   = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));\nconst SettingsPage    = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));\nconst RiskRegisterPage= lazy(() => import('./pages/risk/RiskRegisterPage').then(m => ({ default: m.RiskRegisterPage })));\nconst CyberPage       = lazy(() => import('./pages/cyber/CyberPage').then(m => ({ default: m.CyberPage })));\nconst BcmWorkspacePage= lazy(() => import('./pages/bcm/BcmWorkspacePage').then(m => ({ default: m.BcmWorkspacePage })));\nconst PrivacyPage     = lazy(() => import('./pages/privacy/PrivacyPage').then(m => ({ default: m.PrivacyPage })));\nconst CompliancePage  = lazy(() => import('./pages/compliance/CompliancePage').then(m => ({ default: m.CompliancePage })));\nconst TprmPage        = lazy(() => import('./pages/tprm/TprmPage').then(m => ({ default: m.TprmPage })));\nconst IncidentsPage   = lazy(() => import('./pages/incidents/IncidentsPage').then(m => ({ default: m.IncidentsPage })));\nconst EvidencePage    = lazy(() => import('./pages/evidence/EvidencePage').then(m => ({ default: m.EvidencePage })));\nconst ScmPage         = lazy(() => import('./pages/scm/ScmPage').then(m => ({ default: m.ScmPage })));",
+      "effort": "M",
+      "references": [
+        "https://web.dev/articles/code-splitting-suspense",
+        "https://react.dev/reference/react/lazy",
+        "https://developer.chrome.com/docs/lighthouse/performance/unused-javascript/"
+      ]
+    },
+    {
+      "id": "LH-02",
+      "title": "Both full-language translation dictionaries (ar.ts ~1.05 MiB + en.ts ~0.84 MiB) statically imported and shipped to /login",
+      "phase": "UX",
+      "category": "Performance / Bundle size",
+      "severity": "High",
+      "cvss": "Not a CVE. Performance impact: i18n.tsx statically imports both the Arabic and English translation files, so ~1.9 MiB (uncompressed, dev) of string data loads on every route including the public login page, where only one locale is needed. Two of the three largest resources on /login are these files. High because it is a large, ever-growing payload on the critical path with a clean lazy-loading fix.",
+      "file": "tss-grc-ui-v2/src/lib/i18n.tsx",
+      "lines": "2-3",
+      "locations": [
+        "tss-grc-ui-v2/src/lib/i18n.tsx:2 (import { en } from '../translations/en')",
+        "tss-grc-ui-v2/src/lib/i18n.tsx:3 (import { ar } from '../translations/ar')",
+        "tss-grc-ui-v2/src/translations/ar.ts",
+        "tss-grc-ui-v2/src/translations/en.ts",
+        "audit/raw/lighthouse-login.report.json audits.total-byte-weight"
+      ],
+      "description": "i18n.tsx (lines 2-3) does `import { en } from '../translations/en'` and `import { ar } from '../translations/ar'` at module scope. Both dictionaries are bundled into the eager i18n provider, which the app shell mounts on every route. On /login, Lighthouse byte-weight lists src/translations/ar.ts (1,076,314 B) and src/translations/en.ts (860,108 B) as the #2 and #4 largest resources downloaded — together ~1.84 MiB. A login page that renders a single locale only needs one of them, and a freshly logged-out user needs only the strings on the login form.",
+      "rootCause": "Static (eager) import of both locale bundles in the i18n provider. There is no dynamic-import-per-locale or split between login-shell strings and the full module-string corpus, so the entire translation corpus for both languages is on the initial critical path.",
+      "evidence": "audit/raw/lighthouse-login.report.json audits.total-byte-weight.items: {url: '.../src/translations/ar.ts', totalBytes: 1076314} and {url: '.../src/translations/en.ts', totalBytes: 860108}. On disk: ar.ts = 417,903 bytes source, en.ts = 325,194 bytes source (dev-served + sourcemap inflates the transferred size). i18n.tsx:2-3 static imports confirm both are eager.",
+      "impact": "~1.9 MiB of translation strings (dev) load on the public login page regardless of active locale; the figure grows with every new module's strings. Even after minification/gzip in prod this is a large, monotonically growing payload that blocks an already-slow login render.",
+      "reproduction": "1. Open the byte-weight / treemap audit in audit/raw/lighthouse-login.report.json. 2. Observe ar.ts and en.ts as the 2nd and 4th largest resources on /login. 3. Confirm i18n.tsx imports both statically at lines 2-3.",
+      "resolution": "Load only the active locale, lazily. Replace the two static imports with dynamic imports keyed on the current locale and await them in the provider (with a small synchronous fallback set for the very first paint). Longer term, split each locale dictionary by module/namespace so a route only fetches the strings it renders, and ship login-form strings in a tiny always-loaded base namespace.",
+      "patchBefore": "import { en } from '../translations/en';\nimport { ar } from '../translations/ar';\n// ... provider uses `en` / `ar` synchronously",
+      "patchAfter": "// Load only the active locale on demand; keep a tiny base namespace for first paint.\nconst loaders = {\n  en: () => import('../translations/en').then(m => m.en),\n  ar: () => import('../translations/ar').then(m => m.ar),\n};\n// inside the provider:\nconst [dict, setDict] = useState<Dict | null>(null);\nuseEffect(() => { loaders[locale]().then(setDict); }, [locale]);\n// render base strings until `dict` resolves, then swap in the full locale.",
+      "effort": "M",
+      "references": [
+        "https://web.dev/articles/i18n",
+        "https://developer.chrome.com/docs/lighthouse/performance/total-byte-weight/",
+        "https://react.dev/reference/react/lazy"
+      ]
+    },
+    {
+      "id": "LH-03",
+      "title": "Catastrophic Core Web Vitals on /login: FCP 37.4 s, LCP 72.3 s, Speed Index 37.4 s, TTI 72.3 s",
+      "phase": "UX",
+      "category": "Performance / Core Web Vitals",
+      "severity": "High",
+      "cvss": "Not a CVE. UX impact: every Core Web Vitals timing metric on /login scores 0 — FCP 37.4 s, LCP 72.3 s, Speed Index 37.4 s, Time-to-Interactive 72.3 s — driving the Performance category to 0.38. These are far beyond any usable threshold (good FCP < 1.8 s, good LCP < 2.5 s). High, with the caveat that absolute values are inflated by the Vite dev server (unbundled, on-demand compilation) and a local Kaspersky AV script injection; a production build will be dramatically faster, but the structural causes (LH-01/LH-02, 196 requests) are real.",
+      "file": "audit/raw/lighthouse-login.report.json",
+      "lines": "76-100",
+      "locations": [
+        "audit/raw/lighthouse-login.report.json audits.first-contentful-paint",
+        "audit/raw/lighthouse-login.report.json audits.largest-contentful-paint",
+        "audit/raw/lighthouse-login.report.json audits.speed-index",
+        "audit/raw/lighthouse-login.report.json audits.interactive"
+      ],
+      "description": "All paint/interactivity metrics fail with score 0. FCP = 37,409 ms (37.4 s), LCP = 72,262 ms (72.3 s), Speed Index = 37,409 ms, Time-to-Interactive = 72,262 ms. The root cause is the combination of (a) 196 network requests on a single page navigation — 182 to localhost:5173, because the Vite dev server serves each TS/TSX module as a separate, on-demand-transpiled ESM request rather than a bundle; (b) the ~1.7 MiB of eager authenticated-module JS (LH-01) and ~1.9 MiB of dual-locale translations (LH-02) that load before first paint; and (c) a render-blocking third-party script injected by local Kaspersky AV (~2.1 s blocking, see LH-05). Notably Total Blocking Time is only 40 ms and main-thread work 1.2 s — the wall-clock latency is dominated by the request waterfall and dev-server compile latency, not CPU.",
+      "rootCause": "Measured against the Vite dev server (no production bundle), so the metrics reflect on-demand module compilation plus an unbundled ESM request waterfall (182 localhost requests) amplified by the eager-import bloat (LH-01, LH-02) and an injected blocking AV script. Dev mode inflates the absolute numbers, but the eager-import/translation-bundle/request-count problems persist in any environment.",
+      "evidence": "audit/raw/lighthouse-login.report.json: first-contentful-paint numericValue 37409.26 ms / displayValue '37.4 s' / score 0; largest-contentful-paint 72262.21 ms / '72.3 s' / score 0; speed-index 37409.26 ms / score 0; interactive 72262.21 ms / score 0; total-blocking-time 43.5 ms (score 1); mainthread-work-breakdown 1195.5 ms (score 1); network-requests count 196 (182 localhost). categories.performance.score 0.38.",
+      "impact": "If these timings held in production, the login page would be effectively unusable (over a minute to interactivity). Even discounting the dev-server inflation, the 196-request waterfall and multi-MiB eager payload guarantee a slow first render for real users on mobile/slow networks.",
+      "reproduction": "1. Run Lighthouse (mobile, simulated throttling) against http://localhost:5173/login on the Vite dev server. 2. Read the metrics block. Captured verbatim in audit/raw/lighthouse-login.report.json. For a representative production number, build (`vite build`), serve the static output, and re-run.",
+      "resolution": "Two-track. (1) Re-measure against a production build served statically — this alone removes the dev-server compile latency and collapses the 182-request module waterfall into a handful of hashed bundles, which will move FCP/LCP by an order of magnitude. (2) Land LH-01 and LH-02 so the production entry chunk for /login is minimal, and add `build.rollupOptions.output.manualChunks` to split vendor (react, react-router, lucide-react) from app code for better caching. Re-run Lighthouse to validate the Performance score recovers.",
+      "patchBefore": "// vite.config.ts build block — no chunking strategy, metrics taken against dev server\nbuild: {\n  sourcemap: true,\n  target: 'es2022',\n},",
+      "patchAfter": "build: {\n  sourcemap: true,\n  target: 'es2022',\n  rollupOptions: {\n    output: {\n      manualChunks: {\n        'react-vendor': ['react', 'react-dom', 'react-router-dom'],\n        'icons': ['lucide-react'],\n      },\n    },\n  },\n},\n// And run Lighthouse against `vite preview` / a static host, not the dev server.",
+      "effort": "M",
+      "references": [
+        "https://web.dev/articles/fcp",
+        "https://web.dev/articles/lcp",
+        "https://web.dev/articles/tti",
+        "https://vite.dev/guide/build"
+      ]
+    },
+    {
+      "id": "LH-04",
+      "title": "Cumulative Layout Shift 0.344 on /login — 6 layout shifts during load",
+      "phase": "UX",
+      "category": "Performance / Visual stability",
+      "severity": "Medium",
+      "cvss": "Not a CVE. UX impact: CLS = 0.344 fails Google's 'good' threshold (< 0.1) and even the 'needs improvement' ceiling (0.25); 6 discrete layout shifts occur while the login page loads. Medium because it degrades perceived stability and can cause mis-clicks on the login form, but it is visual rather than blocking.",
+      "file": "audit/raw/lighthouse-login.report.json",
+      "lines": "0",
+      "locations": [
+        "audit/raw/lighthouse-login.report.json audits.cumulative-layout-shift",
+        "audit/raw/lighthouse-login.report.json audits.layout-shifts",
+        "tss-grc-ui-v2/src/pages/LoginPage.tsx"
+      ],
+      "description": "Cumulative Layout Shift is 0.344 (score 0.32) and the layout-shifts audit reports '6 layout shifts found' (score 0). Content reflows as late chunks/fonts/translations resolve — consistent with the staggered arrival of the dual-locale translation dictionaries (LH-02) and the on-demand dev-server module waterfall, which let the login form render against incomplete strings/styles and then jump as resources land.",
+      "rootCause": "Elements (login form, header/brand, localized text) render before their final content/dimensions are known, then shift when async resources (translations, fonts, late JS) resolve. No reserved space (explicit dimensions / min-height / skeleton) for the shifting regions, and locale strings swap in after first paint.",
+      "evidence": "audit/raw/lighthouse-login.report.json: cumulative-layout-shift numericValue 0.34425702372849826 / displayValue '0.344' / score 0.32; layout-shifts displayValue '6 layout shifts found' / score 0; cls-culprits-insight score 0.",
+      "impact": "Form fields and buttons move under the user during the multi-second load, risking accidental focus loss or mis-clicks on the credential fields and submit button; degrades the professional feel of the first screen users see.",
+      "reproduction": "1. Lighthouse /login run, open the CLS and 'Avoid large layout shifts' audits in audit/raw/lighthouse-login.report.json. 2. Observe CLS 0.344 and 6 shift events.",
+      "resolution": "Reserve space for late-arriving content: give the login card/brand fixed dimensions or a min-height; preload the brand/logo image and set explicit width/height; show a skeleton matching final layout while translations resolve; ensure web fonts use `font-display: optional/swap` with size-adjust metrics to avoid reflow. Once LH-02 ships a base login-string namespace synchronously, the locale-swap shift disappears.",
+      "patchBefore": "/* Login card renders with intrinsic height; localized labels swap in after first paint, causing reflow */\n<div className=\"login-card\"> ... </div>",
+      "patchAfter": "/* Reserve space so async strings/fonts/logo don't reflow the form */\n<div className=\"login-card\" style={{ minHeight: 480 }}> ... </div>\n/* and on the logo: <img src=... width={160} height={48} /> */",
+      "effort": "S",
+      "references": [
+        "https://web.dev/articles/cls",
+        "https://web.dev/articles/optimize-cls",
+        "https://developer.chrome.com/docs/lighthouse/performance/layout-shifts/"
+      ]
+    },
+    {
+      "id": "LH-05",
+      "title": "Insecure (HTTP) requests and render-blocking script from local Kaspersky AV injection on the login page",
+      "phase": "UX",
+      "category": "Best Practices / Security posture (environmental)",
+      "severity": "Low",
+      "cvss": "Not a CVE in the app. Best-Practices impact: is-on-https scores 0 ('6 insecure requests found') and the render-blocking-insight attributes ~2.1 s of blocking to an injected http:// script. All six insecure requests are to gc.kis.v2.scr.kaspersky-labs.com — a local Kaspersky antivirus extension man-in-the-middling the page, NOT app-served content. Low because it is an artifact of the test machine's AV, not the application; however it documents that the app is served over plain HTTP in this environment, which is a real prod-readiness concern.",
+      "file": "audit/raw/lighthouse-login.report.json",
+      "lines": "20-67",
+      "locations": [
+        "audit/raw/lighthouse-login.report.json audits.is-on-https",
+        "audit/raw/lighthouse-login.report.json audits.render-blocking-insight"
+      ],
+      "description": "The is-on-https audit lists 6 insecure (http://) requests, all to gc.kis.v2.scr.kaspersky-labs.com (Kaspersky's local web-shield injects scripts into pages). The render-blocking-insight audit (Est savings 1,050 ms) and unused-javascript both implicate the same injected main.js (~201 KB, 2,104 ms blocking). These are introduced by the auditor's machine, not the application bundle. Separately, the app itself is served over http://localhost:5173 in dev with no HTTPS, which is acceptable for local dev but must be HTTPS in staging/prod (CLAUDE.md notes prod uses SSL/PKCS12).",
+      "rootCause": "Local Kaspersky antivirus browser integration injects its own HTTP scripts and beacons into every page it scans; Lighthouse counts them against the page. The underlying app is plain HTTP in the dev profile.",
+      "evidence": "audit/raw/lighthouse-login.report.json is-on-https: score 0, displayValue '6 insecure requests found', all items url host = gc.kis.v2.scr.kaspersky-labs.com. render-blocking-insight: displayValue 'Est savings of 1,050 ms', top item url = http://gc.kis.v2.scr.kaspersky-labs.com/.../main.js, wastedMs 2104, totalBytes 201599. network-requests: 6 of 196 are kaspersky.",
+      "impact": "On the audited machine the AV script blocks rendering for ~2.1 s and triggers the HTTPS failure, distorting the Best-Practices score (0.77) and the timing metrics. It does not affect end users who lack this AV, but it inflates the audit and masks the app's true numbers. The real, app-attributable point is that the app must be served over HTTPS outside dev.",
+      "reproduction": "1. Inspect is-on-https and render-blocking-insight in audit/raw/lighthouse-login.report.json; note every insecure/blocking third-party URL is kaspersky-labs.com. 2. Re-run Lighthouse on a machine without Kaspersky web-shield, or in an incognito profile with extensions disabled, and these 6 requests + the blocking script disappear.",
+      "resolution": "Re-run the audit on a clean profile (no AV script injection, extensions disabled) to get representative Best-Practices/timing numbers. Confirm prod is served strictly over HTTPS (the prod profile already mandates SSL/PKCS12 per CLAUDE.md) and add a strict Content-Security-Policy + HSTS so injected http scripts are blocked in production. No change to the login page code is required for the AV artifact itself.",
+      "patchBefore": "# Audited on a workstation with Kaspersky web-shield active; app served over http://localhost:5173 (dev).",
+      "patchAfter": "# Re-audit with `--chrome-flags=\"--disable-extensions\"` on a clean profile;\n# enforce HTTPS + HSTS + CSP in staging/prod (prod profile already uses PKCS12 SSL).",
+      "effort": "S",
+      "references": [
+        "https://developer.chrome.com/docs/lighthouse/pwa/is-on-https/",
+        "https://web.dev/articles/render-blocking-resources",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security"
+      ]
+    },
+    {
+      "id": "LH-06",
+      "title": "Console error on /login: favicon.ico returns 404 (errors-in-console audit fails)",
+      "phase": "UX",
+      "category": "Best Practices",
+      "severity": "Low",
+      "cvss": "Not a CVE. Best-Practices impact: the errors-in-console audit scores 0 because the browser logs a failed request — GET /favicon.ico returns 404 (Not Found). Low: cosmetic and a noisy console entry, but it contributes to the Best-Practices score (0.77) and signals a missing static asset / favicon link.",
+      "file": "tss-grc-ui-v2/index.html",
+      "lines": "1-22",
+      "locations": [
+        "audit/raw/lighthouse-login.report.json audits.errors-in-console",
+        "tss-grc-ui-v2/index.html (no <link rel=\"icon\"> declared)"
+      ],
+      "description": "errors-in-console fails (score 0) with a single logged error: 'Failed to load resource: the server responded with a status of 404 (Not Found)' for http://localhost:5173/favicon.ico. index.html declares no <link rel=\"icon\"> and there is no favicon.ico at the web root / public dir (public/ contains brand/ and sw.js but no favicon.ico), so the browser's default /favicon.ico probe 404s and logs an error.",
+      "rootCause": "No favicon is provided at the default location and index.html does not declare an icon link, so the browser's implicit /favicon.ico request 404s. A brand/ directory exists under public/ but is not wired to a favicon link.",
+      "evidence": "audit/raw/lighthouse-login.report.json errors-in-console: score 0, items[0] = {source: 'network', description: 'Failed to load resource: the server responded with a status of 404 (Not Found)', sourceLocation.url: 'http://localhost:5173/favicon.ico'}. tss-grc-ui-v2/index.html head contains <title>, charset, viewport, theme-color but no icon link. public/ listing: brand/, sw.js (no favicon.ico).",
+      "impact": "Every page load logs a 404 error in the console (noise that hides real errors during debugging) and the tab shows no favicon. Counts against the Best-Practices category score.",
+      "reproduction": "1. Open audit/raw/lighthouse-login.report.json errors-in-console — note the /favicon.ico 404. 2. Load http://localhost:5173/login in a browser and check DevTools Console / Network for the 404 on favicon.ico.",
+      "resolution": "Add a favicon asset (e.g. public/favicon.ico or an SVG from the existing public/brand/ set) and declare it in index.html with <link rel=\"icon\">. This removes the 404 and the console error.",
+      "patchBefore": "    <title>TSS GRC Platform</title>\n    <!-- no icon link; browser probes /favicon.ico -> 404 -->",
+      "patchAfter": "    <title>TSS GRC Platform</title>\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/brand/logo.svg\" />\n    <!-- or place a real /public/favicon.ico -->",
+      "effort": "S",
+      "references": [
+        "https://developer.chrome.com/docs/lighthouse/best-practices/errors-in-console/",
+        "https://developer.mozilla.org/en-US/docs/Glossary/Favicon"
+      ]
+    },
+    {
+      "id": "LH-07",
+      "title": "Missing meta description on /login (SEO audit fails; SEO category 0.82)",
+      "phase": "UX",
+      "category": "SEO / Discoverability",
+      "severity": "Low",
+      "cvss": "Not a CVE. SEO impact: the meta-description audit scores 0 — index.html declares no <meta name=\"description\">, so the SEO category sits at 0.82. Low for an authenticated GRC tool (the login page is not a public marketing surface), but trivially fixable and improves how the app is represented if ever linked/crawled.",
+      "file": "tss-grc-ui-v2/index.html",
+      "lines": "3-9",
+      "locations": [
+        "audit/raw/lighthouse-login.report.json audits.meta-description",
+        "tss-grc-ui-v2/index.html head"
+      ],
+      "description": "meta-description scores 0: index.html's <head> contains charset, viewport, theme-color and <title>TSS GRC Platform</title> but no <meta name=\"description\">. Lighthouse SEO category is 0.82, with meta-description (and the environmental robots-txt audit, which reports 27 errors but is not under app control on localhost) as the contributors.",
+      "rootCause": "No description meta tag authored in the single static index.html shell.",
+      "evidence": "audit/raw/lighthouse-login.report.json meta-description: score 0. categories.seo.score 0.82. tss-grc-ui-v2/index.html head (lines 3-9) has <title> and theme-color but no <meta name=\"description\">.",
+      "impact": "Search engines and link-preview unfurlers have no summary text for the app; minor for an internal/authenticated platform but it caps the SEO score and looks unfinished in any preview card.",
+      "reproduction": "1. Open audit/raw/lighthouse-login.report.json meta-description (score 0). 2. Inspect tss-grc-ui-v2/index.html and confirm no description meta tag.",
+      "resolution": "Add a concise <meta name=\"description\"> to index.html describing the platform.",
+      "patchBefore": "    <meta name=\"theme-color\" content=\"#0E5E5E\" />\n    <title>TSS GRC Platform</title>",
+      "patchAfter": "    <meta name=\"theme-color\" content=\"#0E5E5E\" />\n    <meta name=\"description\" content=\"TSS GRC Platform — bilingual (Arabic/English) Governance, Risk & Compliance for Saudi Arabia and MENA.\" />\n    <title>TSS GRC Platform</title>",
+      "effort": "S",
+      "references": [
+        "https://developer.chrome.com/docs/lighthouse/seo/meta-description/"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "findings": [
+    {
+      "id": "SEC-ESG-001",
+      "title": "Sustainability (/api/sustainability/**) endpoints have no function-level authorization — every write/delete/approve is guarded only by isAuthenticated()",
+      "phase": "Security",
+      "category": "Broken Access Control (A01) — BFLA / CWE-862 Missing Authorization",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:L) — any authenticated low-privilege user can mutate/approve/delete regulated ESG disclosure data",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/sust/ghg/controller/GhgEmissionRecordController.java",
+      "lines": "40-102",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/annex/controller/SustainabilityAnnexController.java:38-138",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/evidence/controller/SustainabilityEvidenceController.java:28-92",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/metrics/controller/EsgMetricController.java:28-89",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/settings/controller/OrganisationSettingsController.java:28-40",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/cma/controller/CmaDisclosureController.java:44-124",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/materiality/controller/MaterialTopicController.java:27-88",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/sgi/controller/SgiCommitmentController.java:40-103",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/tcfd/controller/TcfdItemController.java:26-107",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/capa/controller/CorrectiveActionController.java:43-115",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/climate/controller/ClimateRiskOpportunityController.java:32-101",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/dashboard/controller/SustainabilityDashboardController.java:27-31"
+      ],
+      "description": "Every endpoint in the older Sustainability slices (annex/reports, evidence, GHG inventory, ESG metrics, org settings, CMA disclosures, materiality, SGI commitments, TCFD items, corrective actions, climate-risks, dashboard) is annotated only with @PreAuthorize(\"isAuthenticated()\"). The platform's established authorization model is method-level @PreAuthorize(\"hasPermission('MODULE','ACTION')\") with distinct READ / WRITE / DELETE granularity, resolved through ModulePermissionEvaluator against MODULE_ACTION authorities (see ControlController in the compliance module: READ on GET, WRITE on POST/PUT, DELETE on DELETE). The Sustainability controllers bypass that model entirely: read, create, update, delete, state-transition (submit/verify/approve/publish/archive/disclose), evidence approval, and even the org-wide settings reset are all reachable by ANY authenticated principal regardless of role — including a read-only AUDITOR, or a user provisioned for an unrelated module with zero ESG authorities. This is a textbook Broken Function Level Authorization (BFLA) gap. Note the inconsistency that proves it is an oversight rather than a design choice: the newer Sprint-11 climate controllers in the SAME module (FinancedEmissionsController, TcfdScenarioController, ClimateReportController under /api/v1/climate/**) DO apply proper hasAnyRole READ_GUARD / WRITE_GUARD separation, as do the AI governance controllers (/api/v1/ai/models/**). Data-layer multi-tenancy is intact (every service scopes by TenantContext org id), so this is a same-tenant privilege-escalation / integrity issue, not a cross-tenant leak.",
+      "rootCause": "The Sustainability slices were built with a placeholder guard (isAuthenticated()) and never upgraded to the platform's hasPermission('MODULE','ACTION') model. No SUST/ESG module permission was wired into the @PreAuthorize annotations, so role-based separation of read vs write vs administrative actions is absent.",
+      "evidence": "GhgEmissionRecordController.java:\n  @PostMapping(\"/{id}/approve\")\n  @PreAuthorize(\"isAuthenticated()\")          // <-- should be hasPermission('SUST','WRITE')/APPROVE\n  public GhgEmissionRecord approve(@PathVariable Long id) { return service.transition(id, \"APPROVED\"); }\n\nOrganisationSettingsController.java:\n  @PostMapping(\"/reset\")\n  @PreAuthorize(\"isAuthenticated()\")          // <-- org-wide settings reset open to any user\n  public OrganisationSettings reset() { return service.resetToDefaults(); }",
+      "impact": "Any authenticated user in the tenant — including read-only auditors, or accounts with no ESG entitlements — can fabricate, alter, approve, publish, or soft-delete the organisation's regulated sustainability disclosures (GHG inventory, CMA Articles 91-94, TCFD/IFRS-S2 items, SGI commitments, materiality matrix, corrective actions) and reset org-level thresholds. Because these feed regulator-ready exports (CMA, TCFD board pack), an unauthorised actor can push a falsified figure all the way to PUBLISHED, or destroy evidence — undermining the integrity and non-repudiation the GRC platform is supposed to provide.",
+      "reproduction": "1. Log in as a low-privilege user (e.g. the seeded `auditor` / Audit@12345, which carries only read authorities). 2. Obtain the Bearer token from /api/v1/auth/login. 3. curl -X POST http://localhost:8084/api/sustainability/ghg -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"reportingYear\":2025,\"scope\":1,\"category\":\"STATIONARY\",\"sourceNameEn\":\"forged\",\"emissionValueTco2e\":1}'  → 201 Created. 4. curl -X POST .../api/sustainability/ghg/{id}/submit then /verify then /approve → record reaches APPROVED. 5. curl -X POST .../api/sustainability/settings/reset → org thresholds wiped. All succeed despite the caller having no ESG/write role.",
+      "resolution": "Replace @PreAuthorize(\"isAuthenticated()\") on every Sustainability controller with the platform's hasPermission model: hasPermission('SUST','READ') on GET endpoints, hasPermission('SUST','WRITE') on POST/PUT and all state-transition/approval endpoints, and hasPermission('SUST','DELETE') on DELETE. Define the SUST_READ/SUST_WRITE/SUST_DELETE authorities and grant them to the appropriate roles (e.g. SUSTAINABILITY_OFFICER, CFO, RISK_MANAGER for write; AUDITOR read-only). Mirror the role-guard approach already used by the Sprint-11 climate controllers in the same module for consistency.",
+      "patchBefore": "@PostMapping(\"/{id}/approve\")\n@PreAuthorize(\"isAuthenticated()\")\npublic GhgEmissionRecord approve(@PathVariable Long id) { return service.transition(id, \"APPROVED\"); }",
+      "patchAfter": "@PostMapping(\"/{id}/approve\")\n@PreAuthorize(\"hasPermission('SUST','WRITE')\")\npublic GhgEmissionRecord approve(@PathVariable Long id) { return service.transition(id, \"APPROVED\"); }\n\n// and across the module:\n//   GET    -> @PreAuthorize(\"hasPermission('SUST','READ')\")\n//   POST/PUT/transition/approve/publish/reset -> hasPermission('SUST','WRITE')\n//   DELETE -> @PreAuthorize(\"hasPermission('SUST','DELETE')\")",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-285: Improper Authorization",
+        "OWASP API Security Top 10 2023 — API5:2023 Broken Function Level Authorization",
+        "OWASP Top 10 2021 — A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-ESG-002",
+      "title": "Separation-of-duties controls (CAPA verifier ≠ owner, evidence approver) are enforced against client-supplied name strings, not the authenticated principal",
+      "phase": "Security",
+      "category": "Broken Access Control / Business Logic (A01) — CWE-639 / CWE-602",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — bypass of segregation-of-duties / self-approval",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/sust/capa/service/CorrectiveActionService.java",
+      "lines": "151-161",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/capa/controller/CorrectiveActionController.java:95-100",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/evidence/service/SustainabilityEvidenceService.java:105-116",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/evidence/controller/SustainabilityEvidenceController.java:62-66"
+      ],
+      "description": "The corrective-action 'Rule A' separation-of-duties control rejects verification only when the supplied verifier name equals the stored ownerName. Both the verifier identity and the owner identity are free-text strings supplied by the client (the verify endpoint reads body.get(\"verifiedBy\"); ownerName came from an earlier client-supplied create/update body). The check is a case-insensitive string compare, never tied to the authenticated user (GrcUserDetails). The same pattern applies to evidence approval, which records approvedBy from body.get(\"approvedBy\") rather than the principal. An actor can therefore self-verify their own corrective action simply by passing any verifier string that differs from ownerName (e.g. add a space, change case differently, or supply an arbitrary colleague's name), and can attribute an approval to anyone. Combined with SEC-ESG-001 (no role enforcement), the 'four-eyes' guarantee these endpoints advertise is cosmetic.",
+      "rootCause": "Actor identity for SoD-sensitive actions is taken from the request body instead of the authenticated SecurityContext / GrcUserDetails. The control compares two attacker-controllable values.",
+      "evidence": "CorrectiveActionService.transition(...):\n  case \"VERIFIED\" -> {\n      if (verifierName == null || verifierName.isBlank())\n          throw new IllegalArgumentException(\"Verification requires a verifier name.\");\n      // Rule A — separation of duties.\n      if (cur.getOwnerName() != null\n          && verifierName.trim().equalsIgnoreCase(cur.getOwnerName().trim()))\n          throw new IllegalArgumentException(\"Verifier must differ from owner (Rule A ...).\");\n      cur.setVerifiedBy(verifierName);   // <-- client-supplied string, not the principal\n  }",
+      "impact": "Self-approval / self-verification of sustainability corrective actions and evidence, defeating the segregation-of-duties control that regulators (CMA, SAMA) expect on remediation sign-off. Approval/verification audit attribution is forgeable, breaking non-repudiation.",
+      "reproduction": "1. As any authenticated user, create a CAPA with ownerName=\"Alice\" and attach evidenceRef. 2. POST /{id}/start, /{id}/complete. 3. POST /{id}/verify with body {\"verifiedBy\":\"Alice \"} (trailing space) or {\"verifiedBy\":\"Bob\"} — the same person verifies their own action; the row records VERIFIED by the supplied name with no link to the real caller.",
+      "resolution": "Derive the actor from the authenticated principal: inject @AuthenticationPrincipal GrcUserDetails and set verifiedBy/approvedBy from its user id/name. Enforce Rule A against the principal's user id versus the stored owner user id (store owner as a user id, not a display string). Reject the action if the principal equals the owner. Remove verifiedBy/approvedBy from the request body so attribution cannot be forged.",
+      "patchBefore": "public CorrectiveAction verify(@PathVariable Long id, @RequestBody(required=false) Map<String,String> body) {\n    String verifier = body == null ? null : body.get(\"verifiedBy\");\n    return service.transition(id, \"VERIFIED\", verifier);\n}",
+      "patchAfter": "public CorrectiveAction verify(@PathVariable Long id, @AuthenticationPrincipal GrcUserDetails me) {\n    return service.transition(id, \"VERIFIED\", me); // service compares me.getUserId() to owner userId\n}",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-602: Client-Side Enforcement of Server-Side Security",
+        "OWASP Top 10 2021 — A04:2021 Insecure Design (segregation of duties)"
+      ]
+    },
+    {
+      "id": "SEC-ESG-003",
+      "title": "Sustainability write endpoints bind raw JPA @Entity request bodies with no @Valid — mass-assignment of workflow/audit fields",
+      "phase": "Security",
+      "category": "Mass Assignment / Improper Input Validation (A08/A04) — CWE-915 / CWE-20",
+      "severity": "Medium",
+      "cvss": "CVSS 5.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — caller can set server-controlled lifecycle/attribution fields at create",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/sust/evidence/controller/SustainabilityEvidenceController.java",
+      "lines": "49-53",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/evidence/service/SustainabilityEvidenceService.java:62-72",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/ghg/controller/GhgEmissionRecordController.java:69-79",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/cma/controller/CmaDisclosureController.java:66-76",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/materiality/controller/MaterialTopicController.java:51-61",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/sgi/controller/SgiCommitmentController.java:71-81",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/capa/controller/CorrectiveActionController.java:74-84"
+      ],
+      "description": "Every create/update endpoint in the Sustainability slices binds the persistent JPA @Entity directly as the @RequestBody (e.g. SustainabilityEvidence, GhgEmissionRecord, CmaDisclosure, MaterialTopic, SgiCommitment, CorrectiveAction) with no DTO and no @Valid. The services reset id and organisationId server-side (good — so tenant/identity cannot be forged), but they do NOT scrub the remaining server-controlled lifecycle and attribution columns. On create, the caller can pre-set approvalStatus/status (e.g. submit an evidence row directly as APPROVED, or a GHG record as APPROVED), approvedBy/approvedAt/reviewerName/verified/verificationDate, createdBy/createdAt, supersedesId, etc., bypassing the intended state machine and approval gates. Unlike the AI governance and climate sub-packages, which use dedicated request DTOs (MlModelRequest, FinancedEmissionsRequest) with @Valid + @NotBlank/@Size constraints and an explicit applyFields() whitelist, the Sustainability slices have no such boundary.",
+      "rootCause": "Controllers expose the JPA entity as the API contract and rely on the service to selectively copy fields on UPDATE only; CREATE persists the inbound entity almost verbatim (after id/org reset), so any column the entity exposes is mass-assignable on creation.",
+      "evidence": "SustainabilityEvidenceController.java:\n  @PostMapping\n  @PreAuthorize(\"isAuthenticated()\")\n  public ResponseEntity<SustainabilityEvidence> create(@RequestBody SustainabilityEvidence req) { ... }\n\nSustainabilityEvidenceService.create():\n  req.setId(null); req.setOrganisationId(org());\n  if (req.getApprovalStatus()==null||blank) req.setApprovalStatus(\"PENDING_REVIEW\");\n  // approvedBy / approvedAt / reviewerName / supersedesId from the body are persisted as-is",
+      "impact": "A caller can create records that skip the review/approval workflow (e.g. evidence born APPROVED with an arbitrary approvedBy, or a GHG/CMA record born APPROVED), forging approval attribution and defeating the lifecycle gates the module enforces on transitions. Audit columns (createdBy) are also client-settable. This compounds SEC-ESG-001 and SEC-ESG-002.",
+      "reproduction": "POST /api/sustainability/evidence with body {\"titleEn\":\"x\",\"approvalStatus\":\"APPROVED\",\"approvedBy\":\"CFO\",\"confidentiality\":\"PUBLIC\"} → 201, row persisted APPROVED/approvedBy=CFO without ever passing through the approve() workflow or any approver check.",
+      "resolution": "Introduce request DTOs for each create/update (as the climate and AI sub-packages already do) carrying only client-settable fields, annotate the controller params with @Valid and the DTO fields with Jakarta constraints (@NotBlank/@Size/@Min). In the service, force initial lifecycle status and null out approval/attribution/audit fields on create regardless of input; set approvedBy/createdBy from the authenticated principal. Never accept the entity as the wire contract.",
+      "patchBefore": "@PostMapping\npublic ResponseEntity<SustainabilityEvidence> create(@RequestBody SustainabilityEvidence req) {\n    return ResponseEntity.status(201).body(service.create(req));\n}",
+      "patchAfter": "@PostMapping\npublic ResponseEntity<SustainabilityEvidence> create(@Valid @RequestBody EvidenceCreateRequest req) {\n    return ResponseEntity.status(201).body(service.create(req)); // service maps only safe fields,\n}                                                                // forces approvalStatus=PENDING_REVIEW",
+      "effort": "L",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "CWE-20: Improper Input Validation",
+        "OWASP API Security Top 10 2023 — API6:2023 / API3:2023",
+        "OWASP Top 10 2021 — A04:2021 Insecure Design, A08:2021"
+      ]
+    },
+    {
+      "id": "SEC-ESG-004",
+      "title": "AI-assisted suggestion endpoints accept unvalidated request bodies and lack function-level authorization (isAuthenticated only)",
+      "phase": "Security",
+      "category": "Broken Access Control / Improper Input Validation (A01/A04) — CWE-862 / CWE-20",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N) — any user can generate/persist AI drafts; low direct impact",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ai/controller/AiSuggestionController.java",
+      "lines": "41-93",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ai/service/AiSuggestionService.java:73-105"
+      ],
+      "description": "The /api/v1/ai/** suggestion endpoints (risk-description, bia-rto-rpo, evidence-quality, incident-root-cause, board-summary, workflow-submission-review, suggestions listing, and the suggestions/{id}/review accept/reject) are guarded only by @PreAuthorize(\"isAuthenticated()\") and bind their record DTOs with no @Valid / no constraints. Unlike the AI governance registry (/api/v1/ai/models/**), which applies hasAnyRole READ/WRITE guards, these endpoints have no role separation: any authenticated user can drive the generator and accept/reject suggestion drafts. Exploitability and impact are limited because (a) the generators are deterministic rule-based heuristics with no outbound LLM/network call and no SQL, (b) every suggestion is persisted scoped to TenantContext org id and the review() path re-checks organisationId before mutating, and (c) suggestions are explicitly non-authoritative drafts that never mutate a real record on their own. The risk is therefore minor: unbounded creation of AiSuggestion rows (resource/audit-noise) and the ability for any user — rather than a designated reviewer — to mark a draft ACCEPTED/REJECTED. The board-summary input also reflects caller-supplied KPI numbers straight into a persisted narrative, so a user can fabricate a board posture string, but it is clearly labelled an unreviewed draft.",
+      "rootCause": "The suggestion controller predates / was not aligned to the hasPermission model used elsewhere; DTOs are bound without validation and the accept/reject action is not restricted to a reviewer role.",
+      "evidence": "AiSuggestionController.java:\n  @PostMapping(\"/board-summary\")\n  @PreAuthorize(\"isAuthenticated()\")\n  public AiSuggestion boardSummary(@RequestBody BoardSummaryInput body) { return service.draftBoardSummary(body); }\n  @PostMapping(\"/suggestions/{id}/review\")\n  @PreAuthorize(\"isAuthenticated()\")\n  public AiSuggestion review(@PathVariable Long id, @RequestBody ReviewBody body) { return service.review(id, body); }",
+      "impact": "Any authenticated user can mass-generate AI suggestion drafts (DB/audit-log noise) and accept or reject another user's drafts. No cross-tenant exposure (org-scoped) and no record-of-truth mutation, so direct security impact is low.",
+      "reproduction": "As any authenticated user: POST /api/v1/ai/board-summary {...} repeatedly to spam AiSuggestion rows; or POST /api/v1/ai/suggestions/{id}/review {\"decision\":\"ACCEPTED\"} on a draft created by another (same-tenant) user.",
+      "resolution": "Align with the platform model: require hasPermission('AI','READ') for listing/generation and a reviewer-level authority (e.g. hasPermission('AI','WRITE') or hasAnyRole(...)) for the /review accept-reject action. Add @Valid plus @NotNull/@Size constraints on the input records and bound the volume of drafts a caller can create.",
+      "patchBefore": "@PostMapping(\"/suggestions/{id}/review\")\n@PreAuthorize(\"isAuthenticated()\")\npublic AiSuggestion review(@PathVariable Long id, @RequestBody ReviewBody body) { return service.review(id, body); }",
+      "patchAfter": "@PostMapping(\"/suggestions/{id}/review\")\n@PreAuthorize(\"hasPermission('AI','WRITE')\")\npublic AiSuggestion review(@PathVariable Long id, @Valid @RequestBody ReviewBody body) { return service.review(id, body); }",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-20: Improper Input Validation",
+        "OWASP API Security Top 10 2023 — API5:2023 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-ESG-005",
+      "title": "Unbounded page size on Sustainability list endpoints enables resource-exhaustion (no max cap on the size parameter)",
+      "phase": "Security",
+      "category": "Improper Input Validation / Uncontrolled Resource Consumption (A04) — CWE-770",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L) — caller-controlled page size, potential memory/DoS",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/sust/evidence/controller/SustainabilityEvidenceController.java",
+      "lines": "28-39",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/ghg/controller/GhgEmissionRecordController.java:40-51",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/metrics/controller/EsgMetricController.java:28-38",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/cma/controller/CmaDisclosureController.java:44-54",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/sust/capa/controller/CorrectiveActionController.java:43-56"
+      ],
+      "description": "List endpoints accept a caller-supplied `size` query param (defaults 50/100) that is passed straight into PageRequest.of(page, size) with no upper bound. A caller can request size=1000000 and force the service to materialise a very large page from the tenant's data set. Several aggregate endpoints (evidence.aggregate, capa.aggregate, climate.aggregate, ghg.aggregate) additionally load the full org result set into memory with findByOrganisationId(...)/findByOrganisationIdAndStatusIn(...) and iterate — fine at demo scale but unbounded in principle. Impact is bounded to the caller's own tenant (org-scoped), so this is availability-only.",
+      "rootCause": "No maximum-size clamp on the pagination parameter and a few aggregate paths read the entire org collection into memory.",
+      "evidence": "EsgMetricController.list(...): var p = PageRequest.of(page, size);  // size has @RequestParam(defaultValue=\"100\") but no max\nGhgEmissionRecordController.list(...): same pattern, defaultValue=\"100\", no cap",
+      "impact": "An authenticated user can issue large-page or repeated full-collection reads to consume backend heap / DB I/O, degrading availability for the tenant. No data exposure beyond the caller's own org.",
+      "reproduction": "GET /api/sustainability/metrics?size=10000000 — the backend attempts to build a page of up to ten million rows.",
+      "resolution": "Clamp the page size to a sane maximum (e.g. min(size, 200)) in each controller or via a shared @ParameterObject Pageable resolver / PageableHandlerMethodArgumentResolver configured with a maxPageSize. For aggregate endpoints, prefer DB-side COUNT/GROUP BY queries over loading the full collection.",
+      "patchBefore": "var p = PageRequest.of(page, size);",
+      "patchAfter": "var p = PageRequest.of(page, Math.min(size, 200));",
+      "effort": "S",
+      "references": [
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "OWASP API Security Top 10 2023 — API4:2023 Unrestricted Resource Consumption"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3139 @@
+{
+  "errors": [],
+  "generated_at": "2026-06-18T13:30:20Z",
+  "metrics": {
+    ".\\.tmp\\dump_edit.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 27,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tmp\\dump_full_edit.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 41,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tmp\\dump_translations_edits.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 50,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tmp\\extract_evidence.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 165,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tmp\\list_ops.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 24,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tmp\\parse_jsonl.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 75,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tmp\\reset_pw.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 24,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tmp\\wrap_cyber_i18n.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 82,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\apply_v21.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 18,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\apply_v22_v23_v24.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 23,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\apply_v25_v28.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 24,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\fix_arabic_mojibake.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 3,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 3,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 193,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\fix_ccm_mojibake.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 2,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 2,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 138,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\forensic_final.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 91,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\introspect_schema.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 2,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 2,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 222,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\.tools\\verify_ccm_fix.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 97,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\Saudi-GRC-Platform-Integration\\18-Excel-Workbook\\build_workbook.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 1237,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\Saudi-GRC-Platform-Integration\\build_master_pdf.py": {
+      "CONFIDENCE.HIGH": 2,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 2,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 65,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\Saudi-GRC-Platform-Integration\\build_pdfs.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 370,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\fix_arabic_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 54,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\fix_arabic_mojibake.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 2,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 2,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 122,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\fix_form_titles_only.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 42,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\seed_bcm_closeout.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 166,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\seed_bcm_remaining_slices.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 522,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\seed_real_data.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 19,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 19,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 2072,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\seed_sama_bcf_clauses.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 209,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\seed_socops_data.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 12,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 12,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 1326,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_ai_lifecycle_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 27,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_ai_lifecycle_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 165,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_ai_lifecycle_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 394,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_attachments_table.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 47,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_bcm_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 173,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_coi_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 54,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_committees_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 120,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_complaints_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 52,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_control_links_table.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 28,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_cpty_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 55,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_cpty_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 226,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_cpty_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 502,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_cyber_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 733,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_data_officer_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 416,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_data_officer_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 2,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 2,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 669,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_dataclass_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 26,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_dataclass_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 165,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_dataclass_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 610,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_dsr_sla_hardening.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 37,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_empty_registers_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 368,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_erm_risk_guidance_ar_backfill.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 67,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_evidence_lifecycle_hardening.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 50,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_evidence_request_department.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 16,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_evidence_status_constraint.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 47,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_fraud_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 57,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_fraud_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 325,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_fraud_seed_cases.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 336,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_lifecycle_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 117,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_lifecycle_seed.py": {
+      "CONFIDENCE.HIGH": 6,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 6,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 275,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_openbanking_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 55,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_openbanking_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 246,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_openbanking_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 563,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_opres_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 57,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_opres_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 237,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_opres_seed_assessments.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 346,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_outsourcing_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 35,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_outsourcing_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 256,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_outsourcing_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 658,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_reginspect_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 56,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_reginspect_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 154,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_reginspect_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 475,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_regreporting_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 56,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_regreporting_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 158,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_regreporting_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 1,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 592,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_risk_level_residual.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 57,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_rrp_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 56,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_rrp_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 237,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_rrp_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 2,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 1,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 617,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sharia_automation_rules.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 55,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sharia_db.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 298,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sharia_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 928,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_ai_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 163,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_bcm_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 397,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_cyber_nca_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 118,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_erm_deepen.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 161,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_esg_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 227,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_nca_ccc_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 539,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_nca_data_cloud_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 827,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_nca_ecc_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 671,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_nca_ot_telework_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 586,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_ndmo_ndi_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 790,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\setup_sme_pdpl_seed.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 718,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    ".\\tss-grc-ui\\server.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 28,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "_totals": {
+      "CONFIDENCE.HIGH": 21,
+      "CONFIDENCE.LOW": 36,
+      "CONFIDENCE.MEDIUM": 22,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 2,
+      "SEVERITY.LOW": 21,
+      "SEVERITY.MEDIUM": 56,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 25053,
+      "nosec": 0,
+      "skipped_tests": 0
+    }
+  },
+  "results": [
+    {
+      "code": "13         try: rec = json.loads(line)\n14         except: continue\n15         if rec.get(\"type\") != \"assistant\": continue\n",
+      "col_offset": 8,
+      "end_col_offset": 24,
+      "filename": ".\\.tmp\\dump_edit.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 14,
+      "line_range": [
+        14
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "17             rec = json.loads(line)\n18         except Exception:\n19             continue\n20         if rec.get(\"type\") != \"assistant\":\n",
+      "col_offset": 8,
+      "end_col_offset": 20,
+      "filename": ".\\.tmp\\dump_full_edit.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 18,
+      "line_range": [
+        18,
+        19
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "16             rec = json.loads(line)\n17         except Exception:\n18             continue\n19         if rec.get(\"type\") != \"assistant\":\n",
+      "col_offset": 8,
+      "end_col_offset": 20,
+      "filename": ".\\.tmp\\dump_translations_edits.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 17,
+      "line_range": [
+        17,
+        18
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "73             rec = json.loads(line)\n74         except Exception:\n75             continue\n76         if rec.get(\"type\") != \"assistant\":\n",
+      "col_offset": 8,
+      "end_col_offset": 20,
+      "filename": ".\\.tmp\\extract_evidence.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 74,
+      "line_range": [
+        74,
+        75
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "9         try: rec = json.loads(line)\n10         except: continue\n11         if rec.get(\"type\") != \"assistant\": continue\n",
+      "col_offset": 8,
+      "end_col_offset": 24,
+      "filename": ".\\.tmp\\list_ops.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 10,
+      "line_range": [
+        10
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "22             rec = json.loads(line)\n23         except Exception:\n24             continue\n25         ts = rec.get(\"timestamp\", \"\")\n",
+      "col_offset": 8,
+      "end_col_offset": 20,
+      "filename": ".\\.tmp\\parse_jsonl.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 23,
+      "line_range": [
+        23,
+        24
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "14     h = bcrypt.hashpw(pw.encode(\"utf-8\"), bcrypt.gensalt(rounds=10)).decode(\"ascii\")\n15     assert \"'\" not in h\n16     lines.append(\n",
+      "col_offset": 4,
+      "end_col_offset": 23,
+      "filename": ".\\.tmp\\reset_pw.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 15,
+      "line_range": [
+        15
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "16     lines.append(\n17         \"UPDATE iam.users SET \"\n18         f\"password_hash = '{h}', \"\n19         \"is_active = 1, is_locked = 0, failed_login_attempts = 0, \"\n20         \"locked_until = NULL, must_change_password = 0, \"\n21         \"password_changed_at = SYSUTCDATETIME(), updated_at = SYSUTCDATETIME() \"\n22         f\"WHERE username = '{user}';\"\n23     )\n",
+      "col_offset": 8,
+      "end_col_offset": 27,
+      "filename": ".\\.tmp\\reset_pw.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 17,
+      "line_range": [
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "141             where = ' OR '.join(c.format(col=col) for c in sig_clauses)\n142             cur.execute(f\"SELECT TOP 1 1 FROM [{s}].[{tbl}] WHERE [{col}] IS NOT NULL AND ({where})\")\n143             if cur.fetchone():\n",
+      "col_offset": 26,
+      "end_col_offset": 47,
+      "filename": ".\\.tools\\fix_arabic_mojibake.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 142,
+      "line_range": [
+        142
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "144                 found.append((s, tbl, col))\n145         except Exception:\n146             pass  # column may be filtered/indexed/computed \u2014 skip\n147     return found\n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": ".\\.tools\\fix_arabic_mojibake.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 145,
+      "line_range": [
+        145,
+        146
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "185         where = sig_clauses_template.format(col=col)\n186         cur.execute(f\"\"\"\n187             SELECT {pk_select}, [{col}]\n188               FROM [{schema}].[{table}]\n189              WHERE [{col}] IS NOT NULL AND ({where})\n190         \"\"\")\n191         rows = cur.fetchall()\n",
+      "col_offset": 24,
+      "end_col_offset": 19,
+      "filename": ".\\.tools\\fix_arabic_mojibake.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 186,
+      "line_range": [
+        186,
+        187,
+        188,
+        189,
+        190
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "209                 cur.execute(\n210                     f\"UPDATE [{schema}].[{table}] SET [{col}]=? WHERE {where_clause}\",\n211                     recovered, *pk_vals\n",
+      "col_offset": 22,
+      "end_col_offset": 30,
+      "filename": ".\\.tools\\fix_arabic_mojibake.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 210,
+      "line_range": [
+        210
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "27     sys.stdout.reconfigure(encoding=\"utf-8\")\n28 except Exception:\n29     pass\n30 \n",
+      "col_offset": 0,
+      "end_col_offset": 8,
+      "filename": ".\\.tools\\fix_ccm_mojibake.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 28,
+      "line_range": [
+        28,
+        29
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "107         try:\n108             cur.execute(f\"SELECT id, {cols_csv} FROM [{sch}].[{tbl}]\")\n109             rows = cur.fetchall()\n",
+      "col_offset": 26,
+      "end_col_offset": 37,
+      "filename": ".\\.tools\\fix_ccm_mojibake.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 108,
+      "line_range": [
+        108
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "151             cur.execute(\n152                 f\"UPDATE [{sch}].[{tbl}] SET [{col}] = ? WHERE id = ?\", after, rid)\n153             applied += 1\n",
+      "col_offset": 18,
+      "end_col_offset": 26,
+      "filename": ".\\.tools\\fix_ccm_mojibake.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 152,
+      "line_range": [
+        152
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "23     sys.stdout.reconfigure(encoding=\"utf-8\")\n24 except Exception:\n25     pass\n26 CONN=(\"DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=TSS_GRC;\"\n",
+      "col_offset": 0,
+      "end_col_offset": 8,
+      "filename": ".\\.tools\\forensic_final.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 24,
+      "line_range": [
+        24,
+        25
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "72     for (sch,tbl,col),(ids,conf,method) in DETERMINED.items():\n73         cur.execute(f\"SELECT id,[{col}] FROM [{sch}].[{tbl}] WHERE id IN ({','.join('?'*len(ids))})\", *ids)\n74         live={r[0]:r[1] for r in cur.fetchall()}\n",
+      "col_offset": 22,
+      "end_col_offset": 33,
+      "filename": ".\\.tools\\forensic_final.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 73,
+      "line_range": [
+        73
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "207         filter_clause = f\" WHERE {ix['filter']}\" if ix['filter'] else ''\n208         out.append(f\"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = '{ix['name']}' AND object_id = OBJECT_ID('{schema}.{table}'))\")\n209         out.append(f\"    CREATE {unique_kw}INDEX [{ix['name']}] ON {schema}.{table} ({cols_str}){filter_clause};\")\n",
+      "col_offset": 21,
+      "end_col_offset": 76,
+      "filename": ".\\.tools\\introspect_schema.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 208,
+      "line_range": [
+        208
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "239     for s in schemas:\n240         out_lines.append(f\"IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '{s}')\")\n241         out_lines.append(f\"    EXEC('CREATE SCHEMA {s}');\")\n",
+      "col_offset": 27,
+      "end_col_offset": 82,
+      "filename": ".\\.tools\\introspect_schema.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 240,
+      "line_range": [
+        240
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "6     sys.stdout.reconfigure(encoding=\"utf-8\")\n7 except Exception:\n8     pass\n9 CONN = (\"DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=TSS_GRC;\"\n",
+      "col_offset": 0,
+      "end_col_offset": 8,
+      "filename": ".\\.tools\\verify_ccm_fix.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 7,
+      "line_range": [
+        7,
+        8
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "61     try:\n62         cur.execute(f\"SELECT id,{', '.join('['+c+']' for c in cols)} FROM [{s_}].[{t_}]\")\n63         rows=cur.fetchall()\n",
+      "col_offset": 22,
+      "end_col_offset": 32,
+      "filename": ".\\.tools\\verify_ccm_fix.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 62,
+      "line_range": [
+        62
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "40         sys.stdout.reconfigure(encoding='utf-8')\n41     except Exception:\n42         pass\n43     root = Path(__file__).parent\n",
+      "col_offset": 4,
+      "end_col_offset": 12,
+      "filename": ".\\Saudi-GRC-Platform-Integration\\build_master_pdf.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 41,
+      "line_range": [
+        41,
+        42
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "60             writer.add_outline_item(section_label, first_page)\n61         except Exception:\n62             pass\n63         total_pages += page_count\n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": ".\\Saudi-GRC-Platform-Integration\\build_master_pdf.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 61,
+      "line_range": [
+        61,
+        62
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "399         sys.stdout.reconfigure(encoding='utf-8')\n400     except Exception:\n401         pass\n402     root = Path(__file__).parent\n",
+      "col_offset": 4,
+      "end_col_offset": 12,
+      "filename": ".\\Saudi-GRC-Platform-Integration\\build_pdfs.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 400,
+      "line_range": [
+        400,
+        401
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "24     sys.stdout.reconfigure(encoding=\"utf-8\")\n25 except Exception:\n26     pass\n27 \n",
+      "col_offset": 0,
+      "end_col_offset": 8,
+      "filename": ".\\fix_arabic_mojibake.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 25,
+      "line_range": [
+        25,
+        26
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "92         try:\n93             cur.execute(f\"SELECT id, {cols_csv} FROM [{schema}].[{table}]\")\n94             rows = cur.fetchall()\n",
+      "col_offset": 26,
+      "end_col_offset": 37,
+      "filename": ".\\fix_arabic_mojibake.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 93,
+      "line_range": [
+        93
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "124                 cur.execute(\n125                     f\"UPDATE [{schema}].[{table}] SET {', '.join(sets)} WHERE id = ?\",\n126                     *params,\n",
+      "col_offset": 22,
+      "end_col_offset": 30,
+      "filename": ".\\fix_arabic_mojibake.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 125,
+      "line_range": [
+        125
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "36         try:\n37             sql = \"UPDATE admin.committee_form_templates SET \" + \", \".join(sets) + \" WHERE id = ?\"\n38             cur.execute(sql, *params)\n",
+      "col_offset": 18,
+      "end_col_offset": 62,
+      "filename": ".\\fix_form_titles_only.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 37,
+      "line_range": [
+        37
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "306     run(\n307         f\"\"\"\n308         IF NOT EXISTS (SELECT 1 FROM privacy.data_subject_requests\n309                        WHERE requester_email = ? AND organisation_id = ? AND request_type = ?)\n310         INSERT INTO privacy.data_subject_requests (external_id, organisation_id,\n311             request_type, requester_name, requester_email, received_at, due_date, status,\n312             is_deleted, created_at)\n313         VALUES (NEWID(), ?, ?, ?, ?, DATEADD(day, -{days_ago}, GETDATE()),\n314             DATEADD(day, -{days_ago} + 30, CAST(GETDATE() AS DATE)), ?, 0, DATEADD(day, -{days_ago}, GETDATE()))\n315         \"\"\",\n316         remail, ORG_TSS, rtype,\n",
+      "col_offset": 12,
+      "end_col_offset": 51,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 307,
+      "line_range": [
+        307,
+        308,
+        309,
+        310,
+        311,
+        312,
+        313,
+        314,
+        315
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "368     run(\n369         f\"\"\"\n370         SET NOCOUNT ON;\n371         IF NOT EXISTS (SELECT 1 FROM privacy.data_breaches\n372                        WHERE title_en = ? AND organisation_id = ?)\n373         INSERT INTO privacy.data_breaches (external_id, organisation_id, title_en, description_en,\n374             breach_type, discovered_at, data_subjects_affected_count, pdpc_notification_required,\n375             status, is_deleted, created_at, auto_generated)\n376         VALUES (NEWID(), ?, ?, ?, ?, DATEADD(day, -{days_ago}, GETDATE()), ?, ?, ?, 0,\n377             DATEADD(day, -{days_ago}, GETDATE()), 0)\n378         \"\"\",\n379         title, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 51,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 369,
+      "line_range": [
+        369,
+        370,
+        371,
+        372,
+        373,
+        374,
+        375,
+        376,
+        377,
+        378
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "409     run(\n410         f\"\"\"\n411         IF NOT EXISTS (SELECT 1 FROM bcm.bia_records\n412                        WHERE process_id = ? AND organisation_id = ? AND is_deleted = 0)\n413         INSERT INTO bcm.bia_records (external_id, process_id, assessment_date, rto_hours, rpo_hours,\n414             mtpd_hours, overall_impact, status, created_at, organisation_id,\n415             financial_impact, operational_impact, regulatory_impact, reputational_impact,\n416             criticality, risk_level, owner_name, business_unit, dependencies_count,\n417             last_review_date, version_number, is_deleted, recovery_tasks_generated, notes)\n418         VALUES (NEWID(), ?, CAST(GETDATE() AS DATE), ?, ?, ?, ?, 'APPROVED', GETDATE(), ?,\n419             ?, ?, ?, ?, ?, ?, ?, ?, 3, DATEADD(month, -2, CAST(GETDATE() AS DATE)), 2, 0, 0,\n420             ?)\n421         \"\"\",\n422         pid, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 8,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 410,
+      "line_range": [
+        410,
+        411,
+        412,
+        413,
+        414,
+        415,
+        416,
+        417,
+        418,
+        419,
+        420,
+        421
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "974     run(\n975         f\"\"\"\n976         IF NOT EXISTS (SELECT 1 FROM scm.vendor_onboarding\n977                        WHERE vendor_id = ? AND organisation_id = ? AND is_deleted = 0)\n978         INSERT INTO scm.vendor_onboarding (external_id, organisation_id, vendor_id,\n979             current_stage, status, due_date, notes, is_deleted, created_at)\n980         VALUES (NEWID(), ?, ?, ?, ?,\n981             DATEADD(day, {days_due}, CAST(GETDATE() AS DATE)),\n982             ?, 0, GETDATE())\n983         \"\"\",\n984         vid, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 25,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 975,
+      "line_range": [
+        975,
+        976,
+        977,
+        978,
+        979,
+        980,
+        981,
+        982,
+        983
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1048     run(\n1049         f\"\"\"\n1050         IF NOT EXISTS (SELECT 1 FROM cyber.cyber_incidents\n1051                        WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)\n1052         INSERT INTO cyber.cyber_incidents (external_id, organisation_id, incident_number,\n1053             title_en, title_ar, incident_type, affected_asset_name, impact, severity,\n1054             workflow_status, detected_at, reported_at,\n1055             resolved_at, incident_lead, notification_sent, bcm_handoff,\n1056             linked_vulnerabilities_count, linked_evidence_count,\n1057             is_deleted, created_at)\n1058         VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?, ?,\n1059             DATEADD(day, -{days_ago}, GETDATE()), DATEADD(day, -{days_ago}, GETDATE()),\n1060             {('DATEADD(day, -' + str(max(days_ago - 7, 1)) + ', GETDATE())') if status in ('CLOSED','RESOLVED') else 'NULL'},\n1061             ?, {'1' if severity in ('CRITICAL','HIGH') else '0'},\n1062             {'1' if itype in ('MALWARE','RANSOMWARE','DDoS') else '0'},\n1063             0, 0, 0, DATEADD(day, -{days_ago}, GETDATE()))\n1064         \"\"\",\n1065         title_en, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 26,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1049,
+      "line_range": [
+        1049,
+        1050,
+        1051,
+        1052,
+        1053,
+        1054,
+        1055,
+        1056,
+        1057,
+        1058,
+        1059,
+        1060,
+        1061,
+        1062,
+        1063,
+        1064
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1093     run(\n1094         f\"\"\"\n1095         IF NOT EXISTS (SELECT 1 FROM bcm.bcm_exercises\n1096                        WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)\n1097         INSERT INTO bcm.bcm_exercises (external_id, organisation_id, title_en, title_ar,\n1098             exercise_type, scheduled_date, executed_date, status, facilitator,\n1099             objectives, overall_result, is_deleted, created_at)\n1100         VALUES (NEWID(), ?, ?, ?, ?, {sched_date}, {exec_date}, ?, ?,\n1101             '\u0627\u0644\u062a\u062d\u0642\u0651\u0642 \u0645\u0646 \u062c\u0627\u0647\u0632\u064a\u0629 \u0627\u0644\u062e\u0637\u0629 + \u0642\u064a\u0627\u0633 RTO/RPO \u0627\u0644\u0641\u0639\u0644\u064a + \u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0644\u062a\u062d\u0633\u064a\u0646 \u0627\u0644\u0639\u0645\u0644\u064a\u0629.',\n1102             {result_val}, 0, GETDATE())\n1103         \"\"\",\n1104         title_en, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 37,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1094,
+      "line_range": [
+        1094,
+        1095,
+        1096,
+        1097,
+        1098,
+        1099,
+        1100,
+        1101,
+        1102,
+        1103
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1154     run(\n1155         f\"\"\"\n1156         IF NOT EXISTS (SELECT 1 FROM compliance.regulatory_changes\n1157                        WHERE citation = ? AND organisation_id = ? AND is_deleted = 0)\n1158         INSERT INTO compliance.regulatory_changes (external_id, organisation_id, source_authority,\n1159             title_en, title_ar, citation, summary_ar, published_date, effective_date,\n1160             applicability, impact_level, status, controls_updated_count, is_deleted, created_at)\n1161         VALUES (NEWID(), ?, ?, ?, ?, ?, ?, DATEADD(day, -{days_ago}, CAST(GETDATE() AS DATE)),\n1162             DATEADD(day, -{days_ago} + 60, CAST(GETDATE() AS DATE)), ?, ?, ?, 0, 0, GETDATE())\n1163         \"\"\",\n1164         cite, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 57,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1155,
+      "line_range": [
+        1155,
+        1156,
+        1157,
+        1158,
+        1159,
+        1160,
+        1161,
+        1162,
+        1163
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1214     run(\n1215         f\"\"\"\n1216         IF NOT EXISTS (SELECT 1 FROM compliance.regulatory_changes\n1217                        WHERE citation = ? AND organisation_id = ? AND is_deleted = 0)\n1218         INSERT INTO compliance.regulatory_changes (external_id, organisation_id, source_authority,\n1219             title_en, title_ar, citation, summary_ar, published_date, effective_date,\n1220             applicability, impact_level, status, controls_updated_count, is_deleted, created_at)\n1221         VALUES (NEWID(), ?, ?, ?, ?, ?, ?, DATEADD(day, -30, CAST(GETDATE() AS DATE)),\n1222             DATEADD(day, {eff}, CAST(GETDATE() AS DATE)), ?, ?, ?, 0, 0, GETDATE())\n1223         \"\"\",\n1224         cite, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 25,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1215,
+      "line_range": [
+        1215,
+        1216,
+        1217,
+        1218,
+        1219,
+        1220,
+        1221,
+        1222,
+        1223
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1330         run(\n1331             f\"\"\"\n1332             IF NOT EXISTS (SELECT 1 FROM ndi.gap\n1333                            WHERE gap_code = ? AND organisation_id = ? AND is_deleted = 0)\n1334             INSERT INTO ndi.gap (organisation_id, external_id, cycle_id, gap_code,\n1335                 source_type, domain, title_en, title_ar, severity, likelihood, risk_score,\n1336                 owner_name, open_date, target_date, rollup_progress, capa_count, capa_completed_count,\n1337                 status, is_deleted, created_at)\n1338             VALUES (?, LOWER(REPLACE(NEWID(),'-','')), ?, ?, 'MANUAL', ?, ?, ?, ?, 'LIKELY', ?, ?,\n1339                 CAST(GETDATE() AS DATE), DATEADD(day, 60, CAST(GETDATE() AS DATE)),\n1340                 {0 if status == 'OPEN' else (50 if status == 'IN_REMEDIATION' else 100)},\n1341                 0, 0, ?, 0, GETDATE())\n1342             \"\"\",\n1343             code, ORG_TSS,\n",
+      "col_offset": 16,
+      "end_col_offset": 16,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1331,
+      "line_range": [
+        1331,
+        1332,
+        1333,
+        1334,
+        1335,
+        1336,
+        1337,
+        1338,
+        1339,
+        1340,
+        1341,
+        1342
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1482     run(\n1483         f\"\"\"\n1484         IF NOT EXISTS (SELECT 1 FROM audit_lc.findings\n1485                        WHERE ref_number = ? AND organisation_id = ? AND is_deleted = 0)\n1486         INSERT INTO audit_lc.findings (external_id, organisation_id, engagement_code, ref_number,\n1487             title_en, title_ar, severity, status, condition_en, condition_ar,\n1488             recommendation_en, recommendation_ar, target_date, owner_role, raised_at, is_deleted)\n1489         VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,\n1490             DATEADD(day, 60, CAST(GETDATE() AS DATE)), 'CISO',\n1491             DATEADD(day, -{days_ago}, GETDATE()), 0)\n1492         \"\"\",\n1493         ref, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 26,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1483,
+      "line_range": [
+        1483,
+        1484,
+        1485,
+        1486,
+        1487,
+        1488,
+        1489,
+        1490,
+        1491,
+        1492
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1560     run(\n1561         f\"\"\"\n1562         IF NOT EXISTS (SELECT 1 FROM approvals.requests\n1563                        WHERE entity_type = ? AND entity_id = ? AND organisation_id = ? AND is_deleted = 0)\n1564         INSERT INTO approvals.requests (external_id, organisation_id, entity_type, entity_id,\n1565             title_en, title_ar, summary_en, summary_ar, requested_by, requested_at,\n1566             assigned_to, original_assigned_to, priority,\n1567             sla_deadline, status, decided_at, decided_by, is_deleted)\n1568         VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?,\n1569             DATEADD(day, {days_offset}, GETDATE()), ?, ?, ?,\n1570             DATEADD(day, {days_offset} + 7, GETDATE()), ?, {decided_at}, {decided_by}, 0)\n1571         \"\"\",\n1572         entity_type, entity_id, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 25,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1561,
+      "line_range": [
+        1561,
+        1562,
+        1563,
+        1564,
+        1565,
+        1566,
+        1567,
+        1568,
+        1569,
+        1570,
+        1571
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1625     run(\n1626         f\"\"\"\n1627         IF NOT EXISTS (SELECT 1 FROM audit_lc.capa_tasks\n1628                        WHERE finding_id = ? AND title_en = ? AND organisation_id = ? AND is_deleted = 0)\n1629         INSERT INTO audit_lc.capa_tasks (external_id, organisation_id, finding_id, kind,\n1630             title_en, title_ar, owner_role, target_date, status, is_deleted)\n1631         VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?,\n1632             DATEADD(day, {target_days}, CAST(GETDATE() AS DATE)), ?, 0)\n1633         \"\"\",\n1634         fref, t_en, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 25,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1626,
+      "line_range": [
+        1626,
+        1627,
+        1628,
+        1629,
+        1630,
+        1631,
+        1632,
+        1633
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1675     run(\n1676         f\"\"\"\n1677         IF NOT EXISTS (SELECT 1 FROM bcm.recovery_operations\n1678                        WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)\n1679         INSERT INTO bcm.recovery_operations (external_id, organisation_id, title_en, title_ar,\n1680             operation_type, triggered_at, resolved_at, rto_target_hours, rto_actual_hours,\n1681             status, assigned_to, description_en, is_deleted, created_at)\n1682         VALUES (NEWID(), ?, ?, ?, ?, {triggered_at}, {resolved_at}, ?, {rto_actual_val},\n1683             ?, ?, ?, 0, GETDATE())\n1684         \"\"\",\n1685         t_en, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 37,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1676,
+      "line_range": [
+        1676,
+        1677,
+        1678,
+        1679,
+        1680,
+        1681,
+        1682,
+        1683,
+        1684
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1776         run(\n1777             f\"\"\"\n1778             IF NOT EXISTS (SELECT 1 FROM risk_lc.kri_breaches\n1779                            WHERE kri_code = ? AND organisation_id = ? AND is_deleted = 0)\n1780             INSERT INTO risk_lc.kri_breaches (external_id, organisation_id, risk_id,\n1781                 kri_code, kri_name_en, kri_name_ar, threshold_value, actual_value,\n1782                 direction, detected_at, status, current_owner, is_deleted)\n1783             VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?,\n1784                 DATEADD(day, -{days_ago}, GETDATE()), ?, ?, 0)\n1785             \"\"\",\n1786             code, ORG_TSS,\n",
+      "col_offset": 16,
+      "end_col_offset": 30,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1777,
+      "line_range": [
+        1777,
+        1778,
+        1779,
+        1780,
+        1781,
+        1782,
+        1783,
+        1784,
+        1785
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1825     run(\n1826         f\"\"\"\n1827         IF NOT EXISTS (SELECT 1 FROM board_pack.packs\n1828                        WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)\n1829         INSERT INTO board_pack.packs (external_id, organisation_id, title_en, title_ar,\n1830             period_label, period_start, period_end, audience, status, drafted_by, drafted_at,\n1831             is_deleted)\n1832         VALUES (LOWER(REPLACE(NEWID(),'-','')), ?, ?, ?, ?, ?, ?, ?, ?, ?,\n1833             DATEADD(day, {drafted_offset}, GETDATE()), 0)\n1834         \"\"\",\n1835         t_en, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 25,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1826,
+      "line_range": [
+        1826,
+        1827,
+        1828,
+        1829,
+        1830,
+        1831,
+        1832,
+        1833,
+        1834
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1899     run(\n1900         f\"\"\"\n1901         IF NOT EXISTS (SELECT 1 FROM ethics.cases\n1902                        WHERE case_code = ? AND organisation_id = ? AND is_deleted = 0)\n1903         INSERT INTO ethics.cases (external_id, organisation_id, case_code, title_en, title_ar,\n1904             category, severity, intake_channel, is_anonymous, description,\n1905             status, date_of_incident, regulator_notified, is_deleted, created_at)\n1906         VALUES (NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,\n1907             DATEADD(day, -{days_ago}, CAST(GETDATE() AS DATE)),\n1908             {'1' if severity == 'CRITICAL' else '0'}, 0, DATEADD(day, -{days_ago}, GETDATE()))\n1909         \"\"\",\n1910         code, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 26,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1900,
+      "line_range": [
+        1900,
+        1901,
+        1902,
+        1903,
+        1904,
+        1905,
+        1906,
+        1907,
+        1908,
+        1909
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1957     run(\n1958         f\"\"\"\n1959         IF NOT EXISTS (SELECT 1 FROM bcm.crisis_aar\n1960                        WHERE crisis_event_id = ? AND organisation_id = ? AND is_deleted = 0)\n1961         INSERT INTO bcm.crisis_aar (organisation_id, external_id, crisis_event_id,\n1962             report_code, title_en, title_ar, executive_summary_en, executive_summary_ar,\n1963             what_worked_md_en, what_failed_md_en, root_cause_md_en,\n1964             recommendations_md_en, status, approved_at, published_at, is_deleted, created_at)\n1965         VALUES (?, NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?,\n1966             ?, ?, {approved_at}, {published_at}, 0, GETDATE())\n1967         \"\"\",\n1968         eid, ORG_TSS,\n",
+      "col_offset": 12,
+      "end_col_offset": 18,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1958,
+      "line_range": [
+        1958,
+        1959,
+        1960,
+        1961,
+        1962,
+        1963,
+        1964,
+        1965,
+        1966,
+        1967
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "2258     run(\n2259         f\"\"\"\n2260         IF NOT EXISTS (SELECT 1 FROM risk.risks\n2261                        WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)\n2262         INSERT INTO risk.risks (external_id, organisation_id, title_en, title_ar,\n2263             source_module, status, inherent_likelihood, inherent_impact,\n2264             residual_likelihood, residual_impact,\n2265             identified_date, review_date, attestation_cadence_days,\n2266             created_at, updated_at, is_deleted)\n2267         VALUES (NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?,\n2268             DATEADD(month, -3, CAST(GETDATE() AS DATE)),\n2269             DATEADD(month, 3, CAST(GETDATE() AS DATE)),\n2270             90, GETDATE(), GETDATE(), 0)\n2271         \"\"\",\n2272         title_en, ORG_ARAMCO,\n",
+      "col_offset": 12,
+      "end_col_offset": 8,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 2259,
+      "line_range": [
+        2259,
+        2260,
+        2261,
+        2262,
+        2263,
+        2264,
+        2265,
+        2266,
+        2267,
+        2268,
+        2269,
+        2270,
+        2271
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "2419     run(\n2420         f\"\"\"\n2421         IF NOT EXISTS (SELECT 1 FROM risk.risks\n2422                        WHERE title_en = ? AND organisation_id = ? AND is_deleted = 0)\n2423         INSERT INTO risk.risks (external_id, organisation_id, title_en, title_ar,\n2424             source_module, status, inherent_likelihood, inherent_impact,\n2425             residual_likelihood, residual_impact,\n2426             identified_date, review_date, attestation_cadence_days,\n2427             created_at, updated_at, is_deleted)\n2428         VALUES (NEWID(), ?, ?, ?, ?, ?, ?, ?, ?, ?,\n2429             DATEADD(month, -3, CAST(GETDATE() AS DATE)),\n2430             DATEADD(month, 3, CAST(GETDATE() AS DATE)),\n2431             90, GETDATE(), GETDATE(), 0)\n2432         \"\"\",\n2433         title_en, ORG_STC,\n",
+      "col_offset": 12,
+      "end_col_offset": 8,
+      "filename": ".\\seed_real_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 2420,
+      "line_range": [
+        2420,
+        2421,
+        2422,
+        2423,
+        2424,
+        2425,
+        2426,
+        2427,
+        2428,
+        2429,
+        2430,
+        2431,
+        2432
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "432     run(\n433         f\"\"\"\n434         IF NOT EXISTS (SELECT 1 FROM socops.security_event\n435                        WHERE organisation_id = ? AND source_system = ? AND external_id = ? AND is_deleted = 0)\n436         INSERT INTO socops.security_event\n437             (organisation_id, external_id, source_system, event_time, ingested_at,\n438              severity, category, rule_name, source_host, source_ip,\n439              destination_host, destination_ip, username, status, sla_due_at, created_at)\n440         VALUES (?, ?, ?,\n441                 DATEADD(hour, {-hours_ago}, SYSUTCDATETIME()),\n442                 DATEADD(hour, {-hours_ago}, SYSUTCDATETIME()),\n443                 ?, ?, ?, ?, ?, ?, ?, ?, ?,\n444                 DATEADD(hour, {sla_offset}, SYSUTCDATETIME()),\n445                 SYSUTCDATETIME())\n446         \"\"\",\n447         ORG_TSS, src, ext,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 433,
+      "line_range": [
+        433,
+        434,
+        435,
+        436,
+        437,
+        438,
+        439,
+        440,
+        441,
+        442,
+        443,
+        444,
+        445,
+        446
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "478     run(\n479         f\"\"\"\n480         IF NOT EXISTS (SELECT 1 FROM socops.scanner_run\n481                        WHERE organisation_id = ? AND scanner = ? AND scan_name = ? AND is_deleted = 0)\n482         INSERT INTO socops.scanner_run\n483             (organisation_id, scanner, scan_name, scope,\n484              started_at, completed_at, status,\n485              findings_total, findings_critical, findings_high, findings_medium, findings_low,\n486              assets_scanned, ingested_at, created_at)\n487         VALUES (?, ?, ?, ?,\n488                 DATEADD(day, -{days_ago}, SYSUTCDATETIME()),\n489                 DATEADD(hour, -{days_ago * 24 - 6}, SYSUTCDATETIME()),\n490                 ?, ?, ?, ?, ?, ?, ?,\n491                 DATEADD(hour, -{days_ago * 24 - 6}, SYSUTCDATETIME()),\n492                 SYSUTCDATETIME())\n493         \"\"\",\n494         ORG_TSS, scn, name,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 479,
+      "line_range": [
+        479,
+        480,
+        481,
+        482,
+        483,
+        484,
+        485,
+        486,
+        487,
+        488,
+        489,
+        490,
+        491,
+        492,
+        493
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "593     run(\n594         f\"\"\"\n595         IF NOT EXISTS (SELECT 1 FROM socops.awareness_campaign\n596                        WHERE organisation_id = ? AND campaign_code = ? AND is_deleted = 0)\n597         INSERT INTO socops.awareness_campaign\n598             (organisation_id, campaign_code, title_en, title_ar, campaign_type,\n599              target_audience, target_user_count,\n600              started_at, ended_at, status,\n601              delivered_count, opened_count, clicked_count, reported_count,\n602              completed_count, repeat_offender_count, pass_rate_percent,\n603              aligned_controls, notes, created_at)\n604         VALUES (?, ?, ?, ?, ?, ?, ?,\n605                 DATEADD(day, {-days_ago}, SYSUTCDATETIME()),\n606                 CASE WHEN ? = 'COMPLETED' THEN DATEADD(day, {-(max(days_ago - 14, 0))}, SYSUTCDATETIME()) ELSE NULL END,\n607                 ?, ?, ?, ?, ?, ?, ?, ?,\n608                 'NCA_ECC_1-5,SAMA_CSF_3.3.5,ISO_27001_A.7.2.2',\n609                 ?, SYSUTCDATETIME())\n610         \"\"\",\n611         ORG_TSS, code,\n",
+      "col_offset": 12,
+      "end_col_offset": 29,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 594,
+      "line_range": [
+        594,
+        595,
+        596,
+        597,
+        598,
+        599,
+        600,
+        601,
+        602,
+        603,
+        604,
+        605,
+        606,
+        607,
+        608,
+        609,
+        610
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "667     run(\n668         f\"\"\"\n669         IF NOT EXISTS (SELECT 1 FROM socops.crypto_asset\n670                        WHERE organisation_id = ? AND asset_code = ? AND is_deleted = 0)\n671         INSERT INTO socops.crypto_asset\n672             (organisation_id, asset_code, asset_type, title_en, title_ar,\n673              issued_by, subject_dn, algorithm, key_length, quantum_safe,\n674              valid_from, valid_until, deployed_on, owner, rotation_period_days,\n675              last_rotated_at, classification, status, created_at)\n676         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,\n677                 DATEADD(day, -180, SYSUTCDATETIME()),\n678                 DATEADD(day, {days_to_exp}, SYSUTCDATETIME()),\n679                 ?, ?, ?,\n680                 DATEADD(day, -180, SYSUTCDATETIME()),\n681                 ?, ?, SYSUTCDATETIME())\n682         \"\"\",\n683         ORG_TSS, code,\n",
+      "col_offset": 12,
+      "end_col_offset": 29,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 668,
+      "line_range": [
+        668,
+        669,
+        670,
+        671,
+        672,
+        673,
+        674,
+        675,
+        676,
+        677,
+        678,
+        679,
+        680,
+        681,
+        682
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "719     run(\n720         f\"\"\"\n721         IF NOT EXISTS (SELECT 1 FROM socops.sbom_component\n722                        WHERE organisation_id = ? AND application_name = ? AND component_name = ? AND component_version = ? AND is_deleted = 0)\n723         INSERT INTO socops.sbom_component\n724             (organisation_id, application_name, component_name, component_version,\n725              package_ecosystem, license, has_known_cves, highest_cve_severity,\n726              upgrade_available, last_scanned_at, created_at)\n727         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,\n728                 DATEADD(day, -2, SYSUTCDATETIME()), SYSUTCDATETIME())\n729         \"\"\",\n730         ORG_TSS, app, comp, ver,\n",
+      "col_offset": 12,
+      "end_col_offset": 8,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 720,
+      "line_range": [
+        720,
+        721,
+        722,
+        723,
+        724,
+        725,
+        726,
+        727,
+        728,
+        729
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "843     run(\n844         f\"\"\"\n845         IF NOT EXISTS (SELECT 1 FROM socops.regulator_examination\n846                        WHERE organisation_id = ? AND examination_code = ? AND is_deleted = 0)\n847         INSERT INTO socops.regulator_examination\n848             (organisation_id, examination_code, regulator, examination_type,\n849              title_en, title_ar, scope_areas, lead_examiner_name,\n850              notified_at, fieldwork_start_at, fieldwork_end_at,\n851              draft_report_at, final_report_at, response_due_at, response_submitted_at, closed_at,\n852              status, findings_total, findings_critical, findings_high, findings_med_low,\n853              overall_rating, related_framework, notes, created_at)\n854         VALUES (?, ?, ?, ?, ?, ?, ?, ?,\n855                 DATEADD(day, -{notif_ago}, SYSUTCDATETIME()),\n856                 {fw_start_clause}, {fw_end_clause},\n857                 {draft_clause}, {final_clause}, {resp_due_clause}, {resp_sub_clause}, {closed_clause},\n858                 ?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME())\n859         \"\"\",\n860         ORG_TSS, code,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 844,
+      "line_range": [
+        844,
+        845,
+        846,
+        847,
+        848,
+        849,
+        850,
+        851,
+        852,
+        853,
+        854,
+        855,
+        856,
+        857,
+        858,
+        859
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "948     run(\n949         f\"\"\"\n950         IF NOT EXISTS (SELECT 1 FROM socops.ot_asset\n951                        WHERE organisation_id = ? AND asset_code = ? AND is_deleted = 0)\n952         INSERT INTO socops.ot_asset\n953             (organisation_id, asset_code, title_en, title_ar, purdue_level, asset_class,\n954              vendor, model, firmware_version, site_code, site_name, process_function,\n955              industrial_protocols, safety_integrity_level, criticality,\n956              last_patched_at, patch_window, remote_access_enabled, network_segment, status,\n957              created_at)\n958         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,\n959                 DATEADD(day, -180, SYSUTCDATETIME()),\n960                 'Annual turnaround (Q4 2026)',\n961                 ?, ?, ?, SYSUTCDATETIME())\n962         \"\"\",\n963         ORG_ARAMCO, code,\n",
+      "col_offset": 12,
+      "end_col_offset": 8,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 949,
+      "line_range": [
+        949,
+        950,
+        951,
+        952,
+        953,
+        954,
+        955,
+        956,
+        957,
+        958,
+        959,
+        960,
+        961,
+        962
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1040     run(\n1041         f\"\"\"\n1042         IF NOT EXISTS (SELECT 1 FROM socops.iam_jml_event\n1043                        WHERE organisation_id = ? AND event_code = ? AND is_deleted = 0)\n1044         INSERT INTO socops.iam_jml_event\n1045             (organisation_id, event_code, event_type, occurred_at,\n1046              subject_username, subject_email, subject_department, subject_job_title,\n1047              source_system, target_system, role_or_entitlement, privileged, justification,\n1048              approver_username, approver_role, outcome, sod_violation_detected, sod_violation_detail,\n1049              requested_at, approved_at, completed_at, created_at)\n1050         VALUES (?, ?, ?,\n1051                 DATEADD(day, -{days_ago}, SYSUTCDATETIME()),\n1052                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,\n1053                 DATEADD(day, -{days_ago + 1}, SYSUTCDATETIME()),\n1054                 DATEADD(day, -{days_ago}, SYSUTCDATETIME()),\n1055                 CASE WHEN ? = 'COMPLETED' THEN DATEADD(day, -{days_ago}, SYSUTCDATETIME()) ELSE NULL END,\n1056                 SYSUTCDATETIME())\n1057         \"\"\",\n1058         ORG_TSS, code,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1041,
+      "line_range": [
+        1041,
+        1042,
+        1043,
+        1044,
+        1045,
+        1046,
+        1047,
+        1048,
+        1049,
+        1050,
+        1051,
+        1052,
+        1053,
+        1054,
+        1055,
+        1056,
+        1057
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1156     run(\n1157         f\"\"\"\n1158         IF NOT EXISTS (SELECT 1 FROM socops.appsec_finding\n1159                        WHERE organisation_id = ? AND scanner = ? AND external_id = ? AND is_deleted = 0)\n1160         INSERT INTO socops.appsec_finding\n1161             (organisation_id, external_id, scanner, scan_type,\n1162              application_name, repository_url, branch, finding_title,\n1163              cwe, cve, severity, cvss_score, file_path, line_number,\n1164              component_name, component_version, fixed_version,\n1165              description, remediation_advice, status, discovered_at,\n1166              fixed_at, sla_due_at, created_at)\n1167         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,\n1168                 DATEADD(day, -{days_ago}, SYSUTCDATETIME()),\n1169                 CASE WHEN ? = 'FIXED' THEN DATEADD(day, -{max(days_ago - 14, 0)}, SYSUTCDATETIME()) ELSE NULL END,\n1170                 DATEADD(day, {30 - days_ago}, SYSUTCDATETIME()),\n1171                 SYSUTCDATETIME())\n1172         \"\"\",\n1173         ORG_TSS, scn, ext,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1157,
+      "line_range": [
+        1157,
+        1158,
+        1159,
+        1160,
+        1161,
+        1162,
+        1163,
+        1164,
+        1165,
+        1166,
+        1167,
+        1168,
+        1169,
+        1170,
+        1171,
+        1172
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1238     run(\n1239         f\"\"\"\n1240         IF NOT EXISTS (SELECT 1 FROM socops.dlp_event\n1241                        WHERE organisation_id = ? AND source_system = ? AND external_id = ? AND is_deleted = 0)\n1242         INSERT INTO socops.dlp_event\n1243             (organisation_id, external_id, source_system, event_time, policy_name,\n1244              policy_category, data_classification, username, user_email, department,\n1245              channel, destination, file_name, file_size_bytes, match_count, severity,\n1246              action_taken, reviewed, review_outcome, created_at)\n1247         VALUES (?, ?, ?,\n1248                 DATEADD(day, -{days_ago}, SYSUTCDATETIME()),\n1249                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, SYSUTCDATETIME())\n1250         \"\"\",\n1251         ORG_TSS, src, ext,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1239,
+      "line_range": [
+        1239,
+        1240,
+        1241,
+        1242,
+        1243,
+        1244,
+        1245,
+        1246,
+        1247,
+        1248,
+        1249,
+        1250
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1337     run(\n1338         f\"\"\"\n1339         IF NOT EXISTS (SELECT 1 FROM socops.brand_monitoring\n1340                        WHERE organisation_id = ? AND source_system = ? AND external_id = ? AND is_deleted = 0)\n1341         INSERT INTO socops.brand_monitoring\n1342             (organisation_id, external_id, source_system, alert_type, detected_at,\n1343              severity, confidence, affected_asset, indicator_value, indicator_context,\n1344              status, takedown_requested_at, takedown_completed_at, created_at)\n1345         VALUES (?, ?, ?, ?,\n1346                 DATEADD(day, -{days_ago}, SYSUTCDATETIME()),\n1347                 ?, ?, ?, ?, ?, ?,\n1348                 CASE WHEN ? IN ('TAKEDOWN_REQUESTED','TAKEDOWN_COMPLETE') THEN DATEADD(day, -{max(days_ago - 2, 0)}, SYSUTCDATETIME()) ELSE NULL END,\n1349                 CASE WHEN ? = 'TAKEDOWN_COMPLETE' THEN DATEADD(day, -{max(days_ago - 5, 0)}, SYSUTCDATETIME()) ELSE NULL END,\n1350                 SYSUTCDATETIME())\n1351         \"\"\",\n1352         ORG_TSS, src, ext,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1338,
+      "line_range": [
+        1338,
+        1339,
+        1340,
+        1341,
+        1342,
+        1343,
+        1344,
+        1345,
+        1346,
+        1347,
+        1348,
+        1349,
+        1350,
+        1351
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "1400     run(\n1401         f\"\"\"\n1402         IF NOT EXISTS (SELECT 1 FROM socops.forensics_artefact\n1403                        WHERE organisation_id = ? AND artefact_code = ? AND is_deleted = 0)\n1404         INSERT INTO socops.forensics_artefact\n1405             (organisation_id, artefact_code, case_code, artefact_type, title_en, title_ar,\n1406              source_host, captured_at, captured_by_handler, capture_tool, capture_method,\n1407              size_bytes, md5_hash, sha256_hash, integrity_verified_at, integrity_status,\n1408              current_custodian, current_location, retention_until, legal_hold, notes,\n1409              created_at)\n1410         VALUES (?, ?, ?, ?, ?, ?, ?,\n1411                 DATEADD(day, -{days_ago}, SYSUTCDATETIME()),\n1412                 ?, ?, ?, ?, ?, ?,\n1413                 DATEADD(day, -{days_ago - 1}, SYSUTCDATETIME()),\n1414                 'VERIFIED', ?, ?,\n1415                 DATEADD(year, {retention_years}, SYSUTCDATETIME()),\n1416                 ?, ?, SYSUTCDATETIME())\n1417         \"\"\",\n1418         ORG_TSS, code,\n",
+      "col_offset": 12,
+      "end_col_offset": 30,
+      "filename": ".\\seed_socops_data.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 1401,
+      "line_range": [
+        1401,
+        1402,
+        1403,
+        1404,
+        1405,
+        1406,
+        1407,
+        1408,
+        1409,
+        1410,
+        1411,
+        1412,
+        1413,
+        1414,
+        1415,
+        1416,
+        1417
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "480         cur.execute(\n481             f\"SELECT organisation_id, COUNT(*) FROM {tbl} WHERE is_deleted = 0 \"\n482             \"GROUP BY organisation_id ORDER BY organisation_id\")\n483         by_org = \" \".join(f\"org{r[0]}={r[1]}\" for r in cur.fetchall())\n",
+      "col_offset": 14,
+      "end_col_offset": 52,
+      "filename": ".\\setup_ai_lifecycle_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 481,
+      "line_range": [
+        481,
+        482
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "25     run(f\"{tbl}.{col}\",\n26         f\"IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('{tbl}') AND name='{col}')\"\n27         f\" ALTER TABLE {tbl} ADD {col} {defn}\")\n28 \n",
+      "col_offset": 10,
+      "end_col_offset": 78,
+      "filename": ".\\setup_bcm_db.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 26,
+      "line_range": [
+        26,
+        27
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "142         try:\n143             cur.execute(f\"SELECT COUNT(*) FROM {table}\")\n144             n = cur.fetchone()[0]\n",
+      "col_offset": 26,
+      "end_col_offset": 47,
+      "filename": ".\\setup_committees_db.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 143,
+      "line_range": [
+        143
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "574             ('Limits',         'cpty.large_exposure_limit')]:\n575         cur.execute(f'SELECT COUNT(*) FROM {tbl} WHERE is_deleted = 0')\n576         print(f'--- {label}: {cur.fetchone()[0]}')\n",
+      "col_offset": 22,
+      "end_col_offset": 43,
+      "filename": ".\\setup_cpty_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 575,
+      "line_range": [
+        575
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "865 for tbl in tables:\n866     cur.execute(f\"SELECT COUNT(*) FROM {tbl}\")\n867     count = cur.fetchone()[0]\n",
+      "col_offset": 18,
+      "end_col_offset": 39,
+      "filename": ".\\setup_cyber_db.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 866,
+      "line_range": [
+        866
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "433         ]:\n434             cur.execute(f\"SELECT COUNT(*) FROM data_officer.{tbl}\")\n435             (n,) = cur.fetchone()\n",
+      "col_offset": 26,
+      "end_col_offset": 60,
+      "filename": ".\\setup_data_officer_db.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 434,
+      "line_range": [
+        434
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "28     \"\"\"Return True if the row was inserted (didn't already exist).\"\"\"\n29     cur.execute(f\"SELECT 1 FROM data_officer.{table} WHERE {ref_col} = ? AND organisation_id = ?\", ref, ORG)\n30     if cur.fetchone():\n",
+      "col_offset": 18,
+      "end_col_offset": 45,
+      "filename": ".\\setup_data_officer_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 29,
+      "line_range": [
+        29
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "33     cur.execute(\n34         f\"INSERT INTO data_officer.{table} ({', '.join(columns)}) VALUES ({placeholders})\",\n35         *values,\n",
+      "col_offset": 10,
+      "end_col_offset": 35,
+      "filename": ".\\setup_data_officer_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 34,
+      "line_range": [
+        34
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "678         cur.execute(\n679             f\"SELECT organisation_id, COUNT(*) FROM {tbl} WHERE is_deleted = 0 \"\n680             \"GROUP BY organisation_id ORDER BY organisation_id\")\n681         by_org = \" \".join(f\"org{r[0]}={r[1]}\" for r in cur.fetchall())\n",
+      "col_offset": 14,
+      "end_col_offset": 52,
+      "filename": ".\\setup_dataclass_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 679,
+      "line_range": [
+        679,
+        680
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "45 def clear(cur, table, where=f'organisation_id = {ORG_ID}'):\n46     cur.execute(f'DELETE FROM {table} WHERE {where}')\n47 \n",
+      "col_offset": 18,
+      "end_col_offset": 30,
+      "filename": ".\\setup_lifecycle_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 46,
+      "line_range": [
+        46
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "80                     f'NPV +{cost*2}K SAR over 3y', f'\u0635\u0627\u0641\u064a \u0627\u0644\u0642\u064a\u0645\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629 +{cost*2} \u0623\u0644\u0641 \u0631\u064a\u0627\u0644 \u0639\u0644\u0649 3 \u0633\u0646\u0648\u0627\u062a',\n81                     days(random.randint(15, 90)))\n82     print(f\"  inserted {len(rows)} treatment plans\")\n",
+      "col_offset": 25,
+      "end_col_offset": 47,
+      "filename": ".\\setup_lifecycle_seed.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 330,
+        "link": "https://cwe.mitre.org/data/definitions/330.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "line_number": 81,
+      "line_range": [
+        81
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random",
+      "test_id": "B311",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "149                     'Implement compensating control + automate where possible', '\u062a\u0637\u0628\u064a\u0642 \u0636\u0627\u0628\u0637 \u062a\u0639\u0648\u064a\u0636\u064a + \u0627\u0644\u0623\u062a\u0645\u062a\u0629 \u062d\u064a\u062b \u0623\u0645\u0643\u0646',\n150                     days_ahead(random.randint(30, 90)), 'CISO',\n151                     days(random.randint(10, 60)), '')\n",
+      "col_offset": 31,
+      "end_col_offset": 53,
+      "filename": ".\\setup_lifecycle_seed.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 330,
+        "link": "https://cwe.mitre.org/data/definitions/330.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "line_number": 150,
+      "line_range": [
+        150
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random",
+      "test_id": "B311",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "150                     days_ahead(random.randint(30, 90)), 'CISO',\n151                     days(random.randint(10, 60)), '')\n152     print(f\"  inserted {len(rows)} findings\")\n",
+      "col_offset": 25,
+      "end_col_offset": 47,
+      "filename": ".\\setup_lifecycle_seed.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 330,
+        "link": "https://cwe.mitre.org/data/definitions/330.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "line_number": 151,
+      "line_range": [
+        151
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random",
+      "test_id": "B311",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "190         status = statuses[i % len(statuses)]\n191         filed_at = days(random.randint(2, 28))\n192         deadline = (filed_at + timedelta(days=30)).date()\n",
+      "col_offset": 24,
+      "end_col_offset": 45,
+      "filename": ".\\setup_lifecycle_seed.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 330,
+        "link": "https://cwe.mitre.org/data/definitions/330.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "line_number": 191,
+      "line_range": [
+        191
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random",
+      "test_id": "B311",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "246     for ext, sev, status, ten, tan, ren, ran, bias, sites in rows:\n247         detected = days(random.randint(5, 30))\n248         cur.execute(sql, ext, ORG_ID, ten, tan, sev, ren, ran, bias, sites, status,\n",
+      "col_offset": 24,
+      "end_col_offset": 45,
+      "filename": ".\\setup_lifecycle_seed.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 330,
+        "link": "https://cwe.mitre.org/data/definitions/330.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "line_number": 247,
+      "line_range": [
+        247
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random",
+      "test_id": "B311",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "299         cve = f'CVE-2026-{1000 + i}'\n300         detected = days(random.randint(3, 60))\n301         deadline = (detected + timedelta(days=sla_days[sev])).date()\n",
+      "col_offset": 24,
+      "end_col_offset": 45,
+      "filename": ".\\setup_lifecycle_seed.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 330,
+        "link": "https://cwe.mitre.org/data/definitions/330.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "line_number": 300,
+      "line_range": [
+        300
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random",
+      "test_id": "B311",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "755     ]:\n756         cur.execute(f\"SELECT COUNT(*) FROM {tbl} WHERE is_deleted = 0\")\n757         print(f\"+ {label:<20s}: {cur.fetchone()[0]}\")\n",
+      "col_offset": 22,
+      "end_col_offset": 43,
+      "filename": ".\\setup_outsourcing_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 756,
+      "line_range": [
+        756
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "580         '\u0627\u0644\u0645\u0644\u062e\u0651\u0635 \u0627\u0644\u0634\u0647\u0631\u064a \u0644\u0644\u062d\u0648\u0627\u062f\u062b \u0627\u0644\u0633\u064a\u0628\u0631\u0627\u0646\u064a\u0629\u060c \u0646\u0633\u0628\u0629 \u0627\u0644\u0627\u0644\u062a\u0632\u0627\u0645 \u0628\u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a\u060c \u0627\u0644\u0634\u0630\u0648\u0630 \u0627\u0644\u0645\u0631\u0635\u0648\u062f '\n581         '\u0639\u0644\u0649 USSD \u200f*900# \u0648SS7/SIGTRAN\u060c \u0648\u0633\u062c\u0644 \u062a\u062f\u0648\u064a\u0631 \u0645\u0641\u0627\u062a\u064a\u062d HSM.',\n582     )\n",
+      "col_offset": 19,
+      "end_col_offset": 0,
+      "filename": ".\\setup_regreporting_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 838,
+        "link": "https://cwe.mitre.org/data/definitions/838.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "A Python source file contains bidirectional control characters ('\\u200f').",
+      "line_number": 581,
+      "line_range": [
+        581
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b613_trojansource.html",
+      "test_id": "B613",
+      "test_name": "trojansource"
+    },
+    {
+      "code": "682             ('Indicators', 'rrp.rrp_indicator')]:\n683         cur.execute(f'SELECT COUNT(*) FROM {table} WHERE is_deleted = 0')\n684         print(f'--- {label}: {cur.fetchone()[0]}')\n",
+      "col_offset": 22,
+      "end_col_offset": 43,
+      "filename": ".\\setup_rrp_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 683,
+      "line_range": [
+        683
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "572             ('OPT-005', 'BUSINESS_LINE', 'USSD *900# corridor sale to peer',\n573              '\u0628\u064a\u0639 \u0645\u0645\u0631\u0651 USSD \u200f*900# \u0644\u0645\u0646\u0627\u0641\u0633',\n574              600, 120, 'LOW', 'Customer-base + tech-debt transfer; SAR 0.5pp RWA',\n",
+      "col_offset": 29,
+      "end_col_offset": 0,
+      "filename": ".\\setup_rrp_seed.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 838,
+        "link": "https://cwe.mitre.org/data/definitions/838.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "A Python source file contains bidirectional control characters ('\\u200f').",
+      "line_number": 573,
+      "line_range": [
+        573
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b613_trojansource.html",
+      "test_id": "B613",
+      "test_name": "trojansource"
+    }
+  ]
+}

@@ -1,0 +1,292 @@
+{
+  "findings": [
+    {
+      "id": "SEC-CFG-001",
+      "title": "Global exception handler leaks exception class name and root-cause message in all profiles (including prod)",
+      "phase": "Security",
+      "category": "Sensitive Information Disclosure (A05:2021 — Security Misconfiguration / CWE-209)",
+      "severity": "Medium",
+      "cvss": "CVSS ~5.3 (AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N) — information disclosure of internal exception types, SQL object names, and stack-trace-derived messages to any caller",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/common/exception/GlobalExceptionHandler.java",
+      "lines": "371-384",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/common/exception/GlobalExceptionHandler.java:240-252",
+        "tss-grc-backend/src/main/java/com/tss/grc/common/exception/GlobalExceptionHandler.java:225-235",
+        "tss-grc-backend/src/main/resources/application-prod.yml:106-115"
+      ],
+      "description": "The catch-all @ExceptionHandler(Exception.class) builds the client-facing ProblemDetail 'detail' from the exception's simple class name plus its root-cause message, and additionally serialises the fully-qualified exception class name into an 'exception' property and the raw root message into a 'rootCause' property. This is returned to the HTTP client for ANY unhandled server error. The same root-message exposure occurs in missingObjectResponse() (line 249, 'rootCause' carries SQL Server's 'Invalid object name schema.table' verbatim). There is no profile gate — application-prod.yml contains no server.error override and no branch on the active profile, so production responses disclose the same internal detail as dev. For a multi-tenant GRC platform handling SAMA/NCA-regulated data, exposing internal class names (revealing framework versions and package structure), SQL object/schema names, and exception messages aids reconnaissance and can leak data-layer structure.",
+      "rootCause": "The handler was intentionally designed to surface developer-friendly diagnostics in the toast/response body ('Real bugs surface clearly instead of hiding behind \"An unexpected error occurred.\"' — comment at lines 368-369). This design was never gated to dev-only, so it ships in prod.",
+      "evidence": "@ExceptionHandler(Exception.class)\npublic ProblemDetail handleGeneral(Exception ex) {\n    log.error(\"Unhandled exception [{}]: {}\", ex.getClass().getName(), ex.getMessage(), ex);\n    String root = rootMessage(ex);\n    String detail = ex.getClass().getSimpleName()\n        + (root != null && !root.isBlank() ? \": \" + root : \"\");\n    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detail);\n    ...\n    pd.setProperty(\"exception\", ex.getClass().getName());\n    pd.setProperty(\"rootCause\", root);",
+      "impact": "An unauthenticated or low-privilege attacker who triggers any unhandled exception (malformed input down an unguarded path, a NullPointerException, a constraint failure) receives the internal exception type, package path, and root-cause text. SQL-layer messages disclose schema and table names (e.g. 'platform.users', 'admin.committee_*'). This accelerates targeted attacks (SQLi probing, dependency-CVE matching) and violates least-disclosure expectations for a regulated platform.",
+      "reproduction": "1. Authenticate (or hit any endpoint that can throw before auth). 2. Send input that triggers an unhandled RuntimeException, e.g. a payload that causes a downstream NPE or an uncategorised DataAccessException. 3. Observe the JSON ProblemDetail response contains 'detail' = '<ExceptionSimpleName>: <root message>', plus 'exception' = fully-qualified class name and 'rootCause' = raw message. Confirm identical behaviour with --spring.profiles.active=prod.",
+      "resolution": "Gate verbose diagnostics to non-prod only. In prod, return a generic detail ('An unexpected error occurred. Reference: <correlationId>') and omit the 'exception' and 'rootCause' properties; log full details server-side keyed by a correlation id returned to the client. Inject the active Environment/profile (or a @Value flag) into the handler and branch on it. Apply the same treatment to missingObjectResponse() so SQL object names are not echoed in prod.",
+      "patchBefore": "@ExceptionHandler(Exception.class)\npublic ProblemDetail handleGeneral(Exception ex) {\n    log.error(\"Unhandled exception [{}]: {}\", ex.getClass().getName(), ex.getMessage(), ex);\n    String root = rootMessage(ex);\n    String detail = ex.getClass().getSimpleName()\n        + (root != null && !root.isBlank() ? \": \" + root : \"\");\n    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detail);\n    pd.setProperty(\"exception\", ex.getClass().getName());\n    pd.setProperty(\"rootCause\", root);\n    ...\n    return pd;\n}",
+      "patchAfter": "@Value(\"${grc.errors.verbose:false}\") private boolean verboseErrors; // true only in dev\n\n@ExceptionHandler(Exception.class)\npublic ProblemDetail handleGeneral(Exception ex) {\n    String ref = UUID.randomUUID().toString();\n    log.error(\"Unhandled exception ref={} [{}]: {}\", ref, ex.getClass().getName(), ex.getMessage(), ex);\n    String detail = verboseErrors\n        ? ex.getClass().getSimpleName() + \": \" + rootMessage(ex)\n        : \"An unexpected error occurred. Reference: \" + ref;\n    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, detail);\n    pd.setProperty(\"reference\", ref);\n    if (verboseErrors) { pd.setProperty(\"exception\", ex.getClass().getName()); pd.setProperty(\"rootCause\", rootMessage(ex)); }\n    pd.setProperty(\"timestamp\", Instant.now());\n    return pd;\n}",
+      "effort": "S",
+      "references": [
+        "CWE-209: Generation of Error Message Containing Sensitive Information",
+        "CWE-211: Externally-Generated Error Message Containing Sensitive Information",
+        "OWASP A05:2021 Security Misconfiguration",
+        "OWASP ASVS v4 7.4.1"
+      ]
+    },
+    {
+      "id": "SEC-CFG-002",
+      "title": "CORS configuration bean is never wired into the Spring Security filter chain",
+      "phase": "Security",
+      "category": "Security Misconfiguration (A05:2021 / CWE-942)",
+      "severity": "Low",
+      "cvss": "Risk rationale: the declared, over-permissive CORS policy is inert (no .cors() and no addCorsMappings), so the dangerous wildcard+credentials combo does NOT take effect — but the same omission is a latent footgun and a functional defect. Low.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java",
+      "lines": "71-153",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/config/CorsConfig.java:30-49",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/WebMvcConfig.java:11-42"
+      ],
+      "description": "CorsConfig declares a CorsConfigurationSource bean named corsConfigurationSource, but the Order(2) securityFilterChain never calls http.cors(...). In Spring Security 6, merely declaring a CorsConfigurationSource bean does NOT auto-activate CORS for the filter chain — you must explicitly call .cors(c -> c.configurationSource(corsConfigurationSource)) (or rely on the default lookup, which still requires the .cors() DSL entry). WebMvcConfig also does not override addCorsMappings, and no CorsFilter/FilterRegistrationBean exists anywhere in the codebase (verified by grep). Consequently the CORS policy is dormant: the API emits no Access-Control-Allow-Origin headers via this configuration. This is simultaneously (a) the mitigating factor that neuters SEC-CFG-003's over-broad dev origins, and (b) a latent risk — the moment someone adds http.cors() to 'fix' cross-origin in dev, the dangerous wildcard+credentials policy in CorsConfig becomes live.",
+      "rootCause": "The CorsConfig class predates the security-chain refactor; the author assumed bean-by-name auto-detection (which existed in older Spring Security WebSecurityConfigurerAdapter setups) still applies. The Order(2) chain was written without a .cors() call.",
+      "evidence": "// SecurityConfig.securityFilterChain — no .cors(...) anywhere:\nhttp\n    .csrf(AbstractHttpConfigurer::disable)\n    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))\n    .authorizeHttpRequests(auth -> auth ... )\n    .addFilterBefore(jwtAuthenticationFilter, ...)\n    .exceptionHandling(...)\n    .headers(...);\n// grep for '.cors(' / 'CorsConfigurationSource' in SecurityConfig.java => no matches",
+      "impact": "Functionally, browser-based cross-origin calls from the dev UI on a different port would not receive CORS headers from this config (may be masked by the static server/proxy). Security-wise the inert state is currently protective, but the disconnect between declared intent (a permissive credentialed CORS policy) and actual wiring is a trap: a future one-line 'fix' silently exposes the over-broad policy of SEC-CFG-003.",
+      "reproduction": "1. Start the API. 2. From a browser origin, issue a cross-origin fetch with credentials to /api/**. 3. Observe no Access-Control-Allow-Origin response header is set by CorsConfig. 4. grep the codebase: no .cors(, no addCorsMappings, no CorsFilter — confirming the bean is unconsumed.",
+      "resolution": "Decide explicitly: if CORS is needed, wire the source via http.cors(c -> c.configurationSource(corsConfigurationSource)) AND first tighten CorsConfig per SEC-CFG-003. If CORS is intentionally handled by the reverse proxy in prod and the static dev server in dev, delete CorsConfig to remove the misleading dead code. Do not leave a permissive-but-dormant policy in the tree.",
+      "patchBefore": "@Bean\n@Order(2)\npublic SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {\n    http\n        .csrf(AbstractHttpConfigurer::disable)\n        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))\n        .authorizeHttpRequests(auth -> auth ... )",
+      "patchAfter": "@Bean\n@Order(2)\npublic SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsSource) throws Exception {\n    http\n        .cors(c -> c.configurationSource(corsSource)) // wire the (now-tightened) source\n        .csrf(AbstractHttpConfigurer::disable)\n        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))\n        .authorizeHttpRequests(auth -> auth ... )",
+      "effort": "S",
+      "references": [
+        "CWE-942: Permissive Cross-domain Policy with Untrusted Domains",
+        "Spring Security Reference — CORS (requires explicit http.cors())",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-CFG-003",
+      "title": "Over-broad CORS allowedOriginPatterns (10.* / 172.* / 192.168.* on any port) combined with allowCredentials=true",
+      "phase": "Security",
+      "category": "Security Misconfiguration / CORS (A05:2021 / CWE-942)",
+      "severity": "Low",
+      "cvss": "Risk rationale: dangerous pattern (broad private-IP wildcards + credentials) but only in the dev profile and currently inert because the source is not wired (SEC-CFG-002). Would be Medium/High if wired or copied to prod.",
+      "file": "tss-grc-backend/src/main/resources/application-dev.yml",
+      "lines": "65-71",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/config/CorsConfig.java:39-44",
+        "tss-grc-backend/src/main/resources/application.yml:142-145",
+        "tss-grc-backend/src/main/resources/application-prod.yml:106-115"
+      ],
+      "description": "The dev profile sets grc.cors.allowed-origins to include broad private-network wildcard patterns: http://192.168.*:[*], http://10.*:[*], http://172.*:[*]. CorsConfig feeds these into setAllowedOriginPatterns(...) with setAllowCredentials(true) and setMaxAge(3600). allowedOriginPatterns is precisely the mechanism that lets wildcards coexist with credentials (which setAllowedOrigins would reject), so the safety net Spring normally provides (no wildcard-with-credentials) is deliberately bypassed. The patterns match the entire RFC-1918 space (10.0.0.0/8, 172.16/12-ish via 172.*, 192.168/16) on ANY port. Any host on those ranges — including an attacker on the same LAN/VPN or a malicious site that can reach a victim's private IP — becomes a trusted credentialed origin. Separately, the PROD profile (application-prod.yml grc: block, lines 106-115) does NOT override grc.cors.allowed-origins, so it inherits the base default http://localhost:3000 (application.yml:145) rather than the documented empty list — a config drift from the stated 'set to empty list in prod' intent (CorsConfig javadoc lines 19-23).",
+      "rootCause": "Convenience for LAN dev access (reach the dev UI from another machine without per-IP config — comment lines 66-70). Wildcard origin patterns plus allowCredentials were chosen to make this frictionless, trading away origin validation. Prod was never given an explicit empty CORS list, so it silently inherits a localhost default.",
+      "evidence": "allowed-origins: \"...,http://192.168.*:[*],http://10.*:[*],http://172.*:[*]\"\n// CorsConfig.java\nconfig.setAllowedOriginPatterns(allowedOrigins);\nconfig.setAllowCredentials(true);   // Required for HttpOnly refresh-token cookie",
+      "impact": "If/when the CORS source is wired (see SEC-CFG-002), any origin in the RFC-1918 ranges on any port can make credentialed cross-origin calls and read responses — enabling a malicious page (or co-tenant on a shared dev/staging LAN/VPN) to drive the authenticated API on a victim's behalf and exfiltrate cross-tenant GRC data. The prod default of localhost:3000 means a real browser front-end on the production domain would be CORS-blocked (functional bug) while localhost is needlessly trusted.",
+      "reproduction": "1. (After wiring http.cors) From a page served at http://10.13.37.5:9999 in a victim's browser, fetch('https://api-host/api/v1/...', {credentials:'include'}). 2. Observe Access-Control-Allow-Origin echoes the attacker origin and Access-Control-Allow-Credentials: true, allowing the response to be read. 3. For prod drift: deploy with profile prod, inspect effective grc.cors.allowed-origins => http://localhost:3000 (inherited), not empty.",
+      "resolution": "Replace wildcard ranges with the exact, known dev origins (specific host:port entries). Never combine broad wildcards with allowCredentials=true. In prod, set grc.cors.allowed-origins explicitly to the production front-end origin(s) or an empty list if same-origin via Nginx — do not rely on inheritance of the localhost default.",
+      "patchBefore": "# application-dev.yml\nallowed-origins: \"...,http://192.168.*:[*],http://10.*:[*],http://172.*:[*]\"",
+      "patchAfter": "# application-dev.yml — enumerate exact dev hosts, no broad RFC-1918 wildcards\nallowed-origins: \"http://localhost:3000,http://127.0.0.1:3000,http://localhost:8086,http://127.0.0.1:8086,http://<your-dev-machine-ip>:8086\"\n# application-prod.yml — be explicit\ngrc:\n  cors:\n    allowed-origins: \"https://grc.yourdomain.sa\"   # or \"\" for same-origin behind Nginx",
+      "effort": "S",
+      "references": [
+        "CWE-942: Permissive Cross-domain Policy with Untrusted Domains",
+        "CWE-346: Origin Validation Error",
+        "PortSwigger — Exploiting CORS misconfigurations",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-CFG-004",
+      "title": "Multipart upload size limits set under wrong YAML key (server.servlet.multipart) — defaults (1MB/10MB) silently in effect",
+      "phase": "Security",
+      "category": "Security Misconfiguration / Resource limits (A05:2021 / CWE-770)",
+      "severity": "Low",
+      "cvss": "Risk rationale: misconfiguration causes overly-restrictive defaults (uploads >1MB fail), not an unbounded-upload DoS. Functional + hardening concern. Low.",
+      "file": "tss-grc-backend/src/main/resources/application.yml",
+      "lines": "85-95",
+      "locations": [
+        "tss-grc-backend/src/main/resources/application.yml:154-158"
+      ],
+      "description": "The multipart limits are declared under server.servlet.multipart (max-file-size: 50MB, max-request-size: 55MB). Spring Boot binds multipart limits from spring.servlet.multipart (MultipartProperties, prefix 'spring.servlet.multipart'), NOT server.servlet.multipart. The 'server.servlet' namespace has no 'multipart' child, so this block is unbound/ignored and the framework defaults apply (max-file-size 1MB, max-request-size 10MB). No @Bean MultipartConfigElement or MultipartResolver overrides it anywhere (verified by grep). Net effect: the evidence-upload feature the comment describes ('Default is 1MB which is too small for real evidence documents') is in fact still capped at the 1MB default. From a security angle this is the inverse of a DoS — limits are too tight rather than too loose — but it is a misconfiguration that defeats an intended control and leaves the real (default) limits undocumented and unreviewed.",
+      "rootCause": "Wrong configuration prefix: the author placed multipart under 'server.servlet' (alongside encoding) instead of the Spring Boot binding prefix 'spring.servlet.multipart'. The mistake is masked because oversized uploads simply fail with the default-limit error, which can look like an application/file-size rule.",
+      "evidence": "server:\n  servlet:\n    context-path: /\n    encoding: { charset: UTF-8, enabled: true, force: true }\n    multipart:\n      max-file-size: 50MB        # <-- under server.servlet, NOT spring.servlet — ignored\n      max-request-size: 55MB",
+      "impact": "Intended 50MB evidence uploads actually fail at 1MB; operators may not realise the effective limit. Because the limit lives at a non-binding key, multipart resource limits are not actually governed by config and are easy to overlook in a hardening review — a future move of this key to the correct prefix with a too-large value (or 'unlimited') would create an upload-DoS vector.",
+      "reproduction": "1. POST a >1MB file to an evidence upload endpoint (e.g. /api/v1/evidence/items/{id}/file). 2. Observe MaxUploadSizeExceededException at ~1MB despite the 50MB config. 3. Confirm by relocating the block to spring.servlet.multipart and re-testing — the 50MB limit then takes effect.",
+      "resolution": "Move the multipart block to spring.servlet.multipart so it binds to MultipartProperties, and choose deliberate, documented limits aligned to grc.storage.max-file-size-mb (50). Keep request-size modestly above file-size.",
+      "patchBefore": "server:\n  servlet:\n    multipart:\n      max-file-size: 50MB\n      max-request-size: 55MB",
+      "patchAfter": "spring:\n  servlet:\n    multipart:\n      max-file-size: 50MB\n      max-request-size: 55MB\n      file-size-threshold: 2MB",
+      "effort": "S",
+      "references": [
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "Spring Boot — MultipartProperties (prefix spring.servlet.multipart)",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-CFG-005",
+      "title": "CSRF globally disabled while a long-lived refresh token is stored in a cookie",
+      "phase": "Security",
+      "category": "Cross-Site Request Forgery (A01:2021 — Broken Access Control / CWE-352)",
+      "severity": "Low",
+      "cvss": "Risk rationale: access-token auth is header-based Bearer (not cookie) so most state-changing API calls are CSRF-immune; residual risk is limited to the cookie-authenticated /api/auth/refresh endpoint and depends on the cookie's SameSite attribute. Low.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java",
+      "lines": "73-74",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:63",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:83-84",
+        "tss-grc-backend/src/main/resources/application-prod.yml:83-89"
+      ],
+      "description": "CSRF protection is disabled on both filter chains (csrf(AbstractHttpConfigurer::disable)). The architectural justification ('not needed for stateless JWT') is sound for the access token, which is carried in the Authorization: Bearer header and stored in sessionStorage — a custom header is not auto-attached by the browser cross-site, so those calls are inherently CSRF-resistant. However the system ALSO uses an HttpOnly refresh-token cookie (7 days) and exposes POST /api/auth/refresh and POST /api/auth/logout as permitAll cookie-authenticated endpoints. Cookies ARE sent automatically by the browser on cross-site requests, so /api/auth/refresh and /api/auth/logout are reachable via CSRF unless the cookie's SameSite attribute blocks it. The prod profile sets server.servlet.session.cookie.same-site=strict (lines 83-89), but that property governs the SERVLET SESSION cookie (JSESSIONID), not the application-issued refresh-token cookie, which is created in AuthController code (outside these config files). If that cookie is not explicitly SameSite=Strict/Lax, a cross-site POST to /api/auth/refresh forces a token refresh (and /api/auth/logout forces a logout — a session-fixation/denial nuisance).",
+      "rootCause": "Blanket csrf-disable applied to the whole API based on the Bearer-token model, without carving out the cookie-authenticated refresh/logout endpoints. The only cookie hardening present (same-site=strict in prod) targets the servlet session cookie, not the custom refresh cookie set in AuthController.",
+      "evidence": "// SecurityConfig\n.csrf(AbstractHttpConfigurer::disable)\n...\n.requestMatchers(HttpMethod.POST, \"/api/auth/refresh\").permitAll()\n.requestMatchers(HttpMethod.POST, \"/api/auth/logout\").permitAll()",
+      "impact": "If the refresh cookie lacks a restrictive SameSite, an attacker page can issue a cross-site POST to /api/auth/refresh (token churn / potential token-fixation depending on rotation) or /api/auth/logout (forced logout — availability nuisance). Impact is bounded because the refreshed access token is returned in the response body, which the cross-site attacker cannot read (CORS), so account takeover is not directly achievable via this vector.",
+      "reproduction": "1. Log in to obtain the refresh cookie. 2. From an attacker-controlled origin, auto-submit a form POST to https://api-host/api/auth/logout (no custom headers, simple request). 3. If the refresh cookie is sent and not SameSite-blocked, the victim is logged out. 4. Repeat against /api/auth/refresh to observe forced token rotation. 5. Inspect Set-Cookie for the refresh token in AuthController to confirm/deny SameSite.",
+      "resolution": "Verify the refresh-token cookie is set with SameSite=Strict (or at least Lax), HttpOnly, and Secure in prod. Given SameSite=Strict, CSRF on these endpoints is mitigated. For defence-in-depth, consider keeping CSRF disabled for Bearer-authenticated routes but require a custom header / double-submit token specifically on the cookie-authenticated /api/auth/refresh and /api/auth/logout, or bind refresh to a header-supplied value in addition to the cookie.",
+      "patchBefore": "// AuthController (refresh cookie) — verify attributes\nResponseCookie.from(\"refreshToken\", token)\n    .httpOnly(true)\n    .path(\"/api/auth\")\n    .maxAge(Duration.ofDays(7))\n    .build();",
+      "patchAfter": "ResponseCookie.from(\"refreshToken\", token)\n    .httpOnly(true)\n    .secure(true)        // prod\n    .sameSite(\"Strict\")  // block cross-site auto-send -> CSRF mitigated\n    .path(\"/api/auth\")\n    .maxAge(Duration.ofDays(7))\n    .build();",
+      "effort": "S",
+      "references": [
+        "CWE-352: Cross-Site Request Forgery (CSRF)",
+        "OWASP A01:2021 Broken Access Control",
+        "OWASP CSRF Prevention Cheat Sheet — SameSite cookies"
+      ]
+    },
+    {
+      "id": "SEC-CFG-006",
+      "title": "Token-as-credential public portal endpoints are permitAll with acknowledged-incomplete hardening (no rate limit / brute-force protection)",
+      "phase": "Security",
+      "category": "Broken Access Control / Identification & Authentication Failures (A01/A07:2021 / CWE-307)",
+      "severity": "Medium",
+      "cvss": "CVSS ~5.3 (AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N) — unauthenticated, token-guessing / enumeration risk on public token endpoints without rate limiting",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java",
+      "lines": "91-117",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:96-98",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:102-117"
+      ],
+      "description": "A set of public, unauthenticated endpoints are permitAll where a per-record token IS the only credential: TPRM vendor BCP attestation (/api/v1/tprm/bcp-attestations/by-token/** GET+POST), whistleblower portal (status/reply by token), customer-complaints tracking (/api/v1/complaints/public/track/**), case-intake tracking (/api/v1/intake/track/**), and PDPL public sub-processor list. The code comment at lines 95-96 explicitly acknowledges the control gap: 'Full vendor portal hardening (rate-limit, MFA bind, full audit) is a follow-up.' With no rate limiting, IP throttling, or lockout at this layer (and dev sets max-failed-login-attempts=99 which governs only login, not these token lookups), the token space is exposed to online brute-force / enumeration. If any token is short, sequential, timestamp-derived, or otherwise low-entropy (must be verified in the service/token-generator code), an attacker can enumerate other vendors'/reporters'/customers' confidential records — a serious confidentiality breach for whistleblower (SAMA CG Art.28 / CMA CG Art.87) and complaint PII data. The HTTP layer correctly permits these by design; the finding is the absence of compensating brute-force controls behind that permit, by the authors' own admission.",
+      "rootCause": "Public token-keyed endpoints were shipped before the compensating controls (rate limiting, audit, token-entropy guarantees) that a credential-bearing public surface requires. Authorization is delegated entirely to token possession with no throttle.",
+      "evidence": "// Slice 10-D: vendor BCP attestation submission portal — token IS\n// the credential, so these two endpoints are auth-free. Full vendor\n// portal hardening (rate-limit, MFA bind, full audit) is a follow-up.\n.requestMatchers(HttpMethod.GET,  \"/api/v1/tprm/bcp-attestations/by-token/**\").permitAll()\n.requestMatchers(HttpMethod.POST, \"/api/v1/tprm/bcp-attestations/by-token/**\").permitAll()",
+      "impact": "An unauthenticated attacker can attempt to guess/enumerate per-record tokens at full request speed to read or submit against other tenants' vendor attestations, whistleblower cases, and customer complaints (which include PII per the comments). For a regulated GRC platform this risks exposure of confidential whistleblower identities and complaint PII, with regulatory consequences under PDPL and SAMA/CMA conduct rules.",
+      "reproduction": "1. Without authenticating, GET /api/v1/complaints/public/track/<guess> or /api/v1/tprm/bcp-attestations/by-token/<guess> in a loop. 2. Observe no rate limiting / lockout from the HTTP/security layer. 3. If tokens are sequential/low-entropy, valid records are discoverable; confirm token entropy by reviewing the token generator in the corresponding service.",
+      "resolution": "Add per-IP and per-token-prefix rate limiting / exponential backoff on all public token endpoints (e.g. bucket4j filter or gateway throttle). Enforce cryptographically-random, sufficiently-long tokens (>=128-bit). Audit-log access attempts (without logging reporter IP where policy forbids). Consider short token TTLs and single-use submission tokens. Track and close the acknowledged 'follow-up' hardening items before production exposure.",
+      "patchBefore": ".requestMatchers(HttpMethod.GET,  \"/api/v1/tprm/bcp-attestations/by-token/**\").permitAll()\n.requestMatchers(HttpMethod.POST, \"/api/v1/tprm/bcp-attestations/by-token/**\").permitAll()\n// no throttling filter registered for these paths",
+      "patchAfter": "// Register a rate-limit filter (e.g. bucket4j) before the JWT filter for /api/v1/**/public/** and /by-token/**\nhttp.addFilterBefore(publicEndpointRateLimitFilter, JwtAuthenticationFilter.class);\n// Ensure tokens are 128-bit+ random (SecureRandom), single-use where applicable, short TTL\n.requestMatchers(HttpMethod.GET,  \"/api/v1/tprm/bcp-attestations/by-token/**\").permitAll()\n.requestMatchers(HttpMethod.POST, \"/api/v1/tprm/bcp-attestations/by-token/**\").permitAll()",
+      "effort": "M",
+      "references": [
+        "CWE-307: Improper Restriction of Excessive Authentication Attempts",
+        "CWE-639: Authorization Bypass Through User-Controlled Key (IDOR)",
+        "OWASP A01:2021 Broken Access Control",
+        "OWASP A07:2021 Identification and Authentication Failures"
+      ]
+    },
+    {
+      "id": "SEC-CFG-007",
+      "title": "Swagger/OpenAPI security chain (Order 1) permits all and is enabled in dev; CSP intentionally relaxed",
+      "phase": "Security",
+      "category": "Security Misconfiguration / Information Disclosure (A05:2021 / CWE-651)",
+      "severity": "Low",
+      "cvss": "Risk rationale: API surface disclosure limited to dev (prod disables springdoc), and the permissive chain only matches doc paths. Low.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java",
+      "lines": "56-67",
+      "locations": [
+        "tss-grc-backend/src/main/resources/application.yml:115-125",
+        "tss-grc-backend/src/main/resources/application-dev.yml:117-122",
+        "tss-grc-backend/src/main/resources/application-prod.yml:117-121",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:89-90"
+      ],
+      "description": "A dedicated Order(1) filter chain matches /swagger-ui.html, /swagger-ui/**, /v3/api-docs, /v3/api-docs/**, /webjars/** and applies anyRequest().permitAll() with CSRF disabled and, deliberately, NO Content-Security-Policy (comment line 54: 'No CSP restriction: Swagger UI requires inline scripts/styles to render'). The full API spec is therefore served without authentication wherever this chain is active. This is gated by springdoc.swagger-ui.enabled / api-docs.enabled — dev enables both (application-dev.yml:117-122), base defaults swagger-ui to env SWAGGER_ENABLED:false, and prod sets swagger-ui.enabled=false AND api-docs.enabled=false (application-prod.yml:117-121). When springdoc is disabled the doc endpoints 404, so prod exposure is closed. Residual concerns: (1) the security chain still permits these paths regardless of the springdoc flag, so re-enabling springdoc (or any future controller mapped under these prefixes) is exposed without auth and without CSP; (2) the relaxed-CSP Swagger chain has no X-Frame-Options/CSP frame-ancestors, so Swagger UI pages are framable (clickjacking) when enabled; (3) in dev the entire authenticated API surface (every endpoint, schema, example) is published to anyone who can reach the dev port — relevant given the broad LAN CORS/access intent in SEC-CFG-003.",
+      "rootCause": "Defence-in-depth was traded for Swagger UI rendering convenience: a separate permissive chain with no CSP, gated only by the springdoc enable flags rather than also by the security chain. The permit rules and the enable flags are maintained in two places that can drift.",
+      "evidence": "@Bean @Order(1)\npublic SecurityFilterChain swaggerFilterChain(HttpSecurity http) throws Exception {\n    http.securityMatcher(\"/swagger-ui.html\", \"/swagger-ui/**\", \"/v3/api-docs\", \"/v3/api-docs/**\", \"/webjars/**\")\n        .csrf(AbstractHttpConfigurer::disable)\n        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))\n        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());\n    return http.build();\n}",
+      "impact": "In dev/staging (or any environment where springdoc is enabled), unauthenticated users reach the complete API documentation, aiding endpoint and parameter discovery for attacks. The missing frame-ancestors/X-Frame-Options on the Swagger chain allows clickjacking of the docs UI where enabled. Prod is protected only by the springdoc disable flags; the security layer itself would still permit the paths if those flags were ever flipped.",
+      "reproduction": "1. With profile dev, GET /v3/api-docs and /swagger-ui.html without any Authorization header -> full spec / UI returned. 2. Inspect response headers on /swagger-ui.html -> no Content-Security-Policy, no X-Frame-Options from the Order(1) chain. 3. With profile prod, GET /v3/api-docs -> 404 (springdoc.api-docs.enabled=false).",
+      "resolution": "Restrict the Swagger paths to non-prod and/or require authentication (or network-restrict to internal IPs) even in dev. Keep the security-chain permit and the springdoc enable flag in sync (ideally make the chain conditional on the same property/profile). Apply at least frame-ancestors 'none' / X-Frame-Options DENY to the Swagger chain to prevent clickjacking; relax only script/style-src as Swagger truly needs.",
+      "patchBefore": "@Bean @Order(1)\npublic SecurityFilterChain swaggerFilterChain(HttpSecurity http) throws Exception {\n    http.securityMatcher(...)\n        .csrf(AbstractHttpConfigurer::disable)\n        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());\n    return http.build();\n}",
+      "patchAfter": "@Profile({\"dev\",\"staging\"})  // never register this chain in prod\n@Bean @Order(1)\npublic SecurityFilterChain swaggerFilterChain(HttpSecurity http) throws Exception {\n    http.securityMatcher(...)\n        .csrf(AbstractHttpConfigurer::disable)\n        .headers(h -> h.frameOptions(f -> f.deny())\n            .contentSecurityPolicy(csp -> csp.policyDirectives(\n                \"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'\")))\n        .authorizeHttpRequests(auth -> auth.anyRequest().authenticated()); // or hasRole(ADMIN)\n    return http.build();\n}",
+      "effort": "M",
+      "references": [
+        "CWE-651: Exposure of WSDL File / API documentation Containing Sensitive Information",
+        "CWE-1021: Improper Restriction of Rendered UI Layers (Clickjacking)",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-CFG-008",
+      "title": "HSTS header emitted in dev over HTTP (max-age 1 year, includeSubDomains) can poison clients",
+      "phase": "Security",
+      "category": "Security Misconfiguration (A05:2021 / CWE-319)",
+      "severity": "Low",
+      "cvss": "Risk rationale: HSTS over plaintext dev can pin a developer's browser to HTTPS for the host for a year; nuisance/availability, low confidentiality impact. Low.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java",
+      "lines": "142-144",
+      "locations": [
+        "tss-grc-backend/src/main/resources/application-dev.yml:53-54"
+      ],
+      "description": "The Order(2) chain unconditionally enables HSTS with maxAgeInSeconds(31536000) and includeSubDomains(true) for ALL profiles. The dev profile runs plain HTTP on port 8084 (no server.ssl). Browsers ignore HSTS received over plain HTTP per spec for the response that delivered it, but if the dev server is ever reached over HTTPS (e.g. via a TLS-terminating proxy, or a shared hostname), or a colleague accesses a LAN dev host that also serves other apps on subdomains, the 1-year includeSubDomains HSTS can force HTTPS-only on that hostname and its subdomains — breaking access to sibling plain-HTTP dev services. Conversely, the genuinely valuable HSTS is in prod (TLS on 8443), where it is correct. The issue is the lack of profile-scoping: HSTS belongs to TLS-terminated environments only.",
+      "rootCause": "Security headers are configured once in a shared chain with no profile awareness; HSTS (a TLS-only directive) is applied even in the plaintext dev profile.",
+      "evidence": ".httpStrictTransportSecurity(hsts -> hsts\n    .maxAgeInSeconds(31536000)\n    .includeSubDomains(true))\n// dev runs HTTP: application-dev.yml -> server.port: 8084, no ssl",
+      "impact": "Developer/QA browsers can be pinned to HTTPS for a dev hostname (and all its subdomains) for a year, breaking access to other plaintext dev services on shared hostnames and causing confusing connection-refused errors that are hard to clear. No direct attacker benefit, but a real operational footgun, especially combined with the LAN-access intent.",
+      "reproduction": "1. Front the dev server with any TLS terminator (or access a dev host that has both HTTP and HTTPS). 2. Browser receives Strict-Transport-Security: max-age=31536000; includeSubDomains. 3. Subsequent plain-HTTP access to that host/subdomains is force-upgraded to HTTPS by the browser for a year.",
+      "resolution": "Scope HSTS to TLS-enabled profiles only (e.g. enable the header block in prod profile / when server.ssl.enabled=true). Optionally lower includeSubDomains unless every subdomain is HTTPS. Leave HSTS fully enabled in prod where it is correct.",
+      "patchBefore": ".httpStrictTransportSecurity(hsts -> hsts\n    .maxAgeInSeconds(31536000)\n    .includeSubDomains(true))",
+      "patchAfter": "// inject @Value(\"${server.ssl.enabled:false}\") boolean sslEnabled;\n.httpStrictTransportSecurity(hsts -> {\n    if (sslEnabled) { hsts.maxAgeInSeconds(31536000).includeSubDomains(true); }\n    else { hsts.disable(); }\n})",
+      "effort": "S",
+      "references": [
+        "CWE-319: Cleartext Transmission of Sensitive Information",
+        "RFC 6797 — HTTP Strict Transport Security",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-CFG-009",
+      "title": "TenantWriteGuard mass-assignment / cross-tenant write interceptor defaults OFF",
+      "phase": "Security",
+      "category": "Broken Access Control / Multi-tenant isolation (A01:2021 / CWE-639)",
+      "severity": "Medium",
+      "cvss": "CVSS ~6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — cross-tenant write integrity risk if any service forgets the per-call setId(null)/org-scoping defense, with the platform-wide backstop disabled by default",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/config/TenantWriteGuardConfig.java",
+      "lines": "52-96",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/config/TenantWriteGuardConfig.java:90-94",
+        "tss-grc-backend/src/main/resources/application.yml:147-152",
+        "tss-grc-backend/src/main/resources/application-prod.yml:106-110"
+      ],
+      "description": "TenantWriteGuardInterceptor is the platform-wide Hibernate-level backstop that throws SecurityException on cross-tenant writes performed without TenantContext.allowCrossTenantWrite(). It is gated by grc.security.tenant-write-guard.enabled which defaults to false (line 52-53) and is NOT set to true in any committed profile (neither application.yml, application-dev.yml, nor application-prod.yml define grc.security.tenant-write-guard). The code itself documents that with the guard off, 'Per-service setId(null) defense is the only mass-assignment guard active' (lines 92-93). Given the platform's stated #1 risk is org-scoping/tenant isolation, shipping the only centralized, defense-in-depth control for cross-tenant writes in a default-disabled state means a single missed per-service guard (a forgotten setId(null) or an unscoped repository save) results in an unguarded cross-tenant write with no backstop. The feature-flag rationale (soak in staging first) is reasonable for rollout but the committed prod profile never flips it on, so production likely runs without the backstop.",
+      "rootCause": "New defensive interceptor was intentionally shipped default-off to allow staged activation (lines 26-45), but no profile (notably application-prod.yml) ever enables it, leaving the centralized cross-tenant write guard inactive in production by default.",
+      "evidence": "@Value(\"${grc.security.tenant-write-guard.enabled:false}\")\nprivate boolean enabled;\n...\n} else {\n    log.info(\"[TenantWriteGuard] interceptor NOT wired \"\n           + \"(grc.security.tenant-write-guard.enabled=false). Per-service \"\n           + \"setId(null) defense is the only mass-assignment guard active.\");\n}",
+      "impact": "If any one of the many module services omits or mis-implements its per-call tenant/id scoping (mass-assignment of organisation_id, or a save that crosses tenants), the write proceeds and corrupts or injects data into another tenant's records, with no platform-level interceptor to block it. For a multi-tenant SAMA/NCA GRC platform this is a high-integrity, cross-tenant data-isolation breach.",
+      "reproduction": "1. Inspect committed profiles: grep grc.security.tenant-write-guard across application*.yml -> no enabled:true. 2. Start with profile prod -> log shows '[TenantWriteGuard] interceptor NOT wired'. 3. Exercise any service path that saves an entity with an attacker-supplied organisation_id where that service lacks the setId(null)/scope check -> write succeeds cross-tenant (no SecurityException).",
+      "resolution": "Enable grc.security.tenant-write-guard.enabled=true in application-prod.yml (after the documented staging soak) so the platform-wide backstop is active in production. Keep the per-service defenses as primary; treat the interceptor as defense-in-depth that should be ON by default in any real deployment. Add a startup assertion/health indicator that fails or warns loudly if the guard is disabled in prod.",
+      "patchBefore": "# application-prod.yml — no grc.security.tenant-write-guard block (defaults to false)\ngrc:\n  security:\n    session-timeout-minutes: 30\n    max-login-attempts: 5\n    lockout-duration-minutes: 30",
+      "patchAfter": "# application-prod.yml\ngrc:\n  security:\n    session-timeout-minutes: 30\n    max-login-attempts: 5\n    lockout-duration-minutes: 30\n    tenant-write-guard:\n      enabled: true   # platform-wide cross-tenant write backstop ON in prod",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "OWASP A01:2021 Broken Access Control",
+        "OWASP A08:2021 Software and Data Integrity Failures"
+      ]
+    },
+    {
+      "id": "SEC-CFG-010",
+      "title": "Stale/incorrect LocaleConfig uses HTTP-session locale resolver in a declared-stateless API",
+      "phase": "Security",
+      "category": "Security Misconfiguration (A05:2021 / CWE-1059)",
+      "severity": "Info",
+      "cvss": "Risk rationale: SessionLocaleResolver would create HttpSessions, contradicting the STATELESS design; minor session-fixation surface and dead-config confusion. Info.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/config/LocaleConfig.java",
+      "lines": "29-46",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:77-78",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/WebMvcConfig.java:11-17"
+      ],
+      "description": "LocaleConfig registers a SessionLocaleResolver and a LocaleChangeInterceptor (?lang=) — a server-side, session-backed i18n mechanism. This contradicts the platform's stateless design (SecurityConfig sets SessionCreationPolicy.STATELESS; CLAUDE.md states 'No HTTP sessions on the server') and the project's documented approach that the standalone frontend handles i18n client-side (translations.js). A SessionLocaleResolver writes the locale into an HttpSession, which (a) would cause sessions to be created despite the stateless intent, and (b) the LocaleChangeInterceptor bean is not registered with the InterceptorRegistry in WebMvcConfig (addInterceptors is not overridden), so it is effectively dead config. Also note WebMvcConfig.addViewControllers redirects '/' to '/dashboard' and addResourceHandlers references classpath:/static/... and comments mention Thymeleaf @{} URLs — all leftovers from a server-rendered design that does not match this REST-only backend. These are correctness/cleanliness issues with a minor security angle (unexpected session creation = small session-fixation surface; dead config obscures the true security posture).",
+      "rootCause": "Carried-over server-side-MVC configuration (session locale + Thymeleaf-era resource handlers/view controllers) that was never removed when the project became a stateless REST API with a separate static frontend.",
+      "evidence": "@Bean\npublic LocaleResolver localeResolver() {\n    SessionLocaleResolver resolver = new SessionLocaleResolver();\n    resolver.setDefaultLocale(Locale.ENGLISH);\n    resolver.setLocaleAttributeName(\"CURRENT_LOCALE\");\n    return resolver;\n}\n// SecurityConfig: SessionCreationPolicy.STATELESS",
+      "impact": "Minimal direct attacker impact. Risk is unintended HttpSession creation (contradicting STATELESS, a minor session-fixation footprint) and misleading dead configuration that complicates security review. The interceptor not being wired means ?lang switching does not even function server-side.",
+      "reproduction": "1. Review LocaleConfig vs SecurityConfig — SessionLocaleResolver vs STATELESS. 2. Note LocaleChangeInterceptor bean is never added in WebMvcConfig.addInterceptors (method absent) -> not active. 3. Confirm REST controllers do not rely on server locale (frontend i18n via translations.js per CLAUDE.md).",
+      "resolution": "Remove the server-side locale machinery (or replace SessionLocaleResolver with AcceptHeaderLocaleResolver if server-side message localization is genuinely needed for validation messages). Prune the Thymeleaf-era view controller and static resource handlers in WebMvcConfig that no longer apply to a REST-only backend. This reduces attack surface and clarifies the stateless posture.",
+      "patchBefore": "@Bean\npublic LocaleResolver localeResolver() {\n    SessionLocaleResolver resolver = new SessionLocaleResolver();\n    resolver.setDefaultLocale(Locale.ENGLISH);\n    return resolver;\n}",
+      "patchAfter": "@Bean\npublic LocaleResolver localeResolver() {\n    AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();\n    resolver.setDefaultLocale(Locale.ENGLISH);\n    resolver.setSupportedLocales(List.of(Locale.ENGLISH, Locale.forLanguageTag(\"ar\")));\n    return resolver; // no HttpSession; consistent with STATELESS\n}",
+      "effort": "S",
+      "references": [
+        "CWE-1059: Insufficient Technical Documentation / stale configuration",
+        "CWE-384: Session Fixation (unintended session creation)",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    }
+  ]
+}

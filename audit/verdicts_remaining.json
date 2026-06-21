@@ -1,0 +1,92 @@
+[
+  {
+    "id": "SEC-NDI-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified in source. NdiAuditController.java:37-41 exposes POST /api/ndi/audit gated only by @PreAuthorize(\"isAuthenticated()\") and binds a raw NdiAuditEvent from the request body. NdiAuditService.record() only nulls id, stamps organisationId, requires action/entityType, and defaults severity, then repo.save(body) — occurredAt, actor identity, message and before/after values are all attacker-controlled. Any authenticated tenant user can forge or backdate entries in the same append-only ledger that NdiAuditPublisher writes, and the search/aggregate endpoints surface it to the Audit tab and AUDIT_TRAIL report. Genuine audit-log integrity (A09) flaw; High is correct."
+  },
+  {
+    "id": "SEC-NPM-001",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "All cited facts verified: package-lock.json:2359 resolves vite 5.4.21 (in the vulnerable <=6.4.2 range for the three GHSA advisories) and vite.config.ts:20-27 sets host:true + allowedHosts:true, exposing the dev server on 0.0.0.0/LAN on a Windows host. However every one of these advisories targets the Vite DEV SERVER only; production ships a static `vite build` output with no dev server running, so the exposure exists solely on developer machines on a trusted LAN. Real but dev-only attack surface — High overstates production impact; Medium."
+  },
+  {
+    "id": "QUAL-IE-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified in EvidenceMatrixService.java:57-143. matrix() loops frameworkRepo.findAll() (64) -> controlRepo.findByFrameworkIdAndIsActiveTrue (71) -> subControlRepo.findByControlIdAndIsActiveTrue (77) -> itemRepo.findBySubControl(org, s.getId()) per sub-control (85), with inline aggregations in one ~86-LOC method. Genuine triple/quad-nested N+1 plus high cyclomatic complexity. The batch pattern that fixes it already exists in the same package — GrcExpertService uses findByFrameworkIdInAndIsActiveTrue / findByControlIdInAndIsActiveTrue + aggregateStatusBySubControl/aggregateExpiryBySubControl/aggregateFreshApprovedBySubControl. Real quality defect; High is right."
+  },
+  {
+    "id": "PERF-NQ-003",
+    "status": "adjusted",
+    "finalSeverity": "High",
+    "rationale": "Same code as QUAL-IE-001 and the nested-loop / per-sub-control item fetch is confirmed exactly at lines 64/71/77/85. The N+1 is real, but 'Critical' overstates blast radius: the framework->control->sub-control tree is a bounded, platform-shared catalog (a handful of frameworks), the method is @Transactional(readOnly=true), and it backs a single matrix view rather than a hot request path. Query count grows with catalog size, not tenant data volume. Real performance bug worth High, not Critical."
+  },
+  {
+    "id": "PERF-IX-002",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "Verified: V3__compliance_module.sql (3 tables), V4__incident_module.sql (1 table) and V7__tprm_module.sql (2 tables) contain 0 CREATE INDEX statements while V8__evidence_module.sql has 8; compliance.findings declares FK_findings_assessment on assessment_id (V3:103-104) with no backing index; no later migration backfills indexes onto these exact tables. The inconsistency is real. But these are low-cardinality GRC registers (controls/assessments/findings/vendors) with a clustered PK, where table scans remain acceptable at realistic data volumes, and dev uses Python-bootstrapped DBs. A genuine schema-discipline gap with modest real-world impact — Medium, not High."
+  },
+  {
+    "id": "FUNC-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: package.json scripts = dev/build/preview/typecheck only (no \"test\"), devDependencies carry no vitest/jest/@testing-library/playwright, and no vitest.config/jest.config exists. The only two test files (src/__tests__/threeLines.test.ts, mobileCrisis.test.ts) both import node:test and are unrunnable by the project toolchain — fed only through tsc --noEmit. The production UI ships zero executable automated tests wired into the build; CI gates the frontend on type-checking alone. High is correct for the active production UI."
+  },
+  {
+    "id": "FUNC-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Recomputed directly from jacoco.csv (1324 class rows): BRANCH 26.0% (5308 covered / 15079 missed), COMPLEXITY 22.3% (4203/14636), INSTRUCTION 37.1%, LINE 38.5%, METHOD 31.9% — every cited figure matches. 762/1324 classes (57.6%) have 0 instruction coverage. The named vulnerable classes are confirmed at 0%: AuthController, EvidenceMatrixService, DataOfficerService, OtAssetService. Decision logic is largely unexercised. High is correct."
+  },
+  {
+    "id": "FUNC-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified end-to-end. OtAssetService, IntakeController and ApprovalChainController have 0 *Test.java files (and 0% JaCoCo). CustomSqlRunner.java (module/ccm/runner) has 0 references to organisation/tenant/TenantContext, so no test could assert tenant-scoped SELECT. BcmService.java:221-232 updateBia and 235-237 deleteBia call biaRepo.findById(id)/deleteById(id) with no tenant predicate (unlike the tenant-scoped listExercises), while BcmServiceTest has getPlan_other_tenant_throws / invokePlan_other_tenant_throws but ZERO bia tests (only the @Mock field references 'bia'). The exploit-path test gap is real. Minor nit: the narrative says '6 Critical findings' but crit_high.json actually holds 8 Critical / 57 High; the count is slightly off but the substantive claim is fully supported. High."
+  },
+  {
+    "id": "COPY-01",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified in LoginPage.tsx: line 25 useState('admin'), line 26 useState('Admin@12345') (live PLATFORM_ADMIN seed creds), rendered pre-filled. Line 114 renders <div className=\"login-hint\"><b>{t('loginHint')}</b></div>, and en.ts:116 loginHint = 'Demo · admin / Admin@12345 — riskmanager / Risk@12345'. Creds are plain component state with no import.meta.env.DEV guard and the hint is an always-rendered translation key, so both ship in every build/locale. Real security-adjacent UX defect; High."
+  },
+  {
+    "id": "LH-01",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: App.tsx:8-18 statically (eagerly) imports LoginPage, DashboardPage, SettingsPage, RiskRegisterPage, CyberPage, BcmWorkspacePage, PrivacyPage, CompliancePage, TprmPage, IncidentsPage, EvidencePage, and line 167 imports ScmPage — all top-level, folded into the entry graph loaded on /login. lighthouse-login.report.json total-byte-weight items confirm CompliancePage.tsx (337,307 B), ScmPage.tsx (289,426 B), CyberPage.tsx (286,941 B), TprmPage.tsx (258,133 B) downloaded on /login; unused-javascript displays 'Est savings of 1,742 KiB'; 196 network requests. Real bundle/code-splitting defect; High."
+  },
+  {
+    "id": "LH-02",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: i18n.tsx lines 2-3 statically import { en } and { ar } at module scope into the eager I18nProvider mounted on every route. lighthouse-login.report.json total-byte-weight lists src/translations/ar.ts at 1,076,314 B and src/translations/en.ts at 860,108 B (~1.84 MiB) downloaded on /login, the #1 and #2 largest resources. A single-locale login page needs neither full dictionary. Real critical-path bloat; High."
+  },
+  {
+    "id": "LH-03",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "The cited metrics are exact in lighthouse-login.report.json: FCP 37,409 ms / LCP 72,262 ms / Speed Index 37,409 ms / TTI 72,262 ms, all score 0, performance 0.38, 196 network requests. BUT the report's own rootCause states these were 'Measured against the Vite dev server (no production bundle)' — the 37s/72s wall-clock is dominated by on-demand ESM transpilation and an unbundled 182-request waterfall, not the shipped artifact; Total Blocking Time is only 40 ms and main-thread work 1.2 s. The real, environment-independent defects (eager imports, dual-locale bundle) are already captured as High in LH-01/LH-02. The headline catastrophic CWV figures do not reflect a production build, so a standalone High is inflated — Medium."
+  },
+  {
+    "id": "A11Y-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: tokens.css:116 --sb-text-3 = #4A5C58 on tokens.css:112 --sb-bg = #0B1F22. Recomputed WCAG ratio = 2.40:1 (matches the finding), far below the 4.5:1 AA floor for the 9-10px sidebar captions/group labels. axe dashboard.json confirms nodes with fg #4a5c58 / bg #0b1f22 / contrastRatio 2.4, and the sidebar shell renders on every authenticated page. Sibling token --sb-text-2 (#7E928F) measures 5.19:1, confirming the wrong tier was assigned. Genuine WCAG 1.4.3 failure (serious); High."
+  },
+  {
+    "id": "A11Y-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: tokens.css:28 --ink-4 = #8C9690 on tokens.css:18 --surface-2 = #F5F1E9. Recomputed ratio = 2.71:1 (matches), below 4.5:1 AA. axe settings.json shows 3 .scale-seg-label nodes with fg #8c9690 / bg #f5f1e9 / contrastRatio 2.7. --ink-4 is a token-level token reused for .text-dim and secondary captions, so not a one-off; adjacent --ink-3 (#5C6A65) reaches 5.03:1. Genuine WCAG 1.4.3 failure; High."
+  },
+  {
+    "id": "A11Y-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: tokens.css:98 --risk-vhigh = #D87560; the .score-pill pairs it with hard-coded white text. Recomputed white-on-#D87560 = 3.17:1 (matches the cited 3.16, rounding), below the 4.5:1 AA floor for 11px bold (not large-text exempt). axe risk-register.json confirms 28 total color-contrast nodes of which 25 are fg #ffffff / bg #d87560 / contrastRatio 3.16 — the dominant source of the page's violations. Dark ink #15201D on the same fill would reach 5.28:1. Genuine WCAG 1.4.3 failure; High."
+  }
+]

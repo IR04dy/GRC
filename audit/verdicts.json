@@ -1,0 +1,392 @@
+[
+  {
+    "id": "SEC-CVE-001",
+    "status": "adjusted",
+    "finalSeverity": "High",
+    "rationale": "Version confirmed: the built artifact (tss-grc-backend/target/tss-grc-platform-0.1.0-SNAPSHOT.jar, BOOT-INF/lib) bundles tomcat-embed-core-10.1.46.jar, transitively managed by spring-boot-starter-parent 3.5.6 (pom.xml lines 8-15). So this IS an outdated/maintained dependency that should be kept current — a legitimate A06 finding. However, the 'Critical' severity with 'auth-bypass' CVEs is not substantiated: Tomcat 10.1.46 (Sept 2025) already contains the fixes for the known auth-bypass/rewrite issues (CVE-2025-49125 etc., fixed in 10.1.42/43) and the dominant recent Tomcat-embedded CVE class in this lineage is request-smuggling/DoS rated High/Moderate, not a Critical auth-bypass/RCE. No Critical CVE is demonstrably applicable to exactly 10.1.46. Downgrading to High: real outdated-component exposure, severity overstated."
+  },
+  {
+    "id": "SEC-CVE-002",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "Version confirmed: built jar bundles spring-security-web-6.5.5.jar (and spring-security-config-6.5.5.jar), managed by Spring Boot parent 3.5.6. The cited advisory class — 'HTTP response (security) headers may not be written' — is a real documented Spring Security issue. But VMware/Broadcom rate this class Moderate, and the practical impact is weakened security headers (e.g. CSP/HSTS occasionally not emitted) leading to defence-in-depth degradation / minor information disclosure, not a direct 'security policy bypass' enabling compromise. Marking Critical is unjustified. 6.5.5 is also a recent release. Real but Medium."
+  },
+  {
+    "id": "SEC-CYB-001",
+    "status": "confirmed",
+    "finalSeverity": "Critical",
+    "rationale": "Confirmed real cross-tenant IDOR. CyberService.getControl(id) (line 184), updateControl(id,req) (199) and deleteControl(id) (210) resolve the entity via controlRepo.findById(id) with NO organisation scoping. The controller (CyberController lines 85-108) passes only the path id — no orgId — to these methods. The @PreAuthorize(\"hasPermission('CYBER','READ'/'WRITE')\") checks only the action permission, NOT object ownership, so a user holding CYBER perms in tenant A can read/update/soft-delete tenant B's CyberControl by guessing/iterating ids. updateControl preserves existing.getOrganisationId(), but 'existing' itself came from the unscoped findById, so the write still lands on the foreign row. No mitigating org-scoped guard exists anywhere in the path. Same unscoped findById pattern repeats for sub-controls/assessments/vulnerabilities/etc. Critical stands."
+  },
+  {
+    "id": "SEC-CYB-002",
+    "status": "confirmed",
+    "finalSeverity": "Critical",
+    "rationale": "Confirmed cross-tenant mass-assignment takeover. OtAssetService.save(in) (lines 38-70) calls repo.save(in) directly on the client-supplied detached entity, including the attacker-controlled in.getId(). The org-scoped findByIdAndOrganisationId at line 45 is used ONLY to snapshot prior remote-access state and returns null for a foreign id — it does NOT block the write. Line 48 sets in.setOrganisationId(currentTenant), then repo.save(in) performs a merge/UPDATE on the foreign row id, overwriting all attacker-supplied fields AND reassigning the victim row to the attacker's tenant. The PUT path (OtAssetController line 41) explicitly body.setId(id), and @PreAuthorize only checks hasAnyRole(...), never object ownership. A privileged-enough user in tenant A overwrites/steals tenant B's OT assets. Critical stands."
+  },
+  {
+    "id": "SEC-FIN-001",
+    "status": "confirmed",
+    "finalSeverity": "Critical",
+    "rationale": "Confirmed unauthenticated cross-tenant PII exposure. SecurityConfig line 93 explicitly permitAll() on GET /api/v1/intake/track/** (verified — no auth required). The IntakeController.track (lines 81-87) and IntakeService.findByReferenceCode (lines 143-146) look up by reference code with NO organisation_id filter (cross-tenant) and map straight to IntakeRecordDto.from(). That DTO mapper (IntakeRecordDto.from, lines 58-82) copies submitterName, submitterEmail, submitterPhone AND the full raw payload verbatim with ZERO redaction, regardless of submitterIsAnonymous. The controller/service docstrings claim 'PII fields are still filtered downstream when the submission was anonymous' — that claim is demonstrably false (no filtering code exists; contrast SecurityConfig's own note that the complaints public portal returns a 'PII-stripped view'). Reference codes are 8 chars from a 31-symbol alphabet with no rate-limiting on the unauthenticated endpoint. Genuine unauthenticated sensitive-data exposure across all tenants. Critical stands."
+  },
+  {
+    "id": "SEC-IAM-001",
+    "status": "confirmed",
+    "finalSeverity": "Critical",
+    "rationale": "Confirmed. POST /api/v1/workflow/chains/{id}/actions (ApprovalChainController:129-134) and /withdraw (136-141) are guarded only by @PreAuthorize(\"isAuthenticated()\"). The actor identity is taken entirely from the request body: ApprovalChainInstanceService.recordAction writes a.setActorUserId(req.actorUserId()) (line 245) and audit-logs \"by user=\"+req.actorUserId() with no comparison to SecurityContextHolder's principal, and no check that the caller matches the step's requiredUserId/requiredRole. The state machine advances purely on the existence of an APPROVED action row for a mandatory step (isStepOrderSatisfied, lines 401-412), so any authenticated user can forge approvals on behalf of any actorUserId and advance/finalise a chain. withdraw() compares originatorUserId to the body's actorUserId, which is attacker-controlled, so the originator-only guard is trivially satisfiable. loadOrThrow() org-scopes the instance, so this is intra-tenant only — but it fully defeats approval segregation-of-duties and forges the approval audit trail on a governance workflow. Critical is warranted (broken function-level authorization + signer/actor identity forgery)."
+  },
+  {
+    "id": "SEC-INT-001",
+    "status": "adjusted",
+    "finalSeverity": "High",
+    "rationale": "Real but over-rated. CustomSqlRunner.execute (59-112) runs em.createNativeQuery(sql) with sql taken verbatim from the test definition's expectedConditionJson. The rejectionReason guard (118-138) is SELECT-only and blocks DML/DDL/EXEC/statement-chaining, but it does NOT tenant-scope the SELECT — a crafted SELECT against iam.users or another tenant's table returns cross-tenant rows, which surface in the run record (rowCount + echoed sql). So a cross-tenant READ exfiltration path is genuine. However the title implies broad \"tenant-supplied\" reachability; in fact authoring/updating a CUSTOM_SQL definition requires CcmController WRITE_GUARD = hasAnyRole('CISO','COMPLIANCE_OFFICER','PLATFORM_ADMIN') and running requires the same RUN_GUARD. It is not reachable by an ordinary authenticated user, and it is read-only (no DML/DDL injection — those are blocked). It remains a serious multi-tenant data-isolation breach abusable by a privileged-but-tenant-scoped role, so not refuted, but the Critical rating overstates exploitability; adjust to High."
+  },
+  {
+    "id": "SEC-AUTH-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed. AuthController.login (56-119) calls authManager.authenticate and on AuthenticationException simply returns 401 with no counting, throttling, or lockout. The User entity carries failedLoginAttempts and lockedUntil fields and GrcUserDetails exposes accountNonLocked, but a project-wide search of src/main shows NO code increments failedLoginAttempts, sets lockedUntil, or reads the application-dev.yml keys max-failed-login-attempts:99 / lockout-duration-minutes:1. CustomUserDetailsService derives accountNonLocked solely from the static user.getIsLocked() flag (line 55), i.e. manual admin locking only. There is no automatic brute-force protection or rate limiting on login (CWE-307). High is appropriate for a missing-throttle on the credential endpoint."
+  },
+  {
+    "id": "SEC-BCM-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed cross-tenant IDOR. BiaRecordRepository exposes only findByProcessId / findByProcessIdIn with no organisation_id finder, and BiaRecord has no organisationId column. BcmService.updateBia (221-232) and deleteBia (235-237) resolve by raw biaRepo.findById / biaRepo.deleteById with zero org check; listBia(processId) (201-207) accepts an arbitrary processId and calls findByProcessId with no org filter; createBia doesn't set/validate org. The controller exposes GET /bia, PUT /bia/{id}, DELETE /bia/{id} (BcmController:147-171) guarded only by the generic hasPermission('BCM',...) module permission, which any BCM user in any tenant holds. A user in tenant A can read, overwrite, or hard-delete tenant B's BIA records by guessing ids (deleteBia is even a hard delete via deleteById). The service comment claiming tenant scoping is enforced 'at the BiaRecordRepository query layer' is false. High is correct."
+  },
+  {
+    "id": "SEC-CMP-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed mass-assignment / cross-tenant overwrite. FrameworkAnchorController.addMapping (119-128) binds a raw PolicyFrameworkMapping via @RequestBody and sets body.setPolicyId(id) but never nulls body.getId(). PolicyFrameworkMapping has an IDENTITY id and no organisationId column, and requirePolicy() only org-scopes the path-variable policy, not the body's mapping id. If the caller supplies an existing mapping id, mappingRepo.save(body) becomes a JPA merge/UPDATE over that row — including a cross-tenant row, since mapping rows are unscoped — letting an authenticated COMPLIANCE:WRITE user clobber/hijack another tenant's policy_framework_mapping. The codebase's own BcmService.createPlan/createProcess explicitly null the id as a documented 'mass-assignment defense', confirming the omission here is a real defect. Requires the COMPLIANCE:WRITE permission, so High (not Critical) is the right severity."
+  },
+  {
+    "id": "SEC-CMP-002",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "CONFIRMED that ControlMapController (tss-grc-backend/.../controlmap/controller/ControlMapController.java) carries NO @PreAuthorize on any of its three endpoints (GET list, GET evidence, PUT replace-set). With SecurityConfig's default rule .anyRequest().authenticated() and @EnableMethodSecurity NOT denying by default, any authenticated user — including read-only roles like AUDITOR — can replace an entity's control links via PUT /api/v1/control-links/{type}/{id}. This is a genuine BFLA, and the surrounding compliance/risk controllers all use the hasPermission('MODULE','ACTION') pattern, so this is a real deviation. However, the audit title also claims 'in-tenant IDOR': I REFUTE that aspect — ControlMapService is fully org-scoped (every method calls TenantContext.getCurrentTenant() and queries findByOrganisationIdAndEntityTypeAndEntityId / deleteForEntity(orgId,...)), so there is NO cross-tenant exposure and the data altered is the caller's own tenant. The exposed data is internal control-to-evidence mapping metadata (not PII/credentials), and the actor on writes is correctly taken from @AuthenticationPrincipal. Real authorization gap but the impact (in-tenant integrity of non-sensitive mapping data, no cross-tenant reach) is below the other High BFLA findings here; adjusting to Medium."
+  },
+  {
+    "id": "SEC-CMP-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "CONFIRMED. Every endpoint in PolicyController (create/update/delete/transition/new-version/expiry-sweep for documents, exceptions and attestations) is gated only by @PreAuthorize(\"isAuthenticated()\"). Given SecurityConfig's .anyRequest().authenticated() baseline and method security that does not deny un-privileged users, any authenticated principal (auditor, risk manager, ordinary user) can author, update, publish (via transition to PUBLISHED), delete policies and approve/reject policy exceptions — a clear Broken Function-Level Authorization on a governance-critical workflow, whereas peer controllers (RegChangePolicyController, RiskController) enforce hasPermission('MODULE',ACTION). The title is accurate (BFLA, not IDOR). I verified PolicyService is org-scoped (get() uses findByIdAndOrganisationId, list/create/transition/delete all resolve org() = TenantContext) so this is NOT cross-tenant, but BFLA over policy authoring/publishing/exception-approval is materially impactful (compliance integrity, ability to forge an approved exception that bypasses controls). High is appropriate and consistent with the audit's other isAuthenticated()-only BFLA Highs."
+  },
+  {
+    "id": "SEC-CVE-003",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "PARTIALLY CONFIRMED. pom.xml line 32 declares mssql.version = 12.8.1.jre11 and lines 112-116 use it, so the vulnerable version claim is accurate; CVE-2025-59250 is a real Microsoft mssql-jdbc improper-input-validation/spoofing issue affecting this version (fixed in 12.10.1/13.2.1). It is a legitimate Vulnerable-&-Outdated-Components (A06) hygiene finding and the dependency should be bumped. However, the exploit precondition is a malicious or MITM SQL Server endpoint: the JDBC URL, host and credentials are server-side and operator-controlled (application-dev.yml/prod externalised secrets), not attacker-influenceable, so there is no direct user-facing attack surface. The CVSS for this class of spoofing CVE sits in the medium band and real-world exploitability in this single-trusted-DB deployment is low. Downgrading from High to Medium — valid patch obligation, limited practical risk."
+  },
+  {
+    "id": "SEC-CVE-004",
+    "status": "refuted",
+    "finalSeverity": "Low",
+    "rationale": "REFUTED as a High. pom uses spring-boot-starter-actuator under Boot 3.5.6, but the cited CVE concerns an authentication bypass specifically via a Health Group 'additional-path' and via CloudFoundry actuator endpoints. Neither precondition exists here: application.yml exposes only health,info,metrics (prod adds prometheus) with NO health groups and NO additional-path configured; the app is a plain Spring Boot jar, not deployed on CloudFoundry (no CF actuator auto-config). In prod the management endpoints run on a separate, non-public port 8090 (server.port: 8090, documented as 'not exposed publicly') with health show-details: never. With the vulnerable feature unused and the management surface network-isolated, the bypass is not reachable. This is at most a keep-up-to-date hygiene note; lowering to Low."
+  },
+  {
+    "id": "SEC-CVE-005",
+    "status": "refuted",
+    "finalSeverity": "Low",
+    "rationale": "REFUTED as a High. The declared version (Boot 3.5.6, pom lines 8-15) is accurate, but the finding overstates impact and cites a CVE id ('CVE-2026-40973') I cannot corroborate as a real, code-execution-grade vulnerability. The underlying issue class — a predictable ApplicationTemp working directory — is a LOCAL information-disclosure / tampering weakness: exploitation requires an attacker who already has local filesystem access to the shared OS temp directory on the host and can race/plant files there. It is not remotely reachable and does not by itself yield 'code execution / session hijacking' as the title claims (no session state is stored in that temp dir in this stateless-JWT app; sessions are STATELESS per SecurityConfig). 3.5.6 is a recent patch line and there is no remote attack surface tied to this in the codebase. Genuine impact is low and local-only; downgrading to Low (keep dependencies current, but not a High)."
+  },
+  {
+    "id": "SEC-CYB-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed. Every method in CloudServiceController (list/get/create/update/stats) is annotated only @PreAuthorize(\"isAuthenticated()\"), with no class-level guard. SecurityConfig's API chain ends in .anyRequest().authenticated(), so there is no compensating module-permission check anywhere — any authenticated principal (even a read-only AUDITOR or a privacy-only user with no CYBER rights) can create/update the NCA CSCC cloud inventory. CloudServiceService IS org-scoped (get() uses findByIdAndOrganisationId, create() forces org from TenantContext, update() loads via the scoped get()), so this is in-tenant BFLA, not cross-tenant. That matches the finding's BFLA claim. High is appropriate for missing function-level authorization on a regulated inventory write surface."
+  },
+  {
+    "id": "SEC-ESG-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed. Every endpoint in GhgEmissionRecordController — including create (POST /), update (PUT /:id), softDelete (DELETE /:id) and the full workflow (submit/verify/approve/archive) — is gated only by @PreAuthorize(\"isAuthenticated()\"); no SUSTAINABILITY permission is required and the global rule is anyRequest().authenticated(). GhgEmissionRecordService is org-scoped (get() uses findByIdAndOrganisationId, create() forces org), so the exposure is in-tenant BFLA plus a segregation-of-duties bypass on the disclosure approval chain (any authenticated user can drive DRAFT→SUBMITTED→VERIFIED→APPROVED). The finding's BFLA/CWE-862 claim holds; High is correct."
+  },
+  {
+    "id": "SEC-EVD-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed. AttachmentController (/api/v1/attachments) carries no @PreAuthorize on any method and no class-level authorization annotation — only @SecurityRequirement (Swagger doc) and @Tag. With SecurityConfig's anyRequest().authenticated(), every authenticated user can list, upload, download, version, edit-metadata and delete attachments for ANY entityType/entityId and any attachment id. There is no ATTACHMENT/EVIDENCE module permission and (by id-based download/delete) no demonstrated owner/tenant binding at the controller. This is generic-file BFLA plus in-tenant IDOR over arbitrary documents. High is appropriate."
+  },
+  {
+    "id": "SEC-EVD-002",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "Real but severity overstated. EvidenceItemCreateRequest has a status field and create()→applyRequest() does `if (req.status() != null) item.setStatus(req.status())` with no validation that the value is a legal starting state, so an EVIDENCE:WRITE user can mint an item directly in APPROVED, bypassing the DRAFT→PENDING_REVIEW→APPROVED state machine and the EvidenceReviewController review record. However the 'four-eyes Segregation-of-Duties' framing is weak: the legitimate approve path (EvidenceItemController /approve) is itself only @PreAuthorize(hasPermission('EVIDENCE','WRITE')) — the same permission as create — so a single WRITE user can already approve their own evidence through the normal flow. The status-injection therefore adds an integrity/validation gap (skips the review row and transition guards) but not a fundamentally new privilege, and it still requires EVIDENCE:WRITE and is org-scoped. Net incremental impact is Medium, not High."
+  },
+  {
+    "id": "SEC-FE-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed. The legacy UI interpolates server-sourced data into innerHTML/insertAdjacentHTML with no escaping. In app.js the global shell builds via shell.innerHTML = _buildShell(user) where displayName comes from user.fullNameEn/username (lines 47/141), and showFlash() injects a message via insertAdjacentHTML (line 269). Module list pages do the same, e.g. compliance/index.html line 183-209 maps rows into innerHTML with ${c.nameEn}, ${c.domain}, ${c.owner}, ${c.code} unescaped. These fields are tenant-user-authored bilingual data persisted server-side, so a control/policy name (or a provisioned username) containing markup like <img src=x onerror=...> executes on render — a genuine stored/DOM XSS. No output encoding exists anywhere in this render path. High is appropriate."
+  },
+  {
+    "id": "SEC-FIN-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "SupplierResilienceController.java: every endpoint, including the sensitive workflow actions approveAlt (L77-81), approvePlan (L125-129), rejectPlan (L131-135), activatePlan (L137-142) and archive, is gated only by @PreAuthorize(\"isAuthenticated()\") with no SCM module permission. The services (verified ExitPlanService) are correctly org-scoped via TenantContext.getCurrentTenant()/findByIdAndOrganisationId, so this is a within-tenant Broken Function-Level Authorization (CWE-862), not cross-tenant — exactly as the category states. Any authenticated user (e.g. a read-only role) can author and approve/activate SAMA-outsourcing exit plans and alternate-supplier records, which are privileged regulatory workflow actions. Severity High is consistent with the other module-wide BFLA findings."
+  },
+  {
+    "id": "SEC-IAM-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "ApprovalRequestService.transition() (L144-211) is invoked from a controller endpoint guarded only by isAuthenticated(). The service is org-scoped (findByOrganisationIdAndExternalId, L147) so no cross-tenant access, but there is no check that the caller is the assignedTo on the request — any authenticated in-org user can move a PENDING request to APPROVED/REJECTED. The decider identity is taken straight from the request body: r.setDecidedBy(req.getDecidedBy()) at L159, with no override from the authenticated principal, so the decider can be forged. Both halves of the claim hold within the tenant. The title's 'any request' is true within the org; not cross-tenant, but the BFLA + forged-decider impact justifies High."
+  },
+  {
+    "id": "SEC-IAM-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "DigitalSignatureController sign (L85-90) and reject (L92-97) are gated only by isAuthenticated() and pass no caller identity to the service. DigitalSignatureService.sign()/reject() (L106-128) load the row via org-scoped get(id) but never compare the authenticated user against the stored signerUserId set at request time (L89). Therefore any authenticated user in the tenant can sign or reject any REQUESTED transaction assigned to a different designated signer — a true signature-forgery / no-binding-to-signer defect. Org-scoping prevents cross-tenant abuse but not the in-tenant signer impersonation. High is appropriate."
+  },
+  {
+    "id": "SEC-INT-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "ServiceNowWebhookController.incidentUpdated (L68-120) resolves the link with linkRepo.findFirstByIntegrationAndExternalNumber(\"SERVICENOW\", number) (L87-88). The repository method (IntegrationExternalLinkRepository L15-16) has NO organisationId parameter, while the sibling finder explicitly takes one — confirming org-scoping was intended but omitted here. The handler then mutates that link (lastKnownState/lastPulledAt, L96-99) and publishes a DomainEvent into link.getOrganisationId()'s automation pipeline (L107-113). A caller (any holder of the PLATFORM_ADMIN/SOC_AUTOMATION/INTEGRATION_SERVICE service role) supplying a number that matches another tenant's link writes to and triggers automation in the victim tenant — cross-tenant write/IDOR. The role gate limits who can call but not which tenant's row is touched. High is correct (privileged-role gate moderates exploitability, but integrity impact is real)."
+  },
+  {
+    "id": "SEC-NDI-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "A grep of the entire ndi module shows every @PreAuthorize across all NDI controllers (cycle, evidence, opex, settings, gap, maturity, submission, plan, compliance, framework, reports, audit, domain, dashboard) is isAuthenticated() — there is not a single hasPermission('NDI',...). NdiAssessmentCycleController (L43-101) confirms create/update/transition/clone/archive/delete are all isAuthenticated() only. NdiAssessmentCycleService is fully org-scoped (TenantContext.getCurrentTenant(), findByIdAndOrganisationId), so this is module-wide within-tenant BFLA (CWE-862) exactly as categorised: any authenticated user can create, transition (including APPROVED/SUBMITTED), and soft-delete SDAIA NDI regulatory assessment cycles. High confirmed."
+  },
+  {
+    "id": "SEC-PLAT-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified LicensingController.java: every endpoint (incl. POST /modules upsert and POST /modules/{code}/disable) is guarded only by @PreAuthorize(\"isAuthenticated()\"). @EnableMethodSecurity(prePostEnabled=true) is active in SecurityConfig, and ModulePermissionEvaluator shows hasPermission requires a specific MODULE_ACTION authority or ROLE_PLATFORM_ADMIN — so isAuthenticated() genuinely means any logged-in user (e.g. seeded auditor/riskmanager) bypasses the admin gate. This is real BFLA: a non-admin can enable/disable their tenant's module entitlements, bypassing licensing and self-inflicting a tenant DoS via the LicenseGuardAspect (RequireModule) which throws ModuleDisabledException for disabled modules. Not Critical / not cross-tenant: upsert forces body.setOrganisationId(TenantContext.getCurrentTenant()) and disable() uses the current tenant, so writes cannot reach other tenants. Severity High is correct for in-tenant privilege escalation over license control."
+  },
+  {
+    "id": "SEC-PLAT-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified AutomationRuleController.java: all 8 endpoints carry only @PreAuthorize(\"isAuthenticated()\"). With method security enabled and the authority-based permission model, any authenticated user (regardless of role) can PATCH a rule's conditionJson/actionJson (the automation logic that drives automated platform actions) and soft-delete rules. Every operation is org-scoped via findByIdAndOrganisationId / findByOrganisationId..., so there is NO cross-tenant exposure — the issue is purely missing function-level authorization within the tenant. Genuine BFLA over the automation engine's integrity warrants High; severity unchanged."
+  },
+  {
+    "id": "SEC-PRIV-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified ConsentRecordController.java: list/get/history/grant/withdraw/supersede/stats are all guarded only by @PreAuthorize(\"isAuthenticated()\") rather than hasPermission('PRIVACY',...). The backing ConsentRecordService is fully org-scoped (findByIdAndOrganisationId, findByOrganisationId...), which confirms the finding's framing as BFLA (CWE-862 missing authorization) and NOT cross-tenant IDOR. Impact within the tenant is real: any authenticated low-privilege user can read the sensitive PDPL consent/PII ledger and grant/withdraw/supersede consents (withdrawal emits CONSENT_WITHDRAWN domain events that start downstream DSR/regulatory clocks). Genuine BFLA on a sensitive PDPL dataset = High; severity unchanged."
+  },
+  {
+    "id": "SEC-PRIV-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified CyberPdplBridgeController.java: POST /trigger is guarded only by @PreAuthorize(\"isAuthenticated()\"). CyberPdplBridgeService.triggerForIncident() is org-scoped (the cyber.incidents SELECT filters WHERE organisation_id = :org and all writes use that org), so the finding is correctly a BFLA / missing-authorization issue, not cross-tenant IDOR. Within the tenant the impact is significant: any authenticated user can fabricate a regulatory privacy.data_breaches record, flip cyber.incidents PII-classification flags (affects_personal_data, pii_classified_by/at), and trip the >=500-subjects / NATIONAL_ID logic that flags a 72h SDAIA notification SLA. Forging breach/regulatory records and mutating incident state under no role check is a genuine High BFLA; severity unchanged."
+  },
+  {
+    "id": "SEC-RISK-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified RiskTreatmentService.get(id) at lines 62-66: it calls treatments.findById(id) with NO organisation scoping and does NOT call ensureRiskInTenant — unlike every sibling method (listForRisk, create, update, transition, delete all invoke ensureRiskInTenant). RiskAdvancedController exposes this directly at GET /api/v1/risk/treatments/{id} under @PreAuthorize(\"hasPermission('RISK','READ')\"), which only checks the caller holds RISK_READ in their own org and performs NO object-level scoping (ModulePermissionEvaluator's instance-level overload delegates to the module-level check). A user in tenant A can therefore read any RiskTreatment by sequential id belonging to tenant B (descriptions, ownerId, due dates, status). Confirmed cross-tenant BOLA/IDOR. Read-only single-object leak (writes via update/transition/delete are properly scoped), so High — not Critical — is appropriate; severity unchanged."
+  },
+  {
+    "id": "SEC-TPRM-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed real cross-tenant IDOR. TprmService.updateAssessment (lines 101-112) and deleteAssessment (lines 114-120) fetch via assessmentRepo.findById(id) with NO organisation filter, then mutate/soft-delete the row. VendorAssessmentRepository declares no org-scoped finder (only findById/findByVendorId), so the raw JpaRepository.findById is unscoped. The contrast is explicit in the same file: getVendor (lines 39-43) DOES filter by TenantContext, but the assessment paths do not. The TprmController endpoints carry @PreAuthorize(\"hasPermission('TPRM',...)\"), but that only verifies the caller holds the TPRM permission in their own tenant — it does not bind the path id to the caller's organisation, so a tenant-A user with TPRM:WRITE/DELETE can update or delete tenant-B assessments by guessing/iterating ids. Not mitigated elsewhere. High is appropriate for a multi-tenant integrity/availability breach (A01 BOLA)."
+  },
+  {
+    "id": "SEC-TPRM-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed real cross-tenant mutation. QuestionnaireService.assignTemplate (line 214), markComplete (line 299) and markReviewed (lines 320-321) all resolve the parent VendorAssessment via assessments.findById(assessmentId) with no organisation scoping (repository has no org-scoped finder), then write to it (assignTemplate sets templateId/totalQuestions/workflowStatus/score; markComplete/markReviewed flip workflowStatus). @PreAuthorize('TPRM','WRITE') on the controller does not scope by tenant, so a tenant-A user can advance/overwrite tenant-B assessment workflow state. Nuance: upsertResponse (lines 238-293) is partially constrained — q is fetched org-scoped (findByIdAndOrganisationId) and line 246 rejects when the victim assessment's templateId mismatches the attacker-scoped question's templateId — so the response-write path is only fully exploitable when va.templateId is null; but assignTemplate/markComplete/markReviewed are cleanly cross-tenant. The core claim (unscoped findById enabling cross-tenant mutation) holds. High is correct."
+  },
+  {
+    "id": "QUAL-DUP-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed. ObligationAttestationCampaign (declared 'public class ... {' with no extends) manually re-declares the full audit/soft-delete/versioning block at lines 116-142 (createdAt, updatedAt, createdBy, updatedBy, isDeleted, deletedAt, deletedBy, @Version rowVersion) plus id at 36-38 — every one of which already exists in com.tss.grc.common.model.BaseEntity (verified: same column names and @Version byte[] rowVersion). So this is genuine duplication of a mapped superclass. Magnitude verified: 369 @Entity classes total (claim 368) and 189 declare the is_deleted column inline (claim 188) — i.e. roughly half the domain model bypasses BaseEntity. High is on the aggressive side for a pure maintainability/DRY issue but defensible given the scale; severity retained."
+  },
+  {
+    "id": "QUAL-DUP-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed with a magnitude caveat. The cited example is real: ObligationCampaignsPage.tsx defines a local ProgressBar component at lines 344-365 rather than importing a shared one (a components/ui dir exists). The named function 'ProgressBar' literally recurs in only 2 page files, so the headline reads stronger than a name-grep shows; however clone detectors measure token-level duplicate blocks, and the broader pattern is substantiated: 70 page files contain the same inline progress-bar style block (height:8 + borderRadius) and 153 page files contain inline bilingual ternaries (lang === 'ar' ? ...), across 313 pages / ~128k LOC. The exact '609 clones / 8,602 lines' figure is tool-derived and not independently reproduced here, but the duplication is genuine and widespread. High retained as a maintainability finding."
+  },
+  {
+    "id": "QUAL-ESG-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed. DataOfficerService is exactly 1054 LOC (verified) and injects exactly 14 *Repository fields (verified). Its own class javadoc states it 'Implements 10 PDPL/NDMO/SDAIA-mandated sub-modules in one service', and the file embeds eight distinct state-machine maps (DSR, DPIA, Breach, Notice, Disposal, NDR, Ethics, plus Consent/Retention described) — a textbook god class / SRP violation aggregating many bounded contexts behind one @Service. All quantitative claims match. High is appropriate for a Quality-phase maintainability finding of this size."
+  },
+  {
+    "id": "QUAL-IE-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified in EvidenceItemService.java. toResponse() (lines 386-422) chains up to 4 findById lookups per item: subControlRepository.findById -> controlRepository.findById -> frameworkRepository.findById, plus userRepository.findById for the owner. It is invoked per-row on list/page endpoints: list() at line 116 does page.map(this::toResponse), and listExpired() (132) and listBySubControl() (139) do .stream().map(this::toResponse).toList(). This is a textbook N+1 with no batch fetch or JOIN mitigation. Severity High is appropriate for a per-row query-amplification defect on collection endpoints."
+  },
+  {
+    "id": "QUAL-RC-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Two distinct PolicyService classes exist and were both read in full. module.compliance.service.PolicyService (cited lines 37-176) implements DRAFT -> LEGAL_REVIEW -> EXEC_APPROVAL -> PUBLISHED -> REVIEW_DUE -> RETIRED -> REJECTED. module.policy.service.PolicyService implements DRAFT -> REVIEW -> APPROVED -> PUBLISHED -> EXPIRED -> ARCHIVED (and is explicitly bean-qualified 'policyManagementService' because, per its own Javadoc, 'module.compliance ships another PolicyService'). These are two unrelated services with genuinely conflicting state machines and different Policy entities, splitting policy lifecycle logic across modules. Confirmed."
+  },
+  {
+    "id": "QUAL-RC-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "FrameworkAnchorController (lines 52-339) injects exactly 8 repositories spanning 4 modules: FrameworkRepository, PolicyRepository, PolicyFrameworkMappingRepository, AuditFindingRepository, ControlRepository (compliance), DpiaRepository (privacy), KriDefinitionRepository and RiskRepository (risk). It runs non-trivial business logic in the web layer (coverage() aggregates satisfaction tallies, implemented-control counts, average-maturity math, union-by-id of risks across two framework dimensions). Fat controller / layering violation confirmed at the cited range."
+  },
+  {
+    "id": "QUAL-TI-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Two parallel SAMA-outsourcing bounded contexts confirmed by directory listing and source. module/outsourcing/* has OutsourcingArrangement entity+repository+controller+DTOs and OutsourcingService.java (verified exactly 612 lines, matching cited 1-612) with state machine PROPOSED->RISK_ASSESSED->BOARD_APPROVED->SAMA_NOTIFIED->LIVE... module/tprm/outsourcing/* independently re-implements the same regulatory context with its own OutsourcingArrangement entity+repository+controller+DTOs and OutsourcingArrangementService (plus DueDiligence/Monitoring/ExitPlan services), state machine PLANNED->DUE_DILIGENCE->AWAITING_SAMA->APPROVED->ACTIVE... Both cite SAMA Rules Governing Outsourcing. Genuine duplicated bounded context with divergent state vocabularies."
+  },
+  {
+    "id": "QUAL-TI-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified the retry/backoff harness is copy-pasted across all three LIVE clients. LiveCrowdStrikeClient (lines 151-230) has the per-attempt loop and a doWithRetryOn5xx supplier using props.getRetry().getMaxAttempts()/getInitialDelayMs()/getBackoffMultiplier(), BACKOFF_CAP_MS=30_000L, sleep(delayMs), and catch(HttpServerErrorException | ResourceAccessException). LiveTenableClient repeats the identical pattern (BACKOFF_CAP_MS=30_000L line 76, doWithRetryOn5xx line 306, same delayMs = Math.min(BACKOFF_CAP_MS, Math.max(delayMs+1L, delayMs*mult)) line 320). LiveSplunkClient repeats it again (BACKOFF_CAP_MS=30_000L line 49, same loop lines 69-100). Three independent copies of the resilience logic. Confirmed."
+  },
+  {
+    "id": "PERF-FE-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed at tss-grc-ui-v2/src/App.tsx lines 8-18: LoginPage, DashboardPage, SettingsPage, RiskRegisterPage, CyberPage, BcmWorkspacePage, PrivacyPage, CompliancePage, TprmPage, IncidentsPage, EvidencePage are all statically (eagerly) imported, while the rest of the ~300 module pages use React.lazy(). Because LoginPage shares the entry chunk with these 10 other heavy workspace pages, /login pulls them all on first paint. The comment 'Critical-path pages stay eager' acknowledges the intent, but login does not need risk/cyber/bcm/privacy/compliance/tprm/incidents/evidence workspaces. This is a real bundle-bloat / TTI regression on the unauthenticated entry route. High is appropriate for a perf finding; it is a performance issue, not a correctness/security bug, so not Critical."
+  },
+  {
+    "id": "PERF-FE-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed at tss-grc-ui-v2/src/lib/i18n.tsx lines 2-3: both dictionaries are statically imported (import { en } from '../translations/en'; import { ar } from '../translations/ar';) and assembled eagerly into the dictionaries map at line 24 inside the always-mounted I18nProvider. Verified on disk: ar.ts = 417,903 bytes (6,061 lines), en.ts = 325,194 bytes (6,081 lines). Only one language is ever active (lang state, line 27), yet both ~408KB+318KB source dictionaries land on the critical path of the entry bundle. Real, avoidable bundle cost; correct as High."
+  },
+  {
+    "id": "PERF-IO-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed at ServiceNowOutboundService.java: push() is annotated @Transactional (line 83) and calls client.createIncident(enriched) (line 109) — a remote ServiceNow HTTP round-trip — then recordExternalLink() persists, all inside the same transaction. The injected client is LiveServiceNowClient, which uses a blocking Spring RestClient (line 46) with an exponential-backoff RETRY loop on 5xx/connection errors (class javadoc lines 35-37). So the Hikari DB connection is held open across the remote call AND its retries. The pushCyberIncident/pushFinding/pushCapaTask/pushComplianceGap facades (lines 59-77) are also @Transactional and route through pushGeneric->createIncident, so the pattern is module-wide. Classic connection-pool-exhaustion-under-load anti-pattern. Caveat: only active when servicenow.mode=LIVE and enabled=true (in dev the stub/disabled path is a no-op), but the finding targets the production code path; High is correct."
+  },
+  {
+    "id": "PERF-IO-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed at TenableInboundService.java: pollFindings() is @Transactional (line 144) and (a) makes the remote poll via client.pollFindings() (line 158) and then (b) iterates the entire returned batch (lines 168-183), running a dedupe lookup query per finding (findByOrganisationIdAndTenableAssetUuidAndTenablePluginId, lines 171-172) and calling ingestOne() which save()s a Vulnerability row per item (line 208) — all inside the one transaction. scheduledPoll() (line 120) invokes the same transactional method. So a single DB connection is held across the remote poll plus the full per-finding ingest loop, exactly as described. The remote client also follows the same retry harness as ServiceNow (per QUAL-TI-002). Connection-hold-across-remote-IO + batch loop is real; High is correct. Same LIVE/enabled caveat applies but does not change the verdict."
+  },
+  {
+    "id": "PERF-IX-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Confirmed at V3__compliance_module.sql lines 15-108: tables compliance.controls, compliance.assessments and compliance.findings each declare organisation_id BIGINT NOT NULL (lines 17, 51, 83) but create only a CLUSTERED PRIMARY KEY on id and a single FK constraint (FK_findings_assessment) — no nonclustered index on organisation_id on any of the three. Since every repository query is org-scoped (findBy*OrganisationId per CLAUDE.md multi-tenancy rules), each becomes a full clustered-index scan filtered by organisation_id. Grep confirms organisation_id appears in 189 migration files (~2,467 occurrences) while CREATE INDEX appears in only ~126 files, and the early core tables (V3 here) have none — supporting the systemic 'many multi-tenant tables lack the supporting index' claim. The exact '74 tables' count is a quantitative assertion I could not fully enumerate, but the cited file/lines clearly demonstrate the pattern and the missing index. High is appropriate for a query-performance/scalability issue."
+  },
+  {
+    "id": "PERF-IX-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified V1__core_schemas.sql lines 1178-1209: iam.users CREATE TABLE declares only CONSTRAINT pk_users PRIMARY KEY ([id]) — no index on [username] or [email], and no UNIQUE constraint on either. A grep across the entire db/migration/sqlserver tree finds no CREATE INDEX / UNIQUE for iam.users in any migration. Username/email are the login lookup keys (V2 seed and auth path query by username), so every login and per-request principal resolution does a clustered-index scan, and there is no DB-level guard against duplicate usernames/emails. Real and on the authentication hot path. High is appropriate (performance/integrity, not a direct security exploit)."
+  },
+  {
+    "id": "PERF-NQ-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified RiskService.list() (lines 51-58) maps every page row through toResponse(), and toResponse() (lines 238-276) issues riskCategoryRepository.findById per row with a non-null categoryId (line 242) plus userRepository.findById per row with a non-null ownerId (line 252) — a 2N+1 pattern. RiskRepository.findByOrganisationId/findByOrgAndStatus carry no @EntityGraph or join fetch, confirming no eager pre-loading. The per-owner User.findById additionally triggers the EAGER role+permission graph (see PERF-NQ-002). The endpoint is paginated, which bounds blast radius per page, but the N+1 within each page is real. High is reasonable."
+  },
+  {
+    "id": "PERF-NQ-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified User.java line 68: roles is @ManyToMany(fetch = FetchType.EAGER), and Role.java line 37: permissions is @ManyToMany(fetch = FetchType.EAGER). Therefore every User load eagerly materialises the full roles graph and, for each role, the full permissions graph — exactly as claimed. This sits on the hottest path (principal resolution on every authenticated request, plus any owner/assignee resolution like RiskService.toResponse). Confirmed; High is justified."
+  },
+  {
+    "id": "PERF-NQ-004",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified RiskControlFindingPivotService lines 140-389. buildRiskPivot/buildControlPivot/buildFindingPivot drive compounding per-row queries: per-link Control findById (line 149), per-link Risk findById (lines 191, 253); findingsForControls re-scans all org findings (line 325); capasForFindings loops findings issuing TWO repo calls each (lines 339, 343); ccmCoverageForControls loops every matching test definition issuing findRecentForTest per def (line 366); latestAssessmentEffectiveness re-queried per control. This is a genuine nested/compounding N+1. It is a single-focal-entity pivot endpoint (not a bulk list), so per-request blast radius is bounded by one entity's link fan-out, but the multiplicative query count is real. High is at the upper edge but defensible."
+  },
+  {
+    "id": "PERF-PG-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified the cited instance: ObligationController.list() (lines 48-52) returns List<ObligationResponse> with no Pageable, calling ObligationService.list() which calls repo.findByOrganisationIdAndIsDeletedFalseOrderByNextDueDateAsc(org()) and maps the entire result set with no limit (service lines 74-76). This is an unbounded org-scoped findAll-style query as described, and the same pattern recurs across sibling list methods (by-regulator, by-owner). Real and systemic. High is reasonable for an unbounded-result-set performance/DoS-surface finding."
+  },
+  {
+    "id": "SEC-NDI-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified in source. NdiAuditController.java:37-41 exposes POST /api/ndi/audit gated only by @PreAuthorize(\"isAuthenticated()\") and binds a raw NdiAuditEvent from the request body. NdiAuditService.record() only nulls id, stamps organisationId, requires action/entityType, and defaults severity, then repo.save(body) — occurredAt, actor identity, message and before/after values are all attacker-controlled. Any authenticated tenant user can forge or backdate entries in the same append-only ledger that NdiAuditPublisher writes, and the search/aggregate endpoints surface it to the Audit tab and AUDIT_TRAIL report. Genuine audit-log integrity (A09) flaw; High is correct."
+  },
+  {
+    "id": "SEC-NPM-001",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "All cited facts verified: package-lock.json:2359 resolves vite 5.4.21 (in the vulnerable <=6.4.2 range for the three GHSA advisories) and vite.config.ts:20-27 sets host:true + allowedHosts:true, exposing the dev server on 0.0.0.0/LAN on a Windows host. However every one of these advisories targets the Vite DEV SERVER only; production ships a static `vite build` output with no dev server running, so the exposure exists solely on developer machines on a trusted LAN. Real but dev-only attack surface — High overstates production impact; Medium."
+  },
+  {
+    "id": "QUAL-IE-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified in EvidenceMatrixService.java:57-143. matrix() loops frameworkRepo.findAll() (64) -> controlRepo.findByFrameworkIdAndIsActiveTrue (71) -> subControlRepo.findByControlIdAndIsActiveTrue (77) -> itemRepo.findBySubControl(org, s.getId()) per sub-control (85), with inline aggregations in one ~86-LOC method. Genuine triple/quad-nested N+1 plus high cyclomatic complexity. The batch pattern that fixes it already exists in the same package — GrcExpertService uses findByFrameworkIdInAndIsActiveTrue / findByControlIdInAndIsActiveTrue + aggregateStatusBySubControl/aggregateExpiryBySubControl/aggregateFreshApprovedBySubControl. Real quality defect; High is right."
+  },
+  {
+    "id": "PERF-NQ-003",
+    "status": "adjusted",
+    "finalSeverity": "High",
+    "rationale": "Same code as QUAL-IE-001 and the nested-loop / per-sub-control item fetch is confirmed exactly at lines 64/71/77/85. The N+1 is real, but 'Critical' overstates blast radius: the framework->control->sub-control tree is a bounded, platform-shared catalog (a handful of frameworks), the method is @Transactional(readOnly=true), and it backs a single matrix view rather than a hot request path. Query count grows with catalog size, not tenant data volume. Real performance bug worth High, not Critical."
+  },
+  {
+    "id": "PERF-IX-002",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "Verified: V3__compliance_module.sql (3 tables), V4__incident_module.sql (1 table) and V7__tprm_module.sql (2 tables) contain 0 CREATE INDEX statements while V8__evidence_module.sql has 8; compliance.findings declares FK_findings_assessment on assessment_id (V3:103-104) with no backing index; no later migration backfills indexes onto these exact tables. The inconsistency is real. But these are low-cardinality GRC registers (controls/assessments/findings/vendors) with a clustered PK, where table scans remain acceptable at realistic data volumes, and dev uses Python-bootstrapped DBs. A genuine schema-discipline gap with modest real-world impact — Medium, not High."
+  },
+  {
+    "id": "FUNC-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: package.json scripts = dev/build/preview/typecheck only (no \"test\"), devDependencies carry no vitest/jest/@testing-library/playwright, and no vitest.config/jest.config exists. The only two test files (src/__tests__/threeLines.test.ts, mobileCrisis.test.ts) both import node:test and are unrunnable by the project toolchain — fed only through tsc --noEmit. The production UI ships zero executable automated tests wired into the build; CI gates the frontend on type-checking alone. High is correct for the active production UI."
+  },
+  {
+    "id": "FUNC-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Recomputed directly from jacoco.csv (1324 class rows): BRANCH 26.0% (5308 covered / 15079 missed), COMPLEXITY 22.3% (4203/14636), INSTRUCTION 37.1%, LINE 38.5%, METHOD 31.9% — every cited figure matches. 762/1324 classes (57.6%) have 0 instruction coverage. The named vulnerable classes are confirmed at 0%: AuthController, EvidenceMatrixService, DataOfficerService, OtAssetService. Decision logic is largely unexercised. High is correct."
+  },
+  {
+    "id": "FUNC-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified end-to-end. OtAssetService, IntakeController and ApprovalChainController have 0 *Test.java files (and 0% JaCoCo). CustomSqlRunner.java (module/ccm/runner) has 0 references to organisation/tenant/TenantContext, so no test could assert tenant-scoped SELECT. BcmService.java:221-232 updateBia and 235-237 deleteBia call biaRepo.findById(id)/deleteById(id) with no tenant predicate (unlike the tenant-scoped listExercises), while BcmServiceTest has getPlan_other_tenant_throws / invokePlan_other_tenant_throws but ZERO bia tests (only the @Mock field references 'bia'). The exploit-path test gap is real. Minor nit: the narrative says '6 Critical findings' but crit_high.json actually holds 8 Critical / 57 High; the count is slightly off but the substantive claim is fully supported. High."
+  },
+  {
+    "id": "COPY-01",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified in LoginPage.tsx: line 25 useState('admin'), line 26 useState('Admin@12345') (live PLATFORM_ADMIN seed creds), rendered pre-filled. Line 114 renders <div className=\"login-hint\"><b>{t('loginHint')}</b></div>, and en.ts:116 loginHint = 'Demo · admin / Admin@12345 — riskmanager / Risk@12345'. Creds are plain component state with no import.meta.env.DEV guard and the hint is an always-rendered translation key, so both ship in every build/locale. Real security-adjacent UX defect; High."
+  },
+  {
+    "id": "LH-01",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: App.tsx:8-18 statically (eagerly) imports LoginPage, DashboardPage, SettingsPage, RiskRegisterPage, CyberPage, BcmWorkspacePage, PrivacyPage, CompliancePage, TprmPage, IncidentsPage, EvidencePage, and line 167 imports ScmPage — all top-level, folded into the entry graph loaded on /login. lighthouse-login.report.json total-byte-weight items confirm CompliancePage.tsx (337,307 B), ScmPage.tsx (289,426 B), CyberPage.tsx (286,941 B), TprmPage.tsx (258,133 B) downloaded on /login; unused-javascript displays 'Est savings of 1,742 KiB'; 196 network requests. Real bundle/code-splitting defect; High."
+  },
+  {
+    "id": "LH-02",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: i18n.tsx lines 2-3 statically import { en } and { ar } at module scope into the eager I18nProvider mounted on every route. lighthouse-login.report.json total-byte-weight lists src/translations/ar.ts at 1,076,314 B and src/translations/en.ts at 860,108 B (~1.84 MiB) downloaded on /login, the #1 and #2 largest resources. A single-locale login page needs neither full dictionary. Real critical-path bloat; High."
+  },
+  {
+    "id": "LH-03",
+    "status": "adjusted",
+    "finalSeverity": "Medium",
+    "rationale": "The cited metrics are exact in lighthouse-login.report.json: FCP 37,409 ms / LCP 72,262 ms / Speed Index 37,409 ms / TTI 72,262 ms, all score 0, performance 0.38, 196 network requests. BUT the report's own rootCause states these were 'Measured against the Vite dev server (no production bundle)' — the 37s/72s wall-clock is dominated by on-demand ESM transpilation and an unbundled 182-request waterfall, not the shipped artifact; Total Blocking Time is only 40 ms and main-thread work 1.2 s. The real, environment-independent defects (eager imports, dual-locale bundle) are already captured as High in LH-01/LH-02. The headline catastrophic CWV figures do not reflect a production build, so a standalone High is inflated — Medium."
+  },
+  {
+    "id": "A11Y-001",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: tokens.css:116 --sb-text-3 = #4A5C58 on tokens.css:112 --sb-bg = #0B1F22. Recomputed WCAG ratio = 2.40:1 (matches the finding), far below the 4.5:1 AA floor for the 9-10px sidebar captions/group labels. axe dashboard.json confirms nodes with fg #4a5c58 / bg #0b1f22 / contrastRatio 2.4, and the sidebar shell renders on every authenticated page. Sibling token --sb-text-2 (#7E928F) measures 5.19:1, confirming the wrong tier was assigned. Genuine WCAG 1.4.3 failure (serious); High."
+  },
+  {
+    "id": "A11Y-002",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: tokens.css:28 --ink-4 = #8C9690 on tokens.css:18 --surface-2 = #F5F1E9. Recomputed ratio = 2.71:1 (matches), below 4.5:1 AA. axe settings.json shows 3 .scale-seg-label nodes with fg #8c9690 / bg #f5f1e9 / contrastRatio 2.7. --ink-4 is a token-level token reused for .text-dim and secondary captions, so not a one-off; adjacent --ink-3 (#5C6A65) reaches 5.03:1. Genuine WCAG 1.4.3 failure; High."
+  },
+  {
+    "id": "A11Y-003",
+    "status": "confirmed",
+    "finalSeverity": "High",
+    "rationale": "Verified: tokens.css:98 --risk-vhigh = #D87560; the .score-pill pairs it with hard-coded white text. Recomputed white-on-#D87560 = 3.17:1 (matches the cited 3.16, rounding), below the 4.5:1 AA floor for 11px bold (not large-text exempt). axe risk-register.json confirms 28 total color-contrast nodes of which 25 are fg #ffffff / bg #d87560 / contrastRatio 3.16 — the dominant source of the page's violations. Dark ink #15201D on the same fill would reach 5.28:1. Genuine WCAG 1.4.3 failure; High."
+  }
+]

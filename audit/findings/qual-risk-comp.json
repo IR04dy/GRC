@@ -1,0 +1,273 @@
+{
+  "findings": [
+    {
+      "id": "QUAL-RC-001",
+      "title": "Two unrelated PolicyService classes with conflicting state machines split policy logic across modules",
+      "phase": "Quality",
+      "category": "SOLID / Naming / Duplication",
+      "severity": "High",
+      "cvss": "Maintainability risk: two same-named services with divergent lifecycles cause developer confusion and require a Spring bean qualifier hack; a change to 'policy lifecycle' can silently target the wrong code path.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java",
+      "lines": "37-176",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java:37-176",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/service/PolicyService.java:24-176",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/RegChangePolicyController.java:45-186"
+      ],
+      "description": "There are two distinct classes named PolicyService. module/policy/service/PolicyService (V79, bean 'policyManagementService', 517 LOC) operates on PolicyDocument/PolicyException/PolicyAttestation with a DRAFT->REVIEW->APPROVED->PUBLISHED->EXPIRED|ARCHIVED state machine. module/compliance/service/PolicyService (176 LOC) operates on a separate Policy entity with a completely different DRAFT->LEGAL_REVIEW->EXEC_APPROVAL->PUBLISHED->REVIEW_DUE->RETIRED|REJECTED state machine. Two policy entities (PolicyDocument vs Policy), two services, two controllers (PolicyController vs RegChangePolicyController), and two state machines model the same business concept ('an organisational policy and its lifecycle'). The compliance PolicyService had to be left default-named and the policy module's one explicitly qualified ('@Service(\"policyManagementService\")') with the comment 'because module.compliance ships another PolicyService' to avoid a bean-name collision.",
+      "rootCause": "Two parallel implementations of policy management were built in separate sprints (compliance §5.3 rec #2 vs V79 policy module) without consolidating onto a single entity/service. No domain owner reconciled them.",
+      "evidence": "policy/PolicyService.java:38 `@Service(\"policyManagementService\")` with line-37 comment 'Bean qualified ... because module.compliance ships another PolicyService.' compliance/PolicyService.java:26 `public class PolicyService` (default bean name). Conflicting transition guards: policy/PolicyService.java:223-230 (DRAFT->REVIEW->APPROVED->PUBLISHED) vs compliance/PolicyService.java:88-155 (DRAFT->LEGAL_REVIEW->EXEC_APPROVAL->PUBLISHED).",
+      "impact": "Developers and AI assistants editing 'policy lifecycle' frequently land in the wrong class. Status vocabularies diverge (REVIEW vs LEGAL_REVIEW; APPROVED vs EXEC_APPROVAL), so reporting/automation rules keyed on policy status must special-case both. Bug fixes applied to one are not reflected in the other.",
+      "reproduction": "Search the codebase for `class PolicyService` — two hits in different packages. Inspect their `transition`/lifecycle methods to confirm divergent status enums.",
+      "resolution": "Pick one canonical policy entity + service. Migrate the compliance Policy lifecycle onto the policy module's PolicyDocument (or vice-versa), deprecate the redundant class, and remove the bean-name qualifier hack. If both must coexist short-term, rename them to disambiguate (e.g. PolicyDocumentService vs LegacyCompliancePolicyService).",
+      "patchBefore": "// policy/service/PolicyService.java\n@Service(\"policyManagementService\")  // collides with compliance.PolicyService\n@RequiredArgsConstructor\npublic class PolicyService { /* DRAFT->REVIEW->APPROVED->PUBLISHED */ }\n\n// compliance/service/PolicyService.java\n@Service\npublic class PolicyService { /* DRAFT->LEGAL_REVIEW->EXEC_APPROVAL->PUBLISHED */ }",
+      "patchAfter": "// Single canonical service on one entity:\n@Service\npublic class PolicyDocumentService {\n    // one PolicyDocument entity, one status enum, one transition guard\n}\n// compliance controller delegates to PolicyDocumentService; legacy class removed.",
+      "effort": "L",
+      "references": [
+        "https://refactoring.guru/smells/duplicate-code",
+        "Single Responsibility / DRY"
+      ]
+    },
+    {
+      "id": "QUAL-RC-002",
+      "title": "ComplianceService.getStats counts findings by status=\"CRITICAL\" but CRITICAL is a severity — count is always 0",
+      "phase": "Quality",
+      "category": "Dead code / Correctness",
+      "severity": "Medium",
+      "cvss": "Correctness bug surfaced as dead logic: the compliance dashboard 'critical findings' tile silently always reports zero, masking real critical findings from board reporting.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/service/ComplianceService.java",
+      "lines": "232-248",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/service/ComplianceService.java:233",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/entity/AuditFinding.java:26-39"
+      ],
+      "description": "getStats() computes `criticalFindings = findingRepo.countByOrganisationIdAndStatus(orgId, \"CRITICAL\")`. On AuditFinding, `status` defaults to \"OPEN\" and only ever holds workflow states (OPEN/CLOSED), while CRITICAL is a value of the separate `severity` column. No finding is ever persisted with status == \"CRITICAL\", so this count is unconditionally 0 and is fed straight into the ComplianceStats DTO that drives the dashboard.",
+      "rootCause": "Field confusion between `severity` (LOW/MEDIUM/HIGH/CRITICAL) and `status` (OPEN/CLOSED). The repository finder name `countByOrganisationIdAndStatus` did not catch the mistake because the literal compiles.",
+      "evidence": "ComplianceService.java:233 `long criticalFindings = findingRepo.countByOrganisationIdAndStatus(orgId, \"CRITICAL\");`. AuditFinding.java:26-27 `@Column(name = \"severity\", nullable = false) private String severity;`; AuditFinding.java:38-39 `@Column(name = \"status\") private String status = \"OPEN\";`. There is no countByOrganisationIdAndSeverity finder being used for this.",
+      "impact": "The criticalFindings KPI returned by GET compliance stats is permanently 0, hiding genuinely critical findings from operators and board packs that consume the stat.",
+      "reproduction": "Seed a finding with severity=CRITICAL, status=OPEN. Call the stats endpoint; criticalFindings returns 0 instead of 1.",
+      "resolution": "Query by severity, not status: add/use `countByOrganisationIdAndSeverity` and pass \"CRITICAL\". Keep openFindings on status.",
+      "patchBefore": "long openFindings     = findingRepo.countByOrganisationIdAndStatus(orgId, \"OPEN\");\nlong criticalFindings = findingRepo.countByOrganisationIdAndStatus(orgId, \"CRITICAL\");",
+      "patchAfter": "long openFindings     = findingRepo.countByOrganisationIdAndStatus(orgId, \"OPEN\");\nlong criticalFindings = findingRepo.countByOrganisationIdAndSeverity(orgId, \"CRITICAL\");",
+      "effort": "S",
+      "references": [
+        "CWE-561: Dead Code"
+      ]
+    },
+    {
+      "id": "QUAL-RC-003",
+      "title": "FrameworkAnchorController is a fat controller: 8 injected repositories across 4 modules, business logic in the web layer",
+      "phase": "Quality",
+      "category": "SOLID / Layering",
+      "severity": "High",
+      "cvss": "Layering violation: a @RestController performs cross-module data aggregation, satisfaction tallying, and maturity averaging that belong in a service. Tightly couples the web layer to privacy/risk/compliance internals and is untestable without the full repository graph.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java",
+      "lines": "52-339",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:54-61",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:153-211"
+      ],
+      "description": "The controller injects 8 repositories directly — FrameworkRepository, PolicyRepository, PolicyFrameworkMappingRepository, AuditFindingRepository, ControlRepository, plus DpiaRepository (privacy module), KriDefinitionRepository and RiskRepository (risk module). It has no service layer at all: every endpoint builds raw HashMap rows by hand and the coverage() endpoint (lines 153-211, ~58 LOC) loops over frameworks computing satisfaction tallies (FULL/PARTIAL/OUT_OF_SCOPE/NA), open/closed finding counts, implemented-control counts, average maturity, and DPIA/KRI/risk counts. This is business logic in a controller and a controller reaching into other modules' repositories — both violate the documented layering (controller -> service -> repository) in CLAUDE.md.",
+      "rootCause": "No FrameworkAnchorService was created; the aggregation logic was written inline in the controller and pulls peer modules' repositories rather than calling their services.",
+      "evidence": "Fields at lines 54-61 inject 8 repositories including `private final DpiaRepository dpiaRepo;` (privacy), `private final KriDefinitionRepository kriRepo;` and `private final RiskRepository riskRepo;` (risk). coverage() lines 163-205 perform per-framework switch tallies and `Math.round((maturitySum * 10.0) / ctrls.size()) / 10.0`. jscpd flags the import/field block as duplicated with bcm/DependencyGraphController (FrameworkAnchorController.java:20-33 <=> DependencyGraphController.java:7-20).",
+      "impact": "Cannot unit-test aggregation without standing up 8 repositories; changes to privacy/risk repository signatures break a compliance controller; the controller class is 347 LOC of mixed concerns and grows with every new anchorable entity type.",
+      "reproduction": "Open FrameworkAnchorController; count `private final ...Repository` fields (8) and note coverage()/risksForFramework() build domain aggregates inline.",
+      "resolution": "Extract a FrameworkAnchorService that owns coverage()/policiesForFramework()/etc. Have it call the owning modules' read services (or expose dedicated repository methods) rather than wiring foreign repositories into the web layer. Return typed DTOs instead of List<Map<String,Object>>.",
+      "patchBefore": "@RestController\npublic class FrameworkAnchorController {\n    private final FrameworkRepository frameworkRepo;\n    private final DpiaRepository dpiaRepo;       // privacy module\n    private final KriDefinitionRepository kriRepo; // risk module\n    private final RiskRepository riskRepo;       // risk module\n    // ... 5 more repos; coverage() builds HashMaps inline\n}",
+      "patchAfter": "@RestController\n@RequiredArgsConstructor\npublic class FrameworkAnchorController {\n    private final FrameworkAnchorService anchorService;\n    @GetMapping(\"/frameworks/coverage\")\n    public List<FrameworkCoverageDto> coverage() { return anchorService.coverage(); }\n}\n// FrameworkAnchorService aggregates via module read-services + typed DTOs.",
+      "effort": "L",
+      "references": [
+        "CLAUDE.md — layered module structure (controller/service/repository)",
+        "https://martinfowler.com/bliki/AnemicDomainModel.html"
+      ]
+    },
+    {
+      "id": "QUAL-RC-004",
+      "title": "Copy-pasted tenant/actor/event helper block (org(), currentUserId(), emit(), timeline()) duplicated across services",
+      "phase": "Quality",
+      "category": "Duplication",
+      "severity": "Medium",
+      "cvss": "Maintainability risk: the same ~30-line helper cluster is duplicated verbatim across reginspect, regreporting and openbanking services; a fix to event emission or actor resolution must be applied in every copy.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java",
+      "lines": "629-660",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:629-660",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reginspect/service/RegInspectService.java:371-404",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:619-652"
+      ],
+      "description": "RegReportingService and RegInspectService contain byte-identical private helpers: `org()` (TenantContext.requireOrganisationId), `currentUserId()` (resolve GrcUserDetails from SecurityContext), `emit(trigger,type,id,corrId,payload)` (publish DomainEvent), and a near-identical `timeline(...)` writer that constructs a *Event/*Update entity. jscpd confirms a 30-line clone between ObService.java:625-654 and RegReportingService.java:633-662, and a 19-line clone between AiLifecycleService.java:349-367 and RegInspectService.java:384-408. The currentUserId() and emit() implementations are identical character-for-character across all three services.",
+      "rootCause": "No shared base class or helper component for tenant-scoped, audited, event-emitting services. Each workspace service (regreporting, reginspect, openbanking) was scaffolded by copy from the previous one.",
+      "evidence": "RegReportingService.java:643 `private static Long org() { return TenantContext.requireOrganisationId(); }`; lines 645-652 currentUserId(); lines 654-660 emit(). RegInspectService.java:387 / 389-396 / 398-404 — identical bodies. jscpd: 30 lines openbanking/ObService:625-654 <=> regreporting/RegReportingService:633-662.",
+      "impact": "A change to actor resolution (e.g. handling service accounts) or DomainEvent construction must be edited in N places; drift between copies introduces subtle behavioural differences between modules.",
+      "reproduction": "Diff the org()/currentUserId()/emit() methods of RegReportingService and RegInspectService — identical. See audit/raw/jscpd/jscpd-report.json clone entry for the 30-line block.",
+      "resolution": "Introduce a shared collaborator (e.g. DomainEventPublisher component wrapping emit() + currentUserId(), and reuse TenantContext.requireOrganisationId() directly) or an abstract TenantAuditedService base. Inject it instead of re-declaring the helpers per service.",
+      "patchBefore": "// repeated verbatim in RegReportingService, RegInspectService, ObService\nprivate static Long currentUserId() {\n    Authentication auth = SecurityContextHolder.getContext().getAuthentication();\n    if (auth == null || !auth.isAuthenticated()\n            || !(auth.getPrincipal() instanceof GrcUserDetails u)) return null;\n    return u.getUserId();\n}\nprivate void emit(String t, String type, Long id, String corr, Map<String,Object> p){ publisher.publishEvent(new DomainEvent(...)); }",
+      "patchAfter": "@Component\npublic class DomainEventEmitter {\n    Long currentUserId() { /* one copy */ }\n    void emit(String t, String type, Long id, String corr, Map<String,Object> p) { /* one copy */ }\n}\n// services inject DomainEventEmitter instead of copy-pasting.",
+      "effort": "M",
+      "references": [
+        "audit/raw/jscpd/jscpd-report.json",
+        "DRY principle"
+      ]
+    },
+    {
+      "id": "QUAL-RC-005",
+      "title": "Campaign attestation services near-duplicated between ObligationCampaignService and VendorBcpCampaignService",
+      "phase": "Quality",
+      "category": "Duplication",
+      "severity": "Medium",
+      "cvss": "Maintainability risk: the obligation attestation-campaign service (state machine, rollups, period math, reminders/escalation) is structurally cloned in the TPRM BCP campaign service; bug fixes and lifecycle changes must be mirrored.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/service/ObligationCampaignService.java",
+      "lines": "56-453",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/service/ObligationCampaignService.java:62-453",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/bcp_attestation/service/VendorBcpCampaignService.java"
+      ],
+      "description": "ObligationCampaignService (454 LOC) implements a DRAFT/OPEN/IN_PROGRESS/ESCALATED/CLOSED/CANCELLED campaign with materialise-targets, sendReminders, escalateOverdue, recomputeRollups, guardTransition and an emit() payload builder. jscpd reports multiple clones against module/tprm/bcp_attestation: the entity rollup-counter block (ObligationAttestationCampaign.java:102-143 <=> VendorBcpCampaign.java:107-148, 42 lines), the service header (ObligationAttestationCampaign:20-43 <=> VendorBcpCampaignService:46-56), the import block (ObligationCampaignService:25-38 <=> VendorBcpCampaignService:26-39), and the repository finder set (14 lines). The two campaign engines are the same pattern over different attestation subjects (regulatory obligations vs vendor BCPs).",
+      "rootCause": "The vendor BCP campaign was modelled by cloning the obligation campaign rather than abstracting a generic attestation-campaign engine parameterised by subject type.",
+      "evidence": "jscpd entries: ObligationAttestationCampaign.java:102-143 <=> tprm/bcp_attestation/entity/VendorBcpCampaign.java:107-148 (42 lines); ObligationCampaignService.java:25-38 <=> VendorBcpCampaignService.java:26-39 (14 lines); ObligationAttestationCampaignRepository.java:11-24 <=> VendorBcpAttestationRepository.java:12-15 (14 lines).",
+      "impact": "Two parallel campaign lifecycle engines must be kept in sync; a fix to reminder/overdue logic or rollup math applied to one is easily forgotten in the other, producing divergent regulator-facing behaviour.",
+      "reproduction": "Compare ObligationCampaignService and VendorBcpCampaignService method-for-method; cross-check the jscpd clone entries referencing tprm/bcp_attestation.",
+      "resolution": "Extract a generic AttestationCampaignEngine<TSubject> (state machine + rollups + reminder/escalate) and have both obligation and BCP campaigns supply a target-resolver + rollup-mapper strategy. Share the rollup-counter columns via a @MappedSuperclass on the campaign entities.",
+      "patchBefore": "// ObligationCampaignService and VendorBcpCampaignService each re-implement:\n//   guardTransition(), openCampaign()/materialise, sendReminders(),\n//   escalateOverdue(), recomputeRollups(), emit()  — structurally identical",
+      "patchAfter": "abstract class AbstractAttestationCampaignService<S> {\n    abstract List<S> resolveTargets(Campaign c);\n    final Campaign open(Campaign c){ /* shared materialise + state guard */ }\n    final void recomputeRollups(Campaign c){ /* shared */ }\n}\n// Obligation + VendorBcp services subclass and supply resolveTargets().",
+      "effort": "L",
+      "references": [
+        "audit/raw/jscpd/jscpd-report.json",
+        "Template Method / Strategy patterns"
+      ]
+    },
+    {
+      "id": "QUAL-RC-006",
+      "title": "Inefficient findByOrganisationId(PageRequest.of(0,1000)) + in-memory framework filter copy-pasted 4×",
+      "phase": "Quality",
+      "category": "Duplication / Efficiency",
+      "severity": "Medium",
+      "cvss": "Performance + duplication risk: the same fetch-1000-rows-then-filter-in-memory pattern for framework/finding aggregation is repeated across two controllers; it silently truncates at 1000 rows and loads the whole finding table per request.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java",
+      "lines": "153-339",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:159",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:322",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/RegChangePolicyController.java:204",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/RegChangePolicyController.java:236"
+      ],
+      "description": "Four code sites load up to 1000 findings via `findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000))` and then filter/aggregate them in Java by framework or status: FrameworkAnchorController.coverage() (line 159), FrameworkAnchorController.findingsForFramework() (line 322), RegChangePolicyController.findingsAging() (line 204) and findingsAgingStats() (line 236). The magic 1000 page size silently truncates results for large tenants, and the per-framework filter (`if (fnd.getFrameworkId() == null || !fnd.getFrameworkId().equals(f.getId())) continue;`) runs the whole finding set through the loop for every framework in coverage().",
+      "rootCause": "Missing repository finders (countByOrganisationIdAndFrameworkIdAndStatus, findByOrganisationIdAndFrameworkId) led developers to pull a wide page and filter in code, then copy that approach to each new endpoint.",
+      "evidence": "Four occurrences of `findByOrganisationId(org, PageRequest.of(0, 1000))` (grep). coverage() lines 174-178 loop `tenantFindings` inside the per-framework loop; findingsForFramework() lines 322-325 filter in-memory; comment at line 321 even notes 'Pull a wide page; tenant filter applied in-memory below'.",
+      "impact": "On tenants with >1000 findings, dashboard/coverage numbers are silently wrong (truncated). Each call materialises the full finding set into memory; coverage() is O(frameworks × findings). The duplicated pattern means a single fix (push filtering to SQL) must be applied in four places.",
+      "reproduction": "grep for `PageRequest.of(0, 1000)` in module/compliance — 4 hits. Seed 1001 findings and observe coverage()/aging stats undercount.",
+      "resolution": "Add derived repository finders that filter/count by framework_id and status in SQL (e.g. countByOrganisationIdAndFrameworkIdAndStatus, findByOrganisationIdAndFrameworkId). Replace the four fetch-1000 sites; eliminate the magic page size.",
+      "patchBefore": "List<AuditFinding> all = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();\nfor (AuditFinding f : all) {\n    if (f.getFrameworkId() == null || !f.getFrameworkId().equals(id)) continue;\n    ...\n}",
+      "patchAfter": "List<AuditFinding> findings = findingRepo.findByOrganisationIdAndFrameworkId(org, id);\nfor (AuditFinding f : findings) { ... }   // filtered in SQL, no 1000-row cap",
+      "effort": "M",
+      "references": [
+        "CWE-1050 / N+1 and full-table-scan anti-patterns"
+      ]
+    },
+    {
+      "id": "QUAL-RC-007",
+      "title": "RegReportingService.dashboard() is a 75-LOC high-branching method mixing 6 query strategies and 3 in-method caches",
+      "phase": "Quality",
+      "category": "Cyclomatic complexity / Long method",
+      "severity": "Medium",
+      "cvss": "Maintainability risk: a single 75-line method computes six dashboard metrics with five repository call patterns, ad-hoc quarter math, an inline obligation cache and two stream pipelines — hard to test and to change safely.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java",
+      "lines": "457-532",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:457-532",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:476-478"
+      ],
+      "description": "dashboard() (lines 457-532, ~75 LOC) computes active obligations, in-flight filings, due-within-7, overdue, submitted-this-quarter, in-flight breakdowns by regulator and status, an upcoming list and an overdue-recent list. It mixes count queries, list queries, two stream-filter pipelines, manual quarter-start arithmetic (`today.withMonth(((today.getMonthValue()-1)/3)*3+1)` at line 476-478), and an inline HashMap obligation cache built with computeIfAbsent — including a second computeIfAbsent inside the upcoming stream (line 508-509). This is well over the ~40 LOC threshold with many independent branches and is the most complex method in the file (756 LOC total).",
+      "rootCause": "All dashboard aggregation accreted into one method instead of being decomposed into named private helpers (one per metric) or pushed into repository projections.",
+      "evidence": "Method spans lines 457-532. Distinct concerns: countByOrganisationIdAndActive (459), countByOrganisationIdAndStatusIn (460), due-within-7 stream (464-469), countByOrganisationIdAndStatusNotInAndDueDateBefore (471-474), quarter-start magic (476-478), submittedThisQuarter stream (479-484), obligCache build (490-494), byRegulator/byStatus loop (495-502), upcoming stream with nested cache lookup (504-510), overdueRecent stream (512-519).",
+      "impact": "Changing one metric risks the others; the nested computeIfAbsent obligation cache is easy to get wrong (one path uses obligCache.get, another computeIfAbsent); the method cannot be unit-tested per metric.",
+      "reproduction": "Open RegReportingService.dashboard(); count statements/branches.",
+      "resolution": "Decompose into private helpers (e.g. long countOverdue(), Map<String,Long> inflightByRegulator(List), List<FilingResponse> upcoming(...)) and extract the quarter-start math to a named helper (quarterStart(LocalDate)). Consider repository-level count projections for the scalar tiles.",
+      "patchBefore": "public DashboardResponse dashboard() {\n    long activeOblig = ...; long inFlight = ...; \n    LocalDate quarterStart = today.withMonth(((today.getMonthValue()-1)/3)*3+1)...;\n    // 75 lines of mixed counts, streams, and an inline obligation cache\n}",
+      "patchAfter": "public DashboardResponse dashboard() {\n    var inflight = filingRepo.findInFlight(org());\n    return DashboardResponse.builder()\n        .activeObligationCount(countActiveObligations())\n        .overdueCount(countOverdue())\n        .submittedThisQuarterCount(countSubmittedSince(quarterStart(LocalDate.now())))\n        .inFlightByRegulator(byRegulator(inflight))\n        .upcoming(upcoming(14)).overdueRecent(overdueRecent(inflight, 10)).build();\n}",
+      "effort": "M",
+      "references": [
+        "https://refactoring.guru/smells/long-method"
+      ]
+    },
+    {
+      "id": "QUAL-RC-008",
+      "title": "Identical-bodied nullSafe() and safe() helpers coexist in the same class (BowTieAnalysisService, RiskService)",
+      "phase": "Quality",
+      "category": "Dead code / Duplication",
+      "severity": "Low",
+      "cvss": "Minor maintainability noise: two private static methods with identical bodies in the same class plus a project-wide proliferation of the same null-coercion helper across 30+ services.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/bowtie/service/BowTieAnalysisService.java",
+      "lines": "536-537",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/bowtie/service/BowTieAnalysisService.java:536-537",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskService.java:309-311"
+      ],
+      "description": "BowTieAnalysisService declares both `private static String nullSafe(String v){ return v==null?\"\":v; }` (line 536) and `private static String safe(String v){ return v==null?\"\":v; }` (line 537) — two methods with identical bodies. RiskService does the same (nullSafe at 309, safe at 310, plus safeNum at 311). Across the backend the same `String safe/nullSafe(String)` one-liner is independently re-declared in 30+ services (grep returns 38 hits), indicating a missing shared utility. Within a single class, having both names for the same behaviour is redundant.",
+      "rootCause": "Two naming conventions ('safe' and 'nullSafe') for the same null-to-empty coercion were both copied in over time; no shared StringUtils.emptyIfNull exists.",
+      "evidence": "BowTieAnalysisService.java:536 `private static String nullSafe(String v) { return v == null ? \"\" : v; }`; :537 `private static String safe(String v) { return v == null ? \"\" : v; }`. RiskService.java:309-310 same pair. grep `private static String (nullSafe|safe)\\(String` => 38 matches across modules.",
+      "impact": "Cognitive overhead (two names, one behaviour); dead-by-redundancy method in each affected class; no single place to change the coercion (e.g. to trim or to '-').",
+      "reproduction": "Open BowTieAnalysisService lines 536-537 and RiskService lines 309-311; run the grep above.",
+      "resolution": "Collapse to one helper per class (or better, a shared common/util Strings.emptyIfNull) and delete the redundant alias. Standardise on a single name project-wide.",
+      "patchBefore": "private static String nullSafe(String v) { return v == null ? \"\" : v; }\nprivate static String safe(String v)     { return v == null ? \"\" : v; }",
+      "patchAfter": "// in common util\npublic static String emptyIfNull(String v) { return v == null ? \"\" : v; }\n// callers use Strings.emptyIfNull(...); per-class aliases removed",
+      "effort": "S",
+      "references": [
+        "CWE-1041: Use of Redundant Code"
+      ]
+    },
+    {
+      "id": "QUAL-RC-009",
+      "title": "KriMeasurementService.evaluateAll always logs KRI_EVALUATION_SKIPPED then increments dispatched — no-op masquerading as work",
+      "phase": "Quality",
+      "category": "Dead code / Misleading metric",
+      "severity": "Low",
+      "cvss": "Minor correctness/observability risk: evaluateAll() returns a 'dispatched' count that actually counts skipped KRIs and writes an audit row per non-MANUAL KRI on every scheduler tick, polluting the audit log.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/kri/service/KriMeasurementService.java",
+      "lines": "175-192",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/kri/service/KriMeasurementService.java:175-192"
+      ],
+      "description": "evaluateAll(orgId) walks active non-MANUAL KRIs and, for each, writes an audit row 'KRI_EVALUATION_SKIPPED ... Auto-fetcher not yet bound' then does `dispatched++` and returns dispatched. The return value is named 'dispatched' but counts KRIs that were explicitly NOT dispatched (auto-fetchers are unimplemented per the Javadoc 'ships the orchestration shell'). The loop body has no effect other than logging, so the variable misreports work done and the scheduler emits one audit row per KRI per tick indefinitely.",
+      "rootCause": "Placeholder/shell code (auto-fetchers deferred to a 'future slice') left in a state where the counter and audit semantics imply real evaluation occurred.",
+      "evidence": "Lines 180-190: `if (\"MANUAL\".equals(d.getSourceQueryType())) continue; audit.log(\"KRI_EVALUATION_SKIPPED\", ... \"Auto-fetcher not yet bound\"); dispatched++;` then `return dispatched;`.",
+      "impact": "Scheduler monitoring sees a non-zero 'dispatched' that is meaningless; the audit_log accumulates a skipped-row per KRI on every run, inflating volume and obscuring real activity.",
+      "reproduction": "Invoke evaluateAll with N active non-MANUAL KRIs; observe return == N and N audit rows even though no measurement was taken.",
+      "resolution": "Either rename the counter to 'considered'/'skipped' and downgrade per-KRI logging to debug/aggregate one summary row, or guard the whole loop behind a feature flag until auto-fetchers land. Do not count skips as dispatches.",
+      "patchBefore": "for (KriDefinition d : active) {\n    if (\"MANUAL\".equals(d.getSourceQueryType())) continue;\n    audit.log(\"KRI_EVALUATION_SKIPPED\", \"KriDefinition\", d.getId(),\n        \"Auto-fetcher not yet bound ...\");\n    dispatched++;\n}\nreturn dispatched;",
+      "patchAfter": "int skipped = 0;\nfor (KriDefinition d : active) {\n    if (\"MANUAL\".equals(d.getSourceQueryType())) continue;\n    skipped++;   // auto-fetchers not yet implemented\n}\nif (skipped > 0) log.debug(\"KRI auto-evaluation skipped for {} KRIs (no fetcher bound)\", skipped);\nreturn 0;   // nothing actually dispatched yet",
+      "effort": "S",
+      "references": [
+        "CWE-561: Dead Code"
+      ]
+    },
+    {
+      "id": "QUAL-RC-010",
+      "title": "Frequency cycle math (period start/end/reference) re-implemented across regreporting and obligation services with magic offsets",
+      "phase": "Quality",
+      "category": "Duplication / Magic numbers",
+      "severity": "Low",
+      "cvss": "Maintainability risk: per-frequency calendar arithmetic (DAILY/WEEKLY/MONTHLY/QUARTERLY/SEMIANNUAL/ANNUAL) is implemented in at least three independent switch statements with embedded magic numbers; a calendar rule change must be made in multiple places.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java",
+      "lines": "564-627",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:564-627",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/service/ObligationService.java:245-259",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/service/ObligationCampaignService.java:378-402"
+      ],
+      "description": "RegReportingService has three frequency switches — periodStartFor() (564-582), nextPeriodEnd() (585-610) and buildReference() (612-627) — each repeating the DAILY/WEEKLY/MONTHLY/QUARTERLY/SEMIANNUAL/ANNUAL cases with inline quarter math `(periodEnd.getMonthValue()-1)/3` and half-year `<= 6 ? ... : ...` logic. ObligationService.computeNextDueDate() (245-259) and ObligationCampaignService.periodStart()/periodEnd() (378-402) independently re-encode the same frequency vocabulary (note ObligationService uses 'SEMI_ANNUAL'/'BIENNIAL' while RegReportingService uses 'SEMIANNUAL' — divergent enum spellings for the same concept). Magic numbers (3 for quarters, 6 for half-years, default offset 5 business days at RegReportingService:190) are scattered.",
+      "rootCause": "No shared Frequency value-object/enum encapsulating period boundaries and rollover; each service hand-rolls the calendar arithmetic, and even the string vocabulary drifted (SEMIANNUAL vs SEMI_ANNUAL).",
+      "evidence": "RegReportingService.java:570 `int q = ((periodEnd.getMonthValue() - 1) / 3);` (also at 597-599, 621); :575 `int h = periodEnd.getMonthValue() <= 6 ? 1 : 7;`. ObligationService.java:253 `case \"SEMI_ANNUAL\" -> base.plusMonths(6);` vs RegReportingService.java:602 `case \"SEMIANNUAL\"`. RegReportingService.java:189-190 default `5` business-day offset literal.",
+      "impact": "A change to how a quarter/half-year boundary is computed (or adding a frequency) requires edits in 5+ switch blocks; the SEMIANNUAL vs SEMI_ANNUAL mismatch means data created by one module won't match the other's switch (falls to default).",
+      "reproduction": "Compare the frequency switch in RegReportingService.periodStartFor / nextPeriodEnd / buildReference with ObligationService.computeNextDueDate and ObligationCampaignService.periodStart/End.",
+      "resolution": "Introduce a single ReportingFrequency enum (canonical spelling) with methods periodStart(end), nextPeriodEnd(seed), referenceSuffix(end) and named constants for quarter/half-year. Replace the hand-rolled switches; reconcile SEMIANNUAL/SEMI_ANNUAL to one token.",
+      "patchBefore": "case \"QUARTERLY\" -> { int q = ((periodEnd.getMonthValue()-1)/3); yield periodEnd.withMonth(q*3+1)...; }\n// repeated in 3 methods here + 2 in obligation services; SEMIANNUAL vs SEMI_ANNUAL diverge",
+      "patchAfter": "enum ReportingFrequency {\n    QUARTERLY { LocalDate periodStart(LocalDate end){ ... } LocalDate next(LocalDate seed){ ... } },\n    SEMIANNUAL { ... }, ...;\n}\n// all services call ReportingFrequency.valueOf(code).periodStart(end) etc.",
+      "effort": "M",
+      "references": [
+        "https://refactoring.guru/replace-type-code-with-class",
+        "Magic Number smell"
+      ]
+    }
+  ]
+}

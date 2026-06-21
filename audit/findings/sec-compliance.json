@@ -1,0 +1,199 @@
+{
+  "findings": [
+    {
+      "id": "SEC-CMP-001",
+      "title": "Cross-tenant overwrite of policy-framework mappings via mass-assignment (addMapping accepts raw entity with attacker-controlled id)",
+      "phase": "Security",
+      "category": "Broken Object Level / Tenant Isolation (A01) + Mass Assignment (CWE-915)",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:H/A:N) — authenticated tenant can mutate another tenant's mapping rows",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java",
+      "lines": "119-128",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/entity/PolicyFrameworkMapping.java:18-46",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/repository/PolicyFrameworkMappingRepository.java:8-12"
+      ],
+      "description": "POST /api/v1/compliance/policies/{id}/mappings binds the request body directly to the JPA entity PolicyFrameworkMapping (@RequestBody PolicyFrameworkMapping body) and then calls mappingRepo.save(body). The handler validates that the path policy {id} belongs to the caller's tenant (requirePolicy) and overwrites body.policyId, but it does NOT null out body.id. PolicyFrameworkMapping has NO organisation_id column at all — the table is tenant-isolated only transitively via its parent Policy. Because Spring Data save() performs a merge() (UPDATE) when the entity id is non-null, an attacker who supplies an existing mapping id belonging to a DIFFERENT tenant's policy will overwrite that row's frameworkId, clauseRef, satisfaction, notes, createdBy and re-point policyId to the attacker's own policy. Mapping ids are global sequential Longs, so they are trivially enumerable.",
+      "rootCause": "The mapping entity carries no organisation_id, so tenant ownership is only enforced via the parent Policy. addMapping binds an unsanitised entity (no DTO) and never resets the id before save(), so a merge can target an arbitrary, cross-tenant primary key.",
+      "evidence": "public PolicyFrameworkMapping addMapping(@PathVariable Long id, @RequestBody PolicyFrameworkMapping body) {\n    requirePolicy(id);\n    if (body.getFrameworkId() == null) throw new IllegalArgumentException(\"frameworkId is required\");\n    body.setPolicyId(id);\n    if (body.getSatisfaction() == null) body.setSatisfaction(\"PARTIAL\");\n    return mappingRepo.save(body);   // body.id is attacker-controlled -> merge() of another tenant's row\n}",
+      "impact": "An authenticated user with COMPLIANCE:WRITE in tenant A can corrupt or hijack policy-framework mapping rows owned by tenant B (alter the clause reference / satisfaction level used in B's regulatory coverage reporting, or steal the row by re-pointing its policyId). This silently falsifies another organisation's compliance coverage posture — a regulatory-integrity breach in a multi-tenant GRC platform.",
+      "reproduction": "1. As a tenant-A user, GET another tenant's mapping id range (ids are sequential; or guess). 2. Create a policy P in tenant A, note its id. 3. POST /api/v1/compliance/policies/{P}/mappings with body {\"id\": <tenantB_mapping_id>, \"frameworkId\": 1, \"satisfaction\": \"FULL\", \"clauseRef\": \"tampered\"}. 4. The pre-existing tenant-B row is updated (merge): its policyId now points to P, its clauseRef/satisfaction are overwritten.",
+      "resolution": "Introduce a request DTO (no id field) for addMapping, or explicitly call body.setId(null) before save so a fresh INSERT is forced (the platform already uses this exact defence in PolicyService.create and RegulatoryChangeService.create). Better still, add an organisation_id column to policy_framework_mappings and filter every finder by it, and on update load the existing row by (id, organisationId) before copying allowed fields.",
+      "patchBefore": "public PolicyFrameworkMapping addMapping(@PathVariable Long id, @RequestBody PolicyFrameworkMapping body) {\n    requirePolicy(id);\n    if (body.getFrameworkId() == null) throw new IllegalArgumentException(\"frameworkId is required\");\n    body.setPolicyId(id);\n    if (body.getSatisfaction() == null) body.setSatisfaction(\"PARTIAL\");\n    return mappingRepo.save(body);\n}",
+      "patchAfter": "public PolicyFrameworkMapping addMapping(@PathVariable Long id, @RequestBody PolicyFrameworkMapping body) {\n    requirePolicy(id);\n    if (body.getFrameworkId() == null) throw new IllegalArgumentException(\"frameworkId is required\");\n    body.setId(null);            // force INSERT — block merge() into a cross-tenant row\n    body.setIsDeleted(false);\n    body.setPolicyId(id);\n    if (body.getSatisfaction() == null) body.setSatisfaction(\"PARTIAL\");\n    return mappingRepo.save(body);\n}",
+      "effort": "S",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes",
+        "OWASP API Top 10 2023: API1 Broken Object Level Authorization",
+        "OWASP API Top 10 2023: API6 Mass Assignment / Unrestricted Access to Sensitive Business Flows"
+      ]
+    },
+    {
+      "id": "SEC-CMP-002",
+      "title": "Control-mapping endpoints have no @PreAuthorize — any authenticated user can read and replace an entity's control links (BFLA)",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "High",
+      "cvss": "CVSS 7.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — no function-level authz on a write endpoint",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/controller/ControlMapController.java",
+      "lines": "31-52",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:118",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/service/ControlMapService.java:56-77"
+      ],
+      "description": "None of the three ControlMapController endpoints (GET /{entityType}/{entityId}, GET .../evidence, and PUT /{entityType}/{entityId}) declare any @PreAuthorize. With @EnableMethodSecurity(prePostEnabled=true) and SecurityConfig's terminal rule anyRequest().authenticated(), the only gate is that a valid JWT is present. Every other controller in the compliance/regulatory domain enforces a module permission (hasPermission('COMPLIANCE',...)) or a role list. The PUT performs a destructive replace-set: it deletes ALL existing control links for the (org, entityType, entityId) tuple and re-inserts the supplied set. Any authenticated user of any role (e.g. a read-only AUDITOR, or a low-privilege operator) can wipe and rewrite the control-to-evidence mapping for any risk/control/policy in their own tenant.",
+      "rootCause": "The controller relies solely on the global authenticated() floor and omits the method-level @PreAuthorize the rest of the platform uses, so authorization collapses from 'right module+action' down to 'any logged-in user'.",
+      "evidence": "@PutMapping(\"/{entityType}/{entityId}\")\n@Operation(summary = \"Replace the entity's control mappings with the supplied set\")\npublic List<ControlLinkResponse> set(@PathVariable String entityType, @PathVariable Long entityId,\n        @RequestBody ControlLinkSetRequest request, @AuthenticationPrincipal GrcUserDetails me) {\n    return service.setMappings(...);   // <-- no @PreAuthorize anywhere on this controller\n}",
+      "impact": "Within a tenant, an under-privileged user can silently destroy and forge the manual control-mapping layer that feeds evidence-readiness and framework-coverage rollups, degrading the integrity of compliance reporting. There is no cross-tenant exposure (service is org-scoped via TenantContext), but the missing function-level check is a clear privilege gap relative to the platform's own conventions.",
+      "reproduction": "1. Log in as any low-privilege user (e.g. AUDITOR). 2. PUT /api/v1/control-links/RISK/123 with body {\"subControlIds\": []}. 3. The response is 200 and all control links for RISK 123 in the tenant are deleted — no COMPLIANCE:WRITE or admin role was required.",
+      "resolution": "Add method-level authorization to all three endpoints: COMPLIANCE:READ (or CONTROLMAP:READ) on the GETs and COMPLIANCE:WRITE on the PUT, matching the convention used by ControlController and FrameworkAnchorController.",
+      "patchBefore": "@PutMapping(\"/{entityType}/{entityId}\")\npublic List<ControlLinkResponse> set(@PathVariable String entityType, @PathVariable Long entityId,\n        @RequestBody ControlLinkSetRequest request, @AuthenticationPrincipal GrcUserDetails me) {\n    return service.setMappings(entityType, entityId, request.subControlIds(), request.satisfaction(),\n        me != null ? me.getUserId() : null);\n}",
+      "patchAfter": "@PutMapping(\"/{entityType}/{entityId}\")\n@PreAuthorize(\"hasPermission('COMPLIANCE','WRITE')\")\npublic List<ControlLinkResponse> set(@PathVariable String entityType, @PathVariable Long entityId,\n        @RequestBody ControlLinkSetRequest request, @AuthenticationPrincipal GrcUserDetails me) {\n    return service.setMappings(entityType, entityId, request.subControlIds(), request.satisfaction(),\n        me != null ? me.getUserId() : null);\n}\n// and add @PreAuthorize(\"hasPermission('COMPLIANCE','READ')\") to both GET handlers",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "OWASP API Top 10 2023: API5 Broken Function Level Authorization",
+        "OWASP Top 10 2021: A01 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-CMP-003",
+      "title": "Policy Management endpoints gated only by isAuthenticated() — any user can author/publish/delete policies and approve exceptions (BFLA)",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "High",
+      "cvss": "CVSS 7.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:L) — privileged governance actions exposed to all authenticated users",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/policy/controller/PolicyController.java",
+      "lines": "46-176",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java:219-252",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java:364-397"
+      ],
+      "description": "Every endpoint in PolicyController is annotated only @PreAuthorize(\"isAuthenticated()\") — including the write/governance actions: create/update/delete policy documents, transition (DRAFT->REVIEW->APPROVED->PUBLISHED->ARCHIVED), new-version, expiry-sweep, create/update/delete policy exceptions, and exception transitions (which include APPROVED — formally accepting residual risk with compensating controls). This is far broader than the sibling RegChangePolicyController, which gates the same conceptual lifecycle behind hasPermission('COMPLIANCE','WRITE'). The service layer is correctly org-scoped (findByIdAndOrganisationId), so there is no cross-tenant exposure, but within a tenant any logged-in user — regardless of role — can publish a corporate policy, approve a policy exception (a legally significant risk-acceptance), or archive/delete policies.",
+      "rootCause": "The controller uses the authentication floor (isAuthenticated) as its only authorization rule for state-changing governance actions instead of a module-permission or role gate, so function-level authorization is effectively absent.",
+      "evidence": "@PostMapping(\"/documents/{id}/transition\")\n@PreAuthorize(\"isAuthenticated()\")\npublic PolicyDocument transition(@PathVariable Long id, @RequestBody Map<String,String> body, Authentication auth) {\n    return service.transition(id, body.get(\"to\"), actor(auth));\n}\n// ... and @PreAuthorize(\"isAuthenticated()\") on createException / exceptions/{id}/transition (APPROVED)",
+      "impact": "Any authenticated user can publish or archive official policies and approve policy exceptions (residual-risk acceptances). In a SAMA/NCA-regulated GRC platform this undermines policy-lifecycle governance and segregation of duties: the person who drafts a policy or requests an exception can self-approve it, and a low-privilege account can publish/retire policies organisation-wide.",
+      "reproduction": "1. Log in as any non-admin user. 2. POST /api/policy/documents/{id}/transition body {\"to\":\"PUBLISHED\"} on a policy in APPROVED state -> 200, policy published. 3. POST /api/policy/exceptions/{id}/transition body {\"to\":\"APPROVED\"} -> 200, residual risk accepted, with no role check.",
+      "resolution": "Replace isAuthenticated() with module-permission / role gates aligned to the rest of the platform: COMPLIANCE:READ for GET/aggregate, COMPLIANCE:WRITE for create/update/transition/new-version/sweep, COMPLIANCE:DELETE for deletes; and enforce segregation of duties so the approver of a policy/exception cannot be its author/requester.",
+      "patchBefore": "@PostMapping(\"/exceptions/{id}/transition\")\n@PreAuthorize(\"isAuthenticated()\")\npublic PolicyException transitionException(@PathVariable Long id, @RequestBody Map<String,String> body, Authentication auth) {\n    return service.transitionException(id, body.get(\"to\"), actor(auth), body.get(\"reason\"));\n}",
+      "patchAfter": "@PostMapping(\"/exceptions/{id}/transition\")\n@PreAuthorize(\"hasPermission('COMPLIANCE','WRITE')\")\npublic PolicyException transitionException(@PathVariable Long id, @RequestBody Map<String,String> body, Authentication auth) {\n    return service.transitionException(id, body.get(\"to\"), actor(auth), body.get(\"reason\"));\n}\n// apply analogous gates across the controller; READ on GETs, DELETE on deletes",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-863: Incorrect Authorization",
+        "OWASP API Top 10 2023: API5 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-CMP-004",
+      "title": "Policy attestation can be completed (attest/decline) by any user, not the assigned attester — repudiation / attestation fraud",
+      "phase": "Security",
+      "category": "Broken Object Level Authorization / Improper Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — integrity of attestation-of-record",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java",
+      "lines": "447-480",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/policy/controller/PolicyController.java:166-176",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/policy/entity/PolicyAttestation.java:30"
+      ],
+      "description": "PolicyService.attest(id, evidenceRef) and decline(id, reason) load the attestation by (id, org) and flip its status to ATTESTED/DECLINED, but they never verify that the authenticated caller is the user named in PolicyAttestation.userUsername (the assignee). Combined with the controller's isAuthenticated()-only gate, any logged-in user in the tenant can complete or decline an attestation that was assigned to a different employee. The attested record (who confirmed they read and accepted the policy, with attestedAt timestamp and evidence) is then attributed to the original assignee, not the actor who actually pressed the button.",
+      "rootCause": "No identity binding between the authenticated principal and the attestation's assignee (userUsername); authorization is reduced to 'authenticated + same tenant'.",
+      "evidence": "public PolicyAttestation attest(Long id, String evidenceRef) {\n    PolicyAttestation a = attestations.findByIdAndOrganisationId(id, org())\n        .orElseThrow(...);\n    if (!\"PENDING\".equals(a.getStatus())) throw ...;\n    a.setStatus(\"ATTESTED\");\n    a.setAttestedAt(LocalDateTime.now());\n    // <-- no check that current principal == a.getUserUsername()\n    ...\n}",
+      "impact": "Attestation-of-record is a compliance artefact (proof an employee read/accepted a policy). A user can falsely complete attestations on behalf of colleagues, producing fraudulent acceptance records and false coverage in the policy aggregate KPIs — a repudiation and audit-integrity problem for SAMA/NCA policy governance.",
+      "reproduction": "1. Admin assigns attestation A to user 'alice' (PENDING). 2. User 'bob' (any role) calls POST /api/policy/attestations/{A}/attest. 3. Response 200; the record shows ATTESTED with userUsername='alice' and attestedAt=now, even though bob acted.",
+      "resolution": "Bind the action to the assignee: compare the authenticated principal's username/id to a.getUserUsername() and reject (403) when they differ, unless the caller holds an explicit compliance-admin override. Record the actual actor separately (updatedBy) for forensics.",
+      "patchBefore": "public PolicyAttestation attest(Long id, String evidenceRef) {\n    PolicyAttestation a = attestations.findByIdAndOrganisationId(id, org()).orElseThrow(...);\n    if (!\"PENDING\".equals(a.getStatus())) throw ...;\n    a.setStatus(\"ATTESTED\");\n    a.setAttestedAt(LocalDateTime.now());\n    ...\n}",
+      "patchAfter": "public PolicyAttestation attest(Long id, String evidenceRef, String currentUsername) {\n    PolicyAttestation a = attestations.findByIdAndOrganisationId(id, org()).orElseThrow(...);\n    if (!a.getUserUsername().equalsIgnoreCase(currentUsername))\n        throw new AccessDeniedException(\"Attestation may only be completed by its assignee\");\n    if (!\"PENDING\".equals(a.getStatus())) throw ...;\n    a.setStatus(\"ATTESTED\");\n    a.setAttestedAt(LocalDateTime.now());\n    ...\n}",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-863: Incorrect Authorization",
+        "OWASP API Top 10 2023: API1 Broken Object Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-CMP-005",
+      "title": "Regulatory Horizon endpoint gated by isAuthenticated() instead of COMPLIANCE:READ (function-level under-scoping)",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N) — broader-than-intended read of compliance data",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/RegulatoryHorizonController.java",
+      "lines": "28-37",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/service/RegulatoryHorizonService.java:44-50"
+      ],
+      "description": "GET /api/v1/compliance/regulatory-horizon is annotated @PreAuthorize(\"isAuthenticated()\"), whereas every other compliance read endpoint requires hasPermission('COMPLIANCE','READ'). The service is correctly org-scoped (changes.findHorizon(org, ...)), so there is no cross-tenant leakage, but any authenticated user — even one with no Compliance module permission (e.g. a pure BCM or privacy operator) — can read the full tenant-wide regulatory-change horizon (authorities, citations, impact levels, assignees, effective dates).",
+      "rootCause": "The controller uses the authentication floor as its authorization rule rather than the module-permission convention used across the compliance package.",
+      "evidence": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic Horizon scan() {\n    return service.scan();\n}",
+      "impact": "Sensitive compliance posture (upcoming regulatory obligations, impact ratings, owner assignments) is readable by any authenticated user regardless of role, exceeding the principle of least privilege for the Compliance module.",
+      "reproduction": "1. Log in as a user without COMPLIANCE:READ. 2. GET /api/v1/compliance/regulatory-horizon -> 200 with the full horizon payload.",
+      "resolution": "Change the guard to @PreAuthorize(\"hasPermission('COMPLIANCE','READ')\") to match the rest of the compliance controllers.",
+      "patchBefore": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic Horizon scan() {\n    return service.scan();\n}",
+      "patchAfter": "@GetMapping\n@PreAuthorize(\"hasPermission('COMPLIANCE','READ')\")\npublic Horizon scan() {\n    return service.scan();\n}",
+      "effort": "S",
+      "references": [
+        "CWE-863: Incorrect Authorization",
+        "OWASP API Top 10 2023: API5 Broken Function Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-CMP-006",
+      "title": "Unbounded page size on regreporting and reginspect list endpoints (resource-exhaustion DoS)",
+      "phase": "Security",
+      "category": "Uncontrolled Resource Consumption (A05 / CWE-770)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L) — caller-controlled, uncapped page size",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/controller/RegReportingController.java",
+      "lines": "80-122",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:405-409",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reginspect/controller/RegInspectController.java:65-72",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/reginspect/service/RegInspectService.java:262-267"
+      ],
+      "description": "listObligations/listFilings (regreporting) and list (reginspect) accept raw @RequestParam int page and int size and pass them straight into PageRequest.of(page, size) in the service with no upper bound. A caller can request size=1000000 and force the server to materialise and serialise an enormous page in one query. This contrasts with the ControlController/obligation controllers which use @PageableDefault. (Several aggregate reads in this package also hard-code PageRequest.of(0,1000) in-memory, e.g. FrameworkAnchorController.findingsAging — bounded but a fixed wide page.)",
+      "rootCause": "No maximum-size clamp on user-supplied pagination parameters before constructing the Pageable.",
+      "evidence": "public Page<ObligationResponse> listObligations(int page, int size) {\n    return obligationRepo.findByOrganisationIdOrderByCodeAsc(org(), PageRequest.of(page, size))\n            .map(this::toObligation);\n}",
+      "impact": "An authenticated user can trigger large heap allocation and slow queries by requesting a very large page size, contributing to denial of service. Impact is bounded by the tenant's row counts but still allows disproportionate resource use from a single request.",
+      "reproduction": "GET /api/v1/regreporting/filings?page=0&size=10000000 — the server attempts to load up to that many rows in one page.",
+      "resolution": "Clamp size to a sane maximum (e.g. Math.min(size, 200)) and validate page>=0, or switch these endpoints to Spring's resolved Pageable with @PageableDefault and a configured spring.data.web.pageable.max-page-size.",
+      "patchBefore": "public Page<ObligationResponse> listObligations(int page, int size) {\n    return obligationRepo.findByOrganisationIdOrderByCodeAsc(org(), PageRequest.of(page, size))\n            .map(this::toObligation);\n}",
+      "patchAfter": "public Page<ObligationResponse> listObligations(int page, int size) {\n    int safeSize = Math.min(Math.max(size, 1), 200);\n    int safePage = Math.max(page, 0);\n    return obligationRepo.findByOrganisationIdOrderByCodeAsc(org(), PageRequest.of(safePage, safeSize))\n            .map(this::toObligation);\n}",
+      "effort": "S",
+      "references": [
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "OWASP API Top 10 2023: API4 Unrestricted Resource Consumption"
+      ]
+    },
+    {
+      "id": "SEC-CMP-007",
+      "title": "Cross-tenant foreign-key references accepted without ownership validation (assessmentId, frameworkId, policyId, relatedControlId/relatedRiskId)",
+      "phase": "Security",
+      "category": "Improper Validation of Specified Resource (A04 / CWE-20) — tenant integrity",
+      "severity": "Low",
+      "cvss": "CVSS 3.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — dangling cross-tenant references, no direct data read",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/service/ComplianceService.java",
+      "lines": "198-208",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java:330-345",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java:433-445",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/service/ObligationService.java:129-186"
+      ],
+      "description": "Several create/update paths accept foreign-key ids from the request body and persist them on a freshly org-stamped row without verifying that the referenced parent belongs to the caller's tenant. Examples: ComplianceService.applyFinding sets f.assessmentId / f.frameworkId from the request; PolicyService.createException sets policyId and createAttestation sets policyId from the body; ObligationService.create/update sets relatedControlId / relatedRiskId. The owning row is correctly stamped with the caller's organisationId, so no cross-tenant data is read back through these objects, but the stored reference can point at another tenant's primary key, creating dangling/forged linkage that may mislead downstream joins, rollups, or future features that dereference these ids.",
+      "rootCause": "Foreign-key inputs are trusted as-is; there is no 'parent belongs to same org' check before the reference is saved.",
+      "evidence": "private void applyFinding(AuditFinding f, FindingRequest req) {\n    f.setAssessmentId(req.assessmentId());     // not validated against caller's org\n    ...\n    if (req.frameworkId() != null) f.setFrameworkId(req.frameworkId());\n}",
+      "impact": "Data-integrity / referential-integrity weakness: a tenant can attach references to objects it does not own, polluting reporting links and risking information disclosure if any future code path resolves these ids without re-checking org ownership. No direct cross-tenant read occurs today through the audited paths.",
+      "reproduction": "1. As tenant A, POST /api/v1/compliance/findings with assessmentId set to a tenant-B assessment id. 2. The finding is created in tenant A but references a foreign assessment; the link is silently accepted.",
+      "resolution": "On each write, validate that supplied parent ids resolve to a row owned by TenantContext.getCurrentTenant() (e.g. assessmentRepo.findById(id).filter(a -> a.getOrganisationId().equals(org)) ...), rejecting otherwise. Apply the same check to policyId (exceptions/attestations) and relatedControlId/relatedRiskId on obligations.",
+      "patchBefore": "if (req.frameworkId() != null) f.setFrameworkId(req.frameworkId());\nf.setAssessmentId(req.assessmentId());",
+      "patchAfter": "if (req.assessmentId() != null) {\n    assessmentRepo.findById(req.assessmentId())\n        .filter(a -> a.getOrganisationId().equals(orgId))\n        .orElseThrow(() -> new IllegalArgumentException(\"assessmentId not in tenant\"));\n    f.setAssessmentId(req.assessmentId());\n}\n// validate frameworkId similarly before assignment",
+      "effort": "M",
+      "references": [
+        "CWE-20: Improper Input Validation",
+        "CWE-1220: Insufficient Granularity of Access Control",
+        "OWASP API Top 10 2023: API1 Broken Object Level Authorization"
+      ]
+    }
+  ]
+}

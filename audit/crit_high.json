@@ -1,0 +1,587 @@
+[
+  {
+    "id": "SEC-CVE-001",
+    "title": "Apache Tomcat embedded (tomcat-embed-core 10.1.46) — multiple Critical/High request-smuggling, auth-bypass and DoS CVEs",
+    "phase": "Security",
+    "severity": "Critical",
+    "category": "Vulnerable & Outdated Components (A06)",
+    "file": "tss-grc-backend/pom.xml",
+    "lines": "8-15"
+  },
+  {
+    "id": "SEC-CVE-002",
+    "title": "Spring Security Web 6.5.5 — HTTP response headers may not be written (security policy bypass & information disclosure)",
+    "phase": "Security",
+    "severity": "Critical",
+    "category": "Vulnerable & Outdated Components (A06)",
+    "file": "tss-grc-backend/pom.xml",
+    "lines": "8-15"
+  },
+  {
+    "id": "SEC-CYB-001",
+    "title": "Cross-tenant read/update/delete (IDOR) across all CyberService single-entity operations",
+    "phase": "Security",
+    "severity": "Critical",
+    "category": "Broken Access Control / IDOR (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java",
+    "lines": "183-214"
+  },
+  {
+    "id": "SEC-CYB-002",
+    "title": "Cross-tenant row overwrite/takeover via client-supplied id on entity-bodied write endpoints (mass assignment)",
+    "phase": "Security",
+    "severity": "Critical",
+    "category": "Broken Access Control / Mass Assignment (A01/A08)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/OtAssetService.java",
+    "lines": "38-70"
+  },
+  {
+    "id": "SEC-FIN-001",
+    "title": "Unauthenticated public intake case-tracker leaks full submitter PII and form payload across all tenants",
+    "phase": "Security",
+    "severity": "Critical",
+    "category": "Broken Access Control / Sensitive Data Exposure (A01/A02, CWE-639, CWE-359)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/intake/controller/IntakeController.java",
+    "lines": "81-87"
+  },
+  {
+    "id": "SEC-IAM-001",
+    "title": "Approval-chain actor identity taken from request body — any authenticated user can forge approvals and advance/finalise chains",
+    "phase": "Security",
+    "severity": "Critical",
+    "category": "Broken Access Control / Broken Function Level Authorization (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/controller/ApprovalChainController.java",
+    "lines": "129-141"
+  },
+  {
+    "id": "SEC-INT-001",
+    "title": "CCM CUSTOM_SQL runner executes arbitrary tenant-supplied SELECT as native SQL — cross-tenant data exfiltration",
+    "phase": "Security",
+    "severity": "Critical",
+    "category": "SQL Injection / Broken Access Control (A03 / A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/CustomSqlRunner.java",
+    "lines": "59-138"
+  },
+  {
+    "id": "SEC-AUTH-001",
+    "title": "No automatic account lockout or brute-force throttling on login",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Identification and Authentication Failures (A07) / CWE-307",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java",
+    "lines": "56-119"
+  },
+  {
+    "id": "SEC-BCM-001",
+    "title": "Cross-tenant read/update/delete of BIA records via unscoped BiaRecordRepository (IDOR)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control / IDOR (A01) — CWE-639",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/BcmService.java",
+    "lines": "200-237"
+  },
+  {
+    "id": "SEC-CMP-001",
+    "title": "Cross-tenant overwrite of policy-framework mappings via mass-assignment (addMapping accepts raw entity with attacker-controlled id)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Object Level / Tenant Isolation (A01) + Mass Assignment (CWE-915)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java",
+    "lines": "119-128"
+  },
+  {
+    "id": "SEC-CMP-002",
+    "title": "Control-mapping endpoints have no @PreAuthorize — any authenticated user can read and replace an entity's control links (BFLA)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Function Level Authorization (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/controller/ControlMapController.java",
+    "lines": "31-52"
+  },
+  {
+    "id": "SEC-CMP-003",
+    "title": "Policy Management endpoints gated only by isAuthenticated() — any user can author/publish/delete policies and approve exceptions (BFLA)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Function Level Authorization (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/policy/controller/PolicyController.java",
+    "lines": "46-176"
+  },
+  {
+    "id": "SEC-CVE-003",
+    "title": "Microsoft SQL Server JDBC Driver 12.8.1.jre11 — improper input validation enables spoofing (CVE-2025-59250)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Vulnerable & Outdated Components (A06)",
+    "file": "tss-grc-backend/pom.xml",
+    "lines": "112-116"
+  },
+  {
+    "id": "SEC-CVE-004",
+    "title": "Spring Boot Actuator 3.5.6 — authentication bypass via Health Group additional path & CloudFoundry endpoints",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Vulnerable & Outdated Components (A06)",
+    "file": "tss-grc-backend/pom.xml",
+    "lines": "66-69"
+  },
+  {
+    "id": "SEC-CVE-005",
+    "title": "Spring Boot 3.5.6 — predictable ApplicationTemp directory enables code execution / session hijacking (CVE-2026-40973)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Vulnerable & Outdated Components (A06)",
+    "file": "tss-grc-backend/pom.xml",
+    "lines": "8-15"
+  },
+  {
+    "id": "SEC-CYB-003",
+    "title": "CloudService endpoints guarded only by isAuthenticated() — any logged-in user can mutate the NCA CSCC cloud inventory (BFLA)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Function Level Authorization (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/controller/CloudServiceController.java",
+    "lines": "23-45"
+  },
+  {
+    "id": "SEC-ESG-001",
+    "title": "Sustainability (/api/sustainability/**) endpoints have no function-level authorization — every write/delete/approve is guarded only by isAuthenticated()",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control (A01) — BFLA / CWE-862 Missing Authorization",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/sust/ghg/controller/GhgEmissionRecordController.java",
+    "lines": "40-102"
+  },
+  {
+    "id": "SEC-EVD-001",
+    "title": "AttachmentController has no @PreAuthorize on any endpoint — generic file upload/download/delete open to every authenticated user (BFLA + in-tenant IDOR)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/controller/AttachmentController.java",
+    "lines": "32-99"
+  },
+  {
+    "id": "SEC-EVD-002",
+    "title": "Evidence item create accepts arbitrary client-supplied status — four-eyes Segregation-of-Duties and review workflow can be fully bypassed",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Business Logic / Broken Access Control (A04/A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java",
+    "lines": "369-384"
+  },
+  {
+    "id": "SEC-FE-001",
+    "title": "Stored/Reflected DOM-based XSS via unsanitised innerHTML of server data in legacy UI (global shell + SCM/Compliance/Dashboard)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Cross-Site Scripting (A03:2021 Injection)",
+    "file": "tss-grc-ui/assets/js/app.js",
+    "lines": "103-143"
+  },
+  {
+    "id": "SEC-FIN-002",
+    "title": "SCM sub-controllers (clauses, fourth-party, resilience, resilience-tests) use only isAuthenticated() — no SCM module permission (BFLA)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Function Level Authorization (A01, CWE-862/CWE-285)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/scm/resilience/controller/SupplierResilienceController.java",
+    "lines": "41-155"
+  },
+  {
+    "id": "SEC-IAM-002",
+    "title": "Approval-request transition has no assignee check and trusts decidedBy from the body — any user can approve/reject any request and forge the decider",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control / Broken Function Level Authorization (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/approvals/controller/ApprovalRequestController.java",
+    "lines": "37-42"
+  },
+  {
+    "id": "SEC-IAM-003",
+    "title": "Digital signature can be applied/rejected by any authenticated user — no binding to the designated signer (signature forgery)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control / Improper Authentication of Signer (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/signature/controller/DigitalSignatureController.java",
+    "lines": "85-97"
+  },
+  {
+    "id": "SEC-INT-002",
+    "title": "ServiceNow inbound webhook resolves IntegrationExternalLink without organisation_id — cross-tenant write/IDOR",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control / IDOR (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/servicenow/webhook/ServiceNowWebhookController.java",
+    "lines": "68-120"
+  },
+  {
+    "id": "SEC-NDI-001",
+    "title": "Entire NDI module uses only isAuthenticated() — no MODULE:ACTION authorization (broken function-level access control)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/cycle/controller/NdiAssessmentCycleController.java",
+    "lines": "43-101"
+  },
+  {
+    "id": "SEC-NDI-002",
+    "title": "Append-only NDI audit ledger is writable by any authenticated user (audit log forgery)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Security Logging & Monitoring Failures (A09)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/controller/NdiAuditController.java",
+    "lines": "37-41"
+  },
+  {
+    "id": "SEC-NPM-001",
+    "title": "Vite dev server — server.fs.deny bypass + path traversal + LAN exposure (high)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Path Traversal / Information Disclosure (A01/A05)",
+    "file": "tss-grc-ui-v2/package.json",
+    "lines": "32-32"
+  },
+  {
+    "id": "SEC-PLAT-001",
+    "title": "Module licensing can be enabled/disabled by any authenticated user (license bypass + tenant DoS)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Function Level Authorization (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/licensing/controller/LicensingController.java",
+    "lines": "48-61"
+  },
+  {
+    "id": "SEC-PLAT-002",
+    "title": "Automation rule logic editable/deletable by any authenticated user",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Function Level Authorization (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/automation/controller/AutomationRuleController.java",
+    "lines": "65-122"
+  },
+  {
+    "id": "SEC-PRIV-001",
+    "title": "PDPL privacy sub-modules use isAuthenticated() instead of hasPermission('PRIVACY',…) — broken function-level authorization (BFLA)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control (A01) / CWE-862 Missing Authorization",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/controller/ConsentRecordController.java",
+    "lines": "27-64"
+  },
+  {
+    "id": "SEC-PRIV-002",
+    "title": "Cyber→PDPL bridge manual trigger creates breach + mutates cyber.incidents under only isAuthenticated()",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control (A01) / CWE-862 Missing Authorization",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/bridge/controller/CyberPdplBridgeController.java",
+    "lines": "28-54"
+  },
+  {
+    "id": "SEC-RISK-001",
+    "title": "Cross-tenant IDOR read of risk treatment plans via GET /treatments/{id}",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Access Control / BOLA (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskTreatmentService.java",
+    "lines": "62-66"
+  },
+  {
+    "id": "SEC-TPRM-001",
+    "title": "Cross-tenant IDOR: VendorAssessment update/delete not scoped to organisation",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Object Level Authorization / IDOR (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/TprmService.java",
+    "lines": "100-120"
+  },
+  {
+    "id": "SEC-TPRM-002",
+    "title": "Cross-tenant mutation of VendorAssessment via questionnaire workflow (unscoped findById)",
+    "phase": "Security",
+    "severity": "High",
+    "category": "Broken Object Level Authorization / IDOR (A01)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java",
+    "lines": "210-326"
+  },
+  {
+    "id": "QUAL-DUP-001",
+    "title": "188 of 368 JPA entities re-declare the full audit/soft-delete/versioning column block instead of extending the existing BaseEntity mapped superclass",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "Code Duplication / Maintainability",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/entity/ObligationAttestationCampaign.java",
+    "lines": "36-142"
+  },
+  {
+    "id": "QUAL-DUP-002",
+    "title": "TSX pages duplicate whole presentational components and helpers (ProgressBar, card components, bilingual pickers) across modules — 609 clones / 8,602 lines",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "Code Duplication / Maintainability",
+    "file": "tss-grc-ui-v2/src/pages/compliance/ObligationCampaignsPage.tsx",
+    "lines": "344-365"
+  },
+  {
+    "id": "QUAL-ESG-001",
+    "title": "God class: DataOfficerService implements 10 sub-modules in 1054 LOC with 14 injected repositories",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "God class / SRP violation",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java",
+    "lines": "48-1054"
+  },
+  {
+    "id": "QUAL-IE-001",
+    "title": "EvidenceMatrixService.matrix() is a triple-nested N+1 query loop (86 LOC, queries scale with the whole framework catalog)",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "Performance / Cyclomatic complexity",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java",
+    "lines": "57-143"
+  },
+  {
+    "id": "QUAL-IE-002",
+    "title": "EvidenceItemService.toResponse() issues up to 4 lookup queries per item, causing N+1 on every list/page endpoint",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "Performance",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java",
+    "lines": "386-422"
+  },
+  {
+    "id": "QUAL-RC-001",
+    "title": "Two unrelated PolicyService classes with conflicting state machines split policy logic across modules",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "SOLID / Naming / Duplication",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java",
+    "lines": "37-176"
+  },
+  {
+    "id": "QUAL-RC-003",
+    "title": "FrameworkAnchorController is a fat controller: 8 injected repositories across 4 modules, business logic in the web layer",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "SOLID / Layering",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java",
+    "lines": "52-339"
+  },
+  {
+    "id": "QUAL-TI-001",
+    "title": "Two parallel SAMA-outsourcing implementations (module/outsourcing vs module/tprm/outsourcing) duplicate the same regulatory bounded context",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "Duplication / Layering (SOLID, DRY, bounded-context overlap)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/service/OutsourcingService.java",
+    "lines": "1-612"
+  },
+  {
+    "id": "QUAL-TI-002",
+    "title": "Integration LIVE clients duplicate the retry / exponential-backoff / sleep / url harness across CrowdStrike, Tenable and Splunk",
+    "phase": "Quality",
+    "severity": "High",
+    "category": "Duplication (copy-paste of resilience logic)",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java",
+    "lines": "151-230"
+  },
+  {
+    "id": "PERF-NQ-003",
+    "title": "EvidenceMatrixService.matrix() is a 4-level nested N+1 (framework -> control -> sub-control -> evidence items)",
+    "phase": "Performance",
+    "severity": "Critical",
+    "category": "Nested N+1 Query",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java",
+    "lines": "57-143"
+  },
+  {
+    "id": "PERF-FE-001",
+    "title": "Heaviest module pages are statically (eagerly) imported into the entry bundle, so /login downloads 8 unrelated workspace pages (~7,000 LOC)",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Bundle size / code splitting",
+    "file": "tss-grc-ui-v2/src/App.tsx",
+    "lines": "8-18,167"
+  },
+  {
+    "id": "PERF-FE-002",
+    "title": "Both full translation dictionaries (Arabic 418 KB + English 325 KB source) are statically imported on the critical path; only one language is ever active",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Bundle size / i18n",
+    "file": "tss-grc-ui-v2/src/lib/i18n.tsx",
+    "lines": "2-3"
+  },
+  {
+    "id": "PERF-IO-001",
+    "title": "Outbound integration HTTP calls execute inside @Transactional methods, holding a Hikari DB connection across the remote round-trip",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Connection pool exhaustion / blocking I/O under transaction",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/servicenow/service/ServiceNowOutboundService.java",
+    "lines": "83-114"
+  },
+  {
+    "id": "PERF-IO-002",
+    "title": "Scheduled and manual integration polls hold one DB connection across the remote poll PLUS the entire per-finding ingest loop",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Long-lived transaction / connection hold across remote I/O + batch loop",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/service/TenableInboundService.java",
+    "lines": "144-185"
+  },
+  {
+    "id": "PERF-IX-001",
+    "title": "74 multi-tenant tables carry organisation_id but have no supporting index — every org-scoped query is a full clustered-index scan",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Database Indexing / Multi-Tenancy",
+    "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql",
+    "lines": "15-108"
+  },
+  {
+    "id": "PERF-IX-002",
+    "title": "Early core-module migrations (compliance, incident, tprm) create tables with zero secondary indexes — inconsistent indexing discipline left foundational registers unindexed",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Database Indexing / Schema Standards",
+    "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql",
+    "lines": "1-112"
+  },
+  {
+    "id": "PERF-IX-003",
+    "title": "iam.users has no index beyond the clustered PK — username/email login lookups and per-request principal resolution scan the user table; no unique constraint on username/email",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Database Indexing / Authentication Hot Path",
+    "file": "tss-grc-backend/src/main/resources/db/migration/sqlserver/V1__core_schemas.sql",
+    "lines": "1178-1209"
+  },
+  {
+    "id": "PERF-NQ-001",
+    "title": "Risk register list endpoint issues 2N+1 queries (category + owner per row) and triggers the EAGER User graph per owner",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "N+1 Query / Lazy Loading",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskService.java",
+    "lines": "52-57,238-276"
+  },
+  {
+    "id": "PERF-NQ-002",
+    "title": "User and Role use FetchType.EAGER ManyToMany, forcing the full role+permission graph on every user load",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "EAGER Fetch / N+1 Query",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/iam/entity/User.java",
+    "lines": "68-74"
+  },
+  {
+    "id": "PERF-NQ-004",
+    "title": "RiskControlFindingPivotService: compounding per-row queries across controls, findings, CAPA and CCM runs",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Nested N+1 Query",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java",
+    "lines": "140-389"
+  },
+  {
+    "id": "PERF-PG-001",
+    "title": "204 register/list endpoints return entire result set with no pagination (unbounded findAll-style queries)",
+    "phase": "Performance",
+    "severity": "High",
+    "category": "Unbounded result set / missing pagination",
+    "file": "tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/controller/ObligationController.java",
+    "lines": "48-52"
+  },
+  {
+    "id": "FUNC-001",
+    "title": "Frontend (tss-grc-ui-v2) ships with zero executable automated tests and no test runner wired into the build",
+    "phase": "Functional",
+    "severity": "High",
+    "category": "Test Coverage / Quality Assurance",
+    "file": "tss-grc-ui-v2/package.json",
+    "lines": "1-40"
+  },
+  {
+    "id": "FUNC-002",
+    "title": "Backend branch coverage is 26.0% and 762 of 1324 classes (57.6%) have 0% coverage — decision logic is largely unexercised",
+    "phase": "Functional",
+    "severity": "High",
+    "category": "Test Coverage / Quality Assurance",
+    "file": "tss-grc-backend/target/site/jacoco/jacoco.csv",
+    "lines": "1-1324"
+  },
+  {
+    "id": "FUNC-003",
+    "title": "Confirmed Critical/High security findings have no test asserting the vulnerable path — 5 of 6 Critical findings sit on classes at 0% coverage or with tests that miss the exploit",
+    "phase": "Functional",
+    "severity": "High",
+    "category": "Test Coverage / Security Regression Testing",
+    "file": "audit/crit_high.json",
+    "lines": "1-55"
+  },
+  {
+    "id": "COPY-01",
+    "title": "Login form ships with pre-filled admin / Admin@12345 credentials and a plaintext credential hint",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Microcopy / Security-adjacent UX",
+    "file": "tss-grc-ui-v2/src/pages/LoginPage.tsx",
+    "lines": "25-26, 114"
+  },
+  {
+    "id": "LH-01",
+    "title": "Critical-path module pages eagerly imported in App.tsx defeat code-splitting on the public /login route",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Performance / Bundle size",
+    "file": "tss-grc-ui-v2/src/App.tsx",
+    "lines": "7-18,167"
+  },
+  {
+    "id": "LH-02",
+    "title": "Both full-language translation dictionaries (ar.ts ~1.05 MiB + en.ts ~0.84 MiB) statically imported and shipped to /login",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Performance / Bundle size",
+    "file": "tss-grc-ui-v2/src/lib/i18n.tsx",
+    "lines": "2-3"
+  },
+  {
+    "id": "LH-03",
+    "title": "Catastrophic Core Web Vitals on /login: FCP 37.4 s, LCP 72.3 s, Speed Index 37.4 s, TTI 72.3 s",
+    "phase": "UX",
+    "severity": "High",
+    "category": "Performance / Core Web Vitals",
+    "file": "audit/raw/lighthouse-login.report.json",
+    "lines": "76-100"
+  },
+  {
+    "id": "A11Y-001",
+    "title": "Sidebar muted text (--sb-text-3) fails WCAG 1.4.3 contrast on every authenticated page (2.4:1)",
+    "phase": "Accessibility",
+    "severity": "High",
+    "category": "Color Contrast",
+    "file": "tss-grc-ui-v2/src/styles/tokens.css",
+    "lines": "116"
+  },
+  {
+    "id": "A11Y-002",
+    "title": "Muted body/label grey (--ink-4) fails WCAG 1.4.3 on light surfaces (2.7:1)",
+    "phase": "Accessibility",
+    "severity": "High",
+    "category": "Color Contrast",
+    "file": "tss-grc-ui-v2/src/styles/tokens.css",
+    "lines": "28"
+  },
+  {
+    "id": "A11Y-003",
+    "title": "Risk score pills: white text on --risk-vhigh fails WCAG 1.4.3 (3.16:1) — 25 instances on the Risk Register",
+    "phase": "Accessibility",
+    "severity": "High",
+    "category": "Color Contrast",
+    "file": "tss-grc-ui-v2/src/styles/tokens.css",
+    "lines": "98"
+  }
+]

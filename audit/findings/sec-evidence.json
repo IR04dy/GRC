@@ -1,0 +1,213 @@
+{
+  "findings": [
+    {
+      "id": "SEC-EVD-001",
+      "title": "AttachmentController has no @PreAuthorize on any endpoint — generic file upload/download/delete open to every authenticated user (BFLA + in-tenant IDOR)",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N) — any authenticated principal, regardless of module role, can read/write/delete files attached to any business entity in their tenant",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/controller/AttachmentController.java",
+      "lines": "32-99",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/controller/AttachmentController.java:36-40",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/controller/AttachmentController.java:42-56",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/controller/AttachmentController.java:58-66",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/controller/AttachmentController.java:94-99",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:118"
+      ],
+      "description": "The generic attachment facility (`/api/v1/attachments/**`) is reusable across every register/form — risk, audit, incident, privacy, board-pack evidence, contracts, committee minutes, etc. Not one of its eight endpoints (list, upload, download, newVersion, history, update, delete) carries a `@PreAuthorize` annotation, nor does the class. The only enforced rule is the catch-all `anyRequest().authenticated()` in SecurityConfig (line 118). The service layer (`AttachmentService.mustGet`) scopes by `TenantContext` so cross-tenant reads are blocked, but WITHIN a tenant there is no module/action authorisation: list/upload accept an arbitrary `entityType` + `entityId` path with no check that the caller may access the owning entity, and download/history/update/delete operate by raw attachment id. A read-only AUDITOR (or any user holding any single permission) can therefore upload forged 'evidence'/'minutes'/'contract' files against any entity, overwrite documents with new versions, read confidential board/audit attachments, and soft-delete them.",
+      "rootCause": "Method-level authorization was never added to the controller, and the platform's default security posture is 'authenticated = allowed'. The reusable, polymorphic (entity_type, entity_id) design means a single missing guard exposes documents belonging to every module at once. There is also no object-level check binding the attachment's entity_type/entity_id to a permission on that owning module.",
+      "evidence": "@RestController\n@RequestMapping(\"/api/v1/attachments\")\npublic class AttachmentController {\n    @GetMapping(\"/{entityType}/{entityId}\")\n    public List<AttachmentResponse> list(...) { ... }      // no @PreAuthorize\n    @PostMapping(value=\"/{entityType}/{entityId}\", ...)\n    public AttachmentResponse upload(...) { ... }          // no @PreAuthorize\n    @GetMapping(\"/{id}/download\")\n    public ResponseEntity<byte[]> download(@PathVariable Long id) { ... } // no @PreAuthorize\n    @DeleteMapping(\"/{id}\")\n    public void delete(@PathVariable Long id) { ... }      // no @PreAuthorize",
+      "impact": "Cross-module, in-tenant broken access control. A least-privileged user can exfiltrate sensitive documents (board packs, audit working papers, contracts, privacy records, committee minutes) attached anywhere in the tenant, plant fraudulent compliance evidence, tamper with documents via the version endpoint, and delete records — undermining the GRC platform's integrity and audit trail and breaching the principle of least privilege required by ECC/ISO 27001/SAMA.",
+      "reproduction": "1. Log in as a low-privilege user, e.g. `auditor` (AUDITOR role, read-only) and obtain a Bearer token.\n2. Download any attachment: `curl -H \"Authorization: Bearer <token>\" http://localhost:8084/api/v1/attachments/42/download` — succeeds for any id 42 in the tenant regardless of module.\n3. Plant evidence: `curl -H \"Authorization: Bearer <token>\" -F file=@forged.pdf -F docType=EVIDENCE http://localhost:8084/api/v1/attachments/risk/7` — uploads a file owned by risk #7 even though the auditor has no RISK:WRITE.\n4. Delete: `curl -X DELETE -H \"Authorization: Bearer <token>\" http://localhost:8084/api/v1/attachments/42` — soft-deletes the attachment.",
+      "resolution": "Add method-level authorization to every endpoint. At minimum gate by the attachment module (e.g. `@PreAuthorize(\"hasPermission('EVIDENCE','READ')\")` on reads / `'WRITE'` on writes / `'DELETE'` on delete). Better: derive the owning module from `entityType` and check the caller's permission on THAT module (object-level authz) so an attachment on a risk requires RISK access, on a board pack requires REPORTING access, etc. Also validate that the (entityType, entityId) actually resolves to an entity the caller may see before storing/listing.",
+      "patchBefore": "@GetMapping(\"/{id}/download\")\n@Operation(summary = \"Download an attachment's binary\")\npublic ResponseEntity<byte[]> download(@PathVariable Long id) {\n    AttachmentService.DownloadPayload p = service.download(id);\n    ...\n}\n\n@DeleteMapping(\"/{id}\")\npublic void delete(@PathVariable Long id) { service.delete(id); }",
+      "patchAfter": "@GetMapping(\"/{id}/download\")\n@PreAuthorize(\"@attachmentAccess.canRead(#id)\")   // resolves entityType -> module READ\npublic ResponseEntity<byte[]> download(@PathVariable Long id) {\n    AttachmentService.DownloadPayload p = service.download(id);\n    ...\n}\n\n@DeleteMapping(\"/{id}\")\n@PreAuthorize(\"@attachmentAccess.canDelete(#id)\") // entityType -> module DELETE\npublic void delete(@PathVariable Long id) { service.delete(id); }\n// list/upload similarly gated on the module implied by {entityType}",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-EVD-002",
+      "title": "Evidence item create accepts arbitrary client-supplied status — four-eyes Segregation-of-Duties and review workflow can be fully bypassed",
+      "phase": "Security",
+      "category": "Business Logic / Broken Access Control (A04/A01)",
+      "severity": "High",
+      "cvss": "CVSS 7.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — a single user with EVIDENCE:WRITE self-approves compliance evidence, defeating the SoD control",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java",
+      "lines": "369-384",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:383",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:156-168",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:186-201",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/controller/EvidenceItemController.java:68-74"
+      ],
+      "description": "`EvidenceItemService.create()` calls `applyRequest()`, which blindly copies the client-supplied `status` onto a new entity: `if (req.status() != null) item.setStatus(req.status());` (line 383). There is no validation against `ITEM_STATUSES` and no transition-guard. The system deliberately enforces Segregation of Duties only on the `approve()` transition (lines 194-199: the creator may not approve their own evidence). Because `create` lets the caller set `status` directly, a user can `POST /api/v1/evidence/items` with `{\"status\":\"APPROVED\"}` and obtain an APPROVED evidence item without ever passing through submit -> review -> approve, never triggering the SoD check or producing an `EVIDENCE_APPROVED` review trail. The same hole lets the create path also seed EXPIRED/REJECTED or any free-text status. `update()` shares the same `applyRequest` and can re-set status on an existing item, again skipping `validateTransition`.",
+      "rootCause": "Mass-assignment of a workflow-controlling field (`status`) on create/update, with the state-machine guard (`validateTransition`) and the SoD guard living only on the dedicated transition methods (`submitForReview`/`approve`/`reject`). The DTO exposes `status` as a freely settable input field.",
+      "evidence": "private void applyRequest(EvidenceItem item, EvidenceItemCreateRequest req) {\n    ...\n    item.setFileName(req.fileName());\n    if (req.status() != null) item.setStatus(req.status());   // <-- no validation, no SoD\n}\n\n// approve() — the SoD guard that create() sidesteps entirely:\nif (currentUser != null && currentUser.equals(item.getCreatedBy())) {\n    throw new BusinessRuleException(\"Segregation of duties: you cannot approve evidence you submitted...\");\n}",
+      "impact": "Defeats the regulatory four-eyes / SoD control (ECC 2-3, ISO 27001 A.5.3, SAMA) the platform advertises for evidence approval. A single insider with EVIDENCE:WRITE can manufacture self-approved compliance evidence, which fulfils linked evidence-requests (`fulfilRequest`) and feeds coverage rollups, audit packs and attestations — directly enabling compliance fraud and undermining the integrity of every downstream assurance artefact.",
+      "reproduction": "1. Authenticate as a user with EVIDENCE:WRITE (e.g. `riskmanager`).\n2. `curl -X POST -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' \\\n   -d '{\"titleEn\":\"Self-approved control evidence\",\"evidenceType\":\"DOCUMENT\",\"status\":\"APPROVED\"}' \\\n   http://localhost:8084/api/v1/evidence/items`\n3. Response shows the item created directly in status APPROVED; no EvidenceReview row, no SoD check, no EVIDENCE_APPROVED transition event — yet the item now counts as approved evidence in the matrix and stats.",
+      "resolution": "On create, ignore any client `status` and force the canonical initial state (`DRAFT`); only allow an explicit non-DRAFT seed for trusted system/import flows behind a separate permission. On update, never mutate `status` via `applyRequest` — route all status changes exclusively through `transitionStatus`/`approve`/`reject` so `validateTransition` and the SoD guard always run. Validate any accepted status against `ITEM_STATUSES`.",
+      "patchBefore": "private void applyRequest(EvidenceItem item, EvidenceItemCreateRequest req) {\n    item.setTitleEn(req.titleEn());\n    ...\n    item.setFileName(req.fileName());\n    if (req.status() != null) item.setStatus(req.status());\n}",
+      "patchAfter": "private void applyRequest(EvidenceItem item, EvidenceItemCreateRequest req) {\n    item.setTitleEn(req.titleEn());\n    ...\n    item.setFileName(req.fileName());\n    // status is workflow-controlled: new items start DRAFT; existing items keep\n    // their current status. All changes go through transitionStatus()/approve().\n    if (item.getStatus() == null) item.setStatus(\"DRAFT\");\n}",
+      "effort": "S",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "CWE-840: Business Logic Errors",
+        "CWE-841: Improper Enforcement of Behavioral Workflow",
+        "OWASP A04:2021 Insecure Design",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-EVD-003",
+      "title": "Evidence chain-of-custody endpoints guarded only by isAuthenticated() — any user can read and mutate WORM chain status (BFLA)",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N) — any authenticated user reads chain reports and triggers chain-status writes without EVIDENCE permission",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/chain/controller/EvidenceChainController.java",
+      "lines": "24-40",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/chain/controller/EvidenceChainController.java:36-40",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/chain/service/EvidenceChainService.java:71-173"
+      ],
+      "description": "Every endpoint of the evidence chain-of-custody controller uses `@PreAuthorize(\"isAuthenticated()\")` rather than the module guard `hasPermission('EVIDENCE','READ')`/`'WRITE'` used by the rest of the evidence module. The sibling `EvidenceItemController`/`EvidenceMatrixController` correctly gate reads on EVIDENCE:READ. More importantly, `POST /api/evidence/chain/{evidenceId}/verify` is a state-mutating operation: `verifyChain` runs `UPDATE evidence.evidence_versions ... SET chain_status, chain_verified_by, chain_break_reason` and `UPDATE evidence.evidence_items SET chain_status, chain_last_verified_by ...` (service lines 138-168). So any authenticated principal — including users with zero evidence permissions — can trigger verification writes and stamp themselves as `chain_verified_by`/`chain_last_verified_by` on tamper-evidence integrity records. The head queries ARE org-scoped (`WHERE id=:id AND organisation_id=:org`), so this is in-tenant BFLA, not cross-tenant; native queries are fully parameterised (no SQLi).",
+      "rootCause": "Authorization for this sub-package was written to a weaker standard (presence of authentication) than the module convention (permission on EVIDENCE), and a write endpoint was placed behind the same weak guard as reads.",
+      "evidence": "@PostMapping(\"/{evidenceId}/verify\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ChainReport verify(@PathVariable Long evidenceId, Authentication auth) {\n    return service.verifyChain(evidenceId, userIdOf(auth));\n}\n// service.verifyChain executes UPDATE ... SET chain_status / chain_verified_by ...",
+      "impact": "A user with no evidence rights can read chain-of-custody reports (which version content hashes are valid/broken) for any evidence in their tenant and can write to the integrity ledger (chain_status, verified_by). This pollutes the tamper-evidence audit trail and lets a low-privileged actor overwrite the recorded verifier identity on regulated WORM records.",
+      "reproduction": "1. Authenticate as a user with NO evidence permission.\n2. Read: `curl -H \"Authorization: Bearer <token>\" http://localhost:8084/api/evidence/chain/15` — returns the full chain report.\n3. Mutate: `curl -X POST -H \"Authorization: Bearer <token>\" http://localhost:8084/api/evidence/chain/15/verify` — the chain_status/chain_verified_by columns are updated and the caller is stamped as verifier.",
+      "resolution": "Replace `isAuthenticated()` with `hasPermission('EVIDENCE','READ')` on the two GET endpoints and `hasPermission('EVIDENCE','WRITE')` (or a dedicated EVIDENCE:VERIFY) on the verify endpoint, matching the rest of the evidence module.",
+      "patchBefore": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic List<ItemSummary> list(...) { ... }\n\n@PostMapping(\"/{evidenceId}/verify\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ChainReport verify(@PathVariable Long evidenceId, Authentication auth) { ... }",
+      "patchAfter": "@GetMapping\n@PreAuthorize(\"hasPermission('EVIDENCE','READ')\")\npublic List<ItemSummary> list(...) { ... }\n\n@PostMapping(\"/{evidenceId}/verify\")\n@PreAuthorize(\"hasPermission('EVIDENCE','WRITE')\")\npublic ChainReport verify(@PathVariable Long evidenceId, Authentication auth) { ... }",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-863: Incorrect Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-EVD-004",
+      "title": "Board pack read endpoints guarded only by isAuthenticated() — sensitive board-level reports exposed to any authenticated user",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N) — confidential board/risk/audit/incident summaries readable by any authenticated principal",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/board_pack/controller/BoardPackController.java",
+      "lines": "19-25",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/board_pack/controller/BoardPackController.java:19-21",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/board_pack/controller/BoardPackController.java:23-25",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/board_pack/service/BoardPackService.java:44-55"
+      ],
+      "description": "`GET /api/board-pack/packs` (list) and `GET /api/board-pack/packs/{id}` (get) are annotated only `@PreAuthorize(\"isAuthenticated()\")`, while the write endpoints correctly require `PLATFORM_ADMIN`/`CRO`/`REPORTING_WRITE`. A BoardPack aggregates the most sensitive material in the platform — `riskSummaryJson`, `appetiteBreachesJson`, `auditEngagementsJson`, `incidentsJson`, `pdplSummaryJson`, `ccmSummaryJson`, `slaSummaryJson`, plus board audience and review comments (see `BoardPackService.create`, lines 67-75). The service is correctly tenant-scoped (`findByOrganisationId...`), so this is in-tenant over-exposure: any authenticated user — including roles with no reporting/governance rights — can enumerate and read every board pack in their organisation.",
+      "rootCause": "Read authorization was set to bare authentication instead of a reporting/governance role or REPORTING:READ permission, inconsistent with the write-side guards on the same controller and with the read guards used by the audit-committee and pivot controllers.",
+      "evidence": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic List<BoardPackDto> list() { return service.listForOrg(); }\n\n@GetMapping(\"/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\npublic BoardPackDto get(@PathVariable String id) { return service.get(id); }",
+      "impact": "Confidential board-level governance reporting (consolidated risk posture, appetite breaches, open audit engagements, incidents, privacy and SLA summaries) leaks to any logged-in user, breaching need-to-know and the confidentiality expectations of SAMA/CMA corporate-governance reporting.",
+      "reproduction": "1. Authenticate as a low-privilege user (e.g. `auditor`).\n2. `curl -H \"Authorization: Bearer <token>\" http://localhost:8084/api/board-pack/packs` — returns the list of board packs for the tenant.\n3. `curl -H \"Authorization: Bearer <token>\" http://localhost:8084/api/board-pack/packs/BP-2026-XYZ` — returns the full board pack including all sensitive *_Json sections.",
+      "resolution": "Gate the read endpoints with a board/governance-appropriate guard mirroring the write side and the audit-committee controller, e.g. `@PreAuthorize(\"hasAnyRole('PLATFORM_ADMIN','CRO','BOARD_MEMBER','AUDIT_COMMITTEE_CHAIR','AUDIT_COMMITTEE_MEMBER','COMPANY_SECRETARY') or hasAuthority('REPORTING_READ')\")`.",
+      "patchBefore": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic List<BoardPackDto> list() { return service.listForOrg(); }\n\n@GetMapping(\"/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\npublic BoardPackDto get(@PathVariable String id) { return service.get(id); }",
+      "patchAfter": "private static final String READ_GUARD = \"hasAnyRole('PLATFORM_ADMIN','CRO','BOARD_MEMBER',\" +\n    \"'AUDIT_COMMITTEE_CHAIR','AUDIT_COMMITTEE_MEMBER','COMPANY_SECRETARY') or hasAuthority('REPORTING_READ')\";\n\n@GetMapping\n@PreAuthorize(READ_GUARD)\npublic List<BoardPackDto> list() { return service.listForOrg(); }\n\n@GetMapping(\"/{id}\")\n@PreAuthorize(READ_GUARD)\npublic BoardPackDto get(@PathVariable String id) { return service.get(id); }",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-200: Exposure of Sensitive Information to an Unauthorized Actor",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-EVD-005",
+      "title": "Attachment download reflects client-controlled MIME type into Content-Type response header",
+      "phase": "Security",
+      "category": "Security Misconfiguration / XSS (A05/A03)",
+      "severity": "Low",
+      "cvss": "CVSS 3.1 (AV:N/AC:H/PR:L/UI:R/S:U/C:L/I:N/A:N) — largely mitigated by global X-Content-Type-Options:nosniff and Content-Disposition:attachment",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/controller/AttachmentController.java",
+      "lines": "58-66",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentStorageService.java:78",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentService.java:55",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:141"
+      ],
+      "description": "On upload, the stored `mimeType` is taken verbatim from `file.getContentType()` (AttachmentStorageService line 78 -> AttachmentService line 55), which is fully client-controlled. On download (AttachmentController lines 60-65) that stored value is echoed straight into the response via `MediaType.parseMediaType(p.mimeType())`. The same pattern exists for evidence items. The download is served with `Content-Disposition: attachment` (forces download) and the application sets a global `X-Content-Type-Options: nosniff` header (SecurityConfig line 141), which together strongly mitigate drive-by/stored-XSS via a spoofed text/html content-type. The extension allow-list also blocks `.html`/`.svg`. Residual risk is therefore low, but reflecting an unvalidated, attacker-supplied content-type is still poor hygiene and could matter if the attachment is ever rendered inline (e.g. a future preview feature dropping Content-Disposition).",
+      "rootCause": "The client-provided multipart Content-Type is persisted and trusted as the authoritative MIME type rather than being derived server-side from the validated extension or via content sniffing.",
+      "evidence": "// store: trusts client content type\nreturn new StoredFile(original, relative, (long) bytes.length, file.getContentType(), sha256Hex(bytes));\n// download: reflects it back\n.contentType(MediaType.parseMediaType(p.mimeType()))\n.body(p.bytes());",
+      "impact": "If a future change serves attachments inline (removes Content-Disposition: attachment) or a client ignores nosniff, an uploaded file with a crafted text/html content-type could be rendered and execute script in the app origin. As currently wired (attachment disposition + nosniff + extension allow-list) practical exploitation is blocked, so impact is limited to defence-in-depth.",
+      "reproduction": "1. Upload a file while setting the multipart part's Content-Type to `text/html` (the extension must still be in the allow-list, e.g. `.txt`).\n2. Download it and observe the response carries `Content-Type: text/html`. With nosniff + attachment disposition the browser still downloads rather than renders, so no script executes today.",
+      "resolution": "Derive the served Content-Type from the validated file extension (a server-side extension->MIME map) instead of the client value, or force `application/octet-stream` for any non-allowlisted/ambiguous type. Keep Content-Disposition: attachment and the global nosniff header. Optionally store the canonical server-derived MIME at upload time.",
+      "patchBefore": "return ResponseEntity.ok()\n    .header(HttpHeaders.CONTENT_DISPOSITION, \"attachment; filename=\\\"\" + p.fileName() + \"\\\"\")\n    .contentType(MediaType.parseMediaType(p.mimeType()))\n    .body(p.bytes());",
+      "patchAfter": "MediaType safe = SafeMime.forExtension(p.fileName())            // server-side map\n    .orElse(MediaType.APPLICATION_OCTET_STREAM);\nreturn ResponseEntity.ok()\n    .header(HttpHeaders.CONTENT_DISPOSITION, \"attachment; filename=\\\"\" + p.fileName() + \"\\\"\")\n    .header(\"X-Content-Type-Options\", \"nosniff\")\n    .contentType(safe)\n    .body(p.bytes());",
+      "effort": "S",
+      "references": [
+        "CWE-79: Improper Neutralization of Input During Web Page Generation (XSS)",
+        "CWE-434: Unrestricted Upload of File with Dangerous Type",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-EVD-006",
+      "title": "EvidenceItemService.addLink creates a link to an evidence id without verifying it belongs to the caller's tenant",
+      "phase": "Security",
+      "category": "Broken Object Level Authorization (A01)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N) — in-tenant data-integrity / weak IDOR; no direct cross-tenant data read",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java",
+      "lines": "291-302",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/controller/EvidenceItemController.java:112-118",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/dto/EvidenceLinkRequest.java:6-12"
+      ],
+      "description": "`addLink` persists an `EvidenceLink` straight from the request DTO. It correctly stamps the link's `organisationId` from the caller's TenantContext, but it never validates that `req.evidenceId()` (nor the `linkedEntityId`) actually resolves to an evidence item / entity owned by that org. Unlike the other mutators in this service (get/update/approve/delete all `findById(...).filter(e -> e.getOrganisationId().equals(orgId))`), the linked-id is trusted blindly. A caller can therefore create dangling or cross-pointing links referencing arbitrary numeric ids, including evidence ids that belong to another tenant. Because the stored link row is tagged with the caller's own org, reads stay tenant-scoped, so this does not directly leak another tenant's data — but it corrupts the evidence-linkage graph (audit pack traceability) and could mislead reviewers, and the missing ownership check is the same class of defect as a BOLA.",
+      "rootCause": "Object-ownership validation that is consistently applied elsewhere in the service was omitted on the create-link path; the foreign id from the request is trusted without a tenant-scoped lookup.",
+      "evidence": "@Transactional\npublic void addLink(EvidenceLinkRequest req) {\n    Long orgId = TenantContext.getCurrentTenant();\n    EvidenceLink link = new EvidenceLink();\n    link.setOrganisationId(orgId);\n    link.setEvidenceId(req.evidenceId());          // not validated against org\n    link.setLinkedEntityId(req.linkedEntityId());  // not validated\n    ...\n    linkRepository.save(link);\n}",
+      "impact": "Integrity of the evidence-to-control / evidence-to-risk linkage graph can be polluted with links to non-existent or other-tenant evidence ids, weakening audit-pack traceability and coverage reporting. No direct cross-tenant disclosure given org-scoped reads, hence Low.",
+      "reproduction": "1. Authenticate with EVIDENCE:WRITE.\n2. `curl -X POST -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' \\\n   -d '{\"evidenceId\":999999,\"linkedModule\":\"RISK\",\"linkedEntityId\":424242}' \\\n   http://localhost:8084/api/v1/evidence/items/link`\n3. A link row is created even though evidence id 999999 does not belong to the caller's org (or does not exist).",
+      "resolution": "Before saving, load the evidence item via the tenant-scoped finder and reject if it is not owned by the caller's org; optionally validate the linked entity reference too.",
+      "patchBefore": "public void addLink(EvidenceLinkRequest req) {\n    Long orgId = TenantContext.getCurrentTenant();\n    EvidenceLink link = new EvidenceLink();\n    link.setOrganisationId(orgId);\n    link.setEvidenceId(req.evidenceId());\n    ...\n    linkRepository.save(link);\n}",
+      "patchAfter": "public void addLink(EvidenceLinkRequest req) {\n    Long orgId = TenantContext.getCurrentTenant();\n    EvidenceItem ev = itemRepository.findById(req.evidenceId())\n        .filter(e -> e.getOrganisationId().equals(orgId))\n        .orElseThrow(() -> new EntityNotFoundException(\"Evidence not found: \" + req.evidenceId()));\n    EvidenceLink link = new EvidenceLink();\n    link.setOrganisationId(orgId);\n    link.setEvidenceId(ev.getId());\n    ...\n    linkRepository.save(link);\n}",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-862: Missing Authorization",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-EVD-007",
+      "title": "Knowledge-base read endpoints guarded only by isAuthenticated() (defence-in-depth)",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "Info",
+      "cvss": "Risk rationale: any authenticated user can read INTERNAL-visibility KB articles in their tenant; content sensitivity is generally low and org-scoped",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/knowledge/controller/KbArticleController.java",
+      "lines": "33-45",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/knowledge/service/KbArticleService.java:44-57"
+      ],
+      "description": "`GET /api/kb/articles` and `GET /api/kb/articles/{slug}` are gated only by `isAuthenticated()`. The service is tenant-scoped and only returns PUBLISHED articles, and the entity carries a `visibility` field (default INTERNAL) — but the read endpoints do not enforce that visibility, so any authenticated user can read every PUBLISHED article in their org regardless of intended audience. Write/transition/delete are correctly role-gated. Listed as Info because KB content is generally low-sensitivity and properly tenant-isolated; flagged for consistency with the module-guard convention and because the `visibility` column implies an access distinction that is not enforced at read time.",
+      "rootCause": "Read endpoints use bare authentication and do not consult the article's `visibility` attribute, so the modelled audience restriction is not enforced.",
+      "evidence": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic List<KbArticleDto> listPublished(@RequestParam(required = false) String category) {\n    return service.listPublished(category);\n}",
+      "impact": "Minor over-exposure within a tenant: articles intended for a narrower audience (per the unused `visibility` field) are readable by any logged-in user. No cross-tenant exposure.",
+      "reproduction": "1. Authenticate as any user.\n2. `curl -H \"Authorization: Bearer <token>\" http://localhost:8084/api/kb/articles` — returns all PUBLISHED articles for the tenant irrespective of their visibility setting.",
+      "resolution": "If the `visibility` field is meant to restrict access, filter list/read results by the caller's authorities/role; otherwise document that all authenticated tenant users may read published KB content. Consider a KB:READ permission for consistency with other modules.",
+      "patchBefore": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic List<KbArticleDto> listPublished(@RequestParam(required = false) String category) {\n    return service.listPublished(category);\n}",
+      "patchAfter": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic List<KbArticleDto> listPublished(@RequestParam(required = false) String category,\n                                       Authentication auth) {\n    // service filters out articles whose visibility exceeds the caller's audience\n    return service.listPublishedFor(category, auth);\n}",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    }
+  ]
+}

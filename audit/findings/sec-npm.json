@@ -1,0 +1,147 @@
+{
+  "findings": [
+    {
+      "id": "SEC-NPM-001",
+      "title": "Vite dev server — server.fs.deny bypass + path traversal + LAN exposure (high)",
+      "phase": "Security",
+      "category": "Path Traversal / Information Disclosure (A01/A05)",
+      "severity": "High",
+      "cvss": "CVSS 7.5 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N) — GHSA-fx2h-pf6j-xcff rated High by npm; arbitrary file read off the dev host. Network-exploitable here because vite.config.ts sets host:true + allowedHosts:true (binds 0.0.0.0/LAN). Rated High (not Critical): read-only, dev/build-time tooling, not the production artifact.",
+      "file": "tss-grc-ui-v2/package.json",
+      "lines": "32-32",
+      "locations": [
+        "tss-grc-ui-v2/package-lock.json:2358-2367",
+        "tss-grc-ui-v2/vite.config.ts:20-42"
+      ],
+      "description": "tss-grc-ui-v2 pins vite ^5.4.10 and resolves to vite 5.4.21 (package-lock.json line 2359). npm audit flags three vite advisories against the installed version: (1) GHSA-fx2h-pf6j-xcff (HIGH) — server.fs.deny bypass on Windows alternate paths lets a request read files the deny-list was meant to protect; (2) GHSA-4w7w-66w2-5vf9 (moderate) — path traversal in optimized-deps `.map` handling (CWE-22/200); (3) GHSA-v6wh-96g9-6wx3 (moderate) — launch-editor NTLMv2 hash disclosure via UNC path handling on Windows (CWE-73/522). All three apply because 5.4.21 falls in the vulnerable range <=6.4.2. Crucially, vite.config.ts (lines 20-42) configures the dev server with `host: true` and `allowedHosts: true`, binding to 0.0.0.0 and accepting arbitrary Host headers, so the dev server is reachable from any machine on the LAN rather than localhost-only. This converts a localhost-only weakness into a LAN-reachable one. The platform runs on Windows (env: Windows 11), where the server.fs.deny bypass and the launch-editor NTLM disclosure are specifically Windows-path issues.",
+      "rootCause": "Outdated vite (5.4.21) carrying multiple unpatched dev-server file-serving flaws, combined with a hardened-down dev-server config (host:true / allowedHosts:true) that exposes the server beyond localhost on a Windows host where the Windows-specific bypasses apply.",
+      "evidence": "package.json:32  \"vite\": \"^5.4.10\"  -> resolved 5.4.21 (package-lock.json:2359 \"version\": \"5.4.21\"). vite.config.ts:20-27\n  server: {\n    port: 5173,\n    strictPort: false,\n    host: true,\n    allowedHosts: true,",
+      "impact": "An attacker on the same LAN (or anyone who can lure a developer's browser to a malicious page while the dev server is up) can read files outside the project root from the developer's workstation (source, .env.local with VITE_API_BASE and any secrets, SSH keys) and, via the launch-editor UNC path issue on Windows, trigger an SMB authentication that leaks the developer's NTLMv2 hash to an attacker-controlled host for offline cracking. Dev/build-time only — this tooling is not part of the shipped production bundle — but the LAN binding makes it a realistic internal-network exposure.",
+      "reproduction": "1. Start the dev server: cd tss-grc-ui-v2 && npm run dev (listens on 0.0.0.0:5173 due to host:true). 2. From another host on the LAN, request a file via the optimized-deps `.map` traversal (GHSA-4w7w-66w2-5vf9) or a server.fs.deny alternate-path bypass (GHSA-fx2h-pf6j-xcff) using a Windows alternate path form to read a file the deny list should block. 3. For the NTLM leak, induce a UNC path (\\\\attacker-host\\share) through the launch-editor flow and capture the SMB auth with responder. npm audit --json confirms: vite range <=6.4.2, fixAvailable vite@8.0.16 (isSemVerMajor).",
+      "resolution": "Upgrade vite to a patched release. npm audit reports the fix as vite@8.0.16 (major). Validate the build/plugin compatibility (vite 8 requires @vitejs/plugin-react bump and Node version check), or as an interim mitigation set the dev server back to localhost-only (host: 'localhost' or host: false, drop allowedHosts:true) so the flaws are not LAN-reachable. Re-run `npm audit` after the bump.",
+      "patchBefore": "// tss-grc-ui-v2/package.json\n\"vite\": \"^5.4.10\"\n\n// tss-grc-ui-v2/vite.config.ts\n  server: {\n    port: 5173,\n    strictPort: false,\n    host: true,\n    allowedHosts: true,",
+      "patchAfter": "// tss-grc-ui-v2/package.json\n\"vite\": \"^8.0.16\"\n\n// tss-grc-ui-v2/vite.config.ts (interim hardening if staying on 5.x)\n  server: {\n    port: 5173,\n    strictPort: false,\n    host: 'localhost',\n    // allowedHosts removed / restricted to known dev hostnames",
+      "effort": "M",
+      "references": [
+        "https://github.com/advisories/GHSA-fx2h-pf6j-xcff",
+        "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
+        "https://github.com/advisories/GHSA-v6wh-96g9-6wx3",
+        "CWE-22",
+        "CWE-200",
+        "CWE-73",
+        "CWE-522",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-NPM-002",
+      "title": "esbuild dev server allows any website to read dev-server responses (CORS, moderate)",
+      "phase": "Security",
+      "category": "Origin Validation Error / CSRF (A05)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.3 (CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N) — GHSA-67mh-4wv8-2f99. Browser-mediated cross-origin read of dev-server responses. Dev-only tooling; requires a developer to visit a malicious page while the server runs.",
+      "file": "tss-grc-ui-v2/package-lock.json",
+      "lines": "1714-1722",
+      "locations": [
+        "tss-grc-ui-v2/package.json:32",
+        "tss-grc-ui-v2/vite.config.ts:20-27"
+      ],
+      "description": "esbuild 0.21.5 (package-lock.json line 1715) is pulled in transitively as a dependency of vite 5.4.21 (vite declares esbuild ^0.21.3 at package-lock.json line 2365). GHSA-67mh-4wv8-2f99 (CWE-346, Origin Validation Error) reports that esbuild's dev server sets a permissive CORS policy (Access-Control-Allow-Origin: *) and does not validate the request origin, so any website the developer visits can send cross-origin requests to the running dev server and read the responses — including bundled source. The installed 0.21.5 is within the vulnerable range <=0.24.2. Combined with the LAN-exposed vite dev server (host:true, vite.config.ts:26), the attack surface is broadened beyond a single developer's loopback.",
+      "rootCause": "Transitive esbuild 0.21.5 (via vite 5.4.21) ships a dev server with wildcard CORS and no origin validation; vite 5.x has not bumped to a patched esbuild.",
+      "evidence": "package-lock.json:1714-1717\n    \"node_modules/esbuild\": {\n      \"version\": \"0.21.5\",\n...\npackage-lock.json:2365  \"esbuild\": \"^0.21.3\"   (under node_modules/vite)",
+      "impact": "While a developer runs `npm run dev` and browses the web, a malicious site can read the responses served by the esbuild/vite dev server cross-origin — leaking application source, route maps, and any inline config/secrets present in the served modules. Confidentiality only; dev/build-time, not the production artifact.",
+      "reproduction": "1. cd tss-grc-ui-v2 && npm run dev. 2. In the same browser, open an attacker page that issues fetch('http://localhost:5173/src/main.tsx') (or the LAN IP, since host:true). 3. Because esbuild replies with permissive CORS, the attacker page reads the body. npm audit --json: esbuild range <=0.24.2, fix delivered by bumping vite.",
+      "resolution": "esbuild is transitive — fix by upgrading vite to a release that depends on a patched esbuild (>=0.25.0). npm audit reports the fix path as vite@8.0.16 (isSemVerMajor:true). After the vite bump, confirm node_modules/esbuild resolves to >=0.25.0 and re-run `npm audit`. Interim: bind the dev server to localhost only (see SEC-NPM-001).",
+      "patchBefore": "// transitive via vite ^5.4.10\nnode_modules/esbuild  -> 0.21.5",
+      "patchAfter": "// after upgrading the direct dependency\n\"vite\": \"^8.0.16\"   // brings esbuild >=0.25.0\nnode_modules/esbuild -> 0.25.x",
+      "effort": "M",
+      "references": [
+        "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
+        "CWE-346",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    },
+    {
+      "id": "SEC-NPM-003",
+      "title": "react-router open redirect via protocol-relative (//) URL reinterpretation (moderate)",
+      "phase": "Security",
+      "category": "Open Redirect / Unvalidated Redirect (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.1 (CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N) — GHSA-2j2x-hqr9-3h42, npm-rated moderate. Open redirect; ships in the production bundle (runtime dependency).",
+      "file": "tss-grc-ui-v2/package.json",
+      "lines": "21-21",
+      "locations": [
+        "tss-grc-ui-v2/package-lock.json:2048-2071"
+      ],
+      "description": "react-router-dom is a DIRECT runtime dependency (package.json line 21, ^6.28.0) and resolves to 6.30.3, which transitively pins react-router 6.30.3 (package-lock.json lines 2048-2071). GHSA-2j2x-hqr9-3h42 (CWE-601) describes that react-router's same-origin redirect handling treats a path beginning with `//` as same-origin, but the browser reinterprets `//evil.com` as a protocol-relative URL pointing to an external host — yielding an open redirect. The installed 6.30.3 is the top of the vulnerable range (>=6.7.0 <6.30.4); the fix landed in 6.30.4. Unlike the vite/esbuild/babel findings, react-router ships in the deployed production bundle, so this is a genuine runtime exposure, not a dev-tooling-only one.",
+      "rootCause": "react-router 6.30.3 (and react-router-dom 6.30.3) classifies redirect targets starting with `//` as same-origin, ignoring that protocol-relative URLs resolve to an external authority in the browser.",
+      "evidence": "package.json:21  \"react-router-dom\": \"^6.28.0\"\npackage-lock.json:2048-2051\n    \"node_modules/react-router\": {\n      \"version\": \"6.30.3\",\n...\npackage-lock.json:2069-2070 (react-router-dom deps) \"react-router\": \"6.30.3\"",
+      "impact": "If any redirect target in the app is derived from user-controllable input (e.g. a ?redirect= / ?next= / returnUrl query param after login), an attacker can craft a link to the trusted GRC app that bounces the authenticated user to //evil.com — enabling phishing and OAuth/token-forwarding attacks against high-value users (PLATFORM_ADMIN, AUDITOR). Impact is conditional on whether the app actually feeds external input into a router redirect; rated Medium accordingly.",
+      "reproduction": "1. Identify any redirect that passes a value to navigate()/redirect() from a query param. 2. Visit https://<grc-app>/login?redirect=//evil.com and authenticate. 3. Observe the browser navigate to https://evil.com (protocol-relative). If no user-controlled redirect path exists in the codebase, exploitability drops to theoretical.",
+      "resolution": "Upgrade react-router-dom (and the transitive react-router) to >=6.30.4, which fixes the same-origin check to reject protocol-relative `//` targets. npm audit reports fixAvailable:true (non-major) for both. Additionally, allowlist redirect targets to known internal paths rather than trusting incoming values.",
+      "patchBefore": "// tss-grc-ui-v2/package.json\n\"react-router-dom\": \"^6.28.0\"   // resolved 6.30.3 (vulnerable)",
+      "patchAfter": "// tss-grc-ui-v2/package.json\n\"react-router-dom\": \"^6.30.4\"   // resolves react-router 6.30.4+ (patched)",
+      "effort": "S",
+      "references": [
+        "https://github.com/advisories/GHSA-2j2x-hqr9-3h42",
+        "CWE-601",
+        "OWASP A01:2021 Broken Access Control (Unvalidated Redirects and Forwards)"
+      ]
+    },
+    {
+      "id": "SEC-NPM-004",
+      "title": "react-router-dom inherits open redirect from react-router (direct dep, moderate)",
+      "phase": "Security",
+      "category": "Open Redirect / Unvalidated Redirect (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.1 (CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N) — same advisory as react-router (GHSA-2j2x-hqr9-3h42), exposed through the direct dependency react-router-dom@6.30.3.",
+      "file": "tss-grc-ui-v2/package.json",
+      "lines": "21-21",
+      "locations": [
+        "tss-grc-ui-v2/package-lock.json:2063-2071"
+      ],
+      "description": "react-router-dom is the DIRECT dependency the app declares (package.json line 21). npm audit lists it as a separate vulnerable package (isDirect:true, range 6.6.3-pre.0 - 6.30.3) whose vulnerability is `via: [react-router]` — i.e. it re-exports the vulnerable react-router 6.30.3 open redirect (GHSA-2j2x-hqr9-3h42, CWE-601). The installed react-router-dom is 6.30.3 (package-lock.json line 2064), which depends on react-router 6.30.3 (line 2070). This entry is the developer-facing handle for the fix: bumping react-router-dom is what actually pulls in the patched react-router. Reported as its own finding because npm audit tracks it as a distinct advisory entry, but it is the same underlying CWE-601 defect as SEC-NPM-003.",
+      "rootCause": "Direct dependency react-router-dom 6.30.3 pins the vulnerable react-router 6.30.3, propagating the protocol-relative `//` open-redirect flaw into the application.",
+      "evidence": "package.json:21  \"react-router-dom\": \"^6.28.0\"\npackage-lock.json:2063-2070\n    \"node_modules/react-router-dom\": {\n      \"version\": \"6.30.3\",\n...      \"react-router\": \"6.30.3\"",
+      "impact": "Same as SEC-NPM-003 — open redirect reachable in the shipped production bundle if user input drives a router redirect. Because react-router-dom is the declared direct dependency, this is the single line to change to remediate both audit entries.",
+      "reproduction": "Same as SEC-NPM-003: authenticate to the app with a crafted ?redirect=//evil.com and observe external navigation, provided a user-controlled redirect path exists.",
+      "resolution": "Bump the direct dependency react-router-dom to >=6.30.4 (npm audit fixAvailable:true, non-major). This transitively upgrades react-router to the patched version, closing both SEC-NPM-003 and SEC-NPM-004. Combine with a server/client-side redirect-target allowlist.",
+      "patchBefore": "// tss-grc-ui-v2/package.json\n\"react-router-dom\": \"^6.28.0\"   // -> 6.30.3 (depends on react-router 6.30.3)",
+      "patchAfter": "// tss-grc-ui-v2/package.json\n\"react-router-dom\": \"^6.30.4\"   // -> react-router 6.30.4+ patched",
+      "effort": "S",
+      "references": [
+        "https://github.com/advisories/GHSA-2j2x-hqr9-3h42",
+        "CWE-601",
+        "OWASP A01:2021 Broken Access Control (Unvalidated Redirects and Forwards)"
+      ]
+    },
+    {
+      "id": "SEC-NPM-005",
+      "title": "@babel/core arbitrary file read via sourceMappingURL comment (build-time, low)",
+      "phase": "Security",
+      "category": "Path Traversal / Information Exposure (A05)",
+      "severity": "Low",
+      "cvss": "CVSS 3.2 (CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:C/C:L/I:N/A:N) — GHSA-4x5r-pxfx-6jf8. Local, high attack complexity, low confidentiality; transitive build-time-only dependency.",
+      "file": "tss-grc-ui-v2/package-lock.json",
+      "lines": "57-62",
+      "locations": [
+        "tss-grc-ui-v2/package-lock.json:1440-1447"
+      ],
+      "description": "@babel/core 7.29.0 (package-lock.json lines 57-62, marked dev:true) is a transitive dependency of @vitejs/plugin-react 4.7.0 (which declares @babel/core ^7.28.0 at package-lock.json line 1447). GHSA-4x5r-pxfx-6jf8 (CWE-22, CWE-200) reports that @babel/core can perform an arbitrary file read when processing a crafted `//# sourceMappingURL=` comment that points at a local file path, causing Babel to read and embed that file's contents into the source map. Installed 7.29.0 is at the top of the vulnerable range <=7.29.0; the fix is the next patch. This is a build-time tool only (dev dependency, never shipped to the browser bundle), so exploitation requires the build to process attacker-controlled source — a low-likelihood scenario for an internal app.",
+      "rootCause": "Transitive dev dependency @babel/core 7.29.0 (via @vitejs/plugin-react 4.7.0) honours sourceMappingURL comments pointing at local files without restricting the path, allowing file content to be read into the generated source map.",
+      "evidence": "package-lock.json:57-61\n    \"node_modules/@babel/core\": {\n      \"version\": \"7.29.0\",\n...\n      \"dev\": true,\npackage-lock.json:1447  \"@babel/core\": \"^7.28.0\"   (under @vitejs/plugin-react)",
+      "impact": "If the build pipeline ever compiles source files supplied by an untrusted party (e.g. a malicious dependency or contributed module), a crafted sourceMappingURL comment can cause Babel to read an arbitrary local file from the build host and leak it into the emitted source map (which the project ships, since vite.config.ts sets build.sourcemap:true). Low real-world risk for a first-party internal UI; included for completeness.",
+      "reproduction": "1. Place a source file containing //# sourceMappingURL=../../../../etc/passwd (or a Windows path) in the build input. 2. Run npm run build (tsc -b && vite build). 3. Inspect the generated .map output for the leaked file content. npm audit --json: @babel/core range <=7.29.0, fixAvailable:true.",
+      "resolution": "Upgrade @babel/core past 7.29.0. It is transitive, so either bump @vitejs/plugin-react to a release pinning the patched @babel/core, or add an npm `overrides` entry forcing @babel/core to the fixed version. npm audit reports fixAvailable:true (non-major). Re-run `npm audit` to confirm.",
+      "patchBefore": "// transitive dev dep via @vitejs/plugin-react 4.7.0\nnode_modules/@babel/core -> 7.29.0  (dev:true)",
+      "patchAfter": "// tss-grc-ui-v2/package.json — pin the fix via overrides\n\"overrides\": {\n  \"@babel/core\": \">=7.29.1\"\n}",
+      "effort": "S",
+      "references": [
+        "https://github.com/advisories/GHSA-4x5r-pxfx-6jf8",
+        "CWE-22",
+        "CWE-200",
+        "OWASP A05:2021 Security Misconfiguration"
+      ]
+    }
+  ]
+}

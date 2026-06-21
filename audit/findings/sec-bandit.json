@@ -1,0 +1,162 @@
+{
+  "findings": [
+    {
+      "id": "SEC-PY-001",
+      "title": "SQL built by Python string/f-string interpolation in DB bootstrap & seed scripts (B608 x56)",
+      "phase": "Security",
+      "category": "SQL Injection (A03)",
+      "severity": "Low",
+      "cvss": "Risk rationale: Bandit rates B608 MEDIUM, but exploitability here is LOW. The interpolated tokens are trusted internal constants (integers such as days_ago/hours_ago, or schema/index names read from the live dev DB) while all external/business data is passed via parameterised '?' placeholders. No untrusted-input path reaches the string-built portion, and the scripts are dev-only DB bootstrap utilities run by an operator with the sa account. Reported as a pattern-hygiene/defence-in-depth issue per scope.",
+      "file": "seed_real_data.py",
+      "lines": "305-319",
+      "locations": [
+        "seed_real_data.py:369-382",
+        "seed_socops_data.py:432-450",
+        ".tools/introspect_schema.py:208-209",
+        ".tools/introspect_schema.py:240-241",
+        "setup_data_officer_seed.py (2 hits)",
+        "setup_cyber_db.py (1 hit)",
+        "fix_arabic_mojibake.py (2 hits)",
+        ".tools/fix_arabic_mojibake.py (3 hits)",
+        ".tmp/reset_pw.py:16-23"
+      ],
+      "description": "Bandit flagged 56 B608 'Possible SQL injection via string-based query construction' occurrences across the repo-root Python DB scripts. The two largest concentrations are seed_real_data.py (19) and seed_socops_data.py (12); the rest are spread across ~19 other setup_*/seed_*/.tools scripts. Verified two representative cases. In seed_real_data.py the SQL is an f-string, but business data (email, name, status, org_id) is bound through '?' placeholders; the only interpolated value is the integer day-offset {days_ago} taken from a hardcoded Python constant list, used inside DATEADD(day, -{days_ago}, ...). Same shape in seed_socops_data.py (interpolated {-hours_ago}/{sla_offset} integers). The genuinely string-built case is .tools/introspect_schema.py, a DDL generator that interpolates schema/table/index names (e.g. CREATE {unique_kw}INDEX [{ix['name']}] ON {schema}.{table}) — but those identifiers come from the live dev DB's own sys.schemas/sys.indexes catalog, not from any external input. Confidence breakdown from the scan: 36 LOW / 20 MEDIUM, 0 HIGH.",
+      "rootCause": "Convenience pattern of assembling SQL with Python f-strings/concatenation instead of fully parameterising every value. Integers and schema identifiers cannot be bound the same way as values, so authors inlined them. None of the inlined tokens originate from untrusted input, but the pattern is brittle: a future edit that interpolates an attacker-influenced field would silently become injectable.",
+      "evidence": "seed_real_data.py:305-319\nfor rtype, rname, remail, status, days_ago in DSRS:\n    run(\n        f\"\"\"\n        IF NOT EXISTS (SELECT 1 FROM privacy.data_subject_requests\n                       WHERE requester_email = ? AND organisation_id = ? AND request_type = ?)\n        INSERT INTO privacy.data_subject_requests (...)\n        VALUES (NEWID(), ?, ?, ?, ?, DATEADD(day, -{days_ago}, GETDATE()),\n            DATEADD(day, -{days_ago} + 30, CAST(GETDATE() AS DATE)), ?, 0, ...)\n        \"\"\",\n        remail, ORG_TSS, rtype, ORG_TSS, rtype, rname, remail, status, ...)\n\n.tools/introspect_schema.py:208\nout.append(f\"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = '{ix['name']}' AND object_id = OBJECT_ID('{schema}.{table}'))\")",
+      "impact": "In the current code there is no exploitable injection: the inlined tokens are trusted constants/catalog names and these scripts never accept network/user input. The real impact is maintenance risk and a poor pattern that scanners (and auditors) will keep flagging, plus the chance of a regression if someone later inlines a user/business field. If any of these scripts were ever repurposed to accept caller-supplied parameters, the string-built portions would become first-order SQL injection against the dev/prod database under the sa login.",
+      "reproduction": "1. bandit -r . -f json | jq '.results[] | select(.test_id==\"B608\")' — yields 56 hits.\n2. Open seed_real_data.py:307 and confirm DATEADD(day, -{days_ago}, ...) is f-string-interpolated while data uses '?'.\n3. Trace DSRS (line ~289) — days_ago is a hardcoded int literal, not input. No injection reachable as written.\n4. Open .tools/introspect_schema.py:208 — confirm identifiers come from sys.indexes/sys.schemas, not external input.",
+      "resolution": "For integer day/hour offsets, bind them as parameters too (pyodbc supports binding the DATEADD operand: DATEADD(day, -?, GETDATE()) with the int passed in the args tuple) rather than f-string interpolation. For the DDL generator, validate identifiers against an allowlist regex (^[A-Za-z0-9_]+$) before interpolation and/or use QUOTENAME() in the emitted T-SQL. Add a repo lint gate (bandit B608) so new string-built SQL is caught in review. Because these are dev-only, the priority is low — but standardising on a single parameterised run() helper across all setup_*/seed_* scripts removes the whole class.",
+      "patchBefore": "run(\n    f\"\"\"\n    ... VALUES (NEWID(), ?, ?, ?, ?, DATEADD(day, -{days_ago}, GETDATE()),\n        DATEADD(day, -{days_ago} + 30, CAST(GETDATE() AS DATE)), ?, 0, ...)\n    \"\"\",\n    remail, ORG_TSS, rtype, ORG_TSS, rtype, rname, remail, status)",
+      "patchAfter": "run(\n    \"\"\"\n    ... VALUES (NEWID(), ?, ?, ?, ?, DATEADD(day, -?, GETDATE()),\n        DATEADD(day, -? + 30, CAST(GETDATE() AS DATE)), ?, 0, ...)\n    \"\"\",\n    remail, ORG_TSS, rtype, ORG_TSS, rtype, rname, remail,\n    days_ago, days_ago, status)\n\n# introspect_schema.py — validate identifiers before interpolation\nimport re\nassert re.fullmatch(r'[A-Za-z0-9_]+', ix['name']), f\"unsafe index name {ix['name']!r}\"",
+      "effort": "M",
+      "references": [
+        "CWE-89: Improper Neutralization of Special Elements used in an SQL Command",
+        "OWASP A03:2021 Injection",
+        "Bandit B608: hardcoded_sql_expressions"
+      ]
+    },
+    {
+      "id": "SEC-PY-002",
+      "title": "Hardcoded database credentials and plaintext user passwords in Python scripts",
+      "phase": "Security",
+      "category": "Use of Hard-coded Credentials (A07)",
+      "severity": "Medium",
+      "cvss": "Risk rationale: dev-only secret (the documented sa/tss.123 dev DB password) hardcoded in ~78 scripts, plus 5 plaintext application user passwords in a password-reset helper. Not a network-exploitable bug, but a real secrets-management hygiene failure: if any of these files reach a shared/public repo or the dev password is ever reused in a non-dev environment, it grants full sa access. Bandit did not emit B105/B106 here because the literals are inside ODBC connection strings / dict values rather than tracked password kwargs; reported per explicit scope to cover hardcoded creds.",
+      "file": "seed_real_data.py",
+      "lines": "39",
+      "locations": [
+        ".tmp/reset_pw.py:4-10",
+        ".tmp/reset_pw.py:16-23",
+        ".tools/forensic_final.py:26-27",
+        ".tools/introspect_schema.py (CONN_STR with UID=sa;PWD=tss.123)",
+        "setup_cyber_db.py / setup_bcm_db.py / 70+ other setup_*/seed_* scripts (UID=sa;PWD=tss.123)"
+      ],
+      "description": "The SQL Server sa credential is hardcoded as 'UID=sa;PWD=tss.123' in 78 Python files at the repo root and under .tools/ (verified by grep: 78 occurrences across 78 files). Separately, .tmp/reset_pw.py embeds five plaintext application-user passwords (Audit@12345, Risk@12345, Compliance@12345, Analyst@12345, Viewer@12345) and then builds UPDATE iam.users SET password_hash = '{h}' ... WHERE username = '{user}' by string interpolation, writing the result to reset_pw.sql. While tss.123 is the documented dev password (CLAUDE.md / application-dev.yml), embedding it and the app passwords in source-controlled scripts spreads the secret widely and couples every utility to one privileged login.",
+      "rootCause": "No centralised secrets/connection configuration for the Python tooling. Each script copy-pastes the same sa connection string literal, and the password-reset helper hardcodes the credential scheme instead of reading it from the environment or prompting.",
+      "evidence": ".tmp/reset_pw.py:4-10\ncreds = {\n    \"auditor\":    \"Audit@12345\",\n    \"rmanager\":   \"Risk@12345\",\n    \"compliance\": \"Compliance@12345\",\n    \"ranalyst\":   \"Analyst@12345\",\n    \"viewer\":     \"Viewer@12345\",\n}\n\nseed_real_data.py:39\n    'UID=sa;PWD=tss.123;Unicode_Results=Yes;'\n\n.tools/forensic_final.py:26-27\nCONN=(\"DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=TSS_GRC;\"\n      \"UID=sa;PWD=tss.123;TrustServerCertificate=yes\")",
+      "impact": "Anyone with read access to the repo obtains the dev sa password and the standard app-user password scheme. If the dev DB is reachable (it binds localhost:1433 with sa enabled) this is full administrative DB access. The plaintext app passwords reveal the org-wide credential convention (<Role>@12345), which likely matches seeded accounts and is trivially guessable for other roles. Risk escalates sharply if the same literal is ever reused outside dev or if .tmp/ scripts are committed.",
+      "reproduction": "1. grep -rn 'PWD=tss.123' *.py .tools/*.py -> 78 files.\n2. Open .tmp/reset_pw.py -> five plaintext passwords in the creds dict.\n3. With the dev DB up: sqlcmd -S localhost -U sa -P tss.123 -Q \"SELECT 1\" authenticates as sa.",
+      "resolution": "Read the connection string / password from environment variables (e.g. os.environ['DB_PASSWORD'], os.environ.get('GRC_DB_DSN')) — matching the backend's existing DB_PASSWORD convention — with no default that contains a real secret. Provide a single shared db_connect() helper imported by every script so the literal exists in zero places. For reset_pw.py, prompt for the password (getpass) or read from env, and never write plaintext passwords into source. Add the dev password to a .env (git-ignored) and rotate it. Add a secret-scanner (gitleaks/trufflehog) and bandit B105/B106 to CI.",
+      "patchBefore": "creds = {\n    \"auditor\": \"Audit@12345\",\n    \"rmanager\": \"Risk@12345\",\n    ...\n}\nCONN = \"...UID=sa;PWD=tss.123;...\"",
+      "patchAfter": "import os, getpass\nDB_PASSWORD = os.environ[\"DB_PASSWORD\"]  # no hardcoded default\nCONN = f\"...UID=sa;PWD={DB_PASSWORD};...\"\n# reset_pw.py: take the new password interactively, never store it\nnew_pw = getpass.getpass(f\"New password for {user}: \")",
+      "effort": "M",
+      "references": [
+        "CWE-798: Use of Hard-coded Credentials",
+        "CWE-259: Use of Hard-coded Password",
+        "OWASP A07:2021 Identification and Authentication Failures",
+        "Bandit B105/B106: hardcoded_password_string / hardcoded_password_funcarg"
+      ]
+    },
+    {
+      "id": "SEC-PY-003",
+      "title": "Non-cryptographic PRNG (random module) flagged for security use (B311 x6)",
+      "phase": "Security",
+      "category": "Insecure Randomness (A02)",
+      "severity": "Info",
+      "cvss": "Risk rationale: false positive in context. random.randint() is used only to compute synthetic dates for demo seed rows, never for tokens, passwords, salts, session IDs or any security decision. No security impact; recorded as triaged-and-dismissed for the audit trail.",
+      "file": "setup_lifecycle_seed.py",
+      "lines": "81",
+      "locations": [
+        "setup_lifecycle_seed.py:150",
+        "setup_lifecycle_seed.py:151",
+        "setup_lifecycle_seed.py:191"
+      ],
+      "description": "Bandit raised 6 B311 ('Standard pseudo-random generators are not suitable for security/cryptographic purposes', CWE-330) hits, all in setup_lifecycle_seed.py. Verified the cited lines: random.randint(...) feeds date helpers days(...) and days_ahead(...) to scatter created_at / due dates across demo records (e.g. days_ahead(random.randint(30, 90)) for a finding due date). The values never influence any secret or access-control outcome.",
+      "rootCause": "Bandit flags any use of the random module regardless of purpose. Here the intent is purely cosmetic data spread for demo realism.",
+      "evidence": "setup_lifecycle_seed.py:81\n        days(random.randint(15, 90)))\nsetup_lifecycle_seed.py:150\n        days_ahead(random.randint(30, 90)), 'CISO',",
+      "impact": "None. Predictable randomness in demo date scattering has no security consequence.",
+      "reproduction": "1. bandit -r . | grep B311 -> 6 hits, all in setup_lifecycle_seed.py.\n2. Open lines 81/150/151/191 -> confirm random.randint feeds only date arithmetic.",
+      "resolution": "No remediation required. To silence the scanner, either add a '# nosec B311 - demo date jitter, not security' comment or use a fixed seed for reproducible demo data. Only switch to secrets/SystemRandom if these helpers are ever reused to mint identifiers or tokens.",
+      "patchBefore": "days_ahead(random.randint(30, 90))",
+      "patchAfter": "days_ahead(random.randint(30, 90))  # nosec B311 - synthetic demo date, not security-sensitive",
+      "effort": "S",
+      "references": [
+        "CWE-330: Use of Insufficiently Random Values",
+        "Bandit B311: random",
+        "Python docs: secrets module (use only for security-sensitive randomness)"
+      ]
+    },
+    {
+      "id": "SEC-PY-004",
+      "title": "Silent exception suppression: try/except/pass and try/except/continue (B110 x8, B112 x6)",
+      "phase": "Security",
+      "category": "Improper Error Handling (A09)",
+      "severity": "Low",
+      "cvss": "Risk rationale: dev-tooling robustness/observability issue, not a vulnerability. Broad except: pass / except: continue blocks swallow all errors (including KeyboardInterrupt-adjacent and unexpected failures), which can mask data-corruption or partial-failure bugs in the bootstrap/seed scripts but has no direct exploit path.",
+      "file": ".tools/forensic_final.py",
+      "lines": "22-25",
+      "locations": [
+        ".tools/fix_arabic_mojibake.py:145",
+        ".tools/fix_ccm_mojibake.py:28",
+        ".tools/verify_ccm_fix.py:7",
+        ".tmp/dump_edit.py:14",
+        ".tmp/dump_full_edit.py:18",
+        ".tmp/dump_translations_edits.py:17",
+        ".tmp/extract_evidence.py:74"
+      ],
+      "description": "Bandit raised 8 B110 (try/except/pass, CWE-703) and 6 B112 (try/except/continue) hits across dev tooling under .tools/ and .tmp/. Verified .tools/forensic_final.py:22-25 (try: sys.stdout.reconfigure(...) except Exception: pass) and .tmp/dump_edit.py:13-14 (try: rec = json.loads(line) except: continue). These suppress errors during stdout reconfiguration and per-line JSON parsing.",
+      "rootCause": "Quick scripts that intentionally skip malformed lines / optional setup steps, using a catch-all that discards the exception instead of catching the specific expected type and logging it.",
+      "evidence": ".tools/forensic_final.py:22-25\ntry:\n    sys.stdout.reconfigure(encoding=\"utf-8\")\nexcept Exception:\n    pass\n\n.tmp/dump_edit.py:13-14\n        try: rec = json.loads(line)\n        except: continue",
+      "impact": "Operational, not security. Swallowed exceptions can hide partial seed/bootstrap failures (a script reports success while having skipped rows), complicating audit reproducibility. A bare 'except:' (dump_edit.py:14) also catches SystemExit/KeyboardInterrupt, which is poor practice.",
+      "reproduction": "1. bandit -r . | grep -E 'B110|B112' -> 14 hits.\n2. Open .tmp/dump_edit.py:14 -> bare 'except: continue'.",
+      "resolution": "Catch the specific expected exception (json.JSONDecodeError, AttributeError) and at minimum log/count the skipped item. Replace bare 'except:' with 'except Exception:' (or the precise type) so control-flow signals propagate. Low priority given dev-only scope.",
+      "patchBefore": "        try: rec = json.loads(line)\n        except: continue",
+      "patchAfter": "        try:\n            rec = json.loads(line)\n        except json.JSONDecodeError:\n            skipped += 1\n            continue",
+      "effort": "S",
+      "references": [
+        "CWE-703: Improper Check or Handling of Exceptional Conditions",
+        "Bandit B110: try_except_pass",
+        "Bandit B112: try_except_continue"
+      ]
+    },
+    {
+      "id": "SEC-PY-005",
+      "title": "Bidirectional Unicode control characters in source (B613 x2) and assert in dev script (B101 x1)",
+      "phase": "Security",
+      "category": "Vulnerable & Outdated / Source Integrity (A06)",
+      "severity": "Info",
+      "cvss": "Risk rationale: both are benign in context. The U+200F (RIGHT-TO-LEFT MARK) characters appear inside legitimate Arabic string literals for correct RTL rendering, not as a Trojan-Source code-reordering attack. The single assert is a sanity check in a dev helper. No security impact.",
+      "file": "setup_regreporting_seed.py",
+      "lines": "581",
+      "locations": [
+        "setup_rrp_seed.py:573",
+        ".tmp/reset_pw.py:15"
+      ],
+      "description": "Bandit raised 2 B613 ('source file contains bidirectional control characters U+200F', CWE-838) hits and 1 B101 ('use of assert'). Verified setup_regreporting_seed.py:581 — the U+200F (RLM) sits inside an Arabic data string ('...USSD \\u200f*900# وSS7/SIGTRAN...') to keep the RTL/LTR boundary around the *900# token rendering correctly; it is data, not control flow. .tmp/reset_pw.py:15 is 'assert \"'\" not in h' guarding that a generated bcrypt hash contains no single quote before string-building SQL.",
+      "rootCause": "B613: legitimate use of RLM in mixed Arabic/Latin/number strings (the platform is Arabic-primary). B101: a dev-time invariant check written with assert (stripped under python -O).",
+      "evidence": "setup_regreporting_seed.py:580-581\n        'الملخّص الشهري للحوادث السيبرانية، نسبة الالتزام بالتحديثات، الشذوذ المرصود '\n        'على USSD \\u200f*900# وSS7/SIGTRAN، وسجل تدوير مفاتيح HSM.',\n\n.tmp/reset_pw.py:15\n        assert \"'\" not in h",
+      "impact": "None. The bidi marks affect only how Arabic strings render; they are not positioned to reorder code in a way that misleads a reviewer (Trojan-Source). The assert is dev-only; if these scripts were ever run under -O the guard would vanish, but the input (a bcrypt hash) cannot contain a quote, so the check is defensive only.",
+      "reproduction": "1. bandit -r . | grep -E 'B613|B101' -> 3 hits.\n2. Open setup_regreporting_seed.py:581 -> RLM is inside an Arabic string literal.\n3. Open .tmp/reset_pw.py:15 -> assert guarding hash content.",
+      "resolution": "B613: no action needed; optionally normalise by using explicit \\u200f escapes (already the case) so the marker is visible in diffs, and confirm no bidi overrides (U+202E) exist. B101: replace the assert with an explicit check that raises ValueError so it survives optimisation, if reset_pw.py is ever promoted beyond throwaway use.",
+      "patchBefore": "assert \"'\" not in h",
+      "patchAfter": "if \"'\" in h:\n    raise ValueError(\"unexpected single quote in bcrypt hash\")",
+      "effort": "S",
+      "references": [
+        "CWE-838: Inappropriate Encoding for Output Context",
+        "CVE-2021-42574: Trojan Source bidirectional text",
+        "Bandit B613: trojansource",
+        "Bandit B101: assert_used"
+      ]
+    }
+  ]
+}

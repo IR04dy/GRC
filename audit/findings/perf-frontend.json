@@ -1,0 +1,174 @@
+{
+  "findings": [
+    {
+      "id": "PERF-FE-001",
+      "title": "Heaviest module pages are statically (eagerly) imported into the entry bundle, so /login downloads 8 unrelated workspace pages (~7,000 LOC)",
+      "phase": "Performance",
+      "category": "Bundle size / code splitting",
+      "severity": "High",
+      "cvss": "High user-facing impact: the public, unauthenticated /login route (Lighthouse Performance 38) is forced to parse/execute the four single largest page modules in the app (Compliance 337 KiB, Scm 289 KiB, Cyber 287 KiB, Tprm 258 KiB transferred) plus four more, none of which /login can navigate to. Affects every first visit and every logged-out user. Not a security issue; pure load-time cost.",
+      "file": "tss-grc-ui-v2/src/App.tsx",
+      "lines": "8-18,167",
+      "locations": [
+        "tss-grc-ui-v2/src/App.tsx:8-18",
+        "tss-grc-ui-v2/src/App.tsx:167",
+        "tss-grc-ui-v2/src/pages/compliance/CompliancePage.tsx:1-1302",
+        "tss-grc-ui-v2/src/pages/scm/ScmPage.tsx:1-1241",
+        "tss-grc-ui-v2/src/pages/cyber/CyberPage.tsx:1-1164",
+        "tss-grc-ui-v2/src/pages/tprm/TprmPage.tsx:1-1110"
+      ],
+      "description": "App.tsx does use route-level code splitting for the vast majority of routes: 295 pages are wrapped in React.lazy() and there are 323 <Route> elements, all under a single <Suspense>. The problem is the deliberate exception. Lines 8-18 statically import 11 pages, and line 167 statically imports ScmPage, with the comment '// Critical-path pages (sidebar landings + login + dashboard) stay eager.' These 12 static imports are NOT all critical-path: LoginPage (119 LOC) and DashboardPage are reasonable to keep eager, but the eager set also pulls in the eight single heaviest page modules in the codebase — CompliancePage (1,302 LOC), ScmPage (1,241), CyberPage (1,164), TprmPage (1,110), RiskRegisterPage (842), EvidencePage (721), IncidentsPage (645) and PrivacyPage (530). Because they are static `import { X } from './pages/...'` (not lazy()), Rollup/Vite places them in the same entry chunk as App.tsx. A user sitting on /login (who cannot reach any of those routes without authenticating) downloads, parses and executes all of them.",
+      "rootCause": "A static ES import is a hard dependency edge: the bundler must include the module in whatever chunk reaches it. App.tsx is the entry, so every `import { CompliancePage } from './pages/compliance/CompliancePage'` (line 15) forces CompliancePage and its entire transitive import graph into the initial chunk. The 'sidebar landings stay eager' decision conflated 'frequently visited after login' with 'must be in the entry bundle', and applied it to the largest pages instead of the smallest.",
+      "evidence": "App.tsx:8-18 + 167 — twelve `import { ... } from './pages/...'` statements (LoginPage, DashboardPage, SettingsPage, RiskRegisterPage, CyberPage, BcmWorkspacePage, PrivacyPage, CompliancePage, TprmPage, IncidentsPage, EvidencePage, ScmPage). `grep -c \"lazy(()\" App.tsx` = 295 lazy pages vs 12 eager. LOC of the eager module pages: CompliancePage 1302, ScmPage 1241, CyberPage 1164, TprmPage 1110, RiskRegisterPage 842, EvidencePage 721, IncidentsPage 645, PrivacyPage 530 = ~7,555 LOC forced onto /login. Lighthouse total-byte-weight items confirm these four arrive on the /login load: CompliancePage 337,307 B, ScmPage 289,426 B, CyberPage 286,941 B, TprmPage 258,133 B; App.tsx itself 463,783 B (dev-server unbundled figures).",
+      "impact": "Inflated entry chunk → larger FCP/LCP/TTI and more main-thread parse/compile work on the most-hit route in the product. unused-javascript audit attributes large wasted bytes specifically to these eager pages on /login: CompliancePage 108,588 B wasted, TprmPage 95,159 B, ScmPage 93,529 B, CyberPage 82,234 B, EvidencePage 63,525 B, RiskRegisterPage 56,072 B — all of it dead weight for an unauthenticated visitor.",
+      "reproduction": "1) Build: `npm run build` in tss-grc-ui-v2. 2) Inspect dist/assets — the entry chunk includes Compliance/Scm/Cyber/Tprm page code (search the entry chunk for strings unique to those pages). 3) Or run Lighthouse against /login (audit/raw/lighthouse-login.report.json): Performance 38, and unused-javascript lists CompliancePage/TprmPage/ScmPage/CyberPage as top wasted-bytes items on a route that never renders them.",
+      "resolution": "Convert the heavy module pages to React.lazy() like the other 295 pages. Keep eager ONLY LoginPage (and optionally DashboardPage as the post-login landing). Everything reachable solely behind the authenticated shell — Compliance, Scm, Cyber, Tprm, Risk, Privacy, Incidents, Evidence, Bcm — should be lazy so its chunk loads on navigation, not on /login. Optionally add a route-prefetch on hover/idle for the sidebar links to hide the lazy latency.",
+      "patchBefore": "// App.tsx lines 11-18, 167 (eager)\nimport { RiskRegisterPage } from './pages/risk/RiskRegisterPage';\nimport { CyberPage } from './pages/cyber/CyberPage';\nimport { BcmWorkspacePage } from './pages/bcm/BcmWorkspacePage';\nimport { PrivacyPage } from './pages/privacy/PrivacyPage';\nimport { CompliancePage } from './pages/compliance/CompliancePage';\nimport { TprmPage } from './pages/tprm/TprmPage';\nimport { IncidentsPage } from './pages/incidents/IncidentsPage';\nimport { EvidencePage } from './pages/evidence/EvidencePage';\n// ...\nimport { ScmPage } from './pages/scm/ScmPage';",
+      "patchAfter": "// Keep only LoginPage (+ DashboardPage) eager; lazy-load the module pages.\nimport { LoginPage } from './pages/LoginPage';\nimport { DashboardPage } from './pages/DashboardPage';\nconst RiskRegisterPage = lazy(() => import('./pages/risk/RiskRegisterPage').then(m => ({ default: m.RiskRegisterPage })));\nconst CyberPage       = lazy(() => import('./pages/cyber/CyberPage').then(m => ({ default: m.CyberPage })));\nconst CompliancePage  = lazy(() => import('./pages/compliance/CompliancePage').then(m => ({ default: m.CompliancePage })));\nconst TprmPage        = lazy(() => import('./pages/tprm/TprmPage').then(m => ({ default: m.TprmPage })));\nconst ScmPage         = lazy(() => import('./pages/scm/ScmPage').then(m => ({ default: m.ScmPage })));\nconst PrivacyPage     = lazy(() => import('./pages/privacy/PrivacyPage').then(m => ({ default: m.PrivacyPage })));\nconst IncidentsPage   = lazy(() => import('./pages/incidents/IncidentsPage').then(m => ({ default: m.IncidentsPage })));\nconst EvidencePage    = lazy(() => import('./pages/evidence/EvidencePage').then(m => ({ default: m.EvidencePage })));\nconst BcmWorkspacePage = lazy(() => import('./pages/bcm/BcmWorkspacePage').then(m => ({ default: m.BcmWorkspacePage })));",
+      "effort": "S",
+      "references": [
+        "https://react.dev/reference/react/lazy",
+        "https://web.dev/articles/reduce-javascript-payloads-with-code-splitting",
+        "https://vitejs.dev/guide/features.html#dynamic-import"
+      ]
+    },
+    {
+      "id": "PERF-FE-002",
+      "title": "Both full translation dictionaries (Arabic 418 KB + English 325 KB source) are statically imported on the critical path; only one language is ever active",
+      "phase": "Performance",
+      "category": "Bundle size / i18n",
+      "severity": "High",
+      "cvss": "High first-load cost on every route including /login: ~1.94 MiB of translation JS arrives on the dev-server /login load (ar.ts 1,076,314 B + en.ts 860,108 B transferred). i18n.tsx is imported by App.tsx and LoginPage, so this is unavoidable on the entry path. The user only ever uses one language at a time, so roughly half is pure waste. No security impact.",
+      "file": "tss-grc-ui-v2/src/lib/i18n.tsx",
+      "lines": "2-3",
+      "locations": [
+        "tss-grc-ui-v2/src/lib/i18n.tsx:2-3",
+        "tss-grc-ui-v2/src/lib/i18n.tsx:24",
+        "tss-grc-ui-v2/src/translations/ar.ts:1-6061",
+        "tss-grc-ui-v2/src/translations/en.ts:1-6081"
+      ],
+      "description": "lib/i18n.tsx statically imports both dictionaries at module top: `import { en } from '../translations/en'` and `import { ar } from '../translations/ar'` (lines 2-3), then builds a static map `const dictionaries: Record<Lang, Dictionary> = { en, ar }` (line 24). en.ts is 6,081 lines / 325,194 bytes of source and ar.ts is 6,061 lines / 417,903 bytes of source. Because i18n.tsx is imported by App.tsx (line 3) and by LoginPage (line 4), both dictionaries are pulled into the initial bundle regardless of which language the user has selected. The default language is Arabic (i18n.tsx selects 'ar' unless localStorage says 'en'), so an Arabic user still downloads the entire English dictionary, and vice-versa.",
+      "rootCause": "Eager static import of both locale modules plus a synchronous lookup map. There is no dynamic import per locale and no split of the dictionary by feature/route. The dictionaries are flat key/value maps loaded whole.",
+      "evidence": "i18n.tsx:2 `import { en } from '../translations/en';`, i18n.tsx:3 `import { ar } from '../translations/ar';`, i18n.tsx:24 `const dictionaries: Record<Lang, Dictionary> = { en: en as Dictionary, ar: ar as Dictionary };`. File sizes via wc: translations/en.ts = 6081 lines / 325,194 B; translations/ar.ts = 6061 lines / 417,903 B. Lighthouse total-byte-weight on /login lists src/translations/ar.ts = 1,076,314 B (transferred, dev) as the #2 heaviest resource and src/translations/en.ts = 860,108 B as #4.",
+      "impact": "~1.9 MiB of JS on every page including the login screen, of which roughly half (the inactive language) is never used in a given session. Increases parse/compile time and entry-chunk size, directly worsening FCP/LCP on /login.",
+      "reproduction": "1) `wc -c tss-grc-ui-v2/src/translations/*.ts` → en 325 KB + ar 418 KB source. 2) Build and inspect the entry chunk — both en and ar key/value tables are present. 3) Lighthouse /login report total-byte-weight: ar.ts and en.ts are the #2 and #4 heaviest resources, both loaded before any language switch.",
+      "resolution": "Lazy-load the active dictionary with dynamic import keyed on the selected language, so only one locale ships initially and the other is fetched on language switch. Replace the static map with `await import(`../translations/${lang}.ts`)` inside an effect (or a loader that suspends), keeping the current dictionary in state. This roughly halves the i18n payload on first load and removes ~325-418 KB from the entry bundle.",
+      "patchBefore": "import { en } from '../translations/en';\nimport { ar } from '../translations/ar';\n// ...\nconst dictionaries: Record<Lang, Dictionary> = { en: en as Dictionary, ar: ar as Dictionary };\n\nexport function I18nProvider({ children }: { children: ReactNode }) {\n  const [lang, setLangState] = useState<Lang>(/* ... */);\n  const t = useCallback((key, fallback) => dictionaries[lang][key] ?? fallback ?? key, [lang]);",
+      "patchAfter": "const loaders: Record<Lang, () => Promise<Dictionary>> = {\n  en: () => import('../translations/en').then(m => m.en as Dictionary),\n  ar: () => import('../translations/ar').then(m => m.ar as Dictionary),\n};\n\nexport function I18nProvider({ children }: { children: ReactNode }) {\n  const [lang, setLangState] = useState<Lang>(/* ... */);\n  const [dict, setDict] = useState<Dictionary>({});\n  useEffect(() => { let live = true; loaders[lang]().then(d => { if (live) setDict(d); }); return () => { live = false; }; }, [lang]);\n  const t = useCallback((key, fallback) => dict[key] ?? fallback ?? key, [dict]);",
+      "effort": "M",
+      "references": [
+        "https://vitejs.dev/guide/features.html#dynamic-import",
+        "https://web.dev/articles/reduce-javascript-payloads-with-code-splitting"
+      ]
+    },
+    {
+      "id": "PERF-FE-003",
+      "title": "@tanstack/react-virtual is a dependency but used by only 1 of 73 tables; 72 pages render every row via an un-virtualized, un-paginated DataTable",
+      "phase": "Performance",
+      "category": "Runtime rendering / virtualization",
+      "severity": "Medium",
+      "cvss": "Medium runtime risk that scales with data volume: the shared DataTable maps the full row array to DOM nodes with no windowing, slicing or pagination. On registers seeded with hundreds of rows (seed_real_data.py loads ~450 rows across 23 tables; production registers grow unbounded) this produces large DOM trees, slow first render, slow re-render on filter/sort, and high memory. The capability to fix it (react-virtual) is already installed but applied to only one screen.",
+      "file": "tss-grc-ui-v2/src/components/ui/DataTable.tsx",
+      "lines": "40-94",
+      "locations": [
+        "tss-grc-ui-v2/src/components/ui/DataTable.tsx:53",
+        "tss-grc-ui-v2/src/components/ui/data-table/DataTableV2.tsx:1-1",
+        "tss-grc-ui-v2/package.json:16"
+      ],
+      "description": "package.json declares `@tanstack/react-virtual: ^3.13.24` (line 16). A grep for its usage finds it imported in exactly one file: components/ui/data-table/DataTableV2.tsx. DataTableV2 (the virtualized table) is referenced by only 1 page. The non-virtualized components/ui/DataTable.tsx is imported by 72 pages, and its render body does `{rows.map(row => ... )}` (line 53) — it materialises one <tr> per row with no windowing, no `rows.slice(...)`, no pagination and no use of react-virtual (the file imports nothing from @tanstack/react-virtual). So the virtualization library that was added to the dependency tree is effectively shelf-ware: the overwhelming majority of GRC registers (risk register, vendor list, controls, obligations, vulnerabilities, complaints, etc.) render every row.",
+      "rootCause": "Two table components diverged: a newer virtualized DataTableV2 (using react-virtual) and the original DataTable (full-map render). Migration stalled at one page, so 72 pages still use the un-virtualized component while the virtualization dependency sits mostly unused.",
+      "evidence": "`grep -rln react-virtual src` → only components/ui/data-table/DataTableV2.tsx. `grep -rln DataTableV2 src/pages` → 1 page. `grep -rln \"import.*DataTable[^V]\" src/pages` → 72 pages. DataTable.tsx is 95 lines; render at line 53 is `{rows.map(row => { ... return (<tr key={row.id}> ... </tr>); })}` with no slice/window/pagination. Big pages confirmed using the un-virtualized table: CyberPage, CompliancePage, ScmPage, RiskRegisterPage all reference plain `DataTable` (not DataTableV2).",
+      "impact": "On large registers the table inflates the DOM node count linearly with row count (Lighthouse dom-size is already flagged on the dashboard-class pages). Render and every subsequent filter/sort/search re-render walk the entire dataset, increasing TBT and interaction latency. Memory grows with row count. The cost is hidden today because seed data is modest, but production GRC registers (audit findings, vulnerabilities, vendors) routinely reach thousands of rows.",
+      "reproduction": "1) `grep -rln 'react-virtual' tss-grc-ui-v2/src` → single hit (DataTableV2). 2) `grep -rln 'DataTableV2' tss-grc-ui-v2/src/pages | wc -l` → 1; `grep -rln \"import.*DataTable[^V]\" tss-grc-ui-v2/src/pages | wc -l` → 72. 3) Open any large register, seed a few thousand rows, observe DOM node count = row count and sluggish sort/filter.",
+      "resolution": "Either (a) migrate the high-volume registers to the existing DataTableV2 so react-virtual actually windows the rows, or (b) if a full migration is out of scope, add row virtualization (or at minimum client-side pagination / a row cap) directly to the shared DataTable so all 72 consumers benefit. If neither table will use react-virtual broadly, remove the dependency to stop shipping it. Pick virtualization for the registers known to grow large (risk, vulnerabilities, vendors, findings, obligations).",
+      "patchBefore": "// components/ui/DataTable.tsx:52-92 — renders ALL rows\n<tbody>\n  {rows.map(row => {\n    // ... one <tr> per row, no windowing\n    return (<tr key={row.id}> ... </tr>);\n  })}\n</tbody>",
+      "patchAfter": "// Route large registers through the already-virtualized DataTableV2,\n// or window the shared component with the installed react-virtual:\nimport { useVirtualizer } from '@tanstack/react-virtual';\n// const rowVirtualizer = useVirtualizer({ count: rows.length, getScrollElement: () => parentRef.current, estimateSize: () => 44, overscan: 12 });\n// render only rowVirtualizer.getVirtualItems(), positioned by translateY.",
+      "effort": "L",
+      "references": [
+        "https://tanstack.com/virtual/latest",
+        "https://web.dev/articles/virtualize-long-lists-react-window"
+      ]
+    },
+    {
+      "id": "PERF-FE-004",
+      "title": "vite.config.ts has no manualChunks / vendor-splitting; React, react-router, recharts and app code land in a single monolithic entry chunk",
+      "phase": "Performance",
+      "category": "Build / chunking strategy",
+      "severity": "Medium",
+      "cvss": "Medium impact on caching and first load: without explicit vendor chunking, Rollup merges stable third-party code (react, react-dom, react-router-dom) with frequently-changing app code into the entry chunk. Every app deploy busts the hash on the whole chunk, so returning users re-download React + router even when only app code changed. Also enlarges the single critical chunk. No security impact.",
+      "file": "tss-grc-ui-v2/vite.config.ts",
+      "lines": "43-46",
+      "locations": [
+        "tss-grc-ui-v2/vite.config.ts:43-46",
+        "tss-grc-ui-v2/package.json:13-24"
+      ],
+      "description": "The build block in vite.config.ts is `build: { sourcemap: true, target: 'es2022' }` (lines 43-46) — there is no `rollupOptions.output.manualChunks` and no chunk-size configuration. `grep -n 'manualChunks|rollupOptions|chunkSizeWarning' vite.config.ts` returns nothing. With Vite/Rollup defaults the route-level React.lazy() splits do create per-route chunks (good), but the shared vendor libraries that every route depends on — react, react-dom, react-router-dom — are pulled into the common/entry chunk together with App.tsx and the eager pages. react-router-dom alone is 209,984 B (Lighthouse, dev), and its unused-javascript wasted estimate on /login is 168,141 B. There is no separation of long-lived vendor code from volatile app code, which is the standard caching optimisation.",
+      "rootCause": "Default Rollup chunking with no manualChunks strategy. The team relied solely on route-level lazy() and never configured vendor splitting, so cross-route shared deps collapse into the entry chunk and share its content hash with app code.",
+      "evidence": "vite.config.ts:43-46 `build: { sourcemap: true, target: 'es2022' }` — no manualChunks. `grep -n manualChunks vite.config.ts` = no match. Dependencies that would benefit from a stable vendor chunk (package.json:13-24): react, react-dom, react-router-dom, recharts, lucide-react, @tanstack/react-table, @stomp/stompjs, sockjs-client. Lighthouse: react-router-dom.js 209,984 B transferred, 168,141 B unused on /login.",
+      "impact": "Poor long-term caching: any app-code change invalidates the entry chunk that also carries react/react-dom/react-router, forcing repeat downloads of unchanged vendor code for returning users. Larger single critical chunk also slows first parse. (Note: the build sets `sourcemap: true` — appropriate for an internal/staging build, but confirm sourcemaps are disabled or access-controlled for any public production deploy.)",
+      "reproduction": "1) `npm run build` and inspect dist/assets — confirm react/react-router are co-located with app entry code rather than in a dedicated vendor chunk. 2) Make a one-line change in any page, rebuild, and observe the entry/vendor chunk hash changes even though React did not.",
+      "resolution": "Add a manualChunks strategy to split stable vendor libraries into their own long-cached chunk(s). At minimum separate react/react-dom/react-router-dom; optionally give recharts and lucide-react their own chunks since they are large and load on distinct routes. This keeps vendor hashes stable across app deploys and shrinks the critical entry chunk.",
+      "patchBefore": "build: {\n  sourcemap: true,\n  target: 'es2022',\n},",
+      "patchAfter": "build: {\n  sourcemap: true,\n  target: 'es2022',\n  rollupOptions: {\n    output: {\n      manualChunks: {\n        'react-vendor': ['react', 'react-dom', 'react-router-dom'],\n        'charts': ['recharts'],\n        'icons': ['lucide-react'],\n        'realtime': ['@stomp/stompjs', 'sockjs-client'],\n      },\n    },\n  },\n},",
+      "effort": "S",
+      "references": [
+        "https://rollupjs.org/configuration-options/#output-manualchunks",
+        "https://vitejs.dev/guide/build.html#chunking-strategy"
+      ]
+    },
+    {
+      "id": "PERF-FE-005",
+      "title": "Layout-direction flip after hydration (index.html dir=ltr vs i18n default ar/RTL) is a structural CLS source; Lighthouse CLS = 0.344",
+      "phase": "Performance",
+      "category": "Layout stability (CLS)",
+      "severity": "Medium",
+      "cvss": "Medium UX/score impact: Lighthouse reports cumulative-layout-shift 0.344 (score 0.32 — failing; good is <0.1). The HTML ships with dir=\"ltr\" but the app defaults to Arabic RTL and flips documentElement.dir in a post-mount effect, so the entire layout mirrors after first paint — a guaranteed, full-page layout shift on the default (Arabic) first load. Affects perceived stability and the Lighthouse score directly.",
+      "file": "tss-grc-ui-v2/index.html",
+      "lines": "2",
+      "locations": [
+        "tss-grc-ui-v2/index.html:2",
+        "tss-grc-ui-v2/src/lib/i18n.tsx:27-40"
+      ],
+      "description": "index.html declares `<html lang=\"en\" dir=\"ltr\">` (line 2). The i18n provider defaults the language to Arabic ('ar', RTL) unless localStorage explicitly holds 'en' (i18n.tsx: initial state returns 'ar' for first-time visitors), and only sets `document.documentElement.dir = dir` inside a useEffect that runs AFTER the first render/paint (i18n.tsx:27-31). So on the default first visit the page paints LTR, React mounts, then the effect flips the document to RTL — mirroring the whole layout and producing a large layout shift. CLS is measured at 0.344, well into the failing range. This is on top of any web-font / late-CSS shift; the dir flip alone is a structural full-page reflow.",
+      "rootCause": "The static HTML's dir/lang attributes are hard-coded to en/ltr and do not match the app's runtime default (ar/rtl). The correct direction is only applied imperatively after mount, so the first paint is always in the wrong direction for the default-language user.",
+      "evidence": "index.html:2 `<html lang=\"en\" dir=\"ltr\">`. i18n.tsx initial state: `const stored = localStorage.getItem(LANG_KEY); return stored === 'en' ? 'en' : 'ar';` (defaults to Arabic). i18n.tsx:27-31 effect: `document.documentElement.lang = lang; document.documentElement.dir = dir;` runs in useEffect (post-paint). Lighthouse cumulative-layout-shift numericValue = 0.34425702372849826, score 0.32.",
+      "impact": "Every default (Arabic) first load mirrors the entire UI after first paint — a jarring shift and a failing CLS contribution. Returning English users who toggled also pay a one-frame flip. Directly depresses the Lighthouse Performance and stability scores.",
+      "reproduction": "1) Clear localStorage, open the app — page paints LTR then snaps to RTL. 2) Lighthouse /login report: cumulative-layout-shift = 0.344 (failing). 3) Compare index.html dir=\"ltr\" against i18n.tsx default 'ar'.",
+      "resolution": "Set the document direction/lang before first paint so the first frame matches the resolved language. Cheapest fix: a tiny inline script in index.html <head> that reads localStorage('grc.lang') (defaulting to 'ar') and sets document.documentElement.lang/dir synchronously before the module bundle loads. Then change index.html's static default to dir=\"rtl\" lang=\"ar\" to match the app default. This eliminates the post-hydration flip entirely.",
+      "patchBefore": "<!-- index.html -->\n<html lang=\"en\" dir=\"ltr\">\n  <head>\n    <!-- ... no direction bootstrap ... -->",
+      "patchAfter": "<!-- index.html -->\n<html lang=\"ar\" dir=\"rtl\">\n  <head>\n    <script>\n      (function () {\n        var l = localStorage.getItem('grc.lang');\n        var lang = l === 'en' ? 'en' : 'ar';\n        document.documentElement.lang = lang;\n        document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';\n      })();\n    </script>",
+      "effort": "S",
+      "references": [
+        "https://web.dev/articles/cls",
+        "https://web.dev/articles/optimize-cls"
+      ]
+    },
+    {
+      "id": "PERF-FE-006",
+      "title": "Lighthouse /login (Performance 38) was captured against the Vite DEV server (unbundled, unminified) — FCP 37s / LCP 72s / unminified-JS 7.5 MB are dev-mode artefacts, not production metrics",
+      "phase": "Performance",
+      "category": "Measurement validity / methodology",
+      "severity": "Info",
+      "cvss": "Informational: this finding does not describe a code defect but warns that the headline numbers (Performance 38, FCP 37.4s, LCP 72.3s, unminified-javascript est. savings 7,521 KiB) come from a development build and overstate the production penalty. Acting on the raw dev numbers without a production-build re-measure would mis-prioritise the audit. The structural findings (PERF-FE-001..005) remain valid regardless.",
+      "file": "audit/raw/lighthouse-login.report.json",
+      "lines": "1-1",
+      "locations": [
+        "audit/raw/lighthouse-login.report.json:1-1",
+        "tss-grc-ui-v2/vite.config.ts:20-27"
+      ],
+      "description": "The Lighthouse report's network-requests and total-byte-weight items are all served from http://localhost:5173 — the Vite dev server (vite.config.ts server.port 5173) — including raw unbundled modules like /src/App.tsx, /src/translations/ar.ts, /@vite/client, /@react-refresh and /node_modules/.vite/deps/*. In dev mode Vite serves unminified, unbundled ES modules with HMR injected, so: (a) unminified-javascript reports 'Est savings of 7,521 KiB' (essentially the whole app, because dev code is never minified) and (b) FCP 37.4s / LCP 72.3s reflect waterfall module fetching + on-the-fly transform, not a production bundle. These specific numbers will improve dramatically against `vite build` output. Notably, the dev-only metrics that do NOT depend on minification — total-blocking-time (40 ms), bootup-time (0.17s), main-thread work (1.2s) — already pass, and CLS (0.344) is a real code issue independent of build mode.",
+      "rootCause": "Lighthouse was pointed at the dev server (npm run dev / port 5173) rather than a production preview (npm run build && npm run preview). Dev servers intentionally trade size/latency for fast HMR.",
+      "evidence": "All Lighthouse resource URLs are localhost:5173 with dev-only paths: /@vite/client (137,996 B), /@react-refresh (117,841 B), /node_modules/.vite/deps/lucide-react.js?v=8de9a796 (1,157,309 B), /src/App.tsx (463,783 B raw TSX), /src/translations/ar.ts (1,076,314 B raw TS). unminified-javascript displayValue 'Est savings of 7,521 KiB' — characteristic of an unminified dev build. FCP/LCP numericValue 37,409 ms / 72,262 ms.",
+      "impact": "Risk of mis-prioritisation: the catastrophic-looking FCP/LCP and 'unminified JS' savings are largely eliminated by a production build alone, whereas the genuine structural wins are PERF-FE-001 (eager heavy pages), PERF-FE-002 (dual dictionaries), PERF-FE-004 (no vendor chunking) and PERF-FE-005 (CLS). Those persist in production.",
+      "reproduction": "Inspect audit/raw/lighthouse-login.report.json network-requests: every URL is localhost:5173 with /@vite, /@react-refresh, /node_modules/.vite/deps and raw /src/*.ts(x) paths — the signature of `vite` (dev), not `vite preview` (prod).",
+      "resolution": "Re-run Lighthouse against a production preview: `npm run build && npm run preview` (or serve dist/ behind a static host with gzip/brotli), then capture /login again. Use that report as the audit baseline for FCP/LCP/byte-weight, and keep the dev report only as evidence for the structural findings. Then re-confirm PERF-FE-001/002/004 against the real bundle/chunk graph.",
+      "patchBefore": "# Measured against dev server:\nnpm run dev   # http://localhost:5173 — unbundled, unminified, HMR",
+      "patchAfter": "# Measure against production build:\nnpm run build && npm run preview   # serves dist/ minified + chunked\n# then run Lighthouse on the preview URL /login",
+      "effort": "S",
+      "references": [
+        "https://vitejs.dev/guide/build.html",
+        "https://developer.chrome.com/docs/lighthouse/overview"
+      ]
+    }
+  ]
+}

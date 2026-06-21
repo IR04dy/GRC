@@ -1,0 +1,180 @@
+{
+  "findings": [
+    {
+      "id": "SEC-PRIV-001",
+      "title": "PDPL privacy sub-modules use isAuthenticated() instead of hasPermission('PRIVACY',…) — broken function-level authorization (BFLA)",
+      "phase": "Security",
+      "category": "Broken Access Control (A01) / CWE-862 Missing Authorization",
+      "severity": "High",
+      "cvss": "CVSS ~8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N) — any authenticated user (any role) can read AND mutate PDPL/PII records they have no module permission for",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/controller/ConsentRecordController.java",
+      "lines": "27-64",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/controller/ConsentRecordController.java:27-64",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/dsa/controller/DataSharingAgreementController.java:24-62",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/processor/controller/ProcessorAssessmentController.java:23-55",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/extensions/controller/CrossBorderTransferController.java:29-64",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/extensions/controller/DisposalCertificateController.java:29-70",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/extensions/controller/PrivacyNoticeController.java:31-78",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/extensions/controller/RopaWorkflowsController.java:48-78",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/controller/PdplDataFlowController.java:32-36"
+      ],
+      "description": "The core PrivacyController, DpiaController and privacy_lc DsrCaseController correctly gate every endpoint with @PreAuthorize(\"hasPermission('PRIVACY','READ'|'WRITE'|'DELETE')\"). However an entire cluster of privacy sub-modules added in later sprints gate every endpoint with only @PreAuthorize(\"isAuthenticated()\"): Consent Records (PDPL Art.5 ledger), Data Sharing Agreements, Processor Assessments (PDPL Art.28), Cross-border Transfers (Art.29), Disposal Certificates, Privacy Notices, ROPA-workflows facade, and the PDPL Data-Flow graph. ModulePermissionEvaluator resolves hasPermission('PRIVACY','READ') to the granted authority PRIVACY_READ (or ROLE_PLATFORM_ADMIN); isAuthenticated() requires none of these. Consequently a user holding only, e.g., RISK_READ or AUDITOR authorities — who is deliberately NOT granted any PRIVACY authority — can list/read AND create/transition/withdraw these PDPL records. ConsentRecordController even exposes GET /consents/by-subject/{subjectRef}, letting any authenticated user enumerate a data subject's full consent history (dataSubjectRef is a PII reference). The records are returned as raw JPA entities, so all columns (data-subject references, destination orgs, data categories) are disclosed.",
+      "rootCause": "These controllers were written with a coarse 'logged-in is enough' guard rather than the platform's MODULE:ACTION permission convention. The privacy module owns the PRIVACY permission namespace but only the original PrivacyController/DpiaController enforce it; the later sub-module controllers never adopted hasPermission('PRIVACY',…), so module-level access control is missing for them.",
+      "evidence": "ConsentRecordController.java:38-42  @GetMapping(\"/by-subject/{subjectRef}\") @PreAuthorize(\"isAuthenticated()\") public List<ConsentRecord> history(@PathVariable String subjectRef){ return service.historyFor(subjectRef); }  — compare PrivacyController.java:30-31 @GetMapping(\"/breaches\") @PreAuthorize(\"hasPermission('PRIVACY','READ')\"). ModulePermissionEvaluator.java:41-43 returns true only for ROLE_PLATFORM_ADMIN or the MODULE_ACTION authority; isAuthenticated() bypasses it entirely.",
+      "impact": "Confidentiality and integrity breach of PDPL-regulated data: any account on the tenant (e.g. a risk analyst, an auditor, a low-privilege operator) can read consent ledgers, processor due-diligence, cross-border transfer approvals and privacy notices, and can mutate them (grant/withdraw consent, approve/reject cross-border transfers, publish/supersede privacy notices, complete disposal certificates). For a Saudi bank this is a regulatory disclosure risk under SDAIA PDPL and undermines the segregation-of-duties the DPO role is supposed to enforce.",
+      "reproduction": "1) Log in as a user whose role grants e.g. RISK_READ but no PRIVACY_* authority (a non-DPO). 2) curl -H \"Authorization: Bearer <token>\" http://localhost:8084/api/v1/privacy/consents → 200 with the full consent ledger. 3) curl -H \"Authorization: Bearer <token>\" \"http://localhost:8084/api/v1/privacy/consents/by-subject/NID-1234567890\" → that subject's consent history. 4) POST /api/privacy/cross-border-transfers/{id}/approve with the same token → approves an Art.29 transfer. All succeed; the same calls with hasPermission('PRIVACY','READ') would 403 for this user.",
+      "resolution": "Replace isAuthenticated() with hasPermission('PRIVACY','READ') on every GET and hasPermission('PRIVACY','WRITE') (and 'DELETE' where applicable) on every mutating endpoint across these controllers, matching PrivacyController/DpiaController. Where a narrower role is warranted (e.g. expire/approve restricted to DPO), use hasAnyRole/hasPermission accordingly. Add an integration test that asserts a token without PRIVACY_* authority receives 403 on each privacy endpoint.",
+      "patchBefore": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic Page<ConsentRecord> list(...) { return service.list(page, size); }\n\n@PostMapping(\"/{id}/withdraw\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ConsentRecord withdraw(@PathVariable Long id, @RequestBody WithdrawBody body) { ... }",
+      "patchAfter": "@GetMapping\n@PreAuthorize(\"hasPermission('PRIVACY','READ')\")\npublic Page<ConsentRecord> list(...) { return service.list(page, size); }\n\n@PostMapping(\"/{id}/withdraw\")\n@PreAuthorize(\"hasPermission('PRIVACY','WRITE')\")\npublic ConsentRecord withdraw(@PathVariable Long id, @RequestBody WithdrawBody body) { ... }",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "OWASP API Security Top 10 2023 — API5:2023 Broken Function Level Authorization",
+        "OWASP Top 10 2021 — A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-PRIV-002",
+      "title": "Cyber→PDPL bridge manual trigger creates breach + mutates cyber.incidents under only isAuthenticated()",
+      "phase": "Security",
+      "category": "Broken Access Control (A01) / CWE-862 Missing Authorization",
+      "severity": "High",
+      "cvss": "CVSS ~7.6 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — cross-module write (privacy.data_breaches + cyber.incidents) with no module permission",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/bridge/controller/CyberPdplBridgeController.java",
+      "lines": "28-54",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/bridge/controller/CyberPdplBridgeController.java:42-54",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/bridge/service/CyberPdplBridgeService.java:64-176"
+      ],
+      "description": "POST /api/privacy/cyber-bridge/trigger is guarded by @PreAuthorize(\"isAuthenticated()\"). The handler calls CyberPdplBridgeService.triggerForIncident, which (a) UPDATEs cyber.incidents to set affects_personal_data + PII classification fields, (b) INSERTs a row into privacy.data_breaches, and (c) cross-links the two. This is a privileged classification action that should require PRIVACY:WRITE (and arguably CYBER:WRITE since it mutates a cyber incident), yet any authenticated user can invoke it. The read endpoints on the same controller (GET /log, /log/by-incident/{id}) are likewise only isAuthenticated().",
+      "rootCause": "The bridge controller was wired with a generic isAuthenticated() guard rather than the PRIVACY module permission. Because the underlying write spans two modules via native SQL, no method-level @PreAuthorize on the cyber side is consulted either.",
+      "evidence": "CyberPdplBridgeController.java:42-44  @PostMapping(\"/trigger\") @PreAuthorize(\"isAuthenticated()\") public ResponseEntity<Response> trigger(@Valid @RequestBody ManualTriggerRequest req, Authentication auth){...}. Service writes: CyberPdplBridgeService.java:95-109 UPDATE cyber.incidents SET affects_personal_data=1,...; :124-146 INSERT INTO privacy.data_breaches (...).",
+      "impact": "Any authenticated user can fabricate a personal-data breach record (which may auto-flag a 72-hour SDAIA notification SLA via pdpc_notification_required) and reclassify an arbitrary cyber incident as PII-affecting within their tenant. This is a data-integrity and compliance-noise attack: false regulatory clocks, polluted breach register, and unauthorized mutation of incident records owned by the cyber module.",
+      "reproduction": "1) Log in as any non-DPO authenticated user. 2) POST /api/privacy/cyber-bridge/trigger {\"cyberIncidentId\":<an incident id in your tenant>,\"dataSubjectsAffectedEst\":600,\"dataCategoriesAffected\":\"NATIONAL_ID\",\"piiAssessment\":\"x\"} with their Bearer token. 3) A privacy.data_breaches row is created with pdpc_notification_required=1 and the cyber incident is reclassified — returns 201.",
+      "resolution": "Gate /trigger with @PreAuthorize(\"hasPermission('PRIVACY','WRITE')\") (and consider also requiring CYBER:WRITE / restricting to DPO,CISO). Gate the read endpoints with hasPermission('PRIVACY','READ'). The native queries themselves are correctly parameterized — only the authorization guard needs tightening.",
+      "patchBefore": "@PostMapping(\"/trigger\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Response> trigger(@Valid @RequestBody ManualTriggerRequest req, Authentication auth) { ... }",
+      "patchAfter": "@PostMapping(\"/trigger\")\n@PreAuthorize(\"hasPermission('PRIVACY','WRITE') and hasPermission('CYBER','WRITE')\")\npublic ResponseEntity<Response> trigger(@Valid @RequestBody ManualTriggerRequest req, Authentication auth) { ... }",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "OWASP API Security Top 10 2023 — API5:2023 Broken Function Level Authorization",
+        "SDAIA PDPL Implementing Regulations — Art.31/40 breach notification"
+      ]
+    },
+    {
+      "id": "SEC-PRIV-003",
+      "title": "Unauthenticated public sub-processor list allows cross-tenant enumeration via attacker-controlled org parameter",
+      "phase": "Security",
+      "category": "Broken Access Control / IDOR (A01) / CWE-639",
+      "severity": "Medium",
+      "cvss": "CVSS ~5.3 (AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N) — unauthenticated cross-tenant read of (intentionally public) vendor list for arbitrary orgs",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/subprocessor/controller/SubprocessorController.java",
+      "lines": "157-162",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/subprocessor/service/SubprocessorPublicListService.java:36-40",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:101"
+      ],
+      "description": "GET /api/v1/privacy/subprocessors/public is permitAll in SecurityConfig and takes a caller-supplied ?org=<id> query parameter that is passed straight into SubprocessorPublicListService.publicList(orgId) → repo.findByOrganisationIdAndLifecycleStageAndIsDeletedFalse(orgId,\"APPROVED\"). Because there is no JWT and thus no TenantContext, the org id is whatever the caller sends (defaulting to 1). An unauthenticated attacker can iterate org=1,2,3,… and harvest the APPROVED sub-processor list (legal name EN/AR, country, region, processing purpose, cross-border safeguard) for every tenant, not just the one whose public privacy notice references the endpoint. While PDPL Art.12 intends this list to be public, exposing every tenant's vendor map through one un-scoped, enumerable parameter is a tenant-isolation weakness and a competitive-intelligence leak.",
+      "rootCause": "The endpoint is org-agnostic by design (no tenant context for anonymous callers) but trusts a client-supplied org id with no host-to-tenant binding, rate limiting, or allow-list of organisations that have opted into public disclosure.",
+      "evidence": "SubprocessorController.java:157-162  @GetMapping(\"/public\") public List<PublicSubprocessorResponse> publicList(@RequestParam(name=\"org\",required=false) Long orgId){ return publicListService.publicList(orgId == null ? 1L : orgId); }  ;  SecurityConfig.java:101 .requestMatchers(HttpMethod.GET, \"/api/v1/privacy/subprocessors/public\").permitAll().",
+      "impact": "Anonymous enumeration of every tenant's approved sub-processor / vendor relationships and cross-border destinations. For multi-tenant SaaS this leaks one customer's supply chain to anyone, including competitors, and lets an attacker map which banks use which processors and in which countries.",
+      "reproduction": "1) Without any auth: for i in 1..50; curl \"http://localhost:8084/api/v1/privacy/subprocessors/public?org=$i\". 2) Each call returns the APPROVED sub-processors for tenant i, regardless of whether tenant i intended a public list.",
+      "resolution": "Bind the public list to a host-based tenant resolver (the planned ethics.<bank>.sa style) instead of a client-supplied org id, OR gate disclosure behind a per-org 'public_transparency_enabled' flag and return 404 for orgs that have not opted in. Add rate limiting to the permitAll path to blunt enumeration. At minimum, do not default to org 1 and reject requests where org cannot be resolved from the request context.",
+      "patchBefore": "@GetMapping(\"/public\")\npublic List<PublicSubprocessorResponse> publicList(@RequestParam(name = \"org\", required = false) Long orgId) {\n    return publicListService.publicList(orgId == null ? 1L : orgId);\n}",
+      "patchAfter": "@GetMapping(\"/public\")\npublic List<PublicSubprocessorResponse> publicList(HttpServletRequest request) {\n    Long orgId = tenantResolver.resolveFromHost(request.getServerName()); // host -> org\n    if (orgId == null || !orgSettings.isPublicTransparencyEnabled(orgId)) {\n        throw new ResponseStatusException(HttpStatus.NOT_FOUND);\n    }\n    return publicListService.publicList(orgId);\n}",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API Security Top 10 2023 — API1:2023 BOLA",
+        "SDAIA PDPL Art.12 (transparency disclosure)"
+      ]
+    },
+    {
+      "id": "SEC-PRIV-004",
+      "title": "SDAIA breach-submission and DSR-extend endpoints accept unbounded/untyped Map<String,Object> bodies (no DTO validation)",
+      "phase": "Security",
+      "category": "Insufficient Input Validation (A04/A08) / CWE-20",
+      "severity": "Low",
+      "cvss": "CVSS ~3.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — weak input typing/validation on privileged workflow mutations",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/controller/PrivacyController.java",
+      "lines": "200-211",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/controller/PrivacyController.java:74-83",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/controller/DpiaController.java:69-79",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ethics/controller/AmlAlertController.java:58-70",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ethics/controller/EthicsCaseController.java:77-81"
+      ],
+      "description": "Several privileged mutation endpoints accept raw @RequestBody Map<String,Object> or unvalidated entity bodies instead of @Valid DTOs with Jakarta constraints. Examples: PrivacyController.extendDsr reads body.get(\"days\") as a Number with no bounds (a caller can pass days=2_000_000 to push the PDPL SLA arbitrarily far out); recordSdaiaSubmission takes a record with no @Valid/@NotBlank; DpiaController.approve/reject and the Ethics AML/EthicsCase transition handlers accept untyped maps. The CRUD create/update endpoints on PrivacyController (createBreach/createDsr/createRopa) and the ethics controllers bind the JPA entity directly via @RequestBody with no @Valid, so client-supplied audit/server-managed fields are accepted from the wire (mass-assignment surface), though the services re-stamp organisationId and (for DPIA) null the id.",
+      "rootCause": "Workflow endpoints were implemented with ad-hoc Map parsing rather than typed, validated request DTOs. No @Valid is applied and no @Min/@Max/@NotBlank constraints bound the values.",
+      "evidence": "PrivacyController.java:200-205  @PostMapping(\"/dsrs/{id}/extend\") public DataSubjectRequest extendDsr(@PathVariable Long id, @RequestBody Map<String,Object> body){ Integer days = body.get(\"days\") instanceof Number n ? n.intValue() : null; return privacyService.extendDsr(id, days);} — PrivacyService.extendDsr only floors at 30 when null/<=0; no upper bound. createBreach(@RequestBody DataBreach req) at lines 45-47 has no @Valid.",
+      "impact": "Weak typing allows out-of-range or unexpected values to drive regulated SLA clocks (DSR due date, breach states) and produces inconsistent validation behaviour. Direct entity binding without @Valid widens the mass-assignment surface and bypasses the bean-validation messages the platform ships. No direct confidentiality breach, hence Low.",
+      "reproduction": "1) As a PRIVACY_WRITE user: POST /api/v1/privacy/dsrs/{id}/extend {\"days\":3650}. 2) The DSR due date is pushed out 10 years with no rejection, defeating the PDPL 30/60-day SLA model.",
+      "resolution": "Introduce typed request records with Jakarta constraints (e.g. ExtendDsrRequest(@Min(1) @Max(60) int days)), annotate every mutating handler body with @Valid, and replace Map<String,Object> transition bodies with explicit DTOs. For create/update, bind a request DTO (not the JPA entity) and map server-managed fields server-side.",
+      "patchBefore": "@PostMapping(\"/dsrs/{id}/extend\")\n@PreAuthorize(\"hasPermission('PRIVACY', 'WRITE')\")\npublic DataSubjectRequest extendDsr(@PathVariable Long id, @RequestBody Map<String, Object> body) {\n    Integer days = body.get(\"days\") instanceof Number n ? n.intValue() : null;\n    return privacyService.extendDsr(id, days);\n}",
+      "patchAfter": "public record ExtendDsrRequest(@NotNull @Min(1) @Max(60) Integer days) {}\n\n@PostMapping(\"/dsrs/{id}/extend\")\n@PreAuthorize(\"hasPermission('PRIVACY', 'WRITE')\")\npublic DataSubjectRequest extendDsr(@PathVariable Long id, @Valid @RequestBody ExtendDsrRequest body) {\n    return privacyService.extendDsr(id, body.days());\n}",
+      "effort": "M",
+      "references": [
+        "CWE-20: Improper Input Validation",
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "OWASP Top 10 2021 — A04:2021 Insecure Design"
+      ]
+    },
+    {
+      "id": "SEC-PRIV-005",
+      "title": "Sensitive PII written into audit-log/business-event messages (consent subject refs, KYC names/IDs, whistleblower actors)",
+      "phase": "Security",
+      "category": "Sensitive Data Exposure (A09/A02) / CWE-532 Insertion of Sensitive Information into Log File",
+      "severity": "Low",
+      "cvss": "CVSS ~3.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N) — PII persisted into audit ledger / event payloads readable by lower-privileged log/automation consumers",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/service/ConsentRecordService.java",
+      "lines": "124-127",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/privacy/service/ConsentRecordService.java:64-77",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ethics/service/WhistleblowerRetaliationService.java:99-101",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ethics/coi/service/CoiService.java:260-263",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ethics/coi/service/CoiService.java:343-345"
+      ],
+      "description": "Multiple services embed personal data directly into audit-log free-text messages and DomainEvent payloads. ConsentRecordService logs 'Consent granted: subject=<dataSubjectRef> purpose=… basis=…' and emits the dataSubjectRef in every CONSENT_* event payload and as the event correlation id ('consent:'+dataSubjectRef+':'+purposeCode). CoiService logs the declarant's full name and employee number into COI_DECLARATION_* audit rows and event payloads. WhistleblowerRetaliationService logs the named claimed actor. These audit rows and F8 event payloads are consumed by separate audit/automation subsystems whose access control is broader than the privacy/ethics module permission — so PII leaks to viewers who should not see the underlying record.",
+      "rootCause": "Audit/event messages were built by string-concatenating the human-readable record including PII identifiers, instead of referencing the entity by surrogate id and keeping PII in the tenant-scoped entity tables only.",
+      "evidence": "ConsentRecordService.java:124-127 audit.log(\"CREATE\",\"ConsentRecord\", saved.getId(), \"Consent granted: subject=\" + saved.getDataSubjectRef() + \" purpose=\" + saved.getPurposeCode() + \" basis=\" + saved.getLegalBasis()); and emit(...) payload includes m.put(\"dataSubjectRef\", nullSafeStr(c.getDataSubjectRef())) (lines 66-67, 86-87). CoiService.java:260-263 logs finalDecl.getFullNameEn() + employeeNo.",
+      "impact": "Personal data (PDPL-regulated subject references, employee names/IDs, named subjects of whistleblower retaliation claims) is duplicated into the audit ledger and the automation event bus. Anyone with audit-log read or rule-engine visibility — a broader population than the data owner — can recover PII, contradicting data-minimisation (PDPL Art.4) and the module's own access scoping.",
+      "reproduction": "1) Grant a consent via POST /api/v1/privacy/consents. 2) Read the audit log (audit-log module) as a user with audit read but no PRIVACY permission → the row text contains the data subject reference. 3) Inspect the CONSENT_GRANTED DomainEvent payload in the automation subsystem → dataSubjectRef present.",
+      "resolution": "Reference records in audit/event text by surrogate id only (e.g. 'ConsentRecord#<id>') and keep PII identifiers out of free-text messages and event payloads, or hash/tokenise the subject reference for correlation. If a subject correlation key is genuinely required for rule matching, use a non-reversible token rather than the raw reference, and ensure audit/event consumers enforce the same data-classification controls as the source module.",
+      "patchBefore": "audit.log(\"CREATE\", \"ConsentRecord\", saved.getId(),\n    \"Consent granted: subject=\" + saved.getDataSubjectRef()\n        + \" purpose=\" + saved.getPurposeCode()\n        + \" basis=\" + saved.getLegalBasis());\n// payload: m.put(\"dataSubjectRef\", nullSafeStr(c.getDataSubjectRef()));",
+      "patchAfter": "audit.log(\"CREATE\", \"ConsentRecord\", saved.getId(),\n    \"Consent granted for ConsentRecord#\" + saved.getId()\n        + \" purpose=\" + saved.getPurposeCode()\n        + \" basis=\" + saved.getLegalBasis());\n// payload: m.put(\"dataSubjectToken\", hash(c.getDataSubjectRef())); // no raw PII",
+      "effort": "M",
+      "references": [
+        "CWE-532: Insertion of Sensitive Information into Log File",
+        "OWASP Top 10 2021 — A09:2021 Security Logging and Monitoring Failures",
+        "SDAIA PDPL Art.4 (data minimisation)"
+      ]
+    },
+    {
+      "id": "SEC-PRIV-006",
+      "title": "Ethics case cross-entity link lookup queries CaseLink without org scoping (post-filter mitigates leak)",
+      "phase": "Security",
+      "category": "Multi-tenancy / Broken Access Control (A01) / CWE-639",
+      "severity": "Info",
+      "cvss": "No direct exposure — cross-tenant rows are post-filtered out before response; defence-in-depth gap only",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ethics/service/EthicsCaseService.java",
+      "lines": "186-209",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ethics/repository/CaseLinkRepository.java:8-11"
+      ],
+      "description": "EthicsCaseService.linksForEntity calls linkRepo.findByEntityTypeAndEntityId(entityType, entityId) which is NOT organisation-scoped at the repository level (CaseLinkRepository has no org parameter). The result set therefore spans all tenants. The service then re-fetches each link's parent case and filters out those whose case.getOrganisationId() does not match the current tenant, so cross-tenant data is not returned to the caller. The exposure is closed by the post-filter, but the query itself reads other tenants' link rows and relies on a correct downstream filter — a fragile pattern that would leak if the filter were ever weakened. Note the controller endpoint is correctly gated by hasPermission('COMPLIANCE','READ').",
+      "rootCause": "The inverse-lookup finder was derived from (entityType, entityId) only; the tenant scope is enforced indirectly via the parent EthicsCase rather than in the query.",
+      "evidence": "CaseLinkRepository.java:10  List<CaseLink> findByEntityTypeAndEntityId(String entityType, Long entityId);  used at EthicsCaseService.java:190 then filtered c.getOrganisationId().equals(org) at line 192.",
+      "impact": "No confidentiality breach today because the parent-case org filter discards out-of-tenant rows. The risk is defence-in-depth: a future refactor that trusts the link list directly would expose cross-tenant case metadata. Rated Info.",
+      "reproduction": "Code-review only: the repository finder lacks an organisationId parameter; correctness depends entirely on the service-layer post-filter at EthicsCaseService.java:192.",
+      "resolution": "Add organisationId to the finder (findByOrganisationIdAndEntityTypeAndEntityId) so tenant scoping is enforced in SQL, keeping the parent-case check as belt-and-braces.",
+      "patchBefore": "List<CaseLink> findByEntityTypeAndEntityId(String entityType, Long entityId);\n// service: linkRepo.findByEntityTypeAndEntityId(entityType, entityId)",
+      "patchAfter": "List<CaseLink> findByOrganisationIdAndEntityTypeAndEntityId(Long organisationId, String entityType, Long entityId);\n// service: linkRepo.findByOrganisationIdAndEntityTypeAndEntityId(org, entityType, entityId)",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP API Security Top 10 2023 — API1:2023 BOLA"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "findings": [
+    {
+      "id": "SEC-CYB-001",
+      "title": "Cross-tenant read/update/delete (IDOR) across all CyberService single-entity operations",
+      "phase": "Security",
+      "category": "Broken Access Control / IDOR (A01)",
+      "severity": "Critical",
+      "cvss": "CVSS 9.1 (AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:H) — authenticated cross-tenant read, modify and delete of another organisation's cyber records",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java",
+      "lines": "183-214",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:269-329",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:340-381",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:399-482",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:508-612",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/controller/CyberController.java:85-101"
+      ],
+      "description": "Every single-entity operation in CyberService — getControl, updateControl, deleteControl, getSubControl path, getAssessment/updateAssessment/approveAssessment/convertGapToCapa/deleteAssessment, getVulnerability/updateVulnerability/escalate/deleteVulnerability, approveException/updateException/deleteException, getIncident/updateIncident/startResponse/deleteIncident, updateAsset/deleteAsset, updateEvidence/deleteEvidence, getActionPlan/updateActionPlan/completeActionPlan/deleteActionPlan — resolves the target entity with the bare JPA primary-key lookup repo.findById(id), which is NOT scoped by organisation_id. The TenantContext orgId is never consulted on these paths. The repositories already expose org-scoped finders (e.g. CyberControlRepository.findByOrganisationId), so the unscoped lookups are an oversight, not a missing capability. The CyberController @PreAuthorize guards only check the caller holds CYBER:READ/WRITE in their own tenant; they do not bind the path id to that tenant. Because primary keys are sequential Long values, any authenticated user with CYBER permissions can enumerate ids and read, modify, approve, escalate, or soft-delete cyber controls, assessments, vulnerabilities, incidents, assets, evidence and action plans belonging to ANY other tenant.",
+      "rootCause": "Service-layer reads/writes use Spring Data's unscoped findById(id) instead of an org-scoped finder (findByIdAndOrganisationId / findByOrganisationIdAndId). The platform relies on per-query org scoping (no global Hibernate tenant filter — see TenantContext javadoc), and this is the developer's responsibility per query; it was omitted on every single-id path in CyberService.",
+      "evidence": "    @Transactional(readOnly = true)\n    public CyberControl getControl(Long id) {\n        return controlRepo.findById(id)\n                .orElseThrow(() -> new EntityNotFoundException(\"CyberControl not found: \" + id));\n    }\n    ...\n    @Transactional\n    public void deleteControl(Long id) {\n        CyberControl c = getControl(id);   // unscoped — any tenant's id resolves\n        c.setIsDeleted(true);\n        controlRepo.save(c);\n    }",
+      "impact": "Full cross-tenant compromise of the Cyber module. A user in tenant A (e.g. STC Bank demo, org 3) can read tenant B's (e.g. the Saudi bank, org 1) cyber-incident details, vulnerability inventory with CVE/asset mappings, control-assessment gaps and evidence, then tamper with them: silently soft-delete another bank's open critical incidents, approve their own forged assessments, escalate/close vulnerabilities, or complete action plans — destroying audit/compliance integrity (NCA ECC, SAMA CSF) and exposing confidential security posture of every other tenant.",
+      "reproduction": "1. Log in as a low-tenant user holding CYBER:READ/WRITE (e.g. riskmanager) in org A; capture Bearer token.\n2. Note that ids are sequential. GET /api/v1/cyber/incidents/{id} iterating id=1..N returns 200 with another tenant's CyberIncident JSON (confirmed: findById ignores org; EntityNotFoundException only when the row truly does not exist).\n3. DELETE /api/v1/cyber/incidents/{id} on a foreign-tenant id returns 204 and soft-deletes the victim tenant's incident.\n4. POST /api/v1/cyber/assessments/{id}/approve on a foreign id flips another tenant's assessment to APPROVED.",
+      "resolution": "Add org-scoped finders to every cyber repository (e.g. Optional<CyberControl> findByIdAndOrganisationId(Long id, Long orgId)) and change every single-id service method to load via the current TenantContext org, throwing EntityNotFoundException when the row is not owned by the caller's tenant. Pass orgId from the controller (it already calls orgId()) into the get/update/delete/workflow methods. Prefer TenantContext.requireOrganisationId() (fail-fast) as the cyber_lc module already does.",
+      "patchBefore": "@Transactional(readOnly = true)\npublic CyberControl getControl(Long id) {\n    return controlRepo.findById(id)\n            .orElseThrow(() -> new EntityNotFoundException(\"CyberControl not found: \" + id));\n}",
+      "patchAfter": "@Transactional(readOnly = true)\npublic CyberControl getControl(Long id) {\n    Long orgId = TenantContext.requireOrganisationId();\n    return controlRepo.findByIdAndOrganisationId(id, orgId)\n            .orElseThrow(() -> new EntityNotFoundException(\"CyberControl not found: \" + id));\n}\n// repository:\n// Optional<CyberControl> findByIdAndOrganisationId(Long id, Long organisationId);",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-284: Improper Access Control",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-CYB-002",
+      "title": "Cross-tenant row overwrite/takeover via client-supplied id on entity-bodied write endpoints (mass assignment)",
+      "phase": "Security",
+      "category": "Broken Access Control / Mass Assignment (A01/A08)",
+      "severity": "Critical",
+      "cvss": "CVSS 8.8 (AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:H/A:H) — authenticated cross-tenant overwrite and tenant-reassignment of arbitrary rows",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/OtAssetService.java",
+      "lines": "38-70",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/CryptoAssetService.java:44-47",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/AppsecFindingService.java:103-111",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/ThreatIntelService.java:40-83",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/CyberInsuranceService.java:41-44",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/SbomComponentService.java:27-30",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/controller/OtAssetController.java:34-43",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/controller/CryptoAssetController.java:42-51",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/controller/ThreatIntelController.java:36-38"
+      ],
+      "description": "The SOC-Ops controllers bind the JPA @Entity directly from @RequestBody and pass it to a service save(in) that does in.setOrganisationId(currentTenant) then repo.save(in) WITHOUT first nulling the id or verifying that an existing row with in.getId() belongs to the caller's tenant. The PUT handlers explicitly do body.setId(id) from the path variable, and the POST/create handlers accept whatever id the client sends in the JSON body. Because in.getId() is non-null, Spring Data save() performs a Hibernate merge: it loads the persistent row by primary key alone (ignoring organisation_id), copies all client-supplied fields onto it, AND sets organisation_id to the attacker's tenant. The result is a cross-tenant overwrite that also re-parents the victim row into the attacker's org. The platform-wide backstop (TenantWriteGuardInterceptor) that would detect the organisation_id change is feature-flagged OFF by default (grc.security.tenant-write-guard.enabled=false, see TenantWriteGuardConfig) and is not enabled in any profile, so nothing prevents this at runtime. This pattern is repeated across nearly all SOC-Ops services (OtAsset, CryptoAsset, AppsecFinding[save], ForensicsArtefact, SbomComponent, PentestEngagement, IamJmlEvent, CyberInsurance, MaDueDiligence, RegulatorExamination, AwarenessCampaign, BrandMonitoring, ZtMaturity, SeasonalOverlay, ThreatIntel[update branch], DlpEvent). The same defect also exists in the main CyberService write methods that omit setId(null): saveAssessment, saveVulnerability, saveException, saveEvidence, saveActionPlan.",
+      "rootCause": "save()/create() methods trust a client-controlled primary key and rely on Hibernate merge, which is keyed on PK only and never validates tenant ownership. The intended per-service mass-assignment defense (req.setId(null) on create) is applied inconsistently — present in saveFramework/saveControl/saveAsset/saveIncident but absent everywhere else — and the global TenantWriteGuardInterceptor that would catch the organisation_id mutation is disabled.",
+      "evidence": "// OtAssetController.update\nbody.setId(id);            // path id, but service never checks ownership\nreturn svc.save(body);\n\n// OtAssetService.save\nin.setOrganisationId(TenantContext.getCurrentTenant());\nboolean isNew = in.getId() == null;\nOtAsset saved = repo.save(in);   // merge by PK -> overwrites foreign-tenant row, reassigns org",
+      "impact": "Any authenticated user holding the relevant SOC-Ops role (e.g. CISO/OT_LEAD) in tenant A can overwrite and seize a specific row owned by tenant B by issuing a write with that row's primary key. This corrupts another bank's OT/ICS asset register, cryptographic inventory, cyber-insurance policies, regulator-examination records, forensic chain-of-custody artefacts, etc., and silently moves those rows out of the victim tenant (data destruction + integrity loss). It defeats the entire multi-tenant isolation guarantee for writes.",
+      "reproduction": "1. As a CISO in org A, GET /api/v1/socops/ot-assets to learn id ranges (or simply enumerate).\n2. Issue PUT /api/v1/socops/ot-assets/{idOwnedByOrgB} with a JSON body of attacker-chosen fields. The response is 200; the row formerly owned by org B is now overwritten and organisation_id is set to org A.\n3. Alternatively POST /api/v1/socops/threat-intel with body {\"id\": <org-B id>, ...}: ThreatIntelService takes the in.getId()!=null branch and overwrites the foreign row.",
+      "resolution": "On create, always force in.setId(null) before save. On update, load the existing row scoped by tenant (repo.findByIdAndOrganisationId(id, currentTenant)) and copy only mutable fields onto the managed entity (never merge a detached, client-built entity). Reject the request with 404/403 if the scoped lookup misses. Additionally, enable the existing TenantWriteGuardInterceptor (grc.security.tenant-write-guard.enabled=true) as a defense-in-depth backstop after wrapping the legitimate cross-tenant sweeps in TenantContext.allowCrossTenantWrite().",
+      "patchBefore": "@Transactional\npublic OtAsset save(OtAsset in) {\n    in.setOrganisationId(TenantContext.getCurrentTenant());\n    boolean isNew = in.getId() == null;\n    OtAsset saved = repo.save(in);   // cross-tenant merge\n    ...\n}",
+      "patchAfter": "@Transactional\npublic OtAsset save(OtAsset in) {\n    Long org = TenantContext.requireOrganisationId();\n    OtAsset target;\n    if (in.getId() == null) {\n        target = in;                 // create\n    } else {\n        target = repo.findByIdAndOrganisationId(in.getId(), org)   // scoped load\n            .orElseThrow(() -> new EntityNotFoundException(\"OtAsset \" + in.getId()));\n        copyMutableFields(in, target);          // never merge the detached body\n    }\n    target.setOrganisationId(org);\n    return repo.save(target);\n}",
+      "effort": "L",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "OWASP API3:2023 Broken Object Property Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-CYB-003",
+      "title": "CloudService endpoints guarded only by isAuthenticated() — any logged-in user can mutate the NCA CSCC cloud inventory (BFLA)",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "High",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:N) — privilege escalation: read-only/unprivileged users can create and modify cloud-service records",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/controller/CloudServiceController.java",
+      "lines": "23-45",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/threatintel/ThreatIntelController.java:42-46"
+      ],
+      "description": "CloudServiceController gates every endpoint (list, get, create, update, stats) with @PreAuthorize(\"isAuthenticated()\") instead of the module-scoped hasPermission('CYBER','READ'/'WRITE') used everywhere else in the cyber module. As a result, ANY authenticated principal — including an AUDITOR or any low-privilege role that holds no CYBER:WRITE authority — can POST and PATCH cloud-service records (provider, residency region, kingdom-data-resident flag, encryption/MFA posture, criticality). The underlying CloudServiceService IS correctly tenant-scoped (findByIdAndOrganisationId), so this is a function-level (not object-level) authorization defect: the wrong, far-too-broad guard. The same weak guard appears on the cyber threat-intel correlation endpoint (POST /api/v1/cyber/threat-intel/correlate), though that one is read-only and tenant-scoped, so lower impact.",
+      "rootCause": "Authorization expression copy/paste of isAuthenticated() rather than the platform's hasPermission('CYBER', ACTION) convention; write actions were not separated from read actions.",
+      "evidence": "@PostMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<CloudService> create(@Valid @RequestBody CloudService body) {\n    return ResponseEntity.ok(service.create(body));\n}\n\n@PatchMapping(\"/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\npublic CloudService update(@PathVariable Long id, @RequestBody CloudService body) {\n    return service.update(id, body);\n}",
+      "impact": "A read-only auditor or any minimally-privileged user can fabricate or alter the regulated cloud-service register (NCA CSCC), e.g. flip kingdomDataResident, downgrade criticality, or mark a non-compliant provider as ACTIVE, undermining data-residency and cloud-controls compliance and the integrity of the inventory feeding the audit-committee dashboard.",
+      "reproduction": "1. Log in as auditor (Audit@12345), a role with no CYBER:WRITE authority.\n2. POST /api/v1/cyber/cloud-services with a valid body — request succeeds (201/200) instead of 403.\n3. PATCH /api/v1/cyber/cloud-services/{id} mutating residencyRegion/kingdomDataResident — succeeds.",
+      "resolution": "Replace isAuthenticated() with hasPermission('CYBER','READ') on list/get/stats and hasPermission('CYBER','WRITE') on create/update, matching CyberController. For the threat-intel correlate endpoint, use hasPermission('CYBER','READ').",
+      "patchBefore": "@PostMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<CloudService> create(@Valid @RequestBody CloudService body) {\n    return ResponseEntity.ok(service.create(body));\n}",
+      "patchAfter": "@PostMapping\n@PreAuthorize(\"hasPermission('CYBER','WRITE')\")\npublic ResponseEntity<CloudService> create(@Valid @RequestBody CloudService body) {\n    return ResponseEntity.ok(service.create(body));\n}",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-CYB-004",
+      "title": "Entity-bodied write endpoints lack DTO validation and accept arbitrary entity fields",
+      "phase": "Security",
+      "category": "Improper Input Validation / Mass Assignment (A04/A08)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — unvalidated/over-broad input on write paths",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/controller/CyberController.java",
+      "lines": "61-65",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cyber/controller/CyberController.java:91-95",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/controller/OtAssetController.java:34-43",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/controller/CryptoAssetController.java:42-51",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/socops/controller/AppsecFindingController.java:36-51"
+      ],
+      "description": "Most cyber and SOC-Ops write controllers bind raw JPA @Entity objects directly from @RequestBody with no @Valid annotation and no request DTO. The entities carry no Jakarta Bean Validation constraints on the bound fields, so callers can submit unconstrained strings (status/severity/workflow values outside the allowed enums, oversized free-text fields up to the column limit, audit/BaseEntity fields, etc.). This is the same class of input-trust problem that enables the id-driven mass-assignment in SEC-CYB-002, but is called out separately because the missing @Valid + DTO boundary also permits invalid workflow/enum values and unbounded text to reach persistence. The well-built reference modules (cyber_lc VulnerabilityDto with @NotBlank/@Pattern, vuln_sla and asm DTOs) show the intended pattern.",
+      "rootCause": "Controllers expose persistence entities as the API request model instead of validated DTOs; @Valid is omitted, so even existing column constraints are only enforced (if at all) at the database layer rather than returning a clean 400.",
+      "evidence": "@PostMapping(\"/frameworks\")\n@PreAuthorize(\"hasPermission('CYBER', 'WRITE')\")\npublic ResponseEntity<CyberFramework> saveFramework(@RequestBody CyberFramework framework) {\n    return ResponseEntity.ok(cyberService.saveFramework(framework, orgId()));\n}",
+      "impact": "Callers can persist semantically invalid records (e.g. arbitrary workflowStatus/severity strings that break dashboard aggregation and workflow state machines) and submit over-broad payloads. Combined with the entity-as-request-model design, it widens the attack surface for property-level abuse. Low severity on its own because no direct confidentiality breach results and the worst mass-assignment vector is tracked under SEC-CYB-002.",
+      "reproduction": "1. As a CYBER:WRITE user, POST /api/v1/cyber/vulnerabilities with {\"severity\":\"PWNED\",\"workflowStatus\":\"BOGUS\", ...}.\n2. The record is accepted; severity/workflowStatus persist unvalidated and skew dashboard counts and escalation logic.",
+      "resolution": "Introduce request DTOs for the cyber and SOC-Ops write endpoints (mirroring cyber_lc/vuln_sla/asm), annotate fields with @NotBlank/@Pattern/@Size, and add @Valid on the @RequestBody parameter. Map DTO -> entity inside the service so server-controlled fields (id, organisationId, externalId, audit fields, workflowStatus) are never client-settable.",
+      "patchBefore": "public ResponseEntity<CyberFramework> saveFramework(@RequestBody CyberFramework framework) {\n    return ResponseEntity.ok(cyberService.saveFramework(framework, orgId()));\n}",
+      "patchAfter": "public ResponseEntity<CyberFrameworkResponse> saveFramework(@Valid @RequestBody CyberFrameworkRequest req) {\n    return ResponseEntity.ok(cyberService.saveFramework(req, orgId()));\n}\n// CyberFrameworkRequest: @NotBlank titleEn; @Pattern(...) frameworkCode; ... (no id/org/workflow fields)",
+      "effort": "L",
+      "references": [
+        "CWE-20: Improper Input Validation",
+        "CWE-915: Mass Assignment",
+        "OWASP A04:2021 Insecure Design",
+        "OWASP API6:2023 / API3:2023"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "findings": [
+    {
+      "id": "SEC-RISK-001",
+      "title": "Cross-tenant IDOR read of risk treatment plans via GET /treatments/{id}",
+      "phase": "Security",
+      "category": "Broken Access Control / BOLA (A01)",
+      "severity": "High",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N) — authenticated cross-tenant read of another organisation's risk treatment data",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskTreatmentService.java",
+      "lines": "62-66",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/RiskAdvancedController.java:75-77",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/repository/RiskTreatmentRepository.java:7-9"
+      ],
+      "description": "RiskTreatmentService.get(Long id) loads a RiskTreatment with a bare JpaRepository.findById(id) and performs NO organisation scoping before returning it. It is exposed directly by RiskAdvancedController.getTreatment (GET /api/v1/risk/treatments/{id}, guarded only by hasPermission('RISK','READ')). Because RiskTreatment surrogate ids are sequential Long PKs and every tenant's user holds RISK:READ, a user in organisation A can enumerate ids and read treatment plans (descriptionEn/Ar, ownerId, dueDate, status, treatmentType, parent riskId) belonging to organisation B. The platform's stated #1 invariant is that every repository read be org-scoped; the sibling write paths (update/transition/delete) are saved by their downstream ensureRiskInTenant(t.getRiskId()) check, and the list path is guarded by ensureRiskInTenant(riskId), but the single-entity read get() has neither guard and the repository has no findByIdAndOrganisationId finder to enforce it.",
+      "rootCause": "Single-entity read uses an unscoped findById(id) and the controller relies on it without any TenantContext check; RiskTreatmentRepository exposes no org-scoped finder. The 'belongs to another organisation' guard exists only inside ensureRiskInTenant(riskId), which get() never calls.",
+      "evidence": "    @Transactional(readOnly = true)\n    public RiskTreatment get(Long id) {\n        return treatments.findById(id)\n            .orElseThrow(() -> new EntityNotFoundException(\"Risk treatment not found: \" + id));\n    }\n// exposed by RiskAdvancedController: \n//   @GetMapping(\"/treatments/{id}\") @PreAuthorize(\"hasPermission('RISK','READ')\")\n//   public RiskTreatment getTreatment(@PathVariable Long id) { return treatmentService.get(id); }",
+      "impact": "Confidentiality breach across tenants: any authenticated user with RISK:READ in one tenant can read risk-treatment records (mitigation strategy, owner, due dates, linked risk) of every other tenant by walking the integer id space. In a multi-tenant SaaS for banks/energy/telco this is a serious cross-customer data leak and a regulatory (SAMA/NCA/PDPL) reportable exposure.",
+      "reproduction": "1. Authenticate as a user in org A (e.g. riskmanager). 2. As org B, note a treatment id (or simply enumerate). 3. From org A's session call GET /api/v1/risk/treatments/{idOfOrgB} with the org A Bearer token. 4. Observe org B's treatment record returned with HTTP 200 (no org check) instead of 404.",
+      "resolution": "Scope the read to the current tenant. Add findByIdAndOrganisationId(id, orgId) to RiskTreatmentRepository (the entity has no organisationId column itself — it inherits org via its parent Risk) and in get(id) resolve the treatment then call ensureRiskInTenant(t.getRiskId()) exactly as update()/transition()/delete() already do. Throw EntityNotFoundException (404) on mismatch so ids cannot be probed.",
+      "patchBefore": "    @Transactional(readOnly = true)\n    public RiskTreatment get(Long id) {\n        return treatments.findById(id)\n            .orElseThrow(() -> new EntityNotFoundException(\"Risk treatment not found: \" + id));\n    }",
+      "patchAfter": "    @Transactional(readOnly = true)\n    public RiskTreatment get(Long id) {\n        RiskTreatment t = treatments.findById(id)\n            .orElseThrow(() -> new EntityNotFoundException(\"Risk treatment not found: \" + id));\n        // Tenant guard: a treatment whose parent risk is not in this org is invisible.\n        ensureRiskInTenant(t.getRiskId());\n        return t;\n    }",
+      "effort": "S",
+      "references": [
+        "CWE-639 Authorization Bypass Through User-Controlled Key",
+        "OWASP API1:2023 Broken Object Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-RISK-002",
+      "title": "Raw JPA entities bound as @RequestBody on assessment/treatment/KRI/appetite write endpoints (mass assignment, no @Valid)",
+      "phase": "Security",
+      "category": "Mass Assignment / Broken Access Control (A01/A08)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N) — client can set server-managed fields and bypass DTO validation",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/RiskAdvancedController.java",
+      "lines": "48-65",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/RiskAdvancedController.java:79-91",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/KriAppetiteController.java:52-62",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/KriAppetiteController.java:131-142",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskAssessmentService.java:57-76"
+      ],
+      "description": "Several write endpoints bind the persistence @Entity directly as the request body with no DTO and no @Valid: RiskAdvancedController.recordAssessment(@RequestBody RiskAssessment body), createTreatment/updateTreatment(@RequestBody RiskTreatment body), and KriAppetiteController.createKri/updateKri(@RequestBody KriDefinition body), createAppetite/updateAppetite(@RequestBody RiskAppetiteStatement body). This lets a client populate any settable column on the entity — e.g. RiskAssessment.assessorId (attribution can be forged to any user id), externalId, assessmentDate; RiskTreatment.completedAt/status on update(); KriDefinition / RiskAppetiteStatement.organisationId could be supplied in JSON. Create paths partly mitigate by overwriting organisationId server-side and calling body.setId(null), but updateTreatment() binds the entity straight onto the managed row with no field allow-list and no validation, and recordAssessment() trusts the body's assessorId. None of these endpoints declare @Valid, so the only constraints are the manual checks inside the service (1..5 scale on assessment; enum sets on treatment/KRI) — fields without a manual check are accepted unvalidated.",
+      "rootCause": "Controllers expose JPA entities as the API contract instead of purpose-built request DTOs with @Valid constraints and an explicit field allow-list; create methods scrub id/org but update methods and child-attribution fields are not protected.",
+      "evidence": "    @PostMapping(\"/risks/{riskId}/assessments\")\n    @PreAuthorize(\"hasPermission('RISK','WRITE')\")\n    public ResponseEntity<RiskAssessment> recordAssessment(@PathVariable Long riskId,\n                                                           @RequestBody RiskAssessment body) {\n        body.setRiskId(riskId);\n        return ResponseEntity.ok(assessmentService.record(body));\n    }\n    // createTreatment / updateTreatment likewise: @RequestBody RiskTreatment body (no @Valid)",
+      "impact": "Integrity / non-repudiation: an authenticated RISK:WRITE user can forge the assessor of a risk re-assessment (assessorId set from the body, not from the JWT principal), backdate assessmentDate, and set entity fields the API never intended to expose. Forged attribution undermines the audit/attestation trail that the ERM module is built to provide to regulators. Missing @Valid also means malformed values reach the persistence layer where only some are caught.",
+      "reproduction": "1. As any RISK:WRITE user, POST /api/v1/risk/risks/{riskId}/assessments with body {\"likelihood\":3,\"impact\":3,\"assessorId\":999,\"assessmentDate\":\"2020-01-01\"}. 2. Observe the saved assessment is attributed to user 999 with a backdated date — neither was taken from the authenticated principal.",
+      "resolution": "Introduce request DTOs (e.g. RiskAssessmentRequest, RiskTreatmentRequest) carrying only client-writable fields, annotate with Jakarta constraints, and bind with @Valid. Derive assessorId from the authenticated principal (Authentication / GrcUserDetails) rather than the body. On update, copy only the allow-listed fields onto the managed entity. Apply the same DTO pattern to the KRI/appetite create/update endpoints.",
+      "patchBefore": "    public ResponseEntity<RiskAssessment> recordAssessment(@PathVariable Long riskId,\n                                                           @RequestBody RiskAssessment body) {\n        body.setRiskId(riskId);\n        return ResponseEntity.ok(assessmentService.record(body));\n    }",
+      "patchAfter": "    public ResponseEntity<RiskAssessment> recordAssessment(@PathVariable Long riskId,\n                                                           @Valid @RequestBody RiskAssessmentRequest req,\n                                                           @AuthenticationPrincipal GrcUserDetails principal) {\n        // map only allow-listed fields; assessor comes from the token, not the body\n        return ResponseEntity.ok(assessmentService.record(\n                riskId, req.likelihood(), req.impact(), req.assessmentNotesEn(), req.assessmentNotesAr(),\n                principal.getUserId()));\n    }",
+      "effort": "M",
+      "references": [
+        "CWE-915 Improperly Controlled Modification of Dynamically-Determined Object Attributes (Mass Assignment)",
+        "CWE-20 Improper Input Validation",
+        "OWASP API6:2023 / API3:2023",
+        "OWASP A08:2021 Software and Data Integrity Failures"
+      ]
+    },
+    {
+      "id": "SEC-RISK-003",
+      "title": "Unbounded client-controlled page size on Emerging-Risk and Scenario list endpoints",
+      "phase": "Security",
+      "category": "Resource Exhaustion / DoS (A05)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L) — memory/DB pressure from arbitrarily large page requests",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/emerging/controller/EmergingRiskController.java",
+      "lines": "27-33",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/scenario/controller/RiskScenarioController.java:49-59"
+      ],
+      "description": "EmergingRiskController.list and RiskScenarioController.list accept a raw int 'size' query parameter and pass it straight into PageRequest.of(page, size) with no upper bound. There is no global spring.data.web.pageable.max-page-size configured (grep of src/main/resources returned no match), so a request such as ?size=100000000 instructs Hibernate to fetch and materialise that many rows for the tenant in one query, plus map each to a Response record. RiskController/KriAppetiteController use @PageableDefault which Spring caps at the default max (2000), but these two controllers build the Pageable by hand and bypass that protection.",
+      "rootCause": "Manual PageRequest.of(page, size) with an unvalidated, unbounded size parameter and no global max-page-size guard.",
+      "evidence": "    public Page<Response> list(@RequestParam(required = false) String status,\n                               @RequestParam(defaultValue = \"0\") int page,\n                               @RequestParam(defaultValue = \"100\") int size) {\n        return service.list(status, PageRequest.of(page, size)).map(Response::from);\n    }",
+      "impact": "An authenticated user can drive large result-set fetches that spike heap and DB load, degrading or denying service for the tenant (and, on a shared node, neighbours). Low data-integrity impact but a cheap availability lever.",
+      "reproduction": "1. Authenticate. 2. GET /api/risk/emerging?size=100000000 (or /api/risk/scenarios?size=100000000). 3. Observe a single large query / large allocation; repeat to sustain pressure.",
+      "resolution": "Clamp size to a sane maximum (e.g. Math.min(size, 200)) and floor page at 0, or switch these endpoints to @PageableDefault/@PageableDefault(size=…) Pageable injection, and set spring.data.web.pageable.max-page-size globally in application.yml as defence in depth.",
+      "patchBefore": "    public Page<Response> list(@RequestParam(required = false) String status,\n                               @RequestParam(defaultValue = \"0\") int page,\n                               @RequestParam(defaultValue = \"100\") int size) {\n        return service.list(status, PageRequest.of(page, size)).map(Response::from);\n    }",
+      "patchAfter": "    public Page<Response> list(@RequestParam(required = false) String status,\n                               @RequestParam(defaultValue = \"0\") int page,\n                               @RequestParam(defaultValue = \"100\") int size) {\n        int safeSize = Math.min(Math.max(size, 1), 200);\n        int safePage = Math.max(page, 0);\n        return service.list(status, PageRequest.of(safePage, safeSize)).map(Response::from);\n    }",
+      "effort": "S",
+      "references": [
+        "CWE-770 Allocation of Resources Without Limits or Throttling",
+        "CWE-400 Uncontrolled Resource Consumption",
+        "OWASP API4:2023 Unrestricted Resource Consumption"
+      ]
+    },
+    {
+      "id": "SEC-RISK-004",
+      "title": "Function-level authorization too coarse: write operations gated only by isAuthenticated()",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization / BFLA (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N) — any authenticated user can create/mutate risk records regardless of role",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/emerging/controller/EmergingRiskController.java",
+      "lines": "27-75",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/scenario/controller/RiskScenarioController.java:49-109",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/capa/controller/CapaTaskController.java:19-53",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/fair/FairCalculatorController.java:37-41"
+      ],
+      "description": "EmergingRiskController (all endpoints), RiskScenarioController (all endpoints incl. create/update/approve/reject/archive), CapaTaskController (list/get/create/transition) and FairCalculatorController guard every operation with @PreAuthorize(\"isAuthenticated()\") rather than the module-permission model (hasPermission('RISK','READ'|'WRITE') / hasPermission('CAPA',…)) used by RiskController, RiskCategoryController, KriAppetiteController and TreatmentPlanController. As a result any authenticated principal — including a read-only AUDITOR or any low-privilege role — can create, mutate, approve, reject and archive emerging risks and scenarios, and create/transition CAPA tasks. Tenant scoping is correctly enforced inside the services (so there is no cross-tenant impact), and CAPA delete is correctly restricted to PLATFORM_ADMIN, but the write-path authorization within a tenant is effectively absent. The approve/reject lifecycle on scenarios is a governance control that should not be available to every role.",
+      "rootCause": "Inconsistent authorization policy: these controllers were wired to isAuthenticated() instead of the ModulePermissionEvaluator hasPermission('RISK', ACTION) checks applied to the rest of the risk module, so role separation (read vs write, sign-off) is not enforced.",
+      "evidence": "    @PostMapping(\"/{id}/approve\")\n    @PreAuthorize(\"isAuthenticated()\")\n    @Operation(summary = \"Approve a DRAFT scenario.\")\n    public Response approve(@PathVariable Long id, Authentication auth) {\n        return Response.from(service.approve(id, usernameOf(auth), userIdOf(auth)));\n    }",
+      "impact": "Within a tenant, role separation collapses for these features: a read-only auditor or any authenticated low-privilege user can author and sign off risk scenarios, emerging risks and CAPA tasks. This undermines the segregation-of-duties posture the GRC platform sells (and that SAMA/NCA governance expects), and lets non-risk users tamper with the risk register.",
+      "reproduction": "1. Authenticate as a non-risk role (e.g. auditor / Audit@12345). 2. POST /api/risk/scenarios with a valid body — succeeds (201). 3. POST /api/risk/scenarios/{id}/approve — succeeds despite no risk-write/approve authority.",
+      "resolution": "Replace isAuthenticated() with the module-permission checks: reads -> hasPermission('RISK','READ'), writes/transitions -> hasPermission('RISK','WRITE'); for CAPA use the CAPA module permission (matching how delete already restricts to PLATFORM_ADMIN). Consider a dedicated approve/sign-off permission for the scenario approve/reject endpoints to preserve segregation of duties.",
+      "patchBefore": "    @PostMapping\n    @PreAuthorize(\"isAuthenticated()\")\n    public ResponseEntity<Response> create(@Valid @RequestBody CreateRequest req) { ... }",
+      "patchAfter": "    @PostMapping\n    @PreAuthorize(\"hasPermission('RISK','WRITE')\")\n    public ResponseEntity<Response> create(@Valid @RequestBody CreateRequest req) { ... }",
+      "effort": "S",
+      "references": [
+        "CWE-862 Missing Authorization",
+        "CWE-285 Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-RISK-005",
+      "title": "Unchecked casts on free-form Map body in correctAssessment / KRI reading / appetite exposure",
+      "phase": "Security",
+      "category": "Improper Input Validation (A03/A04)",
+      "severity": "Low",
+      "cvss": "CVSS 3.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L) — malformed JSON triggers 500/ClassCastException",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/RiskAdvancedController.java",
+      "lines": "56-65",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/KriAppetiteController.java:74-83",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/KriAppetiteController.java:164-173",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/controller/KriAppetiteController.java:97-108"
+      ],
+      "description": "Several endpoints accept an untyped Map<String,Object> body and perform unchecked casts: correctAssessment casts ((Number) body.get(\"likelihood\")) and (String) body.get(\"assessmentNotesEn\"); recordReading/updateExposure dereference body.get(\"value\").toString() (NPE if 'value' absent) and parse it with new BigDecimal(...) (NumberFormatException on non-numeric); acknowledgeBreach reads userId from the body. A client sending the wrong JSON type or omitting a required key triggers an uncaught ClassCastException / NullPointerException / NumberFormatException surfacing as a 500. These are not typed, validated DTOs, so no Jakarta constraints apply and error handling is inconsistent. There is no injection or privilege impact (values are numeric/notes only), but it is poor input hygiene and a minor availability/robustness issue, and acknowledgeBreach trusts a body-supplied userId for attribution rather than the principal.",
+      "rootCause": "Use of weakly-typed Map<String,Object> request bodies with manual casting/parsing instead of validated request DTOs; missing null/type checks.",
+      "evidence": "        Integer likelihood = body.get(\"likelihood\") == null ? null : ((Number) body.get(\"likelihood\")).intValue();\n        ...\n        BigDecimal value = body.get(\"value\") instanceof Number n\n            ? new BigDecimal(n.toString())\n            : new BigDecimal(body.get(\"value\").toString()); // NPE if 'value' missing",
+      "impact": "Authenticated clients can trigger 500 responses (and noisy stack traces in non-prod) with malformed payloads; breach acknowledgement is attributed to a caller-supplied userId rather than the authenticated user, weakening the acknowledgement audit trail.",
+      "reproduction": "1. As a RISK:WRITE user, PUT /api/v1/risk/assessments/{id} with body {\"likelihood\":\"abc\"} -> ClassCastException 500. 2. POST /api/v1/risk/kris/{id}/readings with body {} -> NPE on body.get(\"value\") 500.",
+      "resolution": "Replace the Map bodies with typed DTOs (e.g. AssessmentCorrectionRequest, KriReadingRequest, ExposureUpdateRequest) carrying @NotNull/@DecimalMin constraints validated with @Valid; derive acknowledger userId from the authenticated principal instead of the body.",
+      "patchBefore": "    public KriBreachEvent acknowledgeBreach(@PathVariable Long breachId, @RequestBody Map<String, Object> body) {\n        Long userId = body.get(\"userId\") instanceof Number n ? n.longValue() : null;\n        return kriService.acknowledgeBreach(breachId, userId);\n    }",
+      "patchAfter": "    public KriBreachEvent acknowledgeBreach(@PathVariable Long breachId,\n                                            @AuthenticationPrincipal GrcUserDetails principal) {\n        return kriService.acknowledgeBreach(breachId, principal == null ? null : principal.getUserId());\n    }",
+      "effort": "M",
+      "references": [
+        "CWE-20 Improper Input Validation",
+        "CWE-704 Incorrect Type Conversion or Cast",
+        "OWASP A04:2021 Insecure Design"
+      ]
+    },
+    {
+      "id": "SEC-RISK-006",
+      "title": "KRI sourceQuery stores arbitrary SQL/source text — latent injection surface when auto-fetchers are bound",
+      "phase": "Security",
+      "category": "Potential SQL Injection (A03) — latent",
+      "severity": "Info",
+      "cvss": "Not currently exploitable — no code path executes sourceQuery today; flagged to prevent a future injection regression",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/kri/service/KriDefinitionService.java",
+      "lines": "211-229",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/kri/service/KriMeasurementService.java:175-192"
+      ],
+      "description": "KriDefinition persists a client-supplied sourceQueryType (allows the value 'SQL') and a free-form sourceQuery string (set via applyFields from KriDefinitionRequest.sourceQuery). The scheduler entry point KriMeasurementService.evaluateAll explicitly does NOT execute these queries today — it logs KRI_EVALUATION_SKIPPED with the comment 'Auto-fetcher not yet bound', so there is currently no SQL/OS execution and thus no live injection. However the stored intent is to later run that operator-authored SQL against the database. If a future slice wires a SQL runner that concatenates or directly executes sourceQuery, it becomes a stored second-order SQL injection (and the SQL would run with the application's DB credentials, which can read across tenants).",
+      "rootCause": "Free-form, client-supplied query text (sourceQuery) is stored with the declared intent of later execution; no design-level constraint (parameterisation, query allow-list, or read-only/least-privilege execution account) is recorded against it.",
+      "evidence": "        if (req.sourceQueryType() != null) d.setSourceQueryType(req.sourceQueryType());\n        if (req.sourceQuery() != null)     d.setSourceQuery(req.sourceQuery());\n// SOURCE_TYPES includes \"SQL\"; evaluateAll() currently only logs:\n//   audit.log(\"KRI_EVALUATION_SKIPPED\", ... \"Auto-fetcher not yet bound for source_type=\"+d.getSourceQueryType());",
+      "impact": "No impact in the current build (no execution path). If the SQL auto-fetcher is implemented naively, an operator (or an attacker who reaches the KRI write role) could store arbitrary SQL that the scheduler later executes with the app DB account, enabling cross-tenant data read/exfiltration or worse.",
+      "reproduction": "Not exploitable today. Future: create a KRI with sourceQueryType=SQL and a malicious sourceQuery; if a SQL runner is later bound that executes it verbatim, the payload runs on the next scheduler tick.",
+      "resolution": "When implementing the auto-fetcher, do not execute operator-supplied SQL directly: use a curated/parameterised metric catalogue, force every fetch through a read-only least-privilege DB role scoped to the tenant, and reject/escape any sourceQuery that is not a named, pre-approved metric. Add a test asserting evaluateAll cannot run free-form SQL.",
+      "patchBefore": "    // Future risk: KriDefinition.sourceQuery (free-form, client-set) intended for later execution\n    if (req.sourceQuery() != null) d.setSourceQuery(req.sourceQuery());",
+      "patchAfter": "    // Constrain to a named metric key from an allow-list rather than raw SQL.\n    if (req.sourceQuery() != null) {\n        if (\"SQL\".equals(req.sourceQueryType()) && !APPROVED_METRIC_KEYS.contains(req.sourceQuery()))\n            throw new IllegalArgumentException(\"sourceQuery must be an approved metric key, not raw SQL\");\n        d.setSourceQuery(req.sourceQuery());\n    }",
+      "effort": "M",
+      "references": [
+        "CWE-89 Improper Neutralization of Special Elements used in an SQL Command",
+        "CWE-501 Trust Boundary Violation",
+        "OWASP A03:2021 Injection"
+      ]
+    }
+  ]
+}

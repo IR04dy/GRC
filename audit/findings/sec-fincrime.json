@@ -1,0 +1,185 @@
+{
+  "findings": [
+    {
+      "id": "SEC-FIN-001",
+      "title": "Unauthenticated public intake case-tracker leaks full submitter PII and form payload across all tenants",
+      "phase": "Security",
+      "category": "Broken Access Control / Sensitive Data Exposure (A01/A02, CWE-639, CWE-359)",
+      "severity": "Critical",
+      "cvss": "CVSS ~8.6 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N) — unauthenticated cross-tenant PII + whistleblower disclosure",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/intake/controller/IntakeController.java",
+      "lines": "81-87",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/intake/service/IntakeService.java:143-146",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/intake/repository/IntakeRecordRepository.java:34",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/intake/dto/IntakeRecordDto.java:58-82",
+        "tss-grc-backend/src/main/java/com/tss/grc/config/SecurityConfig.java:91-93"
+      ],
+      "description": "GET /api/v1/intake/track/{referenceCode} is explicitly permitAll in SecurityConfig (line 93) and the controller method carries no @PreAuthorize. The service path findByReferenceCode -> IntakeRecordRepository.findByReferenceCode(referenceCode) is NOT scoped by organisationId, and the controller comment claims 'PII fields are still filtered downstream when the submission was anonymous'. No such filtering exists: IntakeRecordDto.from() copies the entire entity, including submitterName, submitterEmail, submitterPhone, and the raw payload JSON blob. Intake kinds include SPEAKUP, ETHICS_DISCLOSURE, PRIVACY_BREACH, DSR_REQUEST and BREACH_REPORT — the payload and submitter fields therefore contain whistleblower identities, data-subject PII and breach detail. Any anonymous internet caller who obtains/guesses a reference code for ANY tenant receives the full record. Reference codes are 8 random base-32 chars in two segments (XX-YYYY-ZZZZ), but they are shared with submitters over email, appear in logs, and the endpoint has no rate limiting, so they are enumerable/leakable bearer tokens guarding highly sensitive multi-tenant data.",
+      "rootCause": "The 'reference code is the bearer token' design returns the full internal entity DTO with no field-level redaction and no organisation scoping, on a permitAll endpoint. The DTO mapper has no anonymous/public projection.",
+      "evidence": "Controller: `@GetMapping(\"/track/{referenceCode}\") public ResponseEntity<IntakeRecordDto> track(@PathVariable String referenceCode){ return service.findByReferenceCode(referenceCode).map(ResponseEntity::ok)...}` (no @PreAuthorize). Repo: `Optional<IntakeRecord> findByReferenceCode(String referenceCode);` (no org param). DTO: `IntakeRecordDto.from(r)` sets `.submitterName(r.getSubmitterName()).submitterEmail(r.getSubmitterEmail()).submitterPhone(r.getSubmitterPhone()).payload(r.getPayload())`.",
+      "impact": "Unauthenticated disclosure of whistleblower identities, data-subject PII and breach narratives belonging to every tenant. Direct PDPL Article 20/transparency and SAMA/CMA confidential-reporting-channel violations; potential retaliation risk for whistleblowers.",
+      "reproduction": "1) Authenticated user (any tenant) submits an intake; capture the returned referenceCode (or read one from an email/log). 2) Without any token: curl https://host/api/v1/intake/track/SU-AB12-CD34 . 3) Response includes submitterName, submitterEmail, submitterPhone and the full payload JSON, regardless of which tenant owns the record and regardless of submitterIsAnonymous.",
+      "resolution": "Return a minimal public projection (status, kind, acknowledgedAt, slaDueAt, referenceCode only) — never submitter identity or payload. Strip PII unconditionally for the public endpoint, and especially when submitterIsAnonymous is true. Add rate limiting / lockout on the track endpoint. Consider requiring a second factor (e.g. email confirmation) before returning even status.",
+      "patchBefore": "@GetMapping(\"/track/{referenceCode}\")\npublic ResponseEntity<IntakeRecordDto> track(@PathVariable String referenceCode) {\n    return service.findByReferenceCode(referenceCode)\n        .map(ResponseEntity::ok)\n        .orElseGet(() -> ResponseEntity.notFound().build());\n}",
+      "patchAfter": "@GetMapping(\"/track/{referenceCode}\")\npublic ResponseEntity<IntakeTrackingDto> track(@PathVariable String referenceCode) {\n    // public projection only: status + timestamps, NO submitter PII, NO payload\n    return service.findPublicStatusByReferenceCode(referenceCode)\n        .map(ResponseEntity::ok)\n        .orElseGet(() -> ResponseEntity.notFound().build());\n}\n\n// service:\npublic Optional<IntakeTrackingDto> findPublicStatusByReferenceCode(String code) {\n    return repo.findByReferenceCode(code).map(r -> new IntakeTrackingDto(\n        r.getReferenceCode(), r.getKind(), r.getStatus(),\n        r.getAcknowledgedAt(), r.getSlaDueAt()));\n}",
+      "effort": "M",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-359: Exposure of Private Personal Information",
+        "OWASP API3:2023 Broken Object Property Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-FIN-002",
+      "title": "SCM sub-controllers (clauses, fourth-party, resilience, resilience-tests) use only isAuthenticated() — no SCM module permission (BFLA)",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01, CWE-862/CWE-285)",
+      "severity": "High",
+      "cvss": "CVSS ~7.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N) — any authenticated user can read+write supply-chain resilience data",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/scm/resilience/controller/SupplierResilienceController.java",
+      "lines": "41-155",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/clauses/controller/ContractClauseController.java:26-63",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/fourthparty/controller/FourthPartyExposureController.java:29-73",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/resilience/controller/SupplierResilienceTestController.java:23-62",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/controller/ScmController.java:31-67"
+      ],
+      "description": "The primary ScmController correctly gates every endpoint with hasPermission('SCM','READ'|'WRITE'|'DELETE'). The four newer SCM sub-controllers (contract clauses, fourth-party exposure, supplier resilience alternates/exit-plans, supplier resilience tests) gate every endpoint with only @PreAuthorize(\"isAuthenticated()\"). Because authorities follow MODULE_ACTION naming (ModulePermissionEvaluator) and there is no path rule for /api/scm/** in SecurityConfig, ANY authenticated principal — e.g. an AUDITOR or a privacy-only user with zero SCM authorities — can read and mutate supplier exit plans (disengagement playbooks, data-migration & knowledge-transfer plans), contract clause templates, alternate-supplier records, and resilience-test results. Mutating endpoints (create/update/approve/reject/activate/archive/record-test/complete) are equally exposed, so a non-SCM user can approve an exit plan or mark a resilience test passed. This is a function-level authorization gap: the resource is SCM data but the check is merely 'logged in'.",
+      "rootCause": "Sub-controllers were added without re-using the module-permission convention applied by ScmController; isAuthenticated() was used as a placeholder and never tightened. No defence-in-depth path matcher exists for /api/scm/**.",
+      "evidence": "SupplierResilienceController: every method annotated `@PreAuthorize(\"isAuthenticated()\")` (e.g. lines 65-69 createAlt, 125-129 approvePlan). FourthPartyExposureController has no @SecurityRequirement and `@PreAuthorize(\"isAuthenticated()\")` on create/update/validate/mitigate/retire. Contrast ScmController line 53 `@PreAuthorize(\"hasPermission('SCM','WRITE')\")`.",
+      "impact": "Cross-functional users can read sensitive third-party-risk material (exit strategies, fourth-party concentration, contract clause libraries) and tamper with resilience evidence, undermining SAMA outsourcing/operational-resilience controls. Combined with the multi-tenant scoping at the service layer it is not cross-tenant, but it is a broad intra-tenant privilege escalation.",
+      "reproduction": "1) Log in as a user holding only e.g. PRIVACY_READ (no SCM_* authority). 2) GET /api/scm/resilience/exit-plans -> 200 with full plans. 3) POST /api/scm/resilience/exit-plans/{id}/approve -> approves a plan the user has no SCM rights to.",
+      "resolution": "Replace isAuthenticated() with hasPermission('SCM','READ') on GET endpoints and hasPermission('SCM','WRITE') (or DELETE) on mutating endpoints, matching ScmController. Add a belt-and-braces SecurityConfig rule requiring an SCM authority for /api/scm/**.",
+      "patchBefore": "@PostMapping(\"/exit-plans/{id}/approve\")\n@PreAuthorize(\"isAuthenticated()\")\npublic PlanResponse approvePlan(@PathVariable Long id, Authentication auth) {\n    return PlanResponse.from(planService.approve(id, usernameOf(auth), userIdOf(auth)));\n}",
+      "patchAfter": "@PostMapping(\"/exit-plans/{id}/approve\")\n@PreAuthorize(\"hasPermission('SCM','WRITE')\")\npublic PlanResponse approvePlan(@PathVariable Long id, Authentication auth) {\n    return PlanResponse.from(planService.approve(id, usernameOf(auth), userIdOf(auth)));\n}\n// + read endpoints -> hasPermission('SCM','READ')",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-285: Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-FIN-003",
+      "title": "Tenant AML officer can inject/poison platform-global sanctions lists (OFAC/UN/EU) consumed by every tenant",
+      "phase": "Security",
+      "category": "Broken Access Control / Improper Authorization (A01, CWE-639)",
+      "severity": "Medium",
+      "cvss": "CVSS ~6.5 (AV:N/AC:L/PR:L/UI:N/S:C/C:N/I:H/A:N) — cross-tenant data-integrity poisoning of shared screening lists",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/aml/sanctions/service/SanctionsListService.java",
+      "lines": "156-194",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/aml/sanctions/service/SanctionsListService.java:103-121",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/aml/sanctions/service/SanctionsListService.java:129-154",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/aml/sanctions/repository/SanctionsListRepository.java:35-49",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/aml/sanctions/controller/SanctionsScreeningController.java:115-125"
+      ],
+      "description": "Platform-global sanctions lists are stored with organisation_id IS NULL and are visible to (and screened by) every tenant via findVisibleTo / findActiveVisibleTo. SanctionsListService.update() deliberately blocks edits to global lists from a tenant context ('Cannot edit platform-global list ... from tenant context'). However bulkImportEntries() and refresh() use the same loadOrThrow()->findByIdVisibleTo() lookup, which returns global lists to any tenant, and neither method applies the same org-NULL guard. A tenant AML_OFFICER (the role required by POST /lists/{id}/entries/bulk-import) can therefore append arbitrary entries to a global OFAC/UN/EU list. Imported rows take row.setOrganisationId(l.getOrganisationId()) = NULL, so they become globally visible. This lets one tenant inject false sanctions entries (causing false-positive hits and operational blocking for all other tenants) — or, if combined with future delete/refresh-overwrite logic, suppress entries.",
+      "rootCause": "Inconsistent authorization across write paths: the org-NULL global-list guard exists only in update(), not in bulkImportEntries() or refresh(). findByIdVisibleTo intentionally returns shared global lists, so 'visible' is wrongly treated as 'writable'.",
+      "evidence": "update(): `if (l.getOrganisationId() == null) { throw new IllegalArgumentException(\"Cannot edit platform-global list ...\"); }`. bulkImportEntries(): `SanctionsList l = loadOrThrow(req.listId()); ... row.setOrganisationId(l.getOrganisationId()); entryRepo.save(row);` with NO org-NULL check. loadOrThrow -> `listRepo.findByIdVisibleTo(id, org())` which matches `l.organisationId IS NULL OR l.organisationId = :orgId`.",
+      "impact": "Cross-tenant integrity compromise of a financial-crime control: a single tenant can degrade sanctions-screening accuracy for all tenants (mass false positives blocking onboarding, or noise masking true hits), violating SAMA AML/CFT obligations.",
+      "reproduction": "1) As AML_OFFICER in tenant 2, GET /api/v1/aml/sanctions/lists, note a global list id (organisationId null, e.g. OFAC). 2) POST /api/v1/aml/sanctions/lists/{id}/entries/bulk-import with listId={id} and fabricated entries. 3) The entries persist with organisation_id NULL. 4) As any user in tenant 3, POST /checks against that list — fabricated entries now produce hits.",
+      "resolution": "Apply the same org-NULL guard in bulkImportEntries() and refresh(): only the platform admin (cross-tenant scope) may write to organisation_id IS NULL lists; tenant officers may write only to lists they own (l.getOrganisationId() != null && equals(org())).",
+      "patchBefore": "@Transactional\npublic EntryBulkImportResponse bulkImportEntries(EntryBulkImportRequest req) {\n    SanctionsList l = loadOrThrow(req.listId());\n    // ... saves entries with row.setOrganisationId(l.getOrganisationId());\n}",
+      "patchAfter": "@Transactional\npublic EntryBulkImportResponse bulkImportEntries(EntryBulkImportRequest req) {\n    SanctionsList l = loadOrThrow(req.listId());\n    if (l.getOrganisationId() == null) {\n        throw new IllegalArgumentException(\n            \"Cannot import into platform-global list \" + l.getListCode() + \" from tenant context\");\n    }\n    // ... rest unchanged\n}",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "OWASP A01:2021 Broken Access Control",
+        "OWASP API1:2023 Broken Object Level Authorization"
+      ]
+    },
+    {
+      "id": "SEC-FIN-004",
+      "title": "Mass assignment via raw JPA-entity request bodies on create (FourthPartyExposure, SupplierResilienceTest); persistence-layer org guard not wired in",
+      "phase": "Security",
+      "category": "Mass Assignment / Improper Input Handling (A08, CWE-915)",
+      "severity": "Medium",
+      "cvss": "CVSS ~5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:L) — workflow/state-field tampering and soft-delete via unfiltered create",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/scm/fourthparty/service/FourthPartyExposureService.java",
+      "lines": "58-67",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/fourthparty/controller/FourthPartyExposureController.java:45-55",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/fourthparty/entity/FourthPartyExposure.java:86-122",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/resilience/controller/SupplierResilienceTestController.java:36-50",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/resilience/service/SupplierResilienceTestService.java:45-54",
+        "tss-grc-backend/src/main/java/com/tss/grc/common/tenant/TenantContext.java:74-112"
+      ],
+      "description": "Several endpoints bind the JPA @Entity directly as the @RequestBody and persist it. FourthPartyExposureController.create(@RequestBody FourthPartyExposure req) and SupplierResilienceTestController.create(@RequestBody SupplierResilienceTest req) pass the client-supplied entity to repo.save() after only overriding organisationId and nulling id. The FourthPartyExposure entity exposes writable setters for workflow/state and audit columns — status, concentrationRisk, isDeleted, isActive, lastValidatedBy, validatorName, createdBy, updatedBy, rowVersion. A caller can therefore POST a record pre-set to status=VALIDATED with an arbitrary validatorName (bypassing the validate() workflow step), or set isDeleted=1 / isActive=0 at creation. The validate() invariant check only constrains dependencyType/downstreamCriticality/status enum membership — it does not stop status=VALIDATED or audit-field spoofing. organisationId itself is overridden so cross-tenant create is not possible, and update() copies a field whitelist so update is safe; the exposure is on create. Note also that the documented platform backstop (TenantWriteGuardInterceptor / TenantContext.allowCrossTenantWrite) is explicitly NOT wired in yet (see TenantContext lines 74-81), so there is no persistence-layer net catching entity mass-assignment.",
+      "rootCause": "Controllers accept and persist mutable persistence entities instead of constrained request DTOs; no @Valid; the create path does repo.save(req) on the attacker-controlled object graph.",
+      "evidence": "FourthPartyExposureService.create: `validate(req); req.setOrganisationId(TenantContext.getCurrentTenant()); req.setId(null); FourthPartyExposure saved = repo.save(req);`. Entity has `private String status = \"DISCOVERED\"; private String validatorName; private Short isDeleted = 0;` all with Lombok @Setter. Controller: `public ResponseEntity<FourthPartyExposure> create(@RequestBody FourthPartyExposure req)`.",
+      "impact": "Integrity tampering of third-party-risk records: fabricated validation status/validator attribution, immediate soft-deletion or deactivation at create, and forged created_by/row_version audit metadata — eroding the auditability the GRC platform exists to provide.",
+      "reproduction": "1) POST /api/scm/fourth-party with body {\"primaryVendorName\":\"x\",\"fourthPartyName\":\"y\",\"dependencyType\":\"SOFTWARE\",\"downstreamCriticality\":\"HIGH\",\"serviceDescriptionEn\":\"z\",\"status\":\"VALIDATED\",\"validatorName\":\"CISO\",\"isDeleted\":0,\"createdBy\":999}. 2) The persisted row reflects the attacker-chosen status/validatorName/createdBy.",
+      "resolution": "Bind a constrained request DTO (only client-settable fields) for create/update and map server-side; never expose status/concentrationRisk/isDeleted/isActive/createdBy/validatorName as inbound fields. Add @Valid. Wire the documented Hibernate TenantWriteGuardInterceptor as defence-in-depth.",
+      "patchBefore": "@PostMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<FourthPartyExposure> create(@RequestBody FourthPartyExposure req) {\n    return ResponseEntity.status(201).body(service.create(req));\n}",
+      "patchAfter": "@PostMapping\n@PreAuthorize(\"hasPermission('SCM','WRITE')\")\npublic ResponseEntity<FourthPartyExposureResponse> create(@Valid @RequestBody FourthPartyExposureCreateRequest req) {\n    return ResponseEntity.status(201).body(FourthPartyExposureResponse.from(service.create(req)));\n}\n// service builds a fresh entity from the DTO and sets status=DISCOVERED, isDeleted=0 itself.",
+      "effort": "M",
+      "references": [
+        "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes",
+        "OWASP API6:2023 / Mass Assignment",
+        "OWASP A08:2021 Software and Data Integrity Failures"
+      ]
+    },
+    {
+      "id": "SEC-FIN-005",
+      "title": "ScmService silently defaults to organisation 1 when TenantContext is empty (fail-open tenant scoping)",
+      "phase": "Security",
+      "category": "Improper Multi-Tenant Isolation (A01, CWE-639)",
+      "severity": "Low",
+      "cvss": "CVSS ~4.2 (AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:L/A:N) — fail-open default tenant on missing context",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/scm/service/ScmService.java",
+      "lines": "39-42",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/common/tenant/TenantContext.java:58-67"
+      ],
+      "description": "ScmService.orgId() returns TenantContext.getCurrentTenant(), and when that is null it falls back to 1L: `Long id = TenantContext.getCurrentTenant(); return id != null ? id : 1L;`. Every other audited financial-crime service (Fraud, Sharia, RRP, OpRes, AML) uses TenantContext.requireOrganisationId(), which throws if the tenant is missing (fail closed). If any code path ever invokes ScmService without an established TenantContext (e.g. a future scheduler, async task, mis-ordered filter, or a test/util path), reads and writes would silently bind to tenant 1's data — reading tenant 1's vendors/contracts or writing new rows into tenant 1. The IntakeService author chose the opposite (throws IllegalStateException on null tenant), confirming the intended platform convention is fail-closed.",
+      "rootCause": "Defensive 'default to org 1' shortcut instead of failing closed; diverges from the requireOrganisationId() convention used everywhere else.",
+      "evidence": "`private Long orgId() { Long id = TenantContext.getCurrentTenant(); return id != null ? id : 1L; }` — used by every read/write in ScmService (e.g. listVendors, createVendor, stats).",
+      "impact": "Under any future context-loss condition, SCM operations would silently operate on tenant 1 instead of erroring, risking cross-tenant read/write of vendor, contract and incident data. Low today because the JWT filter normally sets the tenant on authenticated requests.",
+      "reproduction": "Static/architectural: invoke any ScmService read with TenantContext cleared (e.g. from a scheduled job or test harness) — it returns tenant 1's data instead of throwing.",
+      "resolution": "Replace the 1L fallback with TenantContext.requireOrganisationId() so SCM fails closed like the other modules.",
+      "patchBefore": "private Long orgId() {\n    Long id = TenantContext.getCurrentTenant();\n    return id != null ? id : 1L;\n}",
+      "patchAfter": "private Long orgId() {\n    return TenantContext.requireOrganisationId();\n}",
+      "effort": "S",
+      "references": [
+        "CWE-639: Authorization Bypass Through User-Controlled Key",
+        "CWE-636: Not Failing Securely ('Failing Open')",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-FIN-006",
+      "title": "Missing @Valid and unbounded page sizes on raw-entity / map request bodies in change_mgmt and SCM sub-controllers",
+      "phase": "Security",
+      "category": "Improper Input Validation (A04, CWE-20)",
+      "severity": "Low",
+      "cvss": "CVSS ~3.7 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:L) — unvalidated input and large-page DoS surface",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/change_mgmt/controller/ChangeManagementController.java",
+      "lines": "53-62",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/change_mgmt/controller/ChangeManagementController.java:92-95",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/change_mgmt/controller/ChangeManagementController.java:105-108",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/clauses/controller/ContractClauseController.java:28-33",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/scm/fourthparty/controller/FourthPartyExposureController.java:32-37"
+      ],
+      "description": "ChangeManagementController binds raw entities (ChangeRequest, ChangeApproval, ChangeTask, ChangeLink, ChangeComment) as @RequestBody with no @Valid; the service applies only ad-hoc null/blank checks. Several list endpoints accept a caller-controlled page size with no upper bound: ContractClauseController list defaults size=200 (line 31) and FourthPartyExposureController/SupplierResilienceController/SupplierResilienceTestController default size=100, all passed straight into PageRequest.of(page, size) with no clamp — a caller may request an arbitrarily large page (e.g. ?size=1000000) and force the DB to materialise an unbounded result set. The change_mgmt entity binding also creates a minor mass-assignment surface for child rows (e.g. ChangeApproval), though the parent organisation scope is enforced via require(changeId) and the children carry no organisationId column, so integrity impact is limited.",
+      "rootCause": "Controllers omit Bean Validation and rely on entity binding; pagination size parameters are not capped.",
+      "evidence": "`public ChangeRequest create(@RequestBody ChangeRequest body)` (no @Valid). `@RequestParam(defaultValue = \"200\") int size ... PageRequest.of(page, size)` in ContractClauseController.list. `@RequestParam(defaultValue = \"100\") int size` in FourthPartyExposureController.list.",
+      "impact": "Unvalidated payloads can persist malformed/oversized state-machine data; uncapped page size enables a low-effort resource-exhaustion vector against the database and JSON serializer.",
+      "reproduction": "1) GET /api/scm/contract-clauses?size=1000000 -> server attempts to load up to a million rows. 2) POST /api/v1/changes with a body missing required fields -> bypasses Bean Validation, relying solely on DB constraints.",
+      "resolution": "Introduce validated request DTOs (with @Valid) for change_mgmt write endpoints; clamp page size to a sane maximum (e.g. Math.min(size, 200)) or use @PageableDefault with a configured max-page-size.",
+      "patchBefore": "@RequestParam(defaultValue = \"200\") int size) {\n    return service.list(status, category, PageRequest.of(page, size)).map(Response::from);\n}",
+      "patchAfter": "@RequestParam(defaultValue = \"50\") int size) {\n    int capped = Math.min(Math.max(size, 1), 200);\n    return service.list(status, category, PageRequest.of(page, capped)).map(Response::from);\n}",
+      "effort": "M",
+      "references": [
+        "CWE-20: Improper Input Validation",
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "OWASP A04:2021 Insecure Design",
+        "OWASP API4:2023 Unrestricted Resource Consumption"
+      ]
+    }
+  ]
+}

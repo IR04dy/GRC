@@ -1,0 +1,151 @@
+{
+  "findings": [
+    {
+      "id": "COPY-01",
+      "title": "Login form ships with pre-filled admin / Admin@12345 credentials and a plaintext credential hint",
+      "phase": "UX",
+      "category": "Microcopy / Security-adjacent UX",
+      "severity": "High",
+      "cvss": "Not a CVSS-scored vuln, but security-adjacent UX: real, well-known credentials are pre-typed into the form and printed beneath it. On any deployment that reuses the seeded accounts this is a one-click foothold; even in demo it trains users to expect default creds and normalises credential exposure on the most security-sensitive screen in the product. Rated High for the UX+trust impact.",
+      "file": "tss-grc-ui-v2/src/pages/LoginPage.tsx",
+      "lines": "25-26, 114",
+      "locations": [
+        "tss-grc-ui-v2/src/pages/LoginPage.tsx:25",
+        "tss-grc-ui-v2/src/pages/LoginPage.tsx:26",
+        "tss-grc-ui-v2/src/pages/LoginPage.tsx:114",
+        "tss-grc-ui-v2/src/translations/en.ts:116 (loginHint)",
+        "tss-grc-ui-v2/src/translations/ar.ts:116 (loginHint)"
+      ],
+      "description": "The username/password React state is initialised to the live seeded super-user: useState('admin') and useState('Admin@12345'). The fields render pre-populated, and below the form loginHint prints 'Demo · admin / Admin@12345 — riskmanager / Risk@12345' verbatim. A first-time user is presented with a fully-armed login form for the PLATFORM_ADMIN account and a printed cheat-sheet of two real accounts.",
+      "rootCause": "Developer convenience defaults left in the production component. The credentials live in component state (not behind an import.meta.env.DEV guard) and the hint string is an always-rendered translation key, so they appear in every build and every locale.",
+      "evidence": "Captured live login screenshot audit/artifacts/e2e/results/shots/login.png shows the username field reading 'admin', the password field pre-filled (masked dots), and the footer line 'admin / Admin@12345 — riskmanager / Risk@12345' rendered in full. Source confirms: LoginPage.tsx:25 const [username, setUsername] = useState('admin'); :26 const [password, setPassword] = useState('Admin@12345'); en.ts:116 loginHint: 'Demo · admin / Admin@12345 — riskmanager / Risk@12345'. The e2e doLogin() helper in audit/artifacts/e2e/tests/audit.spec.ts logs in with exactly these creds and the JWT in results/session-keys.txt decodes to sub=1, usr=admin, ROLE_PLATFORM_ADMIN — i.e. the pre-filled account is the real platform admin.",
+      "impact": "Anyone who opens /login can sign in as platform admin with one click, with no need to know or guess anything. On a shared demo, staging, or any environment where the seed accounts were not rotated this is an immediate account takeover. From a pure UX standpoint it sets the wrong tone for a GRC/security product, and the hint clutters the cleanest screen in the app with operational secrets.",
+      "reproduction": "1. Run the v2 UI (npm run dev, http://localhost:5173). 2. Navigate to /login WITHOUT touching the form. 3. Observe username='admin', password pre-filled, and the credential hint beneath the form (see audit/artifacts/e2e/results/shots/login.png). 4. Click Sign In with no edits — you are authenticated as PLATFORM_ADMIN and land on /risk (e2e test 'login success → lands on /risk' passes).",
+      "resolution": "Start both fields empty in any non-dev build. If a quick-fill is genuinely wanted for demos, gate it behind import.meta.env.DEV and surface it as an explicit, dismissible 'Fill demo credentials' affordance rather than a pre-typed password. Remove the live password from loginHint entirely; if a demo nudge is needed, point users to documented demo accounts without printing the password on screen.",
+      "patchBefore": "// LoginPage.tsx\nconst [username, setUsername] = useState('admin');\nconst [password, setPassword] = useState('Admin@12345');\n\n// en.ts\nloginHint: 'Demo · admin / Admin@12345 — riskmanager / Risk@12345',\n// ar.ts\nloginHint: 'تجريبي · admin / Admin@12345 — riskmanager / Risk@12345',",
+      "patchAfter": "// LoginPage.tsx — never ship real credentials in component state\nconst DEMO = import.meta.env.DEV;\nconst [username, setUsername] = useState('');\nconst [password, setPassword] = useState('');\n// optional dev-only convenience, opt-in, no pre-filled password on screen:\n// {DEMO && <Button type=\"button\" variant=\"ghost\" size=\"sm\"\n//    onClick={() => { setUsername('admin'); setPassword('Admin@12345'); }}>\n//    {t('loginFillDemo')}</Button>}\n\n// en.ts — drop the live password; keep guidance generic\nloginHint: 'Use the credentials provided by your administrator.',\nloginFillDemo: 'Fill demo credentials',\n// ar.ts\nloginHint: 'استخدم بيانات الدخول التي زوّدك بها مسؤول النظام.',\nloginFillDemo: 'تعبئة بيانات الدخول التجريبية',",
+      "effort": "S",
+      "references": [
+        "OWASP ASVS 4.0 V2.1.1 (no default credentials)",
+        "NN/g: Password and login form usability"
+      ]
+    },
+    {
+      "id": "COPY-02",
+      "title": "\"Continue without backend (demo mode)\" CTA silently bounces the user back to /login",
+      "phase": "UX",
+      "category": "CTA clarity / Dead-end flow",
+      "severity": "Medium",
+      "cvss": "No security impact. UX-only: a primary-looking secondary CTA promises an offline demo experience but lands the user back on the page they started from, with no message. Rated Medium because it is a visible, reproducible broken promise on the entry screen that erodes first-run trust.",
+      "file": "tss-grc-ui-v2/src/pages/LoginPage.tsx",
+      "lines": "53-55, 106-108",
+      "locations": [
+        "tss-grc-ui-v2/src/pages/LoginPage.tsx:53",
+        "tss-grc-ui-v2/src/pages/LoginPage.tsx:106",
+        "tss-grc-ui-v2/src/lib/api.ts:68-74",
+        "tss-grc-ui-v2/src/translations/en.ts:117 (loginSkipDemo)"
+      ],
+      "description": "The ghost button labelled 'Continue without backend (demo mode)' calls continueDemo(), which just navigate(landing) (default '/risk') with no token. Because the destination pages immediately call the API and there is no offline/demo data layer, the first 401 triggers redirectToLogin() in api.ts, which does window.location.replace('/login?next=/risk'). The net effect: clicking the demo CTA round-trips straight back to /login. The CTA's promise ('continue without backend') is the one thing the app cannot actually do.",
+      "rootCause": "The label advertises an offline 'demo mode' that was never implemented — there is no client-side mock/data layer. continueDemo() only changes the route; the global 401 handler in api.ts (lines 71-73) then bounces any tokenless page back to /login, so the CTA is a no-op that looks like a dead end.",
+      "evidence": "Live e2e artifact audit/artifacts/e2e/results/demo-bypass-url.txt contains exactly 'http://localhost:5173/login?next=%2Frisk' — i.e. after clicking the demo button the browser ended up back on /login (with ?next=/risk appended by api.ts:73). The e2e test 'demo-skip bypass navigates without auth' (audit/artifacts/e2e/tests/audit.spec.ts:54) clicks the first form button[type=button] and records the resulting URL. Source: LoginPage.tsx:53-55 continueDemo(){ navigate(landing,{replace:true}); }; api.ts:68-74 redirectToLogin() does window.location.replace(`/login?next=${...}`).",
+      "impact": "A new evaluator who has no backend running clicks the most inviting alternative to logging in, the screen flickers, and they are returned to the same login form with no explanation. They cannot tell whether they mis-clicked, the app is broken, or login failed. The single most common 'kick the tyres' path on the entry screen is a confusing dead end.",
+      "reproduction": "1. Open /login (backend may be up or down — result is the same with no token). 2. Click 'Continue without backend (demo mode)'. 3. Observe the URL returns to /login?next=/risk with no toast or message (matches audit/artifacts/e2e/results/demo-bypass-url.txt). The user is back where they started.",
+      "resolution": "Either (a) remove the CTA until a real offline/mock data mode exists, or (b) make the label honest about what happens and add feedback. If the button is meant only to preview the shell, relabel it to set the right expectation and show a toast explaining that live data needs the backend. Do not present a destination the global 401 handler will instantly reject.",
+      "patchBefore": "// LoginPage.tsx\nfunction continueDemo() {\n  navigate(landing, { replace: true });\n}\n...\n<Button type=\"button\" variant=\"ghost\" Icon={ArrowRight} onClick={continueDemo}>\n  {t('loginSkipDemo')}\n</Button>\n\n// en.ts\nloginSkipDemo: 'Continue without backend (demo mode)',\n// ar.ts\nloginSkipDemo: 'الدخول بدون الواجهة الخلفية (وضع تجريبي)',",
+      "patchAfter": "// Preferred: remove the CTA until an offline data layer exists.\n// If a preview is kept, make the promise honest + give feedback:\nfunction previewShell() {\n  toast.info(t('loginPreviewNote')); // explains live data needs sign-in\n  navigate(landing, { replace: true });\n}\n...\n<Button type=\"button\" variant=\"ghost\" Icon={ArrowRight} onClick={previewShell}>\n  {t('loginPreviewShell')}\n</Button>\n\n// en.ts\nloginPreviewShell: 'Preview the interface',\nloginPreviewNote: 'You are previewing the interface. Sign in to load live data.',\n// ar.ts\nloginPreviewShell: 'معاينة الواجهة',\nloginPreviewNote: 'أنت تعاين الواجهة فقط. سجّل الدخول لتحميل البيانات الفعلية.',",
+      "effort": "M",
+      "references": [
+        "NN/g: Microcopy and the principle of least astonishment",
+        "WCAG 2.1 SC 3.2.4 Consistent Identification (predictable component behaviour)"
+      ]
+    },
+    {
+      "id": "COPY-03",
+      "title": "loginNetworkError exposes developer jargon and a localhost URL to end users",
+      "phase": "UX",
+      "category": "Error message clarity / No jargon",
+      "severity": "Medium",
+      "cvss": "No direct security impact. UX-only: the only network-failure message a signed-out user can hit names 'the API' and prints http://localhost:8084, which is meaningless (and slightly alarming) to a non-developer and stays in the deployed build. Rated Medium as it is the primary error string on the entry screen, in both locales.",
+      "file": "tss-grc-ui-v2/src/translations/en.ts",
+      "lines": "113",
+      "locations": [
+        "tss-grc-ui-v2/src/translations/en.ts:113 (loginNetworkError)",
+        "tss-grc-ui-v2/src/translations/ar.ts:113 (loginNetworkError)",
+        "tss-grc-ui-v2/src/pages/LoginPage.tsx:46"
+      ],
+      "description": "When login fails with anything other than a 401, LoginPage.tsx:46 shows t('loginNetworkError') = 'Cannot reach the API. Is the backend running on http://localhost:8084?'. This is a developer's debugging note, not a user-facing message: it uses the term 'the API' and 'the backend', and hard-codes a dev hostname/port that will be wrong in any real deployment. The Arabic string mirrors the same jargon and URL.",
+      "rootCause": "A dev-time troubleshooting string was promoted to the user-facing default error. It conflates two distinct audiences (developer running locally vs. an end user whose connection dropped) and bakes the dev port into copy that ships to all environments.",
+      "evidence": "en.ts:113 loginNetworkError: 'Cannot reach the API. Is the backend running on http://localhost:8084?'; ar.ts:113 loginNetworkError: 'تعذر الوصول إلى الواجهة الخلفية. هل تعمل على http://localhost:8084؟'. LoginPage.tsx:42-47 routes every non-401 error here (the catch block: ApiError 401 -> loginInvalid, else loginNetworkError; non-ApiError -> loginNetworkError). The good-pattern sibling loginInvalid (en.ts:112 'Invalid username or password.') shows the same file is capable of clean user copy, which makes this string an outlier.",
+      "impact": "A real user on a flaky connection, or anyone on a deployed instance, is told to check whether 'the backend' is 'running on http://localhost:8084' — advice they cannot act on and that signals the product is unfinished. It is the wrong voice for the entry screen and undermines the polished impression set by the rest of the login copy.",
+      "reproduction": "1. Open /login with the backend stopped (or block requests to :8084). 2. Click Sign In. 3. The red .login-error banner shows 'Cannot reach the API. Is the backend running on http://localhost:8084?'. Switch to Arabic (lang toggle) and repeat — same jargon and localhost URL appear.",
+      "resolution": "Rewrite to a calm, user-actionable message that does not name internal components or hard-code a dev URL: tell the user the app could not connect and what to do (check connection, try again). Keep any developer hint (the localhost reminder) to console.warn in DEV builds only.",
+      "patchBefore": "// en.ts\nloginNetworkError: 'Cannot reach the API. Is the backend running on http://localhost:8084?',\n// ar.ts\nloginNetworkError: 'تعذر الوصول إلى الواجهة الخلفية. هل تعمل على http://localhost:8084؟',",
+      "patchAfter": "// en.ts\nloginNetworkError: 'We couldn’t connect to the server. Check your connection and try again.',\n// ar.ts\nloginNetworkError: 'تعذّر الاتصال بالخادم. تحقّق من اتصالك وحاول مرة أخرى.',\n// (optional, DEV only, in LoginPage catch):\n// if (import.meta.env.DEV) console.warn('Login failed — is the backend running on', API_BASE, '?');",
+      "effort": "S",
+      "references": [
+        "NN/g: Error message guidelines (be specific, no jargon, suggest a next step)",
+        "Microsoft Writing Style Guide: error messages"
+      ]
+    },
+    {
+      "id": "COPY-04",
+      "title": "Generic, non-actionable load-failure messages across modules (\"Failed to load X\" with no recovery path)",
+      "phase": "UX",
+      "category": "Error message clarity / Actionability",
+      "severity": "Low",
+      "cvss": "No security impact. UX-only: a repeated family of ~18 terse load errors tells users what broke but never what to do next (retry, contact admin), leaving a dead state on data-fetch failure. Low severity given they are recoverable on reload, but the pattern is system-wide.",
+      "file": "tss-grc-ui-v2/src/translations/en.ts",
+      "lines": "455, 1656, 1681, 1734, 4977, 5049, 5141, 5220, 5322, 5374, 5403, 5459, 5489, 5556, 5603, 5649, 5692, 5734",
+      "locations": [
+        "tss-grc-ui-v2/src/translations/en.ts:455 (riskLoadError)",
+        "tss-grc-ui-v2/src/translations/en.ts:1656 (annexLoadFailed)",
+        "tss-grc-ui-v2/src/translations/en.ts:5220 (comLoadFailed)",
+        "tss-grc-ui-v2/src/translations/en.ts:5556 (f4pLoadFailed)"
+      ],
+      "description": "There is a large, consistent family of fetch-failure strings of the form 'Failed to load <thing>' / 'Could not load <thing>.' — riskLoadError 'Could not load risks.', annexLoadFailed 'Failed to load annex data', comLoadFailed 'Failed to load committees', f4pLoadFailed 'Failed to load fourth-party register', and ~14 more. None offers a recovery action (no 'try again', no 'reload', no 'contact your administrator'). When a list fails to load the user is left on a terse red line with no obvious next step.",
+      "rootCause": "Error copy was authored as a status label ('what failed') rather than as guidance ('what failed + what to do'). Each module added its own *LoadFailed key by copy-pasting the same terse template, so the missing call-to-action propagated to ~18 keys.",
+      "evidence": "grep over en.ts: 18 keys match '/LoadFailed:/' plus riskLoadError (en.ts:455 'Could not load risks.'). Representative values: annexLoadFailed 'Failed to load annex data' (1656), comLoadFailed 'Failed to load committees' (5220), f4pLoadFailed 'Failed to load fourth-party register' (5556), srtLoadFailed 'Failed to load resilience tests' (5734). Contrast with the project's own strong empty-state copy that DOES give a next step, e.g. riskEmptySub 'Click \"New Risk\" to register the first one.' (en.ts:187) — proving the convention exists but was not applied to load errors.",
+      "impact": "On any transient fetch failure the user sees a dead-end message and must guess that reloading might help. For a GRC tool where users may be screening alerts or controls under time pressure, the lack of a retry affordance/instruction adds friction and support tickets. Multiplied across ~18 registers it is a consistent quality gap.",
+      "reproduction": "1. Sign in. 2. Open a register whose API is briefly unavailable (e.g. throttle/kill the relevant endpoint) — Risk, Committees, Fourth-party, etc. 3. Observe the failure text is e.g. 'Failed to load committees' / 'Could not load risks.' with no retry button or guidance on what to do next.",
+      "resolution": "Add a recovery clause to the load-failure copy and pair it with a Retry affordance in the shared error component. Standardise on one template ('We couldn’t load <thing>. Try again, or contact your administrator if it persists.') and reuse it across the *LoadFailed keys.",
+      "patchBefore": "// en.ts (representative)\nriskLoadError: 'Could not load risks.',\nannexLoadFailed: 'Failed to load annex data',\ncomLoadFailed:   'Failed to load committees',\nf4pLoadFailed:   'Failed to load fourth-party register',",
+      "patchAfter": "// en.ts — state the failure AND the next step (and render a Retry button)\nriskLoadError: 'We couldn’t load your risks. Try again, or contact your administrator if it persists.',\nannexLoadFailed: 'We couldn’t load the annex data. Try again, or contact your administrator if it persists.',\ncomLoadFailed:   'We couldn’t load committees. Try again, or contact your administrator if it persists.',\nf4pLoadFailed:   'We couldn’t load the fourth-party register. Try again, or contact your administrator if it persists.',\n// ar.ts (mirror, e.g. comLoadFailed):\n// 'تعذّر تحميل اللجان. حاول مرة أخرى، أو تواصل مع مسؤول النظام إذا استمرت المشكلة.'",
+      "effort": "M",
+      "references": [
+        "NN/g: Error message guidelines (offer a constructive next step)",
+        "WCAG 2.1 SC 3.3.1 Error Identification"
+      ]
+    },
+    {
+      "id": "COPY-05",
+      "title": "Inconsistent error voice across modules — \"Failed to load\" vs \"Could not load\" vs \"Could not save\"",
+      "phase": "UX",
+      "category": "Voice & tone consistency",
+      "severity": "Low",
+      "cvss": "No security impact. UX-only consistency defect: the same class of failure is phrased three different ways across modules, weakening the impression of a single, coherent product voice. Low severity, system-wide.",
+      "file": "tss-grc-ui-v2/src/translations/en.ts",
+      "lines": "100, 198, 455, 485, 877, 1656",
+      "locations": [
+        "tss-grc-ui-v2/src/translations/en.ts:100 (orgSwitchFailed)",
+        "tss-grc-ui-v2/src/translations/en.ts:198 (exportFailed)",
+        "tss-grc-ui-v2/src/translations/en.ts:455 (riskLoadError)",
+        "tss-grc-ui-v2/src/translations/en.ts:485 (toastRiskFailed)",
+        "tss-grc-ui-v2/src/translations/en.ts:877 (sigSignFailedToast)",
+        "tss-grc-ui-v2/src/translations/en.ts:1656 (annexLoadFailed)"
+      ],
+      "description": "Failure copy mixes verb choice, capitalisation and punctuation between otherwise-identical situations. Across en.ts there are 20 strings beginning 'Failed to …' but only 7 beginning 'Could not …'; some end with a full stop ('Could not load risks.'), most do not ('Failed to load committees', 'Export failed'); some are noun-first labels ('Export failed') while others are sentence-style. The result is three competing voices for the same kind of event.",
+      "rootCause": "No shared copy convention for failure messages; each module/author picked their own phrasing and punctuation, and there is no lint/style guide enforcing one error template, so divergence accumulated as modules were added.",
+      "evidence": "grep counts over en.ts: 20 strings start with 'Failed to', 7 start with 'Could not'. Concrete clashes: riskLoadError 'Could not load risks.' (455, period) vs annexLoadFailed 'Failed to load annex data' (1656, no period); toastRiskFailed 'Could not save the risk' (485) vs sigSignFailedToast 'Could not record the signature' (877) vs exportFailed 'Export failed' (198, noun-first). Same product, three styles.",
+      "impact": "Inconsistent failure voice makes the UI feel assembled by many hands and reduces perceived quality and trust — especially noticeable in a bilingual enterprise GRC tool where copy is part of the compliance/professionalism signal. It also complicates Arabic translation review since there is no single target phrasing to mirror.",
+      "reproduction": "Static review: open tss-grc-ui-v2/src/translations/en.ts and compare lines 100, 198, 455, 485, 877, 1656 — note 'Failed to load …' (no period), 'Could not load …' (period), and 'Export failed' (noun-first) all coexist for the same class of failure.",
+      "resolution": "Adopt one failure template and apply it everywhere: choose a single verb ('We couldn’t …' / 'Could not …'), consistent sentence case, and consistent terminal punctuation; document it in the UI style guide and sweep the existing keys. Keep EN and AR phrasing aligned to the chosen template.",
+      "patchBefore": "// en.ts — three voices for the same event\norgSwitchFailed: 'Could not switch organisation',\nexportFailed:    'Export failed',\nriskLoadError:   'Could not load risks.',\ntoastRiskFailed: 'Could not save the risk',\nannexLoadFailed: 'Failed to load annex data',",
+      "patchAfter": "// en.ts — one template: \"We couldn’t <verb> <thing>.\"\norgSwitchFailed: 'We couldn’t switch organisations. Try again.',\nexportFailed:    'We couldn’t export the file. Try again.',\nriskLoadError:   'We couldn’t load your risks. Try again.',\ntoastRiskFailed: 'We couldn’t save the risk. Try again.',\nannexLoadFailed: 'We couldn’t load the annex data. Try again.',\n// ar.ts mirrors the same single template: 'تعذّر … . حاول مرة أخرى.'",
+      "effort": "M",
+      "references": [
+        "NN/g: Maintain consistency and standards (Nielsen heuristic #4)",
+        "Microsoft / Apple HIG writing style: consistent error phrasing"
+      ]
+    }
+  ]
+}

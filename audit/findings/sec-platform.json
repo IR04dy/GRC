@@ -1,0 +1,240 @@
+{
+  "findings": [
+    {
+      "id": "SEC-PLAT-001",
+      "title": "Module licensing can be enabled/disabled by any authenticated user (license bypass + tenant DoS)",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "High",
+      "cvss": "CVSS 8.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:H) — privilege escalation: license bypass + tenant-wide DoS",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/licensing/controller/LicensingController.java",
+      "lines": "48-61",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/licensing/service/LicensingService.java:84-147"
+      ],
+      "description": "POST /api/v1/licensing/modules (upsert) and POST /api/v1/licensing/modules/{code}/disable mutate the tenant's OrganisationLicense rows. The controller's own Javadoc labels these as '(admin)' operations, yet both are guarded only by @PreAuthorize(\"isAuthenticated()\"). LicensingService.upsert/disable perform no role check. Because enabled modules drive both the LicenseGuardAspect (RequireModule) gating and the JWT enabled_modules claim that hides/shows sidebar entries, any logged-in user — including a read-only AUDITOR — can grant their entire tenant access to paid modules (RISK, BCM, CYBER, PDPL, TPRM, REPORTING, etc.) they were never licensed for, or disable a module to deny the whole tenant access (DoS). upsert even lets the caller set tier=ENTERPRISE and validTo far in the future.",
+      "rootCause": "Write endpoints that change commercial entitlements use the broadest possible guard (isAuthenticated()) instead of a platform-admin / PLATFORM:WRITE permission. The intended RBAC pattern — hasPermission('MODULE','ACTION') via ModulePermissionEvaluator — is used elsewhere (reporting, dashboard, help) but not enforced here.",
+      "evidence": "@PostMapping(\"/modules\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<OrganisationLicense> upsert(@RequestBody OrganisationLicense body) {\n    body.setOrganisationId(TenantContext.getCurrentTenant());\n    return ResponseEntity.ok(service.upsert(body));\n}\n\n@PostMapping(\"/modules/{code}/disable\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Void> disable(@PathVariable String code) { ... }",
+      "impact": "License/entitlement bypass (revenue impact — any user self-grants paid modules) and tenant-wide denial of service (any user disables a module everyone depends on). The change is tenant-global, not per-user, so a single low-privilege account compromises the whole organisation's licensing state.",
+      "reproduction": "1. Log in as a low-privilege user (e.g. auditor / Audit@12345).\n2. curl -X POST http://localhost:8084/api/v1/licensing/modules -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"moduleCode\":\"CYBER\",\"tier\":\"ENTERPRISE\",\"enabled\":true}'\n3. Observe HTTP 200 and the CYBER module now enabled for the whole tenant.\n4. POST /api/v1/licensing/modules/RISK/disable to disable RISK tenant-wide.",
+      "resolution": "Restrict licensing mutations to platform admins. Replace isAuthenticated() with @PreAuthorize(\"hasRole('PLATFORM_ADMIN')\") (or a dedicated PLATFORM:WRITE / LICENSING:ADMIN permission). Keep the read endpoints (list, me/enabled, catalog) at isAuthenticated().",
+      "patchBefore": "@PostMapping(\"/modules\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<OrganisationLicense> upsert(@RequestBody OrganisationLicense body) {\n    body.setOrganisationId(TenantContext.getCurrentTenant());\n    return ResponseEntity.ok(service.upsert(body));\n}\n\n@PostMapping(\"/modules/{code}/disable\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Void> disable(@PathVariable String code) {\n    service.disable(TenantContext.getCurrentTenant(), code);\n    return ResponseEntity.noContent().build();\n}",
+      "patchAfter": "@PostMapping(\"/modules\")\n@PreAuthorize(\"hasRole('PLATFORM_ADMIN')\")\npublic ResponseEntity<OrganisationLicense> upsert(@RequestBody OrganisationLicense body) {\n    body.setOrganisationId(TenantContext.getCurrentTenant());\n    return ResponseEntity.ok(service.upsert(body));\n}\n\n@PostMapping(\"/modules/{code}/disable\")\n@PreAuthorize(\"hasRole('PLATFORM_ADMIN')\")\npublic ResponseEntity<Void> disable(@PathVariable String code) {\n    service.disable(TenantContext.getCurrentTenant(), code);\n    return ResponseEntity.noContent().build();\n}",
+      "effort": "S",
+      "references": [
+        "CWE-285: Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-002",
+      "title": "Automation rule logic editable/deletable by any authenticated user",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "High",
+      "cvss": "CVSS 7.1 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:L) — tamper with org-wide automation/notification logic",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/automation/controller/AutomationRuleController.java",
+      "lines": "65-122",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/automation/service/AutomationActionExecutor.java:77-241"
+      ],
+      "description": "PATCH /api/v1/automation/rules/{id} lets any authenticated user rewrite an AutomationRule's conditionJson and actionJson, toggle enabled, and change priority; DELETE /api/v1/automation/rules/{id} soft-deletes a rule. Both are guarded only by isAuthenticated(). The F8 engine executes actionJson at rule-fire time: NOTIFY/ESCALATE fan a message out to every active holder of an arbitrary role (capped at 50), and CREATE_RECORD/FLAG drive cross-module side effects. A low-privilege user can therefore (a) disable safety/compliance escalation rules so breaches go unnotified, (b) re-point an ESCALATE rule at a different role to spam or socially-engineer recipients, or (c) silently neuter the SAMA/NCA/PDPL deadline-escalation automation the platform relies on.",
+      "rootCause": "Administrative configuration endpoints (editing the automation engine's rules) are gated by authentication only, not by a platform-admin / AUTOMATION:WRITE permission, diverging from the hasPermission pattern used by the rest of the platform.",
+      "evidence": "@PatchMapping(\"/rules/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\n@Transactional\npublic AutomationRule patch(@PathVariable Long id, @RequestBody PatchBody body) {\n    AutomationRule r = rules.findByIdAndOrganisationId(id, org()) ... ;\n    if (body.conditionJson() != null) r.setConditionJson(body.conditionJson());\n    if (body.actionJson()    != null) r.setActionJson(body.actionJson());\n    ...\n}",
+      "impact": "Tampering with org-wide automation: suppression of compliance/breach escalations (integrity of the GRC control fabric), notification spam/abuse to arbitrary role holders, and disabling of the F8 engine's regulatory deadline chasers. Org scoping is correct (findByIdAndOrganisationId), so impact is confined within the tenant.",
+      "reproduction": "1. Log in as any low-privilege user.\n2. GET /api/v1/automation/rules to enumerate rule ids (also isAuthenticated()).\n3. curl -X PATCH http://localhost:8084/api/v1/automation/rules/1 -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"enabled\":false}' to disable a compliance-escalation rule.\n4. Or set actionJson to {\"type\":\"NOTIFY\",\"role\":\"PLATFORM_ADMIN\",\"message\":\"...\"} to re-target notifications.",
+      "resolution": "Gate PATCH and DELETE (and arguably the read endpoints) on a platform-admin or AUTOMATION:WRITE permission: @PreAuthorize(\"hasPermission('AUTOMATION','WRITE')\") for patch/delete. Reads can stay on hasPermission('AUTOMATION','READ').",
+      "patchBefore": "@PatchMapping(\"/rules/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\n@Transactional\npublic AutomationRule patch(@PathVariable Long id, @RequestBody PatchBody body) { ... }\n\n@DeleteMapping(\"/rules/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Void> softDelete(@PathVariable Long id) { ... }",
+      "patchAfter": "@PatchMapping(\"/rules/{id}\")\n@PreAuthorize(\"hasPermission('AUTOMATION','WRITE')\")\n@Transactional\npublic AutomationRule patch(@PathVariable Long id, @RequestBody PatchBody body) { ... }\n\n@DeleteMapping(\"/rules/{id}\")\n@PreAuthorize(\"hasPermission('AUTOMATION','DELETE')\")\npublic ResponseEntity<Void> softDelete(@PathVariable Long id) { ... }",
+      "effort": "S",
+      "references": [
+        "CWE-285: Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-003",
+      "title": "Control Library and Authority-Document write operations gated only by isAuthenticated()",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N) — unauthorized creation/modification/deletion of GRC control & regulatory data",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/controls/controller/ControlLibraryController.java",
+      "lines": "71-208",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/regulatory/controller/AuthorityDocumentController.java:58-112"
+      ],
+      "description": "Every mutating endpoint of the unified Control Library (POST/PUT/DELETE /controls, /control-objectives, /control-mappings, /risk-control-links, /control-assessments and their /transition actions) and of the Authority Documents catalog (POST/PUT/DELETE /authority-documents, /citations, /transition) is annotated @PreAuthorize(\"isAuthenticated()\"). These are the system-of-record for the GRC spine (NCA ECC / SAMA / PDPL controls, citations, control-to-citation mappings, risk-control matrix, effectiveness assessments). Any authenticated user — regardless of role — can create, edit, retire, supersede or soft-delete this regulated content, and walk workflow state machines (e.g. transition a control DRAFT->ACTIVE or an authority document to SUPERSEDED). Data is correctly tenant-scoped, so this is BFLA within the tenant, not cross-tenant.",
+      "rootCause": "Controllers in the platform F1/F2 slices were written with a uniform isAuthenticated() guard instead of the hasPermission('CONTROL_LIB'/'REGULATORY','WRITE'|'DELETE') checks the project's RBAC model (ModulePermissionEvaluator + the CONTROL_LIB/REGULATORY/POSTURE module codes in LicensingService.KNOWN_MODULES) clearly intends.",
+      "evidence": "@PostMapping(\"/controls\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Control> createControl(@RequestBody Control body) { ... }\n\n@DeleteMapping(\"/controls/{id}\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Void> deleteControl(@PathVariable Long id) { ... }",
+      "impact": "Integrity loss of the control library and regulatory catalog: a non-privileged user can fabricate or retire controls, alter control-to-citation coverage (which directly feeds the F5/F6 compliance-posture heatmaps shown to examiners), or delete mappings — undermining the audit-defensibility the platform sells. No confidentiality/cross-tenant break.",
+      "reproduction": "1. Log in as a read-only role (auditor).\n2. curl -X DELETE http://localhost:8084/api/v1/control-mappings/5 -H \"Authorization: Bearer <token>\" — observe 204 and the mapping disappears from the posture heatmap.\n3. curl -X POST http://localhost:8084/api/v1/controls -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"controlCode\":\"X-1\",\"titleEn\":\"fake\",\"domain\":\"CYBER\"}'.",
+      "resolution": "Apply module-scoped permissions: reads -> hasPermission('CONTROL_LIB','READ') / hasPermission('REGULATORY','READ'); writes -> ...'WRITE'; deletes -> ...'DELETE'. The transition endpoints should require WRITE.",
+      "patchBefore": "@PostMapping(\"/controls\")\n@PreAuthorize(\"isAuthenticated()\")\npublic ResponseEntity<Control> createControl(@RequestBody Control body) { ... }",
+      "patchAfter": "@PostMapping(\"/controls\")\n@PreAuthorize(\"hasPermission('CONTROL_LIB','WRITE')\")\npublic ResponseEntity<Control> createControl(@RequestBody Control body) { ... }",
+      "effort": "M",
+      "references": [
+        "CWE-285: Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-004",
+      "title": "Platform-wide audit log readable by any authenticated user",
+      "phase": "Security",
+      "category": "Broken Access Control (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N) — disclosure of the tenant security/audit trail to all users",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/auditlog/controller/AuditLogController.java",
+      "lines": "32-58",
+      "locations": [],
+      "description": "All four read endpoints of the F7 audit log (GET /api/v1/audit-log, /stats, /history, /trace/{correlationId}) are guarded only by isAuthenticated(). The audit log is the tenant's security ledger: it records who did what (usernames, roles, IP addresses, source endpoints, old/new value JSON diffs, workflow transitions, license changes, rule fires). Exposing it to every authenticated user — including the lowest-privilege role — lets any user reconstruct other users' and admins' activity, harvest internal entity ids, and read change diffs that may contain sensitive field values. Queries are tenant-scoped (findByOrganisationId...), so this is intra-tenant over-exposure, not cross-tenant.",
+      "rootCause": "An inherently administrative/forensic data set is exposed at the authentication tier rather than behind an AUDIT_LOG:READ or platform-admin permission (the AUDIT_LOG module code already exists in LicensingService.KNOWN_MODULES).",
+      "evidence": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic Page<AuditLogEntry> list(@RequestParam(required=false) String actionType, ...) {\n    return service.list(actionType, sourceModule, severity, page, size);\n}",
+      "impact": "Information disclosure: any user can read the full tenant audit trail, including admin actions, value diffs, and source IPs — useful for reconnaissance and for an insider to monitor whether their own activity is being investigated. No data is mutated.",
+      "reproduction": "1. Log in as a low-privilege user.\n2. curl http://localhost:8084/api/v1/audit-log -H \"Authorization: Bearer <token>\" — returns the tenant-wide audit ledger including other users' actions and value diffs.",
+      "resolution": "Gate all audit-log reads on a dedicated permission: @PreAuthorize(\"hasPermission('AUDIT_LOG','READ')\") (or hasRole('PLATFORM_ADMIN')). Consider that /history is sometimes used inline on detail pages — if so, expose a narrower, entity-scoped history under the owning module's READ permission instead.",
+      "patchBefore": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic Page<AuditLogEntry> list(...) { ... }",
+      "patchAfter": "@GetMapping\n@PreAuthorize(\"hasPermission('AUDIT_LOG','READ')\")\npublic Page<AuditLogEntry> list(...) { ... }",
+      "effort": "S",
+      "references": [
+        "CWE-200: Exposure of Sensitive Information to an Unauthorized Actor",
+        "OWASP A01:2021 Broken Access Control",
+        "OWASP A09:2021 Security Logging and Monitoring Failures"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-005",
+      "title": "Generic persistence append endpoint has no authorization guard",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:L) — unauthorized writes to arbitrary tenant key/value stores",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/persistence/controller/PersistenceController.java",
+      "lines": "86-101",
+      "locations": [],
+      "description": "PersistenceController is a generic key/value store backing the frontend's persistence adapter. PUT and DELETE correctly require hasPermission('PLATFORM','WRITE'), but POST /api/v1/persistence/{key} (append) carries NO @PreAuthorize at all. It is therefore covered only by the global SecurityConfig rule .anyRequest().authenticated(), meaning any authenticated user can append arbitrary JSON rows to any store key in their tenant. The body is @RequestBody Object serialized verbatim with no schema, size, or row-count validation, so a user can also write unbounded volumes. This is inconsistent with the bulk-write endpoints on the same controller, which are PLATFORM:WRITE.",
+      "rootCause": "Missing method-level authorization annotation on the append handler; the author relied on the global authenticated() default while protecting the sibling PUT/DELETE with PLATFORM:WRITE, creating an inconsistent privilege boundary.",
+      "evidence": "@PostMapping(\"/{key}\")\n@Transactional\npublic ResponseEntity<Map<String, Object>> append(\n        @PathVariable String key,\n        @RequestBody Object row) {\n    Long orgId = TenantContext.requireOrganisationId();\n    ...\n    PersistenceRow saved = repo.save(new PersistenceRow(orgId, key, seq, json, \"API_APPEND\"));\n    ...\n}",
+      "impact": "Any authenticated user (including read-only roles) can write/pollute arbitrary tenant persistence stores and inflate storage. Org scoping is enforced, so the write stays within the tenant; integrity/availability of frontend-persisted data is the concern.",
+      "reproduction": "1. Log in as an auditor.\n2. curl -X POST http://localhost:8084/api/v1/persistence/anyKey -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"injected\":true}' — returns 200 with a new rowSeq even though the role has no PLATFORM:WRITE.",
+      "resolution": "Add @PreAuthorize(\"hasPermission('PLATFORM','WRITE')\") to the append handler to match PUT/DELETE, and add a payload-size / row-count bound.",
+      "patchBefore": "@PostMapping(\"/{key}\")\n@Transactional\npublic ResponseEntity<Map<String, Object>> append(\n        @PathVariable String key,\n        @RequestBody Object row) { ... }",
+      "patchAfter": "@PostMapping(\"/{key}\")\n@PreAuthorize(\"hasPermission('PLATFORM','WRITE')\")\n@Transactional\npublic ResponseEntity<Map<String, Object>> append(\n        @PathVariable String key,\n        @RequestBody Object row) { ... }",
+      "effort": "S",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-006",
+      "title": "File upload/list/get endpoints lack authorization annotations and content controls",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01) / Unrestricted Upload",
+      "severity": "Medium",
+      "cvss": "CVSS 5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:L) — unauthorized upload + enumeration of tenant file metadata",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/files/controller/FileUploadController.java",
+      "lines": "50-135",
+      "locations": [],
+      "description": "FileUploadController.list (GET), upload (POST) and get (GET /{id}) have no @PreAuthorize (only the global authenticated() applies); only delete requires PLATFORM:WRITE. Consequences: (1) any authenticated user can upload files and can list metadata for any attachedTo key in their tenant (e.g. attachedTo='dsr/DSR-2026-013' or 'evidence/EV-1078'), enumerating which sensitive records have attachments and reading filename/uploadedBy/crNumber/residency — there is no per-record ownership or owning-module READ check, so a user with no privilege on the privacy/evidence module can still browse those files' metadata. (2) The upload performs only a stub virus scan (EICAR string + extension blocklist) and enforces no max file size, MIME allowlist, or filename sanitisation in code (file.getOriginalFilename() is stored and used to build the storage key verbatim).",
+      "rootCause": "Missing method-level authorization on read/upload handlers, and reliance on a documented-but-unimplemented storage/scan backend. Access is scoped only by tenant + a free-text attachedTo string the caller supplies, with no link back to the owning record's module permission.",
+      "evidence": "@GetMapping\npublic ResponseEntity<Map<String, Object>> list(@RequestParam String attachedTo) {\n    Long orgId = TenantContext.requireOrganisationId();\n    List<FileMetadata> rows = repo.findByOrganisationIdAndAttachedToOrderByUploadedAtDesc(orgId, attachedTo);\n    ...\n}\n\n@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)\n@Transactional\npublic ResponseEntity<Map<String, Object>> upload(@RequestParam(\"file\") MultipartFile file, ...) { ... }",
+      "impact": "Intra-tenant: enumeration/disclosure of file metadata attached to sensitive records (DSR/evidence/incident) by users lacking those modules' permissions, plus unauthorized uploads. The virus-scan/size gaps are latent risks until the real storage backend is wired, but the stored unsanitised originalFilename flows into the S3 key and into responses.",
+      "reproduction": "1. Log in as a low-privilege user.\n2. curl 'http://localhost:8084/api/v1/files?attachedTo=dsr/DSR-2026-013' -H \"Authorization: Bearer <token>\" — returns the file list/metadata for that DSR without any privacy-module permission.\n3. curl -F file=@x.bin -F attachedTo=evidence/EV-1 http://localhost:8084/api/v1/files -H \"Authorization: Bearer <token>\" — uploads successfully.",
+      "resolution": "Add @PreAuthorize to list/upload/get (at minimum hasPermission('PLATFORM','READ')/('PLATFORM','WRITE')); ideally derive the owning module from attachedTo and check that module's permission. Enforce a configured max-file-size (spring.servlet.multipart.max-file-size + an in-code check), a MIME allowlist, and sanitise originalFilename before using it in the storage key.",
+      "patchBefore": "@GetMapping\npublic ResponseEntity<Map<String, Object>> list(@RequestParam String attachedTo) { ... }\n\n@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)\n@Transactional\npublic ResponseEntity<Map<String, Object>> upload(@RequestParam(\"file\") MultipartFile file, ...) { ... }",
+      "patchAfter": "@GetMapping\n@PreAuthorize(\"hasPermission('PLATFORM','READ')\")\npublic ResponseEntity<Map<String, Object>> list(@RequestParam String attachedTo) { ... }\n\n@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)\n@PreAuthorize(\"hasPermission('PLATFORM','WRITE')\")\n@Transactional\npublic ResponseEntity<Map<String, Object>> upload(@RequestParam(\"file\") MultipartFile file, ...) {\n    // enforce max size + MIME allowlist + sanitise filename\n}",
+      "effort": "M",
+      "references": [
+        "CWE-862: Missing Authorization",
+        "CWE-434: Unrestricted Upload of File with Dangerous Type",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-007",
+      "title": "Cross-module write endpoints (departments, issues, calendar, buyer-gap risk/privacy actions) gated only by isAuthenticated()",
+      "phase": "Security",
+      "category": "Broken Function Level Authorization (A01)",
+      "severity": "Medium",
+      "cvss": "CVSS 5.4 (AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:L) — unauthorized writes across multiple modules",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapController.java",
+      "lines": "61-146",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/controller/DepartmentController.java:40-54",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/controller/IssueController.java:48-63",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/calendar/controller/CalendarController.java:90-108"
+      ],
+      "description": "Several platform/cross-module write surfaces are guarded only by isAuthenticated(): BuyerGapController exposes POST risk-control links, POST risk attestations, and POST sweeps that mutate privacy DSR/breach state and emit domain events under /api/v1/risk/** and /api/v1/privacy/** without RISK:WRITE / PRIVACY:WRITE; DepartmentController create/update/archive; IssueController create/update/transition; CalendarController create/update/delete. None of these enforce a module permission, so any authenticated user can create or change this data. Tenant scoping is correctly enforced in every backing service (BuyerGapService explicitly validates risk.organisationId == current tenant), so there is no cross-tenant break — the issue is missing function-level RBAC, plus inconsistency with the well-guarded reporting/dashboard controllers.",
+      "rootCause": "These controllers (and the buyer-gap bundle that spans risk/privacy/evidence) were shipped with a blanket isAuthenticated() guard rather than the module-action permissions the platform's RBAC model defines.",
+      "evidence": "@PostMapping(\"/api/v1/risk/risks/{id}/controls\")\n@PreAuthorize(\"isAuthenticated()\")\npublic RiskControl linkRiskControl(@PathVariable Long id, @RequestBody LinkControlBody body) { ... }\n\n@PostMapping(\"/api/v1/privacy/dsr/sla/sweep\")\n@PreAuthorize(\"isAuthenticated()\")\npublic DsrSlaSweepResult dsrSlaSweep() { ... }",
+      "impact": "Within a tenant, any role can mutate risk-control linkage, file risk attestations in another user's name, trigger PDPL/DSR breach sweeps (which flip DsrCase/CrisisEvent state and fire events), and create/edit departments, issues, and calendar events — eroding data integrity and segregation of duties that SAMA/NCA expect. No cross-tenant or unauthenticated exposure.",
+      "reproduction": "1. Log in as a low-privilege user.\n2. curl -X POST http://localhost:8084/api/v1/risk/risks/1/attestations -H \"Authorization: Bearer <token>\" -H 'Content-Type: application/json' -d '{\"decision\":\"CONFIRMED\",\"attestedByName\":\"spoofed\"}' — creates an attestation with no RISK:WRITE.\n3. curl -X POST http://localhost:8084/api/v1/privacy/dsr/sla/sweep -H \"Authorization: Bearer <token>\" — mutates DSR SLA-breach state.",
+      "resolution": "Apply the owning module's WRITE/DELETE permission to each handler: RISK:WRITE on the risk-control/attestation endpoints, PRIVACY:WRITE on the DSR/breach sweeps, EVIDENCE:WRITE on the evidence freshness/connector endpoints, PLATFORM:WRITE (or a Departments/Issues permission) on departments/issues/calendar mutations.",
+      "patchBefore": "@PostMapping(\"/api/v1/risk/risks/{id}/attestations\")\n@PreAuthorize(\"isAuthenticated()\")\npublic RiskAttestation attestRisk(@PathVariable Long id, @RequestBody AttestBody body) { ... }",
+      "patchAfter": "@PostMapping(\"/api/v1/risk/risks/{id}/attestations\")\n@PreAuthorize(\"hasPermission('RISK','WRITE')\")\npublic RiskAttestation attestRisk(@PathVariable Long id, @RequestBody AttestBody body) { ... }",
+      "effort": "M",
+      "references": [
+        "CWE-285: Improper Authorization",
+        "OWASP API5:2023 Broken Function Level Authorization",
+        "OWASP A01:2021 Broken Access Control"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-008",
+      "title": "Unbounded page size on Issue and AutomationRule list endpoints (resource exhaustion)",
+      "phase": "Security",
+      "category": "Resource Exhaustion / Uncontrolled Resource Consumption (A04)",
+      "severity": "Low",
+      "cvss": "CVSS 4.3 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L) — memory/DB pressure via oversized page requests",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/controller/IssueController.java",
+      "lines": "31-36",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/platform/service/IssueService.java:78-82"
+      ],
+      "description": "GET /api/v1/issues accepts a caller-controlled `size` query parameter (default 50) and passes it straight to PageRequest.of(page, size) in IssueService.list with no upper bound. A caller can request size=100000000 and force the server to materialise a very large result page in one query/heap allocation. Other list endpoints in this audit scope correctly cap the page size (AuditLogService caps at 200, AutomationRuleController.listRuns uses Math.min(size,200)), making the Issue endpoint an outlier. Note the AutomationRuleController.list() rule list is also unbounded but reads a typically-small table.",
+      "rootCause": "The page-size parameter is trusted without a maximum clamp, unlike the capped list endpoints elsewhere in the module.",
+      "evidence": "@GetMapping\n@PreAuthorize(\"isAuthenticated()\")\npublic Page<Issue> list(@RequestParam(defaultValue = \"0\") int page,\n                        @RequestParam(defaultValue = \"50\") int size) {\n    return service.list(page, size);\n}\n// IssueService.list:\nreturn repo.findByOrganisationIdOrderByIdDesc(\n    TenantContext.getCurrentTenant(), PageRequest.of(page, size));",
+      "impact": "A single authenticated user can degrade availability by requesting huge pages, causing large DB reads and heap pressure (potential OutOfMemoryError on tenants with many issues). Low severity because it requires authentication and only affects the caller's tenant data volume.",
+      "reproduction": "1. Log in as any user.\n2. curl 'http://localhost:8084/api/v1/issues?page=0&size=100000000' -H \"Authorization: Bearer <token>\" and observe the server attempting to load an unbounded page.",
+      "resolution": "Clamp the page size, e.g. PageRequest.of(page, Math.min(Math.max(size,1), 200)) in IssueService.list (mirroring AuditLogService). Prefer @PageableDefault/Pageable with a configured max page size for consistency.",
+      "patchBefore": "@Transactional(readOnly = true)\npublic Page<Issue> list(int page, int size) {\n    return repo.findByOrganisationIdOrderByIdDesc(\n        TenantContext.getCurrentTenant(), PageRequest.of(page, size));\n}",
+      "patchAfter": "@Transactional(readOnly = true)\npublic Page<Issue> list(int page, int size) {\n    int safeSize = Math.min(Math.max(size, 1), 200);\n    return repo.findByOrganisationIdOrderByIdDesc(\n        TenantContext.getCurrentTenant(), PageRequest.of(page, safeSize));\n}",
+      "effort": "S",
+      "references": [
+        "CWE-770: Allocation of Resources Without Limits or Throttling",
+        "OWASP API4:2023 Unrestricted Resource Consumption",
+        "OWASP A04:2021 Insecure Design"
+      ]
+    },
+    {
+      "id": "SEC-PLAT-009",
+      "title": "Audit-log source IP taken from unvalidated X-Forwarded-For (audit-trail spoofing)",
+      "phase": "Security",
+      "category": "Insufficient Logging Integrity (A09)",
+      "severity": "Low",
+      "cvss": "CVSS 3.7 (AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:L/A:N) — forgeable source IP in the security audit trail",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/platform/auditlog/service/AuditLogService.java",
+      "lines": "159-166",
+      "locations": [],
+      "description": "AuditLogService.extractIp reads the X-Forwarded-For request header and stores the first value as the audit row's ip_address whenever the header is present, with no allowlist of trusted proxies. Any authenticated user can set an arbitrary X-Forwarded-For on their requests, so every audited action they perform can be attributed to a forged source IP in the F7 audit ledger. This weakens the evidentiary value of the audit trail that SAMA/NCA examinations rely on.",
+      "rootCause": "The forwarded-header is trusted unconditionally instead of only when the request arrives from a known/trusted reverse proxy (or via Spring's ForwardedHeaderFilter configured for the deployment topology).",
+      "evidence": "private static String extractIp(HttpServletRequest req) {\n    String xff = req.getHeader(\"X-Forwarded-For\");\n    if (xff != null && !xff.isBlank()) {\n        int comma = xff.indexOf(',');\n        return truncate((comma < 0 ? xff : xff.substring(0, comma)).trim(), 60);\n    }\n    return truncate(req.getRemoteAddr(), 60);\n}",
+      "impact": "Forensic/repudiation risk: audit entries can be made to point at an attacker-chosen IP, frustrating incident investigation and undermining non-repudiation. Low severity — it does not grant access, only degrades log integrity, and the username/role fields remain trustworthy (derived from the JWT).",
+      "reproduction": "1. Log in as any user.\n2. Perform any audited action with header: -H 'X-Forwarded-For: 8.8.8.8'.\n3. GET /api/v1/audit-log and observe the new entry's ip_address recorded as 8.8.8.8 rather than the real client address.",
+      "resolution": "Only honour X-Forwarded-For when the immediate peer (req.getRemoteAddr()) is a configured trusted proxy; otherwise use req.getRemoteAddr(). Better, configure Spring's ForwardedHeaderFilter / server.forward-headers-strategy per deployment and read the resolved remote address.",
+      "patchBefore": "private static String extractIp(HttpServletRequest req) {\n    String xff = req.getHeader(\"X-Forwarded-For\");\n    if (xff != null && !xff.isBlank()) {\n        int comma = xff.indexOf(',');\n        return truncate((comma < 0 ? xff : xff.substring(0, comma)).trim(), 60);\n    }\n    return truncate(req.getRemoteAddr(), 60);\n}",
+      "patchAfter": "private static String extractIp(HttpServletRequest req) {\n    // Only trust XFF when the direct peer is a known proxy; otherwise use the socket address.\n    String peer = req.getRemoteAddr();\n    if (isTrustedProxy(peer)) {\n        String xff = req.getHeader(\"X-Forwarded-For\");\n        if (xff != null && !xff.isBlank()) {\n            int comma = xff.indexOf(',');\n            return truncate((comma < 0 ? xff : xff.substring(0, comma)).trim(), 60);\n        }\n    }\n    return truncate(peer, 60);\n}",
+      "effort": "S",
+      "references": [
+        "CWE-348: Use of Less Trusted Source",
+        "OWASP A09:2021 Security Logging and Monitoring Failures"
+      ]
+    }
+  ]
+}

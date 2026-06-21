@@ -89,3 +89,20 @@ desktop.ini
 /triage.json
 /triaged.json
 /typ.json
+
+# ─── Audit artifacts (2026-06 audit) — keep analysis, drop heavy/regenerable ───
+# Downloaded scanner binaries, archives & extracted tool dirs (~580 MB)
+audit/tools/*.exe
+audit/tools/*.zip
+audit/tools/trivy/
+audit/tools/gitleaks/
+audit/tools/k6/
+# E2E harness run artifacts (regenerable from the committed specs; node_modules
+# and *.log are already ignored globally above)
+audit/artifacts/e2e/package-lock.json
+audit/artifacts/e2e/results/
+audit/artifacts/e2e/test-results/
+audit/artifacts/e2e/playwright-report/
+# Stray duplicate report at repo root + a misplaced audit output dir
+/audit-report.html
+tss-grc-ui-v2/audit/

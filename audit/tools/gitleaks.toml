@@ -1,0 +1,13 @@
+title = "audit"
+[extend]
+useDefault = true
+[allowlist]
+paths = [
+  '''node_modules''',
+  '''(^|/)target/''',
+  '''(^|/)dist/''',
+  '''(^|/)\.git/''',
+  '''(^|/)audit/''',
+  '''(^|/)\.clone-tmp/''',
+  '''package-lock\.json''',
+]

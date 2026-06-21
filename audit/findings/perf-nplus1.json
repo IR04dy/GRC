@@ -1,0 +1,215 @@
+{
+  "findings": [
+    {
+      "id": "PERF-NQ-001",
+      "title": "Risk register list endpoint issues 2N+1 queries (category + owner per row) and triggers the EAGER User graph per owner",
+      "phase": "Performance",
+      "category": "N+1 Query / Lazy Loading",
+      "severity": "High",
+      "cvss": "High business risk: the risk register is the platform's primary, highest-traffic list view. A single paginated page of N rows fans out to 1 + 2N SQL round trips (category lookup + owner lookup per risk), and each owner lookup additionally drags in the User -> roles -> permissions EAGER graph (PERF-NQ-002). At a page size of 50 that is 100+ extra queries per request, scaling linearly with page size and concurrent users. No data-integrity/auth impact; pure latency and DB load.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskService.java",
+      "lines": "52-57,238-276",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskService.java:52-57",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskService.java:238-276",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskService.java:242",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk/service/RiskService.java:252"
+      ],
+      "description": "RiskService.list(...) loads a Page<Risk> via the repository, then maps every row through toResponse(Risk). toResponse performs riskCategoryRepository.findById(r.getCategoryId()) (line 242) and userRepository.findById(r.getOwnerId()) (line 252) for each risk. Both are per-row SELECTs executed inside the page's .map() loop, so the endpoint runs 1 page query + 2 lookups per row. Because User is mapped with EAGER ManyToMany roles (and Role->permissions is also EAGER), every owner lookup also pulls the full role+permission graph (see PERF-NQ-002), multiplying the cost further.",
+      "rootCause": "The mapper resolves foreign-key display fields (category name, owner name/username) with one findById per FK per row instead of batch-loading or projecting the join. There is no caching, no JOIN FETCH, and no IN-clause batch resolution. Category and owner are reference data that could be fetched once for the whole page.",
+      "evidence": "RiskService.java:57  `return page.map(this::toResponse);`\nRiskService.java:242  `RiskCategory cat = riskCategoryRepository.findById(r.getCategoryId()).orElse(null);`\nRiskService.java:252  `User owner = userRepository.findById(r.getOwnerId()).orElse(null);`\nQuery count for a page of N rows = 1 (page) + N (category) + N (owner, each EAGER-expanding roles+permissions). For N=50 => ~101 statements minimum, more with the EAGER role/permission joins per owner.",
+      "impact": "Linear blow-up of DB round trips on the most-used screen in the product. Under realistic page sizes and concurrency the risk-list response time is dominated by serial query latency, and the connection pool is held longer per request, reducing throughput for every other endpoint.",
+      "reproduction": "1. Seed the risk register (seed_real_data.py populates ~hundreds of risks). 2. Enable Hibernate SQL logging (set logging for org.hibernate.SQL to DEBUG, or use datasource-proxy / Hypersistence statement counter). 3. GET /api/risks?page=0&size=50. 4. Count emitted SELECTs: observe one risk_category SELECT and one iam.users SELECT (plus role_permissions joins) per returned row rather than a constant number.",
+      "resolution": "Resolve category + owner display fields once per page. Options: (a) replace the entity list view with a JPQL constructor/interface projection that JOINs risk_category and iam.users and selects only the display columns; (b) collect the distinct categoryIds and ownerIds from the page, issue two findAllById batch queries, build id->name maps, and look up from the maps in toResponse; (c) at minimum cache reference data (categories) with the existing Caffeine cache. Approach (a) is the cleanest and removes the EAGER-graph side effect entirely.",
+      "patchBefore": "public Page<RiskResponse> list(String status, Pageable pageable) {\n    ...\n    return page.map(this::toResponse);\n}\n\nprivate RiskResponse toResponse(Risk r) {\n    if (r.getCategoryId() != null) {\n        RiskCategory cat = riskCategoryRepository.findById(r.getCategoryId()).orElse(null);\n        ...\n    }\n    if (r.getOwnerId() != null) {\n        User owner = userRepository.findById(r.getOwnerId()).orElse(null);\n        ...\n    }\n}",
+      "patchAfter": "public Page<RiskResponse> list(String status, Pageable pageable) {\n    Page<Risk> page = ...;\n    List<Risk> rows = page.getContent();\n    Set<Long> catIds = rows.stream().map(Risk::getCategoryId).filter(Objects::nonNull).collect(toSet());\n    Set<Long> ownerIds = rows.stream().map(Risk::getOwnerId).filter(Objects::nonNull).collect(toSet());\n    Map<Long, RiskCategory> cats = riskCategoryRepository.findAllById(catIds).stream()\n            .collect(toMap(RiskCategory::getId, c -> c));\n    Map<Long, User> owners = userRepository.findAllById(ownerIds).stream()\n            .collect(toMap(User::getId, u -> u));\n    return page.map(r -> toResponse(r, cats, owners)); // mapper reads from the maps, no per-row findById\n}",
+      "effort": "M",
+      "references": [
+        "https://vladmihalcea.com/n-plus-1-query-problem/",
+        "https://docs.spring.io/spring-data/jpa/reference/jpa/projections.html",
+        "CLAUDE.md — Caching: Caffeine L1 (maximumSize=1000, expireAfterWrite=300s)"
+      ]
+    },
+    {
+      "id": "PERF-NQ-002",
+      "title": "User and Role use FetchType.EAGER ManyToMany, forcing the full role+permission graph on every user load",
+      "phase": "Performance",
+      "category": "EAGER Fetch / N+1 Query",
+      "severity": "High",
+      "cvss": "High: User.roles (EAGER) and Role.permissions (EAGER) form a two-level eager collection chain that loads on every single User fetch anywhere in the codebase - user list pages, dashboard counts, and especially the per-row owner lookups in RiskService and other registers. EAGER collections cannot be batch-fetched by a paginated query, so a page of U users triggers U secondary role queries and then a permission query per distinct role. This is the multiplier behind several other findings.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/iam/entity/User.java",
+      "lines": "68-74",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/entity/User.java:68-74",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/entity/Role.java:37-43",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/repository/UserRepository.java:20-36",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/iam/service/UserService.java:32-34"
+      ],
+      "description": "User.roles is annotated @ManyToMany(fetch = FetchType.EAGER) (User.java:68) and Role.permissions is also @ManyToMany(fetch = FetchType.EAGER) (Role.java:37). Any time a User entity is materialised, Hibernate eagerly loads its roles, and for each role eagerly loads its permissions. On the paginated user list (UserService.list -> UserRepository.findWithFilters), the JPQL does LEFT JOIN u.roles but because the collection is EAGER, Hibernate does not use that join to initialise the collection for a paged query; it issues a separate roles SELECT per user and a permissions SELECT per role. The same EAGER chain fires on every userRepository.findById used as an FK lookup across the platform (e.g. RiskService.toResponse line 252).",
+      "rootCause": "Collection associations declared EAGER. EAGER ToMany is a well-known anti-pattern: it cannot be paginated in SQL, defeats projection-based reads, and silently loads heavy graphs on lookups that only need a username or id. Authentication (CustomUserDetailsService) needs roles+permissions, but that is the only place that needs them and it can request them explicitly with a fetch-join.",
+      "evidence": "User.java:68  `@ManyToMany(fetch = FetchType.EAGER)` -> `Set<Role> roles`\nRole.java:37  `@ManyToMany(fetch = FetchType.EAGER)` -> `Set<Permission> permissions`\nUserRepository.java:20-36 findWithFilters returns Page<User> with `LEFT JOIN u.roles r` but EAGER collections force per-row secondary loads regardless. For a page of U users with R distinct roles: 1 + U (roles per user) + up to R (permissions per role) statements.",
+      "impact": "Every user-bearing read path pays for the entire authorization graph. User list, dashboard active-user count path, and any FK owner resolution become multi-query operations. The blast radius is platform-wide because User is referenced as owner/approver across nearly every module.",
+      "reproduction": "1. Enable Hibernate SQL logging. 2. GET the user admin list (UserService.list). 3. Observe one user_roles SELECT per user and one role_permissions SELECT per distinct role, on top of the main user query. 4. Separately, call any register list that resolves an owner (e.g. /api/risks) and observe the same role/permission SELECTs firing per owner.",
+      "resolution": "Change both associations to FetchType.LAZY. Where the full graph is genuinely needed (login / authorization in CustomUserDetailsService) add an explicit @EntityGraph or JPQL `JOIN FETCH u.roles r JOIN FETCH r.permissions` finder. For list views, return a projection that exposes only roleNames via a join, never the entity graph. Verify lazy access inside an open transaction or via DTO projection to avoid LazyInitializationException.",
+      "patchBefore": "// User.java\n@ManyToMany(fetch = FetchType.EAGER)\n@JoinTable(schema = \"iam\", name = \"user_roles\", ...)\nprivate Set<Role> roles = new HashSet<>();\n\n// Role.java\n@ManyToMany(fetch = FetchType.EAGER)\n@JoinTable(schema = \"iam\", name = \"role_permissions\", ...)\nprivate Set<Permission> permissions = new HashSet<>();",
+      "patchAfter": "// User.java\n@ManyToMany(fetch = FetchType.LAZY)\n@JoinTable(schema = \"iam\", name = \"user_roles\", ...)\nprivate Set<Role> roles = new HashSet<>();\n\n// Role.java\n@ManyToMany(fetch = FetchType.LAZY)\n@JoinTable(schema = \"iam\", name = \"role_permissions\", ...)\nprivate Set<Permission> permissions = new HashSet<>();\n\n// UserRepository.java — explicit graph only where auth needs it\n@Query(\"SELECT DISTINCT u FROM User u JOIN FETCH u.roles r JOIN FETCH r.permissions WHERE u.username = :username\")\nOptional<User> findByUsernameWithAuthorities(@Param(\"username\") String username);",
+      "effort": "M",
+      "references": [
+        "https://vladmihalcea.com/eager-fetching-is-a-code-smell/",
+        "https://docs.spring.io/spring-data/jpa/reference/jpa/entity-graph.html",
+        "https://thorben-janssen.com/lazyinitializationexception/"
+      ]
+    },
+    {
+      "id": "PERF-NQ-003",
+      "title": "EvidenceMatrixService.matrix() is a 4-level nested N+1 (framework -> control -> sub-control -> evidence items)",
+      "phase": "Performance",
+      "category": "Nested N+1 Query",
+      "severity": "Critical",
+      "cvss": "Critical: matrix() builds the full evidence matrix by nesting four loops, each issuing per-row queries. Total statements = 1 (frameworks) + F (controls per framework) + F*C (sub-controls per control) + F*C*S (evidence items per sub-control). For a realistic shared catalog (NCA ECC + ISO 27001 + SAMA CSF + PCI-DSS, hundreds of controls each with multiple sub-controls) this is easily 1,000-10,000+ SQL round trips for one page render. The sibling GrcExpertService renders the same tree in ~6 queries, proving the inefficiency is avoidable.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java",
+      "lines": "57-143",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:64",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:71",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:77",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:85",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/GrcExpertService.java:44-138"
+      ],
+      "description": "matrix() iterates frameworkRepo.findAll() (line 64); for each framework calls controlRepo.findByFrameworkIdAndIsActiveTrue (line 71); for each control calls subControlRepo.findByControlIdAndIsActiveTrue (line 77); and for each sub-control calls itemRepo.findBySubControl(org, s.getId()) (line 85) to load every evidence item just to compute counts, freshest expiry and a method-mix histogram in Java. Every level multiplies the previous, producing F*C*S evidence-item queries plus the structural queries above them.",
+      "rootCause": "Per-node fetch instead of batch fetch + in-memory aggregation. The evidence counts/expiry/method-mix are pure aggregates that the DB can compute with GROUP BY in a handful of queries (the EvidenceItemRepository already exposes aggregateStatusBySubControl, aggregateExpiryBySubControl, aggregateFreshApprovedBySubControl). The controls and sub-controls can be batch-loaded with findByFrameworkIdInAndIsActiveTrue / findByControlIdInAndIsActiveTrue (both already exist and are used by GrcExpertService).",
+      "evidence": "EvidenceMatrixService.java:64 `List<EvidenceFramework> frameworks = frameworkRepo.findAll();`\n:71 `controlRepo.findByFrameworkIdAndIsActiveTrue(fw.getId());`  // per framework\n:77 `subControlRepo.findByControlIdAndIsActiveTrue(c.getId());` // per control\n:85 `itemRepo.findBySubControl(org, s.getId());`               // per sub-control\nContrast GrcExpertService.listExpertCatalog() (lines 47-77) which does findByIsActiveTrue + findByFrameworkIdInAndIsActiveTrue + findByControlIdInAndIsActiveTrue + 3 aggregate GROUP BY queries = ~6 statements total for the same framework->control->sub-control tree.",
+      "impact": "The evidence matrix tab (called out in the buyer assessment as a flagship demo screen) can take seconds and hammer the DB with thousands of statements on every load, scaling with the size of the shared control catalog rather than with tenant data. High risk of timeouts and connection-pool exhaustion in a multi-tenant deployment.",
+      "reproduction": "1. Ensure the shared evidence catalog is populated (multiple frameworks with controls + sub-controls). 2. Enable Hibernate SQL logging or attach a statement counter. 3. Invoke EvidenceMatrixService.matrix() (the evidence matrix endpoint). 4. Count SELECTs; observe one findBySubControl per sub-control (and one control/sub-control query per parent), i.e. counts scale as F + F*C + F*C*S. 5. Compare to listExpertCatalog() which holds at ~6 statements.",
+      "resolution": "Refactor matrix() to mirror GrcExpertService: batch-load active frameworks, then controls via findByFrameworkIdInAndIsActiveTrue(fwIds), then sub-controls via findByControlIdInAndIsActiveTrue(ctrlIds), group them in memory (groupingBy frameworkId / controlId), and replace the per-sub-control itemRepo.findBySubControl loop with the existing aggregateStatusBySubControl / aggregateExpiryBySubControl / aggregateFreshApprovedBySubControl GROUP BY queries keyed by sub-control id. The method-mix histogram can be added as one more aggregate query (GROUP BY sub_control_id, collection_method).",
+      "patchBefore": "for (EvidenceFramework fw : frameworks) {\n    List<EvidenceControl> controls = controlRepo.findByFrameworkIdAndIsActiveTrue(fw.getId());\n    for (EvidenceControl c : controls) {\n        List<EvidenceSubControl> subs = subControlRepo.findByControlIdAndIsActiveTrue(c.getId());\n        for (EvidenceSubControl s : subs) {\n            List<EvidenceItem> items = itemRepo.findBySubControl(org, s.getId()); // N*M*K queries\n            ... aggregate in Java ...\n        }\n    }\n}",
+      "patchAfter": "List<EvidenceFramework> frameworks = frameworkRepo.findByIsActiveTrue();\nList<Long> fwIds = frameworks.stream().map(EvidenceFramework::getId).toList();\nList<EvidenceControl> controls = controlRepo.findByFrameworkIdInAndIsActiveTrue(fwIds);\nList<Long> ctrlIds = controls.stream().map(EvidenceControl::getId).toList();\nList<EvidenceSubControl> subs = subControlRepo.findByControlIdInAndIsActiveTrue(ctrlIds);\n// one GROUP BY pass each, keyed by sub-control id\nMap<Long, Map<String,Integer>> statusBySc = ... itemRepo.aggregateStatusBySubControl(org) ...;\nMap<Long, int[]> expiryBySc = ... itemRepo.aggregateExpiryBySubControl(org, today, horizon) ...;\nMap<Long, Integer> freshBySc = ... itemRepo.aggregateFreshApprovedBySubControl(org, today) ...;\nMap<Long,List<EvidenceSubControl>> subsByCtrl = subs.stream().collect(groupingBy(EvidenceSubControl::getControlId));\nMap<Long,List<EvidenceControl>> ctrlsByFw = controls.stream().collect(groupingBy(EvidenceControl::getFrameworkId));\n// then assemble the tree from the maps with zero further queries",
+      "effort": "M",
+      "references": [
+        "https://vladmihalcea.com/n-plus-1-query-problem/",
+        "Internal counter-example: GrcExpertService.listExpertCatalog (same tree, ~6 queries)",
+        "https://docs.jboss.org/hibernate/orm/6.4/userguide/html_single/Hibernate_User_Guide.html#fetching"
+      ]
+    },
+    {
+      "id": "PERF-NQ-004",
+      "title": "RiskControlFindingPivotService: compounding per-row queries across controls, findings, CAPA and CCM runs",
+      "phase": "Performance",
+      "category": "Nested N+1 Query",
+      "severity": "High",
+      "cvss": "High: each pivot build (buildRiskPivot / buildControlPivot / buildFindingPivot) fans out into several per-row query loops that compound: control resolution per link, a full org-findings scan, two CAPA queries per finding, per-control re-load of all CCM test definitions, and per-definition CCM run queries. A risk with a dozen linked controls and a few hundred org findings can produce hundreds of statements for one pivot view, and the per-control toControlPivot work re-runs the same queries repeatedly.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java",
+      "lines": "140-389",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:148-154",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:190-194",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:245-257",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:334-349",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:365-377",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:574-607"
+      ],
+      "description": "Multiple loops issue per-row queries: (1) buildRiskPivot loops over risk-control links calling controlRepo.findByIdAndOrganisationId per link (148-154). (2) buildControlPivot loops links calling riskRepo.findById per link (190-194). (3) buildFindingPivot nests a per-control loop with an inner per-link riskRepo.findById (245-257). (4) capasForFindings runs TWO repository queries (auditLcCapaRepo + capaRepo) per finding (334-349). (5) ccmCoverageForControls calls ccmRunRepo.findRecentForTest once per test definition (365-377). Worst of all, toControlPivot (574-607) calls latestAssessmentEffectiveness (which queries control assessments, 381-389) AND re-loads ALL org CCM test definitions via ccmDefRepo.findByOrganisationIdAndIsDeletedFalse... for EVERY control row (586-589), so the full definition list is re-fetched once per control in the pivot.",
+      "rootCause": "FK and child-collection resolution done one entity at a time inside loops rather than batch-loading by id set, plus repeated re-fetching of the same org-wide list (CCM definitions) inside a per-control mapper. findingsForControls also scans the entire org findings table and re-parses control_crosswalk JSON in Java for every finding instead of filtering in the query.",
+      "evidence": "Line 149 `controlRepo.findByIdAndOrganisationId(link.getControlId(), orgId)` inside `for (RiskControlLink link : links)`.\nLine 253 `riskRepo.findById(link.getRiskId())` inside nested control->link loops.\nLines 339-345 two repo finders per finding inside `for (FindingPivot fp : findings)`.\nLine 366 `ccmRunRepo.findRecentForTest(orgId, d.getId(), PageRequest.of(0,100))` inside `for (ControlTestDefinition d : defs)`.\nLines 586-589 `ccmDefRepo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId)` re-loaded inside toControlPivot, which is itself called once per control row.",
+      "impact": "Pivot views (a flagship analytics screen per the class Javadoc) degrade super-linearly with the number of linked controls/findings and the size of the org's findings and CCM tables. The repeated full re-fetch of CCM definitions per control row is pure waste. High DB load and latency on an interactive drill-down feature.",
+      "reproduction": "1. Seed risks with several linked controls, controls with CCM test definitions and runs, and an org findings table of a few hundred rows. 2. Enable SQL logging. 3. Call buildRiskPivot(riskId). 4. Observe: one control SELECT per link, a full findings scan, two CAPA SELECTs per matching finding, the entire CCM definition list re-fetched once per control row, and one CCM-run SELECT per definition.",
+      "resolution": "Batch-load by id sets: collect controlIds/riskIds and use findAllById / a single findByOrganisationIdAndIdIn finder; load CCM test definitions for the org ONCE before the control loop and pass the map into toControlPivot; load latest control assessments for all controlIds in one query (e.g. findByOrganisationIdAndControlIdIn ordered, then reduce in memory); fetch CAPA for all finding externalIds in one IN query per source repo; and push the control_crosswalk code filter into the findings query (or maintain a normalized control_code -> finding link table) instead of scanning + JSON-parsing every org finding in Java.",
+      "patchBefore": "for (RiskControlLink link : links) {\n    Control c = controlRepo.findByIdAndOrganisationId(link.getControlId(), orgId).orElse(null); // per link\n    ...\n}\n// toControlPivot, called per control row:\nList<ControlTestDefinition> defs = ccmDefRepo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId)\n        .stream().filter(d -> c.getId().equals(d.getControlId())).toList(); // full list re-fetched every call",
+      "patchAfter": "Set<Long> controlIds = links.stream().map(RiskControlLink::getControlId).collect(toSet());\nMap<Long, Control> controlsById = controlRepo.findByOrganisationIdAndIdIn(orgId, controlIds).stream()\n        .collect(toMap(Control::getId, c -> c));\n// load CCM defs ONCE, group by controlId, pass into the mapper\nMap<Long, List<ControlTestDefinition>> defsByControl = ccmDefRepo\n        .findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId).stream()\n        .filter(d -> d.getControlId() != null)\n        .collect(groupingBy(ControlTestDefinition::getControlId));\nfor (RiskControlLink link : links) {\n    Control c = controlsById.get(link.getControlId());\n    if (c == null) continue;\n    controlRows.add(toControlPivot(c, link.getEffectiveness(), defsByControl)); // no per-row query\n}",
+      "effort": "L",
+      "references": [
+        "https://vladmihalcea.com/n-plus-1-query-problem/",
+        "https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html#jpa.query-methods.query-creation",
+        "https://www.baeldung.com/spring-data-jpa-in-clause"
+      ]
+    },
+    {
+      "id": "PERF-NQ-005",
+      "title": "ControlMapService resolves each mapping with 3 findById queries (sub-control + control + framework) per row",
+      "phase": "Performance",
+      "category": "N+1 Query",
+      "severity": "Medium",
+      "cvss": "Medium: getMappings and getEvidenceReadiness both map every ControlLink through a resolver that fires three sequential findById queries (EvidenceSubControl, EvidenceControl, EvidenceFramework). For an entity mapped to N sub-controls this is 1 + 3N queries. N is typically modest (a single entity's control map), so impact is moderate, but the pattern runs on interactive mapping/readiness screens and the reference data involved is fully cacheable, making the cost gratuitous.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/service/ControlMapService.java",
+      "lines": "48-181",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/service/ControlMapService.java:49-53",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/service/ControlMapService.java:113-127",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/service/ControlMapService.java:166-181"
+      ],
+      "description": "getMappings (49-53) maps each ControlLink via resolve(scId, satisfaction). resolve (166-181) calls subControlRepository.findById, then controlRepository.findById(sc.getControlId()), then frameworkRepository.findById(ctrl.getFrameworkId()) - three per-row lookups. getEvidenceReadiness (113-127) repeats the identical three-findById chain inside its per-link loop. The aggregate rollups in getEvidenceReadiness (95-109) are correctly written as GROUP BY queries, but the sub-control/control/framework metadata resolution is per-row.",
+      "rootCause": "Per-row FK chasing for reference data (the framework/control/sub-control catalog is shared, static, and small) instead of batch-loading the distinct ids or caching the catalog. The sub-control -> control -> framework chain is fixed reference data ideal for a one-time load or Caffeine cache.",
+      "evidence": "ControlMapService.java:168 `EvidenceSubControl sc = subControlRepository.findById(scId).orElse(null);`\n:173 `EvidenceControl ctrl = controlRepository.findById(sc.getControlId()).orElse(null);`\n:176 `EvidenceFramework fw = frameworkRepository.findById(ctrl.getFrameworkId()).orElse(null);`\nThe same triple appears at lines 115/121/124 inside getEvidenceReadiness's per-link loop. Query count for N mapped sub-controls = 1 (links) + 3N.",
+      "impact": "Moderate latency on the control-map and evidence-readiness panels; unnecessary DB chatter for data that never changes within a request and is identical across tenants. Scales linearly with the number of sub-controls mapped to an entity.",
+      "reproduction": "1. Map an entity to several sub-controls via setMappings. 2. Enable SQL logging. 3. Call getMappings(entityType, entityId) (and getEvidenceReadiness). 4. Observe three findById SELECTs per returned mapping row.",
+      "resolution": "Batch-resolve: collect the distinct subControlIds from the links, load them with findAllById, collect their controlIds and load with findAllById, collect frameworkIds and load with findAllById, then resolve from in-memory maps. Alternatively, since framework/control/sub-control are a static shared catalog, cache the lookup maps with the existing Caffeine cache (@Cacheable) and resolve from cache.",
+      "patchBefore": "public List<ControlLinkResponse> getMappings(String entityType, Long entityId) {\n    return repo.findByOrganisationIdAndEntityTypeAndEntityId(orgId, entityType, entityId)\n        .stream().map(l -> resolve(l.getSubControlId(), l.getSatisfaction())).toList();\n}\n\nprivate ControlLinkResponse resolve(Long scId, String satisfaction) {\n    EvidenceSubControl sc = subControlRepository.findById(scId).orElse(null);\n    EvidenceControl ctrl = controlRepository.findById(sc.getControlId()).orElse(null);\n    EvidenceFramework fw = frameworkRepository.findById(ctrl.getFrameworkId()).orElse(null);\n    ...\n}",
+      "patchAfter": "public List<ControlLinkResponse> getMappings(String entityType, Long entityId) {\n    List<ControlLink> links = repo.findByOrganisationIdAndEntityTypeAndEntityId(orgId, entityType, entityId);\n    Set<Long> scIds = links.stream().map(ControlLink::getSubControlId).collect(toSet());\n    Map<Long, EvidenceSubControl> scs = subControlRepository.findAllById(scIds).stream().collect(toMap(EvidenceSubControl::getId, s -> s));\n    Set<Long> ctrlIds = scs.values().stream().map(EvidenceSubControl::getControlId).collect(toSet());\n    Map<Long, EvidenceControl> ctrls = controlRepository.findAllById(ctrlIds).stream().collect(toMap(EvidenceControl::getId, c -> c));\n    Set<Long> fwIds = ctrls.values().stream().map(EvidenceControl::getFrameworkId).collect(toSet());\n    Map<Long, EvidenceFramework> fws = frameworkRepository.findAllById(fwIds).stream().collect(toMap(EvidenceFramework::getId, f -> f));\n    return links.stream().map(l -> resolveFromMaps(l, scs, ctrls, fws)).toList(); // zero per-row queries\n}",
+      "effort": "M",
+      "references": [
+        "https://vladmihalcea.com/n-plus-1-query-problem/",
+        "CLAUDE.md — Caching: Caffeine L1 (suited to static reference catalogs)",
+        "https://docs.spring.io/spring-framework/reference/integration/cache/annotations.html"
+      ]
+    },
+    {
+      "id": "PERF-NQ-006",
+      "title": "BcmDependencyGraphService re-queries BIA per plan despite already holding all BIAs in memory",
+      "phase": "Performance",
+      "category": "N+1 Query / Redundant Fetch",
+      "severity": "Low",
+      "cvss": "Low: build() loads all BIAs up front (paged at 1000), then in the BCP/DRP plan loop calls bias.findByIdAndOrganisationId per plan to perform RTO-mismatch detection. That is one extra query per plan for data already resident in memory. Bounded by plan count (paged at 1000) and only on the dependency-graph endpoint, so impact is limited, but it is a clear avoidable N+1.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmDependencyGraphService.java",
+      "lines": "61-142",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmDependencyGraphService.java:71-73",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmDependencyGraphService.java:106-138",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmDependencyGraphService.java:127"
+      ],
+      "description": "build() first loads all BIAs for the tenant into biaRows (lines 71-73). It then loops over BCP/DRP plans (line 106) and, for each plan with a sourceBiaId and rtoHours, calls bias.findByIdAndOrganisationId(p.getSourceBiaId(), org) (line 127) to compare the plan's RTO against the source BIA's RTO. Since every BIA was already loaded at line 71, this is a redundant per-plan query - the BIA could be looked up from a Map<Long, BcmBiaAssessment> built from biaRows.",
+      "rootCause": "The already-materialised BIA list is not indexed into a map for reuse; the RTO-mismatch check re-fetches the parent BIA from the repository inside the plan loop.",
+      "evidence": "Line 71-73 `List<BcmBiaAssessment> biaRows = bias.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1000)).getContent();`\nLine 127 `bias.findByIdAndOrganisationId(p.getSourceBiaId(), org).ifPresent(b -> { ... });` inside `for (BcpPlan p : plans...)`.\nQuery count adds one BIA SELECT per plan that has a sourceBiaId, all redundant because biaRows already contains them.",
+      "impact": "One redundant DB round trip per BCP/DRP plan on the dependency-graph build. Minor latency and DB load; the feature is called out as a common first-demo screen, so the waste is visible under demo conditions but bounded.",
+      "reproduction": "1. Seed BIAs and BCP/DRP plans with sourceBiaId set and rtoHours populated. 2. Enable SQL logging. 3. Call BcmDependencyGraphService.build() (the /bcm-dependency graph endpoint). 4. Observe one BIA SELECT per plan in addition to the initial bulk BIA query.",
+      "resolution": "Build a Map<Long, BcmBiaAssessment> from biaRows once, and resolve the source BIA from that map inside the plan loop instead of calling bias.findByIdAndOrganisationId. This removes the per-plan query entirely and reuses data already in the persistence context.",
+      "patchBefore": "List<BcmBiaAssessment> biaRows = bias.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1000)).getContent();\n...\nfor (BcpPlan p : plans.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0,1000)).getContent()) {\n    ...\n    if (p.getSourceBiaId() != null && p.getRtoHours() != null) {\n        bias.findByIdAndOrganisationId(p.getSourceBiaId(), org).ifPresent(b -> { // per-plan query\n            if (b.getRtoHours() != null && p.getRtoHours() > b.getRtoHours()) { ... }\n        });\n    }\n}",
+      "patchAfter": "List<BcmBiaAssessment> biaRows = bias.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0, 1000)).getContent();\nMap<Long, BcmBiaAssessment> biaById = biaRows.stream().collect(Collectors.toMap(BcmBiaAssessment::getId, b -> b));\n...\nfor (BcpPlan p : plans.findByOrganisationIdOrderByIdDesc(org, PageRequest.of(0,1000)).getContent()) {\n    ...\n    if (p.getSourceBiaId() != null && p.getRtoHours() != null) {\n        BcmBiaAssessment b = biaById.get(p.getSourceBiaId()); // in-memory, no query\n        if (b != null && b.getRtoHours() != null && p.getRtoHours() > b.getRtoHours()) { ... }\n    }\n}",
+      "effort": "S",
+      "references": [
+        "https://vladmihalcea.com/n-plus-1-query-problem/",
+        "https://docs.oracle.com/javase/8/docs/api/java/util/stream/Collectors.html#toMap-java.util.function.Function-java.util.function.Function-"
+      ]
+    },
+    {
+      "id": "PERF-NQ-007",
+      "title": "TreatmentPlan @OneToMany actions is EAGER, causing per-plan child query on list views (and a count that loads all children)",
+      "phase": "Performance",
+      "category": "EAGER Fetch / N+1 Query",
+      "severity": "Medium",
+      "cvss": "Medium: TreatmentPlan.actions is an EAGER @OneToMany. listForOrg() / listForRisk() load the plans for a tenant and Hibernate eagerly issues a separate actions SELECT per plan (TreatmentPlanDto.from reads e.getActions()). For P plans that is 1 + P queries. Additionally generateExternalId() calls .size() on the full plan list purely to count, materialising every plan and its actions just to derive the next sequence number.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/entity/TreatmentPlan.java",
+      "lines": "77-79",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/entity/TreatmentPlan.java:77-79",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/service/TreatmentPlanService.java:94-99",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/service/TreatmentPlanService.java:101-106",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/service/TreatmentPlanService.java:197-201",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/dto/TreatmentPlanDto.java:43"
+      ],
+      "description": "TreatmentPlan.actions is annotated @OneToMany(..., fetch = FetchType.EAGER) (TreatmentPlan.java:77). TreatmentPlanService.listForOrg() (94-99) and listForRisk() (101-106) load all plans for the tenant/risk and map each via TreatmentPlanDto.from, which dereferences e.getActions() (TreatmentPlanDto.java:43). Because the collection is EAGER and the finder returns a list (not a fetch-join), Hibernate issues one actions SELECT per plan. Separately, generateExternalId() (197-201) does repo.findByOrganisationIdOrderByCreatedAtDesc(orgId).size() - loading every plan (and, due to EAGER, every plan's actions) merely to compute count+1 for the next external id.",
+      "rootCause": "EAGER child collection on a list-rendered entity, plus a count derived by materialising and sizing a full entity list instead of a COUNT query. EAGER ToMany cannot be batch-fetched for a list/page result, so it degrades to per-row child loads.",
+      "evidence": "TreatmentPlan.java:77 `@OneToMany(mappedBy = \"plan\", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)` -> `List<TreatmentAction> actions`.\nTreatmentPlanDto.java:43 `.actions(e.getActions() == null ? List.of() : e.getActions().stream().map(TreatmentActionDto::from)...)` - touches the collection for every plan.\nTreatmentPlanService.java:199 `long count = repo.findByOrganisationIdOrderByCreatedAtDesc(orgId).size();` - full materialisation to count.",
+      "impact": "Treatment-plan list endpoints scale at 1 + P queries with EAGER children; the external-id generator loads the entire plan+action graph on every create. Moderate latency and DB load that grows with the number of treatment plans per tenant. The EAGER collection also blocks adopting projection-based list reads later.",
+      "reproduction": "1. Seed several treatment plans, each with multiple treatment actions. 2. Enable SQL logging. 3. Call listForOrg(): observe one treatment_actions SELECT per plan in addition to the plans query. 4. Call create(): observe generateExternalId loading all plans (and their actions) to compute .size().",
+      "resolution": "Change actions to FetchType.LAZY. For list views that need actions, add a JOIN FETCH / @EntityGraph finder so the collection is fetched in one query; for list views that do not need actions, the DTO simply omits them. Replace generateExternalId's list().size() with a repository count query (e.g. countByOrganisationId) - the repository already exposes countByOrganisationIdAndStatus, so add countByOrganisationId.",
+      "patchBefore": "// TreatmentPlan.java\n@OneToMany(mappedBy = \"plan\", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)\n@Where(clause = \"is_deleted = 0\")\nprivate List<TreatmentAction> actions = new ArrayList<>();\n\n// TreatmentPlanService.java\nprivate String generateExternalId(Long orgId) {\n    long count = repo.findByOrganisationIdOrderByCreatedAtDesc(orgId).size();\n    return String.format(\"TP-%d-%03d\", LocalDateTime.now().getYear(), count + 1);\n}",
+      "patchAfter": "// TreatmentPlan.java\n@OneToMany(mappedBy = \"plan\", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)\n@Where(clause = \"is_deleted = 0\")\nprivate List<TreatmentAction> actions = new ArrayList<>();\n\n// TreatmentPlanRepository.java\n@Query(\"SELECT DISTINCT p FROM TreatmentPlan p LEFT JOIN FETCH p.actions WHERE p.organisationId = :orgId ORDER BY p.createdAt DESC\")\nList<TreatmentPlan> findWithActionsByOrg(@Param(\"orgId\") Long orgId);\nlong countByOrganisationId(Long organisationId);\n\n// TreatmentPlanService.java\nprivate String generateExternalId(Long orgId) {\n    long count = repo.countByOrganisationId(orgId); // COUNT query, no materialisation\n    return String.format(\"TP-%d-%03d\", LocalDateTime.now().getYear(), count + 1);\n}",
+      "effort": "M",
+      "references": [
+        "https://vladmihalcea.com/eager-fetching-is-a-code-smell/",
+        "https://docs.spring.io/spring-data/jpa/reference/jpa/entity-graph.html",
+        "https://thorben-janssen.com/association-mappings-multiple-eager-fetchtype-list/"
+      ]
+    }
+  ]
+}

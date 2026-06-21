@@ -1,0 +1,321 @@
+{
+  "findings": [
+    {
+      "id": "QUAL-TI-001",
+      "title": "Two parallel SAMA-outsourcing implementations (module/outsourcing vs module/tprm/outsourcing) duplicate the same regulatory bounded context",
+      "phase": "Quality",
+      "category": "Duplication / Layering (SOLID, DRY, bounded-context overlap)",
+      "severity": "High",
+      "cvss": "Maintainability risk: two complete, independently-evolving codebases implement the same SAMA Rules Governing Outsourcing domain. A regulatory change (e.g. SAMA notification window) must be applied in two places or one silently drifts. Not exploitable, but high long-term defect/divergence cost.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/service/OutsourcingService.java",
+      "lines": "1-612",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/service/OutsourcingService.java:1-612",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/service/OutsourcingArrangementService.java:1-473",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/entity/OutsourcingArrangement.java:1-142",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/entity/OutsourcingArrangement.java:1-196",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/controller/OutsourcingController.java:1-141",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/controller/OutsourcingController.java:1-273"
+      ],
+      "description": "The codebase contains two independent SAMA-outsourcing modules. `module/outsourcing` (Sprint 30) defines entity `OutsourcingArrangement` mapped to schema `outsourcing.outsourcing_arrangement` with state machine PROPOSED->RISK_ASSESSED->BOARD_APPROVED->SAMA_NOTIFIED->LIVE->.... `module/tprm/outsourcing` (Sprint 13) defines a DIFFERENT `OutsourcingArrangement` mapped to schema `tprm.outsourcing_arrangement` with a different state machine PLANNED->DUE_DILIGENCE->AWAITING_SAMA->APPROVED->ACTIVE->.... Both ship their own `OutsourcingController`, `OutsourcingDtos`, repositories and services. They coexist only because they use different bean names (`outsourcingCloudController`) and base paths (`/api/v1/outsourcing` vs `/api/v1/tprm/outsourcing`).",
+      "rootCause": "Two sprints (13 and 30) each built a SAMA-outsourcing register without consolidating onto a shared module. The bounded context (SAMA outsourcing governance) is the same; only the surrounding sprint scope differed.",
+      "evidence": "module/outsourcing/entity/OutsourcingArrangement.java:25-28  -> @Entity(name = \"OutsourcingCloudArrangement\") @Table(schema = \"outsourcing\", name = \"outsourcing_arrangement\"); state machine PROPOSED->...->SAMA_NOTIFIED->LIVE.\nmodule/tprm/outsourcing/entity/OutsourcingArrangement.java:37-39 -> @Table(schema = \"tprm\", name = \"outsourcing_arrangement\"); state machine PLANNED->DUE_DILIGENCE->AWAITING_SAMA->APPROVED->ACTIVE.\nControllers: /api/v1/outsourcing (OutsourcingController.java:15) vs /api/v1/tprm/outsourcing (OutsourcingController.java:78). Two services totalling 612 + 473 LOC implementing the same regulation.",
+      "impact": "Regulatory logic (materiality, SAMA non-objection, exit plans, 60-day notification) must be maintained twice. Auditors and operators see two outsourcing registers with conflicting lifecycles. High risk of one path being patched while the other rots.",
+      "reproduction": "Open both OutsourcingArrangement entities and both OutsourcingControllers. Note identical domain (SAMA outsourcing) with divergent schemas, lifecycles and endpoints, both wired into the running app.",
+      "resolution": "Pick one canonical module for SAMA outsourcing. Migrate the second module's data/endpoints onto it (or formally split responsibilities: e.g. `module/outsourcing` = cloud-service governance, `module/tprm/outsourcing` = vendor-arrangement governance) and document the boundary. At minimum, extract the shared lifecycle/materiality rules into one place so they cannot diverge.",
+      "patchBefore": "// module/outsourcing/.../OutsourcingArrangement.java\n@Table(schema = \"outsourcing\", name = \"outsourcing_arrangement\")  // lifecycle: PROPOSED..LIVE\n\n// module/tprm/outsourcing/.../OutsourcingArrangement.java\n@Table(schema = \"tprm\", name = \"outsourcing_arrangement\")        // lifecycle: PLANNED..ACTIVE",
+      "patchAfter": "// One canonical com.tss.grc.module.outsourcing module owning the SAMA\n// outsourcing register and its single lifecycle state machine; the tprm\n// package depends on it (or is removed) instead of re-implementing it.",
+      "effort": "L",
+      "references": [
+        "Domain-Driven Design: one bounded context, one model",
+        "SAMA Rules Governing Outsourcing (2019, upd. 2023)"
+      ]
+    },
+    {
+      "id": "QUAL-TI-002",
+      "title": "Integration LIVE clients duplicate the retry / exponential-backoff / sleep / url harness across CrowdStrike, Tenable and Splunk",
+      "phase": "Quality",
+      "category": "Duplication (copy-paste of resilience logic)",
+      "severity": "High",
+      "cvss": "Maintainability + correctness drift: the retry/backoff/401-refresh harness is the most safety-critical code in the adapters (it gates how the SOC integration behaves under partial outage). Three independent copies guarantee they will diverge; a fix to one (e.g. honour Retry-After) will not propagate.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java",
+      "lines": "151-230",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:151-230",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:242-246",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:323-331",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/client/LiveTenableClient.java:220-326",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/client/LiveSplunkClient.java:1-195"
+      ],
+      "description": "Each LIVE integration client re-implements the same retry harness: a `BACKOFF_CAP_MS` constant, a `for (attempt=1..maxAttempts)` loop that catches `HttpServerErrorException | ResourceAccessException`, sleeps `delayMs`, multiplies by `backoffMultiplier` capped at `BACKOFF_CAP_MS`, a `doWithRetryOn5xx(Supplier)` wrapper, a private `sleep(long)` that re-throws on interrupt, and a `url(String path)` base-URL composer that strips a trailing slash. LiveTenableClient further contains THREE near-identical retry loops internally (the per-action POST loop, `runOutboundDelete` at 270-303, and `doWithRetryOn5xx` at 306-326).",
+      "rootCause": "Per-vendor adapter packages were built by copying a reference client. No shared `AbstractRetryingRestClient` / retry utility was extracted.",
+      "evidence": "grep counts: `BACKOFF_CAP_MS` in 3 files (crowdstrike, splunk, tenable LiveClient); `private static void sleep(long ms)` in 3 files; `doWithRetryOn5xx` in 2 files. Within LiveTenableClient the retry+backoff loop body (lines 255-262, 291-298, 311-321) is repeated 3x; jscpd also flags LiveTenableClient.java[290-301]<=>[313-324] as an intra-file duplicate.",
+      "impact": "A resilience bug or required enhancement (jitter, Retry-After header, idempotency) must be fixed in 3+ places. Already shows drift: CrowdStrike retries with a one-shot 401 token refresh; Tenable's loop does not.",
+      "reproduction": "Compare the retry loop in LiveCrowdStrikeClient.runDeviceAction (151-199) with LiveTenableClient (220-267) and LiveSplunkClient. Note identical structure and the duplicated `sleep`/`url`/`BACKOFF_CAP_MS`.",
+      "resolution": "Extract a shared retry utility (e.g. `RestRetrySupport.withRetry(RetryConfig, Supplier<T>)`) or a Spring Retry / Resilience4j policy bean, and a shared `baseUrl(path)` helper. Each client supplies only the call and the vendor-specific 401 handling.",
+      "patchBefore": "// duplicated in 3 clients\nprivate static final long BACKOFF_CAP_MS = 30_000L;\nprivate static void sleep(long ms) { ... }\nprivate <T> T doWithRetryOn5xx(Supplier<T> call) { for (int attempt=1; ...) { ... } }",
+      "patchAfter": "// shared\nfinal class RestRetrySupport {\n  static <T> T withRetry(RetryConfig cfg, Supplier<T> call, Runnable on401) { ... }\n}\n// client:\nreturn RestRetrySupport.withRetry(props.getRetry(), () -> http.get()...body(Map.class), tokens::refresh);",
+      "effort": "M",
+      "references": [
+        "Resilience4j Retry",
+        "Spring Retry @Retryable",
+        "audit/raw/jscpd/jscpd-report.json (crowdstrike<=>tenable client blocks)"
+      ]
+    },
+    {
+      "id": "QUAL-TI-003",
+      "title": "DomainEvent emit() + org() + currentUserId() tenant/event plumbing copy-pasted across services (4 in scope, 13 codebase-wide)",
+      "phase": "Quality",
+      "category": "Duplication (cross-module copy-paste of infrastructure helpers)",
+      "severity": "Medium",
+      "cvss": "Maintainability: the event-publishing and tenant/principal-resolution helpers are infrastructure concerns duplicated verbatim into every business service. A change to DomainEvent construction or principal extraction touches 13 files.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java",
+      "lines": "635-652",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:635-652",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cpty/service/CptyService.java:536-553",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/service/OutsourcingService.java:534-551",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/service/OutsourcingArrangementService.java:1-473"
+      ],
+      "description": "The identical trio `private void emit(String trigger, String entityType, Long entityId, String correlationId, Map payload)` (publishes a DomainEvent), `private static Long org()` (TenantContext.requireOrganisationId), and `private static Long currentUserId()` (extracts GrcUserDetails from SecurityContext) appears verbatim in ObService, CptyService and OutsourcingService, and across 13 services codebase-wide.",
+      "rootCause": "No shared base class or `@Component` helper for tenant-scoped event emission; each service was authored by copying the helper block.",
+      "evidence": "ObService.java:646-652 and CptyService.java:547-553 are byte-identical `emit(...)`. jscpd flags ObService.java[625-654]<=>RegReportingService[633-662] (30 lines) and ObService[625-656]<=>ShariaService[672-703] (32 lines). `grep 'private void emit(String trigger, String entityType, Long entityId,'` returns 13 files (openbanking, outsourcing, cpty, sharia, rrp, reginspect, regreporting, opres, fraud, data_officer, dataclass, ethics/coi, ai/lifecycle).",
+      "impact": "13 copies of identical plumbing. Any change (e.g. adding a correlation id, redacting payload keys, switching to a typed event) must be made 13x with no compiler enforcement of consistency.",
+      "reproduction": "Diff ObService.java:635-652 against CptyService.java:536-553 — identical modulo whitespace.",
+      "resolution": "Introduce a shared `DomainEventPublisher` (@Component) exposing `emit(...)`, and a `SecurityHelpers.currentUserId()` / reuse `TenantContext.requireOrganisationId()` directly. Inject the publisher into services instead of re-declaring the helper.",
+      "patchBefore": "private void emit(String trigger, String entityType, Long entityId, String correlationId, Map<String,Object> payload) {\n  publisher.publishEvent(new DomainEvent(TenantContext.getCurrentTenant(), trigger, entityType, entityId, correlationId, payload == null ? Map.of() : new HashMap<>(payload)));\n}",
+      "patchAfter": "// shared bean\n@Component class DomainEventPublisher {\n  private final ApplicationEventPublisher publisher;\n  void emit(String trigger, String entityType, Long entityId, String correlationId, Map<String,Object> payload) { ... }\n}\n// service just injects DomainEventPublisher events; calls events.emit(...)",
+      "effort": "M",
+      "references": [
+        "DRY principle",
+        "audit/raw/jscpd/jscpd-report.json"
+      ]
+    },
+    {
+      "id": "QUAL-TI-004",
+      "title": "CCM runners copy-paste JSON helper cluster (parseJson/strOr/intOr/millisSince) despite an existing shared StubRunnerSupport",
+      "phase": "Quality",
+      "category": "Duplication (copy-paste of helper methods)",
+      "severity": "Medium",
+      "cvss": "Maintainability: the same parsing/timing helpers are redeclared in each runner even though a shared helper class already exists in the package, so the duplication is gratuitous.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/CustomSqlRunner.java",
+      "lines": "158-184",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/CustomSqlRunner.java:158-184",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/SslCertExpiryRunner.java:119-147",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/LdapGroupMembershipRunner.java:120-149",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/StubRunnerSupport.java:63-65"
+      ],
+      "description": "`CustomSqlRunner`, `SslCertExpiryRunner` and `LdapGroupMembershipRunner` each declare their own `static Map<String,Object> parseJson(String)`, `static String strOr(...)`, `static int intOr(...)` and `static int millisSince(long)` with identical bodies. Meanwhile `StubRunnerSupport` (a package-private final helper holder) already exists and even already declares its own `millisSince` (line 63), so there are 4 copies of `millisSince` in one package.",
+      "evidence": "grep 'static int millisSince(long startNanos)' in module/ccm -> 4 files (CustomSqlRunner, SslCertExpiryRunner, LdapGroupMembershipRunner, StubRunnerSupport). grep 'static Map<String, Object> parseJson(String json)' -> 3 files. jscpd: CustomSqlRunner.java[155-182]<=>SslCertExpiryRunner.java[116-143] (28 lines), CustomSqlRunner.java[156-184]<=>LdapGroupMembershipRunner.java[121-149] (29 lines).",
+      "rootCause": "Runners were each scaffolded from a template that inlined the helpers instead of calling a shared support class.",
+      "impact": "Three+ copies of the JSON-coercion logic; a fix (e.g. trimming, locale-safe number parsing) must be repeated, and the existing StubRunnerSupport.millisSince is shadowed/ignored.",
+      "reproduction": "Open the `Helpers` regions of CustomSqlRunner (158-184), SslCertExpiryRunner (119-147) and LdapGroupMembershipRunner (120-149) — identical method bodies.",
+      "resolution": "Move parseJson/strOr/intOr/millisSince into StubRunnerSupport (or a `RunnerSupport` util) and have every runner call the shared versions; delete the per-runner copies.",
+      "patchBefore": "// in each runner\nstatic int millisSince(long startNanos) { return (int)((System.nanoTime()-startNanos)/1_000_000); }\nstatic Map<String,Object> parseJson(String json) { ... }",
+      "patchAfter": "// only in RunnerSupport\nstatic int millisSince(long startNanos) { ... }\nstatic Map<String,Object> parseJson(String json) { ... }\n// runners: RunnerSupport.parseJson(...), RunnerSupport.millisSince(...)",
+      "effort": "S",
+      "references": [
+        "DRY principle",
+        "audit/raw/jscpd/jscpd-report.json (CustomSqlRunner blocks)"
+      ]
+    },
+    {
+      "id": "QUAL-TI-005",
+      "title": "Dead scaffolding methods kept only to silence unused-import warnings (__keepIfNeeded, _silenceUnused) and a no-op currentUserIdOrNull()",
+      "phase": "Quality",
+      "category": "Dead code",
+      "severity": "Medium",
+      "cvss": "Code-health: methods that exist solely to reference an otherwise-unused import, plus a helper that always returns null while pretending to resolve a user id, mislead readers and hide the fact that audit user-attribution is not wired.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/controller/OutsourcingController.java",
+      "lines": "253-272",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/controller/OutsourcingController.java:255-265",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/controller/OutsourcingController.java:267-272",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/controller/OutsourcingController.java:139",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cpty/service/CptyService.java:557-558"
+      ],
+      "description": "`OutsourcingController.currentUserIdOrNull()` (255-265) ALWAYS returns null — its body sets up `auth`, comments that it does not depend on `getId()`, then `return null` inside a try whose only purpose is an empty `catch (Exception ignore) { return null; }`. It is actually called at line 139 (`Long userId = currentUserIdOrNull();`), so `userId` is unconditionally null. `_silenceUnused()` (267-272) is `@SuppressWarnings(\"unused\")` and exists purely to 'keep the import live'. Identically, `CptyService.__keepIfNeeded()` (557-558) is `@SuppressWarnings(\"unused\") private static Set<String> __keepIfNeeded() { return Set.of(); }` — present only so the `java.util.Set` import is not flagged unused.",
+      "rootCause": "Refactors removed the real usages of an import/helper but left placeholder methods rather than deleting the import.",
+      "evidence": "OutsourcingController.java:255-265 returns null on every path; called at :139. :267-272 `_silenceUnused()` touches TenantContext only to keep its import. CptyService.java:558 `private static Set<String> __keepIfNeeded() { return Set.of(); }`.",
+      "impact": "Misleading: a reader assumes user attribution is resolved for the audit trail when it is hard-coded null. The two `keep import alive` methods are pure noise and defeat the unused-import linter.",
+      "reproduction": "Read the three methods; trace currentUserIdOrNull -> always null -> userId at line 139 always null.",
+      "resolution": "Delete `_silenceUnused` and `__keepIfNeeded` and remove the now-unused imports. Either wire `currentUserIdOrNull()` to the real principal (GrcUserDetails.getUserId(), as ObService/CptyService do) or remove it and the line-139 call if user attribution is genuinely not needed here.",
+      "patchBefore": "private static Long currentUserIdOrNull() {\n    try { var auth = SecurityContextHolder.getContext().getAuthentication(); if (auth == null) return null; return null; }\n    catch (Exception ignore) { return null; }\n}\n@SuppressWarnings(\"unused\") private static Long _silenceUnused() { ... }\n// CptyService:\n@SuppressWarnings(\"unused\") private static Set<String> __keepIfNeeded() { return Set.of(); }",
+      "patchAfter": "private static Long currentUserId() {\n    var auth = SecurityContextHolder.getContext().getAuthentication();\n    return (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) ? u.getUserId() : null;\n}\n// _silenceUnused / __keepIfNeeded removed; unused imports removed.",
+      "effort": "S",
+      "references": [
+        "Dead code / YAGNI"
+      ]
+    },
+    {
+      "id": "QUAL-TI-006",
+      "title": "QuestionnaireService hand-parses SELECT-option points from JSON with indexOf/substring instead of Jackson, swallowing parse errors",
+      "phase": "Quality",
+      "category": "Error handling / Reinventing-the-wheel / Brittleness",
+      "severity": "Medium",
+      "cvss": "Correctness + maintainability: vendor questionnaire scoring (which feeds the vendor risk rating) is derived by string-scanning options_json with raw indexOf/substring and a catch-all that returns null on any failure, so malformed or differently-formatted option JSON silently scores zero/null with no signal.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java",
+      "lines": "359-371",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java:359-371"
+      ],
+      "description": "In `computeScoredPoints`, the SELECT case parses option points by searching for the quoted value in `options_json`, finding the next ':' and then walking characters that are digits/'.' to extract a number: `int colon = q.getOptionsJson().indexOf(':', i); int end = colon+1; while (end < ... && \"0123456789.\".indexOf(charAt(end))>=0) end++; try { return new BigDecimal(substring(colon+1,end).trim())...; } catch (Exception ex) { return null; }`. The comment even says 'Without a real JSON library reference here' — but the project uses Jackson throughout (ObjectMapper is used in the CCM runners and elsewhere).",
+      "rootCause": "An ad-hoc parser was written under a false assumption that no JSON library was available, with a broad catch that masks any failure as a null score.",
+      "evidence": "QuestionnaireService.java:360-370 — manual `\"\\\"\" + v + \"\\\"\"` lookup, char-walk number extraction, terminating `catch (Exception ex) { return null; }`. Comment line 360-361 'Without a real JSON library reference here'.",
+      "impact": "Brittle to formatting (whitespace, nested objects, the value appearing as a substring of another key). On any parse hiccup the question silently contributes a null score, skewing the vendor risk rating with no log/exception. Scoring is security/compliance-relevant.",
+      "reproduction": "Provide an options_json where the option value is a substring of another option key, or with spaces around the colon — the manual parser mis-reads or returns null while a JSON parse would be correct.",
+      "resolution": "Deserialize options_json with Jackson into Map<String,Number> (or a small DTO) once, look up the option value, and surface a clear validation error (as the SCALE_1_5/BOOLEAN branches already do) instead of returning null on parse failure.",
+      "patchBefore": "if (q.getOptionsJson() == null) return null;\nString pattern = \"\\\"\" + v + \"\\\"\";\nint i = q.getOptionsJson().indexOf(pattern);\nif (i < 0) throw new IllegalArgumentException(\"SELECT option not found: \" + v);\nint colon = q.getOptionsJson().indexOf(':', i);\nint end = colon + 1;\nwhile (end < q.getOptionsJson().length() && \"0123456789.\".indexOf(q.getOptionsJson().charAt(end)) >= 0) end++;\ntry { return new BigDecimal(q.getOptionsJson().substring(colon + 1, end).trim()).setScale(2, RoundingMode.HALF_UP); }\ncatch (Exception ex) { return null; }",
+      "patchAfter": "Map<String,BigDecimal> opts = MAPPER.readValue(q.getOptionsJson(), new TypeReference<>(){});\nBigDecimal pts = opts.get(v);\nif (pts == null) throw new IllegalArgumentException(\"SELECT option not found: \" + v);\nreturn pts.setScale(2, RoundingMode.HALF_UP);",
+      "effort": "S",
+      "references": [
+        "Jackson ObjectMapper (already a project dependency)",
+        "Avoid swallowing exceptions"
+      ]
+    },
+    {
+      "id": "QUAL-TI-007",
+      "title": "Integration adapters duplicate config/properties (Retry, enabled/mode/baseUrl/timeout) and the StubInvocation/StatusDto DTOs across 4 vendors",
+      "phase": "Quality",
+      "category": "Duplication (configuration & DTO boilerplate)",
+      "severity": "Medium",
+      "cvss": "Maintainability: per-vendor *Properties classes, IntegrationConfig classes, and small DTOs are near-identical, so cross-cutting config changes (new retry knob, common kill-switch semantics) must be applied 4x.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/config/CrowdStrikeProperties.java",
+      "lines": "1-127",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/config/CrowdStrikeProperties.java:106-125",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/config/TenableProperties.java:1-143",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/config/SplunkProperties.java:1-130",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/dto/StubInvocation.java:15-20",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/dto/StatusDto.java:1-14"
+      ],
+      "description": "Each vendor adapter has its own *Properties with the same enabled/mode/baseUrl/timeoutMs fields and an identical nested `Retry { maxAttempts=3; initialDelayMs=500; backoffMultiplier=2.0 }` class plus identical getters/setters; the *IntegrationConfig classes share the same RestClient-builder shape; and `StubInvocation` (a record of at/method/targetId/payload) is copied into all 4 vendor dto packages while `StatusDto` is copied into 2.",
+      "rootCause": "Adapters were templated per vendor with no shared `integrations.common` package for cross-vendor config and DTOs.",
+      "evidence": "find StubInvocation.java -> 4 copies (crowdstrike, servicenow, splunk, tenable). find StatusDto.java -> 2 copies (crowdstrike, tenable). jscpd: CrowdStrikeProperties.java[110-126]<=>SplunkProperties.java[95-111] and <=>TenableProperties.java[127-143] (17 lines each, the Retry block); CrowdStrikeIntegrationConfig.java[1-15]<=> three other IntegrationConfig files.",
+      "impact": "4 copies of the Retry config and StubInvocation record; 2 of StatusDto. Adding a retry parameter or a stub field means editing every vendor package, and they can drift (Splunk's Properties already omits OAuth getters CrowdStrike has).",
+      "reproduction": "Run `find tss-grc-backend/src/main/java/com/tss/grc/module/integrations -name StubInvocation.java` (4 hits) and compare the four records; diff CrowdStrikeProperties.Retry against TenableProperties.Retry / SplunkProperties.Retry — identical fields and defaults.",
+      "resolution": "Create `integrations/common` holding a shared `RetryProperties` (composed via @NestedConfigurationProperty), a base config helper for the RestClient, and shared `StubInvocation` / `IntegrationStatus` records. Vendor properties extend/compose the shared pieces.",
+      "patchBefore": "// repeated in crowdstrike/tenable/splunk Properties\npublic static class Retry { private int maxAttempts=3; private long initialDelayMs=500L; private double backoffMultiplier=2.0; ...getters/setters... }\n// repeated record in 4 dto packages\npublic record StubInvocation(Instant at, String method, String targetId, Map<String,Object> payload) {}",
+      "patchAfter": "// integrations/common\npublic class RetryProperties { ... }\npublic record StubInvocation(Instant at, String method, String targetId, Map<String,Object> payload) {}\n// vendor props:\n@NestedConfigurationProperty private final RetryProperties retry = new RetryProperties();",
+      "effort": "M",
+      "references": [
+        "audit/raw/jscpd/jscpd-report.json (integrations config/dto blocks)",
+        "DRY principle"
+      ]
+    },
+    {
+      "id": "QUAL-TI-008",
+      "title": "Dashboard read methods scan large paged result sets in memory with magic page sizes (ObService.dashboard, OutsourcingService.dashboard)",
+      "phase": "Quality",
+      "category": "Long method / Magic numbers / Inefficient read pattern",
+      "severity": "Medium",
+      "cvss": "Maintainability + scalability: dashboard aggregation is done by pulling fixed-size pages (500/200/10) into memory and filtering with streams, mixing query and aggregation concerns in one ~68-LOC method with unexplained constants.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java",
+      "lines": "511-579",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:511-579",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/service/OutsourcingService.java:446-488",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/cpty/service/CptyService.java:425-470"
+      ],
+      "description": "`ObService.dashboard()` (511-579, ~68 LOC) computes 'revoked last 24h' by fetching `PageRequest.of(0, 500)` of consents and filtering in a stream (518-524), 'samaReportableOpen' from `PageRequest.of(0, 200)` of incidents (531-535), and consents-by-type from another 500-page (553-557). The page sizes 500, 200, 10 and the 30-day cert window are unexplained literals. A comment at 518 admits 'Approximate \"revoked last 24h\" by scanning paged set' — i.e. the figure is wrong once there are >500 consents.",
+      "rootCause": "Aggregations were implemented with in-memory stream filtering over capped pages rather than COUNT/aggregate repository queries, and bounds were hard-coded inline.",
+      "evidence": "ObService.java:519-524 stream over PageRequest.of(0,500); :531-535 over PageRequest.of(0,200); :543-546 certExpiring filter; comment :518 'Approximate ... by scanning paged set'. Method spans 68 LOC. OutsourcingService.dashboard (446-488) and CptyService.dashboard (425-470) follow the same shape.",
+      "impact": "Results silently become inaccurate beyond the page cap (e.g. revokedConsents24h undercounts when >500 consents exist), and the method loads up to ~1200 rows per dashboard hit. Magic numbers obscure intent and are duplicated across dashboards.",
+      "reproduction": "Seed >500 consents with >500 revoked in 24h; ObService.dashboard reports at most the 500-page subset's matches, not the true count.",
+      "resolution": "Replace in-memory scans with repository COUNT/aggregate queries (e.g. countByOrganisationIdAndStatusAndRevokedAtAfter, group-by counts). Extract page sizes / windows into named constants. Consider splitting dashboard() into smaller private aggregators.",
+      "patchBefore": "long revokedRecent = consentRepo.findByOrganisationIdOrderByGrantedAtDesc(org(), PageRequest.of(0, 500)).stream()\n    .filter(c -> \"REVOKED\".equals(c.getStatus()) && c.getRevokedAt()!=null && c.getRevokedAt().isAfter(LocalDateTime.now().minusDays(1)))\n    .count();",
+      "patchAfter": "long revokedRecent = consentRepo.countByOrganisationIdAndStatusAndRevokedAtAfter(org(), \"REVOKED\", LocalDateTime.now().minusDays(1));",
+      "effort": "M",
+      "references": [
+        "Avoid in-memory aggregation of capped pages",
+        "Replace magic numbers with named constants"
+      ]
+    },
+    {
+      "id": "QUAL-TI-009",
+      "title": "Pervasive cause-loss in catch blocks: only ex.getMessage() logged, exception/stacktrace dropped",
+      "phase": "Quality",
+      "category": "Error handling (lost root cause / no stacktrace)",
+      "severity": "Low",
+      "cvss": "Diagnosability: best-effort catches across CCM and integrations log `{}` with `ex.getMessage()` but never pass the Throwable, so stacktraces and chained causes are lost from logs — making production incident triage on integration failures and auto-CAPA failures hard.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/automation/TprmAutomationService.java",
+      "lines": "60-62",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/automation/TprmAutomationService.java:60-62",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/automation/TprmAutomationService.java:83-85",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/automation/TprmAutomationService.java:107-109",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/service/CcmService.java:197-199",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/service/CcmService.java:286-293",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/ccm/service/CcmSchedulerService.java:84-89",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/service/CrowdStrikeInboundService.java:125-129",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:143-146"
+      ],
+      "description": "A consistent pattern of `catch (Exception ex) { log.warn(\"... {}\", ..., ex.getMessage()); }` (and `catch (RuntimeException ex)` variants) where the Throwable itself is not passed to the logger. Examples: TprmAutomationService auto-CAPA hooks (60,83,107), CcmService runner-guard (197) and openConsecutiveFailureIssue (291), CcmSchedulerService dispatch (85), and most integration inbound/outbound/health catches. These are legitimately best-effort (the design intentionally continues), but dropping the cause makes failures opaque.",
+      "rootCause": "Logging convention used `ex.getMessage()` as a format arg instead of passing `ex` as the last SLF4J argument (which would render the stacktrace).",
+      "evidence": "TprmAutomationService.java:61 `log.warn(\"Auto-CAPA for 4P {} failed: {}\", ex.getFourthPartyName(), e.getMessage());` (no Throwable). CrowdStrikeInboundService.java:128 `log.warn(\"[CrowdStrike] scheduled poll failed: {}\", ex.getMessage());`. CcmService.java:197 `log.warn(\"CCM runner threw for test {}: {}\", d.getTestCode(), ex.getMessage());`.",
+      "impact": "When integration polls or auto-CAPA creation fail in production, logs show only the top-level message (often null for NPE) with no stacktrace or chained cause, slowing incident triage.",
+      "reproduction": "Trigger an exception with a null/uninformative message (e.g. NPE) in any of these paths; the warn line shows 'failed: null' with no stack.",
+      "resolution": "Pass the Throwable as the final SLF4J argument so the stacktrace is rendered: `log.warn(\"...failed for {}\", id, ex);` (keep WARN level for best-effort paths). For the CcmSchedulerService cron-parse swallow (CcmSchedulerService.isDue catch at 108-110) add at least a debug log.",
+      "patchBefore": "catch (Exception ex) {\n    log.warn(\"[CrowdStrike] scheduled poll failed: {}\", ex.getMessage());\n}",
+      "patchAfter": "catch (Exception ex) {\n    log.warn(\"[CrowdStrike] scheduled poll failed\", ex);\n}",
+      "effort": "S",
+      "references": [
+        "SLF4J: pass Throwable as last arg to log the stacktrace",
+        "Do not lose exception cause"
+      ]
+    },
+    {
+      "id": "QUAL-TI-010",
+      "title": "Local variable 'http' shadows the RestClient field of the same name in LiveCrowdStrikeClient.runDeviceAction",
+      "phase": "Quality",
+      "category": "Naming clarity (variable shadowing)",
+      "severity": "Low",
+      "cvss": "Readability: a local `int http` shadows the instance field `RestClient http`, two different types under one name in the same method — easy to misread, no functional bug today only because the field is not referenced afterwards in the loop body.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java",
+      "lines": "173-177",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:63",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:173-177"
+      ],
+      "description": "The class has field `private final RestClient http;` (line 63). Inside `runDeviceAction` a local `int http = entity.getStatusCode().value();` (line 173) shadows it and is then used in the log line and the ContainmentResponse (174-177). The Tenable equivalent correctly names this `httpStatus` (LiveTenableClient.java:248), confirming the CrowdStrike name is an inconsistency.",
+      "rootCause": "Variable named after the concept (HTTP status) collided with the injected RestClient field name.",
+      "evidence": "LiveCrowdStrikeClient.java:63 `private final RestClient http;` vs :173 `int http = entity.getStatusCode().value();` (used at :175 and :177). Contrast LiveTenableClient.java:248 `int httpStatus = entity.getStatusCode().value();`.",
+      "impact": "Confusing for maintainers; a future edit that needs `this.http` inside the post-status block would silently bind to the int. Low risk but a clear naming defect.",
+      "reproduction": "Read runDeviceAction lines 161-177; note the int named the same as the RestClient field.",
+      "resolution": "Rename the local to `httpStatus` (matching the Tenable client).",
+      "patchBefore": "int http = entity.getStatusCode().value();\nlog.info(\"[CrowdStrike] {} host={} http={} resourceId={} attempt={}/{}\", actionType, hostId, http, resourceId, attempt, maxAttempts);\nreturn new ContainmentResponse(actionType, hostId, entity.getStatusCode().is2xxSuccessful(), http, attempt, resourceId);",
+      "patchAfter": "int httpStatus = entity.getStatusCode().value();\nlog.info(\"[CrowdStrike] {} host={} http={} resourceId={} attempt={}/{}\", actionType, hostId, httpStatus, resourceId, attempt, maxAttempts);\nreturn new ContainmentResponse(actionType, hostId, entity.getStatusCode().is2xxSuccessful(), httpStatus, attempt, resourceId);",
+      "effort": "S",
+      "references": [
+        "Avoid shadowing fields with locals"
+      ]
+    },
+    {
+      "id": "QUAL-TI-011",
+      "title": "tprm/outsourcing Create/Update request records duplicate ~25 fields each (DTO copy-paste)",
+      "phase": "Quality",
+      "category": "Duplication (DTO field repetition)",
+      "severity": "Low",
+      "cvss": "Maintainability: the Create and Update arrangement request records repeat the same ~25 fields with only validation-annotation differences; adding a field means editing both and keeping them in sync by hand.",
+      "file": "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/dto/OutsourcingDtos.java",
+      "lines": "26-90",
+      "locations": [
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/dto/OutsourcingDtos.java:26-59",
+        "tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/dto/OutsourcingDtos.java:61-90"
+      ],
+      "description": "`ArrangementCreateRequest` and `ArrangementUpdateRequest` enumerate essentially the same fields (titleEn/Ar, serviceType, primaryVendorId, coVendorIds, isMaterial, materialityBasis*, samaNonObjection*, contract*, countryOfProcessing, dataResidency, pdpl*, etc.), differing mainly in @NotBlank/@NotNull presence. jscpd flags an intra-file 12-line duplicate (OutsourcingDtos.java[33-44]<=>[66-77]).",
+      "rootCause": "Update DTO was copied from Create DTO and the validation annotations relaxed, rather than sharing a common field carrier.",
+      "evidence": "jscpd: tprm/outsourcing/dto/OutsourcingDtos.java[33-44]<=>[66-77] (12 lines). Manual read confirms ~25 shared fields across the two records (26-59 vs 61-90).",
+      "impact": "Field additions/renames must be mirrored across both records with no compiler help; easy for the two to drift (e.g. a field added to Create but forgotten on Update).",
+      "reproduction": "Diff the two records; observe the large shared field set.",
+      "resolution": "Accept this as a known trade-off of records, OR introduce a shared component (e.g. a nested `ArrangementCore` record / interface) the two requests embed, so the field list lives in one place.",
+      "patchBefore": "public record ArrangementCreateRequest(... 25 fields with @NotBlank/@NotNull ...) {}\npublic record ArrangementUpdateRequest(... same 25 fields without some constraints ...) {}",
+      "patchAfter": "public record ArrangementCore(String titleEn, String titleAr, String serviceType, ...) {}\npublic record ArrangementCreateRequest(@Valid @NotNull ArrangementCore core, @NotBlank String arrangementCode) {}\npublic record ArrangementUpdateRequest(@Valid ArrangementCore core) {}",
+      "effort": "S",
+      "references": [
+        "audit/raw/jscpd/jscpd-report.json (OutsourcingDtos intra-file block)"
+      ]
+    }
+  ]
+}
