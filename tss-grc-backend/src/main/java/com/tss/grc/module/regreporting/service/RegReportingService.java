@@ -456,34 +456,17 @@ public class RegReportingService {
 
     @Transactional(readOnly = true)
     public DashboardResponse dashboard() {
+        LocalDate today = LocalDate.now();
+
         long activeOblig = obligationRepo.countByOrganisationIdAndActive(org(), true);
         long inFlight = filingRepo.countByOrganisationIdAndStatusIn(
                 org(), IN_FLIGHT_STATUSES);
+        long dueWithin7 = countDueWithin7(today);
+        long overdue = countOverdue(today);
+        long submittedThisQuarter = countSubmittedSince(quarterStart(today));
 
-        LocalDate today = LocalDate.now();
-        long dueWithin7 = filingRepo
-                .findByOrganisationIdAndDueDateBetweenOrderByDueDateAsc(
-                        org(), today, today.plusDays(7)).stream()
-                .filter(f -> OVERDUE_APPLICABLE.contains(f.getStatus())
-                        || "SCHEDULED".equals(f.getStatus()))
-                .count();
-
-        long overdue = filingRepo.countByOrganisationIdAndStatusNotInAndDueDateBefore(
-                org(),
-                Set.of("SUBMITTED", "ACKNOWLEDGED", "CLOSED", "EXEMPTED"),
-                today);
-
-        LocalDate quarterStart = today
-                .withMonth(((today.getMonthValue() - 1) / 3) * 3 + 1)
-                .with(TemporalAdjusters.firstDayOfMonth());
-        long submittedThisQuarter = filingRepo
-                .findByOrganisationIdAndStatusInOrderByDueDateAsc(
-                        org(), Set.of("SUBMITTED", "ACKNOWLEDGED", "CLOSED")).stream()
-                .filter(f -> f.getSubmittedAt() != null
-                        && !f.getSubmittedAt().toLocalDate().isBefore(quarterStart))
-                .count();
-
-        // In-flight breakdowns
+        // In-flight breakdowns share a per-obligation cache with the upcoming /
+        // overdue lists below so each obligation is loaded at most once.
         List<RegReportFiling> inflightList = filingRepo
                 .findByOrganisationIdAndStatusInOrderByDueDateAsc(
                         org(), IN_FLIGHT_STATUSES);
@@ -501,22 +484,8 @@ public class RegReportingService {
             byStatus.merge(f.getStatus(), 1L, Long::sum);
         }
 
-        List<FilingResponse> upcoming = filingRepo
-                .findByOrganisationIdAndDueDateBetweenOrderByDueDateAsc(
-                        org(), today, today.plusDays(14)).stream()
-                .filter(f -> !TERMINAL_STATUSES.contains(f.getStatus()))
-                .map(f -> toFiling(f, obligCache.computeIfAbsent(f.getObligationId(),
-                        oid -> obligationRepo.findByIdAndOrganisationId(oid, org()).orElse(null))))
-                .toList();
-
-        List<FilingResponse> overdueRecent = inflightList.stream()
-                .filter(f -> OVERDUE_APPLICABLE.contains(f.getStatus())
-                        && f.getDueDate() != null
-                        && f.getDueDate().isBefore(today))
-                .sorted(Comparator.comparing(RegReportFiling::getDueDate))
-                .limit(10)
-                .map(f -> toFiling(f, obligCache.get(f.getObligationId())))
-                .toList();
+        List<FilingResponse> upcoming = upcoming(today, obligCache);
+        List<FilingResponse> overdueRecent = overdueRecent(today, inflightList, obligCache);
 
         return DashboardResponse.builder()
                 .activeObligationCount(activeOblig)
@@ -529,6 +498,65 @@ public class RegReportingService {
                 .upcoming(upcoming)
                 .overdueRecent(overdueRecent)
                 .build();
+    }
+
+    /** Filings due in the next 7 days that are still SCHEDULED or otherwise overdue-applicable. */
+    private long countDueWithin7(LocalDate today) {
+        return filingRepo
+                .findByOrganisationIdAndDueDateBetweenOrderByDueDateAsc(
+                        org(), today, today.plusDays(7)).stream()
+                .filter(f -> OVERDUE_APPLICABLE.contains(f.getStatus())
+                        || "SCHEDULED".equals(f.getStatus()))
+                .count();
+    }
+
+    /** Filings past their due date that have not been submitted/closed/exempted. */
+    private long countOverdue(LocalDate today) {
+        return filingRepo.countByOrganisationIdAndStatusNotInAndDueDateBefore(
+                org(),
+                Set.of("SUBMITTED", "ACKNOWLEDGED", "CLOSED", "EXEMPTED"),
+                today);
+    }
+
+    /** Count of submitted/acknowledged/closed filings actually submitted on or after {@code since}. */
+    private long countSubmittedSince(LocalDate since) {
+        return filingRepo
+                .findByOrganisationIdAndStatusInOrderByDueDateAsc(
+                        org(), Set.of("SUBMITTED", "ACKNOWLEDGED", "CLOSED")).stream()
+                .filter(f -> f.getSubmittedAt() != null
+                        && !f.getSubmittedAt().toLocalDate().isBefore(since))
+                .count();
+    }
+
+    /** First day of the calendar quarter containing {@code today}. */
+    static LocalDate quarterStart(LocalDate today) {
+        return today
+                .withMonth(((today.getMonthValue() - 1) / 3) * 3 + 1)
+                .with(TemporalAdjusters.firstDayOfMonth());
+    }
+
+    /** Non-terminal filings due within the next 14 days; hydrates via the shared cache. */
+    private List<FilingResponse> upcoming(LocalDate today, Map<Long, RegReportObligation> obligCache) {
+        return filingRepo
+                .findByOrganisationIdAndDueDateBetweenOrderByDueDateAsc(
+                        org(), today, today.plusDays(14)).stream()
+                .filter(f -> !TERMINAL_STATUSES.contains(f.getStatus()))
+                .map(f -> toFiling(f, obligCache.computeIfAbsent(f.getObligationId(),
+                        oid -> obligationRepo.findByIdAndOrganisationId(oid, org()).orElse(null))))
+                .toList();
+    }
+
+    /** Up to 10 in-flight, overdue filings sorted by due date; obligations read from the shared cache. */
+    private List<FilingResponse> overdueRecent(LocalDate today, List<RegReportFiling> inflightList,
+                                               Map<Long, RegReportObligation> obligCache) {
+        return inflightList.stream()
+                .filter(f -> OVERDUE_APPLICABLE.contains(f.getStatus())
+                        && f.getDueDate() != null
+                        && f.getDueDate().isBefore(today))
+                .sorted(Comparator.comparing(RegReportFiling::getDueDate))
+                .limit(10)
+                .map(f -> toFiling(f, obligCache.get(f.getObligationId())))
+                .toList();
     }
 
     // ─── Helpers ───────────────────────────────────────────────────

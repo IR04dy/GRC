@@ -294,102 +294,17 @@ public class AiSuggestionService {
         String status     = safe(in.status()).toUpperCase(Locale.ROOT);
         String anchor     = safe(in.regulatoryAnchor());
 
-        // Per-wizard tailored checklists. Each branch builds the
-        // checklistEn + checklistAr lists keyed off the specific
-        // regulator expectations for that wizard.
-        List<String> checklistEn = new ArrayList<>();
-        List<String> checklistAr = new ArrayList<>();
-        String headlineEn;
-        String headlineAr;
-        String suggestedDecision = "REVIEW";
-        int conf = 60;
+        // Per-wizard tailored checklists, keyed off the specific regulator
+        // expectations for that wizard. First matcher wins; otherwise the
+        // generic fallback applies — preserving the original ladder order.
+        ReviewTemplate tpl = REVIEW_TEMPLATES.stream()
+            .filter(t -> t.matches(workflowId, module))
+            .findFirst()
+            .map(ReviewMatcher::template)
+            .orElse(GENERIC_REVIEW_TEMPLATE);
 
-        if (workflowId.contains("pdpl-breach")) {
-            headlineEn = "Personal-data breach — verify the 72-hour SDAIA clock";
-            headlineAr = "خرق بيانات شخصية — تحقق من عداد ٧٢ ساعة للهيئة";
-            checklistEn.add("Confirm discoveredAt + reportedToAuthority fields match the wizard input.");
-            checklistEn.add("If the breach is material, ensure SDAIA was filed within 72 hours of discovery.");
-            checklistEn.add("Spot-check whether containmentSummary references a closed crisis_event.");
-            checklistEn.add("Verify DPO approval before flipping status to NOTIFIED.");
-            checklistAr.add("تأكد من تطابق وقت الاكتشاف وحالة التبليغ مع مدخلات المعالج.");
-            checklistAr.add("إذا كان الخرق جوهرياً، تأكد من تبليغ الهيئة خلال ٧٢ ساعة من الاكتشاف.");
-            checklistAr.add("تحقق من ربط ملخص الاحتواء بحدث أزمة مغلق.");
-            checklistAr.add("اعتماد DPO قبل تحويل الحالة إلى مبلَّغ.");
-            suggestedDecision = "APPROVE";
-            conf = 80;
-        } else if (workflowId.contains("nca-cyber-incident")) {
-            headlineEn = "NCA cyber incident — confirm severity + lessons learned";
-            headlineAr = "حادث سيبراني NCA — تأكيد الشدة والدروس المستفادة";
-            checklistEn.add("Severity must align with NIST 800-61 severity scoring (1..5).");
-            checklistEn.add("All 9 lifecycle steps (detection → lessons) should have evidence linked.");
-            checklistEn.add("If NCA-reportable, verify CISO + BCM handoff happened before approval.");
-            checklistEn.add("Spot-check the lessonsLearned field — is there an actionable item?");
-            checklistAr.add("الشدة يجب أن تتوافق مع تصنيف NIST 800-61 (١..٥).");
-            checklistAr.add("يجب ربط أدلة لكل خطوة من الخطوات التسعة (من الاكتشاف إلى الدروس).");
-            checklistAr.add("إذا كان قابلاً للإبلاغ، تحقق من اعتماد CISO وتسليم BCM قبل الاعتماد.");
-            checklistAr.add("راجع حقل الدروس المستفادة — هل يحتوي إجراء قابل للتنفيذ؟");
-            suggestedDecision = "APPROVE";
-            conf = 75;
-        } else if (workflowId.contains("erm-risk-acceptance")) {
-            headlineEn = "Risk acceptance — confirm above-appetite governance";
-            headlineAr = "قبول الخطر — تأكد من حوكمة تجاوز الشهية";
-            checklistEn.add("If residualScore > appetiteUpper, the wizard flagged BOARD-required — verify boardSignedByName.");
-            checklistEn.add("Expiry date must be Hijri-aware; treat blank as a red flag.");
-            checklistEn.add("CRO sign-off is mandatory for HIGH-residual acceptances.");
-            checklistEn.add("Conditions field should describe the compensating control + monitoring cadence.");
-            checklistAr.add("إذا تجاوز الخطر المتبقي حد الشهية، فيلزم اعتماد المجلس — تحقق من الاسم.");
-            checklistAr.add("تاريخ الانتهاء يجب أن يدعم التقويم الهجري؛ الفراغ مؤشر خطر.");
-            checklistAr.add("اعتماد CRO إلزامي لمستويات المخاطر المرتفعة.");
-            checklistAr.add("حقل الشروط يجب أن يصف الضوابط المعوضة وتواتر المراقبة.");
-            conf = 70;
-        } else if (workflowId.contains("pdpl-cross-border")) {
-            headlineEn = "Cross-border transfer — verify Saudi Data Office gating";
-            headlineAr = "نقل عبر الحدود — تحقق من اشتراطات مكتب البيانات السعودي";
-            checklistEn.add("ADEQUACY / SCC / BCR / PUBLIC_INTEREST mechanisms require a SDO reference.");
-            checklistEn.add("If sensitivity ∈ {CHILDREN, BIOMETRIC} or volumeBand=GTE_1M, a DPIA must be linked.");
-            checklistEn.add("Review-period months must be ≤ 12 for STANDARD-sensitivity; ≤ 6 for sensitive.");
-            checklistEn.add("CISO sign-off needed for cross-border transfers off-Kingdom.");
-            checklistAr.add("آليات الكفاية / SCC / BCR / المصلحة العامة تحتاج مرجع مكتب البيانات.");
-            checklistAr.add("إذا كانت الحساسية للأطفال أو بيومترية أو ≥١ مليون شخص، يلزم DPIA مرتبط.");
-            checklistAr.add("فترة المراجعة يجب أن تكون ≤ ١٢ شهراً للعادي و ≤ ٦ للحساس.");
-            checklistAr.add("اعتماد CISO لازم للنقل خارج المملكة.");
-            conf = 75;
-        } else if (workflowId.contains("governance-board-pack")) {
-            headlineEn = "Board pack — confirm approver chain + watermarks";
-            headlineAr = "ملف المجلس — تأكد من سلسلة الاعتماد والعلامات المائية";
-            checklistEn.add("CRO + CISO + CEO approvals are non-negotiable before distribution.");
-            checklistEn.add("DPO sign-off is required if the pack includes personal-data KPIs.");
-            checklistEn.add("Watermark should be true for any audience outside the executive team.");
-            checklistEn.add("AI executive-summary must have been human-edited (aiSummaryAccepted=true).");
-            checklistAr.add("اعتمادات CRO و CISO و CEO إلزامية قبل التوزيع.");
-            checklistAr.add("اعتماد DPO لازم إذا تضمن الملف مؤشرات بيانات شخصية.");
-            checklistAr.add("العلامة المائية تكون مفعّلة لأي جمهور خارج الإدارة التنفيذية.");
-            checklistAr.add("الملخص بالذكاء الاصطناعي يجب أن يكون قد روجع بشرياً.");
-            conf = 65;
-        } else if (module.equals("BCM")) {
-            headlineEn = "BCM submission — verify ISO 22301 §9.3 alignment";
-            headlineAr = "بلاغ BCM — تأكد من توافقه مع ISO 22301 §9.3";
-            checklistEn.add("Exercise outcome must match RTO/RPO actual vs target.");
-            checklistEn.add("If actualRtoHours > target, a CAPA must exist.");
-            checklistEn.add("Peak-season lens (Hajj / Ramadan) flagged where relevant.");
-            checklistAr.add("نتيجة التمرين يجب أن تتطابق مع RTO/RPO الفعلي مقابل المستهدف.");
-            checklistAr.add("إذا تجاوز RTO المستهدف، يجب وجود CAPA.");
-            checklistAr.add("منظور موسم الذروة (الحج / رمضان) عند الاقتضاء.");
-            conf = 60;
-        } else {
-            // Generic fallback — every submission deserves at least these.
-            headlineEn = "Review the wizard payload against the relevant Saudi regulator citation";
-            headlineAr = "راجع حمولة المعالج وفق المرجع التنظيمي السعودي ذي الصلة";
-            checklistEn.add("Verify the regulatory anchor is correct for the chosen workflow.");
-            checklistEn.add("Spot-check the summary for completeness vs the payload JSON.");
-            checklistEn.add("Confirm the submitter role is in the right governance committee.");
-            checklistEn.add("Decide APPROVE / REJECT / UNDER_REVIEW with a reason note.");
-            checklistAr.add("تأكد من صحة المرجع التنظيمي لنوع المعالج المختار.");
-            checklistAr.add("راجع الملخص للتأكد من اكتماله مقارنة بحمولة JSON.");
-            checklistAr.add("تأكد من أن دور المُرسل ضمن لجنة الحوكمة الصحيحة.");
-            checklistAr.add("اتخذ قراراً (اعتماد/رفض/قيد المراجعة) مع سبب موثق.");
-            conf = 50;
-        }
+        String suggestedDecision = tpl.suggestedDecision();
+        int conf = tpl.conf();
 
         // Status-dependent suggestion.
         if ("REJECTED".equals(status))        suggestedDecision = "CLOSE";
@@ -397,10 +312,10 @@ public class AiSuggestionService {
         else if ("UNDER_REVIEW".equals(status)) suggestedDecision = "APPROVE";
 
         Map<String, Object> output = new LinkedHashMap<>();
-        output.put("headlineEn",         headlineEn);
-        output.put("headlineAr",         headlineAr);
-        output.put("checklistEn",        checklistEn);
-        output.put("checklistAr",        checklistAr);
+        output.put("headlineEn",         tpl.headlineEn());
+        output.put("headlineAr",         tpl.headlineAr());
+        output.put("checklistEn",        new ArrayList<>(tpl.checklistEn()));
+        output.put("checklistAr",        new ArrayList<>(tpl.checklistAr()));
         output.put("regulatorCitation",  anchor.isBlank() ? null : anchor);
         output.put("suggestedDecision",  suggestedDecision);
 
@@ -409,6 +324,124 @@ public class AiSuggestionService {
             "Per-wizard heuristic checklist keyed off workflowId + module + status + anchor. "
             + "Swap for an LLM-backed reviewer assistant when the AI gateway is wired.");
     }
+
+    /** Static content for one wizard's review hint (default suggestedDecision before status override). */
+    private record ReviewTemplate(String headlineEn, String headlineAr,
+                                  List<String> checklistEn, List<String> checklistAr,
+                                  String suggestedDecision, int conf) {}
+
+    /** Pairs a (workflowId-prefix / module) predicate with the content it yields. */
+    private record ReviewMatcher(java.util.function.BiPredicate<String, String> predicate,
+                                 ReviewTemplate template) {
+        boolean matches(String workflowId, String module) {
+            return predicate.test(workflowId, module);
+        }
+    }
+
+    /** Generic fallback — every submission deserves at least these. */
+    private static final ReviewTemplate GENERIC_REVIEW_TEMPLATE = new ReviewTemplate(
+        "Review the wizard payload against the relevant Saudi regulator citation",
+        "راجع حمولة المعالج وفق المرجع التنظيمي السعودي ذي الصلة",
+        List.of(
+            "Verify the regulatory anchor is correct for the chosen workflow.",
+            "Spot-check the summary for completeness vs the payload JSON.",
+            "Confirm the submitter role is in the right governance committee.",
+            "Decide APPROVE / REJECT / UNDER_REVIEW with a reason note."),
+        List.of(
+            "تأكد من صحة المرجع التنظيمي لنوع المعالج المختار.",
+            "راجع الملخص للتأكد من اكتماله مقارنة بحمولة JSON.",
+            "تأكد من أن دور المُرسل ضمن لجنة الحوكمة الصحيحة.",
+            "اتخذ قراراً (اعتماد/رفض/قيد المراجعة) مع سبب موثق."),
+        "REVIEW", 50);
+
+    /**
+     * Ordered per-wizard review templates. Evaluated top-to-bottom (first match
+     * wins), mirroring the original if/else ladder: five workflowId-substring
+     * matches, then a BCM module match, then the generic fallback.
+     */
+    private static final List<ReviewMatcher> REVIEW_TEMPLATES = List.of(
+        new ReviewMatcher((wf, mod) -> wf.contains("pdpl-breach"), new ReviewTemplate(
+            "Personal-data breach — verify the 72-hour SDAIA clock",
+            "خرق بيانات شخصية — تحقق من عداد ٧٢ ساعة للهيئة",
+            List.of(
+                "Confirm discoveredAt + reportedToAuthority fields match the wizard input.",
+                "If the breach is material, ensure SDAIA was filed within 72 hours of discovery.",
+                "Spot-check whether containmentSummary references a closed crisis_event.",
+                "Verify DPO approval before flipping status to NOTIFIED."),
+            List.of(
+                "تأكد من تطابق وقت الاكتشاف وحالة التبليغ مع مدخلات المعالج.",
+                "إذا كان الخرق جوهرياً، تأكد من تبليغ الهيئة خلال ٧٢ ساعة من الاكتشاف.",
+                "تحقق من ربط ملخص الاحتواء بحدث أزمة مغلق.",
+                "اعتماد DPO قبل تحويل الحالة إلى مبلَّغ."),
+            "APPROVE", 80)),
+        new ReviewMatcher((wf, mod) -> wf.contains("nca-cyber-incident"), new ReviewTemplate(
+            "NCA cyber incident — confirm severity + lessons learned",
+            "حادث سيبراني NCA — تأكيد الشدة والدروس المستفادة",
+            List.of(
+                "Severity must align with NIST 800-61 severity scoring (1..5).",
+                "All 9 lifecycle steps (detection → lessons) should have evidence linked.",
+                "If NCA-reportable, verify CISO + BCM handoff happened before approval.",
+                "Spot-check the lessonsLearned field — is there an actionable item?"),
+            List.of(
+                "الشدة يجب أن تتوافق مع تصنيف NIST 800-61 (١..٥).",
+                "يجب ربط أدلة لكل خطوة من الخطوات التسعة (من الاكتشاف إلى الدروس).",
+                "إذا كان قابلاً للإبلاغ، تحقق من اعتماد CISO وتسليم BCM قبل الاعتماد.",
+                "راجع حقل الدروس المستفادة — هل يحتوي إجراء قابل للتنفيذ؟"),
+            "APPROVE", 75)),
+        new ReviewMatcher((wf, mod) -> wf.contains("erm-risk-acceptance"), new ReviewTemplate(
+            "Risk acceptance — confirm above-appetite governance",
+            "قبول الخطر — تأكد من حوكمة تجاوز الشهية",
+            List.of(
+                "If residualScore > appetiteUpper, the wizard flagged BOARD-required — verify boardSignedByName.",
+                "Expiry date must be Hijri-aware; treat blank as a red flag.",
+                "CRO sign-off is mandatory for HIGH-residual acceptances.",
+                "Conditions field should describe the compensating control + monitoring cadence."),
+            List.of(
+                "إذا تجاوز الخطر المتبقي حد الشهية، فيلزم اعتماد المجلس — تحقق من الاسم.",
+                "تاريخ الانتهاء يجب أن يدعم التقويم الهجري؛ الفراغ مؤشر خطر.",
+                "اعتماد CRO إلزامي لمستويات المخاطر المرتفعة.",
+                "حقل الشروط يجب أن يصف الضوابط المعوضة وتواتر المراقبة."),
+            "REVIEW", 70)),
+        new ReviewMatcher((wf, mod) -> wf.contains("pdpl-cross-border"), new ReviewTemplate(
+            "Cross-border transfer — verify Saudi Data Office gating",
+            "نقل عبر الحدود — تحقق من اشتراطات مكتب البيانات السعودي",
+            List.of(
+                "ADEQUACY / SCC / BCR / PUBLIC_INTEREST mechanisms require a SDO reference.",
+                "If sensitivity ∈ {CHILDREN, BIOMETRIC} or volumeBand=GTE_1M, a DPIA must be linked.",
+                "Review-period months must be ≤ 12 for STANDARD-sensitivity; ≤ 6 for sensitive.",
+                "CISO sign-off needed for cross-border transfers off-Kingdom."),
+            List.of(
+                "آليات الكفاية / SCC / BCR / المصلحة العامة تحتاج مرجع مكتب البيانات.",
+                "إذا كانت الحساسية للأطفال أو بيومترية أو ≥١ مليون شخص، يلزم DPIA مرتبط.",
+                "فترة المراجعة يجب أن تكون ≤ ١٢ شهراً للعادي و ≤ ٦ للحساس.",
+                "اعتماد CISO لازم للنقل خارج المملكة."),
+            "REVIEW", 75)),
+        new ReviewMatcher((wf, mod) -> wf.contains("governance-board-pack"), new ReviewTemplate(
+            "Board pack — confirm approver chain + watermarks",
+            "ملف المجلس — تأكد من سلسلة الاعتماد والعلامات المائية",
+            List.of(
+                "CRO + CISO + CEO approvals are non-negotiable before distribution.",
+                "DPO sign-off is required if the pack includes personal-data KPIs.",
+                "Watermark should be true for any audience outside the executive team.",
+                "AI executive-summary must have been human-edited (aiSummaryAccepted=true)."),
+            List.of(
+                "اعتمادات CRO و CISO و CEO إلزامية قبل التوزيع.",
+                "اعتماد DPO لازم إذا تضمن الملف مؤشرات بيانات شخصية.",
+                "العلامة المائية تكون مفعّلة لأي جمهور خارج الإدارة التنفيذية.",
+                "الملخص بالذكاء الاصطناعي يجب أن يكون قد روجع بشرياً."),
+            "REVIEW", 65)),
+        new ReviewMatcher((wf, mod) -> mod.equals("BCM"), new ReviewTemplate(
+            "BCM submission — verify ISO 22301 §9.3 alignment",
+            "بلاغ BCM — تأكد من توافقه مع ISO 22301 §9.3",
+            List.of(
+                "Exercise outcome must match RTO/RPO actual vs target.",
+                "If actualRtoHours > target, a CAPA must exist.",
+                "Peak-season lens (Hajj / Ramadan) flagged where relevant."),
+            List.of(
+                "نتيجة التمرين يجب أن تتطابق مع RTO/RPO الفعلي مقابل المستهدف.",
+                "إذا تجاوز RTO المستهدف، يجب وجود CAPA.",
+                "منظور موسم الذروة (الحج / رمضان) عند الاقتضاء."),
+            "REVIEW", 60)));
 
     // ══════════════════════════════════════════════════════════════════
     // Listing + review

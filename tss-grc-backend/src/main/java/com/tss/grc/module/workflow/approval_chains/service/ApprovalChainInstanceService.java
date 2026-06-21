@@ -209,6 +209,46 @@ public class ApprovalChainInstanceService {
                                          Long actingUserId, Set<String> actingRoles) {
         Long orgId = org();
         ApprovalChainInstance i = loadOrThrow(instanceId);
+
+        // Find the specific step row this actor satisfies at the current
+        // step_order. If multiple rows match (parallel rung), we accept
+        // any one — the actor signs against that specific row.
+        List<ApprovalChainStep> stepsAtOrder = guardActionable(i, req, orgId);
+
+        // Pick the step row the AUTHENTICATED actor satisfies. Throws 403 if
+        // the principal is neither the step's required user nor holder of its
+        // required role (no silent rows.get(0) fallback for restricted steps).
+        ApprovalChainStep target = resolveStepForActor(stepsAtOrder, actingUserId, actingRoles);
+        guardDelegation(req, target);
+
+        recordActionRow(orgId, i, req, target, actingUserId);
+
+        // ── Evaluate state machine ─────────────────────────────────
+        if ("REJECTED".equals(req.action())) {
+            i.setStatus("REJECTED");
+            i.setCompletedAt(LocalDateTime.now());
+            touchAndSave(i);
+            emit(i, null, "APPROVAL_CHAIN_REJECTED", Map.of("rejectedAtStep", String.valueOf(req.stepOrder())));
+            return toResponse(i, orgId);
+        }
+
+        if ("APPROVED".equals(req.action())) {
+            applyApproval(orgId, i, req, stepsAtOrder);
+        } else {
+            // REQUESTED_CHANGES / RECUSED / DELEGATED — no state advance.
+            touchAndSave(i);
+        }
+        return toResponse(i, orgId);
+    }
+
+    /**
+     * Pre-action guards: instance must not be terminal, the requested step must be
+     * the current rung, and that rung must have at least one configured step row.
+     * Returns the step rows at the requested order. Throws the same exceptions as
+     * the previous inline checks.
+     */
+    private List<ApprovalChainStep> guardActionable(ApprovalChainInstance i,
+                                                    InstanceActionRequest req, Long orgId) {
         if (TERMINAL_STATUSES.contains(i.getStatus())) {
             throw new IllegalTransitionException(i.getStatus(), "ACTION", TERMINAL_STATUSES);
         }
@@ -217,10 +257,6 @@ public class ApprovalChainInstanceService {
                 "Cannot action step " + req.stepOrder()
                     + " — current step is " + i.getCurrentStepOrder());
         }
-
-        // Find the specific step row this actor satisfies at the current
-        // step_order. If multiple rows match (parallel rung), we accept
-        // any one — the actor signs against that specific row.
         List<ApprovalChainStep> stepsAtOrder = stepRepo
             .findByOrganisationIdAndTemplateIdAndStepOrderAndIsDeletedFalse(
                 orgId, i.getTemplateId(), req.stepOrder());
@@ -228,12 +264,11 @@ public class ApprovalChainInstanceService {
             throw new IllegalArgumentException(
                 "Template " + i.getTemplateId() + " has no step at order " + req.stepOrder());
         }
+        return stepsAtOrder;
+    }
 
-        // Pick the step row the AUTHENTICATED actor satisfies. Throws 403 if
-        // the principal is neither the step's required user nor holder of its
-        // required role (no silent rows.get(0) fallback for restricted steps).
-        ApprovalChainStep target = resolveStepForActor(stepsAtOrder, actingUserId, actingRoles);
-
+    /** Validates DELEGATED preconditions against the resolved target step. */
+    private void guardDelegation(InstanceActionRequest req, ApprovalChainStep target) {
         if ("DELEGATED".equals(req.action()) && !Boolean.TRUE.equals(target.getCanDelegate())) {
             throw new IllegalArgumentException(
                 "Step " + target.getTitleEn() + " does not allow delegation");
@@ -241,7 +276,11 @@ public class ApprovalChainInstanceService {
         if ("DELEGATED".equals(req.action()) && req.delegatedToUserId() == null) {
             throw new IllegalArgumentException("DELEGATED action requires delegatedToUserId");
         }
+    }
 
+    /** Persists the action row, writes the audit entry, and emits the DELEGATED event when applicable. */
+    private void recordActionRow(Long orgId, ApprovalChainInstance i, InstanceActionRequest req,
+                                 ApprovalChainStep target, Long actingUserId) {
         ApprovalChainAction a = new ApprovalChainAction();
         a.setOrganisationId(orgId);
         a.setInstanceId(i.getId());
@@ -265,51 +304,42 @@ public class ApprovalChainInstanceService {
             emit(i, null, "APPROVAL_CHAIN_DELEGATED",
                 Map.of("delegatedToUserId", String.valueOf(req.delegatedToUserId())));
         }
+    }
 
-        // ── Evaluate state machine ─────────────────────────────────
-        String previousStatus = i.getStatus();
+    /**
+     * APPROVED-path advance/finalise logic. When the current rung is satisfied,
+     * emits STEP_COMPLETED and either advances to the next step or finalises the
+     * chain as APPROVED (emitting COMPLETED). Otherwise records progress only.
+     */
+    private void applyApproval(Long orgId, ApprovalChainInstance i, InstanceActionRequest req,
+                               List<ApprovalChainStep> stepsAtOrder) {
+        boolean rungSatisfied = isStepOrderSatisfied(orgId, i, req.stepOrder(), stepsAtOrder);
+        if (rungSatisfied) {
+            // Step completed — emit event, then either advance or finalise.
+            emit(i, null, "APPROVAL_CHAIN_STEP_COMPLETED",
+                Map.of("completedStepOrder", String.valueOf(req.stepOrder())));
 
-        if ("REJECTED".equals(req.action())) {
-            i.setStatus("REJECTED");
-            i.setCompletedAt(LocalDateTime.now());
-            i.setUpdatedAt(LocalDateTime.now());
-            instanceRepo.save(i);
-            emit(i, null, "APPROVAL_CHAIN_REJECTED", Map.of("rejectedAtStep", String.valueOf(req.stepOrder())));
-            return toResponse(i, orgId);
-        }
-
-        // For APPROVED actions, check whether the rung is complete.
-        if ("APPROVED".equals(req.action())) {
-            boolean rungSatisfied = isStepOrderSatisfied(orgId, i, req.stepOrder(), stepsAtOrder);
-            if (rungSatisfied) {
-                // Step completed — emit event, then either advance or finalise.
-                emit(i, null, "APPROVAL_CHAIN_STEP_COMPLETED",
-                    Map.of("completedStepOrder", String.valueOf(req.stepOrder())));
-
-                Integer nextOrder = nextStepOrder(orgId, i.getTemplateId(), req.stepOrder());
-                if (nextOrder == null) {
-                    // No more rungs — APPROVED.
-                    i.setStatus("APPROVED");
-                    i.setCompletedAt(LocalDateTime.now());
-                    i.setUpdatedAt(LocalDateTime.now());
-                    instanceRepo.save(i);
-                    emit(i, null, "APPROVAL_CHAIN_COMPLETED", null);
-                } else {
-                    i.setCurrentStepOrder(nextOrder);
-                    i.setUpdatedAt(LocalDateTime.now());
-                    instanceRepo.save(i);
-                }
+            Integer nextOrder = nextStepOrder(orgId, i.getTemplateId(), req.stepOrder());
+            if (nextOrder == null) {
+                // No more rungs — APPROVED.
+                i.setStatus("APPROVED");
+                i.setCompletedAt(LocalDateTime.now());
+                touchAndSave(i);
+                emit(i, null, "APPROVAL_CHAIN_COMPLETED", null);
             } else {
-                // Rung not yet satisfied — record progress only.
-                i.setUpdatedAt(LocalDateTime.now());
-                instanceRepo.save(i);
+                i.setCurrentStepOrder(nextOrder);
+                touchAndSave(i);
             }
         } else {
-            // REQUESTED_CHANGES / RECUSED / DELEGATED — no state advance.
-            i.setUpdatedAt(LocalDateTime.now());
-            instanceRepo.save(i);
+            // Rung not yet satisfied — record progress only.
+            touchAndSave(i);
         }
-        return toResponse(i, orgId);
+    }
+
+    /** Stamps {@code updatedAt} and persists the instance. */
+    private void touchAndSave(ApprovalChainInstance i) {
+        i.setUpdatedAt(LocalDateTime.now());
+        instanceRepo.save(i);
     }
 
     /**

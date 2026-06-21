@@ -131,16 +131,111 @@ public class CrisisEventService {
         LocalDateTime now = LocalDateTime.now();
         List<ActiveCrisisSummaryRow> rows = new ArrayList<>();
         for (CrisisEvent e : active) {
-            LocalDateTime anchor = e.getDetectionTime() != null
-                ? e.getDetectionTime()
-                : (e.getStartTime() != null ? e.getStartTime() : e.getCreatedAt());
+            rows.add(toSummaryRow(e, now));
+        }
+        rows.sort(ACTIVE_SUMMARY_ORDER);
+        return rows;
+    }
 
+    /** Maps one crisis event onto its mobile-summary row. */
+    private static ActiveCrisisSummaryRow toSummaryRow(CrisisEvent e, LocalDateTime now) {
+        LocalDateTime anchor = e.getDetectionTime() != null
+            ? e.getDetectionTime()
+            : (e.getStartTime() != null ? e.getStartTime() : e.getCreatedAt());
+
+        Deadline deadline = RegulatoryDeadlineCalculator.shortestDeadline(e, anchor);
+        LocalDateTime shortestDeadline = deadline == null ? null : deadline.at();
+        String shortestRegulator = deadline == null ? null : deadline.regulator();
+
+        Long minutesRemaining = null;
+        if (shortestDeadline != null) {
+            minutesRemaining = java.time.Duration.between(now, shortestDeadline).toMinutes();
+        }
+
+        int sev = e.getSeverity() == null ? 1 : e.getSeverity();
+
+        return new ActiveCrisisSummaryRow(
+            e.getId(),
+            e.getEventCode(),
+            e.getTitleEn(),
+            e.getTitleAr(),
+            sev,
+            e.getStatus(),
+            e.getCrisisManagerId(),
+            escalationTier(sev),
+            anchor,
+            shortestRegulator,
+            shortestDeadline,
+            minutesRemaining,
+            Boolean.TRUE.equals(e.getPersonalDataAffected()),
+            Boolean.TRUE.equals(e.getCyberRelated()),
+            Boolean.TRUE.equals(e.getSupplierInvolved()),
+            nextActionLabel(e.getStatus())
+        );
+    }
+
+    /**
+     * Escalation tier — convenient single-letter for the mobile chip:
+     *   T1 (sev 4-5) — critical / national
+     *   T2 (sev 3)   — major disruption
+     *   T3 (sev 1-2) — operational
+     */
+    private static String escalationTier(int sev) {
+        if (sev >= 4)      return "T1";
+        else if (sev == 3) return "T2";
+        else               return "T3";
+    }
+
+    /** nextActionLabel reflects the workflow stage in Saudi-native shorthand. */
+    private static String nextActionLabel(String status) {
+        return switch (Objects.requireNonNullElse(status, "DETECTED")) {
+            case "DETECTED"  -> "بحاجة للتقييم";          // needs triage
+            case "ASSESSING" -> "بحاجة للتفعيل";          // needs activation
+            case "ACTIVATED" -> "بحاجة للاحتواء";         // needs containment
+            case "CONTAINED" -> "بحاجة للاسترداد";        // needs recovery
+            case "RECOVERED" -> "جاهز للإغلاق";           // ready to close
+            default          -> "متابعة";                  // follow-up
+        };
+    }
+
+    /** Sort: severity desc, then earliest deadline first (null last), then anchor desc. */
+    private static final Comparator<ActiveCrisisSummaryRow> ACTIVE_SUMMARY_ORDER = (a, b) -> {
+        int s = Integer.compare(b.severity(), a.severity());
+        if (s != 0) return s;
+        if (a.regulatoryDeadlineAt() == null && b.regulatoryDeadlineAt() == null) {
+            // both null → fall through
+        } else if (a.regulatoryDeadlineAt() == null) return 1;
+        else if (b.regulatoryDeadlineAt() == null) return -1;
+        else {
+            int d = a.regulatoryDeadlineAt().compareTo(b.regulatoryDeadlineAt());
+            if (d != 0) return d;
+        }
+        if (a.openedAt() == null && b.openedAt() == null) return 0;
+        if (a.openedAt() == null) return 1;
+        if (b.openedAt() == null) return -1;
+        return b.openedAt().compareTo(a.openedAt());
+    };
+
+    /** A single regulator deadline ({@code at}) the mobile summary may surface as the headline. */
+    public record Deadline(String regulator, LocalDateTime at) {}
+
+    /**
+     * Computes the shortest applicable regulatory deadline for a crisis event.
+     * Kept as a small static helper so the multi-regulator window logic lives in
+     * one place; identical evaluation order to the previous inline version:
+     * PDPL (72h) seeds first, then NCA (24h) / SAMA-cyber (4h) for cyber events,
+     * then SAMA-BCF (6h, sev ≥ 3), then NCEMA (24h, sev ≥ 4) — each only replacing
+     * the running shortest when strictly earlier.
+     */
+    static final class RegulatoryDeadlineCalculator {
+        private RegulatoryDeadlineCalculator() {}
+
+        static Deadline shortestDeadline(CrisisEvent e, LocalDateTime anchor) {
             LocalDateTime shortestDeadline = null;
             String shortestRegulator = null;
 
             if (Boolean.TRUE.equals(e.getPersonalDataAffected()) && anchor != null) {
-                LocalDateTime d = anchor.plusHours(PDPL_WINDOW_HOURS);
-                shortestDeadline = d;
+                shortestDeadline = anchor.plusHours(PDPL_WINDOW_HOURS);
                 shortestRegulator = "SDAIA_PDPL";
             }
             if (Boolean.TRUE.equals(e.getCyberRelated()) && anchor != null) {
@@ -172,69 +267,8 @@ public class CrisisEventService {
                 }
             }
 
-            Long minutesRemaining = null;
-            if (shortestDeadline != null) {
-                minutesRemaining = java.time.Duration.between(now, shortestDeadline).toMinutes();
-            }
-
-            // Escalation tier — convenient single-letter for the mobile chip:
-            //   T1 (sev 4-5) — critical / national
-            //   T2 (sev 3)   — major disruption
-            //   T3 (sev 1-2) — operational
-            String escalationTier;
-            int sev = e.getSeverity() == null ? 1 : e.getSeverity();
-            if (sev >= 4)      escalationTier = "T1";
-            else if (sev == 3) escalationTier = "T2";
-            else               escalationTier = "T3";
-
-            // nextActionLabel reflects the workflow stage in Saudi-native shorthand.
-            String nextActionLabel = switch (Objects.requireNonNullElse(e.getStatus(), "DETECTED")) {
-                case "DETECTED"  -> "بحاجة للتقييم";          // needs triage
-                case "ASSESSING" -> "بحاجة للتفعيل";          // needs activation
-                case "ACTIVATED" -> "بحاجة للاحتواء";         // needs containment
-                case "CONTAINED" -> "بحاجة للاسترداد";        // needs recovery
-                case "RECOVERED" -> "جاهز للإغلاق";           // ready to close
-                default          -> "متابعة";                  // follow-up
-            };
-
-            rows.add(new ActiveCrisisSummaryRow(
-                e.getId(),
-                e.getEventCode(),
-                e.getTitleEn(),
-                e.getTitleAr(),
-                sev,
-                e.getStatus(),
-                e.getCrisisManagerId(),
-                escalationTier,
-                anchor,
-                shortestRegulator,
-                shortestDeadline,
-                minutesRemaining,
-                Boolean.TRUE.equals(e.getPersonalDataAffected()),
-                Boolean.TRUE.equals(e.getCyberRelated()),
-                Boolean.TRUE.equals(e.getSupplierInvolved()),
-                nextActionLabel
-            ));
+            return shortestDeadline == null ? null : new Deadline(shortestRegulator, shortestDeadline);
         }
-
-        // Sort: severity desc, then earliest deadline first (null last), then anchor desc.
-        rows.sort((a, b) -> {
-            int s = Integer.compare(b.severity(), a.severity());
-            if (s != 0) return s;
-            if (a.regulatoryDeadlineAt() == null && b.regulatoryDeadlineAt() == null) {
-                // both null → fall through
-            } else if (a.regulatoryDeadlineAt() == null) return 1;
-            else if (b.regulatoryDeadlineAt() == null) return -1;
-            else {
-                int d = a.regulatoryDeadlineAt().compareTo(b.regulatoryDeadlineAt());
-                if (d != 0) return d;
-            }
-            if (a.openedAt() == null && b.openedAt() == null) return 0;
-            if (a.openedAt() == null) return 1;
-            if (b.openedAt() == null) return -1;
-            return b.openedAt().compareTo(a.openedAt());
-        });
-        return rows;
     }
 
     /**
