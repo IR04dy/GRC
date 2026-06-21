@@ -36,6 +36,11 @@ public interface EvidenceItemRepository extends JpaRepository<EvidenceItem, Long
            "AND e.subControlId = :subControlId")
     List<EvidenceItem> findBySubControl(@Param("orgId") Long orgId, @Param("subControlId") Long subControlId);
 
+    /** PERF-NQ-003: batch variant of {@link #findBySubControl} — fetch every
+     *  evidence item for a set of sub-controls in one query so the matrix view
+     *  can group them in memory instead of issuing one query per sub-control. */
+    List<EvidenceItem> findByOrganisationIdAndSubControlIdIn(Long orgId, java.util.Collection<Long> subControlIds);
+
     long countByOrganisationIdAndStatus(Long orgId, String status);
 
     long countByOrganisationId(Long orgId);

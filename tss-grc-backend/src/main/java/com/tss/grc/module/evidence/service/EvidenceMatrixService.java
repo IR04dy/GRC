@@ -59,34 +59,51 @@ public class EvidenceMatrixService {
         // INTENTIONAL: EvidenceFramework is a PLATFORM-SHARED catalog (NCA ECC,
         // ISO 27001, SAMA CSF, PCI-DSS, etc.) — same for every tenant. The entity
         // has no organisation_id column. The tenant scoping happens at the
-        // EvidenceItem level (itemRepo.findBySubControl(org, ...)) below.
+        // EvidenceItem level (the org-scoped item query below).
         // Do not refactor to findByOrganisationId — that finder doesn't exist.
-        List<EvidenceFramework> frameworks = frameworkRepo.findAll();
-        List<Map<String, Object>> out = new ArrayList<>();
+        List<EvidenceFramework> frameworks = frameworkRepo.findAll().stream()
+            .filter(fw -> !Boolean.FALSE.equals(fw.getIsActive()))
+            .toList();
         LocalDate today = LocalDate.now();
 
-        for (EvidenceFramework fw : frameworks) {
-            if (Boolean.FALSE.equals(fw.getIsActive())) continue;
+        // PERF-NQ-003: batch-load the active control / sub-control / evidence
+        // graph in a FIXED 4 queries (frameworks, controls, sub-controls, items)
+        // and group in memory — replacing the old 1 + N_fw + N_ctrl + N_sub N+1.
+        List<Long> fwIds = frameworks.stream().map(EvidenceFramework::getId).toList();
+        List<EvidenceControl> controls = fwIds.isEmpty() ? List.of()
+            : controlRepo.findByFrameworkIdInAndIsActiveTrue(fwIds);
+        List<Long> ctrlIds = controls.stream().map(EvidenceControl::getId).toList();
+        List<EvidenceSubControl> subs = ctrlIds.isEmpty() ? List.of()
+            : subControlRepo.findByControlIdInAndIsActiveTrue(ctrlIds);
+        List<Long> subIds = subs.stream().map(EvidenceSubControl::getId).toList();
+        List<EvidenceItem> items = subIds.isEmpty() ? List.of()
+            : itemRepo.findByOrganisationIdAndSubControlIdIn(org, subIds);
 
-            List<EvidenceControl> controls = controlRepo.findByFrameworkIdAndIsActiveTrue(fw.getId());
+        Map<Long, List<EvidenceControl>> controlsByFw = controls.stream()
+            .collect(java.util.stream.Collectors.groupingBy(EvidenceControl::getFrameworkId));
+        Map<Long, List<EvidenceSubControl>> subsByCtrl = subs.stream()
+            .collect(java.util.stream.Collectors.groupingBy(EvidenceSubControl::getControlId));
+        Map<Long, List<EvidenceItem>> itemsBySub = items.stream()
+            .collect(java.util.stream.Collectors.groupingBy(EvidenceItem::getSubControlId));
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (EvidenceFramework fw : frameworks) {
+            List<EvidenceControl> fwControls = controlsByFw.getOrDefault(fw.getId(), List.of());
             List<Map<String, Object>> controlBlocks = new ArrayList<>();
 
-            for (EvidenceControl c : controls) {
-                if (Boolean.FALSE.equals(c.getIsActive())) continue;
-
-                List<EvidenceSubControl> subs = subControlRepo.findByControlIdAndIsActiveTrue(c.getId());
+            for (EvidenceControl c : fwControls) {
+                List<EvidenceSubControl> ctrlSubs = subsByCtrl.getOrDefault(c.getId(), List.of());
                 List<Map<String, Object>> subBlocks = new ArrayList<>();
 
                 int controlEvidenceCount = 0;
                 LocalDate controlFreshestExpiry = null;
 
-                for (EvidenceSubControl s : subs) {
-                    if (Boolean.FALSE.equals(s.getIsActive())) continue;
-                    List<EvidenceItem> items = itemRepo.findBySubControl(org, s.getId());
-                    int count = items.size();
+                for (EvidenceSubControl s : ctrlSubs) {
+                    List<EvidenceItem> subItems = itemsBySub.getOrDefault(s.getId(), List.of());
+                    int count = subItems.size();
                     controlEvidenceCount += count;
 
-                    LocalDate freshestExpiry = items.stream()
+                    LocalDate freshestExpiry = subItems.stream()
                         .map(EvidenceItem::getValidTo)
                         .filter(java.util.Objects::nonNull)
                         .max(java.util.Comparator.naturalOrder())
@@ -96,7 +113,7 @@ public class EvidenceMatrixService {
                     }
 
                     Map<String, Long> methodMix = new HashMap<>();
-                    for (EvidenceItem it : items) {
+                    for (EvidenceItem it : subItems) {
                         String m = it.getCollectionMethod() != null ? it.getCollectionMethod() : "MANUAL";
                         methodMix.merge(m, 1L, Long::sum);
                     }
