@@ -8,9 +8,11 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <!-- Sprint 4 §4.3: bumped from 3.5.0 to 3.5.6 for CVE patches in
-             3.5.1..3.5.6 (CVE-2025-XXXX series in spring-security + Tomcat). -->
-        <version>3.5.6</version>
+        <!-- Sprint 4 §4.3: bumped from 3.5.0 to 3.5.6 for CVE patches.
+             Audit WS5 (2026-06): bumped 3.5.6 -> 3.5.14 to clear SEC-CVE-001
+             (Tomcat >= 10.1.55) and SEC-CVE-002 (Spring Security >= 6.5.9)
+             plus the commons/jackson/logback transitive CVEs. -->
+        <version>3.5.14</version>
         <relativePath/>
     </parent>
 
@@ -35,6 +37,11 @@
         <openpdf.version>1.3.34</openpdf.version>
         <springdoc.version>2.8.6</springdoc.version>
         <caffeine.version>3.2.0</caffeine.version>    <!-- was 3.1.8 -->
+        <!-- Audit WS5 (SEC-CVE-001): the 3.5.14 BOM pins Tomcat 10.1.54 (still
+             CVE-flagged); bump past 10.1.55 via the Boot-managed property.
+             commons-compress is pinned transitively by POI (not the Boot BOM),
+             so it is forced to 1.27.1 in <dependencyManagement> below. -->
+        <tomcat.version>10.1.55</tomcat.version>
         <jjwt.version>0.12.6</jjwt.version>
         <!--
             TOTP MFA library — selected per Open Issue #008 decision doc
@@ -44,6 +51,19 @@
         -->
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- WS5 (SEC-CVE): commons-compress < 1.26 has DoS CVEs
+                 (CVE-2024-25710, CVE-2024-26308). POI 5.2.5 pulls 1.25.0
+                 transitively (outside the Boot BOM), so force the patched line. -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>1.27.1</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- ── Spring Boot Core ────────────────────────────────────────── -->
