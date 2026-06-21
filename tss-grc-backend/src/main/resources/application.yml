@@ -10,6 +10,18 @@ spring:
   application:
     name: tss-grc-platform
 
+  # PERF-PG-003 — global pagination guard. Spring's PageableHandlerMethodArgument
+  # Resolver clamps any client-supplied ?size= to max-page-size, so a paginated
+  # Page<> endpoint can no longer be coerced into materialising the whole table
+  # with ?size=1000000. default-page-size applies when ?size= is omitted.
+  # (Hand-rolled size params — e.g. AuditLogController, the platform pageOf
+  # helpers — additionally clamp with Math.min(size, …) in code.)
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+
   # SQL Server Datasource
   datasource:
     url: ${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=TSS_GRC;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true}
