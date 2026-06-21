@@ -17,7 +17,6 @@ import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.risk.entity.KriDefinition;
-import com.tss.grc.module.risk.entity.KriReading;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.repository.KriReadingRepository;
@@ -29,12 +28,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * S1 — One-click board reporting pack generator.
@@ -167,13 +169,12 @@ public class BoardPackService {
 
     // ── Section: Executive Summary ──────────────────────────────────────────
     private void renderExecutiveSummary(Document doc, Long org, boolean ar) throws DocumentException {
-        long totalRisks    = riskRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getTotalElements();
+        long totalRisks    = riskRepo.countByOrganisationId(org);
         long criticalRisks = riskRepo.countByOrganisationIdAndRiskLevel(org, "CRITICAL");
         long openRisks     = riskRepo.countByOrganisationIdAndStatus(org, "OPEN");
 
-        long openFindings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent()
-            .stream().filter(f -> !"CLOSED".equals(f.getStatus())).count();
-        long totalFindings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getTotalElements();
+        long openFindings  = findingRepo.countOpenByOrganisationId(org);
+        long totalFindings = findingRepo.countByOrganisationId(org);
 
         long totalKris = kriRepo.countByOrganisationId(org);
         long totalControls = controlRepo.countByOrganisationId(org);
@@ -223,7 +224,10 @@ public class BoardPackService {
 
     // ── Section: Risk Register top 20 ──────────────────────────────────────
     private void renderRiskRegister(Document doc, Long org, boolean ar) throws DocumentException {
-        List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 200)).getContent();
+        // Page.getContent() is immutable — copy into a mutable list before sorting
+        // (the in-place sort below otherwise throws UnsupportedOperationException).
+        List<Risk> risks = new java.util.ArrayList<>(
+            riskRepo.findByOrganisationId(org, PageRequest.of(0, 200)).getContent());
         risks.sort(Comparator.comparingInt((Risk r) -> r.getInherentScore() == null ? 0 : r.getInherentScore()).reversed());
         if (risks.size() > 20) risks = risks.subList(0, 20);
 
@@ -246,7 +250,9 @@ public class BoardPackService {
 
     // ── Section: Findings ───────────────────────────────────────────────────
     private void renderFindings(Document doc, Long org, boolean ar) throws DocumentException {
-        List<AuditFinding> findings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        // Page.getContent() is immutable — copy before the in-place sort below.
+        List<AuditFinding> findings = new java.util.ArrayList<>(
+            findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent());
         LocalDate today = LocalDate.now();
 
         long onTrack = 0, mgr = 0, dir = 0, exec = 0;
@@ -293,10 +299,22 @@ public class BoardPackService {
     // ── Section: KRIs ───────────────────────────────────────────────────────
     private void renderKris(Document doc, Long org, boolean ar) throws DocumentException {
         List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
+
+        // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
+        // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
+        // be null), [1]=readingValue. Mirrors findFirstByKriIdOrderByReadingAtDesc.
+        Map<Long, Object[]> latestByKri = new HashMap<>();
+        List<Long> kriIds = kris.stream().map(KriDefinition::getId).toList();
+        if (!kriIds.isEmpty()) {
+            for (Object[] row : readingRepo.findLatestReadingByKriIdIn(kriIds)) {
+                latestByKri.put((Long) row[0], new Object[]{ row[1], row[2] });
+            }
+        }
+
         long green = 0, amber = 0, red = 0, noData = 0;
         for (KriDefinition k : kris) {
-            String latestBand = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId())
-                .map(KriReading::getBand).orElse(null);
+            Object[] latest = latestByKri.get(k.getId());
+            String latestBand = latest == null ? null : (String) latest[0];
             if (latestBand == null) noData++;
             else if ("GREEN".equals(latestBand)) green++;
             else if ("AMBER".equals(latestBand)) amber++;
@@ -317,12 +335,12 @@ public class BoardPackService {
             : new String[]{ "Code", "KRI",        "Band",  "Latest",     "Green ≤", "Amber ≤" };
         for (String h : hdr) t.addCell(headerCell(h, ar));
         for (KriDefinition k : kris) {
-            KriReading latest = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()).orElse(null);
+            Object[] latest = latestByKri.get(k.getId());
             String name = ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn();
             t.addCell(bodyCell(safe(k.getCode()), false));
             t.addCell(bodyCell(safe(name), ar));
-            t.addCell(bodyCell(latest != null ? safe(latest.getBand()) : "—", false));
-            t.addCell(bodyCell(latest != null ? latest.getReadingValue().toPlainString() : "—", false));
+            t.addCell(bodyCell(latest != null ? safe((String) latest[0]) : "—", false));
+            t.addCell(bodyCell(latest != null ? ((BigDecimal) latest[1]).toPlainString() : "—", false));
             t.addCell(bodyCell(k.getGreenMax() != null ? k.getGreenMax().toPlainString() : "—", false));
             t.addCell(bodyCell(k.getAmberMax() != null ? k.getAmberMax().toPlainString() : "—", false));
         }
@@ -332,7 +350,6 @@ public class BoardPackService {
     // ── Section: Framework coverage ─────────────────────────────────────────
     private void renderFrameworks(Document doc, Long org, boolean ar) throws DocumentException {
         List<Framework> frameworks = frameworkRepo.findByIsActiveTrueOrderByFamilyAscCodeAsc();
-        List<AuditFinding> tenantFindings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
 
         float[] widths = new float[]{ 1.3f, 4f, 1f, 1f, 1.3f, 1.3f };
         PdfPTable t = buildTable(widths, ar);
@@ -348,12 +365,8 @@ public class BoardPackService {
                 if ("FULL".equals(m.getSatisfaction())) full++;
             }
             int policyCount = rows.size();
-            int controlCount = controlRepo.findByOrganisationIdAndFrameworkId(org, f.getId()).size();
-            long openFw = 0;
-            for (AuditFinding fnd : tenantFindings) {
-                if (fnd.getFrameworkId() != null && fnd.getFrameworkId().equals(f.getId()) && !"CLOSED".equals(fnd.getStatus()))
-                    openFw++;
-            }
+            long controlCount = controlRepo.countByOrganisationIdAndFrameworkId(org, f.getId());
+            long openFw = findingRepo.countOpenByOrganisationIdAndFrameworkId(org, f.getId());
             String fullPct = policyCount == 0 ? "—" : Math.round(((double) full / policyCount) * 100) + "%";
 
             // Skip frameworks with zero footprint to keep the page readable
@@ -381,11 +394,16 @@ public class BoardPackService {
     // ── Section: Change Mgmt ────────────────────────────────────────────────
     private void renderChanges(Document doc, Long org, boolean ar) throws DocumentException {
         long total      = changeRepo.countByOrganisationId(org);
-        long inFlight   = changeRepo.countByOrganisationIdAndStatus(org, "IMPLEMENTING")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "SCHEDULED")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "CAB_PENDING")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "IMPACT_ASSESSED")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "EMERGENCY_APPROVED");
+        // QUAL-BCMP-006: one GROUP BY status query instead of five per-status counts.
+        Map<String, Long> changeByStatus = new HashMap<>();
+        for (Object[] row : changeRepo.countByStatusGrouped(org)) {
+            changeByStatus.put((String) row[0], (Long) row[1]);
+        }
+        long inFlight   = changeByStatus.getOrDefault("IMPLEMENTING", 0L)
+                        + changeByStatus.getOrDefault("SCHEDULED", 0L)
+                        + changeByStatus.getOrDefault("CAB_PENDING", 0L)
+                        + changeByStatus.getOrDefault("IMPACT_ASSESSED", 0L)
+                        + changeByStatus.getOrDefault("EMERGENCY_APPROVED", 0L);
         long success    = changeRepo.countByOrganisationIdAndOutcome(org, "SUCCESS");
         long rolledBack = changeRepo.countByOrganisationIdAndOutcome(org, "ROLLED_BACK");
         long emergency  = changeRepo.countByOrganisationIdAndChangeType(org, "EMERGENCY");

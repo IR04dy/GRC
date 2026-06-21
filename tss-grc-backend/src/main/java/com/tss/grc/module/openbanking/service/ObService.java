@@ -91,6 +91,9 @@ public class ObService {
 
     private static final long BULK_REVOCATION_THRESHOLD = 100L;
 
+    /** Row cap for the dashboard's recent-TPP and open-incident preview lists. */
+    private static final int DASHBOARD_RECENT_LIMIT = 10;
+
     private final ObTppRepository tppRepo;
     private final ObConsentRepository consentRepo;
     private final ObApiCallRepository apiCallRepo;
@@ -515,24 +518,18 @@ public class ObService {
         long pendingKyb = tppRepo.countByOrganisationIdAndStatus(org(), "PENDING_KYB");
         long activeConsents = consentRepo.countByOrganisationIdAndStatus(org(), "ACTIVE");
 
-        // Approximate "revoked last 24h" by scanning paged set.
-        long revokedRecent = consentRepo.findByOrganisationIdOrderByGrantedAtDesc(
-                        org(), PageRequest.of(0, 500)).stream()
-                .filter(c -> "REVOKED".equals(c.getStatus())
-                        && c.getRevokedAt() != null
-                        && c.getRevokedAt().isAfter(LocalDateTime.now().minusDays(1)))
-                .count();
+        // QUAL-TI-008: "revoked last 24h" via a count query instead of a paged scan.
+        long revokedRecent = consentRepo.countByOrganisationIdAndStatusAndRevokedAtAfter(
+                org(), "REVOKED", LocalDateTime.now().minusDays(1));
 
         long openIncidents = incidentRepo.countByOrganisationIdAndStatus(org(), "OPEN")
                 + incidentRepo.countByOrganisationIdAndStatus(org(), "INVESTIGATING")
                 + incidentRepo.countByOrganisationIdAndStatus(org(), "CONTAINED");
         long criticalOpen = incidentRepo.countByOrganisationIdAndSeverityAndStatusNotIn(
                 org(), "CRITICAL", Set.of("RESOLVED", "CLOSED"));
-        long samaReportableOpen = incidentRepo.findByOrganisationIdOrderByDetectedAtDesc(
-                        org(), PageRequest.of(0, 200)).stream()
-                .filter(x -> Boolean.TRUE.equals(x.getSamaReportable())
-                        && !Set.of("CLOSED", "RESOLVED").contains(x.getStatus()))
-                .count();
+        // QUAL-TI-008: SAMA-reportable-open via a count query instead of a paged scan.
+        long samaReportableOpen = incidentRepo.countByOrganisationIdAndSamaReportableAndStatusNotIn(
+                org(), Boolean.TRUE, Set.of("CLOSED", "RESOLVED"));
 
         long apiCalls24h = apiCallRepo.countByOrganisationIdAndOccurredAtAfter(
                 org(), LocalDateTime.now().minusDays(1));
@@ -550,17 +547,17 @@ public class ObService {
             long n = tppRepo.countByOrganisationIdAndStatus(org(), s);
             if (n > 0) byStatus.put(s, n);
         }
+        // QUAL-TI-008: consent counts grouped by type in one query instead of a paged scan.
         Map<String, Long> byType = new LinkedHashMap<>();
-        for (ObConsent c : consentRepo.findByOrganisationIdOrderByGrantedAtDesc(
-                        org(), PageRequest.of(0, 500)).getContent()) {
-            byType.merge(c.getConsentType(), 1L, Long::sum);
+        for (Object[] row : consentRepo.countByConsentTypeGrouped(org())) {
+            byType.put((String) row[0], (Long) row[1]);
         }
 
         List<TppResponse> recent = tppRepo.findByOrganisationIdOrderByReferenceAsc(
-                        org(), PageRequest.of(0, 10)).stream()
+                        org(), PageRequest.of(0, DASHBOARD_RECENT_LIMIT)).stream()
                 .map(this::toTpp).toList();
         List<IncidentResponse> openList = incidentRepo
-                .findByOrganisationIdOrderByDetectedAtDesc(org(), PageRequest.of(0, 10))
+                .findByOrganisationIdOrderByDetectedAtDesc(org(), PageRequest.of(0, DASHBOARD_RECENT_LIMIT))
                 .stream()
                 .filter(x -> !Set.of("CLOSED", "RESOLVED").contains(x.getStatus()))
                 .map(ObService::toIncident).toList();

@@ -32,4 +32,9 @@ public interface ControlRepository extends JpaRepository<Control, Long> {
     long countByOrganisationId(Long organisationId);
 
     java.util.List<Control> findByOrganisationIdAndFrameworkId(Long organisationId, Long frameworkId);
+
+    /** Count of tenant controls tagged to a framework — replaces a
+     *  {@code findByOrganisationIdAndFrameworkId(...).size()} fetch in board-pack
+     *  framework coverage (QUAL-BCMP-006). */
+    long countByOrganisationIdAndFrameworkId(Long organisationId, Long frameworkId);
 }

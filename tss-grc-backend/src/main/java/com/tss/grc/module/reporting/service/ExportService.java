@@ -16,7 +16,6 @@ import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.risk.entity.KriDefinition;
-import com.tss.grc.module.risk.entity.KriReading;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.repository.KriReadingRepository;
@@ -29,12 +28,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Bilingual operational-report export service (Q1) using OpenPDF.
@@ -184,11 +186,16 @@ public class ExportService {
 
         List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
 
+        // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
+        // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
+        // be null), [1]=readingValue. Mirrors findFirstByKriIdOrderByReadingAtDesc.
+        final Map<Long, Object[]> latestByKri = latestReadingByKri(kris);
+
         // Band counts — green/amber/red/no-data — for the cover KPI strip
         long green = 0, amber = 0, red = 0, noData = 0;
         for (KriDefinition k : kris) {
-            String band = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId())
-                .map(KriReading::getBand).orElse(null);
+            Object[] latest = latestByKri.get(k.getId());
+            String band = latest == null ? null : (String) latest[0];
             if (band == null) noData++;
             else if ("GREEN".equalsIgnoreCase(band)) green++;
             else if ("AMBER".equalsIgnoreCase(band)) amber++;
@@ -215,12 +222,12 @@ public class ExportService {
                 for (String h : hdr) t.addCell(headerCell(h));
 
                 for (KriDefinition k : kris) {
-                    KriReading latest = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()).orElse(null);
+                    Object[] latest = latestByKri.get(k.getId());
                     String name = ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn();
                     cell(t, safe(k.getCode()));
                     cell(t, safe(name));
-                    cell(t, latest != null ? safe(latest.getBand()) : "—");
-                    cell(t, latest != null ? latest.getReadingValue().toPlainString() : "—");
+                    cell(t, latest != null ? safe((String) latest[0]) : "—");
+                    cell(t, latest != null ? ((BigDecimal) latest[1]).toPlainString() : "—");
                     cell(t, k.getGreenMax() != null ? k.getGreenMax().toPlainString() : "—");
                     cell(t, k.getAmberMax() != null ? k.getAmberMax().toPlainString() : "—");
                     cell(t, safe(k.getOwner()));
@@ -298,6 +305,23 @@ public class ExportService {
         t.addCell(c);
     }
     private static String safe(String s) { return s == null ? "—" : s; }
+
+    /**
+     * Latest reading per KRI in one query (QUAL-BCMP-006) — collapses the N+1
+     * {@code findFirstByKriIdOrderByReadingAtDesc} loop shared by the KRI PDF and
+     * XLSX exporters. Returns a map keyed by KRI id; presence of a key mirrors
+     * {@code findFirstByKriIdOrderByReadingAtDesc(id).isPresent()}, value
+     * {@code [0]=band} (nullable), {@code [1]=readingValue}.
+     */
+    private Map<Long, Object[]> latestReadingByKri(List<KriDefinition> kris) {
+        Map<Long, Object[]> out = new HashMap<>();
+        List<Long> kriIds = kris.stream().map(KriDefinition::getId).toList();
+        if (kriIds.isEmpty()) return out;
+        for (Object[] row : readingRepo.findLatestReadingByKriIdIn(kriIds)) {
+            out.put((Long) row[0], new Object[]{ row[1], row[2] });
+        }
+        return out;
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     // Excel exports (Q2) — same datasets, .xlsx with formulas + auto-sized cols
@@ -410,6 +434,10 @@ public class ExportService {
     public byte[] kriDashboardXlsx() {
         Long org = TenantContext.getCurrentTenant();
         List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
+        // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
+        // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
+        // be null), [1]=readingValue.
+        Map<Long, Object[]> latestByKri = latestReadingByKri(kris);
 
         try (Workbook wb = new XSSFWorkbook()) {
             // ── Sheet 1: KRIs ─────────────────────────────────
@@ -431,10 +459,10 @@ public class ExportService {
                 row.createCell(2).setCellValue(safe(k.getDirection()));
                 if (k.getGreenMax() != null) row.createCell(3).setCellValue(k.getGreenMax().doubleValue());
                 if (k.getAmberMax() != null) row.createCell(4).setCellValue(k.getAmberMax().doubleValue());
-                KriReading latest = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()).orElse(null);
+                Object[] latest = latestByKri.get(k.getId());
                 if (latest != null) {
-                    row.createCell(5).setCellValue(latest.getReadingValue().doubleValue());
-                    row.createCell(6).setCellValue(safe(latest.getBand()));
+                    row.createCell(5).setCellValue(((BigDecimal) latest[1]).doubleValue());
+                    row.createCell(6).setCellValue(safe((String) latest[0]));
                 }
                 row.createCell(7).setCellValue(safe(k.getFrequency()));
                 row.createCell(8).setCellValue(safe(k.getOwner()));

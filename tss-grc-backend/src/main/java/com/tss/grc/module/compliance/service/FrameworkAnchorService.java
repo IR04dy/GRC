@@ -19,7 +19,6 @@ import com.tss.grc.module.risk.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -129,7 +128,18 @@ public class FrameworkAnchorService {
     public List<Map<String, Object>> coverage() {
         Long org = TenantContext.getCurrentTenant();
         List<Framework> all = frameworkRepo.findByIsActiveTrueOrderByFamilyAscCodeAsc();
-        List<AuditFinding> tenantFindings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        // QUAL-RC-006: per-(framework,status) finding counts in one GROUP BY query
+        // instead of a fetch-1000-then-tally scan. CLOSED → closed, everything
+        // else (incl. null status) → open, mirroring the prior per-row loop.
+        Map<Long, Long> openByFw = new HashMap<>();
+        Map<Long, Long> closedByFw = new HashMap<>();
+        for (Object[] row : findingRepo.countByFrameworkAndStatusGrouped(org)) {
+            Long fwId = (Long) row[0];
+            String status = (String) row[1];
+            long count = (Long) row[2];
+            if ("CLOSED".equals(status)) closedByFw.merge(fwId, count, Long::sum);
+            else openByFw.merge(fwId, count, Long::sum);
+        }
         List<Map<String, Object>> out = new ArrayList<>();
         for (Framework f : all) {
             List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkId(f.getId());
@@ -144,11 +154,8 @@ public class FrameworkAnchorService {
                     default -> { /* unknown */ }
                 }
             }
-            long openFindings = 0, closedFindings = 0;
-            for (AuditFinding fnd : tenantFindings) {
-                if (fnd.getFrameworkId() == null || !fnd.getFrameworkId().equals(f.getId())) continue;
-                if ("CLOSED".equals(fnd.getStatus())) closedFindings++; else openFindings++;
-            }
+            long openFindings   = openByFw.getOrDefault(f.getId(), 0L);
+            long closedFindings = closedByFw.getOrDefault(f.getId(), 0L);
             List<Control> ctrls = controlRepo.findByOrganisationIdAndFrameworkId(org, f.getId());
             long implemented = ctrls.stream().filter(c -> "IMPLEMENTED".equals(c.getStatus())).count();
             int  maturitySum = ctrls.stream().mapToInt(c -> c.getMaturityLevel() == null ? 0 : c.getMaturityLevel()).sum();
@@ -275,11 +282,10 @@ public class FrameworkAnchorService {
 
     public List<Map<String, Object>> findingsForFramework(Long id) {
         Long org = TenantContext.getCurrentTenant();
-        // Pull a wide page; tenant filter applied in-memory below
-        List<AuditFinding> all = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        // QUAL-RC-006: org + framework filtered in SQL instead of fetch-1000-then-filter.
+        List<AuditFinding> all = findingRepo.findByOrganisationIdAndFrameworkId(org, id);
         List<Map<String, Object>> out = new ArrayList<>();
         for (AuditFinding f : all) {
-            if (f.getFrameworkId() == null || !f.getFrameworkId().equals(id)) continue;
             Map<String, Object> row = new HashMap<>();
             row.put("id",        f.getId());
             row.put("title",     f.getTitle());

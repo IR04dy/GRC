@@ -26,4 +26,11 @@ public interface ObIncidentRepository extends JpaRepository<ObIncident, Long> {
 
     long countByOrganisationIdAndSeverityAndStatusNotIn(
             Long organisationId, String severity, java.util.Collection<String> statuses);
+
+    /** SAMA-reportable incidents still open (status not in the supplied set) —
+     *  replaces a paged in-memory scan in the dashboard (QUAL-TI-008).
+     *  {@code samaReportable = true} excludes null/false, matching the prior
+     *  {@code Boolean.TRUE.equals(...)} guard. */
+    long countByOrganisationIdAndSamaReportableAndStatusNotIn(
+            Long organisationId, Boolean samaReportable, java.util.Collection<String> statuses);
 }

@@ -15,6 +15,7 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
     @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId AND (:status IS NULL OR r.status = :status)")
     Page<Risk> findByOrgAndStatus(@Param("orgId") Long orgId, @Param("status") String status, Pageable pageable);
 
+    long countByOrganisationId(Long organisationId);
     long countByOrganisationIdAndRiskLevel(Long organisationId, String riskLevel);
     long countByOrganisationIdAndStatus(Long organisationId, String status);
 

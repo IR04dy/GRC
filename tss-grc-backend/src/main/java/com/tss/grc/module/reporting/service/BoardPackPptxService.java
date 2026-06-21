@@ -151,7 +151,9 @@ public class BoardPackPptxService {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "أعلى ١٠ مخاطر" : "Top 10 Risks", ar);
 
-        List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 200)).getContent();
+        // Page.getContent() is immutable — copy before the in-place sort below.
+        List<Risk> risks = new java.util.ArrayList<>(
+            riskRepo.findByOrganisationId(org, PageRequest.of(0, 200)).getContent());
         risks.sort(Comparator.comparingInt((Risk r) -> r.getInherentScore() == null ? 0 : r.getInherentScore()).reversed());
         if (risks.size() > 10) risks = risks.subList(0, 10);
 

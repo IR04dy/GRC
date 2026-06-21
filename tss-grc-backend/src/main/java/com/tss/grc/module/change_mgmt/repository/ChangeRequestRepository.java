@@ -32,4 +32,16 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
     long countByOrganisationIdAndChangeType(Long organisationId, String changeType);
     long countByOrganisationIdAndOutcome(Long organisationId, String outcome);
     long countByOrganisationId(Long organisationId);
+
+    /**
+     * Per-status change counts for a tenant in one query — replaces a fan-out of
+     * five {@code countByOrganisationIdAndStatus} calls in board-pack change
+     * reporting (QUAL-BCMP-006). Returns {@code [status, count]} rows.
+     */
+    @Query("""
+        SELECT c.status, COUNT(c) FROM ChangeRequest c
+        WHERE c.organisationId = :orgId
+        GROUP BY c.status
+        """)
+    java.util.List<Object[]> countByStatusGrouped(@Param("orgId") Long orgId);
 }

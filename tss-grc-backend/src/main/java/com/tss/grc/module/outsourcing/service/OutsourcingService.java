@@ -9,6 +9,7 @@ import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Outsourcing &amp; Cloud Governance service — Sprint 30 PR #1.
@@ -81,6 +81,11 @@ public class OutsourcingService {
             "EXECUTED",   Set.of(),
             "REJECTED",   Set.of()
     );
+
+    /** Row cap for the dashboard's recent-arrangement preview list. */
+    private static final int DASHBOARD_RECENT_LIMIT = 8;
+    /** Row cap for the dashboard's overdue-review preview list. */
+    private static final int DASHBOARD_OVERDUE_LIMIT = 10;
 
     private final OutsourcingArrangementRepository arrangementRepo;
     private final CloudServiceRepository cloudRepo;
@@ -445,36 +450,43 @@ public class OutsourcingService {
 
     public DashboardResponse dashboard() {
         Long o = org();
-        List<OutsourcingArrangement> all = arrangementRepo.findByOrganisationIdOrderByCreatedAtDesc(o);
-        Map<String, Long> arrByStatus = all.stream()
-                .collect(Collectors.groupingBy(OutsourcingArrangement::getStatus, Collectors.counting()));
+        // QUAL-TI-008: status counts via one GROUP BY query instead of paging the
+        // full arrangement list into memory and grouping in Java.
+        Map<String, Long> arrByStatus = new HashMap<>();
+        for (Object[] row : arrangementRepo.countByStatusGrouped(o)) {
+            arrByStatus.put((String) row[0], (Long) row[1]);
+        }
 
-        long arrTotal = all.size();
-        long materialActive = arrangementRepo.findActiveMaterial(o).size();
+        long arrTotal = arrangementRepo.countByOrganisationId(o);
+        long materialActive = arrangementRepo.countActiveMaterial(o);
         long live = arrByStatus.getOrDefault("LIVE", 0L);
         long underReview = arrByStatus.getOrDefault("UNDER_REVIEW", 0L);
 
-        List<CloudService> allCloud = cloudRepo.findByOrganisationIdOrderByCreatedAtDesc(o);
-        long cloudTotal = allCloud.size();
-        long cloudT3T4 = allCloud.stream()
-                .filter(c -> "T3".equals(c.getDataClassification())
-                        || "T4".equals(c.getDataClassification())).count();
+        // QUAL-TI-008: cloud counts + classification/residency breakdowns via
+        // count and GROUP BY queries instead of an in-memory scan.
+        long cloudTotal = cloudRepo.countByOrganisationId(o);
+        Map<String, Long> cloudByClass = new HashMap<>();
+        for (Object[] row : cloudRepo.countByDataClassificationGrouped(o)) {
+            cloudByClass.put((String) row[0], (Long) row[1]);
+        }
+        Map<String, Long> cloudByResidency = new HashMap<>();
+        for (Object[] row : cloudRepo.countByDataResidencyGrouped(o)) {
+            cloudByResidency.put((String) row[0], (Long) row[1]);
+        }
+        // T3/T4 are non-null classifications, so present in cloudByClass when nonzero.
+        long cloudT3T4 = cloudByClass.getOrDefault("T3", 0L) + cloudByClass.getOrDefault("T4", 0L);
         long cloudBlocked = cloudRepo.countByOrganisationIdAndStatus(o, "BLOCKED");
 
-        long reviewsOverdue = arrangementRepo.findReviewsDue(o, LocalDate.now()).size();
+        // One findReviewsDue call serves both the count and the bounded preview.
+        List<OutsourcingArrangement> reviewsDue = arrangementRepo.findReviewsDue(o, LocalDate.now());
+        long reviewsOverdue = reviewsDue.size();
         long exitPlansReady = exitRepo.countByOrganisationIdAndStatus(o, "READY");
 
-        Map<String, Long> cloudByClass = allCloud.stream()
-                .filter(c -> c.getDataClassification() != null)
-                .collect(Collectors.groupingBy(CloudService::getDataClassification, Collectors.counting()));
-        Map<String, Long> cloudByResidency = allCloud.stream()
-                .filter(c -> c.getDataResidency() != null)
-                .collect(Collectors.groupingBy(CloudService::getDataResidency, Collectors.counting()));
-
-        List<ArrangementResponse> recent = all.stream()
-                .limit(8).map(OutsourcingService::toArrangement).toList();
-        List<ArrangementResponse> overdue = arrangementRepo.findReviewsDue(o, LocalDate.now())
-                .stream().limit(10).map(OutsourcingService::toArrangement).toList();
+        List<ArrangementResponse> recent = arrangementRepo
+                .findByOrganisationIdOrderByCreatedAtDesc(o, PageRequest.of(0, DASHBOARD_RECENT_LIMIT))
+                .stream().map(OutsourcingService::toArrangement).toList();
+        List<ArrangementResponse> overdue = reviewsDue.stream()
+                .limit(DASHBOARD_OVERDUE_LIMIT).map(OutsourcingService::toArrangement).toList();
 
         return new DashboardResponse(
                 arrTotal, materialActive, live, underReview,
