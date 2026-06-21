@@ -1,3 +1,28 @@
+-- ############################################################################
+-- ## DEPRECATED — DO NOT APPLY (audit PERF-IX-006)
+-- ##
+-- ## This file is ORPHANED: it is wired into neither the Flyway chain
+-- ## (application-prod.yml: locations = classpath:db/migration/sqlserver, i.e.
+-- ## only src/main/resources/db/migration/sqlserver/V*.sql) nor the dev Python
+-- ## bootstrap. Nothing has ever executed it, so its ~25 indexes were never
+-- ## created on any database.
+-- ##
+-- ## It is also STALE: it targets a pre-rename column layout (org_id / bu_id and
+-- ## filtered "WHERE is_deleted = 0" indexes). The live schema uses
+-- ## organisation_id, so several CREATE statements here would fail outright.
+-- ##
+-- ## The performance intent has been SUPERSEDED by versioned, dev-validated
+-- ## Flyway migrations:
+-- ##   V225  backfill_core_module_indexes
+-- ##   V227  iam_users_indexes            (login lookups + username/email unique)
+-- ##   V228  backfill_org_indexes         (organisation_id-leading on 67 tables)
+-- ##   V229  fk_and_cyber_status_indexes  (FK columns + cyber status/workflow_status)
+-- ##
+-- ## Retained only as design reference (the per-index comments explain which
+-- ## query each was meant to serve). Do not run it; do not "fix" the column
+-- ## names to apply it — that would create duplicate/competing indexes.
+-- ############################################################################
+
 -- ============================================================================
 -- TSS GRC Platform - Shared Table Indexes
 -- Compatible: SQL Server 2019 Express Edition

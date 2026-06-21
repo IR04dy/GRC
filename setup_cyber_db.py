@@ -12,7 +12,7 @@ conn = pyodbc.connect(CONN_STR)
 conn.autocommit = True
 cur = conn.cursor()
 
-TOTAL_STEPS = 13
+TOTAL_STEPS = 14
 step_num = [0]
 
 def step(label):
@@ -846,7 +846,47 @@ print(f"  Inserted {len(action_plans)} action plan(s)")
 print(f"  Step {step_num[0]}/{TOTAL_STEPS}: OK")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# STEP 13 – Verify row counts
+# STEP 13 – Performance indexes (audit PERF-IX-004)
+#   cyber.* tables are filtered by status / workflow_status in the service-layer
+#   state machines but the table DDL above creates only the clustered PK. Add a
+#   (organisation_id, <status>) composite per tenant-scoped cyber table so the
+#   dev bootstrap matches the Flyway migration V229 (which provisions prod).
+#   Idempotent: IF NOT EXISTS guards each CREATE so re-running is a safe no-op.
+# ─────────────────────────────────────────────────────────────────────────────
+step("Create performance indexes (status / workflow_status)")
+
+cyber_status_indexes = [
+    ('attack_surface_finding',    'status'),
+    ('attack_surface_shadow_it',  'status'),
+    ('cloud_services',            'status'),
+    ('control_assessments',       'status'),
+    ('cyber_action_plans',        'workflow_status'),
+    ('cyber_assets',              'status'),
+    ('cyber_controls',            'status'),
+    ('cyber_evidence',            'status'),
+    ('cyber_incidents',           'workflow_status'),
+    ('incidents',                 'status'),
+    ('root_cause_analyses',       'status'),
+    ('vuln_exceptions',           'workflow_status'),
+    ('vulnerabilities',           'workflow_status'),
+    ('vulnerability_sla_finding', 'status'),
+]
+created = 0
+for tbl, col in cyber_status_indexes:
+    suffix = 'wfstatus' if col == 'workflow_status' else 'status'
+    idx = f"ix_{tbl}_org_{suffix}"
+    run_quiet(
+        f"IF NOT EXISTS (SELECT 1 FROM sys.indexes "
+        f"WHERE name='{idx}' AND object_id=OBJECT_ID('cyber.{tbl}')) "
+        f"CREATE NONCLUSTERED INDEX {idx} ON cyber.{tbl} (organisation_id, {col})"
+    )
+    created += 1
+print(f"  Ensured {created} cyber status index(es)")
+
+print(f"  Step {step_num[0]}/{TOTAL_STEPS}: OK")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STEP 14 – Verify row counts
 # ─────────────────────────────────────────────────────────────────────────────
 step("Verify row counts")
 

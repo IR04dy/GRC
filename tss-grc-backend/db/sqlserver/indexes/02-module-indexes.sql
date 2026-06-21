@@ -1,3 +1,16 @@
+-- ############################################################################
+-- ## DEPRECATED — DO NOT APPLY (audit PERF-IX-006)
+-- ##
+-- ## Orphaned companion to 01-shared-indexes.sql: wired into neither the Flyway
+-- ## chain nor the dev Python bootstrap, so its ~15 indexes were never created.
+-- ## Targets a stale column layout (org_id / filtered is_deleted) that no longer
+-- ## matches the live organisation_id schema.
+-- ##
+-- ## SUPERSEDED by versioned, dev-validated Flyway migrations V225 / V227 / V228
+-- ## / V229 under src/main/resources/db/migration/sqlserver/. Retained only as
+-- ## design reference — do not run it and do not re-point its column names.
+-- ############################################################################
+
 -- ============================================================================
 -- TSS GRC Platform - Module Table Indexes
 -- Compatible: SQL Server 2019 Express Edition
