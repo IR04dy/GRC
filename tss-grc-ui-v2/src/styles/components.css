@@ -2283,3 +2283,36 @@ tr:hover .row-actions { opacity: 1; }
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* PERF-FE-003 — DataTable client-side pager (shown only when a register exceeds
+   the page size). Logical-property friendly so it mirrors correctly under RTL. */
+.datatable-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+.datatable-pager__status {
+  color: var(--ink-2);
+  font: 600 12px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.datatable-pager__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-1);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.datatable-pager__btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--primary-200); color: var(--primary-700); }
+.datatable-pager__btn:disabled { opacity: .45; cursor: not-allowed; }
+.datatable-pager__btn:focus-visible { box-shadow: var(--focus-ring); outline: none; }
