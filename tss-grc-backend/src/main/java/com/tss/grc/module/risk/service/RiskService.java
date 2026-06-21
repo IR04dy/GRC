@@ -25,7 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,7 +57,20 @@ public class RiskService {
         Page<Risk> page = (status != null && !status.isBlank())
             ? riskRepository.findByOrgAndStatus(orgId, status, pageable)
             : riskRepository.findByOrganisationId(orgId, pageable);
-        return page.map(this::toResponse);
+
+        // PERF-NQ-001: resolve category + owner display fields in TWO batch
+        // queries per page instead of one findById per FK per row (was 2N+1).
+        List<Risk> rows = page.getContent();
+        Set<Long> catIds = rows.stream().map(Risk::getCategoryId).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> ownerIds = rows.stream().map(Risk::getOwnerId).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, RiskCategory> catMap = catIds.isEmpty() ? Map.of()
+            : riskCategoryRepository.findAllById(catIds).stream().collect(Collectors.toMap(RiskCategory::getId, c -> c));
+        Map<Long, User> ownerMap = ownerIds.isEmpty() ? Map.of()
+            : userRepository.findAllById(ownerIds).stream().collect(Collectors.toMap(User::getId, u -> u));
+
+        return page.map(r -> build(r,
+            r.getCategoryId() == null ? null : catMap.get(r.getCategoryId()),
+            r.getOwnerId() == null ? null : ownerMap.get(r.getOwnerId())));
     }
 
     @Transactional(readOnly = true)
@@ -235,26 +251,21 @@ public class RiskService {
         risk.setReviewDate(req.reviewDate());
     }
 
+    /** Single-entity path (get/create/update) — one row, so per-FK findById is fine. */
     private RiskResponse toResponse(Risk r) {
-        String categoryNameEn = null;
-        String categoryNameAr = null;
-        if (r.getCategoryId() != null) {
-            RiskCategory cat = riskCategoryRepository.findById(r.getCategoryId()).orElse(null);
-            if (cat != null) {
-                categoryNameEn = cat.getNameEn();
-                categoryNameAr = cat.getNameAr();
-            }
-        }
+        RiskCategory cat = (r.getCategoryId() != null)
+            ? riskCategoryRepository.findById(r.getCategoryId()).orElse(null) : null;
+        User owner = (r.getOwnerId() != null)
+            ? userRepository.findById(r.getOwnerId()).orElse(null) : null;
+        return build(r, cat, owner);
+    }
 
-        String ownerFullNameEn = null;
-        String ownerUsername = null;
-        if (r.getOwnerId() != null) {
-            User owner = userRepository.findById(r.getOwnerId()).orElse(null);
-            if (owner != null) {
-                ownerFullNameEn = owner.getFullNameEn();
-                ownerUsername = owner.getUsername();
-            }
-        }
+    /** Assemble the response from already-resolved category + owner (no queries). */
+    private RiskResponse build(Risk r, RiskCategory cat, User owner) {
+        String categoryNameEn = cat != null ? cat.getNameEn() : null;
+        String categoryNameAr = cat != null ? cat.getNameAr() : null;
+        String ownerFullNameEn = owner != null ? owner.getFullNameEn() : null;
+        String ownerUsername = owner != null ? owner.getUsername() : null;
 
         String riskCode = "RISK-" + String.format("%04d", r.getId());
 

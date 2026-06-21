@@ -1,15 +1,20 @@
 package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk.dto.RiskRequest;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
+import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,15 +25,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -80,6 +88,46 @@ class RiskServiceTest {
             "Title EN", "العنوان", "desc", "الوصف", null, null,
             3, 4, 2, 3, null, null
         );
+    }
+
+    private static RiskCategory cat(long id, String nameEn) {
+        RiskCategory c = new RiskCategory();
+        c.setId(id); c.setNameEn(nameEn); c.setNameAr(nameEn + " (ar)");
+        return c;
+    }
+
+    private static User owner(long id, String fullName, String username) {
+        User u = new User();
+        u.setId(id); u.setFullNameEn(fullName); u.setUsername(username);
+        return u;
+    }
+
+    // ─── PERF-NQ-001: list() batch-resolves FK display fields ─────────
+
+    @Test
+    void list_batchResolvesCategoryAndOwner_noPerRowFindById() {
+        Risk r1 = risk("OPEN"); r1.setId(1L); r1.setCategoryId(10L); r1.setOwnerId(100L);
+        Risk r2 = risk("OPEN"); r2.setId(2L); r2.setCategoryId(11L); r2.setOwnerId(100L);
+        Risk r3 = risk("OPEN"); r3.setId(3L); r3.setCategoryId(10L); r3.setOwnerId(101L);
+        PageRequest pageable = PageRequest.of(0, 50);
+        when(riskRepository.findByOrganisationId(ORG_ID, pageable))
+            .thenReturn(new PageImpl<>(List.of(r1, r2, r3)));
+        when(riskCategoryRepository.findAllById(anySet()))
+            .thenReturn(List.of(cat(10L, "Operational"), cat(11L, "Cyber")));
+        when(userRepository.findAllById(anySet()))
+            .thenReturn(List.of(owner(100L, "Alice", "alice"), owner(101L, "Bob", "bob")));
+
+        Page<RiskResponse> out = service.list(null, pageable);
+
+        assertThat(out.getContent()).hasSize(3);
+        assertThat(out.getContent().get(0).categoryNameEn()).isEqualTo("Operational");
+        assertThat(out.getContent().get(1).categoryNameEn()).isEqualTo("Cyber");
+        assertThat(out.getContent().get(2).ownerUsername()).isEqualTo("bob");
+        // The fix: exactly ONE batch query per FK type, never per-row findById.
+        verify(riskCategoryRepository, times(1)).findAllById(anySet());
+        verify(userRepository, times(1)).findAllById(anySet());
+        verify(riskCategoryRepository, never()).findById(any());
+        verify(userRepository, never()).findById(any());
     }
 
     // ─── lifecycle: happy path ───────────────────────────────────────
