@@ -37,14 +37,59 @@ public class MaDueDiligenceService {
 
     @Transactional
     public MaDueDiligence save(MaDueDiligence in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        MaDueDiligence saved = repo.save(in);
+        MaDueDiligence target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            MaDueDiligence existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("MaDueDiligence " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        MaDueDiligence saved = repo.save(target);
         audit.log(isNew ? "MA_DD_CREATE" : "MA_DD_UPDATE",
             "MaDueDiligence", saved.getId(),
             saved.getEngagementCode() + " · " + saved.getTargetEntityName()
                 + " · " + saved.getPhase());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(MaDueDiligence in, MaDueDiligence target) {
+        target.setEngagementCode(in.getEngagementCode());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setTargetEntityName(in.getTargetEntityName());
+        target.setTargetIndustry(in.getTargetIndustry());
+        target.setTargetCountry(in.getTargetCountry());
+        target.setDealType(in.getDealType());
+        target.setPhase(in.getPhase());
+        target.setDealStatus(in.getDealStatus());
+        target.setRiskAreasAssessed(in.getRiskAreasAssessed());
+        target.setFindingsTotal(in.getFindingsTotal());
+        target.setFindingsCritical(in.getFindingsCritical());
+        target.setFindingsHigh(in.getFindingsHigh());
+        target.setPriceAdjustmentSar(in.getPriceAdjustmentSar());
+        target.setCyberLeadName(in.getCyberLeadName());
+        target.setLegalLeadName(in.getLegalLeadName());
+        target.setFinanceLeadName(in.getFinanceLeadName());
+        target.setLoiSignedAt(in.getLoiSignedAt());
+        target.setFieldworkStartAt(in.getFieldworkStartAt());
+        target.setFieldworkEndAt(in.getFieldworkEndAt());
+        target.setFinalReportAt(in.getFinalReportAt());
+        target.setDealCloseAt(in.getDealCloseAt());
+        target.setIntegrationCompleteAt(in.getIntegrationCompleteAt());
+        target.setCyberRecommendation(in.getCyberRecommendation());
+        target.setRecommendationNotes(in.getRecommendationNotes());
+        target.setNotes(in.getNotes());
     }
 
     @Transactional

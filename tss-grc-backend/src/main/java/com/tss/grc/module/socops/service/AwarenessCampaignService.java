@@ -32,12 +32,49 @@ public class AwarenessCampaignService {
 
     @Transactional
     public AwarenessCampaign save(AwarenessCampaign in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        AwarenessCampaign saved = repo.save(in);
+        AwarenessCampaign target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            AwarenessCampaign existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("AwarenessCampaign " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        AwarenessCampaign saved = repo.save(target);
         audit.log(isNew ? "AWARENESS_CREATE" : "AWARENESS_UPDATE",
             "AwarenessCampaign", saved.getId(), saved.getCampaignCode());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(AwarenessCampaign in, AwarenessCampaign target) {
+        target.setCampaignCode(in.getCampaignCode());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setCampaignType(in.getCampaignType());
+        target.setTargetAudience(in.getTargetAudience());
+        target.setTargetUserCount(in.getTargetUserCount());
+        target.setStartedAt(in.getStartedAt());
+        target.setEndedAt(in.getEndedAt());
+        target.setStatus(in.getStatus());
+        target.setDeliveredCount(in.getDeliveredCount());
+        target.setOpenedCount(in.getOpenedCount());
+        target.setClickedCount(in.getClickedCount());
+        target.setReportedCount(in.getReportedCount());
+        target.setCompletedCount(in.getCompletedCount());
+        target.setRepeatOffenderCount(in.getRepeatOffenderCount());
+        target.setPassRatePercent(in.getPassRatePercent());
+        target.setAlignedControls(in.getAlignedControls());
+        target.setNotes(in.getNotes());
     }
 
     @Transactional

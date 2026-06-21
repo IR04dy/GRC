@@ -37,9 +37,23 @@ public class RegulatorExaminationService {
 
     @Transactional
     public RegulatorExamination save(RegulatorExamination in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        RegulatorExamination saved = repo.save(in);
+        RegulatorExamination target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            RegulatorExamination existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("RegulatorExamination " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        RegulatorExamination saved = repo.save(target);
         audit.log(isNew ? "REGULATOR_EXAM_CREATE" : "REGULATOR_EXAM_UPDATE",
             "RegulatorExamination", saved.getId(),
             saved.getRegulator() + " · " + saved.getExaminationCode());
@@ -56,6 +70,34 @@ public class RegulatorExaminationService {
                        "examinationType", saved.getExaminationType() == null ? "" : saved.getExaminationType())));
         }
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(RegulatorExamination in, RegulatorExamination target) {
+        target.setExaminationCode(in.getExaminationCode());
+        target.setRegulator(in.getRegulator());
+        target.setExaminationType(in.getExaminationType());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setScopeAreas(in.getScopeAreas());
+        target.setLeadExaminerName(in.getLeadExaminerName());
+        target.setNotifiedAt(in.getNotifiedAt());
+        target.setFieldworkStartAt(in.getFieldworkStartAt());
+        target.setFieldworkEndAt(in.getFieldworkEndAt());
+        target.setDraftReportAt(in.getDraftReportAt());
+        target.setFinalReportAt(in.getFinalReportAt());
+        target.setResponseDueAt(in.getResponseDueAt());
+        target.setResponseSubmittedAt(in.getResponseSubmittedAt());
+        target.setClosedAt(in.getClosedAt());
+        target.setStatus(in.getStatus());
+        target.setFindingsTotal(in.getFindingsTotal());
+        target.setFindingsCritical(in.getFindingsCritical());
+        target.setFindingsHigh(in.getFindingsHigh());
+        target.setFindingsMedLow(in.getFindingsMedLow());
+        target.setOverallRating(in.getOverallRating());
+        target.setRelatedFramework(in.getRelatedFramework());
+        target.setNotes(in.getNotes());
     }
 
     @Transactional

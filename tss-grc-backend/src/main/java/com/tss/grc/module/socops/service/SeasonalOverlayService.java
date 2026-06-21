@@ -38,11 +38,41 @@ public class SeasonalOverlayService {
 
     @Transactional
     public SeasonalOverlay save(SeasonalOverlay in) {
-        in.setOrganisationId(TenantContext.getCurrentTenant());
+        // SEC-CYB-002 — on create force id=null so a client-supplied id can't
+        // overwrite an existing row via merge; on update load the row scoped
+        // to the caller's tenant and copy only mutable fields.
+        Long org = TenantContext.getCurrentTenant();
         boolean isNew = in.getId() == null;
-        SeasonalOverlay saved = repo.save(in);
+        SeasonalOverlay target;
+        if (isNew) {
+            in.setId(null);
+            in.setOrganisationId(org);
+            target = in;
+        } else {
+            SeasonalOverlay existing = repo.findByIdAndOrganisationId(in.getId(), org)
+                .orElseThrow(() -> new EntityNotFoundException("SeasonalOverlay " + in.getId()));
+            copyMutable(in, existing);
+            target = existing;
+        }
+        SeasonalOverlay saved = repo.save(target);
         audit.log(isNew ? "SEASONAL_OVERLAY_CREATE" : "SEASONAL_OVERLAY_UPDATE",
             "SeasonalOverlay", saved.getId(), saved.getOverlayCode());
         return saved;
+    }
+
+    /** Copy client-mutable fields onto the tenant-owned managed entity. id,
+     *  organisationId and audit columns are deliberately never copied. */
+    private void copyMutable(SeasonalOverlay in, SeasonalOverlay target) {
+        target.setOverlayCode(in.getOverlayCode());
+        target.setTitleEn(in.getTitleEn());
+        target.setTitleAr(in.getTitleAr());
+        target.setStartsAt(in.getStartsAt());
+        target.setEndsAt(in.getEndsAt());
+        target.setHijriLabel(in.getHijriLabel());
+        target.setThreatProfile(in.getThreatProfile());
+        target.setAutoTightenKris(in.getAutoTightenKris());
+        target.setAutoTightenSlas(in.getAutoTightenSlas());
+        target.setNotifyRecipients(in.getNotifyRecipients());
+        target.setIsActive(in.getIsActive());
     }
 }

@@ -44,6 +44,9 @@ public class BrandMonitoringService {
                 org, in.getSourceSystem(), in.getExternalId())
             .map(existing -> existing) // dedup — keep existing record
             .orElseGet(() -> {
+                // SEC-CYB-002 — force id=null so a forged id on the ingest body
+                // can't overwrite an existing (cross-tenant) row via merge.
+                in.setId(null);
                 BrandMonitoring saved = repo.save(in);
                 audit.log("BRAND_INGEST", "BrandMonitoring", saved.getId(),
                     saved.getSourceSystem() + " · " + saved.getAlertType()
