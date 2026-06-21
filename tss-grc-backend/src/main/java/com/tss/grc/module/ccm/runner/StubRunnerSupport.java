@@ -1,5 +1,6 @@
 package com.tss.grc.module.ccm.runner;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.module.ccm.entity.ControlTestDefinition;
 
@@ -63,4 +64,30 @@ final class StubRunnerSupport {
     static int millisSince(long startNanos) {
         return (int) ((System.nanoTime() - startNanos) / 1_000_000);
     }
+
+    // ─── Shared JSON / config helpers (used by the live runners) ──────
+
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> parseJson(String json) {
+        if (json == null || json.isBlank()) return Map.of();
+        try {
+            return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid JSON: " + e.getMessage(), e);
+        }
+    }
+
+    static String strOr(Map<String, Object> m, String key, String def) {
+        Object v = m.get(key);
+        return v == null ? def : v.toString();
+    }
+
+    static int intOr(Map<String, Object> m, String key, int def) {
+        Object v = m.get(key);
+        if (v == null) return def;
+        if (v instanceof Number n) return n.intValue();
+        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return def; }
+    }
+
+    static <T> T defaultIfNull(T value, T fallback) { return value == null ? fallback : value; }
 }

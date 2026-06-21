@@ -1,5 +1,8 @@
 package com.tss.grc.module.tprm.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.tprm.entity.QuestionnaireQuestion;
 import com.tss.grc.module.tprm.entity.QuestionnaireResponse;
@@ -22,6 +25,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -67,6 +71,7 @@ public class QuestionnaireService {
     private final QuestionnaireResponseRepository responses;
     private final VendorAssessmentRepository assessments;
     private final VendorRepository vendorRepo;
+    private final ObjectMapper objectMapper;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -372,17 +377,21 @@ public class QuestionnaireService {
                 throw new IllegalArgumentException("BOOLEAN answer must be YES/NO/TRUE/FALSE/1/0, got '" + v + "'");
             }
             case "SELECT" -> {
-                // Without a real JSON library reference here, look up the option's
-                // points by parsing options_json (simple {"v":n,...} format).
+                // Look up the selected option's points in options_json
+                // (simple {"v":n,...} format — keys are option values,
+                // values are the points awarded for that option).
                 if (q.getOptionsJson() == null) return null;
-                String pattern = "\"" + v + "\"";
-                int i = q.getOptionsJson().indexOf(pattern);
-                if (i < 0) throw new IllegalArgumentException("SELECT option not found: " + v);
-                int colon = q.getOptionsJson().indexOf(':', i);
-                int end = colon + 1;
-                while (end < q.getOptionsJson().length() && "0123456789.".indexOf(q.getOptionsJson().charAt(end)) >= 0) end++;
-                try { return new BigDecimal(q.getOptionsJson().substring(colon + 1, end).trim()).setScale(2, RoundingMode.HALF_UP); }
-                catch (Exception ex) { return null; }
+                Map<String, Object> options;
+                try {
+                    options = objectMapper.readValue(q.getOptionsJson(), new TypeReference<Map<String, Object>>() {});
+                } catch (JsonProcessingException ex) {
+                    throw new IllegalArgumentException("SELECT optionsJson is not valid JSON: " + ex.getOriginalMessage());
+                }
+                if (!options.containsKey(v)) throw new IllegalArgumentException("SELECT option not found: " + v);
+                Object points = options.get(v);
+                if (!(points instanceof Number n))
+                    throw new IllegalArgumentException("SELECT option '" + v + "' has a non-numeric points value");
+                return new BigDecimal(n.toString()).setScale(2, RoundingMode.HALF_UP);
             }
             case "TEXT" -> { return null; }   // requires reviewer to set scoredPoints manually
             default -> { return null; }

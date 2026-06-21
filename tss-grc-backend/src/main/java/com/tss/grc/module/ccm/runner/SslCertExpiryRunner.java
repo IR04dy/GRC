@@ -1,6 +1,5 @@
 package com.tss.grc.module.ccm.runner;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.module.ccm.entity.ControlTestDefinition;
 import lombok.extern.slf4j.Slf4j;
@@ -49,15 +48,15 @@ public class SslCertExpiryRunner implements ControlTestRunner {
     public RunResult execute(ControlTestDefinition def) {
         long start = System.nanoTime();
         try {
-            Map<String, Object> cfg = parseJson(def.getTargetConfigJson());
-            Map<String, Object> cond = parseJson(def.getExpectedConditionJson());
-            String host = strOr(cfg, "host", "");
-            int port = intOr(cfg, "port", 443);
-            int minDays = intOr(cond, "minDaysToExpiry", 30);
-            int timeoutMs = Math.max(1_000, defaultIfNull(def.getTimeoutSeconds(), 30) * 1000);
+            Map<String, Object> cfg = StubRunnerSupport.parseJson(def.getTargetConfigJson());
+            Map<String, Object> cond = StubRunnerSupport.parseJson(def.getExpectedConditionJson());
+            String host = StubRunnerSupport.strOr(cfg, "host", "");
+            int port = StubRunnerSupport.intOr(cfg, "port", 443);
+            int minDays = StubRunnerSupport.intOr(cond, "minDaysToExpiry", 30);
+            int timeoutMs = Math.max(1_000, StubRunnerSupport.defaultIfNull(def.getTimeoutSeconds(), 30) * 1000);
 
             if (host.isBlank()) {
-                return RunResult.error("target_config_json.host missing", millisSince(start));
+                return RunResult.error("target_config_json.host missing", StubRunnerSupport.millisSince(start));
             }
 
             Instant notAfter = lookup.fetchNotAfter(host, port, timeoutMs);
@@ -76,7 +75,7 @@ public class SslCertExpiryRunner implements ControlTestRunner {
                 actualJson = "{}";
             }
 
-            int duration = millisSince(start);
+            int duration = StubRunnerSupport.millisSince(start);
             if (daysToExpiry > minDays) {
                 return RunResult.pass(actualJson, duration);
             }
@@ -87,7 +86,7 @@ public class SslCertExpiryRunner implements ControlTestRunner {
         } catch (RuntimeException ex) {
             log.warn("SSL cert-expiry runner failed: {}", ex.getMessage());
             return RunResult.error(ex.getClass().getSimpleName() + ": " + ex.getMessage(),
-                    millisSince(start));
+                    StubRunnerSupport.millisSince(start));
         }
     }
 
@@ -114,36 +113,6 @@ public class SslCertExpiryRunner implements ControlTestRunner {
         } catch (Exception e) {
             throw new RuntimeException("TLS handshake to " + host + ":" + port + " failed: " + e.getMessage(), e);
         }
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────
-
-    @SuppressWarnings("unchecked")
-    static Map<String, Object> parseJson(String json) {
-        if (json == null || json.isBlank()) return Map.of();
-        try {
-            return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            throw new RuntimeException("Invalid JSON: " + e.getMessage(), e);
-        }
-    }
-
-    static String strOr(Map<String, Object> m, String key, String def) {
-        Object v = m.get(key);
-        return v == null ? def : v.toString();
-    }
-
-    static int intOr(Map<String, Object> m, String key, int def) {
-        Object v = m.get(key);
-        if (v == null) return def;
-        if (v instanceof Number n) return n.intValue();
-        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return def; }
-    }
-
-    static <T> T defaultIfNull(T value, T fallback) { return value == null ? fallback : value; }
-
-    static int millisSince(long startNanos) {
-        return (int) ((System.nanoTime() - startNanos) / 1_000_000);
     }
 
     /** Pluggable TLS leaf-cert {@code notAfter} fetcher. */

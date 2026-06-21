@@ -1,6 +1,5 @@
 package com.tss.grc.module.ccm.runner;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.module.ccm.entity.ControlTestDefinition;
 import jakarta.persistence.EntityManager;
@@ -83,16 +82,16 @@ public class CustomSqlRunner implements ControlTestRunner {
                 return RunResult.error(
                     "CUSTOM_SQL execution is disabled by policy (SEC-INT-001). Enable "
                     + "grc.ccm.custom-sql.enabled only with a least-privilege, per-tenant DB account.",
-                    millisSince(start));
+                    StubRunnerSupport.millisSince(start));
             }
 
-            Map<String, Object> cond = parseJson(def.getExpectedConditionJson());
-            String sql = strOr(cond, "sql", "");
-            int maxRows = intOr(cond, "maxRowCount", 0);
+            Map<String, Object> cond = StubRunnerSupport.parseJson(def.getExpectedConditionJson());
+            String sql = StubRunnerSupport.strOr(cond, "sql", "");
+            int maxRows = StubRunnerSupport.intOr(cond, "maxRowCount", 0);
 
             String rejection = rejectionReason(sql);
             if (rejection != null) {
-                return RunResult.error(rejection, millisSince(start));
+                return RunResult.error(rejection, StubRunnerSupport.millisSince(start));
             }
 
             Query q = em.createNativeQuery(sql);
@@ -122,7 +121,7 @@ public class CustomSqlRunner implements ControlTestRunner {
                 actualJson = "{}";
             }
 
-            int duration = millisSince(start);
+            int duration = StubRunnerSupport.millisSince(start);
             if (actualCount <= maxRows) {
                 return RunResult.pass(actualJson, duration);
             }
@@ -132,7 +131,7 @@ public class CustomSqlRunner implements ControlTestRunner {
         } catch (RuntimeException ex) {
             log.warn("CUSTOM_SQL runner failed: {}", ex.getMessage());
             return RunResult.error(ex.getClass().getSimpleName() + ": " + ex.getMessage(),
-                    millisSince(start));
+                    StubRunnerSupport.millisSince(start));
         }
     }
 
@@ -184,33 +183,5 @@ public class CustomSqlRunner implements ControlTestRunner {
                 return s;
             }
         }
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────
-
-    @SuppressWarnings("unchecked")
-    static Map<String, Object> parseJson(String json) {
-        if (json == null || json.isBlank()) return Map.of();
-        try {
-            return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            throw new RuntimeException("Invalid JSON: " + e.getMessage(), e);
-        }
-    }
-
-    static String strOr(Map<String, Object> m, String key, String def) {
-        Object v = m.get(key);
-        return v == null ? def : v.toString();
-    }
-
-    static int intOr(Map<String, Object> m, String key, int def) {
-        Object v = m.get(key);
-        if (v == null) return def;
-        if (v instanceof Number n) return n.intValue();
-        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return def; }
-    }
-
-    static int millisSince(long startNanos) {
-        return (int) ((System.nanoTime() - startNanos) / 1_000_000);
     }
 }

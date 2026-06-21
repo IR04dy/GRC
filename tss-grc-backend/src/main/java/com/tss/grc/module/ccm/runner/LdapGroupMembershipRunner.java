@@ -1,6 +1,5 @@
 package com.tss.grc.module.ccm.runner;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.module.ccm.entity.ControlTestDefinition;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +8,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -65,19 +63,19 @@ public class LdapGroupMembershipRunner implements ControlTestRunner {
         long start = System.nanoTime();
         if (!enabled) {
             return RunResult.skipped("grc.ccm.ldap.enabled=false — runner disabled",
-                    millisSince(start));
+                    StubRunnerSupport.millisSince(start));
         }
         try {
-            Map<String, Object> cfg = parseJson(def.getTargetConfigJson());
-            Map<String, Object> cond = parseJson(def.getExpectedConditionJson());
+            Map<String, Object> cfg = StubRunnerSupport.parseJson(def.getTargetConfigJson());
+            Map<String, Object> cond = StubRunnerSupport.parseJson(def.getExpectedConditionJson());
 
-            String url       = strOr(cfg, "url", "");
-            String bindDn    = strOr(cfg, "bindDn", "");
-            String groupDn   = strOr(cond, "groupDn", "");
-            int maxMembers   = intOr(cond, "maxMembers", 0);
+            String url       = StubRunnerSupport.strOr(cfg, "url", "");
+            String bindDn    = StubRunnerSupport.strOr(cfg, "bindDn", "");
+            String groupDn   = StubRunnerSupport.strOr(cond, "groupDn", "");
+            int maxMembers   = StubRunnerSupport.intOr(cond, "maxMembers", 0);
 
             if (groupDn.isBlank()) {
-                return RunResult.error("expected_condition_json.groupDn missing", millisSince(start));
+                return RunResult.error("expected_condition_json.groupDn missing", StubRunnerSupport.millisSince(start));
             }
 
             int actualMembers = lookup.countMembers(url, bindDn, groupDn);
@@ -93,7 +91,7 @@ public class LdapGroupMembershipRunner implements ControlTestRunner {
                 actualJson = "{}";
             }
 
-            int duration = millisSince(start);
+            int duration = StubRunnerSupport.millisSince(start);
             if (actualMembers <= maxMembers) {
                 return RunResult.pass(actualJson, duration);
             }
@@ -103,7 +101,7 @@ public class LdapGroupMembershipRunner implements ControlTestRunner {
         } catch (RuntimeException ex) {
             log.warn("LDAP group-membership runner failed: {}", ex.getMessage());
             return RunResult.error(ex.getClass().getSimpleName() + ": " + ex.getMessage(),
-                    millisSince(start));
+                    StubRunnerSupport.millisSince(start));
         }
     }
 
@@ -118,34 +116,6 @@ public class LdapGroupMembershipRunner implements ControlTestRunner {
         throw new UnsupportedOperationException(
                 "Live LDAP lookup not wired — see docs/operations/ldap-ad-integration-guide.md. "
                 + "Set grc.ccm.ldap.enabled=false to skip, or wire a real GroupLookup bean.");
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────
-
-    @SuppressWarnings("unchecked")
-    static Map<String, Object> parseJson(String json) {
-        if (json == null || json.isBlank()) return Map.of();
-        try {
-            return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            throw new RuntimeException("Invalid JSON: " + e.getMessage(), e);
-        }
-    }
-
-    static String strOr(Map<String, Object> m, String key, String def) {
-        Object v = m.get(key);
-        return v == null ? def : v.toString();
-    }
-
-    static int intOr(Map<String, Object> m, String key, int def) {
-        Object v = m.get(key);
-        if (v == null) return def;
-        if (v instanceof Number n) return n.intValue();
-        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return def; }
-    }
-
-    static int millisSince(long startNanos) {
-        return (int) ((System.nanoTime() - startNanos) / 1_000_000);
     }
 
     /** Pluggable directory lookup — production wiring opens a real LDAP context. */

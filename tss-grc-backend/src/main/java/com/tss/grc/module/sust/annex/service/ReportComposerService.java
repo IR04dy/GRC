@@ -1,5 +1,7 @@
 package com.tss.grc.module.sust.annex.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.annex.service.AnnexGeneratorService.AnnexContent;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
@@ -55,6 +57,8 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ReportComposerService {
+
+    private final ObjectMapper                     objectMapper;
 
     private final AnnexGeneratorService            annexGenerator;
     private final SustainabilityDashboardService   dashboardService;
@@ -409,19 +413,21 @@ public class ReportComposerService {
     private static String markdownToHtml(String md) {
         StringBuilder out = new StringBuilder(md.length() * 2);
         boolean inTable = false;
+        boolean firstRowOfTable = false;
         boolean inList = false;
         for (String line : md.split("\n", -1)) {
             String t = line.trim();
             // Tables — lines starting with "|".
             if (t.startsWith("|")) {
                 if (t.matches("\\|\\s*-.*")) continue;  // separator row
-                if (!inTable) { out.append("<table>"); inTable = true; }
+                if (!inTable) { out.append("<table>"); inTable = true; firstRowOfTable = true; }
                 String[] cells = t.split("\\|");
                 out.append("<tr>");
                 for (int i = 1; i < cells.length - (t.endsWith("|") ? 1 : 0); i++) {
                     String c = cells[i].trim();
-                    // First table row is treated as <th>.
-                    boolean isHeader = !out.toString().endsWith("</tr>") && out.toString().endsWith("<table><tr>");
+                    // First cell of the first row of a table is treated as <th>.
+                    boolean isHeader = firstRowOfTable;
+                    firstRowOfTable = false;
                     out.append(isHeader ? "<th>" : "<td>")
                        .append(escape(stripBold(c)))
                        .append(isHeader ? "</th>" : "</td>");
@@ -456,10 +462,21 @@ public class ReportComposerService {
     private static String stripBold(String s) { return s.replace("**", ""); }
     private static String safe(String s) { return s == null ? "—" : s; }
 
-    /** Quick JSON serializer — service is small enough that pulling
-     *  Jackson isn't necessary; this handles the shapes we emit. */
+    /** JSON serializer — delegates to the shared Jackson ObjectMapper.
+     *  Falls back to the minimal hand-rolled serializer on the rare
+     *  JsonProcessingException so the export never fails outright. */
+    private String toJson(Object v) {
+        try {
+            return objectMapper.writeValueAsString(v);
+        } catch (JsonProcessingException ex) {
+            return toJsonFallback(v);
+        }
+    }
+
+    /** Minimal hand-rolled serializer retained as a fallback for the
+     *  shapes we emit when Jackson serialization fails. */
     @SuppressWarnings("unchecked")
-    private static String toJson(Object v) {
+    private static String toJsonFallback(Object v) {
         if (v == null) return "null";
         if (v instanceof Boolean || v instanceof Number) return v.toString();
         if (v instanceof String s) return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
@@ -469,7 +486,7 @@ public class ReportComposerService {
             for (var e : ((Map<String, Object>) m).entrySet()) {
                 if (!first) b.append(',');
                 first = false;
-                b.append('"').append(e.getKey()).append("\":").append(toJson(e.getValue()));
+                b.append('"').append(e.getKey()).append("\":").append(toJsonFallback(e.getValue()));
             }
             return b.append('}').toString();
         }
@@ -479,7 +496,7 @@ public class ReportComposerService {
             for (var item : it) {
                 if (!first) b.append(',');
                 first = false;
-                b.append(toJson(item));
+                b.append(toJsonFallback(item));
             }
             return b.append(']').toString();
         }
