@@ -139,7 +139,7 @@
   margin-top: 2px;
 }
 .ndi-cell-warn--warning {
-  color: var(--warning);
+  color: var(--warning-fg); /* A11Y-004: --warning (#C8932A, 2.58:1) fails AA as text; --warning-fg (#876019) passes */
   margin-top: 2px;
 }
 

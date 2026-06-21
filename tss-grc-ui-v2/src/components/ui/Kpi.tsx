@@ -118,8 +118,10 @@ export function Kpi({ Icon, label, value, trend, tone = 'primary', spark, to, on
        * underlying compact formatter (lib/format.ts) already produces a
        * mostly-fits value, so ellipsis is rare and the tooltip is the
        * desktop-only fallback. */}
-      <div className="kpi-value" title={String(value)}>{value}</div>
+      {/* UX-002: label first (eyebrow, --ink-2) then the number, so the
+          reading order is label → value rather than number → caption. */}
       <div className="kpi-label">{label}</div>
+      <div className="kpi-value" title={String(value)}>{value}</div>
       {spark && spark.length >= 2 && <Sparkline values={spark} color={line} />}
     </>
   );

@@ -41,7 +41,9 @@ export function HeatMap({ data, onCellClick, selected }: HeatMapProps) {
                 return (
                   <td
                     key={c}
-                    className="heatmap-cell"
+                    /* A11Y-005: vhigh/crit fills (score > 16) are dark reds —
+                       flag them so the score/count text flips to white. */
+                    className={`heatmap-cell${score > 16 ? ' heatmap-cell--dark' : ''}`}
                     style={{
                       background: colorFor(score),
                       cursor: clickable ? 'pointer' : 'default',

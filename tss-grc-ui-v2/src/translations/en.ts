@@ -110,7 +110,7 @@ export const en = {
   loginSubmit: 'Sign In',
   loginSubmitting: 'Signing in…',
   loginInvalid: 'Invalid username or password.',
-  loginNetworkError: 'Cannot reach the API. Is the backend running on http://localhost:8084?',
+  loginNetworkError: 'We couldn’t connect to the server. Check your internet connection and try again.',
   loginHero: 'Unified governance, risk and compliance for Saudi enterprises.',
   loginHeroSub: 'NCA ECC, SDAIA, PDPL, SAMA, ISO 27001 — out of the box. Native Arabic + English.',
   loginHint: 'Demo · admin / Admin@12345 — riskmanager / Risk@12345',

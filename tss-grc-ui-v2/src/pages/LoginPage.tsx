@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { ShieldCheck, Languages, LogIn, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Languages, LogIn } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useI18n } from '../lib/i18n';
 import { login as apiLogin, ApiError } from '../lib/api';
@@ -22,8 +22,12 @@ export function LoginPage() {
   const landing = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
     ? nextParam
     : '/risk';
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('Admin@12345');
+  // COPY-01 / UX-003: a shipped build must never pre-fill real credentials.
+  // In a dev build we keep the quick-fill (and the on-screen hint) for
+  // convenience; staging/prod start with empty fields and no credential hint.
+  const devQuickFill = import.meta.env.DEV;
+  const [username, setUsername] = useState(devQuickFill ? 'admin' : '');
+  const [password, setPassword] = useState(devQuickFill ? 'Admin@12345' : '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,10 +52,6 @@ export function LoginPage() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function continueDemo() {
-    navigate(landing, { replace: true });
   }
 
   return (
@@ -97,21 +97,20 @@ export function LoginPage() {
             required
           />
 
-          {error && <div className="login-error">{error}</div>}
+          {/* UX-003: a persistent, screen-reader-announced error region so
+              auth failures (bad credentials, lockout, network) are visible. */}
+          {error && <div className="login-error" role="alert" aria-live="assertive">{error}</div>}
 
           <Button type="submit" Icon={LogIn} disabled={submitting} size="lg">
             {submitting ? t('loginSubmitting') : t('loginSubmit')}
-          </Button>
-
-          <Button type="button" variant="ghost" Icon={ArrowRight} onClick={continueDemo}>
-            {t('loginSkipDemo')}
           </Button>
 
           <Button type="button" variant="ghost" size="sm" Icon={Languages} onClick={toggleLang}>
             {t('langToggle')}
           </Button>
 
-          <div className="login-hint"><b>{t('loginHint')}</b></div>
+          {/* COPY-01: the credential hint ships only in dev builds. */}
+          {devQuickFill && <div className="login-hint"><b>{t('loginHint')}</b></div>}
         </form>
       </main>
     </div>

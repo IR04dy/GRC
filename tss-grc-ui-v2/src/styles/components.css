@@ -615,7 +615,11 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
   cursor: default;
 }
 .heatmap-cell:hover { transform: scale(1.06); z-index: 2; }
-.heatmap-score { opacity: .55; }
+/* A11Y-005: was opacity:.55 over --ink-1, which fell to 3.0–3.4:1 on the
+   med/high fills. Use a solid high-contrast ink on the light fills and white
+   on the dark vhigh/crit fills. */
+.heatmap-score { color: var(--ink-2); font-weight: 800; }
+.heatmap-cell--dark .heatmap-score { color: #fff; }
 .heatmap-count {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px;

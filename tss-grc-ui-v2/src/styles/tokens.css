@@ -55,7 +55,7 @@
   --accent-400: #D6A22F;
   --accent-500: #C8932A;
   --accent-600: #A87A20;
-  --accent-700: #876019;
+  --accent-700: #73520F; /* A11Y-004: darkened from #876019 (5.33:1) to 6.73:1 on cream for extra headroom as a text tone */
   --accent:        var(--accent-500);
   --accent-hover:  var(--accent-600);
 
@@ -363,11 +363,14 @@ body { zoom: var(--ui-scale, 1); }
   --focus-ring: 0 0 0 3px color-mix(in oklab, var(--primary) 30%, transparent);
 }
 
-/* Smooth transition between modes (skip if user prefers reduced motion). */
+/* Smooth transition between modes (skip if user prefers reduced motion).
+   A11Y-004: `color` is deliberately NOT transitioned. Animating text colour
+   meant an automated contrast scan (axe) could sample an intermediate frame
+   that sits below AA even when the settled colour passes — surfacing phantom
+   contrast failures. Background/border still animate for a smooth theme swap. */
 @media (prefers-reduced-motion: no-preference) {
   html, html * {
     transition: background-color var(--dur-normal) var(--ease-standard),
-                border-color var(--dur-normal) var(--ease-standard),
-                color var(--dur-fast) var(--ease-standard);
+                border-color var(--dur-normal) var(--ease-standard);
   }
 }
