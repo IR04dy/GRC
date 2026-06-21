@@ -194,7 +194,7 @@ public class CcmService {
                 // Defence-in-depth — the runner contract says "never
                 // throw" but if a buggy runner does we still record an
                 // ERROR row so the scheduler loop survives.
-                log.warn("CCM runner threw for test {}: {}", d.getTestCode(), ex.getMessage());
+                log.warn("CCM runner threw for test {}", d.getTestCode(), ex);
                 result = ControlTestRunner.RunResult.error(
                         ex.getClass().getSimpleName() + ": " + ex.getMessage(), 0);
             }
@@ -288,7 +288,7 @@ public class CcmService {
             // failure poison a run. The audit log still records the
             // bad outcome and the consecutive-failure counter is
             // already incremented.
-            log.warn("Failed to auto-open Issue for {}: {}", d.getTestCode(), ex.getMessage());
+            log.warn("Failed to auto-open Issue for {}", d.getTestCode(), ex);
             return null;
         }
     }

@@ -23,7 +23,6 @@ import com.tss.grc.module.risk.repository.KriReadingRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -354,7 +353,9 @@ public class ExportService {
             sheet.createFreezePane(0, 1);
             for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
             return writeWorkbook(wb);
-        } catch (Exception e) {
+        } catch (java.io.IOException e) {
+            // Only I/O faults from workbook construction/serialisation are wrapped;
+            // any RuntimeException propagates to the GlobalExceptionHandler unaltered.
             throw new ExportException("Excel", "Excel generation failed", e);
         }
     }
@@ -398,7 +399,9 @@ public class ExportService {
             sheet.createFreezePane(0, 1);
             for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
             return writeWorkbook(wb);
-        } catch (Exception e) {
+        } catch (java.io.IOException e) {
+            // Only I/O faults from workbook construction/serialisation are wrapped;
+            // any RuntimeException propagates to the GlobalExceptionHandler unaltered.
             throw new ExportException("Excel", "Excel generation failed", e);
         }
     }
@@ -461,7 +464,9 @@ public class ExportService {
             for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
             summary.autoSizeColumn(0); summary.autoSizeColumn(1);
             return writeWorkbook(wb);
-        } catch (Exception e) {
+        } catch (java.io.IOException e) {
+            // Only I/O faults from workbook construction/serialisation are wrapped;
+            // any RuntimeException propagates to the GlobalExceptionHandler unaltered.
             throw new ExportException("Excel", "Excel generation failed", e);
         }
     }
@@ -489,8 +494,4 @@ public class ExportService {
             return baos.toByteArray();
         }
     }
-
-    // Suppress unused warning for CellRangeAddress import (kept for future merging)
-    @SuppressWarnings("unused")
-    private static final Class<?> KEEP = CellRangeAddress.class;
 }

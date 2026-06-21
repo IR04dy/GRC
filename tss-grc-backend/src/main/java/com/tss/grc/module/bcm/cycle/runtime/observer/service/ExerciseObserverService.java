@@ -637,8 +637,4 @@ public class ExerciseObserverService {
         if (s == null) return "";
         return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
-
-    // Suppress IDE warnings for unused fields in some test paths
-    @SuppressWarnings("unused")
-    private static List<ObservationView> empty() { return new ArrayList<>(); }
 }

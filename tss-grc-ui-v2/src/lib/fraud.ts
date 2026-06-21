@@ -167,7 +167,6 @@ export interface CaseUpdateResponse {
 export interface DashboardResponse {
   openCases: number;
   detectedCount: number;
-  triageCount: number;          // always 0 — TRIAGE is event-only
   investigatingCount: number;
   confirmedCount: number;
   closedCount: number;

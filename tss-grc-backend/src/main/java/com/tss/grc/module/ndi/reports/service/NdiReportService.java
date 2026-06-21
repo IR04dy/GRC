@@ -1,6 +1,5 @@
 package com.tss.grc.module.ndi.reports.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ndi.compliance.entity.NdiComplianceAssessment;
 import com.tss.grc.module.ndi.compliance.repository.NdiComplianceAssessmentRepository;
@@ -55,7 +54,6 @@ public class NdiReportService {
     private final NdiImprovementPlanRepository plans;
     private final NdiSubmissionPackageRepository submissions;
     private final NdiGovernanceDomainService domainService;
-    @SuppressWarnings("unused") private final ObjectMapper json;
 
     public NdiReportService(NdiReportDefinitionRepository defs,
                             NdiAssessmentCycleRepository cycles,
@@ -67,8 +65,7 @@ public class NdiReportService {
                             NdiCorrectiveActionRepository capas,
                             NdiImprovementPlanRepository plans,
                             NdiSubmissionPackageRepository submissions,
-                            NdiGovernanceDomainService domainService,
-                            ObjectMapper json) {
+                            NdiGovernanceDomainService domainService) {
         this.defs = defs;
         this.cycles = cycles;
         this.maturity = maturity;
@@ -80,7 +77,6 @@ public class NdiReportService {
         this.plans = plans;
         this.submissions = submissions;
         this.domainService = domainService;
-        this.json = json;
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }

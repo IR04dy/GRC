@@ -16,8 +16,6 @@ import com.tss.grc.module.risk.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.repository.KriReadingRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import lombok.RequiredArgsConstructor;
-import org.apache.poi.sl.usermodel.PictureData;
-import org.apache.poi.sl.usermodel.TableCell;
 import org.apache.poi.sl.usermodel.TextParagraph;
 import org.apache.poi.sl.usermodel.VerticalAlignment;
 import org.apache.poi.xslf.usermodel.*;
@@ -398,10 +396,4 @@ public class BoardPackPptxService {
     }
 
     private static String safe(String s) { return s == null ? "—" : s; }
-
-    // Suppress unused-import warning for PictureData
-    @SuppressWarnings("unused")
-    private static final Class<?> KEEP_PICTURE_DATA = PictureData.class;
-    @SuppressWarnings("unused")
-    private static final Class<?> KEEP_TABLE_CELL   = TableCell.class;
 }

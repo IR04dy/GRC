@@ -176,19 +176,22 @@ public class KriMeasurementService {
     public int evaluateAll(Long orgId) {
         List<KriDefinition> active = defRepo
                 .findByOrganisationIdAndIsActiveTrueAndIsDeletedFalse(orgId);
-        int dispatched = 0;
+        int skipped = 0;
         for (KriDefinition d : active) {
             if ("MANUAL".equals(d.getSourceQueryType())) continue;
             // Sprint-13 ships the orchestration shell; auto-fetchers
-            // are a future slice. Each iteration is a no-op for now,
-            // but the audit log records that the evaluator considered
-            // the KRI so operators see the scheduler tick is alive.
+            // are a future slice. Each non-MANUAL KRI is skipped for now
+            // (no fetcher bound), so the count reflects skips — not
+            // dispatched work. Per-KRI detail is debug; the scheduler
+            // already logs one aggregate "considered N KRI(s)" summary.
+            log.debug("KRI auto-fetcher not yet bound for source_type={} (KRI {})",
+                    d.getSourceQueryType(), d.getKriCode());
             audit.log("KRI_EVALUATION_SKIPPED", "KriDefinition", d.getId(),
                     "Auto-fetcher not yet bound for source_type="
                             + d.getSourceQueryType() + " (KRI " + d.getKriCode() + ")");
-            dispatched++;
+            skipped++;
         }
-        return dispatched;
+        return skipped;
     }
 
     // ─── Status evaluation — pure, visible for testing ───────────

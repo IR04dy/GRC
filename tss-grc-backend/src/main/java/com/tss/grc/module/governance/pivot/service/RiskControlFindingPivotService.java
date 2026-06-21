@@ -658,13 +658,17 @@ public class RiskControlFindingPivotService {
             List<T> r = sup.get();
             return r == null ? List.of() : r;
         } catch (RuntimeException ex) {
+            log.warn("Pivot safeList supplier failed; returning empty list", ex);
             return Collections.emptyList();
         }
     }
 
     private static <T> Optional<T> safeOpt(java.util.function.Supplier<Optional<T>> sup) {
         try { return sup.get(); }
-        catch (RuntimeException ex) { return Optional.empty(); }
+        catch (RuntimeException ex) {
+            log.warn("Pivot safeOpt supplier failed; returning empty Optional", ex);
+            return Optional.empty();
+        }
     }
 
     private static String safe(String v) { return v == null ? "" : v; }

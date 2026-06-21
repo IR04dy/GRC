@@ -3,6 +3,8 @@ package com.tss.grc.module.ndi.audit.service;
 import com.tss.grc.module.ndi.audit.entity.NdiAuditEvent;
 import com.tss.grc.module.ndi.audit.repository.NdiAuditEventRepository;
 import com.tss.grc.common.tenant.TenantContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class NdiAuditPublisher {
 
+    private static final Logger log = LoggerFactory.getLogger(NdiAuditPublisher.class);
+
     private final NdiAuditEventRepository repo;
 
     public NdiAuditPublisher(NdiAuditEventRepository repo) { this.repo = repo; }
@@ -37,7 +41,10 @@ public class NdiAuditPublisher {
             e.setFromState(fromState);
             e.setToState(toState);
             repo.save(e);
-        } catch (Exception ignored) { /* audit failure never rolls back the parent op */ }
+        } catch (Exception ex) {
+            /* audit failure never rolls back the parent op */
+            log.warn("NDI audit transition publish failed for {} {} (cycle {})", entityType, entityId, cycleId, ex);
+        }
     }
 
     /** CREATE / UPDATE / DELETE and other simple actions. */
@@ -46,7 +53,10 @@ public class NdiAuditPublisher {
                         Long cycleId, String action, String summary) {
         try {
             repo.save(baseEvent(entityType, entityId, entityCode, cycleId, action, summary));
-        } catch (Exception ignored) { /* swallow */ }
+        } catch (Exception ex) {
+            /* swallow */
+            log.warn("NDI audit publish failed for {} {} action={} (cycle {})", entityType, entityId, action, cycleId, ex);
+        }
     }
 
     /** Action with explicit severity (WARN/ERROR). */
@@ -57,7 +67,11 @@ public class NdiAuditPublisher {
             NdiAuditEvent e = baseEvent(entityType, entityId, entityCode, cycleId, action, summary);
             if (severity != null) e.setSeverity(severity);
             repo.save(e);
-        } catch (Exception ignored) { /* swallow */ }
+        } catch (Exception ex) {
+            /* swallow */
+            log.warn("NDI audit publish (severity={}) failed for {} {} action={} (cycle {})",
+                severity, entityType, entityId, action, cycleId, ex);
+        }
     }
 
     private NdiAuditEvent baseEvent(String entityType, Long entityId, String entityCode,
@@ -79,6 +93,9 @@ public class NdiAuditPublisher {
         try {
             Authentication a = SecurityContextHolder.getContext().getAuthentication();
             return a == null ? null : a.getName();
-        } catch (Exception ignored) { return null; }
+        } catch (Exception ex) {
+            log.warn("NDI audit could not resolve current username", ex);
+            return null;
+        }
     }
 }

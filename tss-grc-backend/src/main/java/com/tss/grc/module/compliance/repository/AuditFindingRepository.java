@@ -25,4 +25,6 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Long
     );
 
     long countByOrganisationIdAndStatus(Long organisationId, String status);
+
+    long countByOrganisationIdAndSeverity(Long organisationId, String severity);
 }

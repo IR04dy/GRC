@@ -21,8 +21,6 @@ import com.tss.grc.module.workflow.approval_chains.repository.ApprovalChainStepR
 import com.tss.grc.module.workflow.approval_chains.repository.ApprovalChainTemplateRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -76,8 +74,6 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class ApprovalChainInstanceService {
-
-    private static final Logger log = LoggerFactory.getLogger(ApprovalChainInstanceService.class);
 
     public static final Set<String> TERMINAL_STATUSES = Set.of("APPROVED", "REJECTED", "WITHDRAWN", "EXPIRED");
 

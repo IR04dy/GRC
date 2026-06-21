@@ -58,7 +58,7 @@ public class TprmAutomationService {
             capaService.create(dto);
             log.info("Auto-created CAPA for fourth-party {} (HIGH concentration)", ex.getFourthPartyName());
         } catch (Exception e) {
-            log.warn("Auto-CAPA for 4P {} failed: {}", ex.getFourthPartyName(), e.getMessage());
+            log.warn("Auto-CAPA for 4P {} failed", ex.getFourthPartyName(), e);
         }
     }
 
@@ -81,7 +81,7 @@ public class TprmAutomationService {
             capaService.create(dto);
             log.info("Auto-created CAPA for FAIL processor assessment {}", a.getAssessmentCode());
         } catch (Exception e) {
-            log.warn("Auto-CAPA for processor {} failed: {}", a.getAssessmentCode(), e.getMessage());
+            log.warn("Auto-CAPA for processor {} failed", a.getAssessmentCode(), e);
         }
     }
 
@@ -105,7 +105,7 @@ public class TprmAutomationService {
             capaService.create(dto);
             log.info("Auto-created CAPA for failed resilience test {}", t.getTestCode());
         } catch (Exception e) {
-            log.warn("Auto-CAPA for resilience test {} failed: {}", t.getTestCode(), e.getMessage());
+            log.warn("Auto-CAPA for resilience test {} failed", t.getTestCode(), e);
         }
     }
 

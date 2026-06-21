@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -389,8 +388,4 @@ public class ControlLibraryService {
         }
         return false;
     }
-
-    /** Hide an Objects import if not used elsewhere — silence "unused" warnings. */
-    @SuppressWarnings("unused")
-    private void _touch() { Objects.requireNonNull(this); }
 }

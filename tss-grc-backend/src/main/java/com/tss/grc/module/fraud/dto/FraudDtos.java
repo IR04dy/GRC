@@ -208,7 +208,6 @@ public final class FraudDtos {
     public static class DashboardResponse {
         private long openCases;
         private long detectedCount;
-        private long triageCount;
         private long investigatingCount;
         private long confirmedCount;
         private long closedCount;

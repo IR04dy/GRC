@@ -437,9 +437,11 @@ class KriMeasurementServiceTest {
         when(defRepo.findByOrganisationIdAndIsActiveTrueAndIsDeletedFalse(ORG_ID))
                 .thenReturn(List.of(manual, sql));
 
-        int dispatched = service.evaluateAll(ORG_ID);
+        // Non-MANUAL KRIs have no fetcher bound yet, so each is skipped;
+        // the returned count is the number SKIPPED (not dispatched).
+        int skipped = service.evaluateAll(ORG_ID);
 
-        assertThat(dispatched).isEqualTo(1);
+        assertThat(skipped).isEqualTo(1);
         verify(audit).log(eq("KRI_EVALUATION_SKIPPED"), eq("KriDefinition"), anyLong(), anyString());
     }
 }

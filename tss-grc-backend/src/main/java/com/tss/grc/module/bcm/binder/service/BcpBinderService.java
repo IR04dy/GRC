@@ -303,8 +303,9 @@ public class BcpBinderService {
                     if (v instanceof Long l) return l;
                 } catch (NoSuchMethodException ignored) { /* try next */ }
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
             // never bubble up — current user id is informational only
+            log.debug("Could not resolve current user id from principal {}", a.getPrincipal().getClass().getName(), ex);
         }
         return null;
     }

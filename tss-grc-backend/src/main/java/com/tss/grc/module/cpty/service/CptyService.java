@@ -43,7 +43,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Counterparty Credit Rating Registry service — Sprint 18 PR #1.
@@ -553,9 +552,6 @@ public class CptyService {
     }
 
     // ─── DTO mappers ───────────────────────────────────────────────
-
-    @SuppressWarnings("unused")
-    private static Set<String> __keepIfNeeded() { return Set.of(); }
 
     private CounterpartyResponse toCounterparty(Counterparty c) {
         return CounterpartyResponse.builder()

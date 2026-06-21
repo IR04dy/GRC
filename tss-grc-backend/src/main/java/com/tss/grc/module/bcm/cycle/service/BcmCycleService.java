@@ -10,8 +10,6 @@ import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,8 +41,6 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class BcmCycleService {
-
-    private static final Logger log = LoggerFactory.getLogger(BcmCycleService.class);
 
     private static final Set<String> CYCLE_STATUSES =
         Set.of("DRAFT", "IN_PROGRESS", "UNDER_REVIEW", "APPROVED", "ARCHIVED");
@@ -318,7 +314,4 @@ public class BcmCycleService {
             .sourceModule("bcm")
             .message(message));
     }
-
-    @SuppressWarnings("unused")
-    private void _touch() { log.trace("bound"); }
 }

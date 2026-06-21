@@ -141,14 +141,14 @@ public class RrpService {
         RrpCycle c = loadCycle(id);
         String from = c.getStatus();
         String to = req.getToStatus();
+        if (Set.of("SUBMITTED").contains(to)) {
+            throw new IllegalStateException(
+                    "Use the dedicated /submit endpoint to lodge with SAMA");
+        }
         Set<String> allowed = ALLOWED.getOrDefault(from, Set.of());
         if (!allowed.contains(to)) {
             throw new IllegalStateException(
                     "Illegal transition " + from + " → " + to + " (allowed: " + allowed + ")");
-        }
-        if (Set.of("SUBMITTED").contains(to)) {
-            throw new IllegalStateException(
-                    "Use the dedicated /submit endpoint to lodge with SAMA");
         }
         c.setStatus(to);
         if ("CLOSED".equals(to)) c.setClosedAt(LocalDateTime.now());

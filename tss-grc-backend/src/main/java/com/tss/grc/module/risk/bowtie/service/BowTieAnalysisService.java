@@ -520,12 +520,12 @@ public class BowTieAnalysisService {
 
     private static Map<String, Object> payloadFor(BowTieAnalysis b, String previousStatus) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("bowtieCode",                nullSafe(b.getBowtieCode()));
+        m.put("bowtieCode",                safe(b.getBowtieCode()));
         m.put("externalId",                b.getExternalId() == null ? "" : b.getExternalId().toString());
-        m.put("status",                    nullSafe(b.getStatus()));
-        m.put("riskCategory",              nullSafe(b.getRiskCategory()));
-        m.put("topEventTitleEn",           nullSafe(b.getTopEventTitleEn()));
-        m.put("overallResidualRating",     nullSafe(b.getOverallResidualRating()));
+        m.put("status",                    safe(b.getStatus()));
+        m.put("riskCategory",              safe(b.getRiskCategory()));
+        m.put("topEventTitleEn",           safe(b.getTopEventTitleEn()));
+        m.put("overallResidualRating",     safe(b.getOverallResidualRating()));
         m.put("overallControlEffectiveness",
                 b.getOverallControlEffectiveness() == null ? "" : b.getOverallControlEffectiveness().toPlainString());
         m.put("linkedRiskId",              b.getLinkedRiskId() == null ? "" : String.valueOf(b.getLinkedRiskId()));
@@ -533,6 +533,5 @@ public class BowTieAnalysisService {
         return m;
     }
 
-    private static String nullSafe(String v) { return v == null ? "" : v; }
     private static String safe(String v) { return v == null ? "" : v; }
 }

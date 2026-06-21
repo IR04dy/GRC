@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -231,7 +230,4 @@ public class CompliancePostureService {
             : Math.round((pctSum / pctCount) * 10.0) / 10.0;
         return new DomainAlignment(domain, per, total, mapped, gap, avg);
     }
-
-    @SuppressWarnings("unused")
-    private void _touch() { Objects.requireNonNull(this); }
 }

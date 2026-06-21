@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -42,6 +43,23 @@ public class AuditLifecycleService {
         "DRAFT", "PEER_REVIEW", "APPROVED", "REJECTED");
     private static final Set<String> CAPA_STATUSES = Set.of(
         "OPEN", "IN_PROGRESS", "AWAITING_VERIFICATION", "CLOSED", "OVERDUE");
+
+    private static final Map<String, Set<String>> AP_TRANSITIONS = Map.of(
+        "DRAFT",       Set.of("AC_REVIEW"),
+        "AC_REVIEW",   Set.of("AC_APPROVED", "DRAFT"),
+        "AC_APPROVED", Set.of("EXECUTING"),
+        "EXECUTING",   Set.of("CLOSED"));
+
+    private static final Map<String, Set<String>> WP_TRANSITIONS = Map.of(
+        "DRAFT",       Set.of("PEER_REVIEW"),
+        "PEER_REVIEW", Set.of("APPROVED", "REJECTED"),
+        "REJECTED",    Set.of("DRAFT"));  // re-work loop
+
+    private static final Map<String, Set<String>> CAPA_TRANSITIONS = Map.of(
+        "OPEN",                  Set.of("IN_PROGRESS", "AWAITING_VERIFICATION"),
+        "IN_PROGRESS",           Set.of("AWAITING_VERIFICATION", "OPEN"),
+        "AWAITING_VERIFICATION", Set.of("CLOSED", "IN_PROGRESS"),
+        "OVERDUE",               Set.of("IN_PROGRESS", "AWAITING_VERIFICATION"));
 
     private final AnnualPlanRepository annualPlans;
     private final WorkingPaperRepository workingPapers;
@@ -94,14 +112,8 @@ public class AuditLifecycleService {
     public AnnualPlan transitionAnnualPlan(String externalId, String to, String actor) {
         AnnualPlan p = getAnnualPlan(externalId);
         String from = p.getStatus();
-        boolean ok = switch (from) {
-            case "DRAFT"       -> "AC_REVIEW".equals(to);
-            case "AC_REVIEW"   -> "AC_APPROVED".equals(to) || "DRAFT".equals(to);
-            case "AC_APPROVED" -> "EXECUTING".equals(to);
-            case "EXECUTING"   -> "CLOSED".equals(to);
-            default            -> false;
-        };
-        if (!ok) throw new IllegalTransitionException(from, to, Set.of());
+        Set<String> allowed = AP_TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(to)) throw new IllegalTransitionException(from, to, allowed);
         p.setStatus(to);
         p.setLastUpdated(LocalDateTime.now());
         if ("AC_APPROVED".equals(to)) {
@@ -169,13 +181,8 @@ public class AuditLifecycleService {
     public WorkingPaper transitionWorkingPaper(String externalId, String to, String actor) {
         WorkingPaper wp = getWorkingPaper(externalId);
         String from = wp.getStatus();
-        boolean ok = switch (from) {
-            case "DRAFT"       -> "PEER_REVIEW".equals(to);
-            case "PEER_REVIEW" -> "APPROVED".equals(to) || "REJECTED".equals(to);
-            case "REJECTED"    -> "DRAFT".equals(to);  // re-work loop
-            default            -> false;
-        };
-        if (!ok) throw new IllegalTransitionException(from, to, Set.of());
+        Set<String> allowed = WP_TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(to)) throw new IllegalTransitionException(from, to, allowed);
         wp.setStatus(to);
         if ("APPROVED".equals(to) || "REJECTED".equals(to)) {
             wp.setReviewer(actor);
@@ -240,14 +247,8 @@ public class AuditLifecycleService {
     public CapaTask transitionCapa(String externalId, String to) {
         CapaTask c = getCapa(externalId);
         String from = c.getStatus();
-        boolean ok = switch (from) {
-            case "OPEN"        -> "IN_PROGRESS".equals(to) || "AWAITING_VERIFICATION".equals(to);
-            case "IN_PROGRESS" -> "AWAITING_VERIFICATION".equals(to) || "OPEN".equals(to);
-            case "AWAITING_VERIFICATION" -> "CLOSED".equals(to) || "IN_PROGRESS".equals(to);
-            case "OVERDUE"     -> "IN_PROGRESS".equals(to) || "AWAITING_VERIFICATION".equals(to);
-            default            -> false;
-        };
-        if (!ok) throw new IllegalTransitionException(from, to, Set.of());
+        Set<String> allowed = CAPA_TRANSITIONS.getOrDefault(from, Set.of());
+        if (!allowed.contains(to)) throw new IllegalTransitionException(from, to, allowed);
         c.setStatus(to);
         if ("CLOSED".equals(to)) c.setClosedAt(LocalDateTime.now());
         return capas.save(c);

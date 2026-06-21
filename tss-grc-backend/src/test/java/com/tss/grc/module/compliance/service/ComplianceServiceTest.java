@@ -209,7 +209,7 @@ class ComplianceServiceTest {
         when(controlRepo.countByOrganisationIdAndStatus(ORG_ID, "PARTIAL")).thenReturn(15L);
         when(controlRepo.countByOrganisationIdAndStatus(ORG_ID, "PLANNED")).thenReturn(15L);
         when(findingRepo.countByOrganisationIdAndStatus(ORG_ID, "OPEN")).thenReturn(8L);
-        when(findingRepo.countByOrganisationIdAndStatus(ORG_ID, "CRITICAL")).thenReturn(2L);
+        when(findingRepo.countByOrganisationIdAndSeverity(ORG_ID, "CRITICAL")).thenReturn(2L);
         when(assessmentRepo.avgScoreByOrg(ORG_ID)).thenReturn(72.5);
         when(assessmentRepo.avgScoreByFramework(ORG_ID))
             .thenReturn(List.<Object[]>of(new Object[]{ "NCA_ECC", 80.0 }));
@@ -220,6 +220,7 @@ class ComplianceServiceTest {
         assertThat(stats.implementedControls()).isEqualTo(20);
         assertThat(stats.overallComplianceRate()).isCloseTo(72.5, within(0.0001));
         assertThat(stats.openFindings()).isEqualTo(8);
+        // criticalFindings is counted by SEVERITY=CRITICAL, not status (QUAL-RC-002)
         assertThat(stats.criticalFindings()).isEqualTo(2);
         assertThat(stats.frameworkScores()).hasSize(1);
         Map<String, Object> entry = stats.frameworkScores().get(0);
@@ -234,7 +235,7 @@ class ComplianceServiceTest {
         when(controlRepo.countByOrganisationIdAndStatus(ORG_ID, "PARTIAL")).thenReturn(0L);
         when(controlRepo.countByOrganisationIdAndStatus(ORG_ID, "PLANNED")).thenReturn(30L);
         when(findingRepo.countByOrganisationIdAndStatus(ORG_ID, "OPEN")).thenReturn(0L);
-        when(findingRepo.countByOrganisationIdAndStatus(ORG_ID, "CRITICAL")).thenReturn(0L);
+        when(findingRepo.countByOrganisationIdAndSeverity(ORG_ID, "CRITICAL")).thenReturn(0L);
         when(assessmentRepo.avgScoreByOrg(ORG_ID)).thenReturn(null);
         when(assessmentRepo.avgScoreByFramework(ORG_ID)).thenReturn(List.<Object[]>of());
 
@@ -249,7 +250,7 @@ class ComplianceServiceTest {
         when(controlRepo.countByOrganisationIdAndStatus(ORG_ID, "PARTIAL")).thenReturn(0L);
         when(controlRepo.countByOrganisationIdAndStatus(ORG_ID, "PLANNED")).thenReturn(0L);
         when(findingRepo.countByOrganisationIdAndStatus(ORG_ID, "OPEN")).thenReturn(0L);
-        when(findingRepo.countByOrganisationIdAndStatus(ORG_ID, "CRITICAL")).thenReturn(0L);
+        when(findingRepo.countByOrganisationIdAndSeverity(ORG_ID, "CRITICAL")).thenReturn(0L);
         when(assessmentRepo.avgScoreByOrg(ORG_ID)).thenReturn(null);
         when(assessmentRepo.avgScoreByFramework(ORG_ID)).thenReturn(List.<Object[]>of());
 

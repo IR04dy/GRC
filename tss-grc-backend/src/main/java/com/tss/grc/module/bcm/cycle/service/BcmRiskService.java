@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -223,7 +222,4 @@ public class BcmRiskService {
             .sourceModule("bcm")
             .message(message));
     }
-
-    @SuppressWarnings("unused")
-    private void _touch() { Objects.requireNonNull(this); }
 }

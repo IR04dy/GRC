@@ -14,8 +14,6 @@ import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -30,7 +28,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -69,8 +66,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class StrategyRoiService {
-
-    private static final Logger log = LoggerFactory.getLogger(StrategyRoiService.class);
 
     public static final Set<String> STRATEGY_TYPES = Set.of(
         "ACTIVE_ACTIVE", "WARM_DR", "COLD_DR", "VENDOR_FAILOVER",
@@ -531,7 +526,4 @@ public class StrategyRoiService {
             a.getUpdatedAt()
         );
     }
-
-    @SuppressWarnings("unused")
-    private Optional<StrategyRoiAnalysis> _touch() { log.trace("bound"); return Optional.empty(); }
 }

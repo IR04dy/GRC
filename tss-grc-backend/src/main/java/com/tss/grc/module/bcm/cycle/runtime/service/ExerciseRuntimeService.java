@@ -280,8 +280,8 @@ public class ExerciseRuntimeService {
         if ("COMPLETED".equals(to)) {
             try {
                 createAfterActionDraft(orgId, saved);
-            } catch (RuntimeException ignored) {
-                log.warn("AAR draft creation for run {} failed but transition stands", saved.getId());
+            } catch (RuntimeException ex) {
+                log.warn("AAR draft creation for run {} failed but transition stands", saved.getId(), ex);
             }
         }
         return summarise(saved);

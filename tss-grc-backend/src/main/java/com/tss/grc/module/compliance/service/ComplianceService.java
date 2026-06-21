@@ -230,7 +230,7 @@ public class ComplianceService {
         long partial     = controlRepo.countByOrganisationIdAndStatus(orgId, "PARTIAL");
         long planned     = controlRepo.countByOrganisationIdAndStatus(orgId, "PLANNED");
         long openFindings     = findingRepo.countByOrganisationIdAndStatus(orgId, "OPEN");
-        long criticalFindings = findingRepo.countByOrganisationIdAndStatus(orgId, "CRITICAL");
+        long criticalFindings = findingRepo.countByOrganisationIdAndSeverity(orgId, "CRITICAL");
 
         Double avgScore = assessmentRepo.avgScoreByOrg(orgId);
         double rate = avgScore != null ? avgScore : (total > 0 ? (implemented * 100.0 / total) : 0.0);

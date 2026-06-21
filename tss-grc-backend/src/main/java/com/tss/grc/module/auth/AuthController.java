@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -36,6 +37,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Authentication", description = "JWT login, token refresh, and logout")
 public class AuthController {
 
@@ -101,6 +103,7 @@ public class AuthController {
                 // If persistence fails, the refresh token would be unverifiable
                 // — fail closed so the user gets a clean 500 rather than a
                 // silently broken session.
+                log.error("Failed to record refresh-token issuance for userId={}", principal.getUserId(), ex);
                 return ResponseEntity.status(500).body(Map.of(
                     "message", "Unable to record refresh token — please retry."));
             }
@@ -177,6 +180,7 @@ public class AuthController {
                     com.tss.grc.common.tenant.TenantContext.clear();
                 }
             } catch (Exception ex) {
+                log.error("Failed to rotate refresh token for userId={}", userId, ex);
                 return ResponseEntity.status(500).body(Map.of(
                     "message", "Unable to rotate refresh token — please retry."));
             }

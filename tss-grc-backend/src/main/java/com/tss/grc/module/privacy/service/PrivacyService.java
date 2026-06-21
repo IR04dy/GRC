@@ -12,6 +12,7 @@ import com.tss.grc.module.privacy.repository.ProcessingActivityRepository;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PrivacyService {
 
@@ -160,8 +162,9 @@ public class PrivacyService {
                     String.format("SDAIA status: %s -> %s (ref=%s)", prior, resolvedStatus,
                         saved.getSdaiaSubmissionRef() == null ? "-" : saved.getSdaiaSubmissionRef()));
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
             // Audit failures must not block the regulator-discharge path.
+            log.warn("F7 audit log failed for SDAIA submission on breach {}", id, ex);
         }
         try {
             if (eventPublisher != null) {
@@ -180,8 +183,9 @@ public class PrivacyService {
                     null,
                     payload));
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
             // Event-bus failure must not block the regulator-discharge path.
+            log.warn("F8 event publish failed for SDAIA submission on breach {}", id, ex);
         }
 
         return saved;

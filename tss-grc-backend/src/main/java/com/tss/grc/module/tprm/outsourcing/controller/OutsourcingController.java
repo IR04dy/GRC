@@ -1,6 +1,5 @@
 package com.tss.grc.module.tprm.outsourcing.controller;
 
-import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos.ArrangementCreateRequest;
 import com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos.ArrangementResponse;
 import com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos.ArrangementTransitionRequest;
@@ -262,12 +261,5 @@ public class OutsourcingController {
         } catch (Exception ignore) {
             return null;
         }
-    }
-
-    @SuppressWarnings("unused")
-    private static Long _silenceUnused() {
-        // Touch TenantContext to keep the import live for the surface
-        // contracts that read user/org via the service layer.
-        return TenantContext.getCurrentTenant() == null ? null : TenantContext.requireOrganisationId();
     }
 }

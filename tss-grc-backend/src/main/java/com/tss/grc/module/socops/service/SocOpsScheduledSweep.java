@@ -128,7 +128,7 @@ public class SocOpsScheduledSweep {
                     log.info("[socops sweep] org={} fired {} trigger(s)", orgId, fired);
                 }
             } catch (Exception ex) {
-                log.warn("[socops sweep] org={} scan failed: {}", orgId, ex.getMessage());
+                log.error("[socops sweep] org={} scan failed", orgId, ex);
             } finally {
                 TenantContext.clear();
             }

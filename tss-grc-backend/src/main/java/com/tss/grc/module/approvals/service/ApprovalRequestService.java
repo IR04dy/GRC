@@ -168,9 +168,8 @@ public class ApprovalRequestService {
             r.setAssignedTo(req.getNewAssignedTo());
             if (req.getDelegationReasonEn() != null) r.setDelegationReasonEn(req.getDelegationReasonEn());
         }
-        if ("PENDING".equals(req.getStatus())) {
-            // From DELEGATED back to PENDING — assignedTo is already updated by previous DELEGATED.
-        }
+        // PENDING (re-pending from DELEGATED) keeps assignedTo as set by the
+        // prior DELEGATED transition — no field mutation needed here.
         if ("EXPIRED".equals(req.getStatus())) {
             r.setDecidedAt(now);
         }

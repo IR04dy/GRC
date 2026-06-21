@@ -300,14 +300,14 @@ public class RiskService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("riskCode",           riskCodeFor(r.getId()));
         m.put("externalId",         r.getExternalId() == null ? "" : r.getExternalId().toString());
-        m.put("titleEn",            nullSafe(r.getTitleEn()));
-        m.put("status",             nullSafe(r.getStatus()));
-        m.put("riskLevel",          nullSafe(r.getRiskLevel()));
+        m.put("titleEn",            safe(r.getTitleEn()));
+        m.put("status",             safe(r.getStatus()));
+        m.put("riskLevel",          safe(r.getRiskLevel()));
         m.put("residualScore",      r.getResidualScore() == null ? "" : String.valueOf(r.getResidualScore()));
         m.put("inherentScore",      r.getInherentScore() == null ? "" : String.valueOf(r.getInherentScore()));
         m.put("ownerId",            r.getOwnerId() == null ? "" : String.valueOf(r.getOwnerId()));
         m.put("categoryId",         r.getCategoryId() == null ? "" : String.valueOf(r.getCategoryId()));
-        m.put("complianceFrameworkClause", nullSafe(r.getComplianceFrameworkClause()));
+        m.put("complianceFrameworkClause", safe(r.getComplianceFrameworkClause()));
         if (previousStatus != null) m.put("previousStatus", previousStatus);
         return m;
     }
@@ -317,7 +317,6 @@ public class RiskService {
         return id == null ? "RISK-0000" : "RISK-" + String.format("%04d", id);
     }
 
-    private static String nullSafe(String v) { return v == null ? "" : v; }
     private static String safe(String v) { return v == null ? "" : v; }
     private static String safeNum(Integer v) { return v == null ? "-" : v.toString(); }
 }

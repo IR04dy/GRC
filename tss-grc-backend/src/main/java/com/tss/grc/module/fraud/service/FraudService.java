@@ -330,7 +330,6 @@ public class FraudService {
         return DashboardResponse.builder()
                 .openCases(caseRepo.countOpenByOrg(orgId))
                 .detectedCount(caseRepo.countByOrganisationIdAndStatus(orgId, "DETECTED"))
-                .triageCount(caseRepo.countByOrganisationIdAndStatus(orgId, "TRIAGE"))
                 .investigatingCount(caseRepo.countByOrganisationIdAndStatus(orgId, "INVESTIGATING"))
                 .confirmedCount(caseRepo.countByOrganisationIdAndStatus(orgId, "CONFIRMED"))
                 .closedCount(caseRepo.countByOrganisationIdAndStatus(orgId, "CLOSED"))

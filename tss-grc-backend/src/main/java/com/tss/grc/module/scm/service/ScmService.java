@@ -37,8 +37,7 @@ public class ScmService {
     private BroadcastHelper bcast;
 
     private Long orgId() {
-        Long id = TenantContext.getCurrentTenant();
-        return id != null ? id : 1L;
+        return TenantContext.requireOrganisationId();
     }
 
     // ───────────── Vendors ─────────────

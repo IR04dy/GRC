@@ -13,8 +13,6 @@ import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,8 +55,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class QuantitativeBiaService {
-
-    private static final Logger log = LoggerFactory.getLogger(QuantitativeBiaService.class);
 
     /** Canonical ordered time bands — used by rollups and breach detection. */
     public static final List<String> TIME_BANDS = List.of("24h", "72h", "1w", "2w", "1m");
@@ -499,7 +495,4 @@ public class QuantitativeBiaService {
             lines
         );
     }
-
-    @SuppressWarnings("unused")
-    private void _touch() { log.trace("bound"); }
 }

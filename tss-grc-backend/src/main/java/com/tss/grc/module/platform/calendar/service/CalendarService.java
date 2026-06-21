@@ -24,7 +24,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -346,8 +345,4 @@ public class CalendarService {
     private static String label(String v, String fallback) {
         return v == null || v.isBlank() ? fallback : v;
     }
-
-    /** Suppresses an unused-method warning on {@link Objects}. */
-    @SuppressWarnings("unused")
-    private static final boolean OBJECTS_KEEP_IMPORT = Objects.equals("a", "a");
 }
