@@ -26,14 +26,15 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
+        // PERF-NQ-002: fetch roles+permissions in one query (they are now LAZY).
+        User user = userRepository.findWithRolesByUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
         return buildUserDetails(user);
     }
 
     @Transactional(readOnly = true)
     public UserDetails loadUserById(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findWithRolesById(userId)
             .orElseThrow(() -> new UsernameNotFoundException("User not found by ID: " + userId));
         return buildUserDetails(user);
     }

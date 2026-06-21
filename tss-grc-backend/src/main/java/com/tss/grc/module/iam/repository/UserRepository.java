@@ -3,6 +3,7 @@ package com.tss.grc.module.iam.repository;
 import com.tss.grc.module.iam.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,15 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
+
+    // PERF-NQ-002: auth-path fetch finders. With roles/permissions now LAZY,
+    // these pull the whole authorization graph in ONE query (avoiding the
+    // per-role permission N+1) for CustomUserDetailsService.
+    @EntityGraph(attributePaths = { "roles", "roles.permissions" })
+    Optional<User> findWithRolesByUsername(String username);
+
+    @EntityGraph(attributePaths = { "roles", "roles.permissions" })
+    Optional<User> findWithRolesById(Long id);
     Optional<User> findByUsernameAndOrganisationId(String username, Long orgId);
     Page<User> findByOrganisationId(Long organisationId, Pageable pageable);
     boolean existsByUsernameAndOrganisationId(String username, Long orgId);

@@ -65,7 +65,12 @@ public class User extends BaseEntity {
     @Column(name = "preferred_locale", length = 10)
     private String preferredLocale = "en";
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    // PERF-NQ-002: LAZY — an EAGER ToMany loads the full role+permission graph on
+    // every User lookup (even ones that only need a username/id) and can't be
+    // paginated in SQL. The auth path fetches the graph explicitly via
+    // UserRepository.findWithRolesByUsername/ById (@EntityGraph); other callers
+    // touch roles within their own @Transactional scope.
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         schema = "iam", name = "user_roles",
         joinColumns = @JoinColumn(name = "user_id"),

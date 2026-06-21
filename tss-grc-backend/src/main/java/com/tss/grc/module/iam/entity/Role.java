@@ -34,7 +34,10 @@ public class Role extends BaseEntity {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    // PERF-NQ-002: LAZY (was EAGER). The auth path fetches roles+permissions in
+    // one query via UserRepository.findWithRoles* (@EntityGraph); other readers
+    // access permissions within an open @Transactional session.
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         schema = "iam", name = "role_permissions",
         joinColumns = @JoinColumn(name = "role_id"),
