@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,10 @@ public class ScmService {
     @Autowired(required = false)
     private BroadcastHelper bcast;
 
+    // PERF-PG-004: hard cap for the unpaginated "/vendors/all" dropdown dump so a
+    // single request can never fetch the whole org-scoped vendor table.
+    private static final int DROPDOWN_CAP = 500;
+
     private Long orgId() {
         return TenantContext.requireOrganisationId();
     }
@@ -48,7 +53,9 @@ public class ScmService {
 
     @Transactional(readOnly = true)
     public List<VendorDtos.Response> allVendors() {
-        return vendorRepo.findByOrganisationId(orgId()).stream().map(this::toVendorResponse).toList();
+        // PERF-PG-004: cap the dropdown dump (see DROPDOWN_CAP).
+        return vendorRepo.findByOrganisationId(orgId(), PageRequest.of(0, DROPDOWN_CAP))
+                .stream().map(this::toVendorResponse).toList();
     }
 
     @Transactional(readOnly = true)

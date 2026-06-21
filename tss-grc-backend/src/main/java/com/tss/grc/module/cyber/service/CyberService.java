@@ -36,6 +36,12 @@ public class CyberService {
     @Autowired(required = false)
     private BroadcastHelper bcast;
 
+    // PERF-PG-004: hard cap for the unpaginated "/all" dropdown dumps so a single
+    // request can never fetch the whole org-scoped table. 500 is generous for a
+    // dropdown; a register that legitimately exceeds it should use the paginated
+    // register endpoint + server-side type-ahead, not a full dump.
+    private static final int DROPDOWN_CAP = 500;
+
     // ── Vulnerability escalation workflow ────────────────────────────────────
     private static final List<String> VULN_WORKFLOW = List.of(
             "REGISTERED", "CLASSIFICATION", "OWNER_ASSIGNMENT",
@@ -152,7 +158,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public List<CyberFramework> getFrameworks(Long orgId) {
-        return frameworkRepo.findAllByOrganisationId(orgId);
+        // PERF-PG-004: cap the dropdown dump (see DROPDOWN_CAP).
+        return frameworkRepo.findByOrganisationId(orgId, PageRequest.of(0, DROPDOWN_CAP)).getContent();
     }
 
     @Transactional
@@ -177,7 +184,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public List<CyberControl> getAllControls(Long orgId) {
-        return controlRepo.findAllByOrganisationId(orgId);
+        // PERF-PG-004: cap the dropdown dump (see DROPDOWN_CAP).
+        return controlRepo.findByOrganisationId(orgId, PageRequest.of(0, DROPDOWN_CAP)).getContent();
     }
 
     @Transactional(readOnly = true)
@@ -501,7 +509,8 @@ public class CyberService {
 
     @Transactional(readOnly = true)
     public List<CyberAsset> getAllAssets(Long orgId) {
-        return assetRepo.findAllByOrganisationId(orgId);
+        // PERF-PG-004: cap the dropdown dump (see DROPDOWN_CAP).
+        return assetRepo.findByOrganisationId(orgId, PageRequest.of(0, DROPDOWN_CAP)).getContent();
     }
 
     @Transactional
