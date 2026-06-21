@@ -216,11 +216,7 @@ public class CrowdStrikeOutboundService {
     // ── helpers ─────────────────────────────────────────────────────────
 
     private static Long currentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) return null;
-        Object principal = auth.getPrincipal();
-        if (principal instanceof GrcUserDetails grc) return grc.getUserId();
-        return null;
+        return com.tss.grc.common.security.CurrentActor.userId();
     }
 
     private static String truncate(String s, int max) {

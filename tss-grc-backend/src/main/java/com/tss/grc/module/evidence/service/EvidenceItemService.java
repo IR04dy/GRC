@@ -95,11 +95,7 @@ public class EvidenceItemService {
 
     /** Current authenticated user's id, or null if unavailable (e.g. system context). */
     private Long currentUserId() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) {
-            return u.getUserId();
-        }
-        return null;
+        return com.tss.grc.common.security.CurrentActor.userId();
     }
 
     private void emit(String trigger, EvidenceItem e, String previousStatus) {

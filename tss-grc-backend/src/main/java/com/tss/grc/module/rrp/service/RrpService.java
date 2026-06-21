@@ -600,12 +600,7 @@ public class RrpService {
     private static Long org() { return TenantContext.requireOrganisationId(); }
 
     private static Long currentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()
-                || !(auth.getPrincipal() instanceof GrcUserDetails u)) {
-            return null;
-        }
-        return u.getUserId();
+        return com.tss.grc.common.security.CurrentActor.userId();
     }
 
     private void emit(String trigger, String entityType, Long entityId,
