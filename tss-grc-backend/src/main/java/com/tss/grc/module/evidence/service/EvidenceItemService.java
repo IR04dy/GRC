@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -113,7 +114,9 @@ public class EvidenceItemService {
         Page<EvidenceItem> page = (status != null || type != null)
                 ? itemRepository.findByOrgFiltered(orgId, status, type, pageable)
                 : itemRepository.findByOrganisationId(orgId, pageable);
-        return page.map(this::toResponse);
+        // QUAL-IE-002: batch-resolve the page's lookups (sub-control/control/
+        // framework/owner) instead of 4 queries per row via per-item toResponse.
+        return new PageImpl<>(toResponses(page.getContent()), pageable, page.getTotalElements());
     }
 
     @Transactional(readOnly = true)
@@ -128,15 +131,13 @@ public class EvidenceItemService {
     @Transactional(readOnly = true)
     public List<EvidenceItemResponse> listExpired() {
         Long orgId = TenantContext.getCurrentTenant();
-        return itemRepository.findExpired(orgId, LocalDate.now())
-                .stream().map(this::toResponse).toList();
+        return toResponses(itemRepository.findExpired(orgId, LocalDate.now()));
     }
 
     @Transactional(readOnly = true)
     public List<EvidenceItemResponse> listBySubControl(Long subControlId) {
         Long orgId = TenantContext.getCurrentTenant();
-        return itemRepository.findBySubControl(orgId, subControlId)
-                .stream().map(this::toResponse).toList();
+        return toResponses(itemRepository.findBySubControl(orgId, subControlId));
     }
 
     @Transactional(readOnly = true)
@@ -391,27 +392,86 @@ public class EvidenceItemService {
     }
 
     private EvidenceItemResponse toResponse(EvidenceItem e) {
-        String subControlCode = null, subControlNameEn = null, controlCode = null, frameworkCode = null;
-
+        // Single-item path: tiny lookups (fine for one row). Reuses buildResponse.
+        Map<Long, EvidenceSubControl> scById = new HashMap<>();
+        Map<Long, EvidenceControl> ctrlById = new HashMap<>();
+        Map<Long, EvidenceFramework> fwById = new HashMap<>();
+        Map<Long, String> ownerNameById = new HashMap<>();
         if (e.getSubControlId() != null) {
-            Optional<EvidenceSubControl> sc = subControlRepository.findById(e.getSubControlId());
-            if (sc.isPresent()) {
-                subControlCode   = sc.get().getSubControlCode();
-                subControlNameEn = sc.get().getNameEn();
-                Optional<EvidenceControl> ctrl = controlRepository.findById(sc.get().getControlId());
-                if (ctrl.isPresent()) {
-                    controlCode = ctrl.get().getControlCode();
-                    Optional<EvidenceFramework> fw = frameworkRepository.findById(ctrl.get().getFrameworkId());
-                    if (fw.isPresent()) frameworkCode = fw.get().getCode();
+            subControlRepository.findById(e.getSubControlId()).ifPresent(sc -> {
+                scById.put(sc.getId(), sc);
+                if (sc.getControlId() != null) {
+                    controlRepository.findById(sc.getControlId()).ifPresent(ctrl -> {
+                        ctrlById.put(ctrl.getId(), ctrl);
+                        if (ctrl.getFrameworkId() != null) {
+                            frameworkRepository.findById(ctrl.getFrameworkId())
+                                    .ifPresent(fw -> fwById.put(fw.getId(), fw));
+                        }
+                    });
+                }
+            });
+        }
+        if (e.getOwnerId() != null) {
+            userRepository.findById(e.getOwnerId())
+                    .ifPresent(u -> ownerNameById.put(e.getOwnerId(), u.getFullNameEn()));
+        }
+        return buildResponse(e, scById, ctrlById, fwById, ownerNameById);
+    }
+
+    /**
+     * QUAL-IE-002: batch mapper for list/page endpoints. Pre-fetches the
+     * referenced sub-controls / controls / frameworks / owners in four bulk
+     * findAllById queries (instead of up to four per item) and assembles every
+     * row from the resulting maps.
+     */
+    private List<EvidenceItemResponse> toResponses(List<EvidenceItem> items) {
+        if (items == null || items.isEmpty()) return List.of();
+
+        List<Long> subIds = items.stream().map(EvidenceItem::getSubControlId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        Map<Long, EvidenceSubControl> scById = new HashMap<>();
+        subControlRepository.findAllById(subIds).forEach(sc -> scById.put(sc.getId(), sc));
+
+        List<Long> ctrlIds = scById.values().stream().map(EvidenceSubControl::getControlId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        Map<Long, EvidenceControl> ctrlById = new HashMap<>();
+        controlRepository.findAllById(ctrlIds).forEach(c -> ctrlById.put(c.getId(), c));
+
+        List<Long> fwIds = ctrlById.values().stream().map(EvidenceControl::getFrameworkId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        Map<Long, EvidenceFramework> fwById = new HashMap<>();
+        frameworkRepository.findAllById(fwIds).forEach(fw -> fwById.put(fw.getId(), fw));
+
+        List<Long> ownerIds = items.stream().map(EvidenceItem::getOwnerId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        Map<Long, String> ownerNameById = new HashMap<>();
+        userRepository.findAllById(ownerIds).forEach(u -> ownerNameById.put(u.getId(), u.getFullNameEn()));
+
+        return items.stream().map(e -> buildResponse(e, scById, ctrlById, fwById, ownerNameById)).toList();
+    }
+
+    private EvidenceItemResponse buildResponse(
+            EvidenceItem e,
+            Map<Long, EvidenceSubControl> scById,
+            Map<Long, EvidenceControl> ctrlById,
+            Map<Long, EvidenceFramework> fwById,
+            Map<Long, String> ownerNameById) {
+        String subControlCode = null, subControlNameEn = null, controlCode = null, frameworkCode = null;
+        if (e.getSubControlId() != null) {
+            EvidenceSubControl sc = scById.get(e.getSubControlId());
+            if (sc != null) {
+                subControlCode   = sc.getSubControlCode();
+                subControlNameEn = sc.getNameEn();
+                EvidenceControl ctrl = sc.getControlId() == null ? null : ctrlById.get(sc.getControlId());
+                if (ctrl != null) {
+                    controlCode = ctrl.getControlCode();
+                    EvidenceFramework fw = ctrl.getFrameworkId() == null ? null : fwById.get(ctrl.getFrameworkId());
+                    if (fw != null) frameworkCode = fw.getCode();
                 }
             }
         }
 
-        String ownerName = null;
-        if (e.getOwnerId() != null) {
-            ownerName = userRepository.findById(e.getOwnerId())
-                    .map(User::getFullNameEn).orElse(null);
-        }
+        String ownerName = e.getOwnerId() == null ? null : ownerNameById.get(e.getOwnerId());
 
         boolean isExpired = e.getValidTo() != null && e.getValidTo().isBefore(LocalDate.now());
         String evidenceCode = "EV-" + String.format("%05d", e.getId());
