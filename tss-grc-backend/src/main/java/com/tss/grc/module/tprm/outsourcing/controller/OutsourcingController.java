@@ -22,8 +22,10 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.tss.grc.security.GrcUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -251,15 +253,17 @@ public class OutsourcingController {
 
     // ─── Internal helpers ───────────────────────────────────────────
 
+    /**
+     * QUAL-TI-005: resolve the acting user id from the security principal (mirrors
+     * ObService/CptyService) instead of always returning null. Returns null only
+     * when there is no authenticated GrcUserDetails principal.
+     */
     private static Long currentUserIdOrNull() {
-        try {
-            var auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null) return null;
-            // Many auth principals expose getId() — we don't depend on that
-            // here; the audit log records the username separately.
-            return null;
-        } catch (Exception ignore) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()
+                || !(auth.getPrincipal() instanceof GrcUserDetails u)) {
             return null;
         }
+        return u.getUserId();
     }
 }
