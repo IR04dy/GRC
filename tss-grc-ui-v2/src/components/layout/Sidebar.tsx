@@ -13,7 +13,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Scale,
          ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
          Cloud, ChevronRight, ScrollText, Archive, GraduationCap,
-         Calculator, Radar, Spline,
+         Calculator, Radar, Spline, Gauge, Sparkles, HelpCircle,
          type LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -106,6 +106,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'risk-dash', to: '/risk/dashboard',  Icon: LayoutDashboard, labelKey: 'ermDashSidebar' },
       { id: 'risk',      to: '/risk',            Icon: AlertTriangle,   labelKey: 'modRisk' },
       { id: 'risk-lc',   to: '/risk-lifecycle',  Icon: GitBranch,       labelKey: 'rlcSidebar' },
+      { id: 'kri',       to: '/risk/kri/dashboard', Icon: Gauge,        labelKey: 'kriSidebar' },
       { id: 'scenarios', to: '/risk-scenarios',  Icon: Sigma,           labelKey: 'scnSidebar' },
       { id: 'bowtie',    to: '/risk/bowtie',     Icon: GitBranch,       labelKey: 'bowtieSidebar' },
       { id: 'fair-calc', to: '/risk/fair',       Icon: Calculator,      labelKey: 'fairCalcSidebar' },
@@ -152,6 +153,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: '3lod',         to: '/governance/three-lines', Icon: ShieldCheck,   labelKey: '3lodSidebar' },
       { id: 'audit-ws',     to: '/audit-workspace',        Icon: Stamp,         labelKey: 'modAuditWorkspace' },
+      { id: 'ia-plan',      to: '/audit/ia/plans',         Icon: CalendarDays,  labelKey: 'iaPlanSidebar' },
+      { id: 'ia-universe',  to: '/audit/ia/universe',      Icon: Telescope,     labelKey: 'iaUniverseSidebar' },
       { id: 'audit-lc',     to: '/audit-lifecycle',        Icon: BookOpen,      labelKey: 'alcSidebar' },
       { id: 'ev-chain',     to: '/evidence-chain',         Icon: Fingerprint,   labelKey: 'echSidebar' },
       { id: 'nca-ecc',      to: '/nca-ecc-export',         Icon: ShieldCheck,   labelKey: 'ncaSidebar' },
@@ -337,6 +340,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'ai-model-risk', titleKey: 'navAiGovernance',
     items: [
       { id: 'ai-models', to: '/ai/models', Icon: Bot, labelKey: 'aiModelRegistrySidebar' },
+      { id: 'ai-suggestions', to: '/ai/suggestions', Icon: Sparkles, labelKey: 'aiSuggestionsSidebar' },
       {
         id: 'ai-lifecycle', to: '/ai-lifecycle/dashboard', Icon: Activity,
         labelKey: 'aiLifecycle.sidebar',
@@ -424,6 +428,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'admin',         to: '/admin',                  Icon: UserCog,      labelKey: 'adminTitle' },
       { id: 'licensing',     to: '/admin/licensing',        Icon: KeyRound,     labelKey: 'licensingSidebar' },
+      { id: 'help-topics',   to: '/admin/help-topics',      Icon: HelpCircle,   labelKey: 'helpTopicsSidebar' },
       {
         id: 'committees', to: '/committees', Icon: LandmarkIcon, labelKey: 'comSidebar',
         children: [
